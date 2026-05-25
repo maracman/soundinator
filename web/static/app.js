@@ -48,9 +48,22 @@ const DEFAULTS = {
   precisionRange: 12,
   surpriseProb: 0.08,
   surpriseDimensions: ["pitch"],
+  surprisePitchEnabled: true,
+  surpriseRhythmEnabled: false,
+  surpriseFormantEnabled: false,
+  surpriseDynamicsEnabled: false,
+  surpriseRestEnabled: false,
+  surprisePitchWeight: 1,
+  surpriseRhythmWeight: 0.45,
+  surpriseFormantWeight: 0.45,
+  surpriseDynamicsWeight: 0.35,
+  surpriseRestWeight: 0.2,
+  surpriseAllowMultiple: false,
+  surpriseRangeSd: 3,
   incorporationRate: 0.4,
   surpriseMaxBaked: "Infinity",
   activeFormants: ["ah"],
+  formantWeights: null,
   formantChangeProb: 0.05,
   motifCount: 3,
   motifLengthBeats: 4,
@@ -157,6 +170,18 @@ const PARAM_DESC = {
   registerWidth: "How wide the comfortable register is. Narrow = stays near centre",
   registerSkew: "Asymmetrically weights the register. Negative = wider low tail, positive = wider high tail",
   surpriseProb: "Chance that a motif pass contains one surprised note. Select which variables below can be surprised",
+  surprisePitchEnabled: "Include pitch/scale-degree as a possible surprise feature",
+  surpriseRhythmEnabled: "Include note-duration change as a possible surprise feature",
+  surpriseFormantEnabled: "Include vowel/formant change as a possible surprise feature",
+  surpriseDynamicsEnabled: "Include loud/soft dynamic change as a possible surprise feature",
+  surpriseRestEnabled: "Include rest/silence as a possible surprise feature",
+  surprisePitchWeight: "Relative chance that a surprise uses pitch once a surprise has happened",
+  surpriseRhythmWeight: "Relative chance that a surprise uses duration once a surprise has happened",
+  surpriseFormantWeight: "Relative chance that a surprise uses formant once a surprise has happened",
+  surpriseDynamicsWeight: "Relative chance that a surprise uses dynamics once a surprise has happened",
+  surpriseRestWeight: "Relative chance that a surprise uses rest once a surprise has happened",
+  surpriseAllowMultiple: "Allow multiple feature changes on the same surprised note",
+  surpriseRangeSd: "How many standard deviations the visual range bracket shows",
   incorporationRate: "When a motif-pass surprise occurs, chance it gets baked into the growing repertoire loop",
   surpriseMaxBaked: "Maximum number of baked-in surprise variants allowed. Infinity lets the loop keep growing",
   formantChangeProb: "Probability of switching vowel sound between notes",
@@ -231,8 +256,12 @@ const UI_DESC = {
   edoDivisionsInput: "Set the number of equal octave divisions for N-EDO mode.",
   vis: "Live analyser display of the current audio output.",
   cvInterval: "Probability distribution over melodic interval sizes.",
+  cvMelodyAccuracy: "Melody accuracy and surprise display. The centre is the expected motif note; the bracket marks the finite display range around infinite probability tails.",
+  cvTuningAccuracy: "Tuning accuracy display in cents. Cents are hundredths of a 12-tone semitone, independent of the selected scale or EDO.",
   cvRoot: "How strongly root pull acts across the phrase.",
   cvRegister: "Register probability curve across pitch height.",
+  cvDurationAccuracy: "Duration accuracy and surprise display. Y-axis units follow the current beat-division grid.",
+  cvFormantAccuracy: "Formant probability display around a circular vowel sequence.",
   cvGap: "Articulation distribution. Values above zero create rests; values at or below zero connect or slide notes.",
   cvReverb: "Convolution impulse preview. Orange shows the decay envelope, blue suggests early reflections.",
   cvHarmonicSignature: "Harmonic fingerprint display. Orange is mean, blue is SD, grey/green show low/high register response.",
@@ -417,6 +446,53 @@ function isFormantMode(p = exploreParams) {
   return normaliseVoiceMode(p.voiceMode) === "formant";
 }
 
+function syncSurpriseFeatureParams(p) {
+  const dims = Array.isArray(p.surpriseDimensions) ? p.surpriseDimensions : [];
+  const hasModern = [
+    "surprisePitchEnabled",
+    "surpriseRhythmEnabled",
+    "surpriseFormantEnabled",
+    "surpriseDynamicsEnabled",
+    "surpriseRestEnabled",
+  ].some(key => typeof p[key] === "boolean");
+  if (!hasModern) {
+    p.surprisePitchEnabled = dims.includes("pitch") || dims.includes("octave") || dims.length === 0;
+    p.surpriseRhythmEnabled = dims.includes("rhythm");
+    p.surpriseFormantEnabled = dims.includes("formant");
+    p.surpriseDynamicsEnabled = dims.includes("dynamics");
+    p.surpriseRestEnabled = dims.includes("rest");
+  }
+  if (![p.surprisePitchEnabled, p.surpriseRhythmEnabled, p.surpriseFormantEnabled, p.surpriseDynamicsEnabled, p.surpriseRestEnabled].some(Boolean)) {
+    p.surprisePitchEnabled = true;
+  }
+  p.surpriseDimensions = [
+    p.surprisePitchEnabled ? "pitch" : null,
+    p.surpriseRhythmEnabled ? "rhythm" : null,
+    p.surpriseFormantEnabled ? "formant" : null,
+    p.surpriseDynamicsEnabled ? "dynamics" : null,
+    p.surpriseRestEnabled ? "rest" : null,
+  ].filter(Boolean);
+  p.surprisePitchWeight = p.surprisePitchWeight ?? 1;
+  p.surpriseRhythmWeight = p.surpriseRhythmWeight ?? 0.45;
+  p.surpriseFormantWeight = p.surpriseFormantWeight ?? 0.45;
+  p.surpriseDynamicsWeight = p.surpriseDynamicsWeight ?? 0.35;
+  p.surpriseRestWeight = p.surpriseRestWeight ?? 0.2;
+  p.surpriseRangeSd = p.surpriseRangeSd ?? 3;
+  p.surpriseAllowMultiple = !!p.surpriseAllowMultiple;
+}
+
+function ensureFormantWeights(p) {
+  const keys = Object.keys(FORMANT_PRESETS);
+  const weights = (p.formantWeights && typeof p.formantWeights === "object" && !Array.isArray(p.formantWeights))
+    ? { ...p.formantWeights }
+    : {};
+  keys.forEach(k => {
+    if (!Number.isFinite(Number(weights[k]))) weights[k] = 1;
+    weights[k] = Math.max(0, Math.min(1, Number(weights[k])));
+  });
+  p.formantWeights = weights;
+}
+
 function decorateTooltips(root = document) {
   root.querySelectorAll(".control-row").forEach(row => {
     const input = row.querySelector("[data-param]");
@@ -467,6 +543,18 @@ function decorateTooltips(root = document) {
     setTooltip(label, DIMENSION_DESC[dim]);
     setTooltip(label.querySelector("input"), DIMENSION_DESC[dim]);
   });
+  root.querySelectorAll(".feature-check").forEach(label => {
+    const input = label.querySelector("[data-param-check]");
+    if (!input) return;
+    const text = `${label.textContent.trim()}: ${describeParam(input.dataset.paramCheck, label.textContent.trim())}`;
+    setTooltip(label, text);
+    setTooltip(input, text);
+  });
+  root.querySelectorAll(".formant-weight").forEach(label => {
+    const input = label.querySelector("[data-formant-weight]");
+    if (!input) return;
+    setTooltip(label, `${input.dataset.formantWeight}: Relative probability for this formant in the circular formant space.`);
+  });
 
   root.querySelectorAll(".note-cell").forEach(cell => {
     setTooltip(cell, "Click to cycle this pitch class between off, in-scale, and weighted sub-scale.");
@@ -475,7 +563,7 @@ function decorateTooltips(root = document) {
     setTooltip(cell, "Click to toggle this in-scale degree as a root/tonal-centre target.");
   });
 
-  root.querySelectorAll(".dist-display, .mini-canvas, .js-envelope-canvas").forEach(el => {
+  root.querySelectorAll(".dist-display, .dist-canvas, .mini-canvas, .js-envelope-canvas, .formant-canvas").forEach(el => {
     const canvasText = el.id ? UI_DESC[el.id] : "Distribution display: hover controls nearby to see what shapes it.";
     setTooltip(el, canvasText);
   });
@@ -1007,6 +1095,8 @@ function renderStudyDebrief() {
 function renderExplore() {
   const p = exploreParams;
   p.voiceMode = normaliseVoiceMode(p.voiceMode);
+  syncSurpriseFeatureParams(p);
+  ensureFormantWeights(p);
   if (!["breaks", "percussion", "space"].includes(performanceTab)) performanceTab = "breaks";
 
   // Ensure customDegrees is populated
@@ -1021,7 +1111,7 @@ function renderExplore() {
   // Ensure arrays
   if (!p.subScaleNotes) p.subScaleNotes = [];
   if (!p.activeFormants || p.activeFormants.length === 0) p.activeFormants = ["ah"];
-  if (!p.surpriseDimensions || p.surpriseDimensions.length === 0) p.surpriseDimensions = ["pitch"];
+  syncSurpriseFeatureParams(p);
   if (!Array.isArray(p.rootNotes)) p.rootNotes = [0];
   ensureSpectralPartialParams(p);
 
@@ -1115,10 +1205,20 @@ function renderExplore() {
         ${controlRow("precision", "Tune prob", p.precision, 0, 1, 0.01)}
         ${controlRow("precisionRange", "Cents range", p.precisionRange, 0, 100, 1)}
       </div>
+      ${featureSurpriseBlock("pitch", "Pitch", "surprisePitchEnabled", "surprisePitchWeight", p.surprisePitchEnabled, p.surprisePitchWeight)}
       <div class="dist-display" id="distInterval">
         <canvas class="dist-canvas" id="cvInterval" width="200" height="50"></canvas>
         <span class="dist-label">Interval distribution</span>
       </div>
+      <div class="dist-display" id="distMelodyAccuracy">
+        <canvas class="dist-canvas dist-canvas-tall" id="cvMelodyAccuracy" width="220" height="96"></canvas>
+        <span class="dist-label">Accuracy + surprise</span>
+      </div>
+      <div class="dist-display" id="distTuningAccuracy">
+        <canvas class="dist-canvas dist-canvas-tall" id="cvTuningAccuracy" width="220" height="80"></canvas>
+        <span class="dist-label">Tuning cents</span>
+      </div>
+      <div class="micro-note">Register still modulates the actual pitch choice.</div>
     </div>
 
     <!-- Root Pull -->
@@ -1167,6 +1267,9 @@ function renderExplore() {
         ${controlRow("restOnMeterRatio", "Rest on", p.restOnMeterRatio, 0, 0.95, 0.01)}
         ${controlRow("restOffMeterRatio", "Rest off", p.restOffMeterRatio, 0, 0.95, 0.01)}
       </div>
+      ${featureSurpriseBlock("rhythm", "Duration", "surpriseRhythmEnabled", "surpriseRhythmWeight", p.surpriseRhythmEnabled, p.surpriseRhythmWeight)}
+      ${featureSurpriseBlock("rest", "Rest", "surpriseRestEnabled", "surpriseRestWeight", p.surpriseRestEnabled, p.surpriseRestWeight)}
+      <canvas class="dist-canvas dist-canvas-tall" id="cvDurationAccuracy" width="220" height="108"></canvas>
     </div>
 
     <!-- Surprise -->
@@ -1174,37 +1277,12 @@ function renderExplore() {
       <div class="section-label">Surprise</div>
       <div class="controls-grid">
         ${controlRow("surpriseProb", "Probability", p.surpriseProb, 0, 1, 0.01)}
-      </div>
-      <div class="dimension-checks" id="dimChecks">
-        <label class="dim-check">
-          <input type="checkbox" data-dim="pitch" ${p.surpriseDimensions.includes('pitch') ? 'checked' : ''}/>
-          Pitch
-        </label>
-        <label class="dim-check">
-          <input type="checkbox" data-dim="octave" ${p.surpriseDimensions.includes('octave') ? 'checked' : ''}/>
-          Octave
-        </label>
-        <label class="dim-check">
-          <input type="checkbox" data-dim="formant" ${p.surpriseDimensions.includes('formant') ? 'checked' : ''}/>
-          Formant
-        </label>
-        <label class="dim-check">
-          <input type="checkbox" data-dim="rhythm" ${p.surpriseDimensions.includes('rhythm') ? 'checked' : ''}/>
-          Rhythm
-        </label>
-        <label class="dim-check">
-          <input type="checkbox" data-dim="dynamics" ${p.surpriseDimensions.includes('dynamics') ? 'checked' : ''}/>
-          Dynamics
-        </label>
-        <label class="dim-check">
-          <input type="checkbox" data-dim="rest" ${p.surpriseDimensions.includes('rest') ? 'checked' : ''}/>
-          Rest
-        </label>
-      </div>
-      <div class="controls-grid">
         ${controlRow("incorporationRate", "Incorporation", p.incorporationRate, 0, 1, 0.01)}
         ${selectControlRow("surpriseMaxBaked", "Max baked", p.surpriseMaxBaked, bakedSurpriseOptions(p.surpriseMaxBaked))}
+        ${controlRow("surpriseRangeSd", "Tail bracket", p.surpriseRangeSd, 1, 5, 0.25)}
       </div>
+      ${checkboxControl("surpriseAllowMultiple", "Multiple features on one note", p.surpriseAllowMultiple)}
+      ${featureSurpriseBlock("dynamics", "Dynamics", "surpriseDynamicsEnabled", "surpriseDynamicsWeight", p.surpriseDynamicsEnabled, p.surpriseDynamicsWeight)}
     </div>
 
     <!-- Performance detail -->
@@ -1368,7 +1446,10 @@ function renderExplore() {
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "envelopeProb","envelopeAttack","envelopeAttackSd",
     "envelopeDecay","envelopeDecaySd","envelopeSustain","envelopeSustainSd",
-    "envelopeRelease","envelopeReleaseSd","reverbWet","reverbDecay","reverbTone","reverbPreDelay"
+    "envelopeRelease","envelopeReleaseSd","reverbWet","reverbDecay","reverbTone","reverbPreDelay",
+    "motifHitProb","motifHitRange","precision","precisionRange","beatDivisions",
+    "surprisePitchWeight","surpriseRhythmWeight","surpriseFormantWeight",
+    "surpriseDynamicsWeight","surpriseRestWeight","surpriseRangeSd"
   ]);
   const harmonicParams = new Set([
     "spectralProfile","spectralPartials","spectralDynamicAmount","spectralRegisterAmount",
@@ -1379,6 +1460,8 @@ function renderExplore() {
   ]);
   const liveSubnoteParams = new Set([
     "surpriseProb","incorporationRate","surpriseMaxBaked","motifSurpriseProb",
+    "surprisePitchWeight","surpriseRhythmWeight","surpriseFormantWeight",
+    "surpriseDynamicsWeight","surpriseRestWeight","surpriseRangeSd",
     "gapProb","gapMin","gapMax","gapDistanceSlope","gapTimingRange","slideSpeed","phraseGap",
     "restMotifStartRatio","restOnMeterRatio","restOffMeterRatio",
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
@@ -1393,6 +1476,7 @@ function renderExplore() {
     sl.oninput = () => {
       const key = sl.dataset.param;
       exploreParams[key] = Number(sl.value);
+      if (key.startsWith("surprise")) syncSurpriseFeatureParams(exploreParams);
       const out = v.querySelector(`#out_${key}`);
       if (out) out.textContent = fmtOutput(key, sl.value);
       if (harmonicParams.has(key)) syncHarmonicWorkspace(v);
@@ -1469,6 +1553,17 @@ function renderExplore() {
       synth.updateGenerationParams({ ...exploreParams });
     };
   }
+
+  v.querySelectorAll("input[type=checkbox][data-param-check]").forEach(cb => {
+    cb.onchange = () => {
+      const key = cb.dataset.paramCheck;
+      exploreParams[key] = cb.checked;
+      syncSurpriseFeatureParams(exploreParams);
+      cb.checked = !!exploreParams[key];
+      drawDistributions();
+      synth.updateGenerationParams({ ...exploreParams });
+    };
+  });
 
   // Scale mode toggle
   v.querySelector("#scaleModeGroup").onclick = (e) => {
@@ -1551,9 +1646,28 @@ function renderExplore() {
         exploreParams.activeFormants.push(f);
         chip.classList.add("active");
       }
+      ensureFormantWeights(exploreParams);
+      v.querySelectorAll("input[data-formant-weight]").forEach(input => {
+        const active = exploreParams.activeFormants.includes(input.dataset.formantWeight);
+        input.disabled = !active;
+        input.closest(".formant-weight")?.classList.toggle("disabled", !active);
+      });
+      drawDistributions();
       debouncedReplay();
     };
   }
+
+  v.querySelectorAll("input[data-formant-weight]").forEach(sl => {
+    sl.oninput = () => {
+      ensureFormantWeights(exploreParams);
+      const key = sl.dataset.formantWeight;
+      exploreParams.formantWeights[key] = Number(sl.value);
+      const out = v.querySelector(`[data-formant-weight-out="${key}"]`);
+      if (out) out.textContent = `${Math.round(Number(sl.value) * 100)}%`;
+      drawDistributions();
+      synth.updateGenerationParams({ ...exploreParams });
+    };
+  });
 
   // Sound source mode
   const voiceModeGroup = v.querySelector("#voiceModeGroup");
@@ -1578,18 +1692,6 @@ function renderExplore() {
       debouncedReplay();
     };
   });
-
-  // Surprise dimensions
-  v.querySelector("#dimChecks").onchange = () => {
-    const dims = [];
-    v.querySelectorAll("#dimChecks input:checked").forEach(cb => dims.push(cb.dataset.dim));
-    if (dims.length === 0) {
-      dims.push("pitch");
-      v.querySelector('[data-dim="pitch"]').checked = true;
-    }
-    exploreParams.surpriseDimensions = dims;
-    synth.updateGenerationParams({ ...exploreParams });
-  };
 
   // Rating
   const ratingSlider = v.querySelector("#ratingSlider");
@@ -1687,6 +1789,9 @@ function subnoteWorkspaceHTML(p) {
             <div class="controls-grid">
               ${controlRow("formantChangeProb", "Formant change", p.formantChangeProb, 0, 1, 0.01)}
             </div>
+            ${featureSurpriseBlock("formant", "Formant", "surpriseFormantEnabled", "surpriseFormantWeight", p.surpriseFormantEnabled, p.surpriseFormantWeight)}
+            ${formantWeightControlsHTML(p)}
+            <canvas class="formant-canvas" id="cvFormantAccuracy" width="260" height="132"></canvas>
           </div>
 
           <div class="subnote-side-section${formantDisabled}" data-sound-path="formant" aria-disabled="${!formantMode}">
@@ -2042,8 +2147,30 @@ function handleRootNoteClick(cell) {
 
 function drawDistributions() {
   drawIntervalDist();
+  drawAccuracyDist("cvMelodyAccuracy", {
+    kind: "melody",
+    range: Math.max(3, Math.round(exploreParams.intervalRange || 12)),
+    accuracyProb: exploreParams.motifHitProb ?? 1,
+    accuracySd: Math.max(0.35, (exploreParams.motifHitRange || 1) / Math.max(1, exploreParams.surpriseRangeSd || 3)),
+    surpriseEnabled: !!exploreParams.surprisePitchEnabled,
+    surpriseWeight: exploreParams.surprisePitchWeight ?? 1,
+    unit: "deg",
+    note: "scale-degree difference",
+  });
+  drawAccuracyDist("cvTuningAccuracy", {
+    kind: "tuning",
+    range: Math.max(10, Math.round(exploreParams.precisionRange || 20)),
+    accuracyProb: exploreParams.precision ?? 1,
+    accuracySd: Math.max(1, (exploreParams.precisionRange || 1) / Math.max(1, exploreParams.surpriseRangeSd || 3)),
+    surpriseEnabled: false,
+    surpriseWeight: 0,
+    unit: "c",
+    note: "cents",
+  });
   drawRootPullDist();
   drawRegisterDist();
+  drawDurationAccuracyDist();
+  drawFormantAccuracyDist();
   drawGapDist();
   drawReverbDist();
   drawSpectrumDist();
@@ -2094,6 +2221,162 @@ function drawIntervalDist() {
   ctx.textAlign = "center";
   ctx.fillText("0", 4, h - 2);
   ctx.fillText(String(range), w - 8, h - 2);
+}
+
+function drawAccuracyDist(canvasId, cfg) {
+  const cv = document.getElementById(canvasId);
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = 42;
+  const padR = 8;
+  const padT = 8;
+  const padB = 13;
+  const range = Math.max(1, Math.round(cfg.range || 6));
+  const values = [];
+  for (let d = -range; d <= range; d++) values.push(d);
+  const bracketSd = Math.max(1, Number(exploreParams.surpriseRangeSd || 3));
+  const accSd = Math.max(0.1, cfg.accuracySd || range / bracketSd);
+  const accuracy = values.map(v => Math.exp(-0.5 * (v / accSd) ** 2));
+  const surpriseOffset = Math.max(2, Math.min(range, accSd * bracketSd * 0.82));
+  const surpriseSd = Math.max(0.45, accSd * 0.75);
+  const surprise = values.map(v => (
+    Math.exp(-0.5 * ((v - surpriseOffset) / surpriseSd) ** 2) +
+    Math.exp(-0.5 * ((v + surpriseOffset) / surpriseSd) ** 2)
+  ) * (cfg.surpriseEnabled ? Math.max(0, cfg.surpriseWeight || 0) : 0));
+  const maxVal = Math.max(0.001, ...accuracy, ...surprise);
+  const rowH = (h - padT - padB) / values.length;
+  const x0 = padL;
+  const plotW = w - padL - padR;
+  const centerY = (value) => padT + (values.indexOf(value) + 0.5) * rowH;
+  const xLen = (v) => x0 + (v / maxVal) * plotW;
+
+  ctx.fillStyle = "rgba(255,255,255,0.025)";
+  ctx.fillRect(x0, padT, plotW, h - padT - padB);
+  ctx.strokeStyle = "rgba(136,153,170,0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x0, centerY(0));
+  ctx.lineTo(w - padR, centerY(0));
+  ctx.stroke();
+
+  const bracket = Math.min(range, Math.max(1, Math.round(accSd * bracketSd)));
+  [-bracket, bracket].forEach(v => {
+    if (!values.includes(v)) return;
+    const y = centerY(v);
+    ctx.strokeStyle = "rgba(226,232,240,0.65)";
+    ctx.beginPath();
+    ctx.moveTo(x0 - 5, y);
+    ctx.lineTo(x0 + 5, y);
+    ctx.stroke();
+  });
+  ctx.strokeStyle = "rgba(226,232,240,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(x0 - 5, centerY(-bracket));
+  ctx.lineTo(x0 - 5, centerY(bracket));
+  ctx.stroke();
+
+  values.forEach((value, i) => {
+    const y = padT + i * rowH + rowH * 0.16;
+    const barH = Math.max(1.2, rowH * 0.28);
+    if (cfg.surpriseEnabled) {
+      ctx.fillStyle = "rgba(59,130,246,0.46)";
+      ctx.fillRect(x0, y + barH * 1.08, xLen(surprise[i]) - x0, barH);
+    }
+    ctx.fillStyle = "rgba(245,158,11,0.82)";
+    ctx.fillRect(x0, y, xLen(accuracy[i]) - x0, barH);
+    if (value === 0 || Math.abs(value) === range || Math.abs(value) === bracket) {
+      ctx.fillStyle = "rgba(136,153,170,0.72)";
+      ctx.font = "8px system-ui";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`${value > 0 ? "+" : ""}${value}${cfg.unit || ""}`, x0 - 8, y + barH);
+    }
+  });
+
+  ctx.fillStyle = "rgba(136,153,170,0.72)";
+  ctx.font = "8px system-ui";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("likelihood ->", x0, h - 3);
+  ctx.textAlign = "right";
+  ctx.fillText(cfg.surpriseEnabled ? "orange accuracy / blue surprise" : "accuracy only", w - 2, h - 3);
+}
+
+function drawDurationAccuracyDist() {
+  const beatDiv = Math.max(1, Math.round(exploreParams.beatDivisions || 1));
+  const range = Math.max(2, beatDiv * 2);
+  drawAccuracyDist("cvDurationAccuracy", {
+    kind: "duration",
+    range,
+    accuracyProb: exploreParams.sameLengthProb ?? 0.4,
+    accuracySd: Math.max(0.35, beatDiv / Math.max(1, exploreParams.surpriseRangeSd || 3)),
+    surpriseEnabled: !!exploreParams.surpriseRhythmEnabled,
+    surpriseWeight: exploreParams.surpriseRhythmWeight ?? 0.45,
+    unit: " div",
+    note: "duration difference",
+  });
+  const cv = document.getElementById("cvDurationAccuracy");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "rgba(136,153,170,0.72)";
+  ctx.font = "8px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText(`${beatDiv} divisions/beat`, 4, 9);
+}
+
+function drawFormantAccuracyDist() {
+  const cv = document.getElementById("cvFormantAccuracy");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+  ensureFormantWeights(exploreParams);
+  const sequence = formantDisplaySequence();
+  const active = exploreParams.activeFormants || ["ah"];
+  const maxWeight = Math.max(0.001, ...sequence.map(key => active.includes(key) ? (exploreParams.formantWeights[key] || 0) : 0));
+  const padL = 35;
+  const padR = 8;
+  const padT = 8;
+  const rowH = 14;
+  const totalH = sequence.length * rowH + padT + 10;
+  cv.height = Math.max(132, totalH);
+  ctx.clearRect(0, 0, w, cv.height);
+
+  sequence.forEach((key, i) => {
+    const y = padT + i * rowH;
+    const activeFormant = active.includes(key);
+    const weight = activeFormant ? (exploreParams.formantWeights[key] || 0) : 0;
+    const len = (w - padL - padR) * weight / maxWeight;
+    ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.018)" : "rgba(255,255,255,0.03)";
+    ctx.fillRect(padL, y, w - padL - padR, rowH - 2);
+    ctx.fillStyle = activeFormant ? "rgba(245,158,11,0.78)" : "rgba(85,102,119,0.22)";
+    ctx.fillRect(padL, y + 3, len, rowH - 7);
+    if (exploreParams.surpriseFormantEnabled) {
+      ctx.fillStyle = "rgba(59,130,246,0.35)";
+      ctx.fillRect(padL, y + rowH - 5, (w - padL - padR) * (exploreParams.surpriseFormantWeight || 0) * 0.45, 2);
+    }
+    ctx.fillStyle = activeFormant ? "rgba(226,232,240,0.82)" : "rgba(85,102,119,0.75)";
+    ctx.font = "8px system-ui";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(key, padL - 6, y + rowH / 2);
+  });
+
+  ctx.fillStyle = "rgba(136,153,170,0.72)";
+  ctx.font = "8px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText("circular formant sequence", padL, cv.height - 3);
+}
+
+function formantDisplaySequence() {
+  const preferred = ["ee", "eh", "ah", "oh", "oo"];
+  const keys = Object.keys(FORMANT_PRESETS);
+  const ordered = preferred.filter(k => keys.includes(k));
+  keys.forEach(k => { if (!ordered.includes(k)) ordered.push(k); });
+  return [...ordered, ...ordered, ...ordered.slice(0, 2)];
 }
 
 function drawRootPullDist() {
@@ -2819,6 +3102,41 @@ function selectControlRow(param, label, value, optionsHtml) {
     </div>`;
 }
 
+function checkboxControl(param, label, checked) {
+  const desc = `${label}: ${describeParam(param, label)}`;
+  return `
+    <label class="feature-check"${titleAttr(desc)}>
+      <input type="checkbox" data-param-check="${param}" ${checked ? "checked" : ""}${titleAttr(desc)}/>
+      <span>${label}</span>
+    </label>`;
+}
+
+function featureSurpriseBlock(feature, label, enabledParam, weightParam, checked, weight) {
+  return `
+    <div class="feature-surprise" data-feature-surprise="${feature}">
+      ${checkboxControl(enabledParam, `${label} surprise`, checked)}
+      ${controlRow(weightParam, "Surprise weight", weight, 0, 1, 0.01)}
+    </div>`;
+}
+
+function formantWeightControlsHTML(p) {
+  ensureFormantWeights(p);
+  const active = p.activeFormants || ["ah"];
+  return `
+    <div class="formant-weight-controls">
+      ${Object.keys(FORMANT_PRESETS).map(key => {
+        const disabled = active.includes(key) ? "" : " disabled";
+        const desc = `${key}: Relative probability of selecting this formant when the formant palette is sampled.`;
+        return `
+          <label class="formant-weight${disabled}"${titleAttr(desc)}>
+            <span>${key}</span>
+            <input type="range" data-formant-weight="${key}" min="0" max="1" step="0.01" value="${p.formantWeights[key]}" ${disabled ? "disabled" : ""}${titleAttr(desc)}/>
+            <output data-formant-weight-out="${key}">${Math.round(p.formantWeights[key] * 100)}%</output>
+          </label>`;
+      }).join("")}
+    </div>`;
+}
+
 function percSoundOptions(selected) {
   return Object.entries(PERC_SOUNDS).map(([k, v]) =>
     `<option value="${k}" ${selected === k ? 'selected' : ''}>${v.label}</option>`
@@ -2878,6 +3196,11 @@ function fmtOutput(param, val) {
     case "precision":
     case "motifHitProb":
     case "surpriseProb":
+    case "surprisePitchWeight":
+    case "surpriseRhythmWeight":
+    case "surpriseFormantWeight":
+    case "surpriseDynamicsWeight":
+    case "surpriseRestWeight":
     case "formantChangeProb":
     case "incorporationRate":
     case "sequenceProb":
@@ -2921,6 +3244,7 @@ function fmtOutput(param, val) {
     case "slideSpeed":
     case "phraseGap": return (v * 100).toFixed(0) + "%";
     case "precisionRange": return `±${v.toFixed(0)}c`;
+    case "surpriseRangeSd": return `${v.toFixed(1)} SD`;
     case "envelopeAttack":
     case "envelopeAttackSd":
     case "envelopeDecay":
@@ -2990,6 +3314,7 @@ function randomiseParams() {
   const allFormants = Object.keys(FORMANT_PRESETS);
   p.activeFormants = allFormants.filter(() => Math.random() < 0.4);
   if (p.activeFormants.length === 0) p.activeFormants = [rp(allFormants)];
+  p.formantWeights = Object.fromEntries(allFormants.map(key => [key, p.activeFormants.includes(key) ? rf(0.35, 1.0) : 0.25]));
   p.formantChangeProb = rf(0.0, 0.4);
   p.voiceMode = rp(["formant", "formant", "fourier", "fourier"]);
   p.toneColorProb = rf(0.0, 0.7);
@@ -3028,12 +3353,19 @@ function randomiseParams() {
 
   // Surprise
   p.surpriseProb = rf(0.0, 0.5);
-  p.surpriseDimensions = ["pitch"];
-  if (Math.random() < 0.35) p.surpriseDimensions.push("octave");
-  if (Math.random() < 0.3) p.surpriseDimensions.push("formant");
-  if (Math.random() < 0.25) p.surpriseDimensions.push("rhythm");
-  if (Math.random() < 0.2) p.surpriseDimensions.push("dynamics");
-  if (Math.random() < 0.1) p.surpriseDimensions.push("rest");
+  p.surprisePitchEnabled = true;
+  p.surpriseRhythmEnabled = Math.random() < 0.28;
+  p.surpriseFormantEnabled = Math.random() < 0.34;
+  p.surpriseDynamicsEnabled = Math.random() < 0.22;
+  p.surpriseRestEnabled = Math.random() < 0.12;
+  p.surprisePitchWeight = rf(0.55, 1);
+  p.surpriseRhythmWeight = rf(0.15, 0.75);
+  p.surpriseFormantWeight = rf(0.15, 0.75);
+  p.surpriseDynamicsWeight = rf(0.1, 0.65);
+  p.surpriseRestWeight = rf(0.05, 0.45);
+  p.surpriseAllowMultiple = Math.random() < 0.18;
+  p.surpriseRangeSd = rf(2.5, 3.5);
+  syncSurpriseFeatureParams(p);
   p.incorporationRate = rf(0.1, 0.7);
   p.surpriseMaxBaked = rp(["4", "8", "16", "32", "Infinity"]);
 

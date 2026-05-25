@@ -487,6 +487,7 @@ export class GenerationEngine {
     this._lastOutputFrequency = null;
     this._lastGapFraction = 1;
     this._motifSurprisePlan = null;
+    this._activeSurpriseProjection = null;
   }
 
   _pickInitialRoot() {
@@ -533,12 +534,18 @@ export class GenerationEngine {
     // Surprise probability is evaluated once per motif pass. If it fires, one
     // slot in that pass is altered; incorporation may then bake that variant
     // into the growing repertoire sequence.
+    if (this._activeSurpriseProjection && this._noteIdx >= this._activeSurpriseProjection.snapBackIndex) {
+      this._activeSurpriseProjection = null;
+    }
     if (this._motifSurprisePlan?.position === this._noteIdx) {
-      const surprise = this._surpriseNote(note);
-      note = { ...note, ...surprise };
+      this._activeSurpriseProjection = this._buildSurpriseProjection(this._noteIdx);
+      note = { ...this._activeSurpriseProjection.notes[this._noteIdx] };
       isSurprise = true;
-      this._maybeBakeSurprise(note);
+      this._maybeBakeProjectedSurprise(this._activeSurpriseProjection);
       this._motifSurprisePlan = null;
+    } else if (this._activeSurpriseProjection && this._noteIdx >= this._activeSurpriseProjection.startIndex && this._noteIdx < this._activeSurpriseProjection.snapBackIndex) {
+      note = { ...this._activeSurpriseProjection.notes[this._noteIdx] };
+      isSurprise = true;
     }
 
     // ── Motif-hit accuracy ──
@@ -593,12 +600,10 @@ export class GenerationEngine {
       intonationCents = (this.rng.next() + this.rng.next() - 1) * range;
     }
 
-    // ── Formant changes ──
-    if (this.rng.next() < this.p.formantChangeProb) {
-      const formants = this.p.activeFormants || ["ah"];
-      this._currentFormant = this.rng.pick(formants);
-    }
-    note.formant = this._currentFormant;
+    // Motif generation, surprises, and projections own the note formant.
+    // Playback keeps that value instead of overwriting baked formant surprises.
+    note.formant = note.formant || this._currentFormant;
+    this._currentFormant = note.formant;
 
     const isMotifEnd = this._noteIdx >= this._motif.notes.length - 1;
     this._noteIdx++;
@@ -1005,8 +1010,7 @@ export class GenerationEngine {
 
     const notes = [];
     let deg = this._currentDegree || this.scale.pickNote(this.rng);
-    const formants = this.p.activeFormants || ["ah"];
-    let fmt = this.rng.pick(formants);
+    let fmt = this._pickFormant();
 
     for (let i = 0; i < rhythm.length; i++) {
       const phrasePos = rhythm.length > 1 ? i / (rhythm.length - 1) : 0;
@@ -1018,7 +1022,7 @@ export class GenerationEngine {
         this._handleRootArrival(deg);
       }
       if (this.rng.next() < this.p.formantChangeProb) {
-        fmt = this.rng.pick(formants);
+        fmt = this._pickFormant(fmt);
       }
       notes.push({
         degree: deg,
@@ -1037,7 +1041,7 @@ export class GenerationEngine {
       const srcIdx = this.rng.int(0, Math.min(this.repertoire.size, this.repertoire.baseLen));
       const src = this.repertoire.motifs[srcIdx];
       const pos = this.rng.int(0, src.notes.length);
-      const surprise = this._surpriseNote(src.notes[pos]);
+      const surprise = this._surpriseNote(src.notes[pos], this._chooseSurpriseFeatures());
       const variant = src.variant(pos, surprise);
       this.repertoire.incorporate(variant, this.repertoire.baseIndexFor(srcIdx), this._maxBakedSurprises());
     }
@@ -1045,6 +1049,7 @@ export class GenerationEngine {
 
   _startMotifPass() {
     this._motifSurprisePlan = null;
+    this._activeSurpriseProjection = null;
     const probability = this._clamp01(this.p.surpriseProb ?? 0);
     if (!this._motif || this._motif.notes.length === 0) return;
     if (this.rng.next() < probability) {
@@ -1054,6 +1059,71 @@ export class GenerationEngine {
     }
   }
 
+  _buildSurpriseProjection(startIndex) {
+    const original = this._motif.notes;
+    const features = this._chooseSurpriseFeatures();
+    const notes = original.map(n => ({ ...n }));
+    notes[startIndex] = { ...notes[startIndex], ...this._surpriseNote(notes[startIndex], features) };
+
+    let projectedDegree = notes[startIndex].degree;
+    let projectedFormant = notes[startIndex].formant || this._currentFormant;
+    for (let i = startIndex + 1; i < notes.length; i++) {
+      const phrasePos = notes.length > 1 ? i / (notes.length - 1) : 0;
+      notes[i] = { ...original[i] };
+      if (features.includes("pitch")) {
+        projectedDegree = this._pickBiasedNote(projectedDegree, phrasePos);
+        notes[i].degree = projectedDegree;
+      }
+      if (features.includes("formant")) {
+        if (this.rng.next() < (this.p.formantChangeProb ?? 0.05)) {
+          projectedFormant = this._pickFormant(projectedFormant);
+        }
+        notes[i].formant = projectedFormant;
+      }
+    }
+
+    const snapBackIndex = this._findSnapBackIndex(original, notes, startIndex, features);
+    for (let i = snapBackIndex; i < notes.length; i++) notes[i] = { ...original[i] };
+    return { startIndex, snapBackIndex, features, notes };
+  }
+
+  _findSnapBackIndex(original, projected, startIndex, features) {
+    let originalStart = 0;
+    let projectedStart = 0;
+    const originalStarts = original.map(note => {
+      const start = originalStart;
+      originalStart += note.durationDivs || 1;
+      return start;
+    });
+    const projectedStarts = projected.map(note => {
+      const start = projectedStart;
+      projectedStart += note.durationDivs || 1;
+      return start;
+    });
+
+    for (let i = startIndex + 1; i < original.length; i++) {
+      if (features.includes("rhythm") && originalStarts[i] !== projectedStarts[i]) continue;
+      if (this._projectionMatchesOriginal(original[i], projected[i], features)) return i;
+    }
+    return original.length;
+  }
+
+  _projectionMatchesOriginal(original, projected, features) {
+    if (features.includes("pitch")) {
+      const tolerance = Math.max(1, Math.round(this.p.motifHitRange ?? 1));
+      if (this.scale.stepDistance(original.degree, projected.degree) > tolerance) return false;
+    }
+    if (features.includes("formant") && original.formant !== projected.formant) return false;
+    if (features.includes("rhythm") && (original.durationDivs || 1) !== (projected.durationDivs || 1)) return false;
+    if (features.includes("rest") && !!original.isRest !== !!projected.isRest) return false;
+    if (features.includes("dynamics")) {
+      const o = original.velocityOverride ?? 0.62;
+      const p = projected.velocityOverride ?? 0.62;
+      if (Math.abs(o - p) > 0.15) return false;
+    }
+    return true;
+  }
+
   _maybeBakeSurprise(note) {
     if (!this.repertoire) return false;
     if (this.rng.next() >= this._clamp01(this.p.incorporationRate ?? 0)) return false;
@@ -1061,6 +1131,19 @@ export class GenerationEngine {
     const replacedBase = this.repertoire.baseIndexFor(this._motifIdx);
     const variant = this._motif.variant(this._noteIdx, note);
     return this.repertoire.incorporate(variant, replacedBase, this._maxBakedSurprises());
+  }
+
+  _maybeBakeProjectedSurprise(projection) {
+    if (!this.repertoire || !projection) return false;
+    if (this.rng.next() >= this._clamp01(this.p.incorporationRate ?? 0)) return false;
+    if (!this._canBakeSurprise()) return false;
+    const replacedBase = this.repertoire.baseIndexFor(this._motifIdx);
+    const variantNotes = this._motif.notes.map((note, i) => (
+      i >= projection.startIndex && i < projection.snapBackIndex
+        ? { ...projection.notes[i] }
+        : { ...note }
+    ));
+    return this.repertoire.incorporate(new Motif(variantNotes), replacedBase, this._maxBakedSurprises());
   }
 
   _canBakeSurprise() {
@@ -1082,23 +1165,63 @@ export class GenerationEngine {
     return Math.max(0, Math.min(1, n));
   }
 
-  _surpriseNote(expected) {
-    const dims = this.p.surpriseDimensions || ["pitch"];
+  _pickFormant(exclude = null) {
+    const active = (this.p.activeFormants || ["ah"]).filter(f => f !== exclude);
+    const formants = active.length > 0 ? active : (this.p.activeFormants || ["ah"]);
+    const weights = this.p.formantWeights || {};
+    const total = formants.reduce((sum, f) => sum + Math.max(0.001, Number(weights[f] ?? 1)), 0);
+    let r = this.rng.next() * total;
+    for (const f of formants) {
+      r -= Math.max(0.001, Number(weights[f] ?? 1));
+      if (r <= 0) return f;
+    }
+    return formants[formants.length - 1] || "ah";
+  }
+
+  _chooseSurpriseFeatures() {
+    const candidates = [
+      { key: "pitch", enabled: this.p.surprisePitchEnabled ?? (this.p.surpriseDimensions || ["pitch"]).includes("pitch"), weight: this.p.surprisePitchWeight ?? 1 },
+      { key: "rhythm", enabled: this.p.surpriseRhythmEnabled ?? (this.p.surpriseDimensions || []).includes("rhythm"), weight: this.p.surpriseRhythmWeight ?? 0.45 },
+      { key: "formant", enabled: this.p.surpriseFormantEnabled ?? (this.p.surpriseDimensions || []).includes("formant"), weight: this.p.surpriseFormantWeight ?? 0.45 },
+      { key: "dynamics", enabled: this.p.surpriseDynamicsEnabled ?? (this.p.surpriseDimensions || []).includes("dynamics"), weight: this.p.surpriseDynamicsWeight ?? 0.35 },
+      { key: "rest", enabled: this.p.surpriseRestEnabled ?? (this.p.surpriseDimensions || []).includes("rest"), weight: this.p.surpriseRestWeight ?? 0.2 },
+    ].filter(item => item.enabled && item.weight > 0);
+    if (candidates.length === 0) return ["pitch"];
+
+    const pickOne = (pool) => {
+      const total = pool.reduce((sum, item) => sum + Math.max(0.001, item.weight), 0);
+      let r = this.rng.next() * total;
+      for (const item of pool) {
+        r -= Math.max(0.001, item.weight);
+        if (r <= 0) return item.key;
+      }
+      return pool[pool.length - 1].key;
+    };
+
+    const chosen = [pickOne(candidates)];
+    if (this.p.surpriseAllowMultiple) {
+      for (const item of candidates) {
+        if (!chosen.includes(item.key) && this.rng.next() < this._clamp01(item.weight) * 0.75) {
+          chosen.push(item.key);
+        }
+      }
+    }
+    return chosen;
+  }
+
+  _surpriseNote(expected, dims = null) {
+    dims = dims || this._chooseSurpriseFeatures();
     const out = { degree: expected.degree, formant: expected.formant };
 
     if (dims.includes("pitch")) {
       const dir = this.rng.next() < 0.5 ? -1 : 1;
-      const steps = dir * this.rng.int(3, this.p.intervalRange + 3);
+      const minStep = Math.max(2, Math.round((this.p.motifHitRange ?? 1) + 1));
+      const maxStep = Math.max(minStep + 1, Math.round((this.p.intervalRange ?? 7) + 2));
+      const steps = dir * this.rng.int(minStep, maxStep + 1);
       out.degree = this.scale.stepFrom(expected.degree, steps);
     }
-    if (dims.includes("octave")) {
-      // Shift up or down by one octave
-      const dir = this.rng.next() < 0.5 ? -1 : 1;
-      out.degree = this.scale.nearest((out.degree ?? expected.degree) + dir * this.scale.div);
-    }
     if (dims.includes("formant")) {
-      const others = (this.p.activeFormants || ["ah"]).filter(f => f !== expected.formant);
-      if (others.length > 0) out.formant = this.rng.pick(others);
+      out.formant = this._pickFormant(expected.formant);
     }
     if (dims.includes("rhythm")) {
       // Double or halve the note duration

@@ -50,12 +50,22 @@ order of those motifs.
 - Motif length sets each motif's length in beats.
 - Sequence probability controls fixed-order playback versus random motif choice.
 - Surprise can change one note in a motif pass.
+- Feature-specific surprise checkboxes and weights decide whether that note
+  changes pitch, duration, formant, dynamics, rest state, or several of those at
+  once.
 - Incorporation can bake that surprise into the repertoire.
 - Max baked limits how many surprise variants can be remembered.
 
-When a surprise is baked, the loop grows by appending a new cycle with the
-surprised motif variant included. This is intended to model "a variation becoming
-part of the piece" rather than a one-off random error.
+When a surprise happens, the engine creates a projected continuation from the
+surprised note using the ordinary generation rules. It then snaps back to the
+original motif once the affected feature or features become compatible again.
+For duration surprises, the current implementation uses the simpler
+onset-alignment rule: it waits for projected and original duration positions to
+align, otherwise it stays projected until motif end.
+
+When a surprise is baked, the loop grows by appending a new cycle with that
+projected motif variant included. This is intended to model "a variation
+becoming part of the piece" rather than a one-off random error.
 
 ### 4. Rhythm, Rests, And Articulation
 
