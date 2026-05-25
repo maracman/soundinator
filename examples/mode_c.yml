@@ -1,0 +1,23 @@
+mode: C
+description: On-beat PPI pilot stimulus configuration.
+sample_rate: 48000
+target_lufs: -23.0
+peak_db: -1.0
+trials: 8
+beat:
+  tempo_bpm: 100
+  beats: 32
+  note_duration_fraction: 0.42
+  accent_pattern: [1.0, 0.72, 0.82, 0.72]
+  pitch_degree: 0
+  octave: 0
+  timbre: sine
+probe:
+  placement_cycle: [on_beat, pre_beat, off_beat]
+  duration_s: 0.05
+  intensity_db: 100.0
+  probe_count: 1
+jitter:
+  pitch_cents: 0.0
+  timing_ms: 0.0
+  intensity_db: 0.0

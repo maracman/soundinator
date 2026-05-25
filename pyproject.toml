@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "probabilistic-music-synthesiser"
+version = "0.1.0"
+description = "Probabilistic Web Audio and offline stimulus toolkit for music aesthetics research."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Marcus Anderson" }]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+audio = [
+  "soundfile>=0.12",
+  "pyloudnorm>=0.1",
+  "sounddevice>=0.4",
+]
+experiment = [
+  "psychopy>=2024.1",
+  "pylsl>=1.16",
+]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+synthesiser = "synthesiser.cli:main"
+synthesiser-web = "synthesiser.web.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

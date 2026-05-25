@@ -1,0 +1,27 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.claude/
+
+# Local research notes / draft manuscripts that are not required to run the code.
+*.pdf
+Experiment Plan - Synth, EEG, MVPA.md
+
+# Rendered stimuli and web audio caches are reproducible from seeds/parameters and grow large.
+stimuli/
+web/cache/*
+!web/cache/.gitkeep
+
+# Local participant/session data should never be committed.
+web/data/*.jsonl
+web/data/session_events.jsonl
+web/data/global_presets.json
+!web/data/.gitkeep
