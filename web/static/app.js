@@ -253,6 +253,16 @@ const DEFAULTS = {
   // Material damping law: 0 = glass/metal (all partials ring), 1 = wood/felt
   // (high partials die fast). Per-instrument defaults ride the profile.
   partialMaterial: 0.45,
+  // Partial macros: transforms over the whole harmonic set (see
+  // docs/PARTIAL_MACROS_DESIGN.md). Tilt = spectral slope; odd/even
+  // balance; comb = movable boost of a related-frequency group; six
+  // octave-group faders (1 | 2 | 3-4 | 5-8 | 9-16 | 17+).
+  partialTilt: 0,
+  partialOddEven: 0,
+  partialComb: 0,
+  partialCombFreq: 4,
+  partialGroup1: 1, partialGroup2: 1, partialGroup3: 1,
+  partialGroup4: 1, partialGroup5: 1, partialGroup6: 1,
   spectralDriftProb: 1,
   spectralDriftDepth: 0.35,
   spectralDriftRate: 6,
@@ -1906,6 +1916,8 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
+    "partialTilt","partialOddEven","partialComb","partialCombFreq",
+    "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "spectralRegisterAmount","spectralResonanceAmount","spectralLoudnessNorm",
     "spectralDriftProb","spectralDriftDepth","spectralDriftRate","spectralStretchCents",
     "envelopeProb","envelopeAttack","envelopeAttackSd","envelopeDecay","envelopeDecaySd",
@@ -2692,6 +2704,19 @@ function subnoteWorkspaceHTML(p) {
               ${controlRow("spectralDriftDepth", "Drift depth", p.spectralDriftDepth, 0, 1, 0.01)}
               ${controlRow("spectralDriftRate", "Drift rate", p.spectralDriftRate, 0.5, 20, 0.5)}
               ${controlRow("spectralStretchCents", "Freq stretch", p.spectralStretchCents, -24, 24, 1)}
+              ${controlRow("partialTilt", "Tilt", p.partialTilt, -1, 1, 0.01)}
+              ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
+              ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
+              ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 20, 1)}
+            </div>
+            <div class="subsection-label">Octave groups</div>
+            <div class="controls-grid">
+              ${controlRow("partialGroup1", "Fund (1)", p.partialGroup1, 0, 2, 0.01)}
+              ${controlRow("partialGroup2", "Oct (2)", p.partialGroup2, 0, 2, 0.01)}
+              ${controlRow("partialGroup3", "3–4", p.partialGroup3, 0, 2, 0.01)}
+              ${controlRow("partialGroup4", "5–8", p.partialGroup4, 0, 2, 0.01)}
+              ${controlRow("partialGroup5", "9–16", p.partialGroup5, 0, 2, 0.01)}
+              ${controlRow("partialGroup6", "17+", p.partialGroup6, 0, 2, 0.01)}
             </div>
           </div>
 

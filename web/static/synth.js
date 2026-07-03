@@ -1148,7 +1148,7 @@ export class GenerationEngine {
       const sourceResponse = this._spectralRegisterSourceResponse(reg, registerAmount, fundamentalHz);
       const filterResponse = this._spectralResonanceResponse(profile, harmonicFrequency, resonanceAmount);
       const registerResponse = sourceResponse * filterResponse;
-      const dynamicMean = amp * dynamics * registerResponse;
+      const dynamicMean = amp * dynamics * registerResponse * this._partialMacroGain(harmonic);
       const sampled = shouldSample ? Math.max(0, dynamicMean + this._gaussian() * sd) : dynamicMean;
       referenceNorm += amp;
       return {
@@ -1174,6 +1174,40 @@ export class GenerationEngine {
       spectralReferenceNorm: Math.max(0.001, referenceNorm),
       spectralStretchCents: this.p.spectralStretchCents ?? 0,
     };
+  }
+
+  /**
+   * Macro gain for one harmonic (docs/PARTIAL_MACROS_DESIGN.md): a few
+   * physically meaningful knobs reshape the whole partial set —
+   *   tilt      spectral slope (±~4.5 dB/octave at the extremes)
+   *   odd/even  −1 mutes evens (closed-tube/clarinet), +1 mutes odds;
+   *             the fundamental is always exempt
+   *   comb      movable boost of a related-frequency group centred on a
+   *             harmonic number (keytracked by construction)
+   *   groups    six octave-group faders: 1 | 2 | 3–4 | 5–8 | 9–16 | 17+
+   */
+  _partialMacroGain(harmonic) {
+    const p = this.p;
+    let gain = 1;
+    const tilt = this._clamp(Number(p.partialTilt ?? 0), -1, 1);
+    if (tilt !== 0) gain *= Math.pow(harmonic, tilt * 1.5);
+    const oddEven = this._clamp(Number(p.partialOddEven ?? 0), -1, 1);
+    if (oddEven !== 0 && harmonic > 1) {
+      const isEven = harmonic % 2 === 0;
+      if (oddEven < 0 && isEven) gain *= 1 + oddEven * 0.92;
+      if (oddEven > 0 && !isEven) gain *= 1 - oddEven * 0.92;
+    }
+    const comb = this._clamp(Number(p.partialComb ?? 0), 0, 1);
+    if (comb > 0) {
+      const centre = Math.max(1, Number(p.partialCombFreq ?? 4));
+      const d = Math.log2(harmonic / centre);
+      gain *= 1 + comb * 2 * Math.exp(-0.5 * (d / 0.35) ** 2);
+    }
+    const groupKeys = ["partialGroup1", "partialGroup2", "partialGroup3", "partialGroup4", "partialGroup5", "partialGroup6"];
+    const gi = harmonic === 1 ? 0 : harmonic === 2 ? 1 : harmonic <= 4 ? 2 : harmonic <= 8 ? 3 : harmonic <= 16 ? 4 : 5;
+    const groupGain = Number(p[groupKeys[gi]] ?? 1);
+    if (Number.isFinite(groupGain)) gain *= this._clamp(groupGain, 0, 2);
+    return gain;
   }
 
   _spectralRegisterSourceResponse(reg, amount, fundamentalHz) {

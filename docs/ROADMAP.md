@@ -146,9 +146,14 @@ Full audits in the loop transcript; the load-bearing findings:
 
 - [ ] D7 (owner cue 2026-07-03): partial macros & higher-fidelity formants
   per docs/PARTIAL_MACROS_DESIGN.md (RipplerX/Resonarium patterns):
-  - [ ] D7a. Partial macro layer: tilt, odd/even, comb group, material +
-    six octave-group faders shaping all partials; harmonic editor becomes
-    the dig-down level (progressive disclosure).
+  - [x] D7a. Partial macro layer: partialTilt (spectral slope, ±4.5dB/oct),
+    partialOddEven (−1 mutes evens → clarinet, +1 mutes odds; fundamental
+    exempt), partialComb + centre (movable keytracked group boost), six
+    octave-group faders (1|2|3-4|5-8|9-16|17+) — all applied in the
+    fingerprint over the profile base table, live-updating. Headlessly
+    verified exact (odd −1 → evens ×0.08; tilt −1 → h8 ×0.044; comb@8 →
+    h8 ×3; group1=0 zeroes fundamental only). Harmonic editor unchanged as
+    the dig-down; full write-through/disclosure polish rides with D7c.
   - [x] D7b. Material damping law: each partial above the fundamental gets
     its own decay node, tau falling with harmonic number scaled by the new
     partialMaterial param (0 glass/metal → 1 wood/felt). Per-instrument
