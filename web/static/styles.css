@@ -4966,3 +4966,22 @@ body.explore-mode #app {
   opacity: 0.92;
 }
 body.dragging { cursor: grabbing; user-select: none; }
+
+/* ── Track mute/solo (v2.1 U2) ───────────────────────────── */
+
+.tl2-ms {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: var(--surface);
+  color: var(--text3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.tl2-ms.on { background: rgba(245,166,35,0.25); color: var(--accent2); border-color: rgba(245,166,35,0.6); }
+.tl2-ms.tl2-solo.on { background: rgba(56,189,248,0.22); color: var(--surp); border-color: rgba(56,189,248,0.55); }
+.tl2-head.inaudible .tl2-name { opacity: 0.4; }

@@ -165,13 +165,17 @@ and flexible; check for obvious missing features. Findings, prioritised:
       straight onto a lane (auto-adds to palette); palette items drag to
       lanes/new-track; regions drag to move. Clicks unaffected (5px drag
       threshold). Verified live on every path.
-- [ ] U1 Baked regions do not follow session key changes: notes freeze
-      their Hz at bake time. Recompute frequency at schedule time from
-      degree + cents via the current scale (the design's beat/degree-space
-      rule).
+- [x] U1 DONE (and deeper than expected): baked notes now recompute pitch
+      from degree + cents under the current scale at schedule time; AND
+      the session Key control now actually transposes (it previously only
+      moved root emphasis — the lattice stayed C-anchored). Key = tonic
+      moves to the chosen pitch class, root anchors at degree 0; verified
+      C→G shifts a baked note by exactly 2^(7/12).
 
 ### Missing table-stakes DAW features
-- [ ] U2 Mute / Solo per track.
+- [x] U2 DONE: M/S buttons per track head; solo-aware audibility dims
+      heads, silences live voices immediately, and playback + mixdown skip
+      inaudible tracks.
 - [ ] U3 Duplicate region (⌘/Ctrl-D and alt-drag-to-copy).
 - [ ] U4 Keyboard: Space = play/stop from playhead, Delete = delete
       selected region, Escape = deselect.

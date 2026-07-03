@@ -1080,7 +1080,7 @@ const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", 
 
 function sessionBarControlsHTML() {
   const ctx = arrangement.context;
-  const root = Array.isArray(ctx.rootNotes) && ctx.rootNotes.length ? ctx.rootNotes[0] : 0;
+  const root = ctx.keyRoot ?? (Array.isArray(ctx.rootNotes) && ctx.rootNotes.length ? ctx.rootNotes[0] : 0);
   return `
     <label class="daw-ctx">Tempo
       <input type="range" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/>
@@ -1298,7 +1298,13 @@ function wireSessionBar(v) {
       const key = input.dataset.ctx;
       const ctx = arrangement.context;
       if (key === "root") {
-        ctx.rootNotes = [Number(input.value)];
+        // Key = transpose the whole lattice: tonic moves to the chosen
+        // pitch class and the root anchors at degree 0. Generative regions
+        // follow immediately; baked regions follow via degree-space
+        // recompute (v2.1 U1).
+        ctx.keyRoot = Number(input.value);
+        ctx.tonicHz = 261.63 * Math.pow(2, ctx.keyRoot / 12);
+        ctx.rootNotes = [0];
       } else if (key === "scalePreset") {
         ctx.scalePreset = input.value;
         ctx.scaleMode = "12tone";
@@ -1385,6 +1391,7 @@ function playArrangement(fromBeat = 0) {
     for (const track of arrangement.tracks) {
       const region = regionAtBeat(track, b);
       const voice = producerVoice(track);
+      if (!trackAudible(track)) { voice.stop(); continue; }
       if (region && (b === region.startBeat || b === arrPlay.startAt)) {
         if (region.type === "baked" && Array.isArray(region.notes)) {
           voice.playNotes(regionPlayParams(track, region), region.notes,
@@ -1483,6 +1490,7 @@ async function mixdownArrangement(statusEl) {
   const totalSec = lastEnd * beatSec + 3; // reverb/release tail
   const off = new OfflineAudioContext(2, Math.ceil(totalSec * sr), sr);
   for (const track of arrangement.tracks) {
+    if (!trackAudible(track)) continue;
     for (const region of track.regions) {
       // A fresh voice per region: deterministic take, exactly as live playback
       const voice = new SynthEngine();
@@ -1551,8 +1559,10 @@ function produceTimelineHTML() {
     }).join("");
     const gain = t.gain ?? 1;
     return `<div class="tl2-row">
-      <div class="tl2-head">
+      <div class="tl2-head${trackAudible(t) ? "" : " inaudible"}">
         <span class="tl2-name" title="${esc(t.name)}">${esc(t.name)}</span>
+        <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
+        <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
         <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
         <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
       </div>
@@ -1822,6 +1832,11 @@ function paletteZoneAtPoint(x, y) {
 function beatAtClientX(lane, clientX) {
   const rect = lane.getBoundingClientRect();
   return Math.max(0, Math.min(BEATS_TOTAL - 1, Math.round((clientX - rect.left) / PX_PER_BEAT)));
+}
+
+function trackAudible(track) {
+  const anySolo = arrangement.tracks.some(t => t.solo);
+  return !track.muted && (!anySolo || track.solo);
 }
 
 function trackFreeFrom(track, fromBeat) {
@@ -2203,6 +2218,28 @@ function wireProduce(v) {
     saveArrangement();
     renderProduce();
   };
+
+  // Mute / Solo (live: silences voices immediately, playback skips)
+  v.querySelectorAll("[data-track-mute]").forEach(btn => {
+    btn.onclick = () => {
+      const track = arrangement.tracks.find(t => t.id === btn.dataset.trackMute);
+      if (!track) return;
+      track.muted = !track.muted;
+      saveArrangement();
+      if (arrPlay) arrangement.tracks.forEach(t => { if (!trackAudible(t)) producerVoices.get(t.id)?.stop(); });
+      renderProduce();
+    };
+  });
+  v.querySelectorAll("[data-track-solo]").forEach(btn => {
+    btn.onclick = () => {
+      const track = arrangement.tracks.find(t => t.id === btn.dataset.trackSolo);
+      if (!track) return;
+      track.solo = !track.solo;
+      saveArrangement();
+      if (arrPlay) arrangement.tracks.forEach(t => { if (!trackAudible(t)) producerVoices.get(t.id)?.stop(); });
+      renderProduce();
+    };
+  });
 
   // Per-track gain (live on the playing voice)
   v.querySelectorAll("[data-track-gain]").forEach(sl => {

@@ -2228,12 +2228,23 @@ export class SynthEngine {
     const reps = (loopBeats && totalBeats)
       ? Math.max(1, Math.ceil(totalBeats / loopBeats))
       : 1;
+    // Baked notes live in degree-space (bake design): pitch is recomputed
+    // from degree + cents under the CURRENT scale/key at schedule time, so
+    // baked regions follow session key changes. Stored Hz is only a
+    // fallback for legacy notes without a degree.
+    const scale = this._engine.scale;
     for (let rep = 0; rep < reps; rep++) {
       const repDivs = rep * (loopBeats || 0) * beatDiv;
+      let prevFreq = null;
       for (const stored of notes) {
         const offDivs = (stored.offsetDivs || 0) + repDivs;
         if (totalBeats != null && offDivs / beatDiv >= totalBeats) continue;
         const note = { ...stored };
+        if (Number.isFinite(note.degree) && scale) {
+          note.frequency = scale.degreeToHz(note.degree) * Math.pow(2, (note.intonationCents || 0) / 1200);
+          note.slideFromFrequency = note.legatoFromPrevious ? prevFreq : null;
+        }
+        if (note.velocity > 0) prevFreq = note.frequency;
         const t = t0 + offDivs * divSec;
         this._render(note, t);
         this._schedulePerc(note, t, divSec);
