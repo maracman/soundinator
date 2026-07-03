@@ -1695,8 +1695,7 @@ function rollPanelHTML() {
 function drawRoll(region) {
   const cv = document.getElementById("rollCanvas");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const W = cv.width, H = cv.height;
+  const { ctx, w: W, h: H } = crisp2d(cv);
   ctx.clearRect(0, 0, W, H);
   const notes = region.notes;
   const padL = 34, padR = 8, padT = 8, padB = 18;
@@ -1786,8 +1785,8 @@ function wireRoll(v) {
   const canvasXY = (e) => {
     const rect = cv.getBoundingClientRect();
     return {
-      x: (e.clientX - rect.left) * (cv.width / rect.width),
-      y: (e.clientY - rect.top) * (cv.height / rect.height),
+      x: (e.clientX - rect.left) * ((cv._cssW || cv.width) / rect.width),
+      y: (e.clientY - rect.top) * ((cv._cssH || cv.height) / rect.height),
     };
   };
 
@@ -4636,11 +4635,28 @@ function drawDistributions() {
   drawHarmonicSignature();
 }
 
+// Match a canvas backing store to its CSS layout size × devicePixelRatio so
+// the distribution displays render crisply, and return a context scaled back
+// to CSS-pixel coordinates (so drawing code and hover hit-tests keep working
+// in one coordinate space, stored on the element as _cssW/_cssH). Hidden
+// canvases (clientWidth 0) fall back to the last known or attribute size.
+function crisp2d(cv) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const cssW = cv.clientWidth || cv._cssW || cv.width;
+  const cssH = cv.clientHeight || cv._cssH || cv.height;
+  cv._cssW = cssW; cv._cssH = cssH;
+  const bw = Math.max(1, Math.round(cssW * dpr));
+  const bh = Math.max(1, Math.round(cssH * dpr));
+  if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: cssW, h: cssH };
+}
+
 function drawIntervalDist() {
   const cv = document.getElementById("cvInterval");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const peak = exploreParams.intervalPeakedness;
@@ -4766,7 +4782,7 @@ function wireDistHover(root) {
     const data = cv && _distHoverData[cv.id];
     if (!data || !data.bars.length) { hide(); return; }
     const rect = cv.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) * (cv.width / rect.width);
+    const cx = (e.clientX - rect.left) * ((cv._cssW || cv.width) / rect.width);
     const idx = Math.round((cx - data.barStartX - data.barW / 2) / (data.barW + data.barGap));
     if (idx < 0 || idx >= data.bars.length) { hide(); return; }
     const bar = data.bars[idx];
@@ -4787,8 +4803,7 @@ function wireDistHover(root) {
 function drawMacroDist(canvasId, cfg) {
   const cv = document.getElementById(canvasId);
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const W = cv.width, H = cv.height;
+  const { ctx, w: W, h: H } = crisp2d(cv);
   ctx.clearRect(0, 0, W, H);
 
   // ── Geometry — screen inset from canvas edges
@@ -5565,8 +5580,7 @@ function formantDisplaySequence() {
 function drawRootPullDist() {
   const cv = document.getElementById("cvRoot");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const strength = exploreParams.rootPullStrength;
@@ -5609,8 +5623,7 @@ function drawRootPullDist() {
 function drawRegisterDist() {
   const cv = document.getElementById("cvRegister");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const center = exploreParams.registerCenter;
@@ -5701,8 +5714,7 @@ function loudnessRegisterValue(offset, range) {
 function drawLoudnessRegisterDist() {
   const cv = document.getElementById("cvLoudnessRegister");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   // Loudness register: a flat-topped window across the soft→loud axis, centred
@@ -5765,8 +5777,7 @@ function drawLoudnessRegisterDist() {
 function drawGapDist() {
   const cv = document.getElementById("cvGap");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const minGap = Math.min(exploreParams.gapMin ?? 0, exploreParams.gapMax ?? 0);
@@ -5873,8 +5884,7 @@ function drawGapDist() {
 function drawReverbDist() {
   const cv = document.getElementById("cvReverb");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const profile = REVERB_PROFILES[exploreParams.reverbType] || REVERB_PROFILES.room;
@@ -5931,8 +5941,7 @@ function drawReverbDist() {
 function drawSpectrumDist() {
   const cv = document.getElementById("cvSpectrum");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
@@ -5980,8 +5989,7 @@ function drawVibratoDist() {
   const rateSd = Math.max(0, exploreParams.vibratoRateSd ?? 0);
 
   canvases.forEach(cv => {
-    const ctx = cv.getContext("2d");
-    const w = cv.width, h = cv.height;
+    const { ctx, w, h } = crisp2d(cv);
     const mid = h / 2;
     const maxDepth = Math.max(6, depth + depthSd * 2.5);
     ctx.clearRect(0, 0, w, h);
@@ -6039,8 +6047,7 @@ function drawVibratoDist() {
 function drawHarmonicSignature() {
   const cv = document.getElementById("cvHarmonicSignature");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   ensureSpectralPartialParams(exploreParams);
@@ -6243,8 +6250,7 @@ function drawEnvelopeDist() {
 }
 
 function drawEnvelopeCanvas(cv) {
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const attack = exploreParams.envelopeAttack || 0.008;
