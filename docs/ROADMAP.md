@@ -253,8 +253,13 @@ synth configuration pulled into arrangement tracks.
   "Play arrangement" transport walks the slot grid at session tempo (4
   beats/slot), starting each track's region take at its slot and silencing
   empty cells, with a cyan playhead sweeping the timeline. Verified live
-  (playhead 0→1 at tempo, clean stop). Per-track pan + gain UI deferred to
-  v2 polish.
+  (playhead 0→1 at tempo, clean stop).
+- [x] G-v2 polish (partial): multi-slot regions (grid-span rendering, ×N
+  badge, +/− Longer/Shorter with collision clamping; playback sustains a
+  voice through its span; mixdown honours lengthSlots), per-track gain
+  slider in the track head (live on the playing voice), drag regions
+  between cells/tracks with span-fit checks. Remaining polish: per-track
+  pan, per-track context locks, region take history UI.
 - [x] G6. Export/Import: self-contained arrangement JSON (context + tracks
   with inline instrument params + region seeds) downloads/uploads via
   buttons in the producer bar. WAV mixdown: SynthEngine.renderSpan()

@@ -1095,7 +1095,7 @@ function playArrangement() {
   synth.stop(); // single-region loop, if any
   const ctx = arrangement.context;
   const slotMs = 4 * (60 / Math.max(30, ctx.tempo || 104)) * 1000;
-  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot));
+  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot + regionLen(r) - 1));
   if (!slots.length) return;
   const lastSlot = Math.max(...slots);
   arrPlay = { slot: 0, lastSlot, timer: null };
@@ -1109,10 +1109,11 @@ function playArrangement() {
       return;
     }
     for (const track of arrangement.tracks) {
-      const region = track.regions.find(r => r.slot === s);
+      const region = regionAtSlot(track, s);
       const voice = producerVoice(track);
-      if (region) voice.play(regionPlayParams(track, region));
-      else voice.stop();
+      if (region && s === region.slot) voice.play(regionPlayParams(track, region));
+      else if (!region) voice.stop();
+      // mid-region slots: leave the voice playing through its span
     }
     updatePlayhead(s);
     arrPlay.slot = s + 1;
@@ -1190,7 +1191,7 @@ function audioBufferToWavBlob(buffer) {
 async function mixdownArrangement(statusEl) {
   const ctxP = arrangement.context;
   const slotSec = 4 * 60 / Math.max(30, ctxP.tempo || 104);
-  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot));
+  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot + regionLen(r) - 1));
   if (!slots.length) { alert("Nothing to mix down — place some regions first."); return; }
   stopArrangement();
   synth.stop();
@@ -1205,7 +1206,7 @@ async function mixdownArrangement(statusEl) {
       const voice = new SynthEngine();
       voice.init(off, off.destination);
       voice.setMasterVolume(track.gain ?? 1);
-      voice.renderSpan(regionPlayParams(track, region), region.slot * slotSec + 0.05, slotSec);
+      voice.renderSpan(regionPlayParams(track, region), region.slot * slotSec + 0.05, slotSec * regionLen(region));
     }
   }
   try {
@@ -1218,24 +1219,47 @@ async function mixdownArrangement(statusEl) {
   }
 }
 
+function regionLen(region) { return Math.max(1, region.lengthSlots || 1); }
+
+function regionAtSlot(track, s) {
+  return track.regions.find(r => s >= r.slot && s < r.slot + regionLen(r));
+}
+
+// Longest length this region may take before hitting the next region or the end
+function maxRegionLength(track, region) {
+  let limit = SLOT_COUNT - region.slot;
+  for (const other of track.regions) {
+    if (other.id === region.id) continue;
+    if (other.slot > region.slot) limit = Math.min(limit, other.slot - region.slot);
+  }
+  return limit;
+}
+
 function produceTimelineHTML() {
   if (!arrangement.tracks.length) {
     return '<div class="empty-state">Add an instrument above to create a track.</div>';
   }
   return arrangement.tracks.map(t => {
     const cells = [];
-    for (let s = 0; s < SLOT_COUNT; s++) {
+    for (let s = 0; s < SLOT_COUNT; ) {
       const region = t.regions.find(r => r.slot === s);
       if (region) {
+        const len = Math.min(regionLen(region), SLOT_COUNT - s);
         const sel = selectedRegion?.regionId === region.id ? " selected" : "";
-        cells.push(`<div class="tl-region${sel}" data-region="${region.id}" data-track="${t.id}" data-slot="${s}" title="Region — same seed replays the identical take. Click to select.">
-          <span class="tl-seed">#${region.seed}</span></div>`);
+        cells.push(`<div class="tl-region${sel}" draggable="true" style="grid-column: span ${len}" data-region="${region.id}" data-track="${t.id}" data-slot="${s}" title="Region — same seed replays the identical take. Click to select, drag to move.">
+          <span class="tl-seed">#${region.seed}</span>${len > 1 ? `<span class="tl-len">×${len}</span>` : ""}</div>`);
+        s += len;
+      } else if (regionAtSlot(t, s)) {
+        s++; // covered by a spanning region from earlier; defensive skip
       } else {
-        cells.push(`<div class="tl-cell" data-cell="${t.id}:${s}" data-slot="${s}" title="Place a region here"></div>`);
+        cells.push(`<div class="tl-cell" data-cell="${t.id}:${s}" data-slot="${s}" title="Place a region here (or drop one)"></div>`);
+        s++;
       }
     }
+    const gain = t.gain ?? 1;
     return `<div class="tl-row">
       <div class="tl-head"><span title="${esc(t.name)}">${esc(t.name)}</span>
+        <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
         <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button></div>
       ${cells.join("")}
     </div>`;
@@ -1249,6 +1273,8 @@ function produceToolbarHTML() {
   return `
     <button class="btn btn-primary btn-sm" id="regionPlay">${synth.isPlaying ? "■ Stop loop" : "▶ Loop region"}</button>
     <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context">↻ Reroll take</button>
+    <button class="btn btn-secondary btn-sm" id="regionLonger" title="Extend this region by one slot">＋ Longer</button>
+    <button class="btn btn-secondary btn-sm" id="regionShorter" title="Shorten this region by one slot">− Shorter</button>
     <button class="btn btn-ghost btn-sm" id="regionDelete">Delete</button>`;
 }
 
@@ -1375,6 +1401,69 @@ function wireProduce(v) {
     if (synth.isPlaying) synth.play(regionPlayParams(track, region));
     renderProduce();
   };
+
+  const longerBtn = v.querySelector("#regionLonger");
+  if (longerBtn) longerBtn.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    region.lengthSlots = Math.min(maxRegionLength(track, region), regionLen(region) + 1);
+    saveArrangement();
+    renderProduce();
+  };
+
+  const shorterBtn = v.querySelector("#regionShorter");
+  if (shorterBtn) shorterBtn.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    region.lengthSlots = Math.max(1, regionLen(region) - 1);
+    saveArrangement();
+    renderProduce();
+  };
+
+  // Per-track gain (live on the playing voice)
+  v.querySelectorAll("[data-track-gain]").forEach(sl => {
+    sl.oninput = () => {
+      const track = arrangement.tracks.find(t => t.id === sl.dataset.trackGain);
+      if (!track) return;
+      track.gain = Number(sl.value);
+      saveArrangement();
+      producerVoices.get(track.id)?.setMasterVolume(track.gain);
+    };
+  });
+
+  // Drag regions between cells/tracks
+  v.querySelectorAll(".tl-region").forEach(el => {
+    el.ondragstart = (e) => {
+      e.dataTransfer.setData("text/plain", JSON.stringify({ trackId: el.dataset.track, regionId: el.dataset.region }));
+    };
+  });
+  v.querySelectorAll("[data-cell]").forEach(cell => {
+    cell.ondragover = (e) => e.preventDefault();
+    cell.ondrop = (e) => {
+      e.preventDefault();
+      try {
+        const { trackId, regionId } = JSON.parse(e.dataTransfer.getData("text/plain") || "{}");
+        const [destTrackId, slotStr] = cell.dataset.cell.split(":");
+        const src = arrangement.tracks.find(t => t.id === trackId);
+        const dest = arrangement.tracks.find(t => t.id === destTrackId);
+        const region = src?.regions.find(r => r.id === regionId);
+        if (!src || !dest || !region) return;
+        const slot = Number(slotStr);
+        const len = regionLen(region);
+        if (slot + len > SLOT_COUNT) return;
+        for (let s2 = slot; s2 < slot + len; s2++) {
+          const occ = regionAtSlot(dest, s2);
+          if (occ && occ.id !== region.id) return; // span not free
+        }
+        src.regions = src.regions.filter(r => r.id !== region.id);
+        region.slot = slot;
+        dest.regions.push(region);
+        selectedRegion = { trackId: dest.id, regionId: region.id };
+        saveArrangement();
+        renderProduce();
+      } catch { /* ignore malformed drops */ }
+    };
+  });
 
   const deleteBtn = v.querySelector("#regionDelete");
   if (deleteBtn) deleteBtn.onclick = () => {

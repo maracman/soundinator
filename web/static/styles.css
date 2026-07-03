@@ -4554,3 +4554,18 @@ body.explore-mode #app {
   border-color: var(--surp);
   box-shadow: 0 0 0 1px rgba(56,189,248,0.6), 0 0 10px rgba(56,189,248,0.25);
 }
+
+/* ── Producer v2: region length, track gain ──────────────── */
+
+.tl-len {
+  margin-left: 0.35rem;
+  color: var(--text2);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+}
+
+.tl-head .tl-gain {
+  width: 46px;
+  height: 3px;
+  flex: none;
+}
