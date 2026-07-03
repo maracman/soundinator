@@ -2130,6 +2130,48 @@ export class SynthEngine {
     this._schedule();
   }
 
+  /**
+   * Offline span renderer for mixdown: deterministically generates and
+   * schedules one region's notes from t0 for spanSec into the current
+   * (typically Offline) AudioContext. Mirrors _schedule()'s timing exactly,
+   * minus timers and visual bookkeeping. init(offlineCtx, dest) must have
+   * been called first.
+   */
+  renderSpan(params, t0, spanSec) {
+    if (!this.ctx) return;
+    this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
+    this._vibratoActive = false;
+    this._vibratoPhase = 0;
+    this._vibratoCycleRate = params.vibratoRate || 5.5;
+    this._vibratoCycleDepth = 0;
+    this._timeline = [];
+    this._configureReverb(params);
+    this._percParams = {
+      percBeatVol: params.percBeatVol || 0,
+      percBeatSound: params.percBeatSound || "click",
+      percMotifVol: params.percMotifVol || 0,
+      percMotifSound: params.percMotifSound || "bell",
+      percDownbeatVol: params.percDownbeatVol || 0,
+      percDownbeatSound: params.percDownbeatSound || "wood",
+      percDownbeatEvery: params.percDownbeatEvery || 4,
+    };
+    this._engine = new GenerationEngine(params);
+    this._engine.initialise();
+    let t = t0;
+    let guard = 0;
+    while (t < t0 + spanSec && guard++ < 4000) {
+      const note = this._engine.nextNote();
+      if (!note) break;
+      const beatDiv = note.beatDivisions || 1;
+      const divSec = 60 / ((this._engine.p.tempo || 104) * beatDiv);
+      const noteDur = note.durationDivs * divSec;
+      if (t + noteDur > t0 + spanSec + 1e-6) break; // don't spill past the region
+      this._render(note, t);
+      this._schedulePerc(note, t, divSec);
+      t += noteDur;
+    }
+  }
+
   _configureReverb(params = {}) {
     if (!this._dryGain || !this._wetGain || !this._convolver) return;
     const wet = this._clamp(params.reverbWet ?? 0, 0, 0.95);

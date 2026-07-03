@@ -255,8 +255,13 @@ synth configuration pulled into arrangement tracks.
   empty cells, with a cyan playhead sweeping the timeline. Verified live
   (playhead 0→1 at tempo, clean stop). Per-track pan + gain UI deferred to
   v2 polish.
-- [ ] G6. Arrangement save/load (localStorage + export as JSON), and mixdown
-  export (single stereo WAV render of the arrangement).
+- [x] G6. Export/Import: self-contained arrangement JSON (context + tracks
+  with inline instrument params + region seeds) downloads/uploads via
+  buttons in the producer bar. WAV mixdown: SynthEngine.renderSpan()
+  deterministically schedules each region's notes into an
+  OfflineAudioContext (fresh voice per region, timing mirrors the realtime
+  scheduler), rendered and encoded to 16-bit stereo WAV. Verified: 3
+  regions render 12.4s with energy at their slots, peak 0.42.
 - [ ] G7. (Stretch) Bake to piano roll: materialise a take into an editable
   clip with dual pitch representation (precise-frequency note body + ghost
   of the intended scale note), snap-drag preserving cents offsets,

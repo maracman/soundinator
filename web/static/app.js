@@ -1121,6 +1121,103 @@ function playArrangement() {
   step();
 }
 
+// ── Arrangement export / import / mixdown (G6) ───────────────
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function exportArrangement() {
+  const payload = {
+    format: "phase0-arrangement-1.0",
+    app_version: APP_VERSION,
+    exported_at: new Date().toISOString(),
+    ...arrangement,
+  };
+  downloadBlob(
+    new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+    `${(arrangement.name || "arrangement").replace(/[^\w-]+/g, "_")}.json`
+  );
+}
+
+function importArrangement(file) {
+  file.text().then(text => {
+    const data = JSON.parse(text);
+    if (!Array.isArray(data.tracks)) throw new Error("not an arrangement file");
+    arrangement = {
+      name: data.name || "Imported arrangement",
+      context: data.context || defaultArrangementContext(),
+      tracks: data.tracks,
+    };
+    selectedRegion = null;
+    saveArrangement();
+    renderProduce();
+  }).catch(err => alert(`Could not import: ${err.message}`));
+}
+
+// 16-bit PCM WAV encoder for an AudioBuffer (stereo interleaved).
+function audioBufferToWavBlob(buffer) {
+  const numCh = Math.min(2, buffer.numberOfChannels);
+  const sr = buffer.sampleRate;
+  const frames = buffer.length;
+  const dataBytes = frames * numCh * 2;
+  const ab = new ArrayBuffer(44 + dataBytes);
+  const view = new DataView(ab);
+  const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, "RIFF"); view.setUint32(4, 36 + dataBytes, true); writeStr(8, "WAVE");
+  writeStr(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, numCh, true); view.setUint32(24, sr, true);
+  view.setUint32(28, sr * numCh * 2, true); view.setUint16(32, numCh * 2, true);
+  view.setUint16(34, 16, true); writeStr(36, "data"); view.setUint32(40, dataBytes, true);
+  const chans = [];
+  for (let c = 0; c < numCh; c++) chans.push(buffer.getChannelData(c));
+  let off = 44;
+  for (let i = 0; i < frames; i++) {
+    for (let c = 0; c < numCh; c++) {
+      const s = Math.max(-1, Math.min(1, chans[c][i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      off += 2;
+    }
+  }
+  return new Blob([ab], { type: "audio/wav" });
+}
+
+async function mixdownArrangement(statusEl) {
+  const ctxP = arrangement.context;
+  const slotSec = 4 * 60 / Math.max(30, ctxP.tempo || 104);
+  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot));
+  if (!slots.length) { alert("Nothing to mix down — place some regions first."); return; }
+  stopArrangement();
+  synth.stop();
+  if (statusEl) statusEl.textContent = "Rendering…";
+  const lastSlot = Math.max(...slots);
+  const sr = 44100;
+  const totalSec = (lastSlot + 1) * slotSec + 3; // reverb/release tail
+  const off = new OfflineAudioContext(2, Math.ceil(totalSec * sr), sr);
+  for (const track of arrangement.tracks) {
+    for (const region of track.regions) {
+      // A fresh voice per region: deterministic take, exactly as live playback
+      const voice = new SynthEngine();
+      voice.init(off, off.destination);
+      voice.setMasterVolume(track.gain ?? 1);
+      voice.renderSpan(regionPlayParams(track, region), region.slot * slotSec + 0.05, slotSec);
+    }
+  }
+  try {
+    const rendered = await off.startRendering();
+    downloadBlob(audioBufferToWavBlob(rendered), `${(arrangement.name || "arrangement").replace(/[^\w-]+/g, "_")}.wav`);
+    if (statusEl) statusEl.textContent = "";
+  } catch (err) {
+    if (statusEl) statusEl.textContent = "";
+    alert(`Mixdown failed: ${err.message}`);
+  }
+}
+
 function produceTimelineHTML() {
   if (!arrangement.tracks.length) {
     return '<div class="empty-state">Add an instrument above to create a track.</div>';
@@ -1167,6 +1264,11 @@ function renderProduce() {
         </div>
         <div class="produce-actions">
           <button class="btn btn-primary btn-sm" id="arrPlayBtn">▶ Play arrangement</button>
+          <button class="btn btn-secondary btn-sm" id="arrMixdown" title="Render the arrangement offline and download it as a WAV">⬇ WAV</button>
+          <button class="btn btn-ghost btn-sm" id="arrExport" title="Download this arrangement as a self-contained JSON file (instruments included)">Export</button>
+          <button class="btn btn-ghost btn-sm" id="arrImport" title="Load an arrangement JSON file">Import</button>
+          <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
+          <span class="toolbar-hint" id="mixStatus"></span>
           <button class="btn btn-secondary btn-sm" id="prodStop">■ Stop</button>
           <a class="btn btn-ghost btn-sm" href="#explore">← Sound Studio</a>
         </div>
@@ -1297,6 +1399,17 @@ function wireProduce(v) {
 
   const stopBtn = v.querySelector("#prodStop");
   if (stopBtn) stopBtn.onclick = () => { stopArrangement(); synth.stop(); renderProduce(); };
+
+  const mixBtn = v.querySelector("#arrMixdown");
+  if (mixBtn) mixBtn.onclick = () => mixdownArrangement(v.querySelector("#mixStatus"));
+  const exportBtn = v.querySelector("#arrExport");
+  if (exportBtn) exportBtn.onclick = () => exportArrangement();
+  const importBtn = v.querySelector("#arrImport");
+  const importFile = v.querySelector("#arrImportFile");
+  if (importBtn && importFile) {
+    importBtn.onclick = () => importFile.click();
+    importFile.onchange = () => { if (importFile.files[0]) importArrangement(importFile.files[0]); };
+  }
 }
 
 // ─── Landing ────────────────────────────────────────────────
