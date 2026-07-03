@@ -28,6 +28,12 @@ import {
 const STORAGE_KEY = "phase0.presets.v3";
 const PARTICIPANT_KEY = "phase0.pid.v2";
 const ENGAGE_KEY = "phase0.engagement.v3";
+// Bump APP_VERSION whenever generation semantics change: it is folded into
+// every stimulus_id, so identical parameters across app versions do not
+// collide in analysis.
+const APP_VERSION = "sound-studio-0.2.0";
+const EVENT_SCHEMA_VERSION = "explore-event-1.0";
+const SESSION_ID = crypto.randomUUID(); // fresh per page visit
 const FORMANT_CIRCLE = ["ee", "eh", "ah", "oh", "oo"];
 const SURPRISE_FEATURES = [
   { key: "pitch", label: "Pitch / Melody", enabled: "surprisePitchEnabled", weight: "surprisePitchWeight", distance: "surprisePitchDistance" },
@@ -454,6 +460,7 @@ let macroSubTab = { melody: "accuracy", tuning: "accuracy", duration: "generatio
 let productionTab = "percussion";
 let debounceTimer = null;
 let lastSurpriseCount = 0;
+let lastPlayStartedAt = null; // Date.now() of most recent play start this visit
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -461,6 +468,23 @@ function pid() {
   let id = localStorage.getItem(PARTICIPANT_KEY);
   if (!id) { id = crypto.randomUUID(); localStorage.setItem(PARTICIPANT_KEY, id); }
   return id;
+}
+
+// Deterministic id for "the performance you would hear from these settings":
+// FNV-1a over the canonicalised parameter set (seed included) plus
+// APP_VERSION, run with two offsets for 64 bits of hex.
+function stimulusIdFor(params) {
+  const keys = Object.keys(params).sort();
+  const str = APP_VERSION + "|" + keys.map(k => `${k}=${JSON.stringify(params[k])}`).join("&");
+  const fnv = (offset) => {
+    let h = offset >>> 0;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, "0");
+  };
+  return fnv(0x811c9dc5) + fnv(0x741c9dc3);
 }
 
 function loadEngagement() {
@@ -1819,6 +1843,13 @@ function renderExplore() {
     exploreRating = Number(ratingSlider.value);
     ratingOut.textContent = `${exploreRating}/7`;
   };
+  // Log the committed rating (on release, not every tick) against the
+  // stimulus most recently heard, with how long after play-start it landed.
+  ratingSlider.onchange = () => {
+    trackEngagement("rate", {
+      rating_latency_ms: lastPlayStartedAt ? Date.now() - lastPlayStartedAt : null,
+    });
+  };
 
   // Save preset
   v.querySelector("#saveBtn").onclick = () => {
@@ -1829,6 +1860,8 @@ function renderExplore() {
       name,
       rating: exploreRating,
       parameters: { ...exploreParams },
+      stimulus_id: stimulusIdFor(exploreParams),
+      app_version: APP_VERSION,
     };
     const list = loadPresets();
     list.unshift(entry);
@@ -4857,11 +4890,11 @@ function randomiseParams() {
   p.motifSurpriseProb = rf(0.0, 0.5);
 }
 
-function trackEngagement(type) {
+function trackEngagement(type, extra = {}) {
   if (!exploreEngagement.plays) exploreEngagement.plays = 0;
   if (!exploreEngagement.saves) exploreEngagement.saves = 0;
   if (!exploreEngagement.startedAt) exploreEngagement.startedAt = Date.now();
-  if (type === "play") exploreEngagement.plays++;
+  if (type === "play") { exploreEngagement.plays++; lastPlayStartedAt = Date.now(); }
   if (type === "save") exploreEngagement.saves++;
   saveEngagement();
 
@@ -4869,10 +4902,17 @@ function trackEngagement(type) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      schema_version: EVENT_SCHEMA_VERSION,
       event_type: type,
       participant_id: pid(),
+      session_id: SESSION_ID,
+      stimulus_id: stimulusIdFor(exploreParams),
+      app_version: APP_VERSION,
+      client_ts: new Date().toISOString(),
       parameters: { ...exploreParams },
       rating: exploreRating,
+      play_count: exploreEngagement.plays,
+      ...extra,
     }),
   }).catch(() => {});
 }
@@ -4914,6 +4954,9 @@ function maybeShowContribute(v) {
           notes: area.querySelector("#contribNotes").value,
           favourite_rating: exploreRating,
           parameters: { ...exploreParams },
+          stimulus_id: stimulusIdFor(exploreParams),
+          session_id: SESSION_ID,
+          app_version: APP_VERSION,
         }),
       });
       area.querySelector("#contribBtn").textContent = "Shared!";

@@ -7,8 +7,8 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 2
-- Current phase: A (study flow foundations)
+- Iteration: 3
+- Current phase: A (study flow foundations); next task A3 (opt-in consent flow)
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -42,13 +42,12 @@ Full audits in the loop transcript; the load-bearing findings:
 
 ## Phase A — Volunteer appeal-data study flow (priority 1)
 
-- [ ] A1. Stimulus identity & provenance: give every generated performance a
-  `stimulus_id` (seed + params hash + app version); log it with every play,
-  rating, and save event; include client timestamp and a per-visit
-  `session_id` alongside the persistent participant id.
-- [ ] A2. Rate-what-you-hear: tie the rating to the most recent play (log
-  rating events with the stimulus_id heard, rating latency, and play count)
-  rather than a free-floating slider value.
+- [x] A1. Stimulus identity & provenance: every event now carries
+  `stimulus_id` (FNV-1a over canonical params + APP_VERSION), per-visit
+  `session_id`, `app_version`, `client_ts`, and `schema_version`
+  ("explore-event-1.0"); presets and contributions stamped too.
+- [x] A2. Rate-what-you-hear: committed rating changes log a "rate" event
+  with the stimulus_id, rating latency since play start, and play count.
 - [ ] A3. Friendly opt-in flow for explore mode: lightweight welcome/consent
   card (plain language, version-stamped consent event), optional minimal
   demographics (age band, musical training), skippable — tinkering must work

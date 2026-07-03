@@ -34,6 +34,11 @@ from synthesiser.web.phase0 import (
 )
 
 
+# Version stamp for records appended to explore_events.jsonl; bump on any
+# field addition/rename so exports can branch on record shape.
+EXPLORE_EVENT_SCHEMA_VERSION = "explore-event-1.0"
+
+
 def project_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
@@ -209,6 +214,9 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             "favourite_rating": float(payload.get("favourite_rating", 0) or 0),
             "parameters": parameters,
             "preset_hash": preset_hash,
+            "stimulus_id": truncate_text(payload.get("stimulus_id"), 80),
+            "session_id": truncate_text(payload.get("session_id"), 60),
+            "app_version": truncate_text(payload.get("app_version"), 40),
             "phase0_schema_version": PHASE0_SCHEMA_VERSION,
         }
 
@@ -221,11 +229,19 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         """Log an explore-mode interaction event."""
         event = {
             "id": uuid4().hex,
+            "schema_version": EXPLORE_EVENT_SCHEMA_VERSION,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "event_type": truncate_text(payload.get("event_type"), 40),
             "participant_id": truncate_text(payload.get("participant_id"), 60),
+            "session_id": truncate_text(payload.get("session_id"), 60),
+            "stimulus_id": truncate_text(payload.get("stimulus_id"), 80),
+            "app_version": truncate_text(payload.get("app_version"), 40),
+            "client_ts": truncate_text(payload.get("client_ts"), 40),
             "parameters": payload.get("parameters"),
             "rating": payload.get("rating"),
+            "rating_latency_ms": payload.get("rating_latency_ms"),
+            "play_count": payload.get("play_count"),
+            "metrics": payload.get("metrics"),
         }
         self.roots["events"].parent.mkdir(parents=True, exist_ok=True)
         with self.roots["events"].open("a", encoding="utf-8") as handle:

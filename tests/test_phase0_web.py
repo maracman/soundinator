@@ -90,3 +90,48 @@ def test_phase0_server_render_and_global_library(tmp_path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_explore_event_records_provenance(tmp_path) -> None:
+    (tmp_path / "web" / "static").mkdir(parents=True)
+    (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    base = f"http://{host}:{port}"
+    try:
+        response = post_json(
+            f"{base}/api/explore/event",
+            {
+                "event_type": "rate",
+                "participant_id": "p-123",
+                "session_id": "s-456",
+                "stimulus_id": "abcdef0123456789",
+                "app_version": "sound-studio-0.2.0",
+                "client_ts": "2026-07-03T10:00:00.000Z",
+                "parameters": {"seed": 42, "tempo": 104},
+                "rating": 6,
+                "rating_latency_ms": 5400,
+                "play_count": 3,
+            },
+        )
+        assert response["ok"] is True
+
+        events_path = tmp_path / "web" / "data" / "explore_events.jsonl"
+        lines = events_path.read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 1
+        event = json.loads(lines[0])
+        assert event["schema_version"] == "explore-event-1.0"
+        assert event["event_type"] == "rate"
+        assert event["session_id"] == "s-456"
+        assert event["stimulus_id"] == "abcdef0123456789"
+        assert event["app_version"] == "sound-studio-0.2.0"
+        assert event["client_ts"] == "2026-07-03T10:00:00.000Z"
+        assert event["rating"] == 6
+        assert event["rating_latency_ms"] == 5400
+        assert event["play_count"] == 3
+        assert event["parameters"]["seed"] == 42
+    finally:
+        server.shutdown()
+        server.server_close()
