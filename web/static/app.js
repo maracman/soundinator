@@ -1112,7 +1112,13 @@ function playArrangement() {
     for (const track of arrangement.tracks) {
       const region = regionAtSlot(track, s);
       const voice = producerVoice(track);
-      if (region && s === region.slot) voice.play(regionPlayParams(track, region));
+      if (region && s === region.slot) {
+        if (region.type === "baked" && Array.isArray(region.notes)) {
+          voice.playNotes(regionPlayParams(track, region), region.notes);
+        } else {
+          voice.play(regionPlayParams(track, region));
+        }
+      }
       else if (!region) voice.stop();
       // mid-region slots: leave the voice playing through its span
     }
@@ -1207,7 +1213,11 @@ async function mixdownArrangement(statusEl) {
       const voice = new SynthEngine();
       voice.init(off, off.destination);
       voice.setMasterVolume(track.gain ?? 1);
-      voice.renderSpan(regionPlayParams(track, region), region.slot * slotSec + 0.05, slotSec * regionLen(region));
+      if (region.type === "baked" && Array.isArray(region.notes)) {
+        voice.renderNotesSpan(regionPlayParams(track, region), region.notes, region.slot * slotSec + 0.05);
+      } else {
+        voice.renderSpan(regionPlayParams(track, region), region.slot * slotSec + 0.05, slotSec * regionLen(region));
+      }
     }
   }
   try {
@@ -1248,7 +1258,7 @@ function produceTimelineHTML() {
         const len = Math.min(regionLen(region), SLOT_COUNT - s);
         const sel = selectedRegion?.regionId === region.id ? " selected" : "";
         cells.push(`<div class="tl-region${sel}" draggable="true" style="grid-column: span ${len}" data-region="${region.id}" data-track="${t.id}" data-slot="${s}" title="Region — same seed replays the identical take. Click to select, drag to move.">
-          <span class="tl-seed">#${region.seed}</span>${len > 1 ? `<span class="tl-len">×${len}</span>` : ""}</div>`);
+          <span class="tl-seed">${region.type === "baked" ? "◆" : "#" + region.seed}</span>${len > 1 ? `<span class="tl-len">×${len}</span>` : ""}</div>`);
         s += len;
       } else if (regionAtSlot(t, s)) {
         s++; // covered by a spanning region from earlier; defensive skip
@@ -1271,9 +1281,20 @@ function produceToolbarHTML() {
   if (!selectedRegion) {
     return '<span class="toolbar-hint">Select a region to play it as a loop, reroll its take, or delete it.</span>';
   }
+  const sel = (() => {
+    for (const t of arrangement.tracks) {
+      const r = t.regions.find(r => r.id === selectedRegion.regionId);
+      if (r) return r;
+    }
+    return null;
+  })();
+  const baked = sel?.type === "baked";
   return `
     <button class="btn btn-primary btn-sm" id="regionPlay">${synth.isPlaying ? "■ Stop loop" : "▶ Loop region"}</button>
-    <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context">↻ Reroll take</button>
+    ${baked
+      ? `<button class="btn btn-secondary btn-sm" id="regionUnbake" title="Return this region to generative playback (the baked notes are discarded; the seed regenerates the same take)">Unbake</button>`
+      : `<button class="btn btn-secondary btn-sm" id="regionBake" title="Freeze this take into editable notes — the piano-roll editor works on baked regions">◆ Bake</button>`}
+    <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context"${baked ? " disabled" : ""}>↻ Reroll take</button>
     <button class="btn btn-secondary btn-sm" id="regionLonger" title="Extend this region by one slot">＋ Longer</button>
     <button class="btn btn-secondary btn-sm" id="regionShorter" title="Shorten this region by one slot">− Shorter</button>
     <button class="btn btn-ghost btn-sm" id="regionDelete">Delete</button>`;
@@ -1388,6 +1409,9 @@ function wireProduce(v) {
     if (!track || !region) return;
     stopArrangement();
     if (synth.isPlaying) { synth.stop(); }
+    else if (region.type === "baked" && Array.isArray(region.notes)) {
+      synth.playNotes(regionPlayParams(track, region), region.notes);
+    }
     else { synth.play(regionPlayParams(track, region)); }
     renderProduce();
   };
@@ -1400,6 +1424,29 @@ function wireProduce(v) {
     region.seed = newSeed();
     saveArrangement();
     if (synth.isPlaying) synth.play(regionPlayParams(track, region));
+    renderProduce();
+  };
+
+  const bakeBtn = v.querySelector("#regionBake");
+  if (bakeBtn) bakeBtn.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    const ctxP = arrangement.context;
+    const slotSec = 4 * 60 / Math.max(30, ctxP.tempo || 104);
+    const params = regionPlayParams(track, region);
+    region.notes = synth.captureSpan(params, slotSec * regionLen(region));
+    region.type = "baked";
+    saveArrangement();
+    renderProduce();
+  };
+
+  const unbakeBtn = v.querySelector("#regionUnbake");
+  if (unbakeBtn) unbakeBtn.onclick = () => {
+    const { region } = selected();
+    if (!region) return;
+    delete region.type;
+    delete region.notes;
+    saveArrangement();
     renderProduce();
   };
 

@@ -270,12 +270,14 @@ synth configuration pulled into arrangement tracks.
   OfflineAudioContext (fresh voice per region, timing mirrors the realtime
   scheduler), rendered and encoded to 16-bit stereo WAV. Verified: 3
   regions render 12.4s with energy at their slots, peak 0.42.
-- [ ] G7. (Stretch) Bake to piano roll: materialise a take into an editable
-  clip with dual pitch representation (precise-frequency note body + ghost
-  of the intended scale note), snap-drag preserving cents offsets,
-  fine-tune repitching, and a per-note inspector with relativistic edits
-  over instrument distributions (draw-nudge vs absolute lock). See design
-  doc "Bake" section.
+- [~] G7. (Stretch) Bake to piano roll — STAGE 1 DONE: ◆ Bake captures the
+  region's deterministic take as data (captureSpan: beat-space offsets,
+  degree, cents, velocity, frozen per-note spectral fingerprint); baked
+  regions play/mix via renderNotesSpan/playNotes at the CURRENT session
+  tempo; Unbake reverts (seed retained, non-destructive); reroll disabled
+  while baked. Verified live round-trip (11 notes, badge, playback,
+  revert). Stage 2: piano-roll canvas with dual pitch representation.
+  Stage 3: snap-drag preserving cents offsets + fine-tune + inspector.
 
 ## Cross-cutting
 

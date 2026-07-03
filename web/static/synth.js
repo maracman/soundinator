@@ -2172,6 +2172,80 @@ export class SynthEngine {
     }
   }
 
+  /**
+   * Bake capture (docs/DAW_MODE_DESIGN.md): deterministically generate a
+   * region's take and return its notes as data instead of sound. Offsets
+   * are stored in beat-divisions (beat-space), so baked notes follow a
+   * later session tempo. Needs no AudioContext.
+   */
+  captureSpan(params, spanSec) {
+    const engine = new GenerationEngine(params);
+    engine.initialise();
+    const beatDiv = params.beatDivisions || 1;
+    const divSec = 60 / ((params.tempo || 104) * beatDiv);
+    const notes = [];
+    let offsetDivs = 0;
+    let guard = 0;
+    while (offsetDivs * divSec < spanSec && guard++ < 4000) {
+      const note = engine.nextNote();
+      if (!note) break;
+      const noteDur = note.durationDivs * divSec;
+      if (offsetDivs * divSec + noteDur > spanSec + 1e-6) break;
+      notes.push({ ...note, offsetDivs });
+      offsetDivs += note.durationDivs;
+    }
+    return notes;
+  }
+
+  /**
+   * Schedule a baked note list into the current context from t0. Timbre is
+   * frozen per note (each carries its sampled fingerprint); timing follows
+   * the CURRENT tempo via beat-space offsets. Graph must be initialised.
+   */
+  renderNotesSpan(params, notes, t0) {
+    if (!this.ctx || !Array.isArray(notes)) return;
+    this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
+    this._vibratoActive = false;
+    this._vibratoPhase = 0;
+    this._vibratoCycleRate = params.vibratoRate || 5.5;
+    this._vibratoCycleDepth = 0;
+    this._timeline = [];
+    this._configureReverb(params);
+    this._percParams = {
+      percBeatVol: params.percBeatVol || 0,
+      percBeatSound: params.percBeatSound || "click",
+      percMotifVol: params.percMotifVol || 0,
+      percMotifSound: params.percMotifSound || "bell",
+      percDownbeatVol: params.percDownbeatVol || 0,
+      percDownbeatSound: params.percDownbeatSound || "wood",
+      percDownbeatEvery: params.percDownbeatEvery || 4,
+    };
+    this._engine = new GenerationEngine(params); // rng for render-time draws
+    const beatDiv = params.beatDivisions || 1;
+    const divSec = 60 / ((params.tempo || 104) * beatDiv);
+    for (const stored of notes) {
+      const note = { ...stored };
+      const t = t0 + (note.offsetDivs || 0) * divSec;
+      this._render(note, t);
+      this._schedulePerc(note, t, divSec);
+    }
+  }
+
+  /** Live playback of a baked note list (all scheduled upfront). */
+  playNotes(params, notes) {
+    this.init();
+    if (this.ctx.state === "suspended") this.ctx.resume();
+    this.stop();
+    if (this._masterOut) {
+      const now = this.ctx.currentTime;
+      this._masterOut.gain.cancelScheduledValues(now);
+      this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
+    }
+    this._lastLoudnessCorr = null;
+    this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05);
+    this.playing = true;
+  }
+
   _configureReverb(params = {}) {
     if (!this._dryGain || !this._wetGain || !this._convolver) return;
     const wet = this._clamp(params.reverbWet ?? 0, 0, 0.95);
