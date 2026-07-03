@@ -276,8 +276,15 @@ synth configuration pulled into arrangement tracks.
   regions play/mix via renderNotesSpan/playNotes at the CURRENT session
   tempo; Unbake reverts (seed retained, non-destructive); reroll disabled
   while baked. Verified live round-trip (11 notes, badge, playback,
-  revert). Stage 2: piano-roll canvas with dual pitch representation.
-  Stage 3: snap-drag preserving cents offsets + fine-tune + inspector.
+  revert). STAGE 2 DONE: '✎ Edit notes' opens a piano-roll canvas — rows
+  are scale degrees (root rows violet), columns beat divisions; note bodies
+  sit at their PRECISE pitch (cents as fractional row offset) with dashed
+  ghost outlines at the intended degree when intonation missed; surprise
+  notes cyan; click-to-inspect readout (degree, ±cents, velocity,
+  duration). Verified live with screenshot.
+  Stage 3 (remaining): snap-drag between rows preserving cents offsets,
+  modifier-drag to zero the offset, fine-tune cents drag, edits persisted
+  to region.notes and audible in baked playback.
 
 ## Cross-cutting
 
