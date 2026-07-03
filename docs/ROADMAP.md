@@ -241,8 +241,12 @@ synth configuration pulled into arrangement tracks.
   single synth voice; arrangement persists to localStorage. Producer link
   in the studio header; volunteers at #explore never see it. Verified live
   end-to-end. v2 needs: drag placement/extend, region length, playhead.
-- [ ] G4. Session context layer: tempo, key/root & scale, master dynamics,
-  shared space/reverb inherited by instruments unless locked per-instrument.
+- [x] G4. Session context bar: the arrangement owns its Tier-1 context
+  (tempo, key, scale, master dynamics, space) shown as an editable Session
+  bar in #produce; regions inherit it live (playing region re-parameterises
+  on change); persists with the arrangement. Per-track lock overrides
+  deferred to a later polish pass. Verified: key→G, tempo→92 stored and
+  played.
 - [ ] G5. Multi-voice scheduling in synth.js: N concurrent instrument voices
   with per-track gain/pan and a shared master bus/limiter.
 - [ ] G6. Arrangement save/load (localStorage + export as JSON), and mixdown

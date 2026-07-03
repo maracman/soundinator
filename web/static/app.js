@@ -930,12 +930,27 @@ const SLOT_COUNT = 16; // one slot = one motif-length block
 let arrangement = null;
 let selectedRegion = null; // { trackId, regionId }
 
+// Tier 1 session context owned by the arrangement (docs/DAW_MODE_DESIGN.md):
+// the musical "room and piece" every track inherits live.
+function defaultArrangementContext() {
+  const ctx = {};
+  for (const k of SESSION_CONTEXT_PARAMS) {
+    if (k !== "seed" && k in DEFAULTS) ctx[k] = DEFAULTS[k];
+  }
+  ctx.customDegrees = [...(SCALE_PRESETS[ctx.scalePreset]?.degrees || SCALE_PRESETS.major.degrees)];
+  ctx.reverbWet = 0.16;
+  return ctx;
+}
+
 function loadArrangement() {
   try {
     const a = JSON.parse(localStorage.getItem(ARRANGEMENT_KEY) || "null");
-    if (a && Array.isArray(a.tracks)) return a;
+    if (a && Array.isArray(a.tracks)) {
+      if (!a.context) a.context = defaultArrangementContext();
+      return a;
+    }
   } catch { /* fall through */ }
-  return { name: "Untitled arrangement", tracks: [] };
+  return { name: "Untitled arrangement", tracks: [], context: defaultArrangementContext() };
 }
 function saveArrangement() {
   if (arrangement) localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
@@ -953,12 +968,85 @@ function produceSources() {
 }
 
 function regionPlayParams(track, region) {
-  // Tier 1 session context (inherited live) + Tier 2 instrument + Tier 3 take
-  const context = {};
-  for (const k of SESSION_CONTEXT_PARAMS) {
-    if (k !== "seed" && k in exploreParams) context[k] = exploreParams[k];
-  }
+  // Tier 1 session context (owned by the arrangement, inherited live) +
+  // Tier 2 instrument + Tier 3 take
+  const context = arrangement?.context || defaultArrangementContext();
   return { ...DEFAULTS, ...context, ...track.instrumentParams, seed: region.seed };
+}
+
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+function sessionBarHTML() {
+  const ctx = arrangement.context;
+  const root = Array.isArray(ctx.rootNotes) && ctx.rootNotes.length ? ctx.rootNotes[0] : 0;
+  return `
+    <div class="card session-bar" title="Session context: every track inherits these live — change the key and everything follows.">
+      <div class="section-label">Session</div>
+      <div class="session-controls">
+        <label>Tempo
+          <input type="range" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/>
+          <output id="ctxTempoOut">${ctx.tempo}</output>
+        </label>
+        <label>Key
+          <select data-ctx="root">
+            ${NOTE_NAMES.map((n, i) => `<option value="${i}"${i === root ? " selected" : ""}>${n}</option>`).join("")}
+          </select>
+        </label>
+        <label>Scale
+          <select data-ctx="scalePreset">
+            ${Object.entries(SCALE_PRESETS).map(([k, s]) =>
+              `<option value="${k}"${k === ctx.scalePreset ? " selected" : ""}>${s.label}</option>`).join("")}
+          </select>
+        </label>
+        <label>Dynamics
+          <input type="range" data-ctx="dynamicsLevel" min="0.05" max="1" step="0.01" value="${ctx.dynamicsLevel}"/>
+        </label>
+        <label>Space
+          <select data-ctx="reverbType">
+            ${Object.entries(REVERB_PROFILES).map(([k, r]) =>
+              `<option value="${k}"${k === ctx.reverbType ? " selected" : ""}>${r.label}</option>`).join("")}
+          </select>
+          <input type="range" data-ctx="reverbWet" min="0" max="0.95" step="0.01" value="${ctx.reverbWet}" title="Reverb amount"/>
+        </label>
+      </div>
+    </div>`;
+}
+
+function wireSessionBar(v) {
+  const applyLive = () => {
+    if (!synth.isPlaying || !selectedRegion) return;
+    const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+    const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+    if (track && region) {
+      synth.updateGenerationParams(regionPlayParams(track, region));
+      synth.updateReverb(regionPlayParams(track, region));
+    }
+  };
+  v.querySelectorAll("[data-ctx]").forEach(input => {
+    const handler = () => {
+      const key = input.dataset.ctx;
+      const ctx = arrangement.context;
+      if (key === "root") {
+        ctx.rootNotes = [Number(input.value)];
+      } else if (key === "scalePreset") {
+        ctx.scalePreset = input.value;
+        ctx.scaleMode = "12tone";
+        ctx.customDegrees = [...(SCALE_PRESETS[input.value]?.degrees || SCALE_PRESETS.major.degrees)];
+      } else if (input.type === "range") {
+        ctx[key] = Number(input.value);
+        if (key === "tempo") {
+          const out = v.querySelector("#ctxTempoOut");
+          if (out) out.textContent = input.value;
+        }
+      } else {
+        ctx[key] = input.value;
+      }
+      saveArrangement();
+      applyLive();
+    };
+    if (input.tagName === "SELECT") input.onchange = handler;
+    else input.oninput = handler;
+  });
 }
 
 function newSeed() { return Math.floor(Math.random() * 999999) + 1; }
@@ -1012,6 +1100,7 @@ function renderProduce() {
           <a class="btn btn-ghost btn-sm" href="#explore">← Sound Studio</a>
         </div>
       </div>
+      ${sessionBarHTML()}
       <div class="card produce-browser">
         <div class="section-label">Instruments — click to add a track</div>
         <div class="produce-sources">
@@ -1035,6 +1124,8 @@ function renderProduce() {
 
 function wireProduce(v) {
   const sources = produceSources();
+
+  wireSessionBar(v);
 
   v.querySelectorAll("[data-add-track]").forEach(btn => {
     btn.onclick = () => {
