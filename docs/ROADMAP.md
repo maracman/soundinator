@@ -7,9 +7,11 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 12
-- Phases A-E done (+ CI). Next: Phase F — usability fixes (F1) and the 2-3
-  rendered visual direction proposals for owner approval (F2).
+- Iteration: 13
+- Phases A-E done (+ CI). F2 decided: FabFilter-inspired direction (see
+  docs/UI_DIRECTION.md). Next: F3a reskin (tokens + chrome), folding in F1
+  usability fixes, then F3b display-forward layout, F3c contextual panels
+  (incl. B4a vowel pad).
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -140,10 +142,16 @@ Full audits in the loop transcript; the load-bearing findings:
 
 - [ ] F1. Usability fixes that need no approval: responsive canvases,
   touch-friendly slider sizing, consistent spacing, loading/error states.
-- [ ] F2. Produce 2–3 rendered visual direction proposals (artifact with
-  mockups: e.g. dark pro-studio, warm approachable, current-mock-converged)
-  — STOP and wait for user choice before restyling.
-- [ ] F3. Apply chosen direction across the app.
+- [x] F2. Proposals delivered (artifact with three rendered directions);
+  owner chose a fourth path: FabFilter-inspired design language. Design
+  system specified in docs/UI_DIRECTION.md (monochrome shell, data-owned
+  colour, display-forward, contextual editing, precision readouts).
+- [ ] F3a. Reskin: apply token system + chrome discipline to the existing
+  layout (thin tracks, layer-hued fills, mono readouts, soft elevation).
+- [ ] F3b. Display-forward layout: hero visualiser strip; distribution
+  canvases restyled to filled-curve language with hover readouts.
+- [ ] F3c. Contextual panels: note grid & 2D vowel pad (B4a) as
+  direct-manipulation surfaces with floating per-item editors.
 
 ## Phase G — Producer mode: orchestration / DAW-ish arrangement (owner request 2026-07-03)
 
