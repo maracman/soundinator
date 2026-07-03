@@ -1314,6 +1314,7 @@ function newSeed() { return Math.floor(Math.random() * 999999) + 1; }
 const producerVoices = new Map(); // trackId -> SynthEngine voice
 let producerBus = null;
 let arrPlay = null; // { slot, timer, lastSlot }
+let playheadBeat = 0;  // where Play starts; set by clicking the ruler
 
 function producerVoice(track) {
   synth.init();
@@ -1344,7 +1345,7 @@ function updatePlayhead(beat) {
 function stopArrangement() {
   if (arrPlay) { clearTimeout(arrPlay.timer); arrPlay = null; }
   producerVoices.forEach(v => v.stop());
-  updatePlayhead(-1);
+  updatePlayhead(playheadBeat);
 }
 
 function playArrangement(fromBeat = 0) {
@@ -1370,7 +1371,8 @@ function playArrangement(fromBeat = 0) {
       const voice = producerVoice(track);
       if (region && (b === region.startBeat || b === arrPlay.startAt)) {
         if (region.type === "baked" && Array.isArray(region.notes)) {
-          voice.playNotes(regionPlayParams(track, region), region.notes);
+          voice.playNotes(regionPlayParams(track, region), region.notes,
+            regionLen(region), region.loopSourceBeats || regionLen(region));
         } else {
           voice.play(regionPlayParams(track, region));
         }
@@ -1471,7 +1473,8 @@ async function mixdownArrangement(statusEl) {
       voice.init(off, off.destination);
       voice.setMasterVolume(track.gain ?? 1);
       if (region.type === "baked" && Array.isArray(region.notes)) {
-        voice.renderNotesSpan(regionPlayParams(track, region), region.notes, region.startBeat * beatSec + 0.05);
+        voice.renderNotesSpan(regionPlayParams(track, region), region.notes,
+          region.startBeat * beatSec + 0.05, regionLen(region), region.loopSourceBeats || regionLen(region));
       } else {
         voice.renderSpan(regionPlayParams(track, region), region.startBeat * beatSec + 0.05, beatSec * regionLen(region));
       }
@@ -2012,6 +2015,15 @@ function wireProduce(v) {
     };
   });
 
+  // Click the ruler to set the playhead
+  const ruler = v.querySelector("#tlRuler");
+  if (ruler) ruler.onclick = (e) => {
+    const rect = ruler.getBoundingClientRect();
+    playheadBeat = Math.max(0, Math.min(BEATS_TOTAL - 1, Math.round((e.clientX - rect.left) / PX_PER_BEAT)));
+    updatePlayhead(playheadBeat);
+  };
+  updatePlayhead(arrPlay ? arrPlay.beat : playheadBeat);
+
   wireRoll(v);
 
   const selected = () => {
@@ -2028,7 +2040,8 @@ function wireProduce(v) {
     stopArrangement();
     if (synth.isPlaying) { synth.stop(); }
     else if (region.type === "baked" && Array.isArray(region.notes)) {
-      synth.playNotes(regionPlayParams(track, region), region.notes);
+      synth.playNotes(regionPlayParams(track, region), region.notes,
+        regionLen(region), region.loopSourceBeats || regionLen(region));
     }
     else { synth.play(regionPlayParams(track, region)); }
     renderProduce();
@@ -2054,6 +2067,7 @@ function wireProduce(v) {
     const params = regionPlayParams(track, region);
     region.notes = synth.captureSpan(params, beatSec * regionLen(region));
     region.type = "baked";
+    region.loopSourceBeats = regionLen(region);
     saveArrangement();
     renderProduce();
   };
@@ -2128,8 +2142,8 @@ function wireProduce(v) {
       stopArrangement();
       arrPlayBtn.textContent = "▶ Play arrangement";
     } else {
-      playArrangement();
-      arrPlayBtn.textContent = "■ Stop arrangement";
+      playArrangement(playheadBeat);
+      arrPlayBtn.textContent = "■ Stop";
     }
   };
 

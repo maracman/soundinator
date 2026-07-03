@@ -2202,7 +2202,7 @@ export class SynthEngine {
    * frozen per note (each carries its sampled fingerprint); timing follows
    * the CURRENT tempo via beat-space offsets. Graph must be initialised.
    */
-  renderNotesSpan(params, notes, t0) {
+  renderNotesSpan(params, notes, t0, totalBeats = null, loopBeats = null) {
     if (!this.ctx || !Array.isArray(notes)) return;
     this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
     this._vibratoActive = false;
@@ -2223,16 +2223,26 @@ export class SynthEngine {
     this._engine = new GenerationEngine(params); // rng for render-time draws
     const beatDiv = params.beatDivisions || 1;
     const divSec = 60 / ((params.tempo || 104) * beatDiv);
-    for (const stored of notes) {
-      const note = { ...stored };
-      const t = t0 + (note.offsetDivs || 0) * divSec;
-      this._render(note, t);
-      this._schedulePerc(note, t, divSec);
+    // Loop semantics (bake design): an extended baked region repeats its
+    // stored notes every loopBeats, clipped to totalBeats.
+    const reps = (loopBeats && totalBeats)
+      ? Math.max(1, Math.ceil(totalBeats / loopBeats))
+      : 1;
+    for (let rep = 0; rep < reps; rep++) {
+      const repDivs = rep * (loopBeats || 0) * beatDiv;
+      for (const stored of notes) {
+        const offDivs = (stored.offsetDivs || 0) + repDivs;
+        if (totalBeats != null && offDivs / beatDiv >= totalBeats) continue;
+        const note = { ...stored };
+        const t = t0 + offDivs * divSec;
+        this._render(note, t);
+        this._schedulePerc(note, t, divSec);
+      }
     }
   }
 
   /** Live playback of a baked note list (all scheduled upfront). */
-  playNotes(params, notes) {
+  playNotes(params, notes, totalBeats = null, loopBeats = null) {
     this.init();
     if (this.ctx.state === "suspended") this.ctx.resume();
     this.stop();
@@ -2242,7 +2252,7 @@ export class SynthEngine {
       this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
     }
     this._lastLoudnessCorr = null;
-    this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05);
+    this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05, totalBeats, loopBeats);
     this.playing = true;
   }
 

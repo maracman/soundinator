@@ -133,8 +133,12 @@ Quality:
    bake all beat-based; playhead line on the ruler; v1 slot arrangements
    auto-migrate (regions → beats, inline instruments → palette entries).
    Bar items B3/B4/B5 functionally met pending the P7 walkthrough.
-4. **P4 Playback**: beat-based multi-voice transport from playhead, loop
-   semantics, mixdown update.
+4. **P4 Playback** — DONE: click the ruler to set the playhead (line
+   visible while stopped; Play starts there; stop returns to it); baked
+   regions store loopSourceBeats at bake time and repeat their notes every
+   loop across an extended length, in live playback, region-loop, and
+   mixdown; generative regions regenerate deterministically for their span.
+   Bar item B9 functionally met pending the P7 walkthrough.
 5. **P5 Editor drawer**: piano roll docked; double-click opens; bake flow.
 6. **P6 Palette editing**: round-trip with the synth editor (+fork).
 7. **P7 Walkthrough vs the bar**, fix, screenshot review, then owner
