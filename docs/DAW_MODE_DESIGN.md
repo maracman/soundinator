@@ -7,6 +7,31 @@ parameter scoping (what defaults to session context?) and what happens when
 you return to a previously used synth pattern. This doc proposes answers for
 sign-off before implementation (roadmap Phase G).
 
+## Layout & interaction reference: Celemony Tonalic (owner cue, 2026-07-03)
+
+Tonalic's arranger demonstrates the interaction model producer mode should
+borrow (it independently validates several decisions below):
+
+- **Dual-panel structure.** Upper panel: a rich browse/search/audition
+  space for pattern presets ("Tonalics") — filterable by category, shown as
+  lists or visual sets, with in-context preview (audition against the
+  current session, not in isolation). Lower panel: the arrangement
+  timeline where those presets are dragged in as **Regions**.
+  → Our producer mode adopts this: instrument/section presets and saved
+  patterns are draggable chips in a browser panel; dropping one on a track
+  creates a region referencing it.
+- **Context adaptation.** Tonalic regions automatically adapt to the
+  session's chords, tempo, and groove — exactly our Tier 1 session-context
+  inheritance (tempo/key/scale flow into regions unless locked).
+- **Region mechanics.** Edge-drag to extend; content re-generates to fill.
+  Maps directly to our loop-over-region + deterministic take model.
+- **Refine mode.** Clicking a region opens a deep per-note editor
+  (Melodyne-style) with focused tools — the exact entry pattern for our
+  bake-to-piano-roll editor (G7): arrangement stays simple, depth appears
+  on demand.
+- **Preview-in-context** is the audition default: preset browsing plays
+  against the current session context rather than a canned demo.
+
 ## Core objects
 
 - **Instrument** — a saved synth configuration: sound source (formant/fourier

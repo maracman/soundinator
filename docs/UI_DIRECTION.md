@@ -68,6 +68,21 @@ display *is* the display.
   master; rating stays one obvious friendly control (volunteer-facing,
   never buried).
 
+## Preset-forward interaction (Tonalic cue, owner 2026-07-03)
+
+Celemony Tonalic shows how a preset-reliant instrument should feel: the
+library is a first-class browsing surface (filter, visual sets, in-context
+preview), not a list at the bottom of the page. Adopt now, ahead of
+producer mode:
+
+- Presets/starters get a browsable panel treatment: section-filter chips,
+  hover/press **preview against current settings** (audition the preset
+  merged into what's playing, revert on release), and clear full-vs-section
+  identity.
+- In producer mode (Phase G) this browser becomes the upper panel of the
+  Tonalic-style dual layout: preset chips drag onto timeline tracks as
+  regions; clicking a region opens the deep editor (bake/refine).
+
 ## Approachability guardrail
 
 FabFilter reads professional but never cluttered — that's the point for lay
