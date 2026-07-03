@@ -4613,3 +4613,127 @@ body.explore-mode #app {
   color: var(--text2);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── DAW shell (producer v2 P1) ──────────────────────────── */
+
+.daw {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 20px);
+  gap: 0;
+}
+
+.daw-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+}
+
+.daw-title {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-size: 0.85rem;
+  margin-right: 0.4rem;
+}
+
+.daw-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border2);
+}
+
+.daw-ctx {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--text2);
+}
+.daw-ctx input[type="range"] { width: 84px; }
+.daw-ctx select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.16rem 0.3rem;
+  font-size: 0.7rem;
+}
+.daw-ctx output {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--accent2);
+}
+
+.daw-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.daw-left {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem;
+  overflow-y: auto;
+  flex: none;
+  transition: width 0.15s ease;
+}
+.daw-left.collapsed { padding: 0.6rem 0.15rem; overflow: hidden; }
+.daw-left .produce-sources { flex-direction: column; align-items: stretch; display: flex; }
+.daw-left .source-chip { text-align: left; }
+
+.daw-collapse {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 0.8rem;
+  z-index: 2;
+}
+.daw-collapse:hover { color: var(--text); }
+
+.daw-vsplit {
+  width: 6px;
+  cursor: col-resize;
+  flex: none;
+}
+.daw-vsplit:hover { background: rgba(154,160,171,0.15); border-radius: 3px; }
+
+.daw-center {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem;
+  overflow: auto;
+}
+
+.daw-hsplit {
+  height: 6px;
+  cursor: row-resize;
+  flex: none;
+}
+.daw-hsplit:hover { background: rgba(154,160,171,0.15); border-radius: 3px; }
+
+.daw-editor {
+  flex: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.7rem;
+  overflow: auto;
+}
+.daw-editor.collapsed { border: none; padding: 0; }
+.daw-editor .roll-panel { margin-top: 0; }

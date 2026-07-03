@@ -982,6 +982,73 @@ function regionPlayParams(track, region) {
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
+function sessionBarControlsHTML() {
+  const ctx = arrangement.context;
+  const root = Array.isArray(ctx.rootNotes) && ctx.rootNotes.length ? ctx.rootNotes[0] : 0;
+  return `
+    <label class="daw-ctx">Tempo
+      <input type="range" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/>
+      <output id="ctxTempoOut">${ctx.tempo}</output>
+    </label>
+    <label class="daw-ctx">Key
+      <select data-ctx="root">
+        ${NOTE_NAMES.map((n, i) => `<option value="${i}"${i === root ? " selected" : ""}>${n}</option>`).join("")}
+      </select>
+      <select data-ctx="scalePreset">
+        ${Object.entries(SCALE_PRESETS).map(([k, sc]) =>
+          `<option value="${k}"${k === ctx.scalePreset ? " selected" : ""}>${sc.label}</option>`).join("")}
+      </select>
+    </label>
+    <label class="daw-ctx">Space
+      <select data-ctx="reverbType">
+        ${Object.entries(REVERB_PROFILES).map(([k, r]) =>
+          `<option value="${k}"${k === ctx.reverbType ? " selected" : ""}>${r.label}</option>`).join("")}
+      </select>
+      <input type="range" data-ctx="reverbWet" min="0" max="0.95" step="0.01" value="${ctx.reverbWet}" title="Reverb amount"/>
+    </label>`;
+}
+
+function wireDawLayout(v) {
+  const left = v.querySelector(".daw-left");
+  const editor = v.querySelector(".daw-editor");
+
+  const leftCollapse = v.querySelector("#leftCollapse");
+  if (leftCollapse) leftCollapse.onclick = () => {
+    dawLayout.leftOpen = !dawLayout.leftOpen;
+    saveDawLayout();
+    renderProduce();
+  };
+
+  const dragSplit = (el, apply, commit) => {
+    if (!el) return;
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      const move = (ev) => apply(ev);
+      const up = () => {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        commit();
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
+    };
+  };
+
+  dragSplit(v.querySelector("#dawVSplit"), (ev) => {
+    if (!dawLayout.leftOpen || !left) return;
+    const main = v.querySelector(".daw-main").getBoundingClientRect();
+    dawLayout.leftW = Math.max(160, Math.min(430, ev.clientX - main.left));
+    left.style.width = `${dawLayout.leftW}px`;
+  }, saveDawLayout);
+
+  dragSplit(v.querySelector("#dawHSplit"), (ev) => {
+    if (!editor) return;
+    const daw = v.querySelector(".daw").getBoundingClientRect();
+    dawLayout.editorH = Math.max(140, Math.min(420, daw.bottom - ev.clientY));
+    editor.style.height = `${dawLayout.editorH}px`;
+  }, saveDawLayout);
+}
+
 function sessionBarHTML() {
   const ctx = arrangement.context;
   const root = Array.isArray(ctx.rootNotes) && ctx.rootNotes.length ? ctx.rootNotes[0] : 0;
@@ -1510,46 +1577,66 @@ function produceToolbarHTML() {
     <button class="btn btn-ghost btn-sm" id="regionDelete">Delete</button>`;
 }
 
+// DAW shell layout state (docs/PRODUCER_V2_DESIGN.md B8)
+const DAW_LAYOUT_KEY = "phase0.dawLayout.v1";
+function loadDawLayout() {
+  try {
+    return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false,
+      ...(JSON.parse(localStorage.getItem(DAW_LAYOUT_KEY) || "{}")) };
+  } catch { return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false }; }
+}
+let dawLayout = null;
+function saveDawLayout() { localStorage.setItem(DAW_LAYOUT_KEY, JSON.stringify(dawLayout)); }
+
 function renderProduce() {
   arrangement = arrangement || loadArrangement();
+  dawLayout = dawLayout || loadDawLayout();
   const sources = produceSources();
+  const editorOpen = rollOpen && !!selectedBakedRegion();
   const v = mount(`
-    <div class="produce-view">
-      <div class="produce-top">
-        <div>
-          <h1>Producer</h1>
-          <div class="studio-subtitle">Arrangement — early preview (single-voice playback)</div>
+    <div class="daw">
+      <div class="daw-transport">
+        <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Sound Studio">←</a>
+        <span class="daw-title">Producer</span>
+        <button class="btn btn-primary btn-sm" id="arrPlayBtn">▶ Play</button>
+        <button class="btn btn-secondary btn-sm" id="prodStop">■</button>
+        <span class="daw-sep"></span>
+        ${sessionBarControlsHTML()}
+        <span class="daw-sep"></span>
+        <button class="btn btn-secondary btn-sm" id="arrMixdown" title="Render the arrangement offline and download it as a WAV">⬇ WAV</button>
+        <button class="btn btn-ghost btn-sm" id="arrExport" title="Download this arrangement as a self-contained JSON file (instruments included)">Export</button>
+        <button class="btn btn-ghost btn-sm" id="arrImport" title="Load an arrangement JSON file">Import</button>
+        <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
+        <span class="toolbar-hint" id="mixStatus"></span>
+      </div>
+      <div class="daw-main">
+        <div class="daw-left${dawLayout.leftOpen ? "" : " collapsed"}" style="width:${dawLayout.leftOpen ? dawLayout.leftW : 22}px">
+          <button class="daw-collapse" id="leftCollapse" title="${dawLayout.leftOpen ? "Collapse" : "Expand"} the library panel">${dawLayout.leftOpen ? "◂" : "▸"}</button>
+          <div class="daw-left-content${dawLayout.leftOpen ? "" : " hidden"}">
+            <div class="section-label">Instruments</div>
+            <div class="produce-sources">
+              ${sources.map(s => `
+                <button class="source-chip${s.kind === "factory" ? " chip-factory" : ""}" data-add-track="${esc(s.id)}"
+                  title="${s.kind === "factory" ? "Starter voice" : "Your instrument"} — adds a track playing it">${esc(s.name)}</button>`).join("")}
+            </div>
+            <div class="toolbar-hint" style="margin-top:0.8rem">Browser + palette land here next (P2).</div>
+          </div>
         </div>
-        <div class="produce-actions">
-          <button class="btn btn-primary btn-sm" id="arrPlayBtn">▶ Play arrangement</button>
-          <button class="btn btn-secondary btn-sm" id="arrMixdown" title="Render the arrangement offline and download it as a WAV">⬇ WAV</button>
-          <button class="btn btn-ghost btn-sm" id="arrExport" title="Download this arrangement as a self-contained JSON file (instruments included)">Export</button>
-          <button class="btn btn-ghost btn-sm" id="arrImport" title="Load an arrangement JSON file">Import</button>
-          <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
-          <span class="toolbar-hint" id="mixStatus"></span>
-          <button class="btn btn-secondary btn-sm" id="prodStop">■ Stop</button>
-          <a class="btn btn-ghost btn-sm" href="#explore">← Sound Studio</a>
+        <div class="daw-vsplit" id="dawVSplit" title="Drag to resize the library panel"></div>
+        <div class="daw-center">
+          <div class="timeline-grid" id="timelineGrid">${produceTimelineHTML()}</div>
+          <div class="region-toolbar" id="regionToolbar">${produceToolbarHTML()}</div>
         </div>
       </div>
-      ${sessionBarHTML()}
-      <div class="card produce-browser">
-        <div class="section-label">Instruments — click to add a track</div>
-        <div class="produce-sources">
-          ${sources.map(s => `
-            <button class="source-chip${s.kind === "factory" ? " chip-factory" : ""}" data-add-track="${esc(s.id)}"
-              title="${s.kind === "factory" ? "Starter voice" : "Your instrument"} — adds a track playing it">${esc(s.name)}</button>`).join("")}
-        </div>
-      </div>
-      <div class="card produce-timeline">
-        <div class="section-label">Timeline — click an empty cell to place a region</div>
-        <div class="timeline-grid" id="timelineGrid">${produceTimelineHTML()}</div>
-        <div class="region-toolbar" id="regionToolbar">${produceToolbarHTML()}</div>
-        ${rollPanelHTML()}
+      <div class="daw-hsplit${editorOpen ? "" : " hidden"}" id="dawHSplit" title="Drag to resize the editor"></div>
+      <div class="daw-editor${editorOpen ? "" : " collapsed"}" style="height:${editorOpen ? dawLayout.editorH : 0}px">
+        ${editorOpen ? rollPanelHTML() : ""}
       </div>
     </div>
   `);
   document.body.classList.add("explore-mode");
   document.title = "Sound Studio — Producer";
+  wireDawLayout(v);
   wireProduce(v);
   return v;
 }
@@ -1605,6 +1692,13 @@ function wireProduce(v) {
       if (selectedRegion?.regionId !== el.dataset.region) rollNoteSel = -1;
       selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
       renderProduce();
+    };
+    el.ondblclick = () => {
+      selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
+      if (selectedBakedRegion()) {
+        rollOpen = true;
+        renderProduce();
+      }
     };
   });
 

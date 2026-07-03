@@ -114,8 +114,11 @@ Quality:
 
 ## Implementation stages (one reviewable commit each)
 
-1. **P1 Shell**: three-zone layout with working splitters/collapse +
-   transport bar; v1 timeline temporarily embedded so nothing breaks.
+1. **P1 Shell** — DONE: three-zone layout (transport strip with compact
+   session context, collapsible/resizable left column, centre lanes,
+   collapsible/resizable editor drawer that the piano roll docks into;
+   double-click on a baked region opens it). Layout persists. v1 timeline
+   embedded pending P3.
 2. **P2 Browser + palette**: card browser (search/filter/preview) and
    palette rack with add/remove; drag + click-add.
 3. **P3 Region model**: beat-based tracks/regions, palette-sourced regions,
