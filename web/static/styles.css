@@ -4591,3 +4591,25 @@ body.explore-mode #app {
   }
   .preset-item .actions .btn { padding: 0.5rem 0.9rem; }
 }
+
+/* ── Baked-region piano roll ─────────────────────────────── */
+
+.roll-panel { margin-top: 0.8rem; }
+
+.roll-panel canvas {
+  display: block;
+  width: 100%;
+  height: 240px;
+  background: var(--display);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.roll-readout {
+  margin-top: 0.45rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text2);
+  font-variant-numeric: tabular-nums;
+}

@@ -930,6 +930,9 @@ const SLOT_COUNT = 16; // one slot = one motif-length block
 
 let arrangement = null;
 let selectedRegion = null; // { trackId, regionId }
+let rollOpen = false;      // piano-roll panel visible for a baked region
+let rollNoteSel = -1;      // selected note index in the roll
+let _rollHits = [];        // hit rects from the last roll draw
 
 // Tier 1 session context owned by the arrangement (docs/DAW_MODE_DESIGN.md):
 // the musical "room and piece" every track inherits live.
@@ -1277,6 +1280,128 @@ function produceTimelineHTML() {
   }).join("");
 }
 
+function selectedBakedRegion() {
+  if (!selectedRegion) return null;
+  for (const t of arrangement.tracks) {
+    const r = t.regions.find(r => r.id === selectedRegion.regionId);
+    if (r) return r.type === "baked" && Array.isArray(r.notes) ? r : null;
+  }
+  return null;
+}
+
+function rollPanelHTML() {
+  const region = selectedBakedRegion();
+  if (!rollOpen || !region) return "";
+  return `
+    <div class="roll-panel">
+      <canvas id="rollCanvas" width="960" height="240"></canvas>
+      <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies sit at the exact pitch sung; ghost outlines mark the intended scale note.</div>
+    </div>`;
+}
+
+// Piano roll for a baked region: rows = scale degrees, columns = beat
+// divisions. Dual pitch representation per the bake design — the note BODY
+// is positioned at its precise pitch (degree + cents as a fractional row
+// offset) while a ghost outline marks the intended degree whenever the
+// intonation missed.
+function drawRoll(region) {
+  const cv = document.getElementById("rollCanvas");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const notes = region.notes;
+  const padL = 34, padR = 8, padT = 8, padB = 18;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  const degs = notes.map(n => n.degree);
+  const minDeg = Math.min(...degs) - 1, maxDeg = Math.max(...degs) + 1;
+  const rows = maxDeg - minDeg + 1;
+  const rowH = plotH / rows;
+  const totalDivs = Math.max(1, ...notes.map(n => (n.offsetDivs || 0) + (n.durationDivs || 1)));
+  const xFor = (divs) => padL + (divs / totalDivs) * plotW;
+  const yForPitch = (deg, cents) => padT + (maxDeg - (deg + (cents || 0) / 100)) * rowH;
+
+  // Display well + row/beat grid
+  ctx.fillStyle = "#101216";
+  ctx.fillRect(padL - 2, padT - 2, plotW + 4, plotH + 4);
+  ctx.strokeStyle = "rgba(154,160,171,0.08)";
+  ctx.lineWidth = 0.6;
+  for (let d = minDeg; d <= maxDeg; d++) {
+    const y = padT + (maxDeg - d) * rowH + rowH / 2;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+    if ((((d % 12) + 12) % 12) === 0) {
+      ctx.fillStyle = "rgba(139,124,246,0.5)"; // root rows in violet
+      ctx.font = "8px 'SF Mono', monospace";
+      ctx.textAlign = "right";
+      ctx.fillText(String(d), padL - 5, y + 2.5);
+      ctx.fillStyle = "rgba(154,160,171,0.08)";
+    }
+  }
+  const beatDiv = region.notes[0]?.beatDivisions || 1;
+  for (let b = 0; b <= totalDivs; b += beatDiv) {
+    const x = xFor(b);
+    ctx.strokeStyle = b % (beatDiv * 4) === 0 ? "rgba(154,160,171,0.16)" : "rgba(154,160,171,0.06)";
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+  }
+
+  _rollHits = [];
+  notes.forEach((n, i) => {
+    if (n.isRest || !n.velocity) return;
+    const x = xFor(n.offsetDivs || 0);
+    const w = Math.max(3, xFor((n.offsetDivs || 0) + (n.durationDivs || 1)) - x - 1.5);
+    const bodyH = Math.max(4, rowH * 0.7);
+    const cents = n.intonationCents || 0;
+    // Ghost: the intended scale note, whenever the realised pitch missed it
+    if (Math.abs(cents) > 1) {
+      const gy = yForPitch(n.degree, 0) + rowH / 2 - bodyH / 2;
+      ctx.strokeStyle = "rgba(154,160,171,0.35)";
+      ctx.setLineDash([2, 2]);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, gy, w, bodyH);
+      ctx.setLineDash([]);
+    }
+    // Body at the precise pitch
+    const y = yForPitch(n.degree, cents) + rowH / 2 - bodyH / 2;
+    const sel = i === rollNoteSel;
+    const col = n.isSurprise ? "56,189,248" : "245,166,35";
+    ctx.fillStyle = `rgba(${col},${sel ? 0.95 : 0.7})`;
+    ctx.fillRect(x, y, w, bodyH);
+    if (sel) {
+      ctx.strokeStyle = "rgba(232,234,238,0.9)";
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(x - 0.5, y - 0.5, w + 1, bodyH + 1);
+    }
+    _rollHits.push({ i, x, y, w, h: bodyH });
+  });
+}
+
+function rollReadoutText(n) {
+  const cents = Math.round(n.intonationCents || 0);
+  return `deg ${n.degree}  ·  ${cents >= 0 ? "+" : ""}${cents}¢${Math.abs(cents) > 1 ? ` off deg ${n.degree}` : " (on pitch)"}  ·  vel ${(n.velocity || 0).toFixed(2)}  ·  ${n.durationDivs || 1} div${(n.durationDivs || 1) > 1 ? "s" : ""}${n.isSurprise ? "  ·  surprise" : ""}`;
+}
+
+function wireRoll(v) {
+  const cv = v.querySelector("#rollCanvas");
+  const region = selectedBakedRegion();
+  if (!cv || !region) return;
+  drawRoll(region);
+  cv.onclick = (e) => {
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (cv.width / rect.width);
+    const y = (e.clientY - rect.top) * (cv.height / rect.height);
+    const hit = _rollHits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y - 2 && y <= h.y + h.h + 2);
+    rollNoteSel = hit ? hit.i : -1;
+    drawRoll(region);
+    const readout = v.querySelector("#rollReadout");
+    if (readout) {
+      readout.textContent = hit
+        ? rollReadoutText(region.notes[hit.i])
+        : "Click a note to inspect it.";
+    }
+  };
+}
+
 function produceToolbarHTML() {
   if (!selectedRegion) {
     return '<span class="toolbar-hint">Select a region to play it as a loop, reroll its take, or delete it.</span>';
@@ -1292,7 +1417,8 @@ function produceToolbarHTML() {
   return `
     <button class="btn btn-primary btn-sm" id="regionPlay">${synth.isPlaying ? "■ Stop loop" : "▶ Loop region"}</button>
     ${baked
-      ? `<button class="btn btn-secondary btn-sm" id="regionUnbake" title="Return this region to generative playback (the baked notes are discarded; the seed regenerates the same take)">Unbake</button>`
+      ? `<button class="btn btn-secondary btn-sm" id="regionEditNotes">${rollOpen ? "Hide notes" : "✎ Edit notes"}</button>
+         <button class="btn btn-secondary btn-sm" id="regionUnbake" title="Return this region to generative playback (the baked notes are discarded; the seed regenerates the same take)">Unbake</button>`
       : `<button class="btn btn-secondary btn-sm" id="regionBake" title="Freeze this take into editable notes — the piano-roll editor works on baked regions">◆ Bake</button>`}
     <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context"${baked ? " disabled" : ""}>↻ Reroll take</button>
     <button class="btn btn-secondary btn-sm" id="regionLonger" title="Extend this region by one slot">＋ Longer</button>
@@ -1334,6 +1460,7 @@ function renderProduce() {
         <div class="section-label">Timeline — click an empty cell to place a region</div>
         <div class="timeline-grid" id="timelineGrid">${produceTimelineHTML()}</div>
         <div class="region-toolbar" id="regionToolbar">${produceToolbarHTML()}</div>
+        ${rollPanelHTML()}
       </div>
     </div>
   `);
@@ -1391,10 +1518,13 @@ function wireProduce(v) {
 
   v.querySelectorAll("[data-region]").forEach(el => {
     el.onclick = () => {
+      if (selectedRegion?.regionId !== el.dataset.region) rollNoteSel = -1;
       selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
       renderProduce();
     };
   });
+
+  wireRoll(v);
 
   const selected = () => {
     if (!selectedRegion) return {};
@@ -1437,6 +1567,13 @@ function wireProduce(v) {
     region.notes = synth.captureSpan(params, slotSec * regionLen(region));
     region.type = "baked";
     saveArrangement();
+    renderProduce();
+  };
+
+  const editNotesBtn = v.querySelector("#regionEditNotes");
+  if (editNotesBtn) editNotesBtn.onclick = () => {
+    rollOpen = !rollOpen;
+    rollNoteSel = -1;
     renderProduce();
   };
 
