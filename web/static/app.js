@@ -14,6 +14,7 @@
 
 import {
   SynthEngine,
+  GenerationEngine,
   HeadphoneCheck,
   SCALE_PRESETS,
   FORMANT_PRESETS,
@@ -933,6 +934,7 @@ let selectedRegion = null; // { trackId, regionId }
 let rollOpen = false;      // piano-roll panel visible for a baked region
 let rollNoteSel = -1;      // selected note index in the roll
 let _rollHits = [];        // hit rects from the last roll draw
+let _rollGeom = null;      // geometry from the last roll draw
 
 // Tier 1 session context owned by the arrangement (docs/DAW_MODE_DESIGN.md):
 // the musical "room and piece" every track inherits live.
@@ -1321,6 +1323,7 @@ function drawRoll(region) {
   const totalDivs = Math.max(1, ...notes.map(n => (n.offsetDivs || 0) + (n.durationDivs || 1)));
   const xFor = (divs) => padL + (divs / totalDivs) * plotW;
   const yForPitch = (deg, cents) => padT + (maxDeg - (deg + (cents || 0) / 100)) * rowH;
+  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, totalDivs, W, H };
 
   // Display well + row/beat grid
   ctx.fillStyle = "#101216";
@@ -1372,6 +1375,12 @@ function drawRoll(region) {
       ctx.lineWidth = 1.2;
       ctx.strokeRect(x - 0.5, y - 0.5, w + 1, bodyH + 1);
     }
+    if (n.edited) {
+      ctx.fillStyle = "rgba(232,234,238,0.9)";
+      ctx.beginPath();
+      ctx.arc(x + 3, y + 3, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
     _rollHits.push({ i, x, y, w, h: bodyH });
   });
 }
@@ -1386,20 +1395,95 @@ function wireRoll(v) {
   const region = selectedBakedRegion();
   if (!cv || !region) return;
   drawRoll(region);
-  cv.onclick = (e) => {
+  const readout = v.querySelector("#rollReadout");
+  const setReadout = (text) => { if (readout) readout.textContent = text; };
+  const canvasXY = (e) => {
     const rect = cv.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (cv.width / rect.width);
-    const y = (e.clientY - rect.top) * (cv.height / rect.height);
-    const hit = _rollHits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y - 2 && y <= h.y + h.h + 2);
-    rollNoteSel = hit ? hit.i : -1;
-    drawRoll(region);
-    const readout = v.querySelector("#rollReadout");
-    if (readout) {
-      readout.textContent = hit
-        ? rollReadoutText(region.notes[hit.i])
-        : "Click a note to inspect it.";
-    }
+    return {
+      x: (e.clientX - rect.left) * (cv.width / rect.width),
+      y: (e.clientY - rect.top) * (cv.height / rect.height),
+    };
   };
+
+  // Frequency for an edited pitch, from the region's own scale context
+  const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+  const scale = new GenerationEngine(regionPlayParams(track, region)).scale;
+  const freqFor = (degree, cents) => scale.degreeToHz(degree) * Math.pow(2, (cents || 0) / 1200);
+
+  let drag = null; // { i, note, startX, startY, orig, fine, moved }
+
+  cv.onmousedown = (e) => {
+    const { x, y } = canvasXY(e);
+    const hit = _rollHits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y - 2 && y <= h.y + h.h + 2);
+    if (!hit) {
+      rollNoteSel = -1;
+      drawRoll(region);
+      setReadout("Drag a note to move it (its cents offset rides along); shift-drag snaps clean; alt-drag fine-tunes cents only.");
+      return;
+    }
+    rollNoteSel = hit.i;
+    const note = region.notes[hit.i];
+    drag = {
+      i: hit.i, note,
+      startX: x, startY: y,
+      orig: { degree: note.degree, cents: note.intonationCents || 0, offsetDivs: note.offsetDivs || 0 },
+      fine: e.altKey,
+      moved: false,
+    };
+    drawRoll(region);
+    setReadout(rollReadoutText(note));
+    e.preventDefault();
+  };
+
+  cv.onmousemove = (e) => {
+    if (!drag || !_rollGeom) return;
+    const { x, y } = canvasXY(e);
+    const g = _rollGeom;
+    const dx = x - drag.startX;
+    const dy = y - drag.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
+    const note = drag.note;
+    if (drag.fine) {
+      // Fine-tune: vertical motion edits cents only (one row = 100 cents)
+      note.intonationCents = Math.round(drag.orig.cents - (dy / g.rowH) * 100);
+    } else {
+      // Snap-drag: whole scale rows; the intonation character rides along
+      const stepDelta = Math.round(-dy / g.rowH);
+      note.degree = drag.orig.degree + stepDelta;
+      note.intonationCents = e.shiftKey ? 0 : drag.orig.cents;
+      const divDelta = Math.round(dx / (g.plotW / g.totalDivs));
+      const maxOffset = Math.max(0, g.totalDivs - (note.durationDivs || 1));
+      note.offsetDivs = Math.max(0, Math.min(maxOffset, drag.orig.offsetDivs + divDelta));
+    }
+    drawRoll(region);
+    setReadout(rollReadoutText(note));
+  };
+
+  const finishDrag = (commit) => {
+    if (!drag) return;
+    const note = drag.note;
+    if (!commit || !drag.moved) {
+      // Plain click or cancel: restore values, keep the selection
+      note.degree = drag.orig.degree;
+      note.intonationCents = drag.orig.cents;
+      note.offsetDivs = drag.orig.offsetDivs;
+    } else {
+      const changed = note.degree !== drag.orig.degree
+        || (note.intonationCents || 0) !== drag.orig.cents
+        || (note.offsetDivs || 0) !== drag.orig.offsetDivs;
+      if (changed) {
+        note.frequency = freqFor(note.degree, note.intonationCents);
+        note.edited = true;
+        saveArrangement();
+      }
+    }
+    drag = null;
+    drawRoll(region);
+    setReadout(rollReadoutText(note));
+  };
+
+  cv.onmouseup = () => finishDrag(true);
+  cv.onmouseleave = () => finishDrag(false);
 }
 
 function produceToolbarHTML() {

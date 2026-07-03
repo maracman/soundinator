@@ -282,9 +282,15 @@ synth configuration pulled into arrangement tracks.
   ghost outlines at the intended degree when intonation missed; surprise
   notes cyan; click-to-inspect readout (degree, ±cents, velocity,
   duration). Verified live with screenshot.
-  Stage 3 (remaining): snap-drag between rows preserving cents offsets,
-  modifier-drag to zero the offset, fine-tune cents drag, edits persisted
-  to region.notes and audible in baked playback.
+  STAGE 3 DONE: snap-drag moves notes between scale rows with the cents
+  offset riding along (verified: deg −3→−1, 220→246.95 Hz exact, cents
+  preserved); shift-drag snaps clean; alt-drag fine-tunes cents only;
+  horizontal drag moves onset on the division grid clamped to the region;
+  frequency recomputed from the region's scale context; edited notes wear
+  a dot; edits persist and play in baked playback/mixdown.
+  ── G7 COMPLETE. ROADMAP COMPLETE (remaining: minor polish backlog —
+  per-track pan/locks, take-history UI, dist-canvas DPI, loading states —
+  and owner audition feedback on D5/D7 tone work and starters).
 
 ## Cross-cutting
 
