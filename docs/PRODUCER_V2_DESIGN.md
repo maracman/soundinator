@@ -119,8 +119,12 @@ Quality:
    collapsible/resizable editor drawer that the piano roll docks into;
    double-click on a baked region opens it). Layout persists. v1 timeline
    embedded pending P3.
-2. **P2 Browser + palette**: card browser (search/filter/preview) and
-   palette rack with add/remove; drag + click-add.
+2. **P2 Browser + palette** — DONE: card browser over all factory/user
+   presets + instruments (name, kind chip, description, category chips,
+   text search with focus-preserving re-render, in-context preview) and a
+   palette rack (drag or click-add from browser, remove, persists on the
+   arrangement, items draggable for P3 lanes and usable as track sources).
+   Bar items B1/B2 functionally met pending the P7 walkthrough.
 3. **P3 Region model**: beat-based tracks/regions, palette-sourced regions,
    drag/move/extend, ruler, migration from v1; region rendering.
 4. **P4 Playback**: beat-based multi-voice transport from playhead, loop

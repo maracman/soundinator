@@ -953,13 +953,63 @@ function loadArrangement() {
     const a = JSON.parse(localStorage.getItem(ARRANGEMENT_KEY) || "null");
     if (a && Array.isArray(a.tracks)) {
       if (!a.context) a.context = defaultArrangementContext();
+      if (!Array.isArray(a.palette)) a.palette = [];
       return a;
     }
   } catch { /* fall through */ }
-  return { name: "Untitled arrangement", tracks: [], context: defaultArrangementContext() };
+  return { name: "Untitled arrangement", tracks: [], palette: [], context: defaultArrangementContext() };
 }
 function saveArrangement() {
   if (arrangement) localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
+}
+
+// Everything the browser can offer: factory presets, user presets, and
+// saved instruments — each convertible into a full voice for the palette.
+function browserItems() {
+  const items = [];
+  for (const f of FACTORY_PRESETS) {
+    items.push({
+      id: `factory:${f.id}`, name: f.name,
+      cat: f.section === "full" ? "starter" : "section",
+      kindLabel: f.section === "full" ? "Starter" : (PRESET_SECTIONS[f.section]?.label || f.section),
+      description: f.description || "",
+      section: f.section, params: f.parameters,
+    });
+  }
+  for (const u of loadPresets()) {
+    items.push({
+      id: `user:${u.id}`, name: u.name || "Untitled",
+      cat: (!u.section || u.section === "full") ? "mine" : "section",
+      kindLabel: (!u.section || u.section === "full") ? "My preset" : (PRESET_SECTIONS[u.section]?.label || u.section),
+      description: "", section: u.section || "full", params: u.parameters,
+    });
+  }
+  for (const inst of loadInstruments()) {
+    items.push({
+      id: `inst:${inst.id}`, name: inst.name,
+      cat: "instrument", kindLabel: "Instrument",
+      description: "", section: "instrument", params: inst.parameters,
+    });
+  }
+  return items;
+}
+
+// A browser item as a complete voice (session-context params excluded)
+function voiceParamsFor(item) {
+  if (item.section === "instrument") return { ...item.params };
+  return extractInstrumentParams({ ...DEFAULTS, ...item.params });
+}
+
+function addToPalette(item) {
+  if (!Array.isArray(arrangement.palette)) arrangement.palette = [];
+  arrangement.palette.push({
+    id: crypto.randomUUID(),
+    name: item.name,
+    kindLabel: item.kindLabel,
+    sourceId: item.id,
+    params: voiceParamsFor(item),
+  });
+  saveArrangement();
 }
 
 function produceSources() {
@@ -970,7 +1020,10 @@ function produceSources() {
     id: String(p.id), name: p.name, kind: "factory",
     parameters: extractInstrumentParams({ ...DEFAULTS, ...p.parameters }),
   }));
-  return [...instruments, ...factory];
+  const palette = (arrangement?.palette || []).map(pl => ({
+    id: `pal:${pl.id}`, name: pl.name, kind: "palette", parameters: pl.params,
+  }));
+  return [...palette, ...instruments, ...factory];
 }
 
 function regionPlayParams(track, region) {
@@ -1006,6 +1059,103 @@ function sessionBarControlsHTML() {
       </select>
       <input type="range" data-ctx="reverbWet" min="0" max="0.95" step="0.01" value="${ctx.reverbWet}" title="Reverb amount"/>
     </label>`;
+}
+
+function renderBrowserCards(v) {
+  const container = v.querySelector("#browserCards");
+  if (!container) return;
+  const q = browserSearch.trim().toLowerCase();
+  const items = browserItems().filter(item =>
+    (browserFilter === "all" || item.cat === browserFilter) &&
+    (!q || item.name.toLowerCase().includes(q) || (item.description || "").toLowerCase().includes(q)));
+  container.innerHTML = items.length ? items.map(item => `
+    <div class="browser-card" draggable="true" data-browser-item="${esc(item.id)}">
+      <div class="bc-head">
+        <span class="bc-name">${esc(item.name)}</span>
+        <span class="bc-kind">${esc(item.kindLabel)}</span>
+      </div>
+      ${item.description ? `<div class="bc-desc">${esc(item.description)}</div>` : ""}
+      <div class="bc-actions">
+        <button class="pal-btn" data-browser-preview="${esc(item.id)}" title="Hear it in the session context">${browserPreviewId === item.id ? "■" : "▶"}</button>
+        <button class="pal-btn" data-browser-add="${esc(item.id)}" title="Add to your palette">＋ Palette</button>
+      </div>
+    </div>`).join("") : '<div class="empty-state">No presets match.</div>';
+
+  const findItem = (id) => browserItems().find(i => i.id === id);
+  container.querySelectorAll("[data-browser-add]").forEach(btn => {
+    btn.onclick = () => {
+      const item = findItem(btn.dataset.browserAdd);
+      if (!item) return;
+      addToPalette(item);
+      renderProduce();
+    };
+  });
+  container.querySelectorAll("[data-browser-preview]").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.browserPreview;
+      if (browserPreviewId === id) {
+        synth.stop();
+        browserPreviewId = null;
+      } else {
+        const item = findItem(id);
+        if (!item) return;
+        stopArrangement();
+        synth.play({ ...DEFAULTS, ...arrangement.context, ...voiceParamsFor(item), seed: 20260703 });
+        browserPreviewId = id;
+      }
+      renderBrowserCards(v);
+    };
+  });
+  container.querySelectorAll("[data-browser-item]").forEach(card => {
+    card.ondragstart = (e) => {
+      e.dataTransfer.setData("application/x-browser-item", card.dataset.browserItem);
+    };
+  });
+}
+
+function wireBrowserPalette(v) {
+  renderBrowserCards(v);
+  const search = v.querySelector("#browserSearch");
+  if (search) search.oninput = () => {
+    browserSearch = search.value;
+    renderBrowserCards(v);
+  };
+  v.querySelectorAll("[data-browser-filter]").forEach(chip => {
+    chip.onclick = () => {
+      browserFilter = chip.dataset.browserFilter;
+      v.querySelectorAll("[data-browser-filter]").forEach(c =>
+        c.classList.toggle("active", c === chip));
+      renderBrowserCards(v);
+    };
+  });
+  v.querySelectorAll("[data-palette-remove]").forEach(btn => {
+    btn.onclick = () => {
+      arrangement.palette = (arrangement.palette || []).filter(pl => pl.id !== btn.dataset.paletteRemove);
+      saveArrangement();
+      renderProduce();
+    };
+  });
+  // Browser card dropped on the palette → add it
+  const palette = v.querySelector("#dawPalette");
+  if (palette) {
+    palette.ondragover = (e) => { e.preventDefault(); palette.classList.add("drop-target"); };
+    palette.ondragleave = () => palette.classList.remove("drop-target");
+    palette.ondrop = (e) => {
+      e.preventDefault();
+      palette.classList.remove("drop-target");
+      const id = e.dataTransfer.getData("application/x-browser-item");
+      const item = browserItems().find(i => i.id === id);
+      if (!item) return;
+      addToPalette(item);
+      renderProduce();
+    };
+  }
+  // Palette items drag with their own type (lanes consume this in P3)
+  v.querySelectorAll("[data-palette-item]").forEach(el => {
+    el.ondragstart = (e) => {
+      e.dataTransfer.setData("application/x-palette-item", el.dataset.paletteItem);
+    };
+  });
 }
 
 function wireDawLayout(v) {
@@ -1586,6 +1736,9 @@ function loadDawLayout() {
   } catch { return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false }; }
 }
 let dawLayout = null;
+let browserFilter = "all";   // all | starter | instrument | mine | section
+let browserSearch = "";
+let browserPreviewId = null; // browser item currently previewing
 function saveDawLayout() { localStorage.setItem(DAW_LAYOUT_KEY, JSON.stringify(dawLayout)); }
 
 function renderProduce() {
@@ -1613,13 +1766,29 @@ function renderProduce() {
         <div class="daw-left${dawLayout.leftOpen ? "" : " collapsed"}" style="width:${dawLayout.leftOpen ? dawLayout.leftW : 22}px">
           <button class="daw-collapse" id="leftCollapse" title="${dawLayout.leftOpen ? "Collapse" : "Expand"} the library panel">${dawLayout.leftOpen ? "◂" : "▸"}</button>
           <div class="daw-left-content${dawLayout.leftOpen ? "" : " hidden"}">
-            <div class="section-label">Instruments</div>
-            <div class="produce-sources">
-              ${sources.map(s => `
-                <button class="source-chip${s.kind === "factory" ? " chip-factory" : ""}" data-add-track="${esc(s.id)}"
-                  title="${s.kind === "factory" ? "Starter voice" : "Your instrument"} — adds a track playing it">${esc(s.name)}</button>`).join("")}
+            <div class="daw-browser">
+              <div class="section-label">Browser</div>
+              <input type="search" id="browserSearch" placeholder="Search presets…" value="${esc(browserSearch)}"/>
+              <div class="browser-filters">
+                ${[["all", "All"], ["starter", "Starters"], ["instrument", "Instruments"], ["mine", "Mine"], ["section", "Sections"]].map(([k, label]) =>
+                  `<button class="filter-chip${browserFilter === k ? " active" : ""}" data-browser-filter="${k}">${label}</button>`).join("")}
+              </div>
+              <div class="browser-cards" id="browserCards"></div>
             </div>
-            <div class="toolbar-hint" style="margin-top:0.8rem">Browser + palette land here next (P2).</div>
+            <div class="daw-palette" id="dawPalette">
+              <div class="section-label">Palette</div>
+              <div class="palette-rack" id="paletteRack">
+                ${(arrangement.palette || []).length ? (arrangement.palette || []).map(pl => `
+                  <div class="palette-item" draggable="true" data-palette-item="${pl.id}" title="Your working instrument — drag onto a track (P3) or add a track with +">
+                    <span class="pal-name">${esc(pl.name)}</span>
+                    <span class="pal-kind">${esc(pl.kindLabel || "")}</span>
+                    <span class="pal-actions">
+                      <button class="pal-btn" data-add-track="pal:${pl.id}" title="Add a track playing this instrument">+</button>
+                      <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
+                    </span>
+                  </div>`).join("") : '<div class="empty-state">Drag presets here from the browser above — this is your instrument rack for the arrangement.</div>'}
+              </div>
+            </div>
           </div>
         </div>
         <div class="daw-vsplit" id="dawVSplit" title="Drag to resize the library panel"></div>
@@ -1645,6 +1814,7 @@ function wireProduce(v) {
   const sources = produceSources();
 
   wireSessionBar(v);
+  wireBrowserPalette(v);
 
   v.querySelectorAll("[data-add-track]").forEach(btn => {
     btn.onclick = () => {

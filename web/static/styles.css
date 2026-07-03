@@ -4737,3 +4737,70 @@ body.explore-mode #app {
 }
 .daw-editor.collapsed { border: none; padding: 0; }
 .daw-editor .roll-panel { margin-top: 0; }
+
+/* ── Producer browser + palette (v2 P2) ──────────────────── */
+
+.daw-left-content { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.daw-browser { flex: 1 1 60%; min-height: 0; display: flex; flex-direction: column; }
+.daw-browser input[type="search"] {
+  width: 100%;
+  background: var(--display);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.78rem;
+  margin: 0.35rem 0 0.45rem;
+}
+.browser-filters { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+.browser-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; padding-right: 2px; }
+
+.browser-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  cursor: grab;
+}
+.browser-card:hover { border-color: var(--border2); }
+.bc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.4rem; }
+.bc-name { font-size: 0.78rem; color: var(--text); font-weight: 600; }
+.bc-kind {
+  font-size: 0.62rem;
+  color: var(--accent2);
+  border: 1px solid rgba(245,166,35,0.35);
+  border-radius: 999px;
+  padding: 0.02rem 0.4rem;
+  white-space: nowrap;
+}
+.bc-desc { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; }
+.bc-actions { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
+
+.pal-btn {
+  background: var(--surface);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.pal-btn:hover { color: var(--text); border-color: var(--border2); }
+
+.daw-palette { flex: 1 1 40%; min-height: 90px; margin-top: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; flex-direction: column; }
+.daw-palette.drop-target { outline: 1px dashed var(--accent); outline-offset: 3px; border-radius: 6px; }
+.palette-rack { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem; }
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.3rem 0.45rem;
+  cursor: grab;
+}
+.pal-name { flex: 1; font-size: 0.75rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-kind { font-size: 0.6rem; color: var(--text3); white-space: nowrap; }
+.pal-actions { display: flex; gap: 0.25rem; }
