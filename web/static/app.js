@@ -1589,6 +1589,7 @@ function renderExplore() {
     updateSliderFill(sl);
     sl.oninput = () => {
       const key = sl.dataset.param;
+      noteParamChange(key, exploreParams[key], Number(sl.value));
       exploreParams[key] = Number(sl.value);
       updateSliderFill(sl);
       // Auto-switch active macro subsection when a slider in that section is moved
@@ -1638,6 +1639,7 @@ function renderExplore() {
     sel.value = exploreParams[sel.dataset.paramSelect];
     sel.onchange = () => {
       const key = sel.dataset.paramSelect;
+      noteParamChange(key, exploreParams[key], sel.value);
       exploreParams[key] = sel.value;
       if (key === "spectralProfile") resetSpectralPartialParams(exploreParams);
       const out = v.querySelector(`#out_${key}`);
@@ -1692,6 +1694,7 @@ function renderExplore() {
     cb.onchange = () => {
       const key = cb.dataset.paramCheck;
       const wasPlaying = synth.isPlaying;
+      noteParamChange(key, exploreParams[key], cb.checked);
       exploreParams[key] = cb.checked;
       // Auto-switch active subsection
       const secInfo = _checkToSection[key];
@@ -4906,7 +4909,31 @@ function randomiseParams() {
   p.motifSurpriseProb = rf(0.0, 0.5);
 }
 
+// Parameter-adjustment telemetry: changes buffer up per control and flush as
+// one "adjust" event 3s after the last tweak (or before the next play/rate/
+// save event), so a slider drag is a single {from, to} record, not a stream.
+let pendingParamChanges = {};
+let paramFlushTimer = null;
+
+function noteParamChange(key, from, to) {
+  if (from === to) return;
+  if (!(key in pendingParamChanges)) pendingParamChanges[key] = { from };
+  pendingParamChanges[key].to = to;
+  clearTimeout(paramFlushTimer);
+  paramFlushTimer = setTimeout(flushParamChanges, 3000);
+}
+
+function flushParamChanges() {
+  clearTimeout(paramFlushTimer);
+  paramFlushTimer = null;
+  if (!Object.keys(pendingParamChanges).length) return;
+  const changes = pendingParamChanges;
+  pendingParamChanges = {};
+  trackEngagement("adjust", { changes });
+}
+
 function trackEngagement(type, extra = {}) {
+  if (type !== "adjust") flushParamChanges();
   if (!exploreEngagement.plays) exploreEngagement.plays = 0;
   if (!exploreEngagement.saves) exploreEngagement.saves = 0;
   if (!exploreEngagement.startedAt) exploreEngagement.startedAt = Date.now();

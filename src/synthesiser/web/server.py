@@ -18,6 +18,13 @@ import json
 import mimetypes
 import os
 import tempfile
+import threading
+import time
+
+try:
+    import fcntl
+except ImportError:  # non-POSIX platform; appends fall back to unlocked
+    fcntl = None
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -46,6 +53,32 @@ def project_root() -> Path:
 def truncate_text(value: Any, limit: int) -> str:
     text = str(value or "").strip()
     return text[:limit]
+
+
+def append_jsonl(path: Path, record: dict[str, Any]) -> None:
+    """Append one record to a JSONL file under an exclusive file lock.
+
+    The lock covers concurrent processes as well as this server's threads, so
+    simultaneous submissions cannot interleave partial lines.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+            handle.flush()
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def as_number(value: Any) -> float | int | None:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def as_dict(value: Any) -> dict[str, Any] | None:
+    return value if isinstance(value, dict) else None
 
 
 def read_json_file(path: Path, default: Any) -> Any:
@@ -112,6 +145,9 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if not self.check_rate_limit():
+            self.send_error_json(HTTPStatus.TOO_MANY_REQUESTS, "rate limit exceeded")
+            return
         try:
             payload = self.read_json_body()
 
@@ -143,21 +179,18 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         """Receive a complete study session (all trials + demographics)."""
         entry = {
             "id": uuid4().hex,
+            "schema_version": "study-session-1.0",
             "received_at": datetime.now(timezone.utc).isoformat(),
             "participant_id": truncate_text(payload.get("participant_id"), 60),
             "paradigm": truncate_text(payload.get("paradigm"), 20),
-            "demographics": payload.get("demographics", {}),
+            "demographics": as_dict(payload.get("demographics")) or {},
             "headphone_passed": bool(payload.get("headphone_passed")),
             "responses": payload.get("responses", []),
-            "total_time_ms": payload.get("total_time_ms"),
+            "total_time_ms": as_number(payload.get("total_time_ms")),
             "submitted_at": truncate_text(payload.get("submitted_at"), 40),
         }
 
-        # Append to JSONL file
-        study_path = self.roots["study_data"]
-        study_path.parent.mkdir(parents=True, exist_ok=True)
-        with study_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(entry, sort_keys=True) + "\n")
+        append_jsonl(self.roots["study_data"], entry)
 
         n = len(entry["responses"])
         print(f"  Study session received: {entry['paradigm']}, {n} responses, "
@@ -237,16 +270,15 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             "stimulus_id": truncate_text(payload.get("stimulus_id"), 80),
             "app_version": truncate_text(payload.get("app_version"), 40),
             "client_ts": truncate_text(payload.get("client_ts"), 40),
-            "parameters": payload.get("parameters"),
-            "rating": payload.get("rating"),
-            "rating_latency_ms": payload.get("rating_latency_ms"),
-            "play_count": payload.get("play_count"),
-            "metrics": payload.get("metrics"),
-            "consent": payload.get("consent"),
+            "parameters": as_dict(payload.get("parameters")),
+            "rating": as_number(payload.get("rating")),
+            "rating_latency_ms": as_number(payload.get("rating_latency_ms")),
+            "play_count": as_number(payload.get("play_count")),
+            "metrics": as_dict(payload.get("metrics")),
+            "consent": as_dict(payload.get("consent")),
+            "changes": as_dict(payload.get("changes")),
         }
-        self.roots["events"].parent.mkdir(parents=True, exist_ok=True)
-        with self.roots["events"].open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, sort_keys=True) + "\n")
+        append_jsonl(self.roots["events"], event)
         self.send_json({"ok": True})
 
     # ── File serving ────────────────────────────────────────
@@ -278,6 +310,24 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             return
 
     # ── JSON helpers ────────────────────────────────────────
+
+    def check_rate_limit(self) -> bool:
+        """Sliding one-minute window per client IP across all POST routes."""
+        server = self.server
+        limit = getattr(server, "rate_limit_per_minute", 0)
+        if not limit:
+            return True
+        now = time.monotonic()
+        ip = self.client_address[0]
+        with server.rate_lock:  # type: ignore[attr-defined]
+            window = server.rate_state.setdefault(ip, [])  # type: ignore[attr-defined]
+            cutoff = now - 60.0
+            while window and window[0] < cutoff:
+                window.pop(0)
+            if len(window) >= limit:
+                return False
+            window.append(now)
+        return True
 
     def read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0") or 0)
@@ -315,6 +365,7 @@ def build_server(
     root: Path | None = None,
     data_dir: Path | None = None,
     cache_dir: Path | None = None,
+    rate_limit_per_minute: int | None = None,
 ) -> ThreadingHTTPServer:
     root = root or project_root()
     data = data_dir or root / "web" / "data"
@@ -332,6 +383,11 @@ def build_server(
         write_json_atomic(roots["library"], [])
     server = ThreadingHTTPServer((host, port), Phase0RequestHandler)
     server.roots = roots  # type: ignore[attr-defined]
+    if rate_limit_per_minute is None:
+        rate_limit_per_minute = int(os.environ.get("PHASE0_RATE_LIMIT", "120"))
+    server.rate_limit_per_minute = rate_limit_per_minute  # type: ignore[attr-defined]
+    server.rate_state = {}  # type: ignore[attr-defined]
+    server.rate_lock = threading.Lock()  # type: ignore[attr-defined]
     return server
 
 

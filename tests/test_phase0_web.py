@@ -1,5 +1,6 @@
 import json
 import threading
+import urllib.error
 import urllib.request
 
 from synthesiser.web.phase0 import Phase0Parameters, render_phase0_preset, scale_degrees
@@ -132,6 +133,68 @@ def test_explore_event_records_provenance(tmp_path) -> None:
         assert event["rating_latency_ms"] == 5400
         assert event["play_count"] == 3
         assert event["parameters"]["seed"] == 42
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_concurrent_explore_events_do_not_corrupt_jsonl(tmp_path) -> None:
+    (tmp_path / "web" / "static").mkdir(parents=True)
+    (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")
+    server = build_server("127.0.0.1", 0, root=tmp_path, rate_limit_per_minute=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    base = f"http://{host}:{port}"
+    n_threads, n_posts = 8, 5
+    errors: list[Exception] = []
+
+    def worker(worker_id: int) -> None:
+        for i in range(n_posts):
+            try:
+                post_json(
+                    f"{base}/api/explore/event",
+                    {"event_type": "play", "participant_id": f"w{worker_id}", "play_count": i},
+                )
+            except Exception as exc:  # pragma: no cover - captured for assertion
+                errors.append(exc)
+
+    try:
+        workers = [threading.Thread(target=worker, args=(w,)) for w in range(n_threads)]
+        for t in workers:
+            t.start()
+        for t in workers:
+            t.join()
+        assert not errors
+        lines = (tmp_path / "web" / "data" / "explore_events.jsonl").read_text(
+            encoding="utf-8"
+        ).strip().splitlines()
+        assert len(lines) == n_threads * n_posts
+        for line in lines:
+            json.loads(line)  # every line is intact JSON
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_post_rate_limit(tmp_path) -> None:
+    (tmp_path / "web" / "static").mkdir(parents=True)
+    (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")
+    server = build_server("127.0.0.1", 0, root=tmp_path, rate_limit_per_minute=3)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    base = f"http://{host}:{port}"
+    try:
+        for _ in range(3):
+            post_json(f"{base}/api/explore/event", {"event_type": "play"})
+        try:
+            post_json(f"{base}/api/explore/event", {"event_type": "play"})
+            raised = False
+        except urllib.error.HTTPError as exc:
+            raised = True
+            assert exc.code == 429
+        assert raised
     finally:
         server.shutdown()
         server.server_close()

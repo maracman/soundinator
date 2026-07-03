@@ -7,9 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 4
-- Current phase: A (study flow foundations); next task A4 (param telemetry)
-  then A5 (server hardening)
+- Iteration: 5
+- Phase A complete. Next: Phase B (surprise/expectancy/repetition metrics),
+  starting with B1 (per-note surprisal in synth.js).
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -54,11 +54,14 @@ Full audits in the loop transcript; the load-bearing findings:
   play"), version-stamped consent event; **no events leave the browser unless
   opted in**; footer note shows sharing status with a Change link.
   Verified end-to-end in browser preview.
-- [ ] A4. Parameter-change telemetry (throttled) so appeal can be related to
-  what the volunteer adjusted between plays.
-- [ ] A5. Server hardening for collection: file locking on JSONL appends,
-  schema_version field on every record, basic payload validation and size
-  caps, simple per-IP rate limiting.
+- [x] A4. Parameter-change telemetry: slider/select/checkbox changes buffer
+  per control and flush as one "adjust" event ({from, to} per param) 3s
+  after the last tweak or before the next play/rate/save event.
+- [x] A5. Server hardening: flock-locked JSONL appends (verified by a
+  concurrent-post test), type validation on numeric/dict payload fields,
+  512KB body cap (pre-existing), per-IP sliding-window rate limiting
+  (PHASE0_RATE_LIMIT env, default 120 POSTs/min, 429 on excess),
+  schema_version on study records.
 
 ## Phase B — Expectation/surprise & repetition instrumentation (priority 2)
 
