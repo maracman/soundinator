@@ -89,13 +89,11 @@ remains valid, provenance-complete stimulus material.
 - Arrangement JSON export includes instrument definitions inline so a saved
   arrangement is self-contained and shareable.
 
-## Open questions for the owner
+## Decisions (owner, 2026-07-03)
 
-1. Priority: currently slotted after the research phases (A–C) and the
-   production-quality/preset groundwork (D1–D3) it depends on. Pull earlier?
-2. Should Explore mode's single-synth UI become the "instrument editor"
-   inside producer mode (one mental model), or stay a separate simple mode
-   for volunteers with producer mode as a distinct advanced area?
-   (Current lean: separate entry points sharing the same editor component —
-   volunteers never see tracks/timeline.)
-3. Mixdown export: WAV only, or also stems per track?
+1. **Priority:** producer mode builds after the research phases (A–C) and
+   the production-quality/preset groundwork (D1–D3) it depends on.
+2. **Mode split:** separate entry points sharing the same synth-editor
+   component. Volunteers land in simple Explore mode and never see
+   tracks/timeline; producer mode reuses the editor as its instrument editor.
+3. **Mixdown:** single stereo WAV export; per-track stems deferred.
