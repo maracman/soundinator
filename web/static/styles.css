@@ -4274,3 +4274,31 @@ body.explore-mode #app {
   text-decoration: underline;
   padding: 0;
 }
+
+/* ── Modular preset sections ─────────────────────────────── */
+
+.top-save-bar select {
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+.section-chip {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border2);
+  color: var(--accent2);
+  background: rgba(245, 158, 11, 0.08);
+  white-space: nowrap;
+}
+
+.section-chip.chip-full {
+  color: var(--text3);
+  background: rgba(136, 153, 170, 0.08);
+}

@@ -7,9 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 9
-- Phases A-C done; D1-D2 done. Next: D3 modular per-section presets, then
-  D4 factory starter library.
+- Iteration: 10
+- Phases A-C done; D1-D3 done. Next: D4 factory starter library, then
+  Phase E deployment readiness.
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -111,10 +111,12 @@ Full audits in the loop transcript; the load-bearing findings:
 - [x] D2. Defaults: reverbWet 0→0.16 (room), envelopeRelease 0.08→0.12 so
   first play isn't clinical-dry. Further tone tuning rides with D4
   audition pass.
-- [ ] D3. Modular presets: per-section save/load (sound source, melody/scale,
-  rhythm/duration, dynamics, surprise/sequence, percussion, space) with
-  section chips in the library UI; full-rig presets remain; localStorage
-  schema v4 with migration from v3.
+- [x] D3. Modular presets: 7 sections (sound source, melody & scale,
+  rhythm & rests, dynamics, sequence & surprise, percussion, space) via a
+  parameter classifier; save-scope selector next to the preset name;
+  section chips in the library; section presets merge over current state on
+  load (verified: loading a Space preset reverts reverb, keeps tempo).
+  Additive schema — old v3 entries read as "Full", no migration needed.
 - [ ] D4. Curated starter library: 8–12 factory presets (full + per-section)
   shipped with the app so first-time users have good starting points.
 

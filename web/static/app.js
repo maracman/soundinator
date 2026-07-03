@@ -48,6 +48,60 @@ const SURPRISE_FEATURES = [
   { key: "rest", label: "Rest", enabled: "surpriseRestEnabled", weight: "surpriseRestWeight", distance: null },
 ];
 
+// ─── Modular preset sections ────────────────────────────────
+// Presets can capture the whole rig or just one section of it. Every
+// parameter belongs to exactly one section; `seed` belongs to none (it only
+// travels with full presets). Section presets merge into the current state
+// on load, leaving everything else untouched — and they are the building
+// blocks producer-mode instruments will bundle later.
+const PRESET_SECTIONS = {
+  sound:      { label: "Sound source" },
+  melody:     { label: "Melody & scale" },
+  rhythm:     { label: "Rhythm & rests" },
+  dynamics:   { label: "Dynamics" },
+  surprise:   { label: "Sequence & surprise" },
+  percussion: { label: "Percussion" },
+  space:      { label: "Space" },
+};
+
+const _MELODY_PARAMS = new Set([
+  "scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz",
+  "subScaleNotes", "subScaleWeight", "rootNotes", "rootPullStrength",
+  "rootPullShape", "intervalPeakedness", "intervalRange", "momentum",
+  "registerCenter", "registerWidth", "registerSkew", "precision",
+  "precisionRange", "motifHitProb", "motifHitRange",
+]);
+const _RHYTHM_PARAMS = new Set([
+  "tempo", "beatDivisions", "onBeatProb", "offBeatProb", "sameLengthProb",
+  "restMotifStartRatio", "restOnMeterRatio", "restOffMeterRatio",
+  "gapProb", "gapMin", "gapMax", "gapDistanceSlope", "gapTimingRange",
+  "phraseGap", "slideSpeed",
+]);
+const _SURPRISE_EXTRAS = new Set([
+  "motifCount", "motifLengthBeats", "motifLength", "sequenceProb",
+  "motifSurpriseProb", "incorporationRate",
+  "melSurpriseAmount", "tunSurpriseAmount", "durSurpriseAmount", "dynSurpriseAmount",
+]);
+
+function sectionForParam(key) {
+  if (key === "seed") return null;
+  if (key.startsWith("reverb")) return "space";
+  if (key.startsWith("perc")) return "percussion";
+  if (key.startsWith("surprise") || _SURPRISE_EXTRAS.has(key)) return "surprise";
+  if (key.startsWith("dynamics") || key === "loudnessRange") return "dynamics";
+  if (_RHYTHM_PARAMS.has(key)) return "rhythm";
+  if (_MELODY_PARAMS.has(key)) return "melody";
+  return "sound"; // voiceMode, formant*, tone*, spectral*, vibrato*, envelope*…
+}
+
+function extractSectionParams(params, section) {
+  const out = {};
+  for (const [k, val] of Object.entries(params)) {
+    if (sectionForParam(k) === section) out[k] = val;
+  }
+  return out;
+}
+
 const DEFAULTS = {
   tempo: 104,
   seed: 1001,
@@ -1311,6 +1365,10 @@ function renderExplore() {
       </div>
       <div class="top-save-bar">
         <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
+        <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
+          <option value="full">Everything</option>
+          ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
+        </select>
         <button class="btn btn-primary btn-sm" id="saveBtn">Save</button>
       </div>
       <div class="top-rating-row">
@@ -1872,16 +1930,18 @@ function renderExplore() {
   // Welcome / research opt-in card
   wireWelcomeCard(v);
 
-  // Save preset
+  // Save preset (full rig or a single section)
   v.querySelector("#saveBtn").onclick = () => {
     const name = v.querySelector("#presetName").value.trim() || `Preset ${new Date().toLocaleTimeString()}`;
+    const scope = v.querySelector("#presetScope")?.value || "full";
     const entry = {
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
       name,
+      section: scope,
       rating: exploreRating,
-      parameters: { ...exploreParams },
-      stimulus_id: stimulusIdFor(exploreParams),
+      parameters: scope === "full" ? { ...exploreParams } : extractSectionParams(exploreParams, scope),
+      ...(scope === "full" ? { stimulus_id: stimulusIdFor(exploreParams) } : {}),
       app_version: APP_VERSION,
     };
     const list = loadPresets();
@@ -5103,28 +5163,40 @@ function renderPresetList(container, presets, source) {
     decorateTooltips(container);
     return;
   }
-  container.innerHTML = presets.map(p => `
+  container.innerHTML = presets.map(p => {
+    const sectionKey = p.section && p.section !== "full" ? p.section : null;
+    const sectionLabel = sectionKey ? (PRESET_SECTIONS[sectionKey]?.label || sectionKey) : null;
+    return `
     <div class="preset-item">
       <span class="name">${esc(p.name || p.preset_name || "Untitled")}</span>
-      <span class="meta">${presetSummary(p.parameters)}</span>
+      <span class="section-chip${sectionKey ? "" : " chip-full"}">${sectionLabel || "Full"}</span>
+      <span class="meta">${sectionLabel ? `${Object.keys(p.parameters || {}).length} settings` : presetSummary(p.parameters)}</span>
       <span class="score">${p.rating || p.favourite_rating || ""}/7</span>
       <div class="actions">
-        <button class="btn btn-secondary btn-sm" data-load='${JSON.stringify(p.parameters)}'>Load</button>
+        <button class="btn btn-secondary btn-sm" data-load='${JSON.stringify(p.parameters)}' data-section="${sectionKey || "full"}">Load</button>
         ${source === "my" ? `<button class="btn btn-ghost btn-sm" data-remove="${p.id}">Remove</button>` : ""}
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 
   container.querySelectorAll("[data-load]").forEach(btn => {
     btn.onclick = () => {
       const loaded = JSON.parse(btn.dataset.load);
+      const section = btn.dataset.section || "full";
       // Backward compat: old presets use motifLength (notes), map to motifLengthBeats
       if (loaded.motifLength && !loaded.motifLengthBeats) {
         loaded.motifLengthBeats = loaded.motifLength;
       }
-      // Backward compat: ensure rootNotes is an array
-      if (!Array.isArray(loaded.rootNotes)) loaded.rootNotes = [0];
-      exploreParams = { ...DEFAULTS, ...loaded };
+      if (section === "full") {
+        // Backward compat: ensure rootNotes is an array
+        if (!Array.isArray(loaded.rootNotes)) loaded.rootNotes = [0];
+        exploreParams = { ...DEFAULTS, ...loaded };
+      } else {
+        // Section preset: merge over the current state, leave the rest alone
+        exploreParams = { ...exploreParams, ...loaded };
+        if (!Array.isArray(exploreParams.rootNotes)) exploreParams.rootNotes = [0];
+      }
       const wasPlaying = synth.isPlaying;
       renderExplore();
       if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
@@ -5136,7 +5208,12 @@ function renderPresetList(container, presets, source) {
       renderPresetList(container, loadPresets(), source);
     };
   });
-  container.querySelectorAll("[data-load]").forEach(btn => setTooltip(btn, "Load this preset and restore its full parameter set."));
+  container.querySelectorAll("[data-load]").forEach(btn => setTooltip(
+    btn,
+    btn.dataset.section === "full"
+      ? "Load this preset and restore its full parameter set."
+      : `Apply just this ${PRESET_SECTIONS[btn.dataset.section]?.label || "section"} preset, keeping everything else as it is.`
+  ));
   container.querySelectorAll("[data-remove]").forEach(btn => setTooltip(btn, "Remove this saved local preset."));
   container.querySelectorAll(".preset-item").forEach(item => setTooltip(item, "Saved parameter set. Load it to hear the sound."));
 }
