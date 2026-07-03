@@ -48,17 +48,39 @@ shared preset storage, and optional server-side rendering endpoints.
 
 Listeners can:
 
-- press Play to hear the current probabilistic synthesiser
+- press Play to hear the current probabilistic synthesiser, rate what they
+  hear, and (after a plain-language opt-in) share settings and ratings
+  anonymously with the research project
 - tune melody, scale, rhythm, register, surprise, articulation, rest density,
-  percussion, and reverb
-- switch the Sub-note sound source between Formant and Fourier modes
-- edit per-harmonic amplitude means and standard deviations in Fourier mode
-- save personal presets in browser localStorage
+  percussion, and convolution reverb, with hover readouts showing exact
+  per-layer probabilities on the distribution displays
+- switch the Sub-note sound source between Formant mode (5-formant bank with
+  a 2D vowel pad) and Fourier mode (32 harmonics with instrument profiles,
+  Material damping, tilt/odd-even/comb macros, and octave-group faders)
+- save presets for the whole rig or for one section at a time (sound source,
+  melody & scale, rhythm, dynamics, surprise, percussion, space) — each
+  panel has its own preset bar — and start from 11 factory starters
+- capture a complete voice as a named instrument, then arrange instruments
+  in **Producer mode**: a session-context bar (tempo/key/scale/space),
+  multi-track timeline with deterministic per-region takes (seeded, with
+  reroll), multi-voice playback, arrangement JSON export/import, offline WAV
+  mixdown, and a bake-to-piano-roll editor with dual pitch representation
+  (precise-pitch note bodies, intended-note ghosts, snap-drag that preserves
+  intonation character)
 - voluntarily submit favourite presets to a shared research library
+
+Every play, rating, save, and parameter change is logged (only after opt-in)
+with a deterministic `stimulus_id`, session id, and a per-performance summary
+of expectation/surprise/repetition metrics (per-note surprisal under the
+generative prior, information rate in bits/s, repetition and novelty ratios),
+so appeal can be modelled directly against the mechanisms that generated the
+music. `synthesiser export` turns the logs into tidy CSVs; any rated sound is
+exactly regenerable from its seed and parameters.
 
 Local event logs and contributed preset libraries are written under `web/data/`.
 That directory is ignored by git so participant/session data is not published by
-accident.
+accident. For hosting the studio publicly (Railway/Render/Fly, persistent
+volume, remote CSV pulls), see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## How It Works
 
@@ -121,9 +143,14 @@ alignment.
 
 ## Current Status
 
-The browser synthesiser is the most active part of the project. It currently
-supports the hostable free-play preset workflow and a detailed Sub-note tab for
-probabilistic timbre design.
+The browser synthesiser is the most active part of the project. It supports
+the hostable opt-in study workflow with full parameter/metric provenance, a
+detailed Sub-note tab for probabilistic timbre design (instrument profiles
+with performance characters, partial macros, formant bank), modular and
+factory preset libraries, and a Producer mode for arranging captured
+instruments on a timeline with WAV mixdown and a bake-to-piano-roll editor.
+Design documents for these systems live in `docs/` (UI_DIRECTION,
+DAW_MODE_DESIGN, PARTIAL_MACROS_DESIGN, FORMANT_SPACE_DESIGN, ROADMAP).
 
 The Python package also contains earlier staged research tooling for pitch,
 event generation, jitter, rendering, sidecars, and dry-run experiment checks.
