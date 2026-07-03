@@ -77,6 +77,11 @@ Full audits in the loop transcript; the load-bearing findings:
   and therefore joinable to ratings via stimulus_id.
 - [ ] B4. Keep it invisible to lay users (no UI change beyond maybe a subtle
   "science inside" note in the about card).
+- [ ] B4a. Formant space redesign (owner flag 2026-07-03): replace the
+  circular vowel ring with a continuous 2D (log F1 × log F2) vowel space —
+  fixes the wrap fiction and the one-direction-at-extremes surprise problem;
+  makes formant surprise a measurable acoustic distance; formant weight
+  circle UI becomes a 2D vowel pad. See docs/FORMANT_SPACE_DESIGN.md.
 
 ## Phase C — Data export & regeneration (priority 3)
 
