@@ -1027,6 +1027,17 @@ function voiceParamsFor(item) {
   return extractInstrumentParams({ ...DEFAULTS, ...item.params });
 }
 
+// Palette edit round-trip (producer v2 P6): the palette item under edit in
+// the studio, persisted so it survives the #explore navigation.
+const PALETTE_EDIT_KEY = "phase0.paletteEdit.v1";
+function paletteEditState() {
+  try { return JSON.parse(localStorage.getItem(PALETTE_EDIT_KEY) || "null"); } catch { return null; }
+}
+function setPaletteEditState(state) {
+  if (state) localStorage.setItem(PALETTE_EDIT_KEY, JSON.stringify(state));
+  else localStorage.removeItem(PALETTE_EDIT_KEY);
+}
+
 function addToPalette(item) {
   if (!Array.isArray(arrangement.palette)) arrangement.palette = [];
   arrangement.palette.push({
@@ -1160,6 +1171,19 @@ function wireBrowserPalette(v) {
       renderBrowserCards(v);
     };
   });
+  v.querySelectorAll("[data-palette-edit]").forEach(btn => {
+    btn.onclick = () => {
+      const pl = (arrangement.palette || []).find(x => x.id === btn.dataset.paletteEdit);
+      if (!pl) return;
+      stopArrangement();
+      synth.stop();
+      setPaletteEditState({ paletteId: pl.id, name: pl.name });
+      // Load the voice as it sounds in the arrangement: session context + voice
+      exploreParams = { ...DEFAULTS, ...arrangement.context, ...pl.params };
+      navigate("explore");
+    };
+  });
+
   v.querySelectorAll("[data-palette-remove]").forEach(btn => {
     btn.onclick = () => {
       arrangement.palette = (arrangement.palette || []).filter(pl => pl.id !== btn.dataset.paletteRemove);
@@ -1842,6 +1866,7 @@ function renderProduce() {
                     <span class="pal-name">${esc(pl.name)}</span>
                     <span class="pal-kind">${esc(pl.kindLabel || "")}</span>
                     <span class="pal-actions">
+                      <button class="pal-btn" data-palette-edit="${pl.id}" title="Open this instrument in the Sound Studio editor — save it back and every region using it follows">✎</button>
                       <button class="pal-btn" data-add-track="pal:${pl.id}" title="Add a track playing this instrument">+</button>
                       <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
                     </span>
@@ -2652,6 +2677,7 @@ function renderExplore() {
       </div>
     </div>
 
+    ${paletteEditBannerHTML()}
     ${welcomeCardHTML()}
 
     <!-- Transport -->
@@ -3272,6 +3298,9 @@ function renderExplore() {
 
   // Welcome / research opt-in card
   wireWelcomeCard(v);
+
+  // Palette-instrument editing round-trip (producer v2 P6)
+  wirePaletteEditBanner(v);
 
   // Hover readouts on the probability displays
   wireDistHover(v);
@@ -6521,6 +6550,55 @@ function trackEngagement(type, extra = {}) {
       ...extra,
     }),
   }).catch(() => {});
+}
+
+function paletteEditBannerHTML() {
+  const state = paletteEditState();
+  if (!state) return "";
+  return `
+    <div class="card palette-edit-banner">
+      <span>Editing palette instrument <strong>${esc(state.name)}</strong> — tweak the sound, then:</span>
+      <span class="peb-actions">
+        <button class="btn btn-primary btn-sm" id="palSave" title="Update the instrument — every region using it follows">Save to palette</button>
+        <button class="btn btn-secondary btn-sm" id="palSaveCopy" title="Keep the original and add this as a new palette instrument">Save as copy</button>
+        <button class="btn btn-ghost btn-sm" id="palDiscard">Discard</button>
+      </span>
+    </div>`;
+}
+
+function wirePaletteEditBanner(v) {
+  const state = paletteEditState();
+  if (!state) return;
+  const done = () => {
+    setPaletteEditState(null);
+    synth.stop();
+    navigate("produce");
+  };
+  const save = v.querySelector("#palSave");
+  if (save) save.onclick = () => {
+    arrangement = arrangement || loadArrangement();
+    const pl = (arrangement.palette || []).find(x => x.id === state.paletteId);
+    if (pl) {
+      pl.params = extractInstrumentParams(exploreParams);
+      saveArrangement();
+    }
+    done();
+  };
+  const copy = v.querySelector("#palSaveCopy");
+  if (copy) copy.onclick = () => {
+    arrangement = arrangement || loadArrangement();
+    arrangement.palette = arrangement.palette || [];
+    arrangement.palette.push({
+      id: crypto.randomUUID(),
+      name: `${state.name} copy`,
+      kindLabel: "Edited",
+      params: extractInstrumentParams(exploreParams),
+    });
+    saveArrangement();
+    done();
+  };
+  const discard = v.querySelector("#palDiscard");
+  if (discard) discard.onclick = done;
 }
 
 function welcomeCardHTML() {

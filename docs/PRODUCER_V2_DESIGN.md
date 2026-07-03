@@ -140,6 +140,12 @@ Quality:
    mixdown; generative regions regenerate deterministically for their span.
    Bar item B9 functionally met pending the P7 walkthrough.
 5. **P5 Editor drawer**: piano roll docked; double-click opens; bake flow.
-6. **P6 Palette editing**: round-trip with the synth editor (+fork).
+6. **P6 Palette editing** — DONE: ✎ on a palette item loads its voice
+   (under the arrangement's session context) into the Sound Studio with a
+   persistent banner; 'Save to palette' writes the edited voice back
+   (regions follow), 'Save as copy' forks a new palette entry, 'Discard'
+   returns unchanged. Verified: stretch 6→20 round-trip, session params
+   still excluded, state cleared, returned to #produce. B6 functionally
+   met pending the P7 walkthrough.
 7. **P7 Walkthrough vs the bar**, fix, screenshot review, then owner
    re-audition.

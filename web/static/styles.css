@@ -4933,3 +4933,19 @@ body.explore-mode #app {
 .tl2-newtrack.drop-target { border-color: var(--accent); color: var(--text2); }
 
 .tl2-head .tl-gain { width: 46px; height: 3px; flex: none; }
+
+/* ── Palette edit banner (producer v2 P6) ────────────────── */
+
+.palette-edit-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  border-color: rgba(245,166,35,0.5);
+  background: linear-gradient(180deg, rgba(245,166,35,0.08), var(--surface));
+  font-size: 0.82rem;
+  color: var(--text2);
+}
+.palette-edit-banner strong { color: var(--accent2); }
+.peb-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
