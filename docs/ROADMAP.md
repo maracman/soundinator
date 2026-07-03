@@ -155,8 +155,13 @@ Full audits in the loop transcript; the load-bearing findings:
   library tabs + per-preset in-context preview (non-destructive: auditions
   the preset merged into current settings, reverts exactly on toggle-off;
   Load commits). Verified in browser.
-- [ ] F3b-2. Display-forward layout: hero visualiser strip; distribution
-  canvases restyled to filled-curve language with hover readouts.
+- [x] F3b-2 (partial). Hero visualiser: main display row raised across all
+  three layout variants (~2x taller); distribution displays harmonised into
+  the new shell (neutral glass/grid replacing green phosphor tint, softer
+  scanlines/vignette; layer-colour data unchanged). OPEN QUESTION for
+  owner: keep the CRT/LED display character (harmonised) or fully replace
+  with FabFilter smooth filled curves? Hover readouts pending either way
+  (F3c).
 - [ ] F3c. Contextual panels: note grid & 2D vowel pad (B4a) as
   direct-manipulation surfaces with floating per-item editors.
 

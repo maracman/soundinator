@@ -1403,7 +1403,7 @@ function renderExplore() {
         </div>
       </div>
       <div class="visualiser-wrap vis-mode-${visMode}">
-        <canvas id="vis" width="980" height="150"></canvas>
+        <canvas id="vis" width="980" height="210"></canvas>
       </div>
       <div class="engine-state" id="engineState">
         <div class="stat">Motifs <span class="stat-val" id="statMotifs">&ndash;</span></div>
@@ -3127,16 +3127,16 @@ function drawMacroDist(canvasId, cfg) {
     sX + sW / 2, sY + sH / 2, 0,
     sX + sW / 2, sY + sH / 2, sW * 0.75
   );
-  screenGrad.addColorStop(0, "#060e0a");
-  screenGrad.addColorStop(0.7, "#040a07");
-  screenGrad.addColorStop(1, "#020604");
+  screenGrad.addColorStop(0, "#0f1115");
+  screenGrad.addColorStop(0.7, "#0d0f13");
+  screenGrad.addColorStop(1, "#0a0c0f");
   ctx.fillStyle = screenGrad;
   ctx.beginPath();
   ctx.roundRect(sX, sY, sW, sH, 4);
   ctx.fill();
 
   // Screen edge glow — phosphor bleed at the edges
-  ctx.strokeStyle = "rgba(34,197,94,0.06)";
+  ctx.strokeStyle = "rgba(154,160,171,0.06)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(sX + 1, sY + 1, sW - 2, sH - 2, 3);
@@ -3147,7 +3147,7 @@ function drawMacroDist(canvasId, cfg) {
   ctx.globalCompositeOperation = "screen";
   for (let gy = 0; gy <= 4; gy++) {
     const y = padT + (plotH / 4) * gy;
-    ctx.strokeStyle = gy === 0 ? "rgba(34,197,94,0.04)" : "rgba(34,197,94,0.07)";
+    ctx.strokeStyle = gy === 0 ? "rgba(154,160,171,0.04)" : "rgba(154,160,171,0.06)";
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.setLineDash([2, 3]);
@@ -3160,7 +3160,7 @@ function drawMacroDist(canvasId, cfg) {
   // Vertical grid at center and quarter marks
   for (let gx = 0; gx <= 4; gx++) {
     const x = padL + (plotW / 4) * gx;
-    ctx.strokeStyle = gx === 2 ? "rgba(34,197,94,0.12)" : "rgba(34,197,94,0.05)";
+    ctx.strokeStyle = gx === 2 ? "rgba(154,160,171,0.11)" : "rgba(154,160,171,0.045)";
     ctx.lineWidth = gx === 2 ? 0.8 : 0.5;
     ctx.beginPath();
     ctx.moveTo(x, padT);
@@ -3227,7 +3227,7 @@ function drawMacroDist(canvasId, cfg) {
     // ── Unlit segments: dark "off" LED blocks
     for (let s = 0; s < maxSegs; s++) {
       const sy = axisY - (s + 1) * (segH + segGap);
-      ctx.fillStyle = "rgba(12,22,18,0.25)";
+      ctx.fillStyle = "rgba(21,23,28,0.3)";
       ctx.fillRect(bx, sy, barW, segH);
     }
 
@@ -3235,7 +3235,7 @@ function drawMacroDist(canvasId, cfg) {
     if (ghostSegs > topSegs) {
       for (let s = topSegs; s < ghostSegs; s++) {
         const sy = axisY - (s + 1) * (segH + segGap);
-        ctx.fillStyle = "rgba(34,197,94,0.04)";
+        ctx.fillStyle = "rgba(154,160,171,0.04)";
         ctx.fillRect(bx, sy, barW, segH);
       }
     }
@@ -3382,7 +3382,7 @@ function drawMacroDist(canvasId, cfg) {
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
   for (let y = sY; y < sY + sH; y += 2) {
-    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.fillStyle = "rgba(0,0,0,0.07)";
     ctx.fillRect(sX, y, sW, 1);
   }
   ctx.restore();
@@ -3394,7 +3394,7 @@ function drawMacroDist(canvasId, cfg) {
   );
   vignette.addColorStop(0, "transparent");
   vignette.addColorStop(0.6, "rgba(0,0,0,0.1)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.35)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.22)");
   ctx.fillStyle = vignette;
   ctx.fillRect(sX, sY, sW, sH);
 
