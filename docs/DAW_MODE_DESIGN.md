@@ -78,6 +78,68 @@ Live or Evolve. This also keeps the research property intact: any arrangement
 is exactly regenerable from its JSON (seeds + snapshots), so produced music
 remains valid, provenance-complete stimulus material.
 
+## Bake: from generative region to editable piano roll (stretch goal, owner 2026-07-03)
+
+**Bake** converts a region's take into a concrete, editable note clip. The
+engine already builds the full realised timeline per play (onset, duration,
+frequency, degree, velocity, intonation cents, deviations, envelope draws),
+so baking materialises that list; the region flips from *generative* to
+*baked* while remembering its source (instrument + seed) so "regenerate"
+can always reset it.
+
+### Dual pitch representation
+
+Every baked note stores two things:
+
+- `intended_degree` — the scale note it was "supposed" to play; and
+- `cents_offset` — the realised intonation deviation from it (the product of
+  tuning accuracy/surprise at generation time).
+
+On the roll, the note body sits at its **precise frequency position**
+(fractional row placement), while a ghost outline marks the intended scale
+row, so you can see both the target and the miss at a glance. Two edit
+modes follow directly:
+
+- **Snap-drag** moves `intended_degree` between scale rows (and onsets along
+  the beat grid); `cents_offset` is preserved by default, so a
+  characterfully flat note stays characterfully flat on its new pitch.
+  Modifier-drag (or a toggle) snaps clean, zeroing the offset.
+- **Fine-tune** drags `cents_offset` directly with a live ±cents readout;
+  double-click resets to 0 (or back to the take's original value).
+
+### Per-note editing and the relativistic-edit problem
+
+Properties fall into three classes, and the class decides what an edit means:
+
+1. **Baked scalars** (onset, duration, intended degree, cents offset,
+   velocity): stored absolutely on the note, edited directly.
+2. **Instrument-distribution properties** (attack, decay, vibrato depth,
+   timbre drift — anything sampled per note from an instrument-level
+   distribution): the note stores its **draw** (the quantile/z-score it
+   sampled), not the resolved value. Playback resolves
+   `value = instrument_distribution(current params) at note's draw`, so
+   turning the instrument's attack up later still moves every baked note
+   coherently. A per-note edit in the inspector nudges the *draw* (this is
+   the relativistic edit — "this note, a bit snappier than its siblings"),
+   and an explicit **lock** escalates to an absolute per-note override,
+   shown with a badge, immune to instrument changes.
+3. **Session context** (tempo, key/root): baked notes live in beat-space and
+   degree-space, so they follow tempo and key changes like generative
+   material; a key change re-anchors `intended_degree` and offsets ride
+   along.
+
+Clicking a note opens a compact inspector (Pitch / Time / Expression tabs)
+with per-field "reset to take". Edits are stored as a diff over the take, so
+a baked region remains regenerable and partially revertible.
+
+### UI intuitions to preserve
+
+- The roll must read at a glance: body = what you hear, ghost = what was
+  intended; drag = musical (snapped), modifier-drag = microtonal.
+- Relativistic vs locked edits must be visually distinct (tint vs badge).
+- Baking is never destructive: source instrument, seed, and the unedited
+  take are retained on the region.
+
 ## Other defaults worth stating
 
 - New track's instrument starts linked to all Tier 1 params; overrides are

@@ -136,7 +136,13 @@ synth configuration pulled into arrangement tracks.
 - [ ] G5. Multi-voice scheduling in synth.js: N concurrent instrument voices
   with per-track gain/pan and a shared master bus/limiter.
 - [ ] G6. Arrangement save/load (localStorage + export as JSON), and mixdown
-  export (WAV render of the arrangement).
+  export (single stereo WAV render of the arrangement).
+- [ ] G7. (Stretch) Bake to piano roll: materialise a take into an editable
+  clip with dual pitch representation (precise-frequency note body + ghost
+  of the intended scale note), snap-drag preserving cents offsets,
+  fine-tune repitching, and a per-note inspector with relativistic edits
+  over instrument distributions (draw-nudge vs absolute lock). See design
+  doc "Bake" section.
 
 ## Cross-cutting
 
