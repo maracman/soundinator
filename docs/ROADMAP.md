@@ -166,8 +166,13 @@ Full audits in the loop transcript; the load-bearing findings:
     all 32 in its scrollable grid (explicit pagination unnecessary).
     Nyquist guard already skips unfittable partials. Verified in browser
     at 32 partials, playback clean.
-  - [ ] D7d. 5-formant bank (F1-F5 + bandwidths) behind a disclosure;
-    2D vowel pad unchanged, still drives F1/F2.
+  - [x] D7d. 5-formant bank: FORMANT_PRESETS carry F4/F5 + per-formant
+    bandwidths (Klatt-style tables); renderer runs five parallel bandpasses
+    with Q derived from vowel bandwidth × user scale; F3-F5 levels +
+    bandwidth behind a native "Formant detail" disclosure; vowel pad
+    unchanged (F3-F5/bw resolve by inverse-distance weighting). Verified:
+    ah resolves 2440/3300/3750 Hz with bw 90; live playback clean.
+    D7 COMPLETE — owner audition pass requested.
 
 ## Phase E — Deployment readiness (priority 5)
 

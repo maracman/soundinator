@@ -263,6 +263,11 @@ const DEFAULTS = {
   partialCombFreq: 4,
   partialGroup1: 1, partialGroup2: 1, partialGroup3: 1,
   partialGroup4: 1, partialGroup5: 1, partialGroup6: 1,
+  // 5-formant bank detail (formant mode): F3-F5 trims + bandwidth scale.
+  formantF3Level: 1,
+  formantF4Level: 1,
+  formantF5Level: 1,
+  formantBandwidth: 1,
   spectralDriftProb: 1,
   spectralDriftDepth: 0.35,
   spectralDriftRate: 6,
@@ -1918,6 +1923,7 @@ function renderExplore() {
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
+    "formantF3Level","formantF4Level","formantF5Level","formantBandwidth",
     "spectralRegisterAmount","spectralResonanceAmount","spectralLoudnessNorm",
     "spectralDriftProb","spectralDriftDepth","spectralDriftRate","spectralStretchCents",
     "envelopeProb","envelopeAttack","envelopeAttackSd","envelopeDecay","envelopeDecaySd",
@@ -2674,6 +2680,15 @@ function subnoteWorkspaceHTML(p) {
             </div>
             ${featureSurpriseBlock("formant", "Formant", "surpriseFormantEnabled", null, p.surpriseFormantEnabled, p.surpriseFormantDistance)}
             ${formantWeightControlsHTML(p)}
+            <details class="formant-detail">
+              <summary title="Higher formants (F3-F5) and bandwidths — the presence and 'singer's formant' region. The vowel pad above stays the simple face.">Formant detail</summary>
+              <div class="controls-grid">
+                ${controlRow("formantF3Level", "F3 level", p.formantF3Level, 0, 2, 0.01)}
+                ${controlRow("formantF4Level", "F4 level", p.formantF4Level, 0, 2, 0.01)}
+                ${controlRow("formantF5Level", "F5 level", p.formantF5Level, 0, 2, 0.01)}
+                ${controlRow("formantBandwidth", "Bandwidth", p.formantBandwidth, 0.4, 2.5, 0.01)}
+              </div>
+            </details>
           </div>
 
           <div class="subnote-side-section${formantDisabled}" data-sound-path="formant" aria-disabled="${!formantMode}">

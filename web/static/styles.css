@@ -4497,3 +4497,17 @@ body.explore-mode #app {
 .toolbar-hint { color: var(--text3); font-size: 0.78rem; }
 
 .workspace-link { text-decoration: none; }
+
+/* ── Formant detail disclosure ───────────────────────────── */
+
+.formant-detail { margin-top: 0.6rem; }
+.formant-detail summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  user-select: none;
+}
+.formant-detail summary:hover { color: var(--text2); }
+.formant-detail[open] summary { color: var(--text2); margin-bottom: 0.5rem; }

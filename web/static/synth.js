@@ -30,13 +30,19 @@ export class SeededRNG {
 }
 
 // ─── Formant presets (approximate adult male formant frequencies) ─
+//
+// F1-F3 from the classic Peterson & Barney measurements; F4/F5 and the
+// per-formant bandwidths (bw, Hz) follow standard cascade-synthesis tables
+// (Klatt-style): F4 ≈ 3.3-3.7 kHz, F5 ≈ 3.7-4.1 kHz, bandwidths widening
+// with formant number. F4/F5 carry the "presence"/singer's-formant region
+// that makes voices read as natural rather than filtered.
 
 export const FORMANT_PRESETS = {
-  ah: { f1: 730, f2: 1090, f3: 2440, label: "ah" },
-  ee: { f1: 270, f2: 2290, f3: 3010, label: "ee" },
-  oo: { f1: 300, f2: 870,  f3: 2240, label: "oo" },
-  eh: { f1: 530, f2: 1840, f3: 2480, label: "eh" },
-  oh: { f1: 570, f2: 840,  f3: 2410, label: "oh" },
+  ah: { f1: 730, f2: 1090, f3: 2440, f4: 3300, f5: 3750, bw: [90, 110, 170, 250, 300], label: "ah" },
+  ee: { f1: 270, f2: 2290, f3: 3010, f4: 3500, f5: 3950, bw: [60, 100, 150, 200, 260], label: "ee" },
+  oo: { f1: 300, f2: 870,  f3: 2240, f4: 3300, f5: 3750, bw: [65, 110, 140, 190, 250], label: "oo" },
+  eh: { f1: 530, f2: 1840, f3: 2480, f4: 3450, f5: 3900, bw: [75, 100, 160, 220, 280], label: "eh" },
+  oh: { f1: 570, f2: 840,  f3: 2410, f4: 3300, f5: 3700, bw: [80, 110, 160, 230, 290], label: "oh" },
 };
 const FORMANT_ORDER = ["ee", "eh", "ah", "oh", "oo"];
 
@@ -108,10 +114,14 @@ function formantFreqsAt(formant, dev = 0) {
   const frac = pos - lo;
   const a = FORMANT_PRESETS[order[((lo % n) + n) % n]];
   const b = FORMANT_PRESETS[order[(((lo + 1) % n) + n) % n]];
+  const lerp = (x, y) => x + (y - x) * frac;
   return {
-    f1: a.f1 + (b.f1 - a.f1) * frac,
-    f2: a.f2 + (b.f2 - a.f2) * frac,
-    f3: a.f3 + (b.f3 - a.f3) * frac,
+    f1: lerp(a.f1, b.f1),
+    f2: lerp(a.f2, b.f2),
+    f3: lerp(a.f3, b.f3),
+    f4: lerp(a.f4 || 3400, b.f4 || 3400),
+    f5: lerp(a.f5 || 3800, b.f5 || 3800),
+    bw: (a.bw || [80, 100, 160, 220, 280]).map((v, i) => lerp(v, (b.bw || a.bw || [])[i] ?? v)),
   };
 }
 
@@ -194,13 +204,22 @@ export function nearestVowel(pt) {
  * from the landmark vowels.
  */
 export function formantFreqsAtPoint(pt) {
-  let wSum = 0, f3 = 0;
+  let wSum = 0, f3 = 0, f4 = 0, f5 = 0;
+  const bw = [0, 0, 0, 0, 0];
   for (const [name, p] of Object.entries(VOWEL_POINTS)) {
     const w = 1 / (Math.pow(_vowelDist(pt, p), 2) + 1e-4);
+    const preset = FORMANT_PRESETS[name];
     wSum += w;
-    f3 += w * FORMANT_PRESETS[name].f3;
+    f3 += w * preset.f3;
+    f4 += w * (preset.f4 || 3400);
+    f5 += w * (preset.f5 || 3800);
+    (preset.bw || [80, 100, 160, 220, 280]).forEach((b, i) => { bw[i] += w * b; });
   }
-  return { f1: Math.exp(pt.x), f2: Math.exp(pt.y), f3: f3 / wSum };
+  return {
+    f1: Math.exp(pt.x), f2: Math.exp(pt.y),
+    f3: f3 / wSum, f4: f4 / wSum, f5: f5 / wSum,
+    bw: bw.map(b => b / wSum),
+  };
 }
 
 // ─── Percussion sound definitions ───────────────────────────
@@ -2445,14 +2464,32 @@ export class SynthEngine {
     // Envelope
     const env = this._adsr(note.velocity * 0.4, t0, t1, note);
 
-    // Three parallel formant filters
-    for (const [freq, amp] of [[f.f1, 1.0], [f.f2, 0.6], [f.f3, 0.25]]) {
+    // Five parallel formant filters (docs/PARTIAL_MACROS_DESIGN.md D7d):
+    // F1/F2 carry the vowel, F3 colour, F4/F5 the presence/singer's-formant
+    // region. Q derives from the vowel's per-formant bandwidth, scaled by
+    // the user's bandwidth control; F3-F5 levels are user-trimmable.
+    const gp = this._engine?.p || {};
+    const bwScale = Math.max(0.4, Math.min(2.5, Number(gp.formantBandwidth ?? 1)));
+    const lvl3 = Math.max(0, Math.min(2, Number(gp.formantF3Level ?? 1)));
+    const lvl4 = Math.max(0, Math.min(2, Number(gp.formantF4Level ?? 1)));
+    const lvl5 = Math.max(0, Math.min(2, Number(gp.formantF5Level ?? 1)));
+    const bws = f.bw || [80, 100, 160, 220, 280];
+    const bank = [
+      [f.f1, 1.0, bws[0]],
+      [f.f2, 0.6, bws[1]],
+      [f.f3, 0.25 * lvl3, bws[2]],
+      [f.f4 || 3400, 0.12 * lvl4, bws[3]],
+      [f.f5 || 3800, 0.07 * lvl5, bws[4]],
+    ];
+    for (const [freq, amp, bwHz] of bank) {
+      if (amp <= 0) continue;
       const bp = this.ctx.createBiquadFilter();
       bp.type = "bandpass";
       const formantShift = Math.max(0.7, Math.min(1.3, 1 + (note.toneFormantShift || 0)));
       const resonanceShift = Math.max(0.45, Math.min(1.8, 1 + (note.toneResonanceShift || 0)));
-      bp.frequency.setValueAtTime(freq * formantShift, t0);
-      bp.Q.value = Math.max(2, Math.min(16, 8 * resonanceShift));
+      const centre = freq * formantShift;
+      bp.frequency.setValueAtTime(centre, t0);
+      bp.Q.value = Math.max(2, Math.min(18, (centre / Math.max(30, bwHz * bwScale)) * resonanceShift));
 
       const g = this.ctx.createGain();
       g.gain.value = amp * 0.18 * (1 - spectralMix * 0.55);
