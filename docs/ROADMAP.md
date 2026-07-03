@@ -158,10 +158,9 @@ Full audits in the loop transcript; the load-bearing findings:
 - [x] F3b-2 (partial). Hero visualiser: main display row raised across all
   three layout variants (~2x taller); distribution displays harmonised into
   the new shell (neutral glass/grid replacing green phosphor tint, softer
-  scanlines/vignette; layer-colour data unchanged). OPEN QUESTION for
-  owner: keep the CRT/LED display character (harmonised) or fully replace
-  with FabFilter smooth filled curves? Hover readouts pending either way
-  (F3c).
+  scanlines/vignette; layer-colour data unchanged). Owner decision: KEEP the
+  CRT/LED display character (harmonised); FabFilter curve replacement
+  rejected. Hover readouts pending (F3c).
 - [ ] F3c. Contextual panels: note grid & 2D vowel pad (B4a) as
   direct-manipulation surfaces with floating per-item editors.
 
