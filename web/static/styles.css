@@ -4228,9 +4228,30 @@ body.explore-mode #app {
 
 /* ── Welcome / research opt-in ───────────────────────────── */
 
+/* The welcome card floats over the studio on first visit instead of taking
+   a row in the fixed-height dashboard grid (which squashed the workspace
+   to nothing). One click on either action removes it. */
 .welcome-card {
   border-color: var(--border2);
   background: linear-gradient(180deg, var(--surface2), var(--surface));
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: auto;
+  width: min(560px, calc(100vw - 48px));
+  height: fit-content;
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 1.2rem 1.4rem !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.welcome-card::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(4, 6, 10, 0.62);
 }
 
 .welcome-card h2 {
