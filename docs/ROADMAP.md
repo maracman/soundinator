@@ -127,6 +127,19 @@ Full audits in the loop transcript; the load-bearing findings:
   library tab. Keys validated against DEFAULTS; loaded & played in browser.
   Deeper listening/tuning pass welcome once owner auditions them.
 
+- [x] D5 (owner feedback 2026-07-03): instruments didn't sound like the
+  instruments. Root cause: all profiles shared one generic envelope/vibrato
+  and Fourier mode had no onset transient. Added SPECTRAL_PERFORMANCE per
+  instrument (envelope speech times, vibrato idiom, piano inharmonic
+  stretch) applied on profile selection, plus per-profile attack-noise
+  transients (breath chiff / bow noise / lip buzz / hammer thump) rendered
+  at note onset. Needs owner listening pass; harmonic tables can be
+  refined further against published spectra if still off.
+- [ ] D6 (owner feedback 2026-07-03): modular preset save/load should live
+  in each related panel (like the sub-note panel pattern), not only the
+  one top-bar dropdown. Per-panel preset bars: scale/melody, macro tabs,
+  sequence & surprise, percussion, space, sound source.
+
 ## Phase E — Deployment readiness (priority 5)
 
 - [x] E1. Health endpoint now reports data/cache-dir writability, schema

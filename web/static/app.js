@@ -1727,6 +1727,9 @@ function renderExplore() {
       }
       if (key === "spectralProfile") {
         synth.updateGenerationParams({ ...exploreParams });
+        // The profile applied its performance defaults (envelope, vibrato,
+        // stretch) — re-render so the affected controls show them.
+        renderExplore();
         return;
       }
       if (liveSubnoteParams.has(key)) {
@@ -2439,6 +2442,12 @@ function subnoteWorkspaceHTML(p) {
 
 function resetSpectralPartialParams(p) {
   const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
+  // Choosing an instrument applies its performance character too — envelope
+  // speech, vibrato idiom, inharmonic stretch. They stay ordinary editable
+  // params afterwards; the onset transient rides the profile itself.
+  for (const [key, value] of Object.entries(profile.performance || {})) {
+    if (key !== "attackNoise" && key in DEFAULTS) p[key] = value;
+  }
   p.spectralPartialMeans = profile.partials.map(partial => +(profilePartial(partial).amp || 0).toFixed(3));
   p.spectralPartialSds = profile.partials.map(partial => {
     const spec = profilePartial(partial);

@@ -410,6 +410,77 @@ for (const [profileKey, resonances] of Object.entries(SPECTRAL_RESONANCES)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].resonances = resonances;
 }
 
+// ── Per-instrument performance character ─────────────────────
+//
+// A static spectrum alone never reads as "violin" — the temporal envelope,
+// vibrato idiom, and onset transient carry most of the identity. These
+// defaults are applied when an instrument profile is selected (they remain
+// ordinary user-editable parameters afterwards). Values follow standard
+// instrumental acoustics:
+//  - winds speak in 20-60ms, strings in 60-120ms (bow acceleration), brass
+//    ~25-40ms with a hard lip transient, piano is percussive (<5ms, decaying)
+//  - vibrato: strings wide (~±15-25 cents) at 5-6.5Hz; flute moderate;
+//    clarinet traditionally near-none; brass light
+//  - onsets carry noise: flute breath chiff (broadband, bright), bow noise
+//    (mid-high scratch), brass lip buzz (low), piano hammer thump
+const SPECTRAL_PERFORMANCE = {
+  flute: {
+    envelopeAttack: 0.055, envelopeAttackSd: 0.015, envelopeDecay: 0.05,
+    envelopeSustain: 0.78, envelopeRelease: 0.14,
+    vibratoProb: 0.75, vibratoRate: 5.2, vibratoRateSd: 0.3, vibratoDepth: 10, vibratoDepthSd: 3,
+    attackNoise: { level: 0.4, freq: 2800, q: 0.8, decay: 0.07 },
+  },
+  clarinet: {
+    envelopeAttack: 0.032, envelopeAttackSd: 0.008, envelopeDecay: 0.04,
+    envelopeSustain: 0.82, envelopeRelease: 0.1,
+    vibratoProb: 0.1, vibratoRate: 5.0, vibratoRateSd: 0.2, vibratoDepth: 4, vibratoDepthSd: 1.5,
+    attackNoise: { level: 0.12, freq: 1800, q: 1.2, decay: 0.04 },
+  },
+  violin: {
+    envelopeAttack: 0.085, envelopeAttackSd: 0.025, envelopeDecay: 0.07,
+    envelopeSustain: 0.74, envelopeRelease: 0.22,
+    vibratoProb: 0.85, vibratoRate: 5.9, vibratoRateSd: 0.4, vibratoDepth: 16, vibratoDepthSd: 4,
+    attackNoise: { level: 0.3, freq: 3400, q: 1.0, decay: 0.09 },
+  },
+  cello: {
+    envelopeAttack: 0.105, envelopeAttackSd: 0.03, envelopeDecay: 0.08,
+    envelopeSustain: 0.74, envelopeRelease: 0.28,
+    vibratoProb: 0.8, vibratoRate: 5.1, vibratoRateSd: 0.35, vibratoDepth: 14, vibratoDepthSd: 4,
+    attackNoise: { level: 0.32, freq: 1500, q: 1.0, decay: 0.11 },
+  },
+  trumpet: {
+    envelopeAttack: 0.03, envelopeAttackSd: 0.008, envelopeDecay: 0.05,
+    envelopeSustain: 0.85, envelopeRelease: 0.11,
+    vibratoProb: 0.3, vibratoRate: 5.4, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
+    attackNoise: { level: 0.2, freq: 900, q: 1.4, decay: 0.045 },
+  },
+  trombone: {
+    envelopeAttack: 0.045, envelopeAttackSd: 0.012, envelopeDecay: 0.06,
+    envelopeSustain: 0.84, envelopeRelease: 0.14,
+    vibratoProb: 0.25, vibratoRate: 5.0, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
+    attackNoise: { level: 0.22, freq: 480, q: 1.3, decay: 0.06 },
+  },
+  piano: {
+    // Percussive: instant hammer onset, no sustain plateau (decay carries the
+    // note), no vibrato. Long-decay realism is bounded by the ADSR model.
+    envelopeAttack: 0.004, envelopeAttackSd: 0.001, envelopeDecay: 0.35,
+    envelopeSustain: 0.28, envelopeRelease: 0.3,
+    vibratoProb: 0, vibratoRate: 5, vibratoRateSd: 0, vibratoDepth: 0, vibratoDepthSd: 0,
+    attackNoise: { level: 0.26, freq: 350, q: 0.7, decay: 0.02 },
+    spectralStretchCents: 8, // string inharmonicity stretches upper partials
+  },
+  vocal: {
+    envelopeAttack: 0.06, envelopeAttackSd: 0.02, envelopeDecay: 0.06,
+    envelopeSustain: 0.78, envelopeRelease: 0.18,
+    vibratoProb: 0.85, vibratoRate: 5.5, vibratoRateSd: 0.5, vibratoDepth: 18, vibratoDepthSd: 6,
+    attackNoise: { level: 0.14, freq: 2200, q: 0.9, decay: 0.05 },
+  },
+};
+
+for (const [profileKey, performance] of Object.entries(SPECTRAL_PERFORMANCE)) {
+  if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].performance = performance;
+}
+
 // ─── 12-tone scale presets ──────────────────────────────────
 
 export const SCALE_PRESETS = {
@@ -1085,6 +1156,7 @@ export class GenerationEngine {
     });
     return {
       harmonicPartials: partials,
+      attackNoise: profile.performance?.attackNoise || null,
       spectralMix: fourierMode ? (this.p.spectralMix ?? 0) : 0,
       spectralDriftProb: this.p.spectralDriftProb ?? 1,
       spectralDriftDepth: this.p.spectralDriftDepth ?? 0.35,
@@ -2355,6 +2427,7 @@ export class SynthEngine {
     const t1 = t0 + note.duration;
     const env = this._adsr(note.velocity, t0, t1, note);
     this._renderSpectralPartials(note, t0, t1, env);
+    this._renderAttackNoise(note, t0, env);
     this._renderBreath(note, t0, t1, env);
     env.connect(this.master);
   }
@@ -2531,6 +2604,35 @@ export class SynthEngine {
 
   _clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : lo));
+  }
+
+  /**
+   * Instrument onset transient (breath chiff, bow noise, lip buzz, hammer
+   * thump): a short filtered-noise burst at note start, scaled by velocity.
+   * This carries a large share of instrument identity that a static
+   * spectrum cannot.
+   */
+  _renderAttackNoise(note, t0, env) {
+    const an = note.attackNoise;
+    if (!an || !this._noiseBuffer || !note.velocity) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.setValueAtTime(Math.max(80, an.freq || 2000), t0);
+    bp.Q.value = Math.max(0.3, an.q || 1);
+    const g = this.ctx.createGain();
+    const peak = Math.max(0.0001, note.velocity * (an.level || 0.2) * 0.3);
+    const decay = Math.max(0.015, an.decay || 0.05);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + decay);
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(env);
+    src.start(t0);
+    src.stop(t0 + decay + 0.02);
+    this._track(src);
   }
 
   _renderBreath(note, t0, t1, env) {
