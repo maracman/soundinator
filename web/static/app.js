@@ -4473,12 +4473,23 @@ function drawEnvelopePath(ctx, points, opts) {
 // ─── Explore: Helpers ───────────────────────────────────────
 
 /** Update slider filled-track gradient */
+// Slider fills carry the DATA-layer hue of the subsection they live in
+// (generation amber / accuracy green / surprise cyan), per the FabFilter
+// principle: chrome stays monochrome, colour identifies the data layer.
+const _LAYER_FILL_RGB = {
+  generation: "245,166,35",
+  accuracy: "160,220,50",
+  surprise: "56,189,248",
+};
+
 function updateSliderFill(sl) {
   const min = parseFloat(sl.min) || 0;
   const max = parseFloat(sl.max) || 100;
   const val = parseFloat(sl.value) || 0;
   const pct = ((val - min) / (max - min)) * 100;
-  sl.style.background = `linear-gradient(to right, rgba(245,158,11,0.4) ${pct}%, rgba(20,30,42,0.95) ${pct}%)`;
+  const section = sl.closest("[data-section]")?.dataset.section;
+  const rgb = _LAYER_FILL_RGB[section] || _LAYER_FILL_RGB.generation;
+  sl.style.background = `linear-gradient(to right, rgba(${rgb},0.55) ${pct}%, rgba(43,47,55,0.95) ${pct}%)`;
 }
 
 function controlRow(param, label, value, min, max, step) {

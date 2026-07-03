@@ -7,11 +7,12 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 13
-- Phases A-E done (+ CI). F2 decided: FabFilter-inspired direction (see
-  docs/UI_DIRECTION.md). Next: F3a reskin (tokens + chrome), folding in F1
-  usability fixes, then F3b display-forward layout, F3c contextual panels
-  (incl. B4a vowel pad).
+- Iteration: 15
+- Phases A-E done (+ CI). F2 decided (FabFilter identity + Tonalic
+  preset/sequencing interaction). F3a reskin landed. Next: F3b
+  display-forward layout + Tonalic-style preset browser with in-context
+  preview, then F3c contextual panels (incl. B4a vowel pad), F1 leftovers
+  (responsive canvases, touch sizing).
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -146,8 +147,11 @@ Full audits in the loop transcript; the load-bearing findings:
   owner chose a fourth path: FabFilter-inspired design language. Design
   system specified in docs/UI_DIRECTION.md (monochrome shell, data-owned
   colour, display-forward, contextual editing, precision readouts).
-- [ ] F3a. Reskin: apply token system + chrome discipline to the existing
-  layout (thin tracks, layer-hued fills, mono readouts, soft elevation).
+- [x] F3a. Reskin: FabFilter token system applied (blue-charcoal shell,
+  layer-hue vars); sliders are thin monochrome precision controls with
+  data-hued fills keyed to their subsection (generation amber / accuracy
+  green / surprise cyan); amber glows retired; readouts tabular mono.
+  Verified in browser; playback regression clean.
 - [ ] F3b. Display-forward layout: hero visualiser strip; distribution
   canvases restyled to filled-curve language with hover readouts.
 - [ ] F3c. Contextual panels: note grid & 2D vowel pad (B4a) as
