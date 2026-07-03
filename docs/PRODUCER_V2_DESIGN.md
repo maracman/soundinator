@@ -183,10 +183,12 @@ and flexible; check for obvious missing features. Findings, prioritised:
       Delete/Backspace removes the selected region, Escape deselects and
       closes the editor drawer; inert while typing in inputs and outside
       #produce.
-- [ ] U5 Zoom (px-per-beat) and snap control (bar / beat / half).
-- [ ] U6 Arrangement length not fixed at 16 bars — extend as regions
-      approach the end (or a length setting).
-- [ ] U7 Track rename (double-click the name).
+- [x] U5 DONE: −/＋ zoom (6-32 px/beat, persisted) and Bar/Beat/½ snap
+      select applied to drops, moves, and resizes.
+- [x] U6 DONE: arrangement.lengthBeats (default 64, migrated) with a
+      ＋8-bars control; ruler/lanes grow accordingly.
+- [x] U7 DONE: double-click the track name for inline rename
+      (Enter/blur commits, Escape cancels).
 - [ ] U8 Single-level undo for destructive acts (delete region/track,
       unbake, overwrite palette item).
 - [ ] U9 Loop-repeat tick marks on extended baked regions so the loop

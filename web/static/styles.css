@@ -4985,3 +4985,25 @@ body.dragging { cursor: grabbing; user-select: none; }
 .tl2-ms.on { background: rgba(245,166,35,0.25); color: var(--accent2); border-color: rgba(245,166,35,0.6); }
 .tl2-ms.tl2-solo.on { background: rgba(56,189,248,0.22); color: var(--surp); border-color: rgba(56,189,248,0.55); }
 .tl2-head.inaudible .tl2-name { opacity: 0.4; }
+
+/* ── Zoom/snap controls + rename (v2.1 U5-U7) ───────────── */
+
+.daw-ctx-select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.16rem 0.3rem;
+  font-size: 0.7rem;
+}
+
+.tl2-rename {
+  flex: 1;
+  min-width: 0;
+  background: var(--display);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.3rem;
+}

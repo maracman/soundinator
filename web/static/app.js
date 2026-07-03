@@ -927,9 +927,11 @@ function mount(html) {
 // editor state — G4 gives it its own bar with per-track locks.
 
 const ARRANGEMENT_KEY = "phase0.arrangement.v1";
-const BEATS_TOTAL = 64;   // 16 bars of 4 — the visible arrangement length
-const PX_PER_BEAT = 14;   // lane pixel scale
 const BEATS_PER_BAR = 4;
+let pxPerBeat = 14;   // lane pixel scale (zoom; persisted in dawLayout)
+let snapBeats = 1;    // grid snap: 4 = bar, 1 = beat, 0.5 = half
+
+function totalBeats() { return Math.max(16, arrangement?.lengthBeats || 64); }
 
 // v1 arrangements used 4-beat slots and inline per-track instruments; v2
 // regions live in beat-space and source their voice from the palette.
@@ -981,10 +983,11 @@ function loadArrangement() {
     if (a && Array.isArray(a.tracks)) {
       if (!a.context) a.context = defaultArrangementContext();
       if (!Array.isArray(a.palette)) a.palette = [];
+      if (!a.lengthBeats) a.lengthBeats = 64;
       return migrateArrangement(a);
     }
   } catch { /* fall through */ }
-  return { name: "Untitled arrangement", version: 2, tracks: [], palette: [], context: defaultArrangementContext() };
+  return { name: "Untitled arrangement", version: 2, lengthBeats: 64, tracks: [], palette: [], context: defaultArrangementContext() };
 }
 function saveArrangement() {
   if (arrangement) localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
@@ -1361,7 +1364,7 @@ function updatePlayhead(beat) {
   if (!line) return;
   if (beat == null || beat < 0) { line.classList.add("hidden"); return; }
   line.classList.remove("hidden");
-  line.style.left = `${beat * PX_PER_BEAT}px`;
+  line.style.left = `${beat * pxPerBeat}px`;
 }
 
 function stopArrangement() {
@@ -1392,7 +1395,7 @@ function playArrangement(fromBeat = 0) {
       const region = regionAtBeat(track, b);
       const voice = producerVoice(track);
       if (!trackAudible(track)) { voice.stop(); continue; }
-      if (region && (b === region.startBeat || b === arrPlay.startAt)) {
+      if (region && (b === Math.ceil(region.startBeat) || b === arrPlay.startAt)) {
         if (region.type === "baked" && Array.isArray(region.notes)) {
           voice.playNotes(regionPlayParams(track, region), region.notes,
             regionLen(region), region.loopSourceBeats || regionLen(region));
@@ -1521,14 +1524,14 @@ function regionAtBeat(track, b) {
 }
 
 function spanFree(track, startBeat, lengthBeats, ignoreId = null) {
-  if (startBeat < 0 || startBeat + lengthBeats > BEATS_TOTAL) return false;
+  if (startBeat < 0 || startBeat + lengthBeats > totalBeats()) return false;
   return !track.regions.some(r => r.id !== ignoreId &&
     startBeat < r.startBeat + regionLen(r) && r.startBeat < startBeat + lengthBeats);
 }
 
 // Longest length this region may take before the next region or the end
 function maxRegionLength(track, region) {
-  let limit = BEATS_TOTAL - region.startBeat;
+  let limit = totalBeats() - region.startBeat;
   for (const other of track.regions) {
     if (other.id === region.id) continue;
     if (other.startBeat > region.startBeat) {
@@ -1539,11 +1542,11 @@ function maxRegionLength(track, region) {
 }
 
 function produceTimelineHTML() {
-  const laneW = BEATS_TOTAL * PX_PER_BEAT;
+  const laneW = totalBeats() * pxPerBeat;
   // Ruler: bar numbers every BEATS_PER_BAR
-  const barCount = BEATS_TOTAL / BEATS_PER_BAR;
+  const barCount = totalBeats() / BEATS_PER_BAR;
   const rulerMarks = Array.from({ length: barCount }, (_, i) =>
-    `<span class="tl2-bar" style="left:${i * BEATS_PER_BAR * PX_PER_BEAT}px">${i + 1}</span>`).join("");
+    `<span class="tl2-bar" style="left:${i * BEATS_PER_BAR * pxPerBeat}px">${i + 1}</span>`).join("");
   const trackRows = arrangement.tracks.map(t => {
     const regions = t.regions.map(r => {
       const sel = selectedRegion?.regionId === r.id ? " selected" : "";
@@ -1551,7 +1554,7 @@ function produceTimelineHTML() {
       const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
       const label = pal ? pal.name : t.name;
       return `<div class="tl2-region${sel}${baked}" data-region="${r.id}" data-track="${t.id}"
-        style="left:${r.startBeat * PX_PER_BEAT}px;width:${regionLen(r) * PX_PER_BEAT - 2}px"
+        style="left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
         title="${esc(label)} — drag to move, drag the right edge to extend. Double-click a baked region to edit its notes.">
         <span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
@@ -1831,7 +1834,9 @@ function paletteZoneAtPoint(x, y) {
 }
 function beatAtClientX(lane, clientX) {
   const rect = lane.getBoundingClientRect();
-  return Math.max(0, Math.min(BEATS_TOTAL - 1, Math.round((clientX - rect.left) / PX_PER_BEAT)));
+  const raw = (clientX - rect.left) / pxPerBeat;
+  const snapped = Math.round(raw / snapBeats) * snapBeats;
+  return Math.max(0, Math.min(totalBeats() - snapBeats, snapped));
 }
 
 function trackAudible(track) {
@@ -1840,7 +1845,7 @@ function trackAudible(track) {
 }
 
 function trackFreeFrom(track, fromBeat) {
-  let limit = BEATS_TOTAL - fromBeat;
+  let limit = totalBeats() - fromBeat;
   for (const r of track.regions) {
     if (r.startBeat + regionLen(r) <= fromBeat) continue;
     if (r.startBeat >= fromBeat) limit = Math.min(limit, r.startBeat - fromBeat);
@@ -1876,7 +1881,7 @@ function dropRegionOnLane(laneId, payload, beat, copy = false) {
   if (!src || !region || laneId === "__new__") return false;
   const dest = arrangement.tracks.find(t => t.id === laneId);
   if (!dest) return false;
-  const start = Math.max(0, Math.min(BEATS_TOTAL - regionLen(region), beat));
+  const start = Math.max(0, Math.min(totalBeats() - regionLen(region), beat));
   if (!spanFree(dest, start, regionLen(region), copy ? null : region.id)) return false;
   let placed = region;
   if (copy) {
@@ -1901,8 +1906,8 @@ function duplicateSelectedRegion() {
   if (!track || !region) return;
   const len = regionLen(region);
   let start = region.startBeat + len;
-  while (start + len <= BEATS_TOTAL && !spanFree(track, start, len)) start++;
-  if (start + len > BEATS_TOTAL) return;
+  while (start + len <= totalBeats() && !spanFree(track, start, len)) start++;
+  if (start + len > totalBeats()) return;
   const copy = JSON.parse(JSON.stringify(region));
   copy.id = crypto.randomUUID();
   copy.startBeat = start;
@@ -2005,9 +2010,9 @@ function pointerDragUp(e) {
 const DAW_LAYOUT_KEY = "phase0.dawLayout.v1";
 function loadDawLayout() {
   try {
-    return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false,
+    return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false, pxPerBeat: 14, snapBeats: 1,
       ...(JSON.parse(localStorage.getItem(DAW_LAYOUT_KEY) || "{}")) };
-  } catch { return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false }; }
+  } catch { return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false, pxPerBeat: 14, snapBeats: 1 }; }
 }
 let dawLayout = null;
 let browserFilter = "all";   // all | starter | instrument | mine | section
@@ -2018,6 +2023,8 @@ function saveDawLayout() { localStorage.setItem(DAW_LAYOUT_KEY, JSON.stringify(d
 function renderProduce() {
   arrangement = arrangement || loadArrangement();
   dawLayout = dawLayout || loadDawLayout();
+  pxPerBeat = dawLayout.pxPerBeat || 14;
+  snapBeats = dawLayout.snapBeats || 1;
   const sources = produceSources();
   const editorOpen = rollOpen && !!selectedBakedRegion();
   const v = mount(`
@@ -2029,6 +2036,15 @@ function renderProduce() {
         <button class="btn btn-secondary btn-sm" id="prodStop">■</button>
         <span class="daw-sep"></span>
         ${sessionBarControlsHTML()}
+        <span class="daw-sep"></span>
+        <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
+        <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
+        <select id="snapSelect" class="daw-ctx-select" title="Grid snap">
+          <option value="4"${snapBeats === 4 ? " selected" : ""}>Bar</option>
+          <option value="1"${snapBeats === 1 ? " selected" : ""}>Beat</option>
+          <option value="0.5"${snapBeats === 0.5 ? " selected" : ""}>½ beat</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" id="addBars" title="Lengthen the arrangement by 8 bars">＋8 bars</button>
         <span class="daw-sep"></span>
         <button class="btn btn-secondary btn-sm" id="arrMixdown" title="Render the arrangement offline and download it as a WAV">⬇ WAV</button>
         <button class="btn btn-ghost btn-sm" id="arrExport" title="Download this arrangement as a self-contained JSON file (instruments included)">Export</button>
@@ -2145,10 +2161,10 @@ function wireProduce(v) {
       const startX = e.clientX;
       const origLen = regionLen(region);
       const move = (ev) => {
-        const delta = Math.round((ev.clientX - startX) / PX_PER_BEAT);
+        const delta = Math.round((ev.clientX - startX) / pxPerBeat);
         const len = Math.max(1, Math.min(maxRegionLength(track, region), origLen + delta));
         region.lengthBeats = len;
-        regionEl.style.width = `${len * PX_PER_BEAT - 2}px`;
+        regionEl.style.width = `${len * pxPerBeat - 2}px`;
       };
       const up = () => {
         document.removeEventListener("mousemove", move);
@@ -2180,7 +2196,7 @@ function wireProduce(v) {
   const ruler = v.querySelector("#tlRuler");
   if (ruler) ruler.onclick = (e) => {
     const rect = ruler.getBoundingClientRect();
-    playheadBeat = Math.max(0, Math.min(BEATS_TOTAL - 1, Math.round((e.clientX - rect.left) / PX_PER_BEAT)));
+    playheadBeat = Math.max(0, Math.min(totalBeats() - 1, Math.round((e.clientX - rect.left) / pxPerBeat)));
     updatePlayhead(playheadBeat);
   };
   updatePlayhead(arrPlay ? arrPlay.beat : playheadBeat);
@@ -2340,6 +2356,59 @@ function wireProduce(v) {
 
   const stopBtn = v.querySelector("#prodStop");
   if (stopBtn) stopBtn.onclick = () => { stopArrangement(); synth.stop(); renderProduce(); };
+
+  // Zoom / snap / length (v2.1 U5, U6)
+  const zoomIn = v.querySelector("#zoomIn");
+  const zoomOut = v.querySelector("#zoomOut");
+  const setZoom = (px) => {
+    dawLayout.pxPerBeat = Math.max(6, Math.min(32, px));
+    saveDawLayout();
+    renderProduce();
+  };
+  if (zoomIn) zoomIn.onclick = () => setZoom((dawLayout.pxPerBeat || 14) + 3);
+  if (zoomOut) zoomOut.onclick = () => setZoom((dawLayout.pxPerBeat || 14) - 3);
+  const snapSelect = v.querySelector("#snapSelect");
+  if (snapSelect) snapSelect.onchange = () => {
+    dawLayout.snapBeats = Number(snapSelect.value);
+    saveDawLayout();
+    renderProduce();
+  };
+  const addBars = v.querySelector("#addBars");
+  if (addBars) addBars.onclick = () => {
+    arrangement.lengthBeats = totalBeats() + 8 * BEATS_PER_BAR;
+    saveArrangement();
+    renderProduce();
+  };
+
+  // Track rename via double-click (v2.1 U7)
+  v.querySelectorAll(".tl2-name").forEach(nameEl => {
+    nameEl.ondblclick = (e) => {
+      e.stopPropagation();
+      const head = nameEl.closest(".tl2-head");
+      const trackId = head?.querySelector("[data-track-gain]")?.dataset.trackGain;
+      const track = arrangement.tracks.find(t => t.id === trackId);
+      if (!track) return;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = track.name;
+      input.maxLength = 60;
+      input.className = "tl2-rename";
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+      const commit = () => {
+        track.name = input.value.trim() || track.name;
+        saveArrangement();
+        renderProduce();
+      };
+      input.onblur = commit;
+      input.onkeydown = (ev) => {
+        if (ev.key === "Enter") { ev.preventDefault(); input.blur(); }
+        if (ev.key === "Escape") { input.oninput = null; input.onblur = null; renderProduce(); }
+        ev.stopPropagation();
+      };
+    };
+  });
 
   const mixBtn = v.querySelector("#arrMixdown");
   if (mixBtn) mixBtn.onclick = () => mixdownArrangement(v.querySelector("#mixStatus"));
