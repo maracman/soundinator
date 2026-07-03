@@ -1,8 +1,11 @@
 # Sound Studio User Manual
 
-Last checked against `web/static/app.js` and `web/static/synth.js` on 2026-05-25.
+Last checked against `web/static/app.js` and `web/static/synth.js` on 2026-07-03.
 
-This manual describes the current Sound Studio interface and what each value does. The main idea is that the synthesiser is probabilistic at several musical time scales:
+This manual describes the current web app: the volunteer study flow, the
+Sound Studio (Explore), the preset system, the Sub-note timbre workshop, and
+Producer mode. The core idea throughout is that the synthesiser is
+probabilistic at several musical time scales:
 
 - Repertoire scale: which motifs exist, how the loop grows, and whether surprises become part of the repeated material.
 - Note scale: scale degrees, intervals, rhythm, rests, tuning, formants, and dynamics.
@@ -10,15 +13,62 @@ This manual describes the current Sound Studio interface and what each value doe
 
 Musically, you can think of it like a small improvising player. The scale gives the player its pitch vocabulary, Melody and Rhythm set its habits, Surprise lets habits mutate into new repeated material, and Sub-note controls shape the instrument-like body of each note.
 
-## Quick Start
+## The App At A Glance
+
+The landing page offers two entry points; a third mode is reachable from the
+Sound Studio:
+
+| Area | What it is | Who it is for |
+|---|---|---|
+| Take the Study | A structured ~10 minute listening study: consent → optional demographics → headphone check → a slider or comparison task → debrief. | Volunteers contributing research data. |
+| Explore Sounds | The full Sound Studio: play, tune every distribution, save/load presets, rate what you hear, optionally share settings with the research library. | Curious listeners and sound designers. |
+| Producer | A DAW-style arrangement view (browser → palette → tracks) built on instruments captured in the Sound Studio. | Music production with the same engine. |
+
+The same `Seed` and same parameters always produce the same generative path,
+in the studio, in the study, and in Producer regions. Every rated sound is
+exactly regenerable.
+
+## The Study Flow
+
+1. **Consent** — plain-language information about what the study involves and
+   what is collected. Nothing is logged until the consent box is ticked and
+   Continue is pressed. The consent text is versioned
+   (`explore-consent-1.0`) and the version is stored with every decision.
+2. **About You (step 1 of 4)** — brief optional demographics (age, years of
+   musical training, and similar). Every field can be left blank.
+3. **Headphone Check (step 2 of 4)** — three short tones panned left, right,
+   or both; you say where you heard each. Failing does not block you, but the
+   app recommends headphones and records that the check was not passed.
+4. **Choose Your Task (step 3 of 4)** — either the **Slider task** (adjust
+   one control until the sound is as pleasing as possible, 9 short trials) or
+   the **Comparison task** (hear two sounds, pick the one you prefer, 12
+   quick trials).
+5. **Debrief** — what the study was about and how to keep exploring.
+
+Every trial stores the full parameter set, the seed, a deterministic
+`stimulus_id`, and the expectation/surprise/repetition metrics of what was
+actually heard, so appeal can be modelled against the generative mechanisms.
+
+## Research Data And Privacy
+
+- Nothing is sent to the server before opt-in consent (in the study flow or
+  via the research opt-in in Explore).
+- After opt-in, plays, ratings, saves, and parameter changes are logged with
+  a session id, `stimulus_id` (a deterministic hash of the parameters and app
+  version), and a per-performance metrics summary: per-note surprisal under
+  the generative prior, information rate in bits/s, and repetition/novelty
+  ratios.
+- Data lives in `web/data/` on the server (git-ignored) and is exported to
+  tidy CSVs with `synthesiser export` (admin-token gated over HTTP).
+- Shared-library preset submission has its own explicit consent checkbox.
+
+## Quick Start (Explore)
 
 1. Press `Play`.
 2. Change one family of controls at a time.
 3. Use `Randomise` to find unexpected areas.
-4. Use `Save` when you find a sound worth returning to.
-5. Use `Shared library` to hear other saved presets.
-
-The same `Seed` and same parameters should produce the same generative path, which is useful when you want to reproduce a setting.
+4. Use a panel's `+ Save` to keep just that section, or the main `Save` for the whole rig.
+5. Use `Shared library` to hear other saved presets, and the 11 factory starters to hear designed corners of the space.
 
 ## Transport And Visualiser
 
@@ -37,6 +87,38 @@ The visualiser shows live frequency-spectrum energy from the Web Audio analyser.
 | Motifs | Total motif variants currently in the repertoire. This grows when surprises are baked in. |
 | Sequence | Current length of the motif sequence loop. This grows as baked variants are appended. |
 | Notes | Total note slots rendered since playback began. |
+
+## Presets
+
+Presets exist at three scopes:
+
+1. **Section presets** — each major panel (Sound source, Melody & scale,
+   Rhythm & rests, Dynamics, Sequence & surprise, Percussion, Space) has its
+   own preset bar: a dropdown to load a saved section preset *into that
+   section only* (everything else stays as it is) and a `+ Save` button that
+   captures just that panel's parameters. This is how you mix, say, one
+   preset's rhythm with another's tone.
+2. **Full-rig presets** — the main Save control stores the complete parameter
+   set. Loading one replaces everything.
+3. **Instruments** — `Save current voice as instrument` captures the sound,
+   expression, and sequence behaviour of the current voice *without* the
+   session-level parameters (tempo, key/scale, seed, dynamics level, space).
+   Instruments are the currency of Producer mode: the session context is
+   supplied by the arrangement instead.
+
+Eleven factory starters ship with the app: five full rigs (Glass Bells,
+Night Choir, Clockwork, Wandering Flute, Restless Weaver) and six section
+starters. Factory and user presets appear together in the panel dropdowns and
+in the Producer browser.
+
+| Control | Meaning |
+|---|---|
+| Rating | Subjective liking score from 1 to 7. |
+| Preset name / Save | Saves the current full parameter set locally in the browser. |
+| My presets | Local presets saved in this browser. |
+| Shared library | Community presets submitted to the server (explicit consent checkbox per submission). |
+
+Presets store parameter settings, not rendered audio.
 
 ## Scale
 
@@ -129,20 +211,9 @@ Important distinction:
 
 The Duration display puts duration difference on the vertical axis and likelihood on the horizontal axis. The units are beat subdivisions, so the labels update when `Beat divisions` changes.
 
-## Sound Source
-
-Sound Source lives in the Sub-note tab. It chooses which tone-production model is active.
-
-| Control | Meaning | Musical analogy |
-|---|---|---|
-| Formant | Uses a sawtooth source through vowel-like bandpass filters. The Fourier decomposition controls are greyed out and do not affect the sound. | A synthetic voice or reed-like resonant body. |
-| Fourier | Uses additive harmonic partials from the Instrument Fourier Print. Formant-specific controls are greyed out. | An instrument-like spectrum built from fixed harmonics. |
-
-The inactive path is disabled intentionally: this keeps the vowel/formant model and the harmonic/Fourier model from being confused with one another.
-
 ## Surprise
 
-Surprise controls whether an unexpected event is introduced at the motif-pass level. The feature-specific surprise checkboxes and weights now live beside the relevant musical controls where possible.
+Surprise controls whether an unexpected event is introduced at the motif-pass level. The feature-specific surprise checkboxes and weights live beside the relevant musical controls where possible.
 
 | Control | Meaning | Musical analogy |
 |---|---|---|
@@ -227,52 +298,78 @@ This section controls the larger repeated structure.
 
 The sequence grows when surprises or repertoire-level motif variants are incorporated. The `Sequence` counter shows that growth.
 
-## Rating And Presets
-
-| Control | Meaning |
-|---|---|
-| Rating | Subjective liking score from 1 to 7. |
-| Preset name | Name for the current settings. |
-| Save | Saves the current full parameter set locally in the browser. |
-| My presets | Local presets saved in this browser. |
-| Shared library | Community presets submitted to the server. |
-
-The preset stores the parameter settings, not a rendered audio file.
-
 ## Sub-note Tab
 
 The Sub-note tab gives the whole screen to tone production details. These controls affect what happens inside a single note and across held notes.
 
-## Formant Voice
+### Sound Source
 
-Formant Voice is editable when `Sound Source > Formant` is active.
+Sound Source chooses which tone-production model is active. The inactive
+path's controls are greyed out intentionally so the two models are not
+confused with one another.
 
 | Control | Meaning | Musical analogy |
 |---|---|---|
-| Formant chips: ah, ee, oo, eh, oh | Chooses the vowel palette available to notes. | The mouth shape of a sung tone. |
+| Formant | A source signal shaped by a five-formant vowel filter bank. | A synthetic voice or reed-like resonant body. |
+| Fourier | Additive harmonic partials from the Instrument Fourier Print. | An instrument-like spectrum built from fixed harmonics. |
+
+### Formant Voice And The Vowel Pad
+
+Active when `Sound Source > Formant` is selected. The vowel model is a
+Klatt-style five-formant bank: each vowel sets F1–F5 centre frequencies and a
+per-formant bandwidth.
+
+The vowel display is a **2D vowel pad** laid out in log-F1 × log-F2 space —
+the same space phoneticians use for vowel charts. The five named vowels
+(`ee`, `eh`, `ah`, `oh`, `oo`) sit at their measured positions; any point on
+the pad is a valid vowel, interpolated from the named ones by distance. This
+means vowel "surprise" can move in two directions even from an extreme vowel
+(a line or circle could not).
+
+| Control | Meaning | Musical analogy |
+|---|---|---|
+| Vowel chips: ah, ee, oo, eh, oh | Chooses the vowel palette available to notes. | The mouth shape of a sung tone. |
 | Formant change | Probability of switching vowel/formant between notes. | Changing sung vowel from note to note. |
 | Formant surprise | Includes vowel/formant as a possible surprise feature. | Unexpected vowel colour. |
 | Surprise weight | Relative chance that a surprise uses formant once global Surprise fires. | How often timbre is the dimension of surprise. |
-| Formant weights | Relative probability for each active formant when the formant palette is sampled. | Biasing the singer toward some vowels. |
+| Formant weights | Relative probability for each active vowel when the palette is sampled. | Biasing the singer toward some vowels. |
 
-The formant display lays vowels out as a circular sequence so you can see repeated vowel space rather than a one-way list. Orange bars show the ordinary formant probabilities; blue indicates the formant surprise contribution when Formant surprise is enabled. Baked formant surprises now persist because playback no longer overwrites stored motif formants.
+Orange marks show the ordinary vowel probabilities on the pad; blue indicates
+the surprise contribution when Formant surprise is enabled. Baked formant
+surprises persist because playback does not overwrite stored motif formants.
 
-## Harmonic Decomposition And Instrument Fourier Print
+### Colour Distribution
 
-This section is active when `Sound Source > Fourier` is selected. It is the instrument-like spectral fingerprint. Each harmonic has a fixed frequency slot:
-
-- H1 = 1 x f0, the fundamental.
-- H2 = 2 x f0, the second harmonic.
-- H3 = 3 x f0, and so on.
-
-The amplitude of each harmonic is controlled by a probability distribution.
+Part of the Formant path (greyed out in Fourier mode). It changes the
+formant-filter/body colour inside individual notes.
 
 | Control | Meaning | Musical analogy |
 |---|---|---|
-| Instrument profile | Loads an approximate harmonic fingerprint: flute, clarinet, violin, cello, trumpet, trombone, piano, or vocal. | Choosing the instrument family. |
+| Chance | Probability that a note receives this tone-colour variation. | |
+| Formant | Random shift of formant filter positions. | Slight mouth/throat shape change. |
+| Resonance | Random shift of formant filter resonance/Q. | Narrower or wider vowel resonance. |
+| Breath | Adds probabilistic noise/breath component. | Air in the tone. |
+
+### Instrument Fourier Print
+
+Active when `Sound Source > Fourier` is selected. This is the instrument-like
+spectral fingerprint. Each harmonic has a fixed frequency slot: H1 = 1 × f0
+(the fundamental), H2 = 2 × f0, and so on, with each amplitude controlled by
+a probability distribution.
+
+The **Instrument profile** selector loads one of eight profiles built from
+published spectral data: flute, clarinet, violin, cello, trumpet, trombone,
+piano, or vocal. A profile carries more than amplitudes — each has a
+*performance character*: its own envelope tendencies, vibrato behaviour,
+attack noise (breath, bow, hammer), and a Material damping setting, so a
+piano decays like a struck string and a flute breathes.
+
+| Control | Meaning | Musical analogy |
+|---|---|---|
+| Instrument profile | Loads the harmonic fingerprint plus performance character for one of the eight instruments. | Choosing the instrument family. |
 | Sample chance | Chance that each new note samples every harmonic amplitude from its current mean/SD distribution. If it does not sample, it uses the current dynamics/register/resonance-shaped means. | Whether each note gets a fresh spectral fingerprint. |
 | Mix | Overall level of the additive harmonic fingerprint. At zero, Fourier mode is effectively silent except for any breath/noise. | How much the instrument body dominates. |
-| Harmonics | Number of harmonic partials used, from 1 to 20. | How rich/bright the spectrum can be. |
+| Harmonics | Number of harmonic partials used, from 1 to 32. | How rich/bright the spectrum can be. |
 | Dyn response | Global strength of each harmonic's dynamics sensitivity. | Upper harmonics blooming when played louder. |
 | Reg response | Global strength of register sensitivity. | Timbre changing across low and high notes. |
 | Resonance | Strength of fixed instrument resonances acting on harmonic frequencies. | Body resonances or formant-like spectral peaks. |
@@ -282,151 +379,191 @@ The amplitude of each harmonic is controlled by a probability distribution.
 | Drift rate | How often held-note harmonic amplitudes redraw and glide. | Slow timbral breathing vs rapid flicker. |
 | Freq stretch | Optional high-harmonic frequency stretch in cents. `0` keeps harmonic frequencies fixed at integer multiples. | Piano-string-like inharmonicity. |
 
-Per-harmonic controls:
+### Partial Macros
+
+Rather than editing 32 harmonics one at a time, the macro controls transform
+the whole harmonic set at once (an approach borrowed from physical-modelling
+synths like RipplerX and Resonarium):
+
+| Control | Meaning | Musical analogy |
+|---|---|---|
+| Tilt | Spectral slope: negative darkens (rolls off highs), positive brightens. | Playing closer to or further from the bridge. |
+| Odd / even | Rebalances odd vs even harmonics. Fully negative mutes evens (hollow, clarinet-like); fully positive mutes odds. | Cylindrical vs conical bore character. |
+| Comb boost / Comb centre | Boosts harmonics near a chosen harmonic number and its multiples. | Emphasising a body resonance. |
+| Material | Damping law applied per note: low values let every partial ring (glass, metal); high values kill upper partials quickly (wood, felt). Higher harmonics always decay faster. | What the instrument is made of. |
+| Octave-group faders: Fund (1), Oct (2), 3–4, 5–8, 9–16, 17+ | Level fader per octave band of harmonics. | A six-band graphic EQ over the harmonic series. |
+
+The per-harmonic detail table (below the macros) still allows exact editing:
 
 | Label | Meaning |
 |---|---|
-| Hn | Harmonic number. H5 means 5 x f0 before optional stretch. |
+| Hn | Harmonic number. H5 means 5 × f0 before optional stretch. |
 | M | Mean amplitude for this harmonic. |
 | SD | Standard deviation for this harmonic's amplitude distribution. |
-| D | Dynamics sensitivity for this harmonic. Positive values bloom with higher velocity; negative values shrink with higher velocity. |
-| R | Register sensitivity for this harmonic. Positive values favour higher registers; negative values favour lower registers. |
+| D | Dynamics sensitivity. Positive values bloom with higher velocity. |
+| R | Register sensitivity. Positive values favour higher registers. |
 
-The display shows:
+The display shows the amplitude mean (orange), SD band (blue), low/high
+register response (grey/green), and the combined waveform sum at the bottom.
 
-- Orange line: amplitude mean.
-- Blue band: standard deviation around the mean.
-- Grey/green lines: low-register and high-register response.
-- Bottom sum: combined waveform from the visible harmonics.
+### Vibrato Distribution
 
-## Colour Distribution
-
-Colour Distribution is part of the Formant path. It changes the formant-filter/body colour of a note and is greyed out in Fourier mode.
-
-| Control | Meaning | Musical analogy |
-|---|---|---|
-| Chance | Probability that a note receives this tone-colour variation. |
-| Formant | Random shift of formant filter positions. | Slight mouth/throat shape change. |
-| Resonance | Random shift of formant filter resonance/Q. | Narrower or wider vowel resonance. |
-| Breath | Adds probabilistic noise/breath component. | Air in the tone. |
-
-These controls are active only in Formant mode in the interface.
-
-## Vibrato Distribution
-
-Vibrato changes pitch within a note.
-
-| Control | Meaning | Musical analogy |
-|---|---|---|
+| Control | Meaning |
+|---|---|
 | Chance | Chance that a connected phrase receives vibrato. |
-| Depth | Mean vibrato depth in cents. |
-| Depth SD | Standard deviation of vibrato depth. Sampled every vibrato cycle. |
-| Rate | Mean vibrato rate in Hz. |
-| Rate SD | Standard deviation of vibrato rate. Sampled every vibrato cycle. |
+| Depth / Depth SD | Mean vibrato depth in cents, and its per-cycle variability. |
+| Rate / Rate SD | Mean vibrato rate in Hz, and its per-cycle variability. |
 
 If notes are joined by the Breaks controls, vibrato phase continues across the joined notes instead of restarting.
 
-## Envelope Distribution
+### Envelope Distribution
 
-Envelope controls onset, decay, sustain, and release. The classic ADSR diagram is shown with mean and SD banding.
+Envelope controls onset, decay, sustain, and release, drawn as the classic
+ADSR diagram with mean and SD banding.
 
 | Control | Meaning | Musical analogy |
 |---|---|---|
-| Chance | Probability that the ADSR values are sampled from their distributions for a note. |
-| Attack mean/SD | How fast the note reaches full level, and how variable that time is. | Bow/tongue/pick onset. |
+| Chance | Probability that the ADSR values are sampled from their distributions for a note. | |
+| Attack mean/SD | How fast the note reaches full level, and how variable that is. | Bow/tongue/pick onset. |
 | Decay mean/SD | How quickly the note falls from attack peak to sustain. | Initial settling. |
 | Sustain mean/SD | Held level after the attack/decay. | How much the sound is maintained. |
 | Release mean/SD | How long the note takes to fade after its end. | Tail of the note. |
 
-If `Chance` is zero, the means are used and the SD controls have no audible effect.
+If `Chance` is zero, the means are used and the SD controls have no audible
+effect. Choosing an instrument profile re-seats these values to that
+instrument's performance character.
 
-## How Formants Work With The Fourier Section
+## Producer Mode
 
-The current synth now treats Formant and Fourier as two separate sound paths.
+Producer arranges instruments on a multi-track timeline, following the same
+logic as a conventional DAW (Logic / Pro Tools): sounds are made in the
+studio, browsed into a palette, and placed on tracks as regions.
 
-1. `Sound Source > Formant` chooses the vowel/filter model.
-   - A sawtooth oscillator is sent through three bandpass filters: F1, F2, and F3.
-   - The selected vowel chip (`ah`, `ee`, `oo`, `eh`, `oh`) chooses the filter frequencies.
-   - `Formant change` changes the audible vowel label between notes. Formant surprise can also bake a vowel change into the motif.
-   - Fourier decomposition controls are disabled and the engine sets the Fourier mix to zero for playback.
+### Layout
 
-2. `Sound Source > Fourier` chooses the additive harmonic model.
-   - It creates sine oscillators at H1, H2, H3, etc.
-   - Each harmonic amplitude can be drawn from its own mean/SD distribution at note onset, depending on `Sample chance`.
-   - Dynamics, register, resonances, and held-note drift reshape those amplitudes.
-   - Formant-specific controls are disabled.
+Three adjustable zones, DAW-style:
 
-Practical interpretation:
+- **Left column** — the preset/instrument **Browser** (top) and your
+  **Palette** rack (bottom).
+- **Centre** — the transport strip, bar ruler, and **track lanes**.
+- **Bottom** — the collapsible **editor drawer**, where the piano roll opens.
 
-- Formant = vowel or resonator shape.
-- Fourier Print = instrument spectral fingerprint.
-- Colour Distribution = small per-note shifts in the vowel/resonator when Formant is active.
-- Harmonic editor = direct control over the amplitudes of each harmonic when Fourier is active.
+The left column and editor drawer resize by dragging their splitters and
+collapse via chevrons; the layout persists across reloads.
 
-## Current Redundancies And Things To Flag
+### Browser → Palette → Tracks
 
-These are not necessarily bugs, but they are places where the interface can confuse users.
+1. **Browser**: every factory preset, user preset, and saved instrument as
+   cards with name, kind, and description — filter by category chips or text
+   search, and preview in context before committing.
+2. **Palette**: your working set for this arrangement. Drag a card in (or
+   click its add button). Drag a browser card *straight onto a lane* and it
+   is added to the palette automatically.
+3. **Tracks**: drag a palette item onto a lane to create a region at the
+   snapped drop beat, or below the last lane to create a new track. The
+   palette "+" button is the no-drag fallback: it creates a track with a
+   starter region.
 
-1. `Formant` appears in several places.
-   - Voice chips choose vowel categories.
-   - `Formant change` changes vowels between notes.
-   - `Formant surprise` creates an unexpected vowel change that can be baked into the motif.
-   - `Colour Distribution > Formant` shifts filter positions inside individual notes.
-   Suggested wording: rename the chips to `Vowel palette`, Formant surprise to `Vowel surprise`, and Colour Distribution to `Filter drift`.
+All dragging is pointer-based with a drag ghost and live lane highlighting.
+A click is never mistaken for a drag (5 px threshold).
 
-2. `Hit prob` and `Tune prob` both sound like precision.
-   - `Hit prob` is scale-degree accuracy.
-   - `Tune prob` is cents-level intonation accuracy.
-   Suggested wording: `Scale-degree hit` and `Tuning hit`.
+### Regions
 
-3. Rest controls exist as performance rests and baked surprise rests.
-   - Rhythm rests are transient density/performance rests.
-   - Rest surprise can be baked into a motif.
-   Suggested UI flag: show "performance" vs "baked" in tooltips.
+A region is a placed span of music: it knows its palette instrument, start
+beat, length, and seed. One track can hold many regions back to back, each
+with a different instrument — the region carries the sound; the track is a
+lane.
 
-4. Breaks can be overridden by `Phrase`.
-   - Even if `Min` and `Max` are zero, `Phrase` can still insert gaps at motif boundaries.
-   Suggested UI flag: make `Phrase` visually part of the same zero-line articulation graph.
+- **Move**: drag along a track or to another track (snap to grid,
+  collision-blocked).
+- **Copy**: hold Alt while dragging (the ghost shows ⧉), or select and press
+  ⌘/Ctrl-D to duplicate into the next free span.
+- **Extend/loop**: drag the right edge. A generative region simply generates
+  more (deterministically); a baked region repeats its notes every loop, with
+  thin tick marks at each loop boundary.
+- **Region toolbar** (when selected): ▶ Loop region, ◆ Bake / Unbake,
+  ✎ Edit notes, ↻ Reroll take (new seed, same instrument and context),
+  ± length, a per-region level slider, **→ Studio** (open this region's exact
+  voice + session context + seed in the Sound Studio), and Delete.
 
-5. `Probability` in Surprise and `Whole motif` both grow the repertoire.
-   - `Probability` chooses one surprised note within a motif pass.
-   - `Whole motif` currently creates a new motif variant by changing one random note at a boundary. The label sounds broader than the implementation.
-   - Both count toward `Max baked`.
-   Suggested UI flag: group them as "note-slot surprise" vs "boundary motif variant".
+### Session Context vs Instrument vs Take
 
-6. `Sample chance` and `Hold drift` both randomise harmonic amplitudes.
-   - `Sample chance` samples once at note onset.
-   - `Hold drift` keeps sampling during a held note.
-   Suggested wording: `New-note sample` and `Held-note drift`.
+Parameters split into three tiers:
 
-7. `Freq stretch` breaks strictly fixed harmonic frequencies.
-   - At zero, harmonics are fixed integer multiples of f0.
-   - Above or below zero, higher harmonics are stretched in cents.
-   If the research design requires fixed harmonic frequencies, leave this at zero or remove it from participant-facing presets.
+- **Session context** (owned by the arrangement, set in the transport strip):
+  tempo, key, scale, dynamics level, space/reverb. Changing the key really
+  transposes — all regions, including baked ones, follow because pitches are
+  stored in scale-degree space, not frozen Hz.
+- **Instrument** (owned by the palette item): everything about the voice.
+- **Take** (owned by the region): the seed, and after baking, the notes.
 
-8. `spectralSpread` is currently a hidden/legacy global SD initializer.
-   - It affects SD when a spectral profile is reset or randomised.
-   - It is not currently visible as a direct control.
-   Suggested action: either expose it as "Global SD" or remove it from saved preset vocabulary after per-harmonic SD controls are stable.
+### Editing Instruments From The Palette
 
-9. `envelopeRange` appears to be a hidden/legacy field.
-   - The current envelope UI uses per-parameter mean/SD controls instead.
-   Suggested action: remove it from defaults/randomisation unless it is planned for a future compact control.
+Press ✎ on a palette item to open its voice in the Sound Studio under the
+arrangement's session context. A persistent banner offers **Save to palette**
+(all regions using it follow), **Save as copy** (fork a new palette entry),
+or **Discard**.
 
-10. Legacy presets made before the Sound Source split may contain old `sine` or `triangle` voice-mode names. The current interface normalises them into the two user-facing modes.
-   - This is expected from the current synthesis path.
-   Suggested action: no user-facing change needed unless old shared-library presets should be migrated on the server.
+### Bake And The Piano Roll
 
-11. Downbeat percussion can overlap with motif accent.
-   - At motif start, `Motif` and `Down` can both fire.
-   This can be useful, but high volumes may make the boundary click louder than expected.
+**◆ Bake** freezes a region's generated take into editable notes.
+Double-click a baked region and the piano roll opens in the editor drawer:
 
-12. Very high `Incorporation`, `Whole motif`, and `Max baked = Infinity` can make the loop grow continuously.
-   - This is musically interesting but less controlled for comparison tasks.
-   Suggested participant setting: use a finite `Max baked` for structured listening studies.
+- Note bodies sit at their *precise* pitch (including cents deviations);
+  a dashed ghost marks the *intended* scale degree.
+- Dragging snaps whole scale rows while preserving each note's cents
+  character; hold Shift to zero the cents; hold Alt to fine-tune cents only.
+- Edits persist with the arrangement and are audible immediately.
+- **Unbake** returns the region to generative playback (the seed regenerates
+  the same take).
 
-13. Not every control updates in the same way during playback.
-   - Reverb changes are live space-effect changes.
-   - Many Sub-note, Surprise, and articulation values update the running generation engine without rebuilding the repertoire.
-   - Scale, voice mode, motif structure, some melody/rhythm controls, and percussion sound/volume changes can restart the current take because they require a rebuilt engine or playback bus.
-   Suggested UI flag: show a small "live" vs "rebuilds take" indicator for controls during testing.
+### Transport, Arrangements, And Output
+
+| Control | Meaning |
+|---|---|
+| Arrangement select + New / Rename / Delete | Multiple named arrangements; switching saves and swaps cleanly. |
+| ▶ / ■ | Play the arrangement from the playhead (click the ruler to set it). |
+| ↩ Undo | Single-level undo of the last arrangement change (⌘Z; press again to redo). |
+| − / ＋ | Timeline zoom (persisted). |
+| Snap select | Bar / Beat / ½-beat grid for drops, moves, and resizes. |
+| ＋8 bars | Lengthen the arrangement. |
+| ⬇ WAV | Offline mixdown of the whole arrangement to a 16-bit WAV download. |
+| Export / Import | Arrangement JSON round-trip (includes the palette). |
+
+Track heads have inline rename (double-click the name), a gain fader, a pan
+slider, and **M**ute / **S**olo buttons — all honoured live and in mixdown.
+
+Keyboard (inert while typing in a field): `Space` play/stop ·
+`Delete`/`Backspace` remove selected region · `Escape` deselect / close
+drawer · `⌘D` duplicate · `⌘Z` undo.
+
+## Known Quirks And Flags
+
+Not necessarily bugs, but places where the interface can confuse users:
+
+1. `Formant` appears in several places: the vowel chips choose the palette,
+   `Formant change` switches vowels between notes, `Formant surprise` bakes
+   vowel changes into motifs, and `Colour Distribution > Formant` shifts
+   filter positions inside notes. Tooltips distinguish them; the wording is
+   still worth a pass (e.g. "Vowel palette" / "Filter drift").
+2. `Hit prob` (scale-degree accuracy) and `Tune prob` (cents-level accuracy)
+   both sound like precision. See the Melody section for the distinction.
+3. Rest controls exist as transient performance rests (Rhythm) and baked
+   surprise rests (Rest surprise).
+4. Breaks can be overridden by `Phrase`: even with `Min`/`Max` at zero,
+   `Phrase` still inserts gaps at motif boundaries.
+5. Surprise `Probability` and Repertoire `Whole motif` both grow the
+   repertoire and both count toward `Max baked`; the former surprises one
+   note in a pass, the latter varies one note at a motif boundary.
+6. `Sample chance` randomises harmonic amplitudes once at note onset;
+   `Hold drift` keeps sampling during a held note.
+7. `Freq stretch` above zero breaks strictly fixed harmonic frequencies.
+   Research designs requiring exact integer harmonics should leave it at 0.
+8. Very high `Incorporation`, `Whole motif`, and `Max baked = Infinity`
+   grow the loop continuously — musically interesting, less controlled for
+   comparison tasks. Use a finite `Max baked` for structured listening.
+9. Downbeat percussion (`Down`) and `Motif` accent can stack at motif start.
+10. Not every control updates the same way during playback: reverb is live,
+    most Sub-note/Surprise/articulation values update the running engine,
+    while scale, voice mode, motif structure, and percussion sound changes
+    rebuild the current take.
