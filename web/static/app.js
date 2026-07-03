@@ -522,6 +522,11 @@ let productionTab = "percussion";
 let debounceTimer = null;
 let lastSurpriseCount = 0;
 let lastPlayStartedAt = null; // Date.now() of most recent play start this visit
+let libraryFilter = "all";    // section filter shared across library tabs
+// In-context preset preview (Tonalic cue): audition a preset merged into the
+// current state without committing it. Non-destructive: exploreParams is
+// untouched; ending the preview restores exactly what was playing.
+let presetPreview = null;     // { snapshot, wasPlaying, presetId }
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -1416,6 +1421,12 @@ function renderExplore() {
         <button class="tab" id="tabMy">My presets</button>
         <button class="tab" id="tabGlobal">Shared library</button>
       </div>
+      <div class="library-filters" id="libraryFilters">
+        <button class="filter-chip${libraryFilter === "all" ? " active" : ""}" data-filter="all">All</button>
+        <button class="filter-chip${libraryFilter === "full" ? " active" : ""}" data-filter="full">Full rigs</button>
+        ${Object.entries(PRESET_SECTIONS).map(([k, s]) =>
+          `<button class="filter-chip${libraryFilter === k ? " active" : ""}" data-filter="${k}">${s.label}</button>`).join("")}
+      </div>
       <div id="starterPresets" class="preset-list"></div>
       <div id="myPresets" class="preset-list hidden"></div>
       <div id="globalPresets" class="preset-list hidden"></div>
@@ -1984,6 +1995,21 @@ function renderExplore() {
   if (topMyPresets) topMyPresets.onclick = () => tabMy.click();
   const topLibrary = v.querySelector("#topLibrary");
   if (topLibrary) topLibrary.onclick = () => tabGlobal.click();
+
+  // Section filter chips (shared across all library tabs)
+  const libraryFilters = v.querySelector("#libraryFilters");
+  if (libraryFilters) {
+    libraryFilters.onclick = (e) => {
+      const chip = e.target.closest("[data-filter]");
+      if (!chip) return;
+      libraryFilter = chip.dataset.filter;
+      libraryFilters.querySelectorAll(".filter-chip").forEach(c =>
+        c.classList.toggle("active", c === chip));
+      renderPresetList(starterList, FACTORY_PRESETS, "starter");
+      renderPresetList(myList, loadPresets(), "my");
+      if (!globalList.classList.contains("hidden")) loadGlobalPresets(globalList);
+    };
+  }
 
   // Initial renders
   renderPresetList(starterList, FACTORY_PRESETS, "starter");
@@ -5179,7 +5205,53 @@ function maybeShowContribute(v) {
   };
 }
 
+function mergedPresetParams(entry) {
+  const loaded = { ...entry.parameters };
+  if (loaded.motifLength && !loaded.motifLengthBeats) loaded.motifLengthBeats = loaded.motifLength;
+  const merged = entry.section && entry.section !== "full"
+    ? { ...exploreParams, ...loaded }
+    : { ...DEFAULTS, ...loaded };
+  if (!Array.isArray(merged.rootNotes)) merged.rootNotes = [0];
+  return merged;
+}
+
+function startPresetPreview(entry) {
+  if (!presetPreview) {
+    presetPreview = { wasPlaying: synth.isPlaying, presetId: entry.id };
+  } else {
+    presetPreview.presetId = entry.id;
+  }
+  synth.play(mergedPresetParams(entry));
+  startVisualiser();
+  syncPreviewButtons();
+}
+
+function endPresetPreview() {
+  if (!presetPreview) return;
+  const { wasPlaying } = presetPreview;
+  presetPreview = null;
+  if (wasPlaying) {
+    synth.play({ ...exploreParams });
+    startVisualiser();
+  } else {
+    synth.stop();
+    cancelAnimationFrame(animFrame);
+  }
+  syncPreviewButtons();
+}
+
+function syncPreviewButtons() {
+  document.querySelectorAll("[data-preview]").forEach(btn => {
+    const active = presetPreview && presetPreview.presetId === btn.dataset.preview;
+    btn.classList.toggle("previewing", !!active);
+    btn.textContent = active ? "■" : "▶";
+  });
+}
+
 function renderPresetList(container, presets, source) {
+  if (libraryFilter !== "all") {
+    presets = presets.filter(p => (p.section && p.section !== "full" ? p.section : "full") === libraryFilter);
+  }
   if (!presets.length) {
     container.innerHTML = '<div class="empty-state">No presets yet. Save one to get started.</div>';
     decorateTooltips(container);
@@ -5195,6 +5267,7 @@ function renderPresetList(container, presets, source) {
       <span class="meta">${p.description ? esc(p.description) : (sectionLabel ? `${Object.keys(p.parameters || {}).length} settings` : presetSummary(p.parameters))}</span>
       <span class="score">${(p.rating || p.favourite_rating) ? `${p.rating || p.favourite_rating}/7` : ""}</span>
       <div class="actions">
+        <button class="btn btn-ghost btn-sm preview-btn" data-preview="${p.id}" title="Preview: hear this preset merged into your current sound, without changing anything">▶</button>
         <button class="btn btn-secondary btn-sm" data-load='${JSON.stringify(p.parameters)}' data-section="${sectionKey || "full"}">Load</button>
         ${source === "my" ? `<button class="btn btn-ghost btn-sm" data-remove="${p.id}">Remove</button>` : ""}
       </div>
@@ -5202,24 +5275,29 @@ function renderPresetList(container, presets, source) {
   `;
   }).join("");
 
+  const entryById = new Map(presets.map(p => [String(p.id), p]));
+
+  container.querySelectorAll("[data-preview]").forEach(btn => {
+    btn.onclick = () => {
+      const entry = entryById.get(btn.dataset.preview);
+      if (!entry) return;
+      if (presetPreview && presetPreview.presetId === btn.dataset.preview) {
+        endPresetPreview();
+      } else {
+        startPresetPreview(entry);
+      }
+    };
+  });
+
   container.querySelectorAll("[data-load]").forEach(btn => {
     btn.onclick = () => {
-      const loaded = JSON.parse(btn.dataset.load);
       const section = btn.dataset.section || "full";
-      // Backward compat: old presets use motifLength (notes), map to motifLengthBeats
-      if (loaded.motifLength && !loaded.motifLengthBeats) {
-        loaded.motifLengthBeats = loaded.motifLength;
-      }
-      if (section === "full") {
-        // Backward compat: ensure rootNotes is an array
-        if (!Array.isArray(loaded.rootNotes)) loaded.rootNotes = [0];
-        exploreParams = { ...DEFAULTS, ...loaded };
-      } else {
-        // Section preset: merge over the current state, leave the rest alone
-        exploreParams = { ...exploreParams, ...loaded };
-        if (!Array.isArray(exploreParams.rootNotes)) exploreParams.rootNotes = [0];
-      }
-      const wasPlaying = synth.isPlaying;
+      const wasPlaying = presetPreview ? presetPreview.wasPlaying : synth.isPlaying;
+      presetPreview = null; // loading commits: no revert
+      exploreParams = mergedPresetParams({
+        parameters: JSON.parse(btn.dataset.load),
+        section,
+      });
       renderExplore();
       if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
     };

@@ -7,12 +7,11 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 15
-- Phases A-E done (+ CI). F2 decided (FabFilter identity + Tonalic
-  preset/sequencing interaction). F3a reskin landed. Next: F3b
-  display-forward layout + Tonalic-style preset browser with in-context
-  preview, then F3c contextual panels (incl. B4a vowel pad), F1 leftovers
-  (responsive canvases, touch sizing).
+- Iteration: 16
+- F3a reskin + F3b-1 preset browser landed. Next: F3b-2 display-forward
+  layout (hero visualiser, curve-styled distribution canvases), then F3c
+  contextual panels (incl. B4a vowel pad), F1 leftovers (responsive
+  canvases, touch sizing).
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -152,7 +151,11 @@ Full audits in the loop transcript; the load-bearing findings:
   data-hued fills keyed to their subsection (generation amber / accuracy
   green / surprise cyan); amber glows retired; readouts tabular mono.
   Verified in browser; playback regression clean.
-- [ ] F3b. Display-forward layout: hero visualiser strip; distribution
+- [x] F3b-1. Tonalic preset browser: section filter chips across all
+  library tabs + per-preset in-context preview (non-destructive: auditions
+  the preset merged into current settings, reverts exactly on toggle-off;
+  Load commits). Verified in browser.
+- [ ] F3b-2. Display-forward layout: hero visualiser strip; distribution
   canvases restyled to filled-curve language with hover readouts.
 - [ ] F3c. Contextual panels: note grid & 2D vowel pad (B4a) as
   direct-manipulation surfaces with floating per-item editors.

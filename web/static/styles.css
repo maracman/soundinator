@@ -4298,3 +4298,40 @@ body.explore-mode #app {
   color: var(--text3);
   background: rgba(136, 153, 170, 0.08);
 }
+
+/* ── Preset browser: section filters + in-context preview ── */
+
+.library-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.7rem 0 0.9rem;
+}
+
+.filter-chip {
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.18rem 0.7rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.filter-chip:hover { border-color: var(--border2); color: var(--text); }
+
+.filter-chip.active {
+  color: var(--accent2);
+  border-color: rgba(245,166,35,0.5);
+  background: rgba(245,166,35,0.08);
+}
+
+.preview-btn { min-width: 2rem; }
+
+.preview-btn.previewing {
+  color: var(--surp);
+  border-color: rgba(56,189,248,0.5);
+  background: rgba(56,189,248,0.1);
+}
