@@ -149,8 +149,12 @@ Full audits in the loop transcript; the load-bearing findings:
   - [ ] D7a. Partial macro layer: tilt, odd/even, comb group, material +
     six octave-group faders shaping all partials; harmonic editor becomes
     the dig-down level (progressive disclosure).
-  - [ ] D7b. Per-partial decay law (Material) in the renderer — bright
-    partials die faster; the big struck/plucked realism lever.
+  - [x] D7b. Material damping law: each partial above the fundamental gets
+    its own decay node, tau falling with harmonic number scaled by the new
+    partialMaterial param (0 glass/metal → 1 wood/felt). Per-instrument
+    defaults ride the profiles (piano 0.7 … trumpet 0.28); Material slider
+    in the Fourier print panel, live-updating. Verified: piano profile
+    sets slider to 0.7, playback clean.
   - [ ] D7c. 32-partial support with paginated harmonic editor.
   - [ ] D7d. 5-formant bank (F1-F5 + bandwidths) behind a disclosure;
     2D vowel pad unchanged, still drives F1/F2.

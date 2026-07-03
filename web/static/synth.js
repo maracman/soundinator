@@ -429,36 +429,42 @@ const SPECTRAL_PERFORMANCE = {
     envelopeSustain: 0.78, envelopeRelease: 0.14,
     vibratoProb: 0.75, vibratoRate: 5.2, vibratoRateSd: 0.3, vibratoDepth: 10, vibratoDepthSd: 3,
     attackNoise: { level: 0.4, freq: 2800, q: 0.8, decay: 0.07 },
+    partialMaterial: 0.35,
   },
   clarinet: {
     envelopeAttack: 0.032, envelopeAttackSd: 0.008, envelopeDecay: 0.04,
     envelopeSustain: 0.82, envelopeRelease: 0.1,
     vibratoProb: 0.1, vibratoRate: 5.0, vibratoRateSd: 0.2, vibratoDepth: 4, vibratoDepthSd: 1.5,
     attackNoise: { level: 0.12, freq: 1800, q: 1.2, decay: 0.04 },
+    partialMaterial: 0.4,
   },
   violin: {
     envelopeAttack: 0.085, envelopeAttackSd: 0.025, envelopeDecay: 0.07,
     envelopeSustain: 0.74, envelopeRelease: 0.22,
     vibratoProb: 0.85, vibratoRate: 5.9, vibratoRateSd: 0.4, vibratoDepth: 16, vibratoDepthSd: 4,
     attackNoise: { level: 0.3, freq: 3400, q: 1.0, decay: 0.09 },
+    partialMaterial: 0.5,
   },
   cello: {
     envelopeAttack: 0.105, envelopeAttackSd: 0.03, envelopeDecay: 0.08,
     envelopeSustain: 0.74, envelopeRelease: 0.28,
     vibratoProb: 0.8, vibratoRate: 5.1, vibratoRateSd: 0.35, vibratoDepth: 14, vibratoDepthSd: 4,
     attackNoise: { level: 0.32, freq: 1500, q: 1.0, decay: 0.11 },
+    partialMaterial: 0.5,
   },
   trumpet: {
     envelopeAttack: 0.03, envelopeAttackSd: 0.008, envelopeDecay: 0.05,
     envelopeSustain: 0.85, envelopeRelease: 0.11,
     vibratoProb: 0.3, vibratoRate: 5.4, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
     attackNoise: { level: 0.2, freq: 900, q: 1.4, decay: 0.045 },
+    partialMaterial: 0.28,
   },
   trombone: {
     envelopeAttack: 0.045, envelopeAttackSd: 0.012, envelopeDecay: 0.06,
     envelopeSustain: 0.84, envelopeRelease: 0.14,
     vibratoProb: 0.25, vibratoRate: 5.0, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
     attackNoise: { level: 0.22, freq: 480, q: 1.3, decay: 0.06 },
+    partialMaterial: 0.32,
   },
   piano: {
     // Percussive: instant hammer onset, no sustain plateau (decay carries the
@@ -467,6 +473,7 @@ const SPECTRAL_PERFORMANCE = {
     envelopeSustain: 0.28, envelopeRelease: 0.3,
     vibratoProb: 0, vibratoRate: 5, vibratoRateSd: 0, vibratoDepth: 0, vibratoDepthSd: 0,
     attackNoise: { level: 0.26, freq: 350, q: 0.7, decay: 0.02 },
+    partialMaterial: 0.7,
     spectralStretchCents: 8, // string inharmonicity stretches upper partials
   },
   vocal: {
@@ -474,6 +481,7 @@ const SPECTRAL_PERFORMANCE = {
     envelopeSustain: 0.78, envelopeRelease: 0.18,
     vibratoProb: 0.85, vibratoRate: 5.5, vibratoRateSd: 0.5, vibratoDepth: 18, vibratoDepthSd: 6,
     attackNoise: { level: 0.14, freq: 2200, q: 0.9, decay: 0.05 },
+    partialMaterial: 0.42,
   },
 };
 
@@ -1157,6 +1165,7 @@ export class GenerationEngine {
     return {
       harmonicPartials: partials,
       attackNoise: profile.performance?.attackNoise || null,
+      partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
       spectralMix: fourierMode ? (this.p.spectralMix ?? 0) : 0,
       spectralDriftProb: this.p.spectralDriftProb ?? 1,
       spectralDriftDepth: this.p.spectralDriftDepth ?? 0.35,
@@ -2543,7 +2552,24 @@ export class SynthEngine {
       const gainScale = mix * Math.min(1, 1.4 / Math.sqrt(harmonic)) / norm;
       scheduled.push({ param: g.gain, part, gainScale });
       osc.connect(g);
-      g.connect(env);
+      let tail = g;
+      // Material damping law (docs/PARTIAL_MACROS_DESIGN.md): each partial
+      // gets its own decay, faster for higher harmonics — wood/felt kills
+      // the highs, glass/metal lets them ring. This is what makes struck
+      // and plucked tones read as real; on sustained tones it shaves the
+      // top naturally over the note.
+      const material = Math.max(0, Math.min(1, note.partialMaterial ?? 0));
+      if (material > 0 && harmonic > 1) {
+        const decayG = this.ctx.createGain();
+        const baseTau = Math.max(0.25, (t1 - t0) * 0.9);
+        const tau = baseTau / (1 + material * Math.pow(harmonic - 1, 0.9) * 0.6);
+        decayG.gain.setValueAtTime(1, t0);
+        decayG.gain.setTargetAtTime(0.0001, t0 + 0.01, tau / 3);
+        g.connect(decayG);
+        decayG.connect(env);
+        tail = null;
+      }
+      if (tail) tail.connect(env);
       osc.start(t0);
       osc.stop(t1 + 0.04);
       this._track(osc);

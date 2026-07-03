@@ -250,6 +250,9 @@ const DEFAULTS = {
   spectralRegisterAmount: 0.55,
   spectralResonanceAmount: 0.35,
   spectralLoudnessNorm: 0.65,
+  // Material damping law: 0 = glass/metal (all partials ring), 1 = wood/felt
+  // (high partials die fast). Per-instrument defaults ride the profile.
+  partialMaterial: 0.45,
   spectralDriftProb: 1,
   spectralDriftDepth: 0.35,
   spectralDriftRate: 6,
@@ -357,6 +360,7 @@ const PARAM_DESC = {
   spectralDynamicAmount: "How strongly note dynamics reshape each harmonic amplitude",
   spectralRegisterAmount: "How strongly note range reshapes each harmonic amplitude",
   spectralResonanceAmount: "How strongly fixed instrument resonances reshape absolute harmonic frequencies",
+  partialMaterial: "Damping law for the harmonic partials: low values let every partial ring (glass, metal); high values make the upper partials die away quickly (wood, felt). Applied per note, faster decay for higher harmonics",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -1901,7 +1905,7 @@ function renderExplore() {
     "dynamicsLevel","loudnessRange","dynamicsPrecision","dynamicsRange","formantChangeProb",
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
-    "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount",
+    "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
     "spectralRegisterAmount","spectralResonanceAmount","spectralLoudnessNorm",
     "spectralDriftProb","spectralDriftDepth","spectralDriftRate","spectralStretchCents",
     "envelopeProb","envelopeAttack","envelopeAttackSd","envelopeDecay","envelopeDecaySd",
@@ -2682,6 +2686,7 @@ function subnoteWorkspaceHTML(p) {
               ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
               ${controlRow("spectralRegisterAmount", "Reg response", p.spectralRegisterAmount, 0, 1.5, 0.01)}
               ${controlRow("spectralResonanceAmount", "Resonance", p.spectralResonanceAmount, 0, 1.5, 0.01)}
+              ${controlRow("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01)}
               ${controlRow("spectralLoudnessNorm", "Loud norm", p.spectralLoudnessNorm, 0, 1, 0.01)}
               ${controlRow("spectralDriftProb", "Hold drift", p.spectralDriftProb, 0, 1, 0.01)}
               ${controlRow("spectralDriftDepth", "Drift depth", p.spectralDriftDepth, 0, 1, 0.01)}
