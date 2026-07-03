@@ -4804,3 +4804,132 @@ body.explore-mode #app {
 .pal-name { flex: 1; font-size: 0.75rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pal-kind { font-size: 0.6rem; color: var(--text3); white-space: nowrap; }
 .pal-actions { display: flex; gap: 0.25rem; }
+
+/* ── Producer v2 P3: beat-based timeline ─────────────────── */
+
+.tl2 { overflow-x: auto; padding-bottom: 4px; }
+
+.tl2-row { display: flex; align-items: stretch; margin-bottom: 4px; }
+
+.tl2-head {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: none;
+  width: 150px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-right: 6px;
+  font-size: 0.72rem;
+}
+.tl2-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.tl2-corner { background: transparent; border: none; }
+
+.tl2-ruler {
+  position: relative;
+  height: 22px;
+  flex: none;
+  background:
+    repeating-linear-gradient(to right,
+      rgba(154,160,171,0.18) 0, rgba(154,160,171,0.18) 1px,
+      transparent 1px, transparent 56px),
+    repeating-linear-gradient(to right,
+      rgba(154,160,171,0.07) 0, rgba(154,160,171,0.07) 1px,
+      transparent 1px, transparent 14px),
+    var(--display);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.tl2-bar {
+  position: absolute;
+  top: 2px;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--text3);
+  padding-left: 3px;
+}
+.tl2-playhead {
+  position: absolute;
+  top: 0;
+  bottom: -600px;
+  width: 1.5px;
+  background: var(--surp);
+  box-shadow: 0 0 6px rgba(56,189,248,0.6);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.tl2-lane {
+  position: relative;
+  flex: none;
+  height: 40px;
+  background:
+    repeating-linear-gradient(to right,
+      rgba(154,160,171,0.12) 0, rgba(154,160,171,0.12) 1px,
+      transparent 1px, transparent 56px),
+    repeating-linear-gradient(to right,
+      rgba(154,160,171,0.045) 0, rgba(154,160,171,0.045) 1px,
+      transparent 1px, transparent 14px),
+    var(--display);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.tl2-lane.drop-target { border-color: var(--accent); }
+
+.tl2-region {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  background: linear-gradient(180deg, rgba(245,166,35,0.28), rgba(245,166,35,0.16));
+  border: 1px solid rgba(245,166,35,0.6);
+  border-radius: 4px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.tl2-region.baked {
+  background: linear-gradient(180deg, rgba(56,189,248,0.22), rgba(56,189,248,0.12));
+  border-color: rgba(56,189,248,0.55);
+}
+.tl2-region.selected { box-shadow: 0 0 0 1.5px rgba(232,234,238,0.7); }
+.tl2-region-label {
+  font-size: 0.62rem;
+  color: var(--text);
+  padding: 0 0.35rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.tl2-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  border-right: 2px solid rgba(232,234,238,0.35);
+}
+.tl2-resize:hover { border-right-color: rgba(232,234,238,0.8); }
+
+.tl2-newtrack {
+  flex: none;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 0.8rem;
+  color: var(--text3);
+  font-size: 0.72rem;
+  border: 1px dashed var(--border2);
+  border-radius: 5px;
+}
+.tl2-newtrack.drop-target { border-color: var(--accent); color: var(--text2); }
+
+.tl2-head .tl-gain { width: 46px; height: 3px; flex: none; }

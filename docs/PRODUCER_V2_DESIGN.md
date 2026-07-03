@@ -125,8 +125,14 @@ Quality:
    palette rack (drag or click-add from browser, remove, persists on the
    arrangement, items draggable for P3 lanes and usable as track sources).
    Bar items B1/B2 functionally met pending the P7 walkthrough.
-3. **P3 Region model**: beat-based tracks/regions, palette-sourced regions,
-   drag/move/extend, ruler, migration from v1; region rendering.
+3. **P3 Region model** — DONE: beat-based lanes under a numbered bar
+   ruler; regions {paletteId, startBeat, lengthBeats, seed} rendered
+   proportionally; palette items drop onto lanes (or the new-track zone) to
+   create regions at the snapped beat; regions drag along/between tracks
+   (collision-blocked) and resize by right-edge drag; playback/mixdown/
+   bake all beat-based; playhead line on the ruler; v1 slot arrangements
+   auto-migrate (regions → beats, inline instruments → palette entries).
+   Bar items B3/B4/B5 functionally met pending the P7 walkthrough.
 4. **P4 Playback**: beat-based multi-voice transport from playhead, loop
    semantics, mixdown update.
 5. **P5 Editor drawer**: piano roll docked; double-click opens; bake flow.

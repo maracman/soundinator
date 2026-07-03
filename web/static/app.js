@@ -927,7 +927,34 @@ function mount(html) {
 // editor state — G4 gives it its own bar with per-track locks.
 
 const ARRANGEMENT_KEY = "phase0.arrangement.v1";
-const SLOT_COUNT = 16; // one slot = one motif-length block
+const BEATS_TOTAL = 64;   // 16 bars of 4 — the visible arrangement length
+const PX_PER_BEAT = 14;   // lane pixel scale
+const BEATS_PER_BAR = 4;
+
+// v1 arrangements used 4-beat slots and inline per-track instruments; v2
+// regions live in beat-space and source their voice from the palette.
+function migrateArrangement(a) {
+  if (a.version === 2) return a;
+  if (!Array.isArray(a.palette)) a.palette = [];
+  for (const t of a.tracks || []) {
+    let palId = null;
+    if (t.instrumentParams && (t.regions || []).length) {
+      palId = crypto.randomUUID();
+      a.palette.push({ id: palId, name: t.name, kindLabel: "Migrated", params: { ...t.instrumentParams } });
+    }
+    for (const r of t.regions || []) {
+      if (r.startBeat == null) {
+        r.startBeat = (r.slot || 0) * 4;
+        r.lengthBeats = (r.lengthSlots || 1) * 4;
+        delete r.slot;
+        delete r.lengthSlots;
+      }
+      if (!r.paletteId && palId) r.paletteId = palId;
+    }
+  }
+  a.version = 2;
+  return a;
+}
 
 let arrangement = null;
 let selectedRegion = null; // { trackId, regionId }
@@ -954,10 +981,10 @@ function loadArrangement() {
     if (a && Array.isArray(a.tracks)) {
       if (!a.context) a.context = defaultArrangementContext();
       if (!Array.isArray(a.palette)) a.palette = [];
-      return a;
+      return migrateArrangement(a);
     }
   } catch { /* fall through */ }
-  return { name: "Untitled arrangement", tracks: [], palette: [], context: defaultArrangementContext() };
+  return { name: "Untitled arrangement", version: 2, tracks: [], palette: [], context: defaultArrangementContext() };
 }
 function saveArrangement() {
   if (arrangement) localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
@@ -1026,11 +1053,16 @@ function produceSources() {
   return [...palette, ...instruments, ...factory];
 }
 
+function regionVoiceParams(track, region) {
+  const pal = (arrangement?.palette || []).find(pl => pl.id === region.paletteId);
+  return pal ? pal.params : (track.instrumentParams || {});
+}
+
 function regionPlayParams(track, region) {
   // Tier 1 session context (owned by the arrangement, inherited live) +
-  // Tier 2 instrument + Tier 3 take
+  // Tier 2 instrument (from the palette) + Tier 3 take
   const context = arrangement?.context || defaultArrangementContext();
-  return { ...DEFAULTS, ...context, ...track.instrumentParams, seed: region.seed };
+  return { ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed };
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -1301,10 +1333,12 @@ function producerVoice(track) {
   return voice;
 }
 
-function updatePlayhead(slot) {
-  document.querySelectorAll("[data-slot]").forEach(el => {
-    el.classList.toggle("playhead", Number(el.dataset.slot) === slot);
-  });
+function updatePlayhead(beat) {
+  const line = document.getElementById("tlPlayhead");
+  if (!line) return;
+  if (beat == null || beat < 0) { line.classList.add("hidden"); return; }
+  line.classList.remove("hidden");
+  line.style.left = `${beat * PX_PER_BEAT}px`;
 }
 
 function stopArrangement() {
@@ -1313,44 +1347,45 @@ function stopArrangement() {
   updatePlayhead(-1);
 }
 
-function playArrangement() {
+function playArrangement(fromBeat = 0) {
   stopArrangement();
   synth.stop(); // single-region loop, if any
   const ctx = arrangement.context;
-  const slotMs = 4 * (60 / Math.max(30, ctx.tempo || 104)) * 1000;
-  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot + regionLen(r) - 1));
-  if (!slots.length) return;
-  const lastSlot = Math.max(...slots);
-  arrPlay = { slot: 0, lastSlot, timer: null };
+  const beatMs = (60 / Math.max(30, ctx.tempo || 104)) * 1000;
+  const ends = arrangement.tracks.flatMap(t => t.regions.map(r => r.startBeat + regionLen(r)));
+  if (!ends.length) return;
+  const lastBeat = Math.max(...ends) - 1;
+  arrPlay = { beat: Math.max(0, Math.floor(fromBeat)), lastBeat, timer: null };
   const step = () => {
     if (!arrPlay) return;
-    const s = arrPlay.slot;
-    if (s > arrPlay.lastSlot) {
+    const b = arrPlay.beat;
+    if (b > arrPlay.lastBeat) {
       stopArrangement();
       const btn = document.querySelector("#arrPlayBtn");
-      if (btn) btn.textContent = "▶ Play arrangement";
+      if (btn) btn.textContent = "▶ Play";
       return;
     }
     for (const track of arrangement.tracks) {
-      const region = regionAtSlot(track, s);
+      const region = regionAtBeat(track, b);
       const voice = producerVoice(track);
-      if (region && s === region.slot) {
+      if (region && (b === region.startBeat || b === arrPlay.startAt)) {
         if (region.type === "baked" && Array.isArray(region.notes)) {
           voice.playNotes(regionPlayParams(track, region), region.notes);
         } else {
           voice.play(regionPlayParams(track, region));
         }
+      } else if (!region) {
+        voice.stop();
       }
-      else if (!region) voice.stop();
-      // mid-region slots: leave the voice playing through its span
+      // mid-region beats: leave the voice playing through its span
     }
-    updatePlayhead(s);
-    arrPlay.slot = s + 1;
-    arrPlay.timer = setTimeout(step, slotMs);
+    updatePlayhead(b);
+    arrPlay.beat = b + 1;
+    arrPlay.timer = setTimeout(step, beatMs);
   };
+  arrPlay.startAt = arrPlay.beat; // regions already sounding at the start beat begin here
   step();
 }
-
 // ── Arrangement export / import / mixdown (G6) ───────────────
 
 function downloadBlob(blob, filename) {
@@ -1419,15 +1454,15 @@ function audioBufferToWavBlob(buffer) {
 
 async function mixdownArrangement(statusEl) {
   const ctxP = arrangement.context;
-  const slotSec = 4 * 60 / Math.max(30, ctxP.tempo || 104);
-  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot + regionLen(r) - 1));
-  if (!slots.length) { alert("Nothing to mix down — place some regions first."); return; }
+  const beatSec = 60 / Math.max(30, ctxP.tempo || 104);
+  const ends = arrangement.tracks.flatMap(t => t.regions.map(r => r.startBeat + regionLen(r)));
+  if (!ends.length) { alert("Nothing to mix down — place some regions first."); return; }
   stopArrangement();
   synth.stop();
   if (statusEl) statusEl.textContent = "Rendering…";
-  const lastSlot = Math.max(...slots);
+  const lastEnd = Math.max(...ends);
   const sr = 44100;
-  const totalSec = (lastSlot + 1) * slotSec + 3; // reverb/release tail
+  const totalSec = lastEnd * beatSec + 3; // reverb/release tail
   const off = new OfflineAudioContext(2, Math.ceil(totalSec * sr), sr);
   for (const track of arrangement.tracks) {
     for (const region of track.regions) {
@@ -1436,9 +1471,9 @@ async function mixdownArrangement(statusEl) {
       voice.init(off, off.destination);
       voice.setMasterVolume(track.gain ?? 1);
       if (region.type === "baked" && Array.isArray(region.notes)) {
-        voice.renderNotesSpan(regionPlayParams(track, region), region.notes, region.slot * slotSec + 0.05);
+        voice.renderNotesSpan(regionPlayParams(track, region), region.notes, region.startBeat * beatSec + 0.05);
       } else {
-        voice.renderSpan(regionPlayParams(track, region), region.slot * slotSec + 0.05, slotSec * regionLen(region));
+        voice.renderSpan(regionPlayParams(track, region), region.startBeat * beatSec + 0.05, beatSec * regionLen(region));
       }
     }
   }
@@ -1452,53 +1487,74 @@ async function mixdownArrangement(statusEl) {
   }
 }
 
-function regionLen(region) { return Math.max(1, region.lengthSlots || 1); }
+function regionLen(region) { return Math.max(1, region.lengthBeats || 1); }
 
-function regionAtSlot(track, s) {
-  return track.regions.find(r => s >= r.slot && s < r.slot + regionLen(r));
+function regionAtBeat(track, b) {
+  return track.regions.find(r => b >= r.startBeat && b < r.startBeat + regionLen(r));
 }
 
-// Longest length this region may take before hitting the next region or the end
+function spanFree(track, startBeat, lengthBeats, ignoreId = null) {
+  if (startBeat < 0 || startBeat + lengthBeats > BEATS_TOTAL) return false;
+  return !track.regions.some(r => r.id !== ignoreId &&
+    startBeat < r.startBeat + regionLen(r) && r.startBeat < startBeat + lengthBeats);
+}
+
+// Longest length this region may take before the next region or the end
 function maxRegionLength(track, region) {
-  let limit = SLOT_COUNT - region.slot;
+  let limit = BEATS_TOTAL - region.startBeat;
   for (const other of track.regions) {
     if (other.id === region.id) continue;
-    if (other.slot > region.slot) limit = Math.min(limit, other.slot - region.slot);
+    if (other.startBeat > region.startBeat) {
+      limit = Math.min(limit, other.startBeat - region.startBeat);
+    }
   }
   return limit;
 }
 
 function produceTimelineHTML() {
-  if (!arrangement.tracks.length) {
-    return '<div class="empty-state">Add an instrument above to create a track.</div>';
-  }
-  return arrangement.tracks.map(t => {
-    const cells = [];
-    for (let s = 0; s < SLOT_COUNT; ) {
-      const region = t.regions.find(r => r.slot === s);
-      if (region) {
-        const len = Math.min(regionLen(region), SLOT_COUNT - s);
-        const sel = selectedRegion?.regionId === region.id ? " selected" : "";
-        cells.push(`<div class="tl-region${sel}" draggable="true" style="grid-column: span ${len}" data-region="${region.id}" data-track="${t.id}" data-slot="${s}" title="Region — same seed replays the identical take. Click to select, drag to move.">
-          <span class="tl-seed">${region.type === "baked" ? "◆" : "#" + region.seed}</span>${len > 1 ? `<span class="tl-len">×${len}</span>` : ""}</div>`);
-        s += len;
-      } else if (regionAtSlot(t, s)) {
-        s++; // covered by a spanning region from earlier; defensive skip
-      } else {
-        cells.push(`<div class="tl-cell" data-cell="${t.id}:${s}" data-slot="${s}" title="Place a region here (or drop one)"></div>`);
-        s++;
-      }
-    }
+  const laneW = BEATS_TOTAL * PX_PER_BEAT;
+  // Ruler: bar numbers every BEATS_PER_BAR
+  const barCount = BEATS_TOTAL / BEATS_PER_BAR;
+  const rulerMarks = Array.from({ length: barCount }, (_, i) =>
+    `<span class="tl2-bar" style="left:${i * BEATS_PER_BAR * PX_PER_BEAT}px">${i + 1}</span>`).join("");
+  const trackRows = arrangement.tracks.map(t => {
+    const regions = t.regions.map(r => {
+      const sel = selectedRegion?.regionId === r.id ? " selected" : "";
+      const baked = r.type === "baked" ? " baked" : "";
+      const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
+      const label = pal ? pal.name : t.name;
+      return `<div class="tl2-region${sel}${baked}" draggable="true" data-region="${r.id}" data-track="${t.id}"
+        style="left:${r.startBeat * PX_PER_BEAT}px;width:${regionLen(r) * PX_PER_BEAT - 2}px"
+        title="${esc(label)} — drag to move, drag the right edge to extend. Double-click a baked region to edit its notes.">
+        <span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
+        <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
+      </div>`;
+    }).join("");
     const gain = t.gain ?? 1;
-    return `<div class="tl-row">
-      <div class="tl-head"><span title="${esc(t.name)}">${esc(t.name)}</span>
+    return `<div class="tl2-row">
+      <div class="tl2-head">
+        <span class="tl2-name" title="${esc(t.name)}">${esc(t.name)}</span>
         <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
-        <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button></div>
-      ${cells.join("")}
+        <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
+      </div>
+      <div class="tl2-lane" data-lane="${t.id}" style="width:${laneW}px">${regions}</div>
     </div>`;
   }).join("");
+  return `
+    <div class="tl2">
+      <div class="tl2-row tl2-ruler-row">
+        <div class="tl2-head tl2-corner"></div>
+        <div class="tl2-ruler" id="tlRuler" style="width:${laneW}px">${rulerMarks}
+          <div class="tl2-playhead hidden" id="tlPlayhead"></div>
+        </div>
+      </div>
+      ${trackRows || ""}
+      <div class="tl2-row">
+        <div class="tl2-head tl2-corner"></div>
+        <div class="tl2-newtrack" data-lane="__new__" style="width:${laneW}px">${arrangement.tracks.length ? "Drop a palette instrument here to add a track" : "Drag an instrument from your palette here to create the first track"}</div>
+      </div>
+    </div>`;
 }
-
 function selectedBakedRegion() {
   if (!selectedRegion) return null;
   for (const t of arrangement.tracks) {
@@ -1844,16 +1900,100 @@ function wireProduce(v) {
     };
   });
 
-  v.querySelectorAll("[data-cell]").forEach(cell => {
-    cell.onclick = () => {
-      const [trackId, slotStr] = cell.dataset.cell.split(":");
-      const track = arrangement.tracks.find(t => t.id === trackId);
-      if (!track) return;
-      const region = { id: crypto.randomUUID(), slot: Number(slotStr), seed: newSeed() };
-      track.regions.push(region);
-      selectedRegion = { trackId, regionId: region.id };
-      saveArrangement();
-      renderProduce();
+  // Lanes accept palette items (create region) and regions (move)
+  const beatFromEvent = (lane, e) => {
+    const rect = lane.getBoundingClientRect();
+    return Math.max(0, Math.min(BEATS_TOTAL - 1, Math.round((e.clientX - rect.left) / PX_PER_BEAT)));
+  };
+  const defaultRegionBeats = BEATS_PER_BAR * 2;
+
+  v.querySelectorAll("[data-lane]").forEach(lane => {
+    lane.ondragover = (e) => { e.preventDefault(); lane.classList.add("drop-target"); };
+    lane.ondragleave = () => lane.classList.remove("drop-target");
+    lane.ondrop = (e) => {
+      e.preventDefault();
+      lane.classList.remove("drop-target");
+      const beat = beatFromEvent(lane, e);
+      const palId = e.dataTransfer.getData("application/x-palette-item");
+      const regionData = e.dataTransfer.getData("application/x-region");
+
+      if (palId) {
+        const pal = (arrangement.palette || []).find(pl => pl.id === palId);
+        if (!pal) return;
+        let track;
+        if (lane.dataset.lane === "__new__") {
+          track = { id: crypto.randomUUID(), name: pal.name, gain: 1, regions: [] };
+          arrangement.tracks.push(track);
+        } else {
+          track = arrangement.tracks.find(t => t.id === lane.dataset.lane);
+        }
+        if (!track) return;
+        const len = Math.min(defaultRegionBeats, maxAvailable(track, beat));
+        if (len < 1) return;
+        const region = { id: crypto.randomUUID(), paletteId: pal.id, startBeat: beat, lengthBeats: len, seed: newSeed() };
+        track.regions.push(region);
+        selectedRegion = { trackId: track.id, regionId: region.id };
+        saveArrangement();
+        renderProduce();
+        return;
+      }
+
+      if (regionData) {
+        try {
+          const { trackId, regionId } = JSON.parse(regionData);
+          const src = arrangement.tracks.find(t => t.id === trackId);
+          const region = src?.regions.find(r => r.id === regionId);
+          if (!src || !region || lane.dataset.lane === "__new__") return;
+          const dest = arrangement.tracks.find(t => t.id === lane.dataset.lane);
+          if (!dest) return;
+          const start = Math.max(0, Math.min(BEATS_TOTAL - regionLen(region), beat));
+          if (!spanFree(dest, start, regionLen(region), region.id)) return;
+          src.regions = src.regions.filter(r => r.id !== region.id);
+          region.startBeat = start;
+          dest.regions.push(region);
+          selectedRegion = { trackId: dest.id, regionId: region.id };
+          saveArrangement();
+          renderProduce();
+        } catch { /* malformed */ }
+      }
+    };
+  });
+
+  function maxAvailable(track, fromBeat) {
+    let limit = BEATS_TOTAL - fromBeat;
+    for (const r of track.regions) {
+      if (r.startBeat + regionLen(r) <= fromBeat) continue;
+      if (r.startBeat >= fromBeat) limit = Math.min(limit, r.startBeat - fromBeat);
+      else return 0; // dropping inside an existing region
+    }
+    return limit;
+  }
+
+  // Right-edge resize (mouse drag, snapped to beats, collision-clamped)
+  v.querySelectorAll("[data-resize]").forEach(handle => {
+    handle.onmousedown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const regionEl = handle.closest("[data-region]");
+      const track = arrangement.tracks.find(t => t.id === regionEl.dataset.track);
+      const region = track?.regions.find(r => r.id === regionEl.dataset.region);
+      if (!track || !region) return;
+      const startX = e.clientX;
+      const origLen = regionLen(region);
+      const move = (ev) => {
+        const delta = Math.round((ev.clientX - startX) / PX_PER_BEAT);
+        const len = Math.max(1, Math.min(maxRegionLength(track, region), origLen + delta));
+        region.lengthBeats = len;
+        regionEl.style.width = `${len * PX_PER_BEAT - 2}px`;
+      };
+      const up = () => {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        saveArrangement();
+        renderProduce();
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
     };
   });
 
@@ -1910,9 +2050,9 @@ function wireProduce(v) {
     const { track, region } = selected();
     if (!track || !region) return;
     const ctxP = arrangement.context;
-    const slotSec = 4 * 60 / Math.max(30, ctxP.tempo || 104);
+    const beatSec = 60 / Math.max(30, ctxP.tempo || 104);
     const params = regionPlayParams(track, region);
-    region.notes = synth.captureSpan(params, slotSec * regionLen(region));
+    region.notes = synth.captureSpan(params, beatSec * regionLen(region));
     region.type = "baked";
     saveArrangement();
     renderProduce();
@@ -1939,7 +2079,7 @@ function wireProduce(v) {
   if (longerBtn) longerBtn.onclick = () => {
     const { track, region } = selected();
     if (!track || !region) return;
-    region.lengthSlots = Math.min(maxRegionLength(track, region), regionLen(region) + 1);
+    region.lengthBeats = Math.min(maxRegionLength(track, region), regionLen(region) + BEATS_PER_BAR);
     saveArrangement();
     renderProduce();
   };
@@ -1948,7 +2088,7 @@ function wireProduce(v) {
   if (shorterBtn) shorterBtn.onclick = () => {
     const { track, region } = selected();
     if (!track || !region) return;
-    region.lengthSlots = Math.max(1, regionLen(region) - 1);
+    region.lengthBeats = Math.max(1, regionLen(region) - BEATS_PER_BAR);
     saveArrangement();
     renderProduce();
   };
@@ -1964,37 +2104,11 @@ function wireProduce(v) {
     };
   });
 
-  // Drag regions between cells/tracks
-  v.querySelectorAll(".tl-region").forEach(el => {
+  // Regions announce themselves for lane drops
+  v.querySelectorAll("[data-region]").forEach(el => {
     el.ondragstart = (e) => {
-      e.dataTransfer.setData("text/plain", JSON.stringify({ trackId: el.dataset.track, regionId: el.dataset.region }));
-    };
-  });
-  v.querySelectorAll("[data-cell]").forEach(cell => {
-    cell.ondragover = (e) => e.preventDefault();
-    cell.ondrop = (e) => {
-      e.preventDefault();
-      try {
-        const { trackId, regionId } = JSON.parse(e.dataTransfer.getData("text/plain") || "{}");
-        const [destTrackId, slotStr] = cell.dataset.cell.split(":");
-        const src = arrangement.tracks.find(t => t.id === trackId);
-        const dest = arrangement.tracks.find(t => t.id === destTrackId);
-        const region = src?.regions.find(r => r.id === regionId);
-        if (!src || !dest || !region) return;
-        const slot = Number(slotStr);
-        const len = regionLen(region);
-        if (slot + len > SLOT_COUNT) return;
-        for (let s2 = slot; s2 < slot + len; s2++) {
-          const occ = regionAtSlot(dest, s2);
-          if (occ && occ.id !== region.id) return; // span not free
-        }
-        src.regions = src.regions.filter(r => r.id !== region.id);
-        region.slot = slot;
-        dest.regions.push(region);
-        selectedRegion = { trackId: dest.id, regionId: region.id };
-        saveArrangement();
-        renderProduce();
-      } catch { /* ignore malformed drops */ }
+      e.dataTransfer.setData("application/x-region",
+        JSON.stringify({ trackId: el.dataset.track, regionId: el.dataset.region }));
     };
   });
 
