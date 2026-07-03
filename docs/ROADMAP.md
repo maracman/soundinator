@@ -7,9 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 6
-- Phase B core (B1-B3) done. Next: B4a formant-space redesign, then Phase C
-  (export CLI + endpoint).
+- Iteration: 7
+- Phase B done except the B4a vowel-pad UI (engine redesign landed;
+  2D pad UI deferred to Phase F visual work). Next: Phase C (export).
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -81,11 +81,13 @@ Full audits in the loop transcript; the load-bearing findings:
   surpriseProb/sequenceProb manipulations) and live in browser.
 - [ ] B4. Keep it invisible to lay users (no UI change beyond maybe a subtle
   "science inside" note in the about card).
-- [ ] B4a. Formant space redesign (owner flag 2026-07-03): replace the
-  circular vowel ring with a continuous 2D (log F1 × log F2) vowel space —
-  fixes the wrap fiction and the one-direction-at-extremes surprise problem;
-  makes formant surprise a measurable acoustic distance; formant weight
-  circle UI becomes a 2D vowel pad. See docs/FORMANT_SPACE_DESIGN.md.
+- [x] B4a. Formant space redesign (engine): vowels are landmarks in
+  continuous log-F1 × log-F2 space; accuracy misses and surprises displace
+  by random direction + magnitude, clamped to the vowel region (verified:
+  deviations from extreme "ee" cover all directions symmetrically). Legacy
+  step/distance params mapped to acoustic units; realised-vs-intended
+  distance logged per note and summarised as mean_formant_deviation_loghz.
+  Remaining: 2D vowel-pad UI (do with Phase F restyle).
 
 ## Phase C — Data export & regeneration (priority 3)
 

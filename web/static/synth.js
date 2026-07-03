@@ -115,6 +115,94 @@ function formantFreqsAt(formant, dev = 0) {
   };
 }
 
+// ─── 2D vowel space (log F1 × log F2) ────────────────────────
+//
+// Vowels are landmarks in a continuous two-dimensional acoustic space rather
+// than stops on a ring: F1 (openness) × F2 (frontness), log-scaled so equal
+// distances are roughly equal perceptual steps. Accuracy misses and surprises
+// displace the realised vowel by a random DIRECTION and magnitude in this
+// space, so extreme vowels deviate inward naturally — no wraparound fiction,
+// no one-direction dead end at the ends of a line.
+// See docs/FORMANT_SPACE_DESIGN.md.
+
+export const VOWEL_POINTS = Object.fromEntries(
+  Object.entries(FORMANT_PRESETS).map(([name, p]) => [
+    name, { x: Math.log(p.f1), y: Math.log(p.f2) },
+  ])
+);
+
+function _vowelDist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// Legacy unit conversion: old params measured formant deviation in "circle
+// steps"; one step ≈ the mean distance between adjacent vowels on the old
+// ee–eh–ah–oh–oo path. Old surprise distance (0..1) maps onto the largest
+// pairwise landmark distance.
+const VOWEL_STEP_UNIT = (() => {
+  let sum = 0, n = 0;
+  for (let i = 0; i < FORMANT_ORDER.length - 1; i++) {
+    const a = VOWEL_POINTS[FORMANT_ORDER[i]], b = VOWEL_POINTS[FORMANT_ORDER[i + 1]];
+    if (a && b) { sum += _vowelDist(a, b); n++; }
+  }
+  return n ? sum / n : 0.5;
+})();
+const VOWEL_MAX_DIST = (() => {
+  let max = 0;
+  const names = Object.keys(VOWEL_POINTS);
+  for (const a of names) for (const b of names) {
+    max = Math.max(max, _vowelDist(VOWEL_POINTS[a], VOWEL_POINTS[b]));
+  }
+  return max || 1;
+})();
+// Vowel region: bounding box of the landmarks, slightly inflated. The space
+// between the horseshoe arms is real (schwa-like) vowel territory.
+const VOWEL_BOUNDS = (() => {
+  const pts = Object.values(VOWEL_POINTS);
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const pad = 0.06;
+  return {
+    minX: Math.min(...xs) - pad, maxX: Math.max(...xs) + pad,
+    minY: Math.min(...ys) - pad, maxY: Math.max(...ys) + pad,
+  };
+})();
+
+function clampToVowelRegion(pt) {
+  return {
+    x: Math.min(VOWEL_BOUNDS.maxX, Math.max(VOWEL_BOUNDS.minX, pt.x)),
+    y: Math.min(VOWEL_BOUNDS.maxY, Math.max(VOWEL_BOUNDS.minY, pt.y)),
+  };
+}
+
+export function vowelPointFor(name) {
+  const p = VOWEL_POINTS[name] || VOWEL_POINTS.ah;
+  return { x: p.x, y: p.y };
+}
+
+export function nearestVowel(pt) {
+  let best = "ah", bestD = Infinity;
+  for (const [name, p] of Object.entries(VOWEL_POINTS)) {
+    const d = _vowelDist(pt, p);
+    if (d < bestD) { bestD = d; best = name; }
+  }
+  return best;
+}
+
+/**
+ * Resolve formant frequencies for a point in vowel space. F1/F2 come directly
+ * from the point; F3 (not part of the space) is inverse-distance-weighted
+ * from the landmark vowels.
+ */
+export function formantFreqsAtPoint(pt) {
+  let wSum = 0, f3 = 0;
+  for (const [name, p] of Object.entries(VOWEL_POINTS)) {
+    const w = 1 / (Math.pow(_vowelDist(pt, p), 2) + 1e-4);
+    wSum += w;
+    f3 += w * FORMANT_PRESETS[name].f3;
+  }
+  return { f1: Math.exp(pt.x), f2: Math.exp(pt.y), f3: f3 / wSum };
+}
+
 // ─── Percussion sound definitions ───────────────────────────
 
 export const PERC_SOUNDS = {
@@ -756,7 +844,15 @@ export class GenerationEngine {
     // including between two pure vowels. The base vowel stays stable for tracking.
     note.formant = note.formant || this._currentFormant;
     this._currentFormant = note.formant;
-    note.formantDev = (note.formantDev || 0) + this._formantAccuracyDev(note.formant);
+    // Realised vowel position: surprise may have set a displaced point; the
+    // accuracy miss displaces further from there. Distance from the intended
+    // landmark (in log-Hz units) is the measurable formant deviation.
+    note.formantPos = this._formantAccuracyPos(note.formant, note.formantPos);
+    const intendedVowel = vowelPointFor(note.formant);
+    note.formantDistance = Math.hypot(
+      note.formantPos.x - intendedVowel.x,
+      note.formantPos.y - intendedVowel.y
+    );
 
     const isMotifEnd = this._noteIdx >= this._motif.notes.length - 1;
     const motifNoteIndex = this._noteIdx;
@@ -835,7 +931,8 @@ export class GenerationEngine {
       noteRole,
       duration: Math.max(gridDuration * 0.04, duration),
       formant: note.formant,
-      formantDev: note.formantDev || 0,
+      formantPos: note.formantPos,
+      formantDistance: note.formantDistance || 0,
       velocity,
       isRest: !!note.isRest || isRatioRest,
       isSurprise,
@@ -1283,6 +1380,10 @@ export class GenerationEngine {
     }
     if (ctx.dynBits != null) { m.dynBits += ctx.dynBits; m.dynBitsN++; }
     if (ctx.restBits != null) m.restBits += ctx.restBits;
+    if (note.formantDistance != null) {
+      m.formantDist = (m.formantDist || 0) + note.formantDistance;
+      m.formantDistN = (m.formantDistN || 0) + 1;
+    }
     // Pitch+duration bigram novelty within this performance
     if (ctx.prevDegree != null) {
       const key = `${ctx.prevDegree}>${note.degree}|${note.durationDivs}`;
@@ -1315,6 +1416,7 @@ export class GenerationEngine {
       bigram_novelty_ratio: m.bigramEvents ? m.novelBigrams / m.bigramEvents : null,
       mean_dynamics_surprisal_bits: m.dynBitsN ? m.dynBits / m.dynBitsN : null,
       mean_rest_surprisal_bits: m.notes ? m.restBits / m.notes : null,
+      mean_formant_deviation_loghz: m.formantDistN ? m.formantDist / m.formantDistN : null,
       motif_passes: passCounts.reduce((s, c) => s + c, 0),
       max_motif_reuse: passCounts.length ? Math.max(...passCounts) : 0,
       incorporated_variants: this.repertoire ? this.repertoire.size - this.repertoire.baseLen : 0,
@@ -1584,35 +1686,39 @@ export class GenerationEngine {
     return integer ? Math.round(value) : value;
   }
 
-  _formantStep(formant, steps) {
-    const order = FORMANT_ORDER.filter(f => FORMANT_PRESETS[f]);
-    const start = Math.max(0, order.indexOf(formant));
-    return order[(start + steps + order.length * 8) % order.length] || formant || "ah";
+  /**
+   * Formant-accuracy miss as a displacement in 2D vowel space. On a hit the
+   * point is unchanged; on a miss it moves in a uniformly random direction by
+   * up to `range` legacy steps (1 step ≈ mean adjacent-vowel distance),
+   * clamped to the vowel region. At extreme vowels the reachable directions
+   * simply fan inward — the distribution never collapses to one side.
+   */
+  _formantAccuracyPos(formant, basePos) {
+    const base = FORMANT_PRESETS[formant] ? formant : "ah";
+    const pos = basePos || vowelPointFor(base);
+    const accuracy = this._clamp01(this._formantMapValue("formantAccuracyByFormant", "formantAccuracy", base, 0.85));
+    if (this.rng.next() <= accuracy) return { ...pos };
+    const half = (FORMANT_ORDER.filter(f => FORMANT_PRESETS[f]).length || 5) / 2;
+    const range = Math.max(0, Math.min(half, this._formantMapValue("formantRangeByFormant", "formantAccuracyRange", base, 1)));
+    if (range <= 0) return { ...pos };
+    const mag = range * VOWEL_STEP_UNIT * this.rng.next();
+    const theta = this.rng.next() * Math.PI * 2;
+    return clampToVowelRegion({ x: pos.x + Math.cos(theta) * mag, y: pos.y + Math.sin(theta) * mag });
   }
 
   /**
-   * Continuous formant-accuracy miss, in circle steps. Returns 0 on a hit; on a
-   * miss it returns a signed deviation up to ±range, where range is capped at
-   * half a circle (e.g. ±2.5 steps for 5 vowels). The value is continuous, so a
-   * missed vowel can land *between* two pure vowels.
+   * Surprise vowel: displace the base landmark by `distance` (0..1 of the
+   * widest landmark separation) in a random direction. Returns the realised
+   * point plus the nearest landmark name for tracking/UI.
    */
-  _formantAccuracyDev(formant) {
-    const base = FORMANT_PRESETS[formant] ? formant : "ah";
-    const accuracy = this._clamp01(this._formantMapValue("formantAccuracyByFormant", "formantAccuracy", base, 0.85));
-    if (this.rng.next() <= accuracy) return 0;
-    const half = (FORMANT_ORDER.filter(f => FORMANT_PRESETS[f]).length || 5) / 2;
-    const range = Math.max(0, Math.min(half, this._formantMapValue("formantRangeByFormant", "formantAccuracyRange", base, 1)));
-    if (range <= 0) return 0;
-    const mag = range * this.rng.next();
-    return mag * (this.rng.next() < 0.5 ? -1 : 1);
-  }
-
   _pickSurpriseFormant(formant) {
     const base = FORMANT_PRESETS[formant] ? formant : "ah";
     const distance = this._clamp01(this._formantMapValue("surpriseFormantDistanceByFormant", "surpriseFormantDistance", base, 0.85));
-    const maxStep = Math.max(1, Math.floor(FORMANT_ORDER.length / 2));
-    const stepSize = Math.max(1, Math.round(1 + distance * (maxStep - 1)));
-    return this._formantStep(base, stepSize * (this.rng.next() < 0.5 ? -1 : 1));
+    const mag = Math.max(0.35 * VOWEL_STEP_UNIT, distance * VOWEL_MAX_DIST);
+    const from = vowelPointFor(base);
+    const theta = this.rng.next() * Math.PI * 2;
+    const pos = clampToVowelRegion({ x: from.x + Math.cos(theta) * mag, y: from.y + Math.sin(theta) * mag });
+    return { name: nearestVowel(pos), pos };
   }
 
   _pickVelocity() {
@@ -1686,7 +1792,9 @@ export class GenerationEngine {
       out.tuningOverrideCents = cents * (this.rng.next() < 0.5 ? -1 : 1);
     }
     if (dims.includes("formant")) {
-      out.formant = this._pickSurpriseFormant(expected.formant);
+      const surpriseVowel = this._pickSurpriseFormant(expected.formant);
+      out.formant = surpriseVowel.name;
+      out.formantPos = surpriseVowel.pos;
     }
     if (dims.includes("rhythm")) {
       // Double or halve the note duration
@@ -2142,7 +2250,9 @@ export class SynthEngine {
   /** Formant synthesis: sawtooth → 3 parallel bandpass → envelope → master */
   _renderFormant(note, t0) {
     const t1 = t0 + note.duration;
-    const f = formantFreqsAt(note.formant, note.formantDev || 0);
+    const f = note.formantPos
+      ? formantFreqsAtPoint(note.formantPos)
+      : formantFreqsAt(note.formant, note.formantDev || 0);
     const spectralMix = this._spectralMix(note);
 
     const osc = this.ctx.createOscillator();
