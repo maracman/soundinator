@@ -1112,7 +1112,7 @@ function renderBrowserCards(v) {
     (browserFilter === "all" || item.cat === browserFilter) &&
     (!q || item.name.toLowerCase().includes(q) || (item.description || "").toLowerCase().includes(q)));
   container.innerHTML = items.length ? items.map(item => `
-    <div class="browser-card" draggable="true" data-browser-item="${esc(item.id)}">
+    <div class="browser-card" data-browser-item="${esc(item.id)}">
       <div class="bc-head">
         <span class="bc-name">${esc(item.name)}</span>
         <span class="bc-kind">${esc(item.kindLabel)}</span>
@@ -1150,8 +1150,11 @@ function renderBrowserCards(v) {
     };
   });
   container.querySelectorAll("[data-browser-item]").forEach(card => {
-    card.ondragstart = (e) => {
-      e.dataTransfer.setData("application/x-browser-item", card.dataset.browserItem);
+    card.setAttribute("draggable", "false");
+    card.onmousedown = (e) => {
+      if (e.target.closest(".pal-btn")) return; // buttons stay clickable
+      const item = browserItems().find(i => i.id === card.dataset.browserItem);
+      if (item) beginPointerDrag("browser", item.id, item.name, e);
     };
   });
 }
@@ -1191,25 +1194,14 @@ function wireBrowserPalette(v) {
       renderProduce();
     };
   });
-  // Browser card dropped on the palette → add it
-  const palette = v.querySelector("#dawPalette");
-  if (palette) {
-    palette.ondragover = (e) => { e.preventDefault(); palette.classList.add("drop-target"); };
-    palette.ondragleave = () => palette.classList.remove("drop-target");
-    palette.ondrop = (e) => {
-      e.preventDefault();
-      palette.classList.remove("drop-target");
-      const id = e.dataTransfer.getData("application/x-browser-item");
-      const item = browserItems().find(i => i.id === id);
-      if (!item) return;
-      addToPalette(item);
-      renderProduce();
-    };
-  }
-  // Palette items drag with their own type (lanes consume this in P3)
+  // (browser→palette drops are handled by the pointer-drag machinery)
+  // Palette items drag onto lanes via pointer tracking
   v.querySelectorAll("[data-palette-item]").forEach(el => {
-    el.ondragstart = (e) => {
-      e.dataTransfer.setData("application/x-palette-item", el.dataset.paletteItem);
+    el.setAttribute("draggable", "false");
+    el.onmousedown = (e) => {
+      if (e.target.closest(".pal-btn")) return;
+      const pl = (arrangement.palette || []).find(x => x.id === el.dataset.paletteItem);
+      if (pl) beginPointerDrag("palette", pl.id, pl.name, e);
     };
   });
 }
@@ -1550,7 +1542,7 @@ function produceTimelineHTML() {
       const baked = r.type === "baked" ? " baked" : "";
       const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
       const label = pal ? pal.name : t.name;
-      return `<div class="tl2-region${sel}${baked}" draggable="true" data-region="${r.id}" data-track="${t.id}"
+      return `<div class="tl2-region${sel}${baked}" data-region="${r.id}" data-track="${t.id}"
         style="left:${r.startBeat * PX_PER_BEAT}px;width:${regionLen(r) * PX_PER_BEAT - 2}px"
         title="${esc(label)} — drag to move, drag the right edge to extend. Double-click a baked region to edit its notes.">
         <span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
@@ -1810,6 +1802,141 @@ function produceToolbarHTML() {
     <button class="btn btn-ghost btn-sm" id="regionDelete">Delete</button>`;
 }
 
+// ── Pointer-based drag & drop (v2.1 U0) ─────────────────────
+// HTML5 DnD proved unreliable across real browsers; DAW-style dragging is
+// plain pointer tracking with a ghost. Sources: browser cards (→ palette
+// or straight onto a lane), palette items (→ lanes/new-track), regions
+// (→ move along/between lanes).
+let pointerDrag = null; // { kind, data, label, startX, startY, started, ghost }
+
+function laneAtPoint(x, y) {
+  return document.elementsFromPoint(x, y)
+    .map(el => (el.closest ? el.closest("[data-lane]") : null))
+    .find(Boolean) || null;
+}
+function paletteZoneAtPoint(x, y) {
+  return document.elementsFromPoint(x, y)
+    .map(el => (el.closest ? el.closest("#dawPalette") : null))
+    .find(Boolean) || null;
+}
+function beatAtClientX(lane, clientX) {
+  const rect = lane.getBoundingClientRect();
+  return Math.max(0, Math.min(BEATS_TOTAL - 1, Math.round((clientX - rect.left) / PX_PER_BEAT)));
+}
+
+function trackFreeFrom(track, fromBeat) {
+  let limit = BEATS_TOTAL - fromBeat;
+  for (const r of track.regions) {
+    if (r.startBeat + regionLen(r) <= fromBeat) continue;
+    if (r.startBeat >= fromBeat) limit = Math.min(limit, r.startBeat - fromBeat);
+    else return 0; // inside an existing region
+  }
+  return limit;
+}
+
+function dropPaletteOnLane(laneId, palId, beat) {
+  const pal = (arrangement.palette || []).find(pl => pl.id === palId);
+  if (!pal) return false;
+  let track;
+  if (laneId === "__new__") {
+    track = { id: crypto.randomUUID(), name: pal.name, gain: 1, regions: [] };
+    arrangement.tracks.push(track);
+  } else {
+    track = arrangement.tracks.find(t => t.id === laneId);
+  }
+  if (!track) return false;
+  const len = Math.min(BEATS_PER_BAR * 2, trackFreeFrom(track, beat));
+  if (len < 1) return false;
+  const region = { id: crypto.randomUUID(), paletteId: pal.id, startBeat: beat, lengthBeats: len, seed: newSeed() };
+  track.regions.push(region);
+  selectedRegion = { trackId: track.id, regionId: region.id };
+  saveArrangement();
+  renderProduce();
+  return true;
+}
+
+function dropRegionOnLane(laneId, payload, beat) {
+  const src = arrangement.tracks.find(t => t.id === payload.trackId);
+  const region = src?.regions.find(r => r.id === payload.regionId);
+  if (!src || !region || laneId === "__new__") return false;
+  const dest = arrangement.tracks.find(t => t.id === laneId);
+  if (!dest) return false;
+  const start = Math.max(0, Math.min(BEATS_TOTAL - regionLen(region), beat));
+  if (!spanFree(dest, start, regionLen(region), region.id)) return false;
+  src.regions = src.regions.filter(r => r.id !== region.id);
+  region.startBeat = start;
+  dest.regions.push(region);
+  selectedRegion = { trackId: dest.id, regionId: region.id };
+  saveArrangement();
+  renderProduce();
+  return true;
+}
+
+function beginPointerDrag(kind, data, label, e) {
+  pointerDrag = { kind, data, label, startX: e.clientX, startY: e.clientY, started: false, ghost: null };
+  document.addEventListener("mousemove", pointerDragMove);
+  document.addEventListener("mouseup", pointerDragUp);
+}
+
+function pointerDragMove(e) {
+  if (!pointerDrag) return;
+  if (!pointerDrag.started) {
+    if (Math.abs(e.clientX - pointerDrag.startX) + Math.abs(e.clientY - pointerDrag.startY) < 5) return;
+    pointerDrag.started = true;
+    const g = document.createElement("div");
+    g.className = "drag-ghost";
+    g.textContent = pointerDrag.label;
+    document.body.appendChild(g);
+    pointerDrag.ghost = g;
+    document.body.classList.add("dragging");
+  }
+  pointerDrag.ghost.style.left = `${e.clientX + 12}px`;
+  pointerDrag.ghost.style.top = `${e.clientY + 10}px`;
+  document.querySelectorAll(".drop-target").forEach(el => el.classList.remove("drop-target"));
+  const lane = laneAtPoint(e.clientX, e.clientY);
+  if (lane) lane.classList.add("drop-target");
+  else if (pointerDrag.kind === "browser") {
+    const zone = paletteZoneAtPoint(e.clientX, e.clientY);
+    if (zone) zone.classList.add("drop-target");
+  }
+  e.preventDefault();
+}
+
+function pointerDragUp(e) {
+  document.removeEventListener("mousemove", pointerDragMove);
+  document.removeEventListener("mouseup", pointerDragUp);
+  const drag = pointerDrag;
+  pointerDrag = null;
+  if (!drag) return;
+  drag.ghost?.remove();
+  document.body.classList.remove("dragging");
+  document.querySelectorAll(".drop-target").forEach(el => el.classList.remove("drop-target"));
+  if (!drag.started) return; // plain click — click handlers take it from here
+
+  const lane = laneAtPoint(e.clientX, e.clientY);
+  if (drag.kind === "region") {
+    if (lane) dropRegionOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX));
+    return;
+  }
+  if (drag.kind === "palette") {
+    if (lane) dropPaletteOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX));
+    return;
+  }
+  if (drag.kind === "browser") {
+    const item = browserItems().find(i => i.id === drag.data);
+    if (!item) return;
+    if (lane) {
+      // Straight from the browser onto a track: add to palette, then place
+      addToPalette(item);
+      const palId = arrangement.palette[arrangement.palette.length - 1].id;
+      dropPaletteOnLane(lane.dataset.lane, palId, beatAtClientX(lane, e.clientX));
+    } else if (paletteZoneAtPoint(e.clientX, e.clientY)) {
+      addToPalette(item);
+      renderProduce();
+    }
+  }
+}
+
 // DAW shell layout state (docs/PRODUCER_V2_DESIGN.md B8)
 const DAW_LAYOUT_KEY = "phase0.dawLayout.v1";
 function loadDawLayout() {
@@ -1862,7 +1989,7 @@ function renderProduce() {
               <div class="section-label">Palette</div>
               <div class="palette-rack" id="paletteRack">
                 ${(arrangement.palette || []).length ? (arrangement.palette || []).map(pl => `
-                  <div class="palette-item" draggable="true" data-palette-item="${pl.id}" title="Your working instrument — drag onto a track (P3) or add a track with +">
+                  <div class="palette-item" data-palette-item="${pl.id}" title="Your working instrument — drag onto a track (P3) or add a track with +">
                     <span class="pal-name">${esc(pl.name)}</span>
                     <span class="pal-kind">${esc(pl.kindLabel || "")}</span>
                     <span class="pal-actions">
@@ -1940,74 +2067,7 @@ function wireProduce(v) {
     };
   });
 
-  // Lanes accept palette items (create region) and regions (move)
-  const beatFromEvent = (lane, e) => {
-    const rect = lane.getBoundingClientRect();
-    return Math.max(0, Math.min(BEATS_TOTAL - 1, Math.round((e.clientX - rect.left) / PX_PER_BEAT)));
-  };
-  const defaultRegionBeats = BEATS_PER_BAR * 2;
-
-  v.querySelectorAll("[data-lane]").forEach(lane => {
-    lane.ondragover = (e) => { e.preventDefault(); lane.classList.add("drop-target"); };
-    lane.ondragleave = () => lane.classList.remove("drop-target");
-    lane.ondrop = (e) => {
-      e.preventDefault();
-      lane.classList.remove("drop-target");
-      const beat = beatFromEvent(lane, e);
-      const palId = e.dataTransfer.getData("application/x-palette-item");
-      const regionData = e.dataTransfer.getData("application/x-region");
-
-      if (palId) {
-        const pal = (arrangement.palette || []).find(pl => pl.id === palId);
-        if (!pal) return;
-        let track;
-        if (lane.dataset.lane === "__new__") {
-          track = { id: crypto.randomUUID(), name: pal.name, gain: 1, regions: [] };
-          arrangement.tracks.push(track);
-        } else {
-          track = arrangement.tracks.find(t => t.id === lane.dataset.lane);
-        }
-        if (!track) return;
-        const len = Math.min(defaultRegionBeats, maxAvailable(track, beat));
-        if (len < 1) return;
-        const region = { id: crypto.randomUUID(), paletteId: pal.id, startBeat: beat, lengthBeats: len, seed: newSeed() };
-        track.regions.push(region);
-        selectedRegion = { trackId: track.id, regionId: region.id };
-        saveArrangement();
-        renderProduce();
-        return;
-      }
-
-      if (regionData) {
-        try {
-          const { trackId, regionId } = JSON.parse(regionData);
-          const src = arrangement.tracks.find(t => t.id === trackId);
-          const region = src?.regions.find(r => r.id === regionId);
-          if (!src || !region || lane.dataset.lane === "__new__") return;
-          const dest = arrangement.tracks.find(t => t.id === lane.dataset.lane);
-          if (!dest) return;
-          const start = Math.max(0, Math.min(BEATS_TOTAL - regionLen(region), beat));
-          if (!spanFree(dest, start, regionLen(region), region.id)) return;
-          src.regions = src.regions.filter(r => r.id !== region.id);
-          region.startBeat = start;
-          dest.regions.push(region);
-          selectedRegion = { trackId: dest.id, regionId: region.id };
-          saveArrangement();
-          renderProduce();
-        } catch { /* malformed */ }
-      }
-    };
-  });
-
-  function maxAvailable(track, fromBeat) {
-    let limit = BEATS_TOTAL - fromBeat;
-    for (const r of track.regions) {
-      if (r.startBeat + regionLen(r) <= fromBeat) continue;
-      if (r.startBeat >= fromBeat) limit = Math.min(limit, r.startBeat - fromBeat);
-      else return 0; // dropping inside an existing region
-    }
-    return limit;
-  }
+  // Lane drops are handled by the pointer-drag machinery (v2.1 U0)
 
   // Right-edge resize (mouse drag, snapped to beats, collision-clamped)
   v.querySelectorAll("[data-resize]").forEach(handle => {
@@ -2155,11 +2215,18 @@ function wireProduce(v) {
     };
   });
 
-  // Regions announce themselves for lane drops
+  // Region bodies drag via pointer tracking (resize handle excluded)
   v.querySelectorAll("[data-region]").forEach(el => {
-    el.ondragstart = (e) => {
-      e.dataTransfer.setData("application/x-region",
-        JSON.stringify({ trackId: el.dataset.track, regionId: el.dataset.region }));
+    el.setAttribute("draggable", "false");
+    el.onmousedown = (e) => {
+      if (e.target.closest("[data-resize]")) return;
+      const track = arrangement.tracks.find(t => t.id === el.dataset.track);
+      const region = track?.regions.find(r => r.id === el.dataset.region);
+      if (!region) return;
+      const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
+      beginPointerDrag("region", { trackId: el.dataset.track, regionId: el.dataset.region },
+        pal ? pal.name : track.name, e);
+      e.preventDefault();
     };
   });
 

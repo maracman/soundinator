@@ -152,3 +152,47 @@ Quality:
    gap found and fixed (B3 click-fallback: palette "+" now creates the
    track WITH a starter region). Explore flow verified unregressed.
    AWAITING Q4 OWNER SIGN-OFF — producer v2 is not "done" until then.
+
+
+## v2.1 — Usability & flexibility review (owner request 2026-07-03)
+
+Owner: drag-and-drop broken in real use; make the section more user-friendly
+and flexible; check for obvious missing features. Findings, prioritised:
+
+### Broken / correctness
+- [x] U0 DONE: HTML5 DnD replaced by pointer dragging with a drag ghost
+      and live lane highlight. Browser cards drag to the palette OR
+      straight onto a lane (auto-adds to palette); palette items drag to
+      lanes/new-track; regions drag to move. Clicks unaffected (5px drag
+      threshold). Verified live on every path.
+- [ ] U1 Baked regions do not follow session key changes: notes freeze
+      their Hz at bake time. Recompute frequency at schedule time from
+      degree + cents via the current scale (the design's beat/degree-space
+      rule).
+
+### Missing table-stakes DAW features
+- [ ] U2 Mute / Solo per track.
+- [ ] U3 Duplicate region (⌘/Ctrl-D and alt-drag-to-copy).
+- [ ] U4 Keyboard: Space = play/stop from playhead, Delete = delete
+      selected region, Escape = deselect.
+- [ ] U5 Zoom (px-per-beat) and snap control (bar / beat / half).
+- [ ] U6 Arrangement length not fixed at 16 bars — extend as regions
+      approach the end (or a length setting).
+- [ ] U7 Track rename (double-click the name).
+- [ ] U8 Single-level undo for destructive acts (delete region/track,
+      unbake, overwrite palette item).
+- [ ] U9 Loop-repeat tick marks on extended baked regions so the loop
+      boundary is visible.
+- [ ] U10 Per-track pan.
+
+### Flexibility / scope alignment
+- [ ] U11 New/clear arrangement + multiple named arrangements (save slots)
+      so experiments aren't one-shot.
+- [ ] U12 Region gain (per-region velocity scale) for quick balance moves
+      without editing the instrument.
+- [ ] U13 "Send to Sound Studio" on a region: open its exact voice+context
+      to explore from where the arrangement left off (inverse of palette
+      edit).
+
+Order of attack: U0 (blocker) → U1 (audio correctness) → U2/U3/U4 (daily
+driving) → U5/U6/U7 → U8-U13.
