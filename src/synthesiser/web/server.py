@@ -30,7 +30,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+import hmac
+from urllib.parse import parse_qs, unquote, urlparse
 from uuid import uuid4
 
 from synthesiser.web.phase0 import (
@@ -122,6 +123,12 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/presets/global":
             self.send_json(read_json_file(self.roots["library"], []))
+            return
+
+        # Admin data export: /api/export.csv?table=ratings&token=...
+        # Requires PHASE0_ADMIN_TOKEN to be set server-side; disabled otherwise.
+        if path == "/api/export.csv":
+            self.handle_export(parse_qs(parsed.query))
             return
 
         # Legacy alias
@@ -258,6 +265,33 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         write_json_atomic(self.roots["library"], library[:1000])
         self.send_json({"ok": True, "entry": entry}, status=HTTPStatus.CREATED)
 
+    def handle_export(self, query: dict[str, list[str]]) -> None:
+        """Serve a CSV table of collected data, gated on the admin token."""
+        expected = getattr(self.server, "admin_token", "") or ""
+        supplied = (query.get("token") or [""])[0]
+        if not expected:
+            self.send_error_json(HTTPStatus.FORBIDDEN, "export disabled: PHASE0_ADMIN_TOKEN not set")
+            return
+        if not hmac.compare_digest(supplied, expected):
+            self.send_error_json(HTTPStatus.FORBIDDEN, "invalid token")
+            return
+        from synthesiser.web.export import TABLES, build_table
+
+        table = (query.get("table") or ["ratings"])[0]
+        if table not in TABLES:
+            self.send_error_json(
+                HTTPStatus.BAD_REQUEST, f"unknown table {table!r}; expected one of {', '.join(TABLES)}"
+            )
+            return
+        csv_text = build_table(table, self.roots["events"].parent)
+        encoded = csv_text.encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition", f'attachment; filename="{table}.csv"')
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
     def handle_explore_event(self, payload: dict[str, Any]) -> None:
         """Log an explore-mode interaction event."""
         event = {
@@ -388,6 +422,7 @@ def build_server(
     server.rate_limit_per_minute = rate_limit_per_minute  # type: ignore[attr-defined]
     server.rate_state = {}  # type: ignore[attr-defined]
     server.rate_lock = threading.Lock()  # type: ignore[attr-defined]
+    server.admin_token = os.environ.get("PHASE0_ADMIN_TOKEN", "")  # type: ignore[attr-defined]
     return server
 
 

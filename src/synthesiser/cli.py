@@ -50,6 +50,15 @@ def _vocal_pipeline(seed: int, sr: int, lufs: float, peak: float):
     return pipeline
 
 
+def export_data(args: argparse.Namespace) -> None:
+    from synthesiser.web.export import export_all
+
+    written = export_all(Path(args.data_dir), Path(args.out))
+    for name, path in written.items():
+        lines = max(0, path.read_text(encoding="utf-8").count("\n") - 1)
+        print(f"  {name:<14} {lines:>6} rows  -> {path}")
+
+
 def _report(stimulus_id: str, sidecar: dict, extra: str = "") -> None:
     qc = sidecar["qc"]
     parts = [
@@ -269,6 +278,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dry-run", help="Print marker schedule from a JSON sidecar")
     p.add_argument("sidecar")
     p.set_defaults(func=dry_run)
+
+    # Export web study/explore data to tidy CSVs
+    p = sub.add_parser("export", help="Export web data (explore events, ratings, stimuli, study trials, presets) to CSV")
+    p.add_argument("--data-dir", default="web/data", help="Directory holding the JSONL/JSON data files")
+    p.add_argument("--out", default="exports", help="Output directory for CSV files")
+    p.set_defaults(func=export_data)
 
     return parser
 

@@ -7,9 +7,10 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 7
-- Phase B done except the B4a vowel-pad UI (engine redesign landed;
-  2D pad UI deferred to Phase F visual work). Next: Phase C (export).
+- Iteration: 8
+- Phases A-C done (vowel-pad UI rides with Phase F). Next: Phase D
+  (production quality), starting D1 (click/harshness audio pass) and D2
+  (nice defaults), then D3 modular presets.
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -91,13 +92,15 @@ Full audits in the loop transcript; the load-bearing findings:
 
 ## Phase C — Data export & regeneration (priority 3)
 
-- [ ] C1. `synthesiser export` CLI: JSONL → tidy CSVs (ratings.csv,
-  plays.csv, sessions.csv, presets.csv) with flattened parameters + metrics,
-  schema-version aware.
-- [ ] C2. Admin-token-protected `/api/export.csv` endpoint for pulling data
-  off a PaaS without shell access.
-- [ ] C3. Regeneration check: CLI command that takes a stimulus_id/seed row
-  and re-renders the exact stimulus; test covering seed determinism.
+- [x] C1. `synthesiser export` CLI → events.csv, ratings.csv, stimuli.csv,
+  study_trials.csv, presets.csv with param_/metric_/demo_ flattening,
+  schema-tolerant (skips torn lines; legacy records export cleanly).
+- [x] C2. `/api/export.csv?table=…&token=…` gated on PHASE0_ADMIN_TOKEN
+  (constant-time compare; disabled when unset).
+- [x] C3. Regeneration bundle: stimuli.csv holds one row per stimulus_id
+  with the complete parameter set + seed (verified exact round-trip in
+  tests); engine determinism per seed verified headlessly in iteration 6;
+  server-side Phase0 re-render remains available via /api/render.
 
 ## Phase D — Music production quality (priority 4)
 
