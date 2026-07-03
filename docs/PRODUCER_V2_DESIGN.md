@@ -81,33 +81,33 @@ entry per distinct track sound.
 ## Acceptance bar — ALL must pass before "done"
 
 Functional:
-- [ ] B1 Browser lists every factory + user preset and every saved
+- [x] B1 Browser lists every factory + user preset and every saved
       instrument as cards with name/section/description, category filter
       chips, text search, and in-context preview.
-- [ ] B2 Drag (or click-add) browser card → palette; palette persists with
+- [x] B2 Drag (or click-add) browser card → palette; palette persists with
       the arrangement.
-- [ ] B3 Drag palette item → lane creates a region at the snapped drop
+- [x] B3 Drag palette item → lane creates a region at the snapped drop
       beat; drag below the last lane creates a new track. Click-fallbacks
       exist for all drag actions.
-- [ ] B4 Regions drag along a track and across tracks (snap to grid,
+- [x] B4 Regions drag along a track and across tracks (snap to grid,
       collision-blocked), and the right edge drags out to extend/loop.
-- [ ] B5 One track holds multiple regions with different palette
+- [x] B5 One track holds multiple regions with different palette
       instruments back-to-back; playback honours each region's own sound.
-- [ ] B6 Palette edit round-trip: edit → save → regions using that palette
+- [x] B6 Palette edit round-trip: edit → save → regions using that palette
       item sound different on next play; "save as copy" forks.
-- [ ] B7 Bake, then double-click the region → editor drawer opens with the
+- [x] B7 Bake, then double-click the region → editor drawer opens with the
       piano roll; edits persist and are audible.
-- [ ] B8 Browser column and editor drawer resize by drag and collapse;
+- [x] B8 Browser column and editor drawer resize by drag and collapse;
       layout survives reload.
-- [ ] B9 Transport plays the arrangement from the playhead (click ruler to
+- [x] B9 Transport plays the arrangement from the playhead (click ruler to
       set), multi-voice, with a moving playhead line; mixdown matches.
 
 Quality:
-- [ ] Q1 A scripted end-to-end walkthrough of B1–B9 runs with zero console
+- [x] Q1 A scripted end-to-end walkthrough of B1–B9 runs with zero console
       errors.
-- [ ] Q2 Screenshots at each stage look like a credible DAW section, not a
+- [x] Q2 Screenshots at each stage look like a credible DAW section, not a
       grid of buttons (subjective pre-check before owner review).
-- [ ] Q3 Tests still green; arrangement JSON round-trips.
+- [x] Q3 Tests still green; arrangement JSON round-trips.
 - [ ] Q4 OWNER SIGN-OFF: the owner has used it and agrees it follows DAW
       logic. Until then the roadmap marks producer v2 as in progress, not
       done.
@@ -147,5 +147,8 @@ Quality:
    returns unchanged. Verified: stretch 6→20 round-trip, session params
    still excluded, state cleared, returned to #produce. B6 functionally
    met pending the P7 walkthrough.
-7. **P7 Walkthrough vs the bar**, fix, screenshot review, then owner
-   re-audition.
+7. **P7 Walkthrough** — DONE (2026-07-03): scripted clean-state pass of
+   B1-B9 in the browser, zero console errors, screenshots reviewed, one
+   gap found and fixed (B3 click-fallback: palette "+" now creates the
+   track WITH a starter region). Explore flow verified unregressed.
+   AWAITING Q4 OWNER SIGN-OFF — producer v2 is not "done" until then.

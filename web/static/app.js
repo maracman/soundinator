@@ -1904,14 +1904,26 @@ function wireProduce(v) {
     btn.onclick = () => {
       const source = sources.find(s => s.id === btn.dataset.addTrack);
       if (!source) return;
-      arrangement.tracks.push({
+      const track = {
         id: crypto.randomUUID(),
         name: source.name,
         sourceKind: source.kind,
         instrumentParams: { ...source.parameters },
         gain: 1,
         regions: [],
-      });
+      };
+      // Click fallback for drag-placement: a palette "+" starts the track
+      // with a first region at bar 1, ready to move/extend from the toolbar.
+      const palId = btn.dataset.addTrack.startsWith("pal:") ? btn.dataset.addTrack.slice(4) : null;
+      if (palId) {
+        track.regions.push({
+          id: crypto.randomUUID(), paletteId: palId,
+          startBeat: 0, lengthBeats: BEATS_PER_BAR * 2, seed: newSeed(),
+        });
+      }
+      arrangement.tracks.push(track);
+      const region = track.regions[0];
+      if (region) selectedRegion = { trackId: track.id, regionId: region.id };
       saveArrangement();
       renderProduce();
     };
