@@ -4402,3 +4402,11 @@ body.explore-mode #app {
   flex: none;
   white-space: nowrap;
 }
+
+/* ── Instrument library tab ──────────────────────────────── */
+
+.instrument-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+}

@@ -37,6 +37,7 @@ const APP_VERSION = "sound-studio-0.2.0";
 const EVENT_SCHEMA_VERSION = "explore-event-1.0";
 const SESSION_ID = crypto.randomUUID(); // fresh per page visit
 const CONSENT_KEY = "phase0.consent.v1";
+const INSTRUMENTS_KEY = "phase0.instruments.v1";
 // Bump when the consent wording or what-we-collect changes; stored with every
 // consent decision so records can be tied to the text the volunteer saw.
 const CONSENT_VERSION = "explore-consent-1.0";
@@ -102,6 +103,33 @@ function extractSectionParams(params, section) {
     if (sectionForParam(k) === section) out[k] = val;
   }
   return out;
+}
+
+// ── Instruments (producer mode, docs/DAW_MODE_DESIGN.md) ────
+// An instrument is a complete voice: everything timbral and behavioural,
+// EXCLUDING the session-context tier (tempo, key/scale, master dynamics,
+// shared space) which the session provides and the instrument inherits.
+// Loading an instrument therefore merges over the current state, leaving
+// the musical context untouched.
+const SESSION_CONTEXT_PARAMS = new Set([
+  "seed", "tempo", "scaleMode", "scalePreset", "customDegrees",
+  "edoDivisions", "tonicHz", "rootNotes", "dynamicsLevel",
+  "reverbType", "reverbWet", "reverbDecay", "reverbTone", "reverbPreDelay",
+]);
+
+function extractInstrumentParams(params) {
+  const out = {};
+  for (const [k, val] of Object.entries(params)) {
+    if (!SESSION_CONTEXT_PARAMS.has(k)) out[k] = val;
+  }
+  return out;
+}
+
+function loadInstruments() {
+  try { return JSON.parse(localStorage.getItem(INSTRUMENTS_KEY) || "[]"); } catch { return []; }
+}
+function saveInstruments(list) {
+  localStorage.setItem(INSTRUMENTS_KEY, JSON.stringify(list.slice(0, 100)));
 }
 
 const DEFAULTS = {
@@ -1420,6 +1448,7 @@ function renderExplore() {
       <div class="tabs">
         <button class="tab active" id="tabStarters">Starters</button>
         <button class="tab" id="tabMy">My presets</button>
+        <button class="tab" id="tabInstruments">Instruments</button>
         <button class="tab" id="tabGlobal">Shared library</button>
       </div>
       <div class="library-filters" id="libraryFilters">
@@ -1430,6 +1459,12 @@ function renderExplore() {
       </div>
       <div id="starterPresets" class="preset-list"></div>
       <div id="myPresets" class="preset-list hidden"></div>
+      <div id="instrumentList" class="preset-list hidden">
+        <div class="instrument-actions">
+          <button class="btn btn-secondary btn-sm" id="saveInstrumentBtn" title="Capture the current voice — sound, expression, sequence behaviour — as a named instrument. Tempo, key, and space stay with the session.">Save current voice as instrument</button>
+        </div>
+        <div id="instrumentEntries"></div>
+      </div>
       <div id="globalPresets" class="preset-list hidden"></div>
     </div>
 
@@ -1979,13 +2014,16 @@ function renderExplore() {
   // Library tabs
   const tabStarters = v.querySelector("#tabStarters");
   const tabMy = v.querySelector("#tabMy");
+  const tabInstruments = v.querySelector("#tabInstruments");
   const tabGlobal = v.querySelector("#tabGlobal");
   const starterList = v.querySelector("#starterPresets");
   const myList = v.querySelector("#myPresets");
+  const instrumentList = v.querySelector("#instrumentList");
   const globalList = v.querySelector("#globalPresets");
   const libraryCard = v.querySelector("#libraryCard");
   const tabsAndLists = [
-    [tabStarters, starterList], [tabMy, myList], [tabGlobal, globalList],
+    [tabStarters, starterList], [tabMy, myList],
+    [tabInstruments, instrumentList], [tabGlobal, globalList],
   ];
   const showLibraryTab = (activeTab) => {
     for (const [tab, list] of tabsAndLists) {
@@ -1997,10 +2035,30 @@ function renderExplore() {
 
   tabStarters.onclick = () => showLibraryTab(tabStarters);
   tabMy.onclick = () => showLibraryTab(tabMy);
+  tabInstruments.onclick = () => showLibraryTab(tabInstruments);
   tabGlobal.onclick = async () => {
     showLibraryTab(tabGlobal);
     await loadGlobalPresets(globalList);
   };
+
+  // Instruments: capture the current voice (session context excluded)
+  const saveInstrumentBtn = v.querySelector("#saveInstrumentBtn");
+  if (saveInstrumentBtn) saveInstrumentBtn.onclick = () => {
+    const name = prompt("Name this instrument:");
+    if (!name || !name.trim()) return;
+    const list = loadInstruments();
+    list.unshift({
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      name: name.trim().slice(0, 80),
+      app_version: APP_VERSION,
+      parameters: extractInstrumentParams(exploreParams),
+    });
+    saveInstruments(list);
+    trackEngagement("save");
+    renderInstrumentTab(v);
+  };
+  renderInstrumentTab(v);
   const topMyPresets = v.querySelector("#topMyPresets");
   if (topMyPresets) topMyPresets.onclick = () => tabMy.click();
   const topLibrary = v.querySelector("#topLibrary");
@@ -5381,8 +5439,18 @@ function syncPreviewButtons() {
   });
 }
 
+function renderInstrumentTab(root) {
+  const entries = root.querySelector("#instrumentEntries");
+  if (!entries) return;
+  const instruments = loadInstruments().map(inst => ({ ...inst, section: "instrument" }));
+  renderPresetList(entries, instruments, "instrument");
+  if (!instruments.length) {
+    entries.innerHTML = '<div class="empty-state">No instruments yet. Dial in a voice you like, then capture it above — tempo, key, and space stay with the session.</div>';
+  }
+}
+
 function renderPresetList(container, presets, source) {
-  if (libraryFilter !== "all") {
+  if (libraryFilter !== "all" && source !== "instrument") {
     presets = presets.filter(p => (p.section && p.section !== "full" ? p.section : "full") === libraryFilter);
   }
   if (!presets.length) {
@@ -5392,7 +5460,9 @@ function renderPresetList(container, presets, source) {
   }
   container.innerHTML = presets.map(p => {
     const sectionKey = p.section && p.section !== "full" ? p.section : null;
-    const sectionLabel = sectionKey ? (PRESET_SECTIONS[sectionKey]?.label || sectionKey) : null;
+    const sectionLabel = sectionKey
+      ? (PRESET_SECTIONS[sectionKey]?.label || (sectionKey === "instrument" ? "Instrument" : sectionKey))
+      : null;
     return `
     <div class="preset-item">
       <span class="name">${esc(p.name || p.preset_name || "Untitled")}</span>
@@ -5402,7 +5472,7 @@ function renderPresetList(container, presets, source) {
       <div class="actions">
         <button class="btn btn-ghost btn-sm preview-btn" data-preview="${p.id}" title="Preview: hear this preset merged into your current sound, without changing anything">▶</button>
         <button class="btn btn-secondary btn-sm" data-load='${JSON.stringify(p.parameters)}' data-section="${sectionKey || "full"}">Load</button>
-        ${source === "my" ? `<button class="btn btn-ghost btn-sm" data-remove="${p.id}">Remove</button>` : ""}
+        ${source === "my" || source === "instrument" ? `<button class="btn btn-ghost btn-sm" data-remove="${p.id}">Remove</button>` : ""}
       </div>
     </div>
   `;
@@ -5437,6 +5507,11 @@ function renderPresetList(container, presets, source) {
   });
   container.querySelectorAll("[data-remove]").forEach(btn => {
     btn.onclick = () => {
+      if (source === "instrument") {
+        saveInstruments(loadInstruments().filter(p => p.id !== btn.dataset.remove));
+        renderInstrumentTab(container.closest(".view") || document);
+        return;
+      }
       savePresets(loadPresets().filter(p => p.id !== btn.dataset.remove));
       renderPresetList(container, loadPresets(), source);
     };

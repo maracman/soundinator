@@ -198,8 +198,12 @@ synth configuration pulled into arrangement tracks.
 
 - [ ] G1. Design sign-off: parameter scoping tiers (session context vs
   instrument vs region) and return-to-pattern semantics reviewed by owner.
-- [ ] G2. Instrument library: save current synth state as a named instrument
-  (excluding session-scoped params); instrument browser to pull into tracks.
+- [x] G2. Instrument library: "Save current voice as instrument" captures
+  everything timbral/behavioural (116 params) excluding the session-context
+  tier (tempo, key/scale, master dynamics, space, seed); Instruments tab in
+  the library with preview/load/remove; loading merges over current state
+  so the musical context survives (verified: session tempo preserved).
+  These entries become the draggable sources for the G3 timeline.
 - [ ] G3. Arrangement view: tracks × timeline regions; each region references
   an instrument + pattern settings + seed (a "take"); loop-over-region
   playback; region reroll for a fresh take.
