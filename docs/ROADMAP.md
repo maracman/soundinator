@@ -160,7 +160,12 @@ Full audits in the loop transcript; the load-bearing findings:
     defaults ride the profiles (piano 0.7 … trumpet 0.28); Material slider
     in the Fourier print panel, live-updating. Verified: piano profile
     sets slider to 0.7, playback clean.
-  - [ ] D7c. 32-partial support with paginated harmonic editor.
+  - [x] D7c. 32 partials: profile tables extrapolated 20→32 by stride-2
+    geometric continuation (clarinet odd/even parity preserved in the
+    tail); Harmonics + Comb centre sliders to 32; harmonic editor renders
+    all 32 in its scrollable grid (explicit pagination unnecessary).
+    Nyquist guard already skips unfittable partials. Verified in browser
+    at 32 partials, playback clean.
   - [ ] D7d. 5-formant bank (F1-F5 + bandwidths) behind a disclosure;
     2D vowel pad unchanged, still drives F1/F2.
 

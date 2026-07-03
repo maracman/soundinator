@@ -489,6 +489,31 @@ for (const [profileKey, performance] of Object.entries(SPECTRAL_PERFORMANCE)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].performance = performance;
 }
 
+// ── Extend every profile's partial table to 32 harmonics ─────
+// The hand-tuned tables specify the first 20; the tail is extrapolated by
+// stride-2 geometric continuation so alternating odd/even patterns
+// (clarinet) keep their parity structure while monotone spectra continue
+// their decay. The Nyquist guard in the renderer skips whatever a given
+// fundamental can't fit.
+const TARGET_PARTIALS = 32;
+for (const profile of Object.values(SPECTRAL_PROFILES)) {
+  const parts = profile.partials;
+  while (parts.length < TARGET_PARTIALS) {
+    const n = parts.length;
+    const ref = parts[n - 2];  // same parity as the entry being added
+    const ref2 = parts[n - 4] || ref;
+    const ratio = ref2.amp > 0
+      ? Math.max(0.2, Math.min(0.95, ref.amp / ref2.amp))
+      : 0.6;
+    parts.push({
+      amp: +(ref.amp * ratio).toFixed(5),
+      spread: Math.min(0.8, (ref.spread ?? 0.4) + 0.04),
+      dyn: +((ref.dyn ?? 0) + Math.max(0, (ref.dyn ?? 0) - (ref2.dyn ?? 0))).toFixed(2),
+      ...(ref.reg != null ? { reg: ref.reg } : {}),
+    });
+  }
+}
+
 // ─── 12-tone scale presets ──────────────────────────────────
 
 export const SCALE_PRESETS = {

@@ -2694,7 +2694,7 @@ function subnoteWorkspaceHTML(p) {
             <div class="controls-grid">
               ${controlRow("spectralProb", "Sample chance", p.spectralProb, 0, 1, 0.01)}
               ${controlRow("spectralMix", "Mix", p.spectralMix, 0, 1, 0.01)}
-              ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 20, 1)}
+              ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 32, 1)}
               ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
               ${controlRow("spectralRegisterAmount", "Reg response", p.spectralRegisterAmount, 0, 1.5, 0.01)}
               ${controlRow("spectralResonanceAmount", "Resonance", p.spectralResonanceAmount, 0, 1.5, 0.01)}
@@ -2707,7 +2707,7 @@ function subnoteWorkspaceHTML(p) {
               ${controlRow("partialTilt", "Tilt", p.partialTilt, -1, 1, 0.01)}
               ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
               ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
-              ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 20, 1)}
+              ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 32, 1)}
             </div>
             <div class="subsection-label">Octave groups</div>
             <div class="controls-grid">
