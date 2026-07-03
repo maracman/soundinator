@@ -1945,6 +1945,9 @@ function renderExplore() {
   // Welcome / research opt-in card
   wireWelcomeCard(v);
 
+  // Hover readouts on the probability displays
+  wireDistHover(v);
+
   // Save preset (full rig or a single section)
   v.querySelector("#saveBtn").onclick = () => {
     const name = v.querySelector("#presetName").value.trim() || `Preset ${new Date().toLocaleTimeString()}`;
@@ -2930,6 +2933,42 @@ function recentAxisMarkers(axis) {
  *   },
  * }
  */
+// ── Display hover readouts (FabFilter cue: precise values at the cursor) ──
+const _distHoverData = {};
+
+function wireDistHover(root) {
+  let bubble = document.getElementById("distReadout");
+  if (!bubble) {
+    bubble = document.createElement("div");
+    bubble.id = "distReadout";
+    bubble.className = "dist-readout";
+    bubble.style.display = "none";
+    document.body.appendChild(bubble);
+  }
+  const hide = () => { bubble.style.display = "none"; };
+  root.addEventListener("mousemove", (e) => {
+    const cv = e.target.closest ? e.target.closest("canvas") : null;
+    const data = cv && _distHoverData[cv.id];
+    if (!data || !data.bars.length) { hide(); return; }
+    const rect = cv.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (cv.width / rect.width);
+    const idx = Math.round((cx - data.barStartX - data.barW / 2) / (data.barW + data.barGap));
+    if (idx < 0 || idx >= data.bars.length) { hide(); return; }
+    const bar = data.bars[idx];
+    const pct = (v) => `${(v * 100).toFixed(1)}%`;
+    const parts = [];
+    if (data.gen) parts.push(`<span class="dr-gen">gen ${pct(bar.genP)}</span>`);
+    parts.push(`<span class="dr-acc">acc ${pct(bar.accP)}</span>`);
+    if (data.hasSurp) parts.push(`<span class="dr-surp">surp ${pct(bar.surpP)}</span>`);
+    const dLabel = Number.isInteger(bar.d) ? (bar.d > 0 ? `+${bar.d}` : `${bar.d}`) : bar.d.toFixed(2);
+    bubble.innerHTML = `<strong>${dLabel}</strong>${parts.join("")}`;
+    bubble.style.display = "block";
+    bubble.style.left = `${Math.min(e.clientX + 14, window.innerWidth - 190)}px`;
+    bubble.style.top = `${e.clientY - 34}px`;
+  });
+  root.addEventListener("mouseleave", hide);
+}
+
 function drawMacroDist(canvasId, cfg) {
   const cv = document.getElementById(canvasId);
   if (!cv) return;
@@ -3180,6 +3219,10 @@ function drawMacroDist(canvasId, cfg) {
   const maxSegs = Math.floor(plotH / (segH + segGap));
   const totalBarsW = barCount * (barW + barGap);
   const barStartX = padL + (plotW - totalBarsW) / 2;
+
+  // Stash geometry + values so the hover readout can resolve the cursor to
+  // exact per-layer probabilities without re-rendering the canvas.
+  _distHoverData[canvasId] = { bars, barStartX, barW, barGap, gen: !!gen, hasSurp };
 
   // sqrt scale: compress massive dynamic range so small bars are visible
   const sqrtMax = Math.sqrt(maxProb);

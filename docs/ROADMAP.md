@@ -166,8 +166,12 @@ Full audits in the loop transcript; the load-bearing findings:
   pad (log-F1 × log-F2, classic vowel-chart orientation: ee front-closed
   top-left, oo back-closed top-right, ah open bottom), weights as dot
   sizes, horseshoe outline, display-well styling. Completes B4a's UI.
-- [ ] F3c-2. Hover crosshair readouts on probability displays; note-grid /
-  vowel-pad direct manipulation with floating per-item editors.
+- [x] F3c-2a. Hover readouts: probability displays show a floating
+  layer-coloured readout at the cursor (step offset + exact gen/acc/surp
+  probabilities), hidden when the pointer leaves. Verified in browser.
+- [ ] F3c-2b. Direct manipulation: note-grid / vowel-pad click-to-edit with
+  floating per-item editors (deferred; candidates for the producer-mode
+  editor pass).
 
 ## Phase G — Producer mode: orchestration / DAW-ish arrangement (owner request 2026-07-03)
 

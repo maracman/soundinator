@@ -4352,3 +4352,28 @@ body.explore-mode #app {
   border-color: rgba(56,189,248,0.5);
   background: rgba(56,189,248,0.1);
 }
+
+/* ── Display hover readout ───────────────────────────────── */
+
+.dist-readout {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  background: rgba(16,18,22,0.94);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text2);
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+}
+
+.dist-readout strong { color: var(--text); font-weight: 600; margin-right: 0.15rem; }
+.dist-readout .dr-gen  { color: var(--gen); }
+.dist-readout .dr-acc  { color: var(--acc); }
+.dist-readout .dr-surp { color: var(--surp); }
