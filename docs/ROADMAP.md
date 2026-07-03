@@ -81,8 +81,9 @@ Full audits in the loop transcript; the load-bearing findings:
   the summary of everything heard up to the rating moment. Verified
   headlessly in Node (deterministic per seed; responds correctly to
   surpriseProb/sequenceProb manipulations) and live in browser.
-- [ ] B4. Keep it invisible to lay users (no UI change beyond maybe a subtle
-  "science inside" note in the about card).
+- [x] B4. Research machinery is invisible to lay users: metrics ride the
+  event payloads only; the welcome card + footer sharing note are the only
+  research-facing UI, in plain language.
 - [x] B4a. Formant space redesign (engine): vowels are landmarks in
   continuous log-F1 × log-F2 space; accuracy misses and surprises displace
   by random direction + magnitude, clamped to the vowel region (verified:
@@ -161,8 +162,12 @@ Full audits in the loop transcript; the load-bearing findings:
   scanlines/vignette; layer-colour data unchanged). Owner decision: KEEP the
   CRT/LED display character (harmonised); FabFilter curve replacement
   rejected. Hover readouts pending (F3c).
-- [ ] F3c. Contextual panels: note grid & 2D vowel pad (B4a) as
-  direct-manipulation surfaces with floating per-item editors.
+- [x] F3c-1. 2D vowel pad: the formant weight circle is now a true vowel
+  pad (log-F1 × log-F2, classic vowel-chart orientation: ee front-closed
+  top-left, oo back-closed top-right, ah open bottom), weights as dot
+  sizes, horseshoe outline, display-well styling. Completes B4a's UI.
+- [ ] F3c-2. Hover crosshair readouts on probability displays; note-grid /
+  vowel-pad direct manipulation with floating per-item editors.
 
 ## Phase G — Producer mode: orchestration / DAW-ish arrangement (owner request 2026-07-03)
 

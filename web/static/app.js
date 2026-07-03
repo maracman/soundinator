@@ -21,6 +21,7 @@ import {
   REVERB_PROFILES,
   SPECTRAL_PROFILES,
   spectralDefaultRegisterSensitivity,
+  VOWEL_POINTS,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -4621,26 +4622,48 @@ function applyFormantScopedParam(param, value) {
   }
 }
 
+// ── 2D vowel pad ─────────────────────────────────────────────
+// The vowel space is two-dimensional (log F1 openness × log F2 frontness;
+// see docs/FORMANT_SPACE_DESIGN.md). The pad projects it in the classic
+// vowel-chart orientation: front vowels left, back vowels right, closed at
+// the top, open at the bottom. Landmark dot size shows sampling weight.
+const _VOWEL_PAD = { W: 170, H: 120, pad: 20 };
+
+function vowelPadScreenPos(name) {
+  const pts = Object.values(VOWEL_POINTS);
+  const minX = Math.min(...pts.map(p => p.x)), maxX = Math.max(...pts.map(p => p.x));
+  const minY = Math.min(...pts.map(p => p.y)), maxY = Math.max(...pts.map(p => p.y));
+  const p = VOWEL_POINTS[name];
+  const { W, H, pad } = _VOWEL_PAD;
+  return {
+    // x: high F2 (front) on the left, low F2 (back) on the right
+    x: pad + ((maxY - p.y) / Math.max(1e-9, maxY - minY)) * (W - pad * 2),
+    // y: low F1 (closed) at the top, high F1 (open) at the bottom
+    y: pad + ((p.x - minX) / Math.max(1e-9, maxX - minX)) * (H - pad * 2),
+  };
+}
+
 function formantWeightCircleHTML() {
-  const C = 60, MAXR = 42;
-  const keys = FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]);
-  const n = keys.length || 1;
-  const ang = (i) => (-90 + (i * 360 / n)) * Math.PI / 180;
-  const rings = [0.34, 0.67, 1].map(f =>
-    `<circle cx="${C}" cy="${C}" r="${(MAXR * f).toFixed(1)}" class="fw-ring"/>`).join("");
-  const spokes = keys.map((k, i) => {
-    const a = ang(i);
-    return `<line x1="${C}" y1="${C}" x2="${(C + Math.cos(a) * MAXR).toFixed(1)}" y2="${(C + Math.sin(a) * MAXR).toFixed(1)}" class="fw-spoke"/>`;
+  const { W, H } = _VOWEL_PAD;
+  const keys = Object.keys(FORMANT_PRESETS);
+  // Horseshoe outline through the landmarks in vowel-chart order
+  const hull = FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k])
+    .map(k => { const s = vowelPadScreenPos(k); return `${s.x.toFixed(1)},${s.y.toFixed(1)}`; })
+    .join(" ");
+  const dots = keys.map(k => {
+    const s = vowelPadScreenPos(k);
+    return `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="2.6" class="fw-dot" data-fw-dot="${k}"/>`;
   }).join("");
-  const labels = keys.map((k, i) => {
-    const a = ang(i);
-    const lx = C + Math.cos(a) * (MAXR + 11), ly = C + Math.sin(a) * (MAXR + 11);
-    return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" class="fw-label" data-fw-label="${k}">${k}</text>`;
+  const labels = keys.map(k => {
+    const s = vowelPadScreenPos(k);
+    const dy = s.y < H / 2 ? -7 : 13;
+    return `<text x="${s.x.toFixed(1)}" y="${(s.y + dy).toFixed(1)}" class="fw-label" data-fw-label="${k}" text-anchor="middle">${k}</text>`;
   }).join("");
-  const dots = keys.map(k => `<circle r="2.6" class="fw-dot" data-fw-dot="${k}"/>`).join("");
-  return `<svg class="formant-weight-circle" viewBox="0 0 120 120" data-formant-weight-circle aria-hidden="true">
-      ${rings}${spokes}
-      <polygon class="fw-poly" data-fw-poly points=""/>
+  return `<svg class="formant-weight-circle vowel-pad" viewBox="0 0 ${W} ${H}" data-formant-weight-circle aria-hidden="true">
+      <rect x="2" y="2" width="${W - 4}" height="${H - 4}" rx="7" class="vp-well"/>
+      <text x="9" y="${H / 2}" class="vp-axis" text-anchor="middle" transform="rotate(-90 9 ${H / 2})">closed → open</text>
+      <text x="${W / 2}" y="${H - 5}" class="vp-axis" text-anchor="middle">front ← → back</text>
+      <polyline class="fw-poly" data-fw-poly points="${hull}"/>
       ${dots}${labels}
     </svg>`;
 }
@@ -4648,28 +4671,20 @@ function formantWeightCircleHTML() {
 function updateFormantWeightCircle(root) {
   const svg = (root || document).querySelector("[data-formant-weight-circle]");
   if (!svg) return;
-  const C = 60, MAXR = 42;
-  const keys = FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]);
-  const n = keys.length || 1;
+  // 2D pad: landmark positions are fixed (they ARE the vowel space); the
+  // sampling weight shows as dot size, inactive vowels dim out.
   const active = exploreParams.activeFormants || [];
   const weights = exploreParams.formantWeights || {};
-  const pts = [];
-  keys.forEach((k, i) => {
-    const a = (-90 + (i * 360 / n)) * Math.PI / 180;
+  for (const k of Object.keys(FORMANT_PRESETS)) {
     const on = active.includes(k);
     const w = on ? Math.max(0, Math.min(1, Number(weights[k]) || 0)) : 0;
-    const r = MAXR * w;
-    const x = C + Math.cos(a) * r, y = C + Math.sin(a) * r;
-    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     const dot = svg.querySelector(`[data-fw-dot="${k}"]`);
     if (dot) {
-      dot.setAttribute("cx", x.toFixed(1));
-      dot.setAttribute("cy", y.toFixed(1));
+      dot.setAttribute("r", (1.6 + 4.4 * w).toFixed(2));
       dot.classList.toggle("inactive", !on);
     }
     svg.querySelector(`[data-fw-label="${k}"]`)?.classList.toggle("inactive", !on);
-  });
-  svg.querySelector("[data-fw-poly]")?.setAttribute("points", pts.join(" "));
+  }
 }
 
 function formantWeightControlsHTML(p) {
