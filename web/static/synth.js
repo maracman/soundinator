@@ -1870,9 +1870,29 @@ export class SynthEngine {
     this.analyser.fftSize = 1024;
     this.analyser.smoothingTimeConstant = 0.82;
 
-    // Master output fader + brick-wall limiter (post-analyser → destination)
+    // Master output fader + tone shaping + soft clip + brick-wall limiter
+    // (post-analyser → destination). The gentle EQ tames sawtooth harshness
+    // and sub-sonic rumble; the tanh soft clipper rounds transients off
+    // BEFORE the hard limiter so the limiter rarely slams.
     this._masterOut = this.ctx.createGain();
     this._masterOut.gain.value = this._masterVolume;
+    this._masterHP = this.ctx.createBiquadFilter();
+    this._masterHP.type = "highpass";
+    this._masterHP.frequency.value = 28;
+    this._masterHP.Q.value = 0.71;
+    this._masterShelf = this.ctx.createBiquadFilter();
+    this._masterShelf.type = "highshelf";
+    this._masterShelf.frequency.value = 9500;
+    this._masterShelf.gain.value = -2.5;
+    this._softClip = this.ctx.createWaveShaper();
+    this._softClip.oversample = "2x";
+    const CLIP_N = 1024, drive = 2;
+    const curve = new Float32Array(CLIP_N);
+    for (let i = 0; i < CLIP_N; i++) {
+      const x = (i / (CLIP_N - 1)) * 2 - 1;
+      curve[i] = Math.tanh(drive * x) / Math.tanh(drive);
+    }
+    this._softClip.curve = curve;
     this._limiter = this.ctx.createDynamicsCompressor();
     this._limiter.threshold.value = -1.5;
     this._limiter.knee.value = 0;
@@ -1888,6 +1908,9 @@ export class SynthEngine {
     this._reverbTone.connect(this._wetGain);
     this._wetGain.connect(this.analyser);
     this.analyser.connect(this._masterOut);
+    this._masterOut.connect(this._masterHP);
+    this._masterHP.connect(this._masterShelf);
+    this._masterShelf.connect(this._softClip);
     this._limiter.connect(this.ctx.destination);
     this._applyLimiterRouting();
 
@@ -1908,6 +1931,13 @@ export class SynthEngine {
     this.init();
     if (this.ctx.state === "suspended") this.ctx.resume();
     this.stop();
+    // stop() fades the master out; bring it back for the new performance.
+    if (this._masterOut) {
+      const now = this.ctx.currentTime;
+      this._masterOut.gain.cancelScheduledValues(now);
+      this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
+    }
+    this._lastLoudnessCorr = null;
 
     this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
     this._vibratoActive = false;
@@ -2031,8 +2061,21 @@ export class SynthEngine {
     this.playing = false;
     clearTimeout(this._timer);
     this._timer = null;
-    for (const n of this._nodes) { try { n.stop(0); } catch {} }
+    // Click-free stop: fade the master down over ~25ms, then kill the nodes.
+    // The node list is snapshotted so a play() that follows immediately can
+    // start fresh voices without the deferred stop touching them.
+    const nodes = this._nodes;
     this._nodes = [];
+    if (this.ctx && this._masterOut && nodes.length) {
+      const now = this.ctx.currentTime;
+      this._masterOut.gain.cancelScheduledValues(now);
+      this._masterOut.gain.setTargetAtTime(0, now, 0.008);
+      setTimeout(() => {
+        for (const n of nodes) { try { n.stop(0); } catch {} }
+      }, 40);
+    } else {
+      for (const n of nodes) { try { n.stop(0); } catch {} }
+    }
     if (this._wetGain && this.ctx) {
       this._wetGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
     }
@@ -2058,12 +2101,12 @@ export class SynthEngine {
     return this._engine ? this._engine.getMetricsSummary() : null;
   }
 
-  /** Route master output through the limiter or straight to the destination. */
+  /** Route the soft-clipped master through the limiter or straight out. */
   _applyLimiterRouting() {
-    if (!this._masterOut || !this.ctx) return;
-    try { this._masterOut.disconnect(); } catch {}
-    if (this._limiterOn) this._masterOut.connect(this._limiter);
-    else this._masterOut.connect(this.ctx.destination);
+    if (!this._softClip || !this.ctx) return;
+    try { this._softClip.disconnect(); } catch {}
+    if (this._limiterOn) this._softClip.connect(this._limiter);
+    else this._softClip.connect(this.ctx.destination);
   }
 
   /** Set master output level. Accepts a linear gain (0..~2). */
@@ -2467,7 +2510,13 @@ export class SynthEngine {
     const target = partials.reduce((sum, item) => sum + Math.max(0, item.part.mean || 0), 0);
     const actual = draws.reduce((sum, amp) => sum + Math.max(0, amp), 0);
     if (target <= 0.0001 || actual <= 0.0001) return 1;
-    return Math.pow(this._clamp(target / actual, 0.25, 4), amount);
+    let corr = Math.pow(this._clamp(target / actual, 0.25, 4), amount);
+    // Slew-limit the correction so re-normalisation can't jump the level
+    // audibly between consecutive draws/notes (max ±30% per step).
+    const prev = this._lastLoudnessCorr;
+    if (prev) corr = this._clamp(corr, prev * 0.7, prev * 1.3);
+    this._lastLoudnessCorr = corr;
+    return corr;
   }
 
   _nextRandom() {

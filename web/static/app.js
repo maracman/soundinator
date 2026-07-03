@@ -137,7 +137,9 @@ const DEFAULTS = {
   percDownbeatEvery: 4,
   // Space
   reverbType: "room",
-  reverbWet: 0,
+  // A touch of room by default: a completely dry first play sounds clinical
+  // to newcomers, and the space is easy to remove.
+  reverbWet: 0.16,
   reverbDecay: 1.4,
   reverbTone: 0.6,
   reverbPreDelay: 0.015,
@@ -176,7 +178,7 @@ const DEFAULTS = {
   envelopeDecaySd: 0.018,
   envelopeSustain: 0.6,
   envelopeSustainSd: 0.08,
-  envelopeRelease: 0.08,
+  envelopeRelease: 0.12,
   envelopeReleaseSd: 0.035,
   // Articulation gaps
   gapProb: 1,

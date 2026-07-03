@@ -7,10 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 8
-- Phases A-C done (vowel-pad UI rides with Phase F). Next: Phase D
-  (production quality), starting D1 (click/harshness audio pass) and D2
-  (nice defaults), then D3 modular presets.
+- Iteration: 9
+- Phases A-C done; D1-D2 done. Next: D3 modular per-section presets, then
+  D4 factory starter library.
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -104,11 +103,14 @@ Full audits in the loop transcript; the load-bearing findings:
 
 ## Phase D — Music production quality (priority 4)
 
-- [ ] D1. Click/harshness pass: gain ramps on oscillator start/stop, soft
-  clipper before the brick-wall limiter, gentle master high-shelf/low-cut,
-  clamp spectral-renorm jumps.
-- [ ] D2. Nice defaults: retune DEFAULTS so first play sounds musical
-  (tempo, reverb wet > 0, warmer profile), audition each voice mode.
+- [x] D1. Click/harshness pass: tanh soft clipper (2x oversampled) before
+  the limiter; master 28Hz low-cut + -2.5dB high shelf @9.5kHz; click-free
+  stop (25ms master fade, deferred node kill, gain restored on next play);
+  spectral loudness renorm slew-limited to ±30%/step. (Per-note envelopes
+  already ramped to zero — verified, no change needed.)
+- [x] D2. Defaults: reverbWet 0→0.16 (room), envelopeRelease 0.08→0.12 so
+  first play isn't clinical-dry. Further tone tuning rides with D4
+  audition pass.
 - [ ] D3. Modular presets: per-section save/load (sound source, melody/scale,
   rhythm/duration, dynamics, surprise/sequence, percussion, space) with
   section chips in the library UI; full-rig presets remain; localStorage
