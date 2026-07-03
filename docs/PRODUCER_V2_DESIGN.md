@@ -176,9 +176,13 @@ and flexible; check for obvious missing features. Findings, prioritised:
 - [x] U2 DONE: M/S buttons per track head; solo-aware audibility dims
       heads, silences live voices immediately, and playback + mixdown skip
       inaudible tracks.
-- [ ] U3 Duplicate region (⌘/Ctrl-D and alt-drag-to-copy).
-- [ ] U4 Keyboard: Space = play/stop from playhead, Delete = delete
-      selected region, Escape = deselect.
+- [x] U3 DONE: ⌘/Ctrl-D duplicates the selected region into the first
+      free span after it; alt-drag copies (ghost shows ⧉), including
+      across tracks; the original stays put.
+- [x] U4 DONE: Space toggles arrangement play/stop from the playhead,
+      Delete/Backspace removes the selected region, Escape deselects and
+      closes the editor drawer; inert while typing in inputs and outside
+      #produce.
 - [ ] U5 Zoom (px-per-beat) and snap control (bar / beat / half).
 - [ ] U6 Arrangement length not fixed at 16 bars — extend as regions
       approach the end (or a length setting).

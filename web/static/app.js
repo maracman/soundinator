@@ -1870,21 +1870,70 @@ function dropPaletteOnLane(laneId, palId, beat) {
   return true;
 }
 
-function dropRegionOnLane(laneId, payload, beat) {
+function dropRegionOnLane(laneId, payload, beat, copy = false) {
   const src = arrangement.tracks.find(t => t.id === payload.trackId);
   const region = src?.regions.find(r => r.id === payload.regionId);
   if (!src || !region || laneId === "__new__") return false;
   const dest = arrangement.tracks.find(t => t.id === laneId);
   if (!dest) return false;
   const start = Math.max(0, Math.min(BEATS_TOTAL - regionLen(region), beat));
-  if (!spanFree(dest, start, regionLen(region), region.id)) return false;
-  src.regions = src.regions.filter(r => r.id !== region.id);
-  region.startBeat = start;
-  dest.regions.push(region);
-  selectedRegion = { trackId: dest.id, regionId: region.id };
+  if (!spanFree(dest, start, regionLen(region), copy ? null : region.id)) return false;
+  let placed = region;
+  if (copy) {
+    placed = JSON.parse(JSON.stringify(region));
+    placed.id = crypto.randomUUID();
+  } else {
+    src.regions = src.regions.filter(r => r.id !== region.id);
+  }
+  placed.startBeat = start;
+  dest.regions.push(placed);
+  selectedRegion = { trackId: dest.id, regionId: placed.id };
   saveArrangement();
   renderProduce();
   return true;
+}
+
+// U3: duplicate the selected region into the first free span after it
+function duplicateSelectedRegion() {
+  if (!selectedRegion) return;
+  const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+  const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+  if (!track || !region) return;
+  const len = regionLen(region);
+  let start = region.startBeat + len;
+  while (start + len <= BEATS_TOTAL && !spanFree(track, start, len)) start++;
+  if (start + len > BEATS_TOTAL) return;
+  const copy = JSON.parse(JSON.stringify(region));
+  copy.id = crypto.randomUUID();
+  copy.startBeat = start;
+  track.regions.push(copy);
+  selectedRegion = { trackId: track.id, regionId: copy.id };
+  saveArrangement();
+  renderProduce();
+}
+
+// U4: DAW keyboard transport, active only in the producer view
+if (!window._dawKeysInstalled) {
+  window._dawKeysInstalled = true;
+  document.addEventListener("keydown", (e) => {
+    if (!location.hash.includes("produce") || !arrangement) return;
+    const t = e.target;
+    if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    if (e.code === "Space") {
+      e.preventDefault();
+      document.querySelector("#arrPlayBtn")?.click();
+    } else if ((e.key === "Delete" || e.key === "Backspace") && selectedRegion) {
+      e.preventDefault();
+      document.querySelector("#regionDelete")?.click();
+    } else if (e.key === "Escape") {
+      selectedRegion = null;
+      rollOpen = false;
+      renderProduce();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+      e.preventDefault();
+      duplicateSelectedRegion();
+    }
+  });
 }
 
 function beginPointerDrag(kind, data, label, e) {
@@ -1930,7 +1979,7 @@ function pointerDragUp(e) {
 
   const lane = laneAtPoint(e.clientX, e.clientY);
   if (drag.kind === "region") {
-    if (lane) dropRegionOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX));
+    if (lane) dropRegionOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX), drag.alt || e.altKey);
     return;
   }
   if (drag.kind === "palette") {
@@ -2262,7 +2311,8 @@ function wireProduce(v) {
       if (!region) return;
       const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
       beginPointerDrag("region", { trackId: el.dataset.track, regionId: el.dataset.region },
-        pal ? pal.name : track.name, e);
+        (e.altKey ? "⧉ " : "") + (pal ? pal.name : track.name), e);
+      pointerDrag.alt = e.altKey;
       e.preventDefault();
     };
   });
