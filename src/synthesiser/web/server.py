@@ -114,10 +114,18 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         if path == "/api/health":
+            data_dir = self.roots["events"].parent
+            cache_dir = self.roots["cache"]
             self.send_json({
                 "ok": True,
                 "phase0_schema_version": PHASE0_SCHEMA_VERSION,
                 "synth_version_hash": SYNTH_VERSION_HASH,
+                "explore_event_schema_version": EXPLORE_EVENT_SCHEMA_VERSION,
+                "data_dir": str(data_dir),
+                "data_dir_writable": os.access(data_dir, os.W_OK),
+                "cache_dir_writable": os.access(cache_dir, os.W_OK),
+                "rate_limit_per_minute": getattr(self.server, "rate_limit_per_minute", None),
+                "export_enabled": bool(getattr(self.server, "admin_token", "")),
             })
             return
 

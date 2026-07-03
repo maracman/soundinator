@@ -1,0 +1,67 @@
+# Deployment Runbook
+
+The Sound Studio ships as one dependency-light Python server (stdlib HTTP +
+numpy/scipy for server-side rendering). Audio runs client-side in the
+browser; the server hosts static files, collects study/explore data, and
+serves the preset library — so a single small instance is plenty for a
+pilot study.
+
+## What the server needs
+
+| Env var              | Required | Purpose                                             |
+|----------------------|----------|-----------------------------------------------------|
+| `PORT`               | set by PaaS | Listen port (defaults to 8765 locally)           |
+| `HOST`               | no       | Procfile passes `--host 0.0.0.0` already            |
+| `PHASE0_DATA_DIR`    | **yes, in production** | Where JSONL/preset data is written — point at a persistent volume or all collected data dies with the instance |
+| `PHASE0_CACHE_DIR`   | no       | Server-render cache; safe to lose (regenerable)     |
+| `PHASE0_ADMIN_TOKEN` | recommended | Enables `/api/export.csv`; keep it secret        |
+| `PHASE0_RATE_LIMIT`  | no       | POSTs/min/IP (default 120; 0 disables)              |
+
+Process command (already in `Procfile`):
+
+```
+web: PYTHONPATH=src python3 -m synthesiser.web.server --host 0.0.0.0
+```
+
+## Railway (quickest)
+
+1. `railway init` in the repo (or "Deploy from GitHub repo" in the dashboard).
+2. Add a **Volume**, mount it at `/data`.
+3. Set env vars: `PHASE0_DATA_DIR=/data`, `PHASE0_ADMIN_TOKEN=<long random string>`.
+4. Railway injects `PORT` automatically; the Procfile is detected as the start command. Python deps install from `requirements.txt`.
+5. Deploy, then check `https://<app>.up.railway.app/api/health` —
+   `data_dir_writable` must be `true` and `data_dir` must be `/data`.
+
+## Render
+
+1. New → Web Service → connect the repo.
+2. Build command: `pip install -r requirements.txt`; start command: copy the Procfile line.
+3. Add a **Disk** (e.g. 1 GB) mounted at `/var/data`; set `PHASE0_DATA_DIR=/var/data`.
+4. Set `PHASE0_ADMIN_TOKEN`. Render injects `PORT`.
+
+## Fly.io
+
+1. `fly launch --no-deploy` (accept the generated fly.toml; internal port = 8080, so set `PORT=8080` in `[env]`).
+2. `fly volumes create phase0_data --size 1`.
+3. In fly.toml add a `[mounts]` section: `source = "phase0_data"`, `destination = "/data"`, and `PHASE0_DATA_DIR = "/data"` under `[env]`.
+4. `fly secrets set PHASE0_ADMIN_TOKEN=<long random string>` then `fly deploy`.
+
+## After deploying
+
+- **Health**: `GET /api/health` → confirm `ok`, `data_dir_writable: true`,
+  `export_enabled: true`.
+- **Pull data** (no shell needed):
+  `curl -o ratings.csv "https://<app>/api/export.csv?table=ratings&token=$TOKEN"` —
+  tables: `events`, `ratings`, `stimuli`, `study_trials`, `presets`.
+- **Back up**: schedule a periodic `export.csv` pull for each table, or snapshot
+  the volume. `stimuli.csv` + the app version is sufficient to regenerate any
+  rated sound exactly.
+
+## Notes
+
+- The server is threaded with flock-guarded appends; run **one instance**
+  (multiple instances would each need their own volume — don't).
+- CORS is open (`*`) on JSON endpoints; data-collection endpoints are
+  rate-limited per IP.
+- `web/cache/` on ephemeral disk is fine; server-rendered WAVs regenerate
+  from parameter hashes on demand.

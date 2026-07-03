@@ -177,6 +177,26 @@ def test_concurrent_explore_events_do_not_corrupt_jsonl(tmp_path) -> None:
         server.server_close()
 
 
+def test_health_reports_deployment_state(tmp_path, monkeypatch) -> None:
+    (tmp_path / "web" / "static").mkdir(parents=True)
+    (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")
+    monkeypatch.setenv("PHASE0_ADMIN_TOKEN", "sekrit")
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    try:
+        health = get_json(f"http://{host}:{port}/api/health")
+        assert health["ok"] is True
+        assert health["data_dir_writable"] is True
+        assert health["cache_dir_writable"] is True
+        assert health["export_enabled"] is True
+        assert health["rate_limit_per_minute"] == 120
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_post_rate_limit(tmp_path) -> None:
     (tmp_path / "web" / "static").mkdir(parents=True)
     (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")

@@ -7,9 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 11
-- Phases A-D done. Next: Phase E deployment readiness (E1-E3), then Phase F
-  UI proposals for owner approval.
+- Iteration: 12
+- Phases A-E done (+ CI). Next: Phase F — usability fixes (F1) and the 2-3
+  rendered visual direction proposals for owner approval (F2).
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -126,13 +126,15 @@ Full audits in the loop transcript; the load-bearing findings:
 
 ## Phase E — Deployment readiness (priority 5)
 
-- [ ] E1. Procfile/env polish (PORT respected — verify, document
-  PHASE0_DATA_DIR volume setup for Railway/Render/Fly), health endpoint
-  reports data-dir writability.
-- [ ] E2. Deployment doc: one-page runbook for Railway/Render/Fly with
-  persistent volume, plus backup/download-data instructions.
-- [ ] E3. Basic ops: request logging, graceful handling of missing dirs,
-  smoke test hitting all endpoints.
+- [x] E1. Health endpoint now reports data/cache-dir writability, schema
+  versions, rate limit, and export-enabled state; PORT/HOST env handling
+  verified (PORT read from env, Procfile passes 0.0.0.0).
+- [x] E2. docs/DEPLOYMENT.md: Railway/Render/Fly runbooks with persistent
+  volume setup, env table, health verification, and no-shell data pulls
+  via the export endpoint.
+- [x] E3. Request logging pre-existed; dirs are mkdir'd at startup; test
+  suite hits every endpoint (health/render/presets/events/export/rate
+  limit) — 20 tests.
 
 ## Phase F — UI/design (priority 6, gated on user approval)
 
@@ -171,8 +173,9 @@ synth configuration pulled into arrangement tracks.
 
 ## Cross-cutting
 
-- [ ] X1. CI: GitHub Actions running pytest + node --check on push.
-- [ ] X2. Tests for new server behaviour (locking, validation, export).
+- [x] X1. CI: GitHub Actions (pytest + node --check) on push/PR.
+- [x] X2. Tests for locking, validation, rate limiting, export, health
+  (20 tests total as of iteration 12).
 
 ## Completed
 
