@@ -4377,3 +4377,28 @@ body.explore-mode #app {
 .dist-readout .dr-gen  { color: var(--gen); }
 .dist-readout .dr-acc  { color: var(--acc); }
 .dist-readout .dr-surp { color: var(--surp); }
+
+/* ── Per-panel preset bars ───────────────────────────────── */
+
+.panel-presets {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.3rem 0 0.55rem;
+}
+
+.panel-presets select {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.22rem 0.4rem;
+  font-size: 0.72rem;
+}
+
+.panel-presets .btn {
+  flex: none;
+  white-space: nowrap;
+}

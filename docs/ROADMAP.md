@@ -135,10 +135,14 @@ Full audits in the loop transcript; the load-bearing findings:
   transients (breath chiff / bow noise / lip buzz / hammer thump) rendered
   at note onset. Needs owner listening pass; harmonic tables can be
   refined further against published spectra if still off.
-- [ ] D6 (owner feedback 2026-07-03): modular preset save/load should live
-  in each related panel (like the sub-note panel pattern), not only the
-  one top-bar dropdown. Per-panel preset bars: scale/melody, macro tabs,
-  sequence & surprise, percussion, space, sound source.
+- [x] D6 (owner feedback 2026-07-03): per-panel preset bars — each section
+  panel now has its own load-select (factory + user presets for that
+  section) and Save button: Scale & Root (melody), Duration tab (rhythm),
+  Dynamics tab, Sequence & Surprise, Reverb (space), Percussion, Sound
+  Source (sound). Loads merge into that section only; saves capture only
+  that section. Verified live: Cathedral Wash loaded from the Reverb
+  panel, a percussion kit saved from its panel appears in its dropdown
+  with exactly the 7 percussion params. Top-bar scope selector retained.
 
 ## Phase E — Deployment readiness (priority 5)
 

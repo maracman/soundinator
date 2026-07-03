@@ -1951,6 +1951,9 @@ function renderExplore() {
   // Hover readouts on the probability displays
   wireDistHover(v);
 
+  // Per-panel section preset bars
+  wirePanelPresetBars(v);
+
   // Save preset (full rig or a single section)
   v.querySelector("#saveBtn").onclick = () => {
     const name = v.querySelector("#presetName").value.trim() || `Preset ${new Date().toLocaleTimeString()}`;
@@ -2033,6 +2036,7 @@ function macroWorkspaceHTML(p) {
   return `
     <div class="card scale-card">
       <div class="section-label">Scale & Root</div>
+      ${panelPresetBarHTML("melody")}
       <div class="mode-btns" id="scaleModeGroup">
         <button class="mode-btn${p.scaleMode !== 'edo' ? ' active' : ''}" data-smode="12tone">12-tone</button>
         <button class="mode-btn${p.scaleMode === 'edo' ? ' active' : ''}" data-smode="edo">N-EDO</button>
@@ -2092,6 +2096,7 @@ function macroWorkspaceHTML(p) {
 
     <div class="card structure-card">
       <div class="section-label">Markov Sequence &amp; Surprise</div>
+      ${panelPresetBarHTML("surprise")}
       <div class="section-subhead">Sequence</div>
       <div class="controls-grid">
         ${controlRow("motifCount", "Motif states", p.motifCount, 1, 8, 1)}
@@ -2155,6 +2160,7 @@ function macroPanelHTML(p) {
     const durSub = macroSubTab.duration;
     return `
       <div class="macro-panel duration-panel">
+        ${panelPresetBarHTML("rhythm")}
         <div class="macro-controls">
           <div class="macro-subsection${durSub === "generation" ? " active" : ""}" data-section="generation">
             <div class="subsection-label">Generation</div>
@@ -2198,6 +2204,7 @@ function macroPanelHTML(p) {
     const dynSub = macroSubTab.dynamics;
     return `
       <div class="macro-panel dynamics-panel">
+        ${panelPresetBarHTML("dynamics")}
         <div class="macro-controls">
           <div class="macro-subsection${dynSub === "generation" ? " active" : ""}" data-section="generation">
             <div class="subsection-label">Generation</div>
@@ -2274,6 +2281,7 @@ function productionPanelHTML(p) {
     <div class="perf-panel production-panel production-panel-split">
       <div class="perf-section space-section">
         <div class="perf-section-title">Reverb</div>
+        ${panelPresetBarHTML("space")}
         <select data-param-select="reverbType" class="param-select">
           ${reverbTypeOptions(p.reverbType)}
         </select>
@@ -2287,6 +2295,7 @@ function productionPanelHTML(p) {
       </div>
       <div class="perf-section percussion-section">
         <div class="perf-section-title">Percussion</div>
+        ${panelPresetBarHTML("percussion")}
         <div class="perc-layers">
           <div class="perc-layer">
             <div class="perc-header">Beat</div>
@@ -2360,6 +2369,7 @@ function subnoteWorkspaceHTML(p) {
         <div class="subnote-side">
           <div class="subnote-side-section sound-source-section">
             <div class="section-label">Sound Source</div>
+            ${panelPresetBarHTML("sound")}
             <div class="mode-btns sound-source-modes" id="voiceModeGroup">
               <button class="mode-btn${formantMode ? ' active' : ''}" data-vmode="formant">Formant</button>
               <button class="mode-btn${!formantMode ? ' active' : ''}" data-vmode="fourier">Fourier</button>
@@ -5270,6 +5280,62 @@ function maybeShowContribute(v) {
       alert("Could not contribute: " + err.message);
     }
   };
+}
+
+// ── Per-panel preset bars (owner feedback: presets live where the controls
+// live). Each section panel gets a compact load-select + save button acting
+// on that section only; the central library remains for browsing/sharing.
+function panelPresetBarHTML(section) {
+  const label = PRESET_SECTIONS[section]?.label || section;
+  const options = [...FACTORY_PRESETS, ...loadPresets()]
+    .filter(p => (p.section || "full") === section)
+    .map(p => `<option value="${esc(String(p.id))}">${esc(p.name || "Untitled")}</option>`)
+    .join("");
+  return `
+    <div class="panel-presets" data-panel-section="${section}">
+      <select data-panel-preset-load="${section}" title="Load a saved ${esc(label)} preset into this section only — everything else stays as it is">
+        <option value="">${esc(label)} presets…</option>${options}
+      </select>
+      <button class="btn btn-ghost btn-sm" data-panel-preset-save="${section}" title="Save the current ${esc(label)} settings as a section preset">+ Save</button>
+    </div>`;
+}
+
+function wirePanelPresetBars(v) {
+  const findEntry = (id) =>
+    [...FACTORY_PRESETS, ...loadPresets()].find(p => String(p.id) === id);
+  v.querySelectorAll("[data-panel-preset-load]").forEach(sel => {
+    sel.onchange = () => {
+      const entry = sel.value && findEntry(sel.value);
+      if (!entry) return;
+      const wasPlaying = presetPreview ? presetPreview.wasPlaying : synth.isPlaying;
+      presetPreview = null;
+      exploreParams = mergedPresetParams(entry);
+      renderExplore();
+      if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+    };
+  });
+  v.querySelectorAll("[data-panel-preset-save]").forEach(btn => {
+    btn.onclick = () => {
+      const section = btn.dataset.panelPresetSave;
+      const label = PRESET_SECTIONS[section]?.label || section;
+      const name = prompt(`Name this ${label} preset:`);
+      if (!name || !name.trim()) return;
+      const entry = {
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        name: name.trim().slice(0, 80),
+        section,
+        rating: exploreRating,
+        parameters: extractSectionParams(exploreParams, section),
+        app_version: APP_VERSION,
+      };
+      const list = loadPresets();
+      list.unshift(entry);
+      savePresets(list);
+      trackEngagement("save");
+      renderExplore(); // refresh every panel bar + library list
+    };
+  });
 }
 
 function mergedPresetParams(entry) {
