@@ -926,7 +926,19 @@ function mount(html) {
 // context (tempo/key/scale/space/master dynamics) comes from the shared
 // editor state — G4 gives it its own bar with per-track locks.
 
-const ARRANGEMENT_KEY = "phase0.arrangement.v1";
+const ARRANGEMENT_KEY = "phase0.arrangement.v1"; // legacy single-slot (migrated)
+const ARRANGEMENTS_KEY = "phase0.arrangements.v1";
+const ARRANGEMENT_CURRENT_KEY = "phase0.arrangement.current";
+
+function loadArrangementRegistry() {
+  try {
+    const reg = JSON.parse(localStorage.getItem(ARRANGEMENTS_KEY) || "{}");
+    return reg && typeof reg === "object" ? reg : {};
+  } catch { return {}; }
+}
+function saveArrangementRegistry(reg) {
+  localStorage.setItem(ARRANGEMENTS_KEY, JSON.stringify(reg));
+}
 const BEATS_PER_BAR = 4;
 let pxPerBeat = 14;   // lane pixel scale (zoom; persisted in dawLayout)
 let snapBeats = 1;    // grid snap: 4 = bar, 1 = beat, 0.5 = half
@@ -977,36 +989,78 @@ function defaultArrangementContext() {
   return ctx;
 }
 
+function normaliseArrangement(a) {
+  if (!a.context) a.context = defaultArrangementContext();
+  if (!Array.isArray(a.palette)) a.palette = [];
+  if (!a.lengthBeats) a.lengthBeats = 64;
+  if (!a.id) a.id = crypto.randomUUID();
+  return migrateArrangement(a);
+}
+
+function freshArrangement(name = "Untitled arrangement") {
+  return { id: crypto.randomUUID(), name, version: 2, lengthBeats: 64, tracks: [], palette: [], context: defaultArrangementContext() };
+}
+
 function loadArrangement() {
-  try {
-    const a = JSON.parse(localStorage.getItem(ARRANGEMENT_KEY) || "null");
-    if (a && Array.isArray(a.tracks)) {
-      if (!a.context) a.context = defaultArrangementContext();
-      if (!Array.isArray(a.palette)) a.palette = [];
-      if (!a.lengthBeats) a.lengthBeats = 64;
-      return migrateArrangement(a);
-    }
-  } catch { /* fall through */ }
-  return { name: "Untitled arrangement", version: 2, lengthBeats: 64, tracks: [], palette: [], context: defaultArrangementContext() };
+  let reg = loadArrangementRegistry();
+  // One-time migration of the legacy single-slot arrangement
+  const legacy = localStorage.getItem(ARRANGEMENT_KEY);
+  if (legacy && !Object.keys(reg).length) {
+    try {
+      const a = JSON.parse(legacy);
+      if (a && Array.isArray(a.tracks)) {
+        normaliseArrangement(a);
+        reg[a.id] = a;
+        saveArrangementRegistry(reg);
+        localStorage.setItem(ARRANGEMENT_CURRENT_KEY, a.id);
+      }
+    } catch { /* ignore */ }
+    localStorage.removeItem(ARRANGEMENT_KEY);
+  }
+  const curId = localStorage.getItem(ARRANGEMENT_CURRENT_KEY);
+  let a = curId ? reg[curId] : null;
+  if (!a) a = Object.values(reg)[0] || null;
+  if (!a) {
+    a = freshArrangement();
+    reg[a.id] = a;
+    saveArrangementRegistry(reg);
+  }
+  localStorage.setItem(ARRANGEMENT_CURRENT_KEY, a.id);
+  return normaliseArrangement(a);
 }
 let undoSlot = null; // single-level; a second undo swaps back (redo)
 
 function saveArrangement() {
   if (!arrangement) return;
-  // The store still holds the pre-mutation state here — that IS the undo point.
-  const prev = localStorage.getItem(ARRANGEMENT_KEY);
-  if (prev) undoSlot = prev;
-  localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
+  if (!arrangement.id) arrangement.id = crypto.randomUUID();
+  const reg = loadArrangementRegistry();
+  // The registry still holds the pre-mutation state — that IS the undo point.
+  if (reg[arrangement.id]) undoSlot = JSON.stringify(reg[arrangement.id]);
+  reg[arrangement.id] = arrangement;
+  saveArrangementRegistry(reg);
+  localStorage.setItem(ARRANGEMENT_CURRENT_KEY, arrangement.id);
 }
 
 function undoArrangement() {
   if (!undoSlot) return;
   const current = JSON.stringify(arrangement);
-  arrangement = migrateArrangement(JSON.parse(undoSlot));
+  arrangement = normaliseArrangement(JSON.parse(undoSlot));
   undoSlot = current; // undo again = redo
-  localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
+  const reg = loadArrangementRegistry();
+  reg[arrangement.id] = arrangement;
+  saveArrangementRegistry(reg);
   selectedRegion = null;
   stopArrangement();
+  renderProduce();
+}
+
+function switchArrangement(id) {
+  stopArrangement();
+  synth.stop();
+  localStorage.setItem(ARRANGEMENT_CURRENT_KEY, id);
+  arrangement = null;
+  selectedRegion = null;
+  undoSlot = null;
   renderProduce();
 }
 
@@ -1414,6 +1468,7 @@ function playArrangement(fromBeat = 0) {
       const voice = producerVoice(track);
       if (!trackAudible(track)) { voice.stop(); continue; }
       if (region && (b === Math.ceil(region.startBeat) || b === arrPlay.startAt)) {
+        voice.setMasterVolume((track.gain ?? 1) * (region.gain ?? 1));
         if (region.type === "baked" && Array.isArray(region.notes)) {
           voice.playNotes(regionPlayParams(track, region), region.notes,
             regionLen(region), region.loopSourceBeats || regionLen(region));
@@ -1460,11 +1515,11 @@ function importArrangement(file) {
   file.text().then(text => {
     const data = JSON.parse(text);
     if (!Array.isArray(data.tracks)) throw new Error("not an arrangement file");
-    arrangement = {
+    arrangement = normaliseArrangement({
+      ...data,
+      id: crypto.randomUUID(),
       name: data.name || "Imported arrangement",
-      context: data.context || defaultArrangementContext(),
-      tracks: data.tracks,
-    };
+    });
     selectedRegion = null;
     saveArrangement();
     renderProduce();
@@ -1516,7 +1571,7 @@ async function mixdownArrangement(statusEl) {
       // A fresh voice per region: deterministic take, exactly as live playback
       const voice = new SynthEngine();
       voice.init(off, off.destination);
-      voice.setMasterVolume(track.gain ?? 1);
+      voice.setMasterVolume((track.gain ?? 1) * (region.gain ?? 1));
       voice.setPan(track.pan ?? 0);
       if (region.type === "baked" && Array.isArray(region.notes)) {
         voice.renderNotesSpan(regionPlayParams(track, region), region.notes,
@@ -1838,6 +1893,10 @@ function produceToolbarHTML() {
     <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context"${baked ? " disabled" : ""}>↻ Reroll take</button>
     <button class="btn btn-secondary btn-sm" id="regionLonger" title="Extend this region by one slot">＋ Longer</button>
     <button class="btn btn-secondary btn-sm" id="regionShorter" title="Shorten this region by one slot">− Shorter</button>
+    <label class="region-gain-label" title="Region level (multiplies the track level during this region)">Lvl
+      <input type="range" id="regionGain" min="0" max="1.5" step="0.05" value="${sel?.gain ?? 1}"/>
+    </label>
+    <button class="btn btn-ghost btn-sm" id="regionToStudio" title="Open this region's exact sound and context in the Sound Studio">→ Studio</button>
     <button class="btn btn-ghost btn-sm" id="regionDelete">Delete</button>`;
 }
 
@@ -2061,6 +2120,13 @@ function renderProduce() {
       <div class="daw-transport">
         <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Sound Studio">←</a>
         <span class="daw-title">Producer</span>
+        <select id="arrSelect" class="daw-ctx-select" title="Switch arrangement">
+          ${Object.values(loadArrangementRegistry()).map(a =>
+            `<option value="${a.id}"${a.id === arrangement.id ? " selected" : ""}>${esc(a.name || "Untitled")}</option>`).join("")}
+        </select>
+        <button class="btn btn-ghost btn-sm" id="arrNew" title="New empty arrangement">New</button>
+        <button class="btn btn-ghost btn-sm" id="arrRename" title="Rename this arrangement">Aa</button>
+        <button class="btn btn-ghost btn-sm" id="arrDelete" title="Delete this arrangement">🗑</button>
         <button class="btn btn-primary btn-sm" id="arrPlayBtn">▶ Play</button>
         <button class="btn btn-secondary btn-sm" id="prodStop">■</button>
         <span class="daw-sep"></span>
@@ -2374,6 +2440,27 @@ function wireProduce(v) {
     };
   });
 
+  // Region gain (v2.1 U12) — live on the playing voice
+  const regionGain = v.querySelector("#regionGain");
+  if (regionGain) regionGain.oninput = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    region.gain = Number(regionGain.value);
+    saveArrangement();
+    producerVoices.get(track.id)?.setMasterVolume((track.gain ?? 1) * (region.gain ?? 1));
+  };
+
+  // Send region to the Sound Studio (v2.1 U13) — one-way explore
+  const toStudio = v.querySelector("#regionToStudio");
+  if (toStudio) toStudio.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    stopArrangement();
+    synth.stop();
+    exploreParams = { ...regionPlayParams(track, region) };
+    navigate("explore");
+  };
+
   const deleteBtn = v.querySelector("#regionDelete");
   if (deleteBtn) deleteBtn.onclick = () => {
     const { track, region } = selected();
@@ -2414,6 +2501,36 @@ function wireProduce(v) {
     saveDawLayout();
     renderProduce();
   };
+  // Arrangement registry controls (v2.1 U11)
+  const arrSelect = v.querySelector("#arrSelect");
+  if (arrSelect) arrSelect.onchange = () => switchArrangement(arrSelect.value);
+  const arrNew = v.querySelector("#arrNew");
+  if (arrNew) arrNew.onclick = () => {
+    const a = freshArrangement(prompt("Name the new arrangement:") || "Untitled arrangement");
+    const reg = loadArrangementRegistry();
+    reg[a.id] = a;
+    saveArrangementRegistry(reg);
+    switchArrangement(a.id);
+  };
+  const arrRename = v.querySelector("#arrRename");
+  if (arrRename) arrRename.onclick = () => {
+    const name = prompt("Rename arrangement:", arrangement.name);
+    if (!name || !name.trim()) return;
+    arrangement.name = name.trim().slice(0, 80);
+    saveArrangement();
+    renderProduce();
+  };
+  const arrDelete = v.querySelector("#arrDelete");
+  if (arrDelete) arrDelete.onclick = () => {
+    if (!confirm(`Delete arrangement "${arrangement.name}"? This cannot be undone.`)) return;
+    const reg = loadArrangementRegistry();
+    delete reg[arrangement.id];
+    saveArrangementRegistry(reg);
+    const next = Object.keys(reg)[0];
+    if (next) switchArrangement(next);
+    else { localStorage.removeItem(ARRANGEMENT_CURRENT_KEY); arrangement = null; renderProduce(); }
+  };
+
   const undoBtn = v.querySelector("#undoBtn");
   if (undoBtn) undoBtn.onclick = () => undoArrangement();
 

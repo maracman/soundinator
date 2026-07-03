@@ -198,13 +198,17 @@ and flexible; check for obvious missing features. Findings, prioritised:
       master chain, honoured live and in mixdown.
 
 ### Flexibility / scope alignment
-- [ ] U11 New/clear arrangement + multiple named arrangements (save slots)
-      so experiments aren't one-shot.
-- [ ] U12 Region gain (per-region velocity scale) for quick balance moves
-      without editing the instrument.
-- [ ] U13 "Send to Sound Studio" on a region: open its exact voice+context
-      to explore from where the arrangement left off (inverse of palette
-      edit).
+- [x] U11 DONE: arrangements live in a registry with an arrangement
+      select + New / Rename / Delete in the transport; the legacy single
+      slot auto-migrates; switching saves and swaps cleanly.
+- [x] U12 DONE: per-region level slider in the toolbar, multiplying the
+      track level during that region in playback and mixdown, live-updating
+      on the playing voice.
+- [x] U13 DONE: '→ Studio' on the region toolbar opens the region's
+      exact voice + session context + seed in the Sound Studio (one-way
+      exploration).
 
 Order of attack: U0 (blocker) → U1 (audio correctness) → U2/U3/U4 (daily
 driving) → U5/U6/U7 → U8-U13.
+
+**v2.1 BACKLOG COMPLETE (U0-U13). Awaiting Q4 owner re-audition.**
