@@ -34,6 +34,10 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 const APP_VERSION = "sound-studio-0.2.0";
 const EVENT_SCHEMA_VERSION = "explore-event-1.0";
 const SESSION_ID = crypto.randomUUID(); // fresh per page visit
+const CONSENT_KEY = "phase0.consent.v1";
+// Bump when the consent wording or what-we-collect changes; stored with every
+// consent decision so records can be tied to the text the volunteer saw.
+const CONSENT_VERSION = "explore-consent-1.0";
 const FORMANT_CIRCLE = ["ee", "eh", "ah", "oh", "oo"];
 const SURPRISE_FEATURES = [
   { key: "pitch", label: "Pitch / Melody", enabled: "surprisePitchEnabled", weight: "surprisePitchWeight", distance: "surprisePitchDistance" },
@@ -486,6 +490,12 @@ function stimulusIdFor(params) {
   };
   return fnv(0x811c9dc5) + fnv(0x741c9dc3);
 }
+
+function loadConsent() {
+  try { return JSON.parse(localStorage.getItem(CONSENT_KEY) || "null"); } catch { return null; }
+}
+function saveConsent(record) { localStorage.setItem(CONSENT_KEY, JSON.stringify(record)); }
+function researchOptedIn() { return loadConsent()?.status === "granted"; }
 
 function loadEngagement() {
   try { return JSON.parse(localStorage.getItem(ENGAGE_KEY) || "{}"); } catch { return {}; }
@@ -1283,6 +1293,8 @@ function renderExplore() {
       </div>
     </div>
 
+    ${welcomeCardHTML()}
+
     <!-- Transport -->
     <div class="card transport-card">
       <div class="transport">
@@ -1370,6 +1382,7 @@ function renderExplore() {
     </div>
 
     <div id="contributeArea"></div>
+    <div class="research-note" id="researchNote"></div>
     </div>
   `);
   document.body.classList.add("explore-mode");
@@ -1850,6 +1863,9 @@ function renderExplore() {
       rating_latency_ms: lastPlayStartedAt ? Date.now() - lastPlayStartedAt : null,
     });
   };
+
+  // Welcome / research opt-in card
+  wireWelcomeCard(v);
 
   // Save preset
   v.querySelector("#saveBtn").onclick = () => {
@@ -4898,6 +4914,10 @@ function trackEngagement(type, extra = {}) {
   if (type === "save") exploreEngagement.saves++;
   saveEngagement();
 
+  // Nothing leaves the browser unless the volunteer opted in on the welcome
+  // card. Local engagement counters above still run so the app works fully.
+  if (!researchOptedIn()) return;
+
   fetch("/api/explore/event", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -4915,6 +4935,86 @@ function trackEngagement(type, extra = {}) {
       ...extra,
     }),
   }).catch(() => {});
+}
+
+function welcomeCardHTML() {
+  if (loadConsent()) return "";
+  return `
+    <div class="card welcome-card" id="welcomeCard">
+      <h2>Welcome to the Sound Studio</h2>
+      <p>Shape a stream of generated music by playing with the controls — no musical
+      experience needed. The studio is also part of a research project on why music
+      sounds good: if you opt in, the settings you explore and the ratings you give
+      are shared anonymously with the researchers. No account, no personal details,
+      and everything here works either way. Opting in is for adults (18+).</p>
+      <div class="welcome-demographics">
+        <label>Age
+          <select id="welcomeAge">
+            <option value="">Prefer not to say</option>
+            <option>18–24</option><option>25–34</option><option>35–44</option>
+            <option>45–54</option><option>55–64</option><option>65+</option>
+          </select>
+        </label>
+        <label>Musical training
+          <select id="welcomeTraining">
+            <option value="">Prefer not to say</option>
+            <option>None</option><option>Under 2 years</option><option>2–5 years</option>
+            <option>5–10 years</option><option>10+ years</option>
+          </select>
+        </label>
+      </div>
+      <div class="welcome-actions">
+        <button class="btn btn-primary" id="welcomeOptIn">Play and share my ratings</button>
+        <button class="btn btn-secondary" id="welcomeOptOut">Just play</button>
+      </div>
+      <p class="welcome-smallprint">Both questions are optional. You can change your
+      choice any time from the note at the bottom of the page.</p>
+    </div>`;
+}
+
+function wireWelcomeCard(v) {
+  const card = v.querySelector("#welcomeCard");
+  if (card) {
+    card.querySelector("#welcomeOptIn").onclick = () => {
+      const demographics = {
+        age_band: card.querySelector("#welcomeAge").value || null,
+        musical_training: card.querySelector("#welcomeTraining").value || null,
+      };
+      saveConsent({
+        status: "granted",
+        consent_version: CONSENT_VERSION,
+        decided_at: new Date().toISOString(),
+        demographics,
+      });
+      trackEngagement("consent", {
+        consent: { status: "granted", consent_version: CONSENT_VERSION, demographics },
+      });
+      card.remove();
+      updateResearchNote(v);
+    };
+    card.querySelector("#welcomeOptOut").onclick = () => {
+      saveConsent({
+        status: "declined",
+        consent_version: CONSENT_VERSION,
+        decided_at: new Date().toISOString(),
+      });
+      card.remove();
+      updateResearchNote(v);
+    };
+  }
+  updateResearchNote(v);
+}
+
+function updateResearchNote(v) {
+  const note = v.querySelector("#researchNote");
+  if (!note) return;
+  if (!loadConsent()) { note.innerHTML = ""; return; }
+  const on = researchOptedIn();
+  note.innerHTML = `Anonymous research sharing is <strong>${on ? "on" : "off"}</strong>${on ? " — thank you for helping" : ""}. <button class="link-btn" id="researchChangeBtn">Change</button>`;
+  note.querySelector("#researchChangeBtn").onclick = () => {
+    localStorage.removeItem(CONSENT_KEY);
+    renderExplore();
+  };
 }
 
 function maybeShowContribute(v) {

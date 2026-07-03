@@ -7,8 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 3
-- Current phase: A (study flow foundations); next task A3 (opt-in consent flow)
+- Iteration: 4
+- Current phase: A (study flow foundations); next task A4 (param telemetry)
+  then A5 (server hardening)
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -48,10 +49,11 @@ Full audits in the loop transcript; the load-bearing findings:
   ("explore-event-1.0"); presets and contributions stamped too.
 - [x] A2. Rate-what-you-hear: committed rating changes log a "rate" event
   with the stimulus_id, rating latency since play start, and play count.
-- [ ] A3. Friendly opt-in flow for explore mode: lightweight welcome/consent
-  card (plain language, version-stamped consent event), optional minimal
-  demographics (age band, musical training), skippable — tinkering must work
-  without it.
+- [x] A3. Friendly opt-in flow: welcome card in explore view (plain language,
+  optional age band + musical training, "Play and share my ratings" vs "Just
+  play"), version-stamped consent event; **no events leave the browser unless
+  opted in**; footer note shows sharing status with a Change link.
+  Verified end-to-end in browser preview.
 - [ ] A4. Parameter-change telemetry (throttled) so appeal can be related to
   what the volunteer adjusted between plays.
 - [ ] A5. Server hardening for collection: file locking on JSONL appends,

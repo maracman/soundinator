@@ -4212,3 +4212,65 @@ body.explore-mode #app {
   color: #6f7b89;
   box-shadow: none;
 }
+
+/* ── Welcome / research opt-in ───────────────────────────── */
+
+.welcome-card {
+  border-color: var(--border2);
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
+}
+
+.welcome-card h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+}
+
+.welcome-card p {
+  color: var(--text2);
+  font-size: 0.92rem;
+  max-width: 60ch;
+}
+
+.welcome-demographics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin: 0.9rem 0;
+}
+
+.welcome-demographics label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--text2);
+}
+
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.welcome-smallprint {
+  font-size: 0.78rem;
+  color: var(--text3);
+}
+
+.research-note {
+  margin-top: 1.2rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text3);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--blue);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  padding: 0;
+}

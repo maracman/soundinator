@@ -242,6 +242,7 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             "rating_latency_ms": payload.get("rating_latency_ms"),
             "play_count": payload.get("play_count"),
             "metrics": payload.get("metrics"),
+            "consent": payload.get("consent"),
         }
         self.roots["events"].parent.mkdir(parents=True, exist_ok=True)
         with self.roots["events"].open("a", encoding="utf-8") as handle:
