@@ -4410,3 +4410,90 @@ body.explore-mode #app {
   justify-content: flex-end;
   margin-bottom: 0.6rem;
 }
+
+/* ── Producer mode ───────────────────────────────────────── */
+
+.produce-view { display: flex; flex-direction: column; gap: 10px; }
+
+.produce-top {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.produce-top h1 { font-size: 1.25rem; letter-spacing: 0.05em; }
+.produce-actions { display: flex; gap: 0.5rem; }
+
+.produce-browser .produce-sources {
+  display: flex; flex-wrap: wrap; gap: 0.45rem;
+}
+
+.source-chip {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.source-chip:hover { border-color: var(--accent); background: rgba(245,166,35,0.08); }
+.source-chip.chip-factory { color: var(--text2); }
+
+.timeline-grid { display: flex; flex-direction: column; gap: 4px; overflow-x: auto; }
+
+.tl-row {
+  display: grid;
+  grid-template-columns: 130px repeat(16, minmax(38px, 1fr));
+  gap: 3px;
+  align-items: stretch;
+}
+
+.tl-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  color: var(--text);
+  overflow: hidden;
+}
+.tl-head span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-remove {
+  background: none; border: none; color: var(--text3);
+  cursor: pointer; font-size: 0.85rem; line-height: 1;
+}
+.tl-remove:hover { color: var(--red); }
+
+.tl-cell {
+  min-height: 34px;
+  background: var(--display);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+.tl-cell:hover { border-color: var(--accent); }
+
+.tl-region {
+  min-height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(245,166,35,0.16);
+  border: 1px solid rgba(245,166,35,0.55);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.62rem;
+}
+.tl-region.selected {
+  border-color: var(--surp);
+  box-shadow: 0 0 0 1px rgba(56,189,248,0.5);
+}
+.tl-seed { color: var(--accent2); font-family: var(--mono); }
+
+.region-toolbar {
+  display: flex; gap: 0.5rem; align-items: center;
+  margin-top: 0.7rem;
+}
+.toolbar-hint { color: var(--text3); font-size: 0.78rem; }
+
+.workspace-link { text-decoration: none; }

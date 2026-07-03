@@ -204,9 +204,13 @@ synth configuration pulled into arrangement tracks.
   the library with preview/load/remove; loading merges over current state
   so the musical context survives (verified: session tempo preserved).
   These entries become the draggable sources for the G3 timeline.
-- [ ] G3. Arrangement view: tracks × timeline regions; each region references
-  an instrument + pattern settings + seed (a "take"); loop-over-region
-  playback; region reroll for a fresh take.
+- [x] G3 (v1). Arrangement view at #produce: Tonalic dual-panel (instrument
+  browser above — saved instruments + factory voices; timeline below).
+  Tracks × 16 slots; click-to-place regions each holding a deterministic
+  take (seed, with reroll + seed history); loop-region playback via the
+  single synth voice; arrangement persists to localStorage. Producer link
+  in the studio header; volunteers at #explore never see it. Verified live
+  end-to-end. v2 needs: drag placement/extend, region length, playhead.
 - [ ] G4. Session context layer: tempo, key/root & scale, master dynamics,
   shared space/reverb inherited by instruments unless locked per-instrument.
 - [ ] G5. Multi-voice scheduling in synth.js: N concurrent instrument voices

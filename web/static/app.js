@@ -885,6 +885,7 @@ function route() {
   if (h === "study/pairwise")      return renderStudyPairwise();
   if (h === "study/debrief")       return renderStudyDebrief();
   if (h === "home")                return renderLanding();
+  if (h === "produce")             return renderProduce();
   if (h === "explore" || h === "") return renderExplore();
   return renderExplore();
 }
@@ -893,6 +894,216 @@ function mount(html) {
   document.body.classList.remove("explore-mode");
   el.innerHTML = `<div class="view">${html}</div>`;
   return el.querySelector(".view");
+}
+
+// ─── Producer mode (Phase G, docs/DAW_MODE_DESIGN.md) ───────
+//
+// Tonalic dual-panel: instrument browser above, arrangement timeline below.
+// v1 (G3): tracks hold single-slot regions; each region is a deterministic
+// take (instrument params + seed). Playback of a region reuses the single
+// synth voice; simultaneous multi-track playback arrives with G5. Session
+// context (tempo/key/scale/space/master dynamics) comes from the shared
+// editor state — G4 gives it its own bar with per-track locks.
+
+const ARRANGEMENT_KEY = "phase0.arrangement.v1";
+const SLOT_COUNT = 16; // one slot = one motif-length block
+
+let arrangement = null;
+let selectedRegion = null; // { trackId, regionId }
+
+function loadArrangement() {
+  try {
+    const a = JSON.parse(localStorage.getItem(ARRANGEMENT_KEY) || "null");
+    if (a && Array.isArray(a.tracks)) return a;
+  } catch { /* fall through */ }
+  return { name: "Untitled arrangement", tracks: [] };
+}
+function saveArrangement() {
+  if (arrangement) localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
+}
+
+function produceSources() {
+  const instruments = loadInstruments().map(i => ({
+    id: String(i.id), name: i.name, kind: "instrument", parameters: i.parameters,
+  }));
+  const factory = FACTORY_PRESETS.filter(p => p.section === "full").map(p => ({
+    id: String(p.id), name: p.name, kind: "factory",
+    parameters: extractInstrumentParams({ ...DEFAULTS, ...p.parameters }),
+  }));
+  return [...instruments, ...factory];
+}
+
+function regionPlayParams(track, region) {
+  // Tier 1 session context (inherited live) + Tier 2 instrument + Tier 3 take
+  const context = {};
+  for (const k of SESSION_CONTEXT_PARAMS) {
+    if (k !== "seed" && k in exploreParams) context[k] = exploreParams[k];
+  }
+  return { ...DEFAULTS, ...context, ...track.instrumentParams, seed: region.seed };
+}
+
+function newSeed() { return Math.floor(Math.random() * 999999) + 1; }
+
+function produceTimelineHTML() {
+  if (!arrangement.tracks.length) {
+    return '<div class="empty-state">Add an instrument above to create a track.</div>';
+  }
+  return arrangement.tracks.map(t => {
+    const cells = [];
+    for (let s = 0; s < SLOT_COUNT; s++) {
+      const region = t.regions.find(r => r.slot === s);
+      if (region) {
+        const sel = selectedRegion?.regionId === region.id ? " selected" : "";
+        cells.push(`<div class="tl-region${sel}" data-region="${region.id}" data-track="${t.id}" title="Region — same seed replays the identical take. Click to select.">
+          <span class="tl-seed">#${region.seed}</span></div>`);
+      } else {
+        cells.push(`<div class="tl-cell" data-cell="${t.id}:${s}" title="Place a region here"></div>`);
+      }
+    }
+    return `<div class="tl-row">
+      <div class="tl-head"><span title="${esc(t.name)}">${esc(t.name)}</span>
+        <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button></div>
+      ${cells.join("")}
+    </div>`;
+  }).join("");
+}
+
+function produceToolbarHTML() {
+  if (!selectedRegion) {
+    return '<span class="toolbar-hint">Select a region to play it as a loop, reroll its take, or delete it.</span>';
+  }
+  return `
+    <button class="btn btn-primary btn-sm" id="regionPlay">${synth.isPlaying ? "■ Stop loop" : "▶ Loop region"}</button>
+    <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context">↻ Reroll take</button>
+    <button class="btn btn-ghost btn-sm" id="regionDelete">Delete</button>`;
+}
+
+function renderProduce() {
+  arrangement = arrangement || loadArrangement();
+  const sources = produceSources();
+  const v = mount(`
+    <div class="produce-view">
+      <div class="produce-top">
+        <div>
+          <h1>Producer</h1>
+          <div class="studio-subtitle">Arrangement — early preview (single-voice playback)</div>
+        </div>
+        <div class="produce-actions">
+          <button class="btn btn-secondary btn-sm" id="prodStop">■ Stop</button>
+          <a class="btn btn-ghost btn-sm" href="#explore">← Sound Studio</a>
+        </div>
+      </div>
+      <div class="card produce-browser">
+        <div class="section-label">Instruments — click to add a track</div>
+        <div class="produce-sources">
+          ${sources.map(s => `
+            <button class="source-chip${s.kind === "factory" ? " chip-factory" : ""}" data-add-track="${esc(s.id)}"
+              title="${s.kind === "factory" ? "Starter voice" : "Your instrument"} — adds a track playing it">${esc(s.name)}</button>`).join("")}
+        </div>
+      </div>
+      <div class="card produce-timeline">
+        <div class="section-label">Timeline — click an empty cell to place a region</div>
+        <div class="timeline-grid" id="timelineGrid">${produceTimelineHTML()}</div>
+        <div class="region-toolbar" id="regionToolbar">${produceToolbarHTML()}</div>
+      </div>
+    </div>
+  `);
+  document.body.classList.add("explore-mode");
+  document.title = "Sound Studio — Producer";
+  wireProduce(v);
+  return v;
+}
+
+function wireProduce(v) {
+  const sources = produceSources();
+
+  v.querySelectorAll("[data-add-track]").forEach(btn => {
+    btn.onclick = () => {
+      const source = sources.find(s => s.id === btn.dataset.addTrack);
+      if (!source) return;
+      arrangement.tracks.push({
+        id: crypto.randomUUID(),
+        name: source.name,
+        sourceKind: source.kind,
+        instrumentParams: { ...source.parameters },
+        gain: 1,
+        regions: [],
+      });
+      saveArrangement();
+      renderProduce();
+    };
+  });
+
+  v.querySelectorAll("[data-remove-track]").forEach(btn => {
+    btn.onclick = () => {
+      arrangement.tracks = arrangement.tracks.filter(t => t.id !== btn.dataset.removeTrack);
+      if (selectedRegion && !arrangement.tracks.some(t => t.id === selectedRegion.trackId)) {
+        selectedRegion = null;
+      }
+      saveArrangement();
+      renderProduce();
+    };
+  });
+
+  v.querySelectorAll("[data-cell]").forEach(cell => {
+    cell.onclick = () => {
+      const [trackId, slotStr] = cell.dataset.cell.split(":");
+      const track = arrangement.tracks.find(t => t.id === trackId);
+      if (!track) return;
+      const region = { id: crypto.randomUUID(), slot: Number(slotStr), seed: newSeed() };
+      track.regions.push(region);
+      selectedRegion = { trackId, regionId: region.id };
+      saveArrangement();
+      renderProduce();
+    };
+  });
+
+  v.querySelectorAll("[data-region]").forEach(el => {
+    el.onclick = () => {
+      selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
+      renderProduce();
+    };
+  });
+
+  const selected = () => {
+    if (!selectedRegion) return {};
+    const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+    const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+    return { track, region };
+  };
+
+  const playBtn = v.querySelector("#regionPlay");
+  if (playBtn) playBtn.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    if (synth.isPlaying) { synth.stop(); }
+    else { synth.play(regionPlayParams(track, region)); }
+    renderProduce();
+  };
+
+  const rerollBtn = v.querySelector("#regionReroll");
+  if (rerollBtn) rerollBtn.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    region.previousSeeds = [...(region.previousSeeds || []), region.seed];
+    region.seed = newSeed();
+    saveArrangement();
+    if (synth.isPlaying) synth.play(regionPlayParams(track, region));
+    renderProduce();
+  };
+
+  const deleteBtn = v.querySelector("#regionDelete");
+  if (deleteBtn) deleteBtn.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region) return;
+    track.regions = track.regions.filter(r => r.id !== region.id);
+    selectedRegion = null;
+    saveArrangement();
+    renderProduce();
+  };
+
+  const stopBtn = v.querySelector("#prodStop");
+  if (stopBtn) stopBtn.onclick = () => { synth.stop(); renderProduce(); };
 }
 
 // ─── Landing ────────────────────────────────────────────────
@@ -1381,6 +1592,7 @@ function renderExplore() {
       <div class="workspace-tabs" id="workspaceTabs">
         <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore">Macro</button>
         <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote">Sub-note</button>
+        <a class="workspace-tab workspace-link" href="#produce" title="Producer: arrange your instruments on a timeline (early preview)">Producer</a>
       </div>
     </div>
 
