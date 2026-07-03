@@ -144,6 +144,17 @@ Full audits in the loop transcript; the load-bearing findings:
   panel, a percussion kit saved from its panel appears in its dropdown
   with exactly the 7 percussion params. Top-bar scope selector retained.
 
+- [ ] D7 (owner cue 2026-07-03): partial macros & higher-fidelity formants
+  per docs/PARTIAL_MACROS_DESIGN.md (RipplerX/Resonarium patterns):
+  - [ ] D7a. Partial macro layer: tilt, odd/even, comb group, material +
+    six octave-group faders shaping all partials; harmonic editor becomes
+    the dig-down level (progressive disclosure).
+  - [ ] D7b. Per-partial decay law (Material) in the renderer — bright
+    partials die faster; the big struck/plucked realism lever.
+  - [ ] D7c. 32-partial support with paginated harmonic editor.
+  - [ ] D7d. 5-formant bank (F1-F5 + bandwidths) behind a disclosure;
+    2D vowel pad unchanged, still drives F1/F2.
+
 ## Phase E — Deployment readiness (priority 5)
 
 - [x] E1. Health endpoint now reports data/cache-dir writability, schema
