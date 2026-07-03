@@ -288,7 +288,12 @@ synth configuration pulled into arrangement tracks.
   horizontal drag moves onset on the division grid clamped to the region;
   frequency recomputed from the region's scale context; edited notes wear
   a dot; edits persist and play in baked playback/mixdown.
-  ── G7 COMPLETE. ROADMAP COMPLETE (remaining: minor polish backlog —
+  ── OWNER REVIEW (2026-07-03): producer section REJECTED — "nothing like
+  I wanted… needs to be rethought from the ground up… follows the same
+  logic as a DAW like Pro Tools or Logic." Full redesign specified in
+  docs/PRODUCER_V2_DESIGN.md with an explicit acceptance bar (B1-B9 +
+  Q1-Q4 incl. owner sign-off). Producer status: IN PROGRESS, not done.
+  ── G7 roll internals survive (they dock into the v2 editor drawer) (remaining: minor polish backlog —
   per-track pan/locks, take-history UI, dist-canvas DPI, loading states —
   and owner audition feedback on D5/D7 tone work and starters).
 
