@@ -247,8 +247,14 @@ synth configuration pulled into arrangement tracks.
   on change); persists with the arrangement. Per-track lock overrides
   deferred to a later polish pass. Verified: key→G, tempo→92 stored and
   played.
-- [ ] G5. Multi-voice scheduling in synth.js: N concurrent instrument voices
-  with per-track gain/pan and a shared master bus/limiter.
+- [x] G5. Multi-voice arrangement playback: SynthEngine.init() accepts a
+  shared AudioContext + destination, so each track runs its own engine
+  voice into a common producer bus; per-track gain via setMasterVolume;
+  "Play arrangement" transport walks the slot grid at session tempo (4
+  beats/slot), starting each track's region take at its slot and silencing
+  empty cells, with a cyan playhead sweeping the timeline. Verified live
+  (playhead 0→1 at tempo, clean stop). Per-track pan + gain UI deferred to
+  v2 polish.
 - [ ] G6. Arrangement save/load (localStorage + export as JSON), and mixdown
   export (single stereo WAV render of the arrangement).
 - [ ] G7. (Stretch) Bake to piano roll: materialise a take into an editable

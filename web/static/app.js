@@ -1051,6 +1051,76 @@ function wireSessionBar(v) {
 
 function newSeed() { return Math.floor(Math.random() * 999999) + 1; }
 
+// ── Multi-voice arrangement playback (G5) ────────────────────
+// One SynthEngine voice per track, all sharing the main AudioContext and a
+// common producer bus. The transport walks the slot grid at session tempo
+// (4 beats per slot), starting each track's region at its slot with its
+// seed and silencing tracks with empty cells.
+const producerVoices = new Map(); // trackId -> SynthEngine voice
+let producerBus = null;
+let arrPlay = null; // { slot, timer, lastSlot }
+
+function producerVoice(track) {
+  synth.init();
+  if (synth.ctx.state === "suspended") synth.ctx.resume();
+  if (!producerBus) {
+    producerBus = synth.ctx.createGain();
+    producerBus.gain.value = 1;
+    producerBus.connect(synth.ctx.destination);
+  }
+  let voice = producerVoices.get(track.id);
+  if (!voice) {
+    voice = new SynthEngine();
+    voice.init(synth.ctx, producerBus);
+    producerVoices.set(track.id, voice);
+  }
+  voice.setMasterVolume(track.gain ?? 1);
+  return voice;
+}
+
+function updatePlayhead(slot) {
+  document.querySelectorAll("[data-slot]").forEach(el => {
+    el.classList.toggle("playhead", Number(el.dataset.slot) === slot);
+  });
+}
+
+function stopArrangement() {
+  if (arrPlay) { clearTimeout(arrPlay.timer); arrPlay = null; }
+  producerVoices.forEach(v => v.stop());
+  updatePlayhead(-1);
+}
+
+function playArrangement() {
+  stopArrangement();
+  synth.stop(); // single-region loop, if any
+  const ctx = arrangement.context;
+  const slotMs = 4 * (60 / Math.max(30, ctx.tempo || 104)) * 1000;
+  const slots = arrangement.tracks.flatMap(t => t.regions.map(r => r.slot));
+  if (!slots.length) return;
+  const lastSlot = Math.max(...slots);
+  arrPlay = { slot: 0, lastSlot, timer: null };
+  const step = () => {
+    if (!arrPlay) return;
+    const s = arrPlay.slot;
+    if (s > arrPlay.lastSlot) {
+      stopArrangement();
+      const btn = document.querySelector("#arrPlayBtn");
+      if (btn) btn.textContent = "▶ Play arrangement";
+      return;
+    }
+    for (const track of arrangement.tracks) {
+      const region = track.regions.find(r => r.slot === s);
+      const voice = producerVoice(track);
+      if (region) voice.play(regionPlayParams(track, region));
+      else voice.stop();
+    }
+    updatePlayhead(s);
+    arrPlay.slot = s + 1;
+    arrPlay.timer = setTimeout(step, slotMs);
+  };
+  step();
+}
+
 function produceTimelineHTML() {
   if (!arrangement.tracks.length) {
     return '<div class="empty-state">Add an instrument above to create a track.</div>';
@@ -1061,10 +1131,10 @@ function produceTimelineHTML() {
       const region = t.regions.find(r => r.slot === s);
       if (region) {
         const sel = selectedRegion?.regionId === region.id ? " selected" : "";
-        cells.push(`<div class="tl-region${sel}" data-region="${region.id}" data-track="${t.id}" title="Region — same seed replays the identical take. Click to select.">
+        cells.push(`<div class="tl-region${sel}" data-region="${region.id}" data-track="${t.id}" data-slot="${s}" title="Region — same seed replays the identical take. Click to select.">
           <span class="tl-seed">#${region.seed}</span></div>`);
       } else {
-        cells.push(`<div class="tl-cell" data-cell="${t.id}:${s}" title="Place a region here"></div>`);
+        cells.push(`<div class="tl-cell" data-cell="${t.id}:${s}" data-slot="${s}" title="Place a region here"></div>`);
       }
     }
     return `<div class="tl-row">
@@ -1096,6 +1166,7 @@ function renderProduce() {
           <div class="studio-subtitle">Arrangement — early preview (single-voice playback)</div>
         </div>
         <div class="produce-actions">
+          <button class="btn btn-primary btn-sm" id="arrPlayBtn">▶ Play arrangement</button>
           <button class="btn btn-secondary btn-sm" id="prodStop">■ Stop</button>
           <a class="btn btn-ghost btn-sm" href="#explore">← Sound Studio</a>
         </div>
@@ -1186,6 +1257,7 @@ function wireProduce(v) {
   if (playBtn) playBtn.onclick = () => {
     const { track, region } = selected();
     if (!track || !region) return;
+    stopArrangement();
     if (synth.isPlaying) { synth.stop(); }
     else { synth.play(regionPlayParams(track, region)); }
     renderProduce();
@@ -1212,8 +1284,19 @@ function wireProduce(v) {
     renderProduce();
   };
 
+  const arrPlayBtn = v.querySelector("#arrPlayBtn");
+  if (arrPlayBtn) arrPlayBtn.onclick = () => {
+    if (arrPlay) {
+      stopArrangement();
+      arrPlayBtn.textContent = "▶ Play arrangement";
+    } else {
+      playArrangement();
+      arrPlayBtn.textContent = "■ Stop arrangement";
+    }
+  };
+
   const stopBtn = v.querySelector("#prodStop");
-  if (stopBtn) stopBtn.onclick = () => { synth.stop(); renderProduce(); };
+  if (stopBtn) stopBtn.onclick = () => { stopArrangement(); synth.stop(); renderProduce(); };
 }
 
 // ─── Landing ────────────────────────────────────────────────

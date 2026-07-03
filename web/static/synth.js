@@ -2013,10 +2013,17 @@ export class SynthEngine {
     this._limiterOn = true;
   }
 
-  init() {
+  /**
+   * Build the audio graph. Pass a shared AudioContext + destination to run
+   * this engine as one voice among several (producer mode: every track
+   * voice shares the page's context and feeds a common bus) — omit both
+   * for the default standalone behaviour.
+   */
+  init(sharedCtx = null, destination = null) {
     if (this.ctx) return;
     const C = window.AudioContext || window.webkitAudioContext;
-    this.ctx = new C();
+    this.ctx = sharedCtx || new C();
+    this._dest = destination || this.ctx.destination;
     this.master = this.ctx.createGain();
     this.master.gain.value = 0.45;
     this._dryGain = this.ctx.createGain();
@@ -2070,7 +2077,7 @@ export class SynthEngine {
     this._masterOut.connect(this._masterHP);
     this._masterHP.connect(this._masterShelf);
     this._masterShelf.connect(this._softClip);
-    this._limiter.connect(this.ctx.destination);
+    this._limiter.connect(this._dest);
     this._applyLimiterRouting();
 
     // Percussion bus
@@ -2265,7 +2272,7 @@ export class SynthEngine {
     if (!this._softClip || !this.ctx) return;
     try { this._softClip.disconnect(); } catch {}
     if (this._limiterOn) this._softClip.connect(this._limiter);
-    else this._softClip.connect(this.ctx.destination);
+    else this._softClip.connect(this._dest);
   }
 
   /** Set master output level. Accepts a linear gain (0..~2). */
