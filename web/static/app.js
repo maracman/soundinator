@@ -28,6 +28,15 @@ import {
 const STORAGE_KEY = "phase0.presets.v3";
 const PARTICIPANT_KEY = "phase0.pid.v2";
 const ENGAGE_KEY = "phase0.engagement.v3";
+const FORMANT_CIRCLE = ["ee", "eh", "ah", "oh", "oo"];
+const SURPRISE_FEATURES = [
+  { key: "pitch", label: "Pitch / Melody", enabled: "surprisePitchEnabled", weight: "surprisePitchWeight", distance: "surprisePitchDistance" },
+  { key: "tuning", label: "Tuning", enabled: "surpriseTuningEnabled", weight: "surpriseTuningWeight", distance: "surpriseTuningDistance" },
+  { key: "rhythm", label: "Duration", enabled: "surpriseRhythmEnabled", weight: "surpriseRhythmWeight", distance: "surpriseRhythmDistance" },
+  { key: "formant", label: "Formant / Timbre", enabled: "surpriseFormantEnabled", weight: "surpriseFormantWeight", distance: "surpriseFormantDistance" },
+  { key: "dynamics", label: "Dynamics", enabled: "surpriseDynamicsEnabled", weight: "surpriseDynamicsWeight", distance: "surpriseDynamicsDistance" },
+  { key: "rest", label: "Rest", enabled: "surpriseRestEnabled", weight: "surpriseRestWeight", distance: null },
+];
 
 const DEFAULTS = {
   tempo: 104,
@@ -40,8 +49,9 @@ const DEFAULTS = {
   subScaleNotes: [0, 4, 7],
   subScaleWeight: 0.7,
   tonicHz: 261.63,
-  intervalPeakedness: 1.5,
+  intervalPeakedness: 2.0,
   intervalRange: 7,
+  momentum: 0,
   motifHitProb: 0.92,
   motifHitRange: 2,
   precision: 0.9,
@@ -49,22 +59,44 @@ const DEFAULTS = {
   surpriseProb: 0.08,
   surpriseDimensions: ["pitch"],
   surprisePitchEnabled: true,
+  surpriseTuningEnabled: false,
   surpriseRhythmEnabled: false,
   surpriseFormantEnabled: false,
   surpriseDynamicsEnabled: false,
   surpriseRestEnabled: false,
   surprisePitchWeight: 1,
+  surpriseTuningWeight: 0.45,
   surpriseRhythmWeight: 0.45,
   surpriseFormantWeight: 0.45,
   surpriseDynamicsWeight: 0.35,
   surpriseRestWeight: 0.2,
+  melSurpriseAmount: 0.5,
+  tunSurpriseAmount: 0.5,
+  durSurpriseAmount: 0.5,
+  dynSurpriseAmount: 0.5,
+  dynamicsHitRange: 22,
+  surprisePitchDistance: 1,
+  surpriseTuningDistance: 0.9,
+  surpriseRhythmDistance: 0.8,
+  surpriseFormantDistance: 0.85,
+  surpriseDynamicsDistance: 0.85,
   surpriseAllowMultiple: false,
-  surpriseRangeSd: 3,
   incorporationRate: 0.4,
   surpriseMaxBaked: "Infinity",
   activeFormants: ["ah"],
   formantWeights: null,
   formantChangeProb: 0.05,
+  formantFocus: "ah",
+  formantEditAll: true,
+  formantAccuracy: 0.85,
+  formantAccuracyRange: 1,
+  formantAccuracyByFormant: null,
+  formantRangeByFormant: null,
+  surpriseFormantDistanceByFormant: null,
+  dynamicsLevel: 0.62,
+  loudnessRange: 0.6,
+  dynamicsPrecision: 0.75,
+  dynamicsRange: 0.22,
   motifCount: 3,
   motifLengthBeats: 4,
   sequenceProb: 0.8,
@@ -150,8 +182,9 @@ const DEFAULTS = {
 
 const PARAM_DESC = {
   tempo: "Playback speed in beats per minute",
-  intervalPeakedness: "How strongly the melody favours small intervals. Low = jumpy, high = stepwise",
-  intervalRange: "Maximum interval size in scale degrees. Low = stepwise, high = allows large leaps",
+  intervalPeakedness: "Shape of the interval distribution. At the bottom of the dial every interval size within the range is equally likely (flat/uniform); raising it forms a bell that narrows to a sharp point at the top (stepwise/repeat). The range sets how far the flat/uniform spread reaches",
+  intervalRange: "Maximum interval size in scale degrees — the hard limit of the interval distribution. Widening it stretches the whole shape: at the flat/uniform end it sets how far equal-probability intervals reach; with the bell it widens the spread",
+  momentum: "Tendency to keep moving in the same direction as the previous step. Stronger after short notes, fades near register edges (max 80% continuation)",
   motifHitProb: "Probability that playback hits the expected motif note",
   motifHitRange: "Maximum miss distance in scale degrees when the motif note is not hit",
   precision: "Probability that a note is tuned exactly to its target pitch",
@@ -171,20 +204,34 @@ const PARAM_DESC = {
   registerSkew: "Asymmetrically weights the register. Negative = wider low tail, positive = wider high tail",
   surpriseProb: "Chance that a motif pass contains one surprised note. Select which variables below can be surprised",
   surprisePitchEnabled: "Include pitch/scale-degree as a possible surprise feature",
+  surpriseTuningEnabled: "Include cents-level tuning as a possible surprise feature",
   surpriseRhythmEnabled: "Include note-duration change as a possible surprise feature",
   surpriseFormantEnabled: "Include vowel/formant change as a possible surprise feature",
   surpriseDynamicsEnabled: "Include loud/soft dynamic change as a possible surprise feature",
   surpriseRestEnabled: "Include rest/silence as a possible surprise feature",
   surprisePitchWeight: "Relative chance that a surprise uses pitch once a surprise has happened",
+  surpriseTuningWeight: "Relative chance that a surprise uses cents-level tuning once a surprise has happened",
   surpriseRhythmWeight: "Relative chance that a surprise uses duration once a surprise has happened",
   surpriseFormantWeight: "Relative chance that a surprise uses formant once a surprise has happened",
   surpriseDynamicsWeight: "Relative chance that a surprise uses dynamics once a surprise has happened",
   surpriseRestWeight: "Relative chance that a surprise uses rest once a surprise has happened",
+  surprisePitchDistance: "How far pitch surprises sit from the ordinary accuracy distribution",
+  surpriseTuningDistance: "How far tuning surprises sit from the ordinary cents distribution",
+  surpriseRhythmDistance: "How far duration surprises sit from the ordinary rhythm distribution",
+  surpriseFormantDistance: "How far formant surprises sit from the ordinary vowel distribution",
+  surpriseDynamicsDistance: "How far dynamic surprises sit from the ordinary loudness distribution",
   surpriseAllowMultiple: "Allow multiple feature changes on the same surprised note",
-  surpriseRangeSd: "How many standard deviations the visual range bracket shows",
   incorporationRate: "When a motif-pass surprise occurs, chance it gets baked into the growing repertoire loop",
   surpriseMaxBaked: "Maximum number of baked-in surprise variants allowed. Infinity lets the loop keep growing",
   formantChangeProb: "Probability of switching vowel sound between notes",
+  formantFocus: "The formant at the centre of the visible accuracy/surprise distribution",
+  formantEditAll: "Apply formant accuracy and surprise-distance edits to every formant at once",
+  formantAccuracy: "Probability that playback keeps the expected formant colour",
+  formantAccuracyRange: "How far a missed vowel can drift, in circle steps — up to half a circle. Misses land continuously, between vowels too",
+  dynamicsLevel: "Loudness register centre — where the dynamics settle (analogue of the melodic register centre)",
+  loudnessRange: "Loudness register width — the soft/loud limits the dynamics stay within (analogue of the melodic register width)",
+  dynamicsPrecision: "Accuracy: probability the previously generated dynamic is reproduced exactly",
+  dynamicsRange: "Generation: how variable the loudness is from one note to the next",
   motifCount: "Number of distinct melodic patterns generated at the start",
   motifLengthBeats: "Length of each motif in beats (multiplied by beat divisions for total grid)",
   sequenceProb: "How strictly motifs follow a fixed order vs. random selection",
@@ -242,6 +289,7 @@ const UI_DESC = {
   stopBtn: "Stop playback and clear scheduled notes.",
   randBtn: "Generate a coherent random preset across the whole synthesiser.",
   seedBtn: "Generate a new random seed. The same seed and parameters recreate the same sequence.",
+  regenBtn: "Rebuild the generative sequence from the start with the current parameters, while playback keeps running — so you can hear the from-scratch result of your latest tweaks.",
   backHome: "Return to the opening screen.",
   saveBtn: "Save the current full parameter set as a local browser preset.",
   tabMy: "Show presets saved in this browser.",
@@ -260,8 +308,10 @@ const UI_DESC = {
   cvTuningAccuracy: "Tuning accuracy display in cents. Cents are hundredths of a 12-tone semitone, independent of the selected scale or EDO.",
   cvRoot: "How strongly root pull acts across the phrase.",
   cvRegister: "Register probability curve across pitch height.",
+  cvLoudnessRegister: "Loudness register: where the dynamics settle (centre) and the soft/loud limits (range). Analogue of the melodic register.",
   cvDurationAccuracy: "Duration accuracy and surprise display. Y-axis units follow the current beat-division grid.",
-  cvFormantAccuracy: "Formant probability display around a circular vowel sequence.",
+  cvDynamicsAccuracy: "Dynamics accuracy and surprise display. Y-axis shows loudness difference from the ordinary dynamic centre.",
+  cvFormantAccuracy: "Formant accuracy and surprise display around a circular vowel sequence. The selected formant is the centre row.",
   cvGap: "Articulation distribution. Values above zero create rests; values at or below zero connect or slide notes.",
   cvReverb: "Convolution impulse preview. Orange shows the decay envelope, blue suggests early reflections.",
   cvHarmonicSignature: "Harmonic fingerprint display. Orange is mean, blue is SD, grey/green show low/high register response.",
@@ -270,17 +320,22 @@ const UI_DESC = {
 
 const SECTION_DESC = {
   Scale: "Choose the pitch set available to the generative engine.",
-  Melody: "Control note-to-note movement, motif hit accuracy, and cents-level tuning precision.",
+  "Macro Probability": "Select one macro layer and edit its probability distribution in the shared monitor.",
+  Melody: "Control scale-degree movement, motif-hit accuracy, and register.",
+  Tuning: "Control cents-level pitch accuracy.",
+  Duration: "Control onset likelihood, note length, rests, breaks, and slides.",
+  Dynamics: "Control loudness accuracy and dynamic variation.",
   "Root Pull": "Choose tonal centre notes and how strongly melody is drawn toward them.",
   Register: "Shape the pitch height and range where melodies tend to live.",
   Rhythm: "Control note onset probabilities and rhythmic regularity.",
+  "Markov Sequence": "Control motif states, loop length, ordering bias, and surprise incorporation.",
+  Production: "Optional listening context that does not regenerate motif material.",
   "Sound Source": "Choose between the vowel/formant model and the additive Fourier harmonic model.",
   "Formant Voice": "Choose the vowel/formant palette used by Formant mode.",
   Surprise: "Choose what changes when a motif pass contains one surprise, and whether it becomes part of the loop.",
   Breaks: "Shape gaps between notes and phrase-boundary separations.",
   Percussion: "Add beat, motif, and downbeat accent layers.",
   Space: "Add generated convolution reverbs after the synthesiser.",
-  "Motif Repertoire": "Control the number, length, ordering, and repertoire-level mutation of motifs.",
   "Harmonic Decomposition": "Inspect every harmonic partial and the combined waveform produced by the current fingerprint. Disabled while Formant mode is selected.",
   "Instrument Fourier Print": "Choose and shape the instrument-like harmonic fingerprint used by Fourier mode.",
   "Colour Distribution": "Shape sub-note formant, resonance, and breath variation used by Formant mode.",
@@ -298,7 +353,7 @@ const DIMENSION_DESC = {
 };
 
 const WORKSPACE_DESC = {
-  explore: "Show the main compact synthesiser controls.",
+  explore: "Show the main macro-level synthesiser controls.",
   subnote: "Open the detailed harmonic, tone-colour, and envelope workspace.",
 };
 
@@ -365,6 +420,18 @@ const synth = new SynthEngine();
 let el;
 let animFrame = null;
 let canvas, canvasCtx;
+let _lastMarkerTick = 0;     // throttle for live note-trace redraws
+let _markersActive = false;  // whether the note trace was drawn last frame
+
+// Frequency-response area view mode: "spectrum" | "motifs" | "pianoroll"
+let visMode = "spectrum";
+const VIS_MODE_LABEL = {
+  spectrum: "Frequency Response",
+  motifs: "Motif Timeline",
+  pianoroll: "Piano Roll",
+};
+// Smoothed pitch range for the piano roll (avoids jitter as notes scroll in/out)
+let _pianoRange = null;
 
 // Study state
 let studyParadigm = null;
@@ -382,8 +449,11 @@ let exploreParams = { ...DEFAULTS };
 let exploreRating = 4;
 let exploreEngagement = loadEngagement();
 let workspaceTab = "explore";
-let performanceTab = "breaks";
+let macroTab = "melody";
+let macroSubTab = { melody: "accuracy", tuning: "accuracy", duration: "generation", dynamics: "generation" };
+let productionTab = "percussion";
 let debounceTimer = null;
+let lastSurpriseCount = 0;
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -450,6 +520,7 @@ function syncSurpriseFeatureParams(p) {
   const dims = Array.isArray(p.surpriseDimensions) ? p.surpriseDimensions : [];
   const hasModern = [
     "surprisePitchEnabled",
+    "surpriseTuningEnabled",
     "surpriseRhythmEnabled",
     "surpriseFormantEnabled",
     "surpriseDynamicsEnabled",
@@ -457,27 +528,34 @@ function syncSurpriseFeatureParams(p) {
   ].some(key => typeof p[key] === "boolean");
   if (!hasModern) {
     p.surprisePitchEnabled = dims.includes("pitch") || dims.includes("octave") || dims.length === 0;
+    p.surpriseTuningEnabled = dims.includes("tuning");
     p.surpriseRhythmEnabled = dims.includes("rhythm");
     p.surpriseFormantEnabled = dims.includes("formant");
     p.surpriseDynamicsEnabled = dims.includes("dynamics");
     p.surpriseRestEnabled = dims.includes("rest");
   }
-  if (![p.surprisePitchEnabled, p.surpriseRhythmEnabled, p.surpriseFormantEnabled, p.surpriseDynamicsEnabled, p.surpriseRestEnabled].some(Boolean)) {
+  if (![p.surprisePitchEnabled, p.surpriseTuningEnabled, p.surpriseRhythmEnabled, p.surpriseFormantEnabled, p.surpriseDynamicsEnabled, p.surpriseRestEnabled].some(Boolean)) {
     p.surprisePitchEnabled = true;
   }
   p.surpriseDimensions = [
     p.surprisePitchEnabled ? "pitch" : null,
+    p.surpriseTuningEnabled ? "tuning" : null,
     p.surpriseRhythmEnabled ? "rhythm" : null,
     p.surpriseFormantEnabled ? "formant" : null,
     p.surpriseDynamicsEnabled ? "dynamics" : null,
     p.surpriseRestEnabled ? "rest" : null,
   ].filter(Boolean);
   p.surprisePitchWeight = p.surprisePitchWeight ?? 1;
+  p.surpriseTuningWeight = p.surpriseTuningWeight ?? 0.45;
   p.surpriseRhythmWeight = p.surpriseRhythmWeight ?? 0.45;
   p.surpriseFormantWeight = p.surpriseFormantWeight ?? 0.45;
   p.surpriseDynamicsWeight = p.surpriseDynamicsWeight ?? 0.35;
   p.surpriseRestWeight = p.surpriseRestWeight ?? 0.2;
-  p.surpriseRangeSd = p.surpriseRangeSd ?? 3;
+  p.surprisePitchDistance = p.surprisePitchDistance ?? 1;
+  p.surpriseTuningDistance = p.surpriseTuningDistance ?? 0.9;
+  p.surpriseRhythmDistance = p.surpriseRhythmDistance ?? 0.8;
+  p.surpriseFormantDistance = p.surpriseFormantDistance ?? 0.85;
+  p.surpriseDynamicsDistance = p.surpriseDynamicsDistance ?? 0.85;
   p.surpriseAllowMultiple = !!p.surpriseAllowMultiple;
 }
 
@@ -491,6 +569,37 @@ function ensureFormantWeights(p) {
     weights[k] = Math.max(0, Math.min(1, Number(weights[k])));
   });
   p.formantWeights = weights;
+  if (!FORMANT_PRESETS[p.formantFocus]) p.formantFocus = p.activeFormants?.[0] || "ah";
+  // Accuracy + surprise are global (apply to every formant equally) — always "edit all".
+  p.formantEditAll = true;
+  // Half a vowel circle is the largest a sung vowel can miss by (e.g. ±2.5 steps
+  // for 5 vowels). The miss range is continuous — it can land between vowels.
+  const formantHalf = (FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]).length || keys.length) / 2;
+  p.formantAccuracy = clamp(Number(p.formantAccuracy ?? 0.85), 0, 1);
+  p.formantAccuracyRange = Math.max(0, Math.min(formantHalf, Number(p.formantAccuracyRange ?? 1)));
+  p.surpriseFormantDistance = clamp(Number(p.surpriseFormantDistance ?? 0.85), 0, 1);
+  // Accuracy + surprise apply to every formant equally: mirror the global scalar
+  // into every per-formant slot so the engine (which reads the map first) never
+  // produces vowel-specific behaviour, even when loading older varied presets.
+  p.formantAccuracyByFormant = uniformFormantMap(p.formantAccuracy);
+  p.formantRangeByFormant = uniformFormantMap(p.formantAccuracyRange);
+  p.surpriseFormantDistanceByFormant = uniformFormantMap(p.surpriseFormantDistance);
+}
+
+function uniformFormantMap(value, integer = false) {
+  const v = integer ? Math.round(Number(value) || 0) : (Number(value) || 0);
+  return Object.fromEntries(Object.keys(FORMANT_PRESETS).map(key => [key, v]));
+}
+
+function normaliseFormantMap(value, fallback, min, max, integer = false) {
+  const map = (value && typeof value === "object" && !Array.isArray(value)) ? { ...value } : {};
+  Object.keys(FORMANT_PRESETS).forEach(key => {
+    let v = Number(map[key] ?? fallback);
+    if (!Number.isFinite(v)) v = fallback;
+    v = Math.max(min, Math.min(max, v));
+    map[key] = integer ? Math.round(v) : v;
+  });
+  return map;
 }
 
 function decorateTooltips(root = document) {
@@ -525,6 +634,21 @@ function decorateTooltips(root = document) {
   root.querySelectorAll("[data-workspace-tab]").forEach(btn => {
     setTooltip(btn, WORKSPACE_DESC[btn.dataset.workspaceTab]);
   });
+  root.querySelectorAll("[data-macro-tab]").forEach(btn => {
+    const text = {
+      melody: "Edit scale-degree motion, motif-hit accuracy, melody surprise, and register.",
+      tuning: "Edit cents-level pitch accuracy and tuning surprise.",
+      duration: "Edit note durations, rests, breaks, slides, and duration surprise.",
+      dynamics: "Edit loudness accuracy and dynamic surprise.",
+    }[btn.dataset.macroTab];
+    setTooltip(btn, text);
+  });
+  root.querySelectorAll("[data-production-tab]").forEach(btn => {
+    const text = btn.dataset.productionTab === "space"
+      ? "Reverb for listening context. It does not regenerate motifs."
+      : "Percussion markers for listening context. They do not regenerate motifs.";
+    setTooltip(btn, text);
+  });
   root.querySelectorAll("[data-performance-tab]").forEach(btn => {
     setTooltip(btn, PERFORMANCE_DESC[btn.dataset.performanceTab]);
   });
@@ -555,9 +679,15 @@ function decorateTooltips(root = document) {
     if (!input) return;
     setTooltip(label, `${input.dataset.formantWeight}: Relative probability for this formant in the circular formant space.`);
   });
+  root.querySelectorAll("[data-formant-focus]").forEach(btn => {
+    setTooltip(btn, `Centre the formant accuracy/surprise distribution on ${btn.dataset.formantFocus}.`);
+  });
+  root.querySelectorAll("[data-formant-scope]").forEach(input => {
+    setTooltip(input, describeParam(input.dataset.formantScope, input.dataset.formantScope));
+  });
 
   root.querySelectorAll(".note-cell").forEach(cell => {
-    setTooltip(cell, "Click to cycle this pitch class between off, in-scale, and weighted sub-scale.");
+    setTooltip(cell, "Click to cycle this pitch class through off, in-scale, weighted sub-scale, and root.");
   });
   root.querySelectorAll(".root-cell").forEach(cell => {
     setTooltip(cell, "Click to toggle this in-scale degree as a root/tonal-centre target.");
@@ -1097,7 +1227,8 @@ function renderExplore() {
   p.voiceMode = normaliseVoiceMode(p.voiceMode);
   syncSurpriseFeatureParams(p);
   ensureFormantWeights(p);
-  if (!["breaks", "percussion", "space"].includes(performanceTab)) performanceTab = "breaks";
+  if (!["melody", "tuning", "duration", "dynamics"].includes(macroTab)) macroTab = "melody";
+  if (!["percussion", "space"].includes(productionTab)) productionTab = "percussion";
 
   // Ensure customDegrees is populated
   if (!p.customDegrees || p.customDegrees.length === 0) {
@@ -1120,265 +1251,66 @@ function renderExplore() {
     <div class="explore-top">
       <div>
         <h1>Sound Studio</h1>
-        <div class="workspace-tabs" id="workspaceTabs">
-          <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore">Explore</button>
-          <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote">Sub-note</button>
-        </div>
+        <div class="studio-subtitle">Probabilistic Synthesiser</div>
       </div>
-      <button class="btn btn-ghost btn-sm" id="backHome">Back</button>
+      <div class="workspace-tabs" id="workspaceTabs">
+        <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore">Macro</button>
+        <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote">Sub-note</button>
+      </div>
     </div>
 
     <!-- Transport -->
     <div class="card transport-card">
       <div class="transport">
-        <button class="btn btn-primary" id="playBtn">Play</button>
-        <button class="btn btn-secondary" id="stopBtn">Stop</button>
-        <div class="spacer"></div>
-        <button class="btn btn-secondary" id="randBtn">Randomise</button>
-        <button class="btn btn-ghost btn-sm" id="seedBtn">Seed: ${p.seed}</button>
-      </div>
-      <div class="controls-grid">
-        ${controlRow("tempo", "Tempo", p.tempo, 50, 180, 1)}
-      </div>
-    </div>
-
-    ${workspaceTab === 'subnote' ? subnoteWorkspaceHTML(p) : ''}
-
-    <!-- Visualiser -->
-    <div class="visual-card">
-    <div class="visualiser-wrap">
-      <canvas id="vis" width="820" height="140"></canvas>
-      <span class="visualiser-badge">Web Audio</span>
-    </div>
-    <div class="engine-state" id="engineState">
-      <div class="stat">Motifs: <span class="stat-val" id="statMotifs">&ndash;</span></div>
-      <div class="stat">Sequence: <span class="stat-val" id="statSeq">&ndash;</span></div>
-      <div class="stat">Notes: <span class="stat-val" id="statNotes">&ndash;</span></div>
-    </div>
-    </div>
-
-    <!-- Scale -->
-    <div class="card scale-card">
-      <div class="section-label">Scale</div>
-      <div class="mode-btns" id="scaleModeGroup">
-        <button class="mode-btn${p.scaleMode !== 'edo' ? ' active' : ''}" data-smode="12tone">12-tone</button>
-        <button class="mode-btn${p.scaleMode === 'edo' ? ' active' : ''}" data-smode="edo">N-EDO</button>
-      </div>
-      <div id="scaleOptions">
-        ${p.scaleMode !== 'edo' ? `
-          <div class="scale-preset-row">
-            <label class="text-sm">Preset
-              <select id="scalePresetSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem">
-                ${Object.entries(SCALE_PRESETS).map(([k, v]) =>
-                  `<option value="${k}" ${p.scalePreset === k ? 'selected' : ''}>${v.label}</option>`
-                ).join('')}
-              </select>
-            </label>
-          </div>
-        ` : `
-          <div class="edo-row">
-            <span class="text-sm" style="color:var(--text2)">Divisions:</span>
-            <input type="number" id="edoDivisionsInput" class="edo-input"
-                   min="3" max="48" value="${p.edoDivisions}"/>
-          </div>
-        `}
-      </div>
-      <div id="noteGridContainer">${buildNoteGridHTML(p)}</div>
-      <div class="note-grid-legend">
-        <div class="legend-item"><div class="legend-dot off"></div> Off</div>
-        <div class="legend-item"><div class="legend-dot scale"></div> In scale</div>
-        <div class="legend-item"><div class="legend-dot sub"></div> Sub-scale</div>
-      </div>
-      <div class="controls-grid" style="margin-top:0.75rem">
-        ${controlRow("subScaleWeight", "Sub-scale weight", p.subScaleWeight, 0.5, 1.0, 0.01)}
-      </div>
-    </div>
-
-    <!-- Melody (note-to-note) -->
-    <div class="card melody-card">
-      <div class="section-label">Melody</div>
-      <div class="controls-grid">
-        ${controlRow("intervalPeakedness", "Interval shape", p.intervalPeakedness, 0, 4, 0.05)}
-        ${controlRow("intervalRange", "Interval range", p.intervalRange, 1, 24, 1)}
-        ${controlRow("motifHitProb", "Hit prob", p.motifHitProb, 0, 1, 0.01)}
-        ${controlRow("motifHitRange", "Hit range", p.motifHitRange, 0, 12, 1)}
-        ${controlRow("precision", "Tune prob", p.precision, 0, 1, 0.01)}
-        ${controlRow("precisionRange", "Cents range", p.precisionRange, 0, 100, 1)}
-      </div>
-      ${featureSurpriseBlock("pitch", "Pitch", "surprisePitchEnabled", "surprisePitchWeight", p.surprisePitchEnabled, p.surprisePitchWeight)}
-      <div class="dist-display" id="distInterval">
-        <canvas class="dist-canvas" id="cvInterval" width="200" height="50"></canvas>
-        <span class="dist-label">Interval distribution</span>
-      </div>
-      <div class="dist-display" id="distMelodyAccuracy">
-        <canvas class="dist-canvas dist-canvas-tall" id="cvMelodyAccuracy" width="220" height="96"></canvas>
-        <span class="dist-label">Accuracy + surprise</span>
-      </div>
-      <div class="dist-display" id="distTuningAccuracy">
-        <canvas class="dist-canvas dist-canvas-tall" id="cvTuningAccuracy" width="220" height="80"></canvas>
-        <span class="dist-label">Tuning cents</span>
-      </div>
-      <div class="micro-note">Register still modulates the actual pitch choice.</div>
-    </div>
-
-    <!-- Root Pull -->
-    <div class="card root-card">
-      <div class="section-label">Root Pull</div>
-      <div class="root-note-grid" id="rootNoteGrid">
-        ${buildRootNoteGridHTML(p)}
-      </div>
-      <div class="note-grid-legend" style="margin-bottom:0.6rem">
-        <div class="legend-item"><div class="legend-dot off"></div> Not root</div>
-        <div class="legend-item"><div class="legend-dot root"></div> Root note</div>
-      </div>
-      <div class="controls-grid">
-        ${controlRow("rootPullStrength", "Pull strength", p.rootPullStrength, 0, 1, 0.01)}
-        ${controlRow("rootPullShape", "Pull shape", p.rootPullShape, 0, 1, 0.01)}
-      </div>
-      <div class="dist-display" id="distRoot">
-        <canvas class="dist-canvas" id="cvRoot" width="200" height="50"></canvas>
-        <span class="dist-label">Pull strength across phrase</span>
-      </div>
-    </div>
-
-    <!-- Register -->
-    <div class="card register-card">
-      <div class="section-label">Register</div>
-      <div class="controls-grid">
-        ${controlRow("registerCenter", "Centre", p.registerCenter, -24, 24, 1)}
-        ${controlRow("registerWidth", "Width", p.registerWidth, 2, 36, 1)}
-        ${controlRow("registerSkew", "Skew", p.registerSkew, -1, 1, 0.05)}
-      </div>
-      <div class="dist-display" id="distRegister">
-        <canvas class="dist-canvas" id="cvRegister" width="200" height="50"></canvas>
-        <span class="dist-label">Register probability</span>
-      </div>
-    </div>
-
-    <!-- Rhythm -->
-    <div class="card rhythm-card">
-      <div class="section-label">Rhythm</div>
-      <div class="controls-grid">
-        ${controlRow("beatDivisions", "Beat divisions", p.beatDivisions, 1, 6, 1)}
-        ${controlRow("onBeatProb", "On-beat onset", p.onBeatProb, 0, 1, 0.01)}
-        ${controlRow("offBeatProb", "Off-beat onset", p.offBeatProb, 0, 1, 0.01)}
-        ${controlRow("sameLengthProb", "Same length", p.sameLengthProb, 0, 1, 0.01)}
-        ${controlRow("restMotifStartRatio", "Rest motif", p.restMotifStartRatio, 0, 0.95, 0.01)}
-        ${controlRow("restOnMeterRatio", "Rest on", p.restOnMeterRatio, 0, 0.95, 0.01)}
-        ${controlRow("restOffMeterRatio", "Rest off", p.restOffMeterRatio, 0, 0.95, 0.01)}
-      </div>
-      ${featureSurpriseBlock("rhythm", "Duration", "surpriseRhythmEnabled", "surpriseRhythmWeight", p.surpriseRhythmEnabled, p.surpriseRhythmWeight)}
-      ${featureSurpriseBlock("rest", "Rest", "surpriseRestEnabled", "surpriseRestWeight", p.surpriseRestEnabled, p.surpriseRestWeight)}
-      <canvas class="dist-canvas dist-canvas-tall" id="cvDurationAccuracy" width="220" height="108"></canvas>
-    </div>
-
-    <!-- Surprise -->
-    <div class="card surprise-card">
-      <div class="section-label">Surprise</div>
-      <div class="controls-grid">
-        ${controlRow("surpriseProb", "Probability", p.surpriseProb, 0, 1, 0.01)}
-        ${controlRow("incorporationRate", "Incorporation", p.incorporationRate, 0, 1, 0.01)}
-        ${selectControlRow("surpriseMaxBaked", "Max baked", p.surpriseMaxBaked, bakedSurpriseOptions(p.surpriseMaxBaked))}
-        ${controlRow("surpriseRangeSd", "Tail bracket", p.surpriseRangeSd, 1, 5, 0.25)}
-      </div>
-      ${checkboxControl("surpriseAllowMultiple", "Multiple features on one note", p.surpriseAllowMultiple)}
-      ${featureSurpriseBlock("dynamics", "Dynamics", "surpriseDynamicsEnabled", "surpriseDynamicsWeight", p.surpriseDynamicsEnabled, p.surpriseDynamicsWeight)}
-    </div>
-
-    <!-- Performance detail -->
-    <div class="card percussion-card">
-      <div class="performance-tabs" id="performanceTabs">
-        <button class="perf-tab${performanceTab === 'breaks' ? ' active' : ''}" data-performance-tab="breaks">Breaks</button>
-        <button class="perf-tab${performanceTab === 'percussion' ? ' active' : ''}" data-performance-tab="percussion">Percussion</button>
-        <button class="perf-tab${performanceTab === 'space' ? ' active' : ''}" data-performance-tab="space">Space</button>
-      </div>
-
-      <div class="perf-panel${performanceTab !== 'breaks' ? ' hidden' : ''}" data-panel="breaks">
-        <div class="perf-section">
-          <div class="section-label">Breaks</div>
-          <div class="controls-grid">
-            ${controlRow("gapProb", "Chance", p.gapProb, 0, 1, 0.01)}
-            ${controlRow("gapMin", "Min", p.gapMin, -0.8, 0.8, 0.01)}
-            ${controlRow("gapMax", "Max", p.gapMax, -0.8, 0.8, 0.01)}
-            ${controlRow("gapDistanceSlope", "Slope", p.gapDistanceSlope, 0, 1, 0.01)}
-            ${controlRow("gapTimingRange", "Range", p.gapTimingRange, 0, 0.4, 0.01)}
-            ${controlRow("slideSpeed", "Slide speed", p.slideSpeed, 0, 1, 0.01)}
-            ${controlRow("phraseGap", "Phrase", p.phraseGap, 0, 0.8, 0.01)}
-          </div>
-          <canvas class="mini-canvas" id="cvGap" width="360" height="64"></canvas>
+        <button class="transport-round transport-play${synth.isPlaying ? ' is-playing' : ''}" id="playBtn">${synth.isPlaying ? "❚❚" : "▶"}</button>
+        <button class="transport-round transport-stop" id="stopBtn">■</button>
+        <button class="btn btn-secondary rand-btn" id="randBtn">Randomise</button>
+        <button class="btn btn-secondary" id="regenBtn" title="Rebuild the sequence from the start using the current parameters">↻ Restart seq</button>
+        <div class="seed-box">
+          <span>Seed</span>
+          <button class="btn btn-ghost btn-sm" id="seedBtn">${p.seed}</button>
         </div>
       </div>
-
-      <div class="perf-panel${performanceTab !== 'percussion' ? ' hidden' : ''}" data-panel="percussion">
-        <div class="perf-section percussion-section">
-          <div class="section-label">Percussion</div>
-          <div class="perc-layers">
-            <div class="perc-layer">
-              <div class="perc-header">Beat</div>
-              <select data-perc="percBeatSound" class="perc-select">
-                ${percSoundOptions(p.percBeatSound)}
-              </select>
-              ${controlRow("percBeatVol", "Vol", p.percBeatVol, 0, 1, 0.01)}
-            </div>
-            <div class="perc-layer">
-              <div class="perc-header">Motif</div>
-              <select data-perc="percMotifSound" class="perc-select">
-                ${percSoundOptions(p.percMotifSound)}
-              </select>
-              ${controlRow("percMotifVol", "Vol", p.percMotifVol, 0, 1, 0.01)}
-            </div>
-            <div class="perc-layer">
-              <div class="perc-header">Down</div>
-              <select data-perc="percDownbeatSound" class="perc-select">
-                ${percSoundOptions(p.percDownbeatSound)}
-              </select>
-              ${controlRow("percDownbeatVol", "Vol", p.percDownbeatVol, 0, 1, 0.01)}
-              ${controlRow("percDownbeatEvery", "Every", p.percDownbeatEvery, 1, 16, 1)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="perf-panel${performanceTab !== 'space' ? ' hidden' : ''}" data-panel="space">
-        <div class="perf-section space-section">
-          <div class="section-label">Space</div>
-          <select data-param-select="reverbType" class="param-select">
-            ${reverbTypeOptions(p.reverbType)}
-          </select>
-          <div class="controls-grid">
-            ${controlRow("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01)}
-            ${controlRow("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1)}
-            ${controlRow("reverbTone", "Tone", p.reverbTone, 0, 1, 0.01)}
-            ${controlRow("reverbPreDelay", "Pre-delay", p.reverbPreDelay, 0, 0.25, 0.005)}
-          </div>
-          <canvas class="mini-canvas" id="cvReverb" width="360" height="46"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- Motif Repertoire -->
-    <div class="card motif-card">
-      <div class="section-label">Motif Repertoire</div>
-      <div class="controls-grid">
-        ${controlRow("motifCount", "Motif count", p.motifCount, 1, 8, 1)}
-        ${controlRow("motifLengthBeats", "Motif (beats)", p.motifLengthBeats, 1, 16, 1)}
-        ${controlRow("sequenceProb", "Sequence prob", p.sequenceProb, 0, 1, 0.01)}
-        ${controlRow("motifSurpriseProb", "Whole motif", p.motifSurpriseProb, 0, 1, 0.01)}
-      </div>
-    </div>
-
-    <!-- Rating & Save -->
-    <div class="card rating-card">
-      <div class="rating-row">
-        <span class="label">How much do you like this?</span>
-        <input type="range" id="ratingSlider" min="1" max="7" step="1" value="${exploreRating}"/>
-        <output id="ratingOut">${exploreRating}/7</output>
-      </div>
-      <div class="preset-bar">
+      <div class="top-save-bar">
         <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
         <button class="btn btn-primary btn-sm" id="saveBtn">Save</button>
       </div>
+      <div class="top-rating-row">
+        <span class="label">Rating</span>
+        <input type="range" id="ratingSlider" min="1" max="7" step="1" value="${exploreRating}"/>
+        <output id="ratingOut">${exploreRating}/7</output>
+      </div>
+      <div class="controls-grid tempo-grid">
+        ${controlRow("tempo", "Tempo", p.tempo, 50, 180, 1)}
+      </div>
+      <div class="top-library-actions">
+        <button class="top-action-btn" id="topMyPresets">My Presets</button>
+        <button class="top-action-btn" id="topLibrary">Library</button>
+      </div>
     </div>
+
+    <!-- Frequency response dash -->
+    <div class="visual-card" id="visualCard">
+      <div class="visual-status">
+        <div><span class="status-dot"></span>${VIS_MODE_LABEL[visMode] || "Frequency Response"}</div>
+        <div class="surprise-status">Surprise Event</div>
+        <div class="vis-mode-switch" id="visModeSwitch">
+          <button class="vis-mode-btn${visMode === "spectrum" ? " active" : ""}" data-vismode="spectrum">Spec</button>
+          <button class="vis-mode-btn${visMode === "motifs" ? " active" : ""}" data-vismode="motifs">Motif</button>
+          <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll">Roll</button>
+        </div>
+      </div>
+      <div class="visualiser-wrap vis-mode-${visMode}">
+        <canvas id="vis" width="980" height="150"></canvas>
+      </div>
+      <div class="engine-state" id="engineState">
+        <div class="stat">Motifs <span class="stat-val" id="statMotifs">&ndash;</span></div>
+        <div class="stat">Sequence <span class="stat-val" id="statSeq">&ndash;</span></div>
+        <div class="stat">Notes <span class="stat-val" id="statNotes">&ndash;</span></div>
+      </div>
+    </div>
+
+    ${workspaceTab === 'subnote' ? subnoteWorkspaceHTML(p) : macroWorkspaceHTML(p)}
 
     <!-- Library -->
     <div class="card library-card" id="libraryCard">
@@ -1388,6 +1320,29 @@ function renderExplore() {
       </div>
       <div id="myPresets" class="preset-list"></div>
       <div id="globalPresets" class="preset-list hidden"></div>
+    </div>
+
+    <div class="card output-card">
+      <div class="section-label">Output</div>
+      <div class="output-layout">
+        <div class="meter-stack">
+          <div class="meter-pair">
+            <span id="meterL"></span><span id="meterR"></span>
+          </div>
+          <div class="meter-labels">
+            <span>0</span><span>-12</span><span>-24</span><span>-48</span>
+          </div>
+        </div>
+        <div class="master-strip">
+          <div class="section-label">Master</div>
+          <div class="vertical-fader" id="masterFader" title="Master output level"><span></span></div>
+          <output id="masterReadout">0.0 dB</output>
+        </div>
+        <div class="limiter-strip">
+          <div class="section-label">Limiter</div>
+          <button class="limiter-btn active" id="limiterBtn">On</button>
+        </div>
+      </div>
     </div>
 
     <div id="contributeArea"></div>
@@ -1401,7 +1356,28 @@ function renderExplore() {
   canvas = v.querySelector("#vis");
   canvasCtx = canvas.getContext("2d");
 
-  v.querySelector("#backHome").onclick = () => { synth.stop(); navigate("home"); };
+  const visModeSwitch = v.querySelector("#visModeSwitch");
+  if (visModeSwitch) {
+    visModeSwitch.onclick = (e) => {
+      const btn = e.target.closest("[data-vismode]");
+      if (!btn || btn.dataset.vismode === visMode) return;
+      visMode = btn.dataset.vismode;
+      visModeSwitch.querySelectorAll(".vis-mode-btn").forEach(b =>
+        b.classList.toggle("active", b.dataset.vismode === visMode));
+      // Resize canvas + relabel the status header
+      const wrap = canvas.closest(".visualiser-wrap");
+      if (wrap) wrap.className = `visualiser-wrap vis-mode-${visMode}`;
+      const label = visModeSwitch.parentElement.querySelector(".status-dot")?.parentElement;
+      if (label) label.innerHTML = `<span class="status-dot"></span>${VIS_MODE_LABEL[visMode] || "Frequency Response"}`;
+      _pianoRange = null;
+      if (synth.isPlaying) startVisualiser(); else drawStaticVis();
+    };
+  }
+
+  wireOutputControls(v);
+
+  const backBtn = v.querySelector("#backHome");
+  if (backBtn) backBtn.onclick = () => { synth.stop(); navigate("home"); };
   v.querySelector("#workspaceTabs").onclick = (e) => {
     const btn = e.target.closest("[data-workspace-tab]");
     if (!btn || btn.dataset.workspaceTab === workspaceTab) return;
@@ -1415,12 +1391,52 @@ function renderExplore() {
   };
 
   // Transport
-  v.querySelector("#playBtn").onclick = () => {
+  const playBtn = v.querySelector("#playBtn");
+  const syncPlayButton = () => {
+    if (!playBtn) return;
+    playBtn.textContent = synth.isPlaying ? "❚❚" : "▶";
+    playBtn.classList.toggle("is-playing", synth.isPlaying);
+  };
+  playBtn.onclick = () => {
+    if (synth.isPlaying) {
+      synth.stop();
+      cancelAnimationFrame(animFrame);
+      _markersActive = false;
+      drawMacroDistsAll();   // clear any lingering live note-trace beam
+      drawStaticVis();
+      resetMeters();
+      syncPlayButton();
+      return;
+    }
+    lastSurpriseCount = 0;
     synth.play({ ...exploreParams });
     startVisualiser();
+    syncPlayButton();
     trackEngagement("play");
   };
-  v.querySelector("#stopBtn").onclick = () => synth.stop();
+  const stopBtn = v.querySelector("#stopBtn");
+  if (stopBtn) stopBtn.onclick = () => {
+    synth.stop();
+    cancelAnimationFrame(animFrame);
+    _markersActive = false;
+    drawMacroDistsAll();   // clear any lingering live note-trace beam
+    drawStaticVis();
+    resetMeters();
+    syncPlayButton();
+  };
+  const regenBtn = v.querySelector("#regenBtn");
+  if (regenBtn) regenBtn.onclick = () => {
+    // Rebuild the Markov sequence from the start with the current params. If
+    // already playing, do it seamlessly; otherwise start fresh.
+    lastSurpriseCount = 0;
+    if (synth.isPlaying) {
+      synth.regenerate({ ...exploreParams });
+    } else {
+      synth.play({ ...exploreParams });
+      startVisualiser();
+      syncPlayButton();
+    }
+  };
   v.querySelector("#randBtn").onclick = () => {
     const wasPlaying = synth.isPlaying;
     randomiseParams();
@@ -1436,9 +1452,54 @@ function renderExplore() {
     debouncedReplay();
   };
 
+  const macroTabs = v.querySelector("#macroTabs");
+  if (macroTabs) {
+    macroTabs.onclick = (e) => {
+      const btn = e.target.closest("[data-macro-tab]");
+      if (!btn || btn.dataset.macroTab === macroTab) return;
+      const wasPlaying = synth.isPlaying;
+      macroTab = btn.dataset.macroTab;
+      renderExplore();
+      if (wasPlaying) startVisualiser();
+    };
+  }
+
+  // Param → { macroTab, section } mapping for auto-switching the active subsection
+  const _paramToSection = {
+    // Melody
+    intervalPeakedness: { tab: "melody", section: "generation" },
+    intervalRange:      { tab: "melody", section: "generation" },
+    momentum:           { tab: "melody", section: "generation" },
+    motifHitProb:       { tab: "melody", section: "accuracy" },
+    motifHitRange:      { tab: "melody", section: "accuracy" },
+    melSurpriseAmount:  { tab: "melody", section: "surprise" },
+    surprisePitchDistance: { tab: "melody", section: "surprise" },
+    // Tuning
+    precision:          { tab: "tuning", section: "accuracy" },
+    precisionRange:     { tab: "tuning", section: "accuracy" },
+    tunSurpriseAmount:  { tab: "tuning", section: "surprise" },
+    surpriseTuningDistance: { tab: "tuning", section: "surprise" },
+    // Duration
+    beatDivisions:      { tab: "duration", section: "generation" },
+    sameLengthProb:     { tab: "duration", section: "generation" },
+    onBeatProb:         { tab: "duration", section: "generation" },
+    offBeatProb:        { tab: "duration", section: "generation" },
+    restMotifStartRatio:{ tab: "duration", section: "generation" },
+    restOnMeterRatio:   { tab: "duration", section: "generation" },
+    restOffMeterRatio:  { tab: "duration", section: "generation" },
+    durSurpriseAmount:  { tab: "duration", section: "surprise" },
+    surpriseRhythmDistance: { tab: "duration", section: "surprise" },
+    // Dynamics
+    dynamicsRange:      { tab: "dynamics", section: "generation" },
+    dynamicsPrecision:  { tab: "dynamics", section: "accuracy" },
+    dynamicsHitRange:   { tab: "dynamics", section: "accuracy" },
+    dynSurpriseAmount:  { tab: "dynamics", section: "surprise" },
+    surpriseDynamicsDistance: { tab: "dynamics", section: "surprise" },
+  };
+
   // All range sliders with data-param
   const distParams = new Set([
-    "intervalPeakedness","intervalRange","rootPullStrength","rootPullShape",
+    "intervalPeakedness","intervalRange","momentum","rootPullStrength","rootPullShape",
     "registerCenter","registerWidth","registerSkew","gapProb","gapMin","gapMax",
     "gapDistanceSlope","gapTimingRange","slideSpeed","phraseGap","spectralProb","spectralMix",
     "spectralPartials","spectralDynamicAmount","spectralRegisterAmount","spectralResonanceAmount",
@@ -1448,8 +1509,14 @@ function renderExplore() {
     "envelopeDecay","envelopeDecaySd","envelopeSustain","envelopeSustainSd",
     "envelopeRelease","envelopeReleaseSd","reverbWet","reverbDecay","reverbTone","reverbPreDelay",
     "motifHitProb","motifHitRange","precision","precisionRange","beatDivisions",
-    "surprisePitchWeight","surpriseRhythmWeight","surpriseFormantWeight",
-    "surpriseDynamicsWeight","surpriseRestWeight","surpriseRangeSd"
+    "onBeatProb","offBeatProb","sameLengthProb","restMotifStartRatio","restOnMeterRatio","restOffMeterRatio",
+    "dynamicsLevel","loudnessRange","dynamicsPrecision","dynamicsRange","formantChangeProb",
+    "surprisePitchWeight","surpriseTuningWeight","surpriseRhythmWeight","surpriseFormantWeight",
+    "surpriseDynamicsWeight","surpriseRestWeight",
+    "surprisePitchDistance","surpriseTuningDistance","surpriseRhythmDistance",
+    "surpriseFormantDistance","surpriseDynamicsDistance",
+    "melSurpriseAmount","tunSurpriseAmount","durSurpriseAmount","dynSurpriseAmount",
+    "dynamicsHitRange"
   ]);
   const harmonicParams = new Set([
     "spectralProfile","spectralPartials","spectralDynamicAmount","spectralRegisterAmount",
@@ -1459,11 +1526,20 @@ function renderExplore() {
     "reverbWet","reverbDecay","reverbTone","reverbPreDelay"
   ]);
   const liveSubnoteParams = new Set([
+    // Melody-generation shaping: changing these continues the current Markov
+    // sequence (incorporating the new params into freshly generated material)
+    // instead of restarting from the top. Use "Restart seq" to hear the full
+    // from-scratch effect.
+    "intervalPeakedness","intervalRange","momentum","registerCenter","registerWidth","registerSkew",
+    "rootPullStrength","rootPullShape",
     "surpriseProb","incorporationRate","surpriseMaxBaked","motifSurpriseProb",
-    "surprisePitchWeight","surpriseRhythmWeight","surpriseFormantWeight",
-    "surpriseDynamicsWeight","surpriseRestWeight","surpriseRangeSd",
+    "surprisePitchWeight","surpriseTuningWeight","surpriseRhythmWeight","surpriseFormantWeight",
+    "surpriseDynamicsWeight","surpriseRestWeight",
+    "surprisePitchDistance","surpriseTuningDistance","surpriseRhythmDistance",
+    "surpriseFormantDistance","surpriseDynamicsDistance",
     "gapProb","gapMin","gapMax","gapDistanceSlope","gapTimingRange","slideSpeed","phraseGap",
     "restMotifStartRatio","restOnMeterRatio","restOffMeterRatio",
+    "dynamicsLevel","loudnessRange","dynamicsPrecision","dynamicsRange","formantChangeProb",
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount",
@@ -1473,9 +1549,23 @@ function renderExplore() {
     "envelopeSustain","envelopeSustainSd","envelopeRelease","envelopeReleaseSd"
   ]);
   v.querySelectorAll("input[type=range][data-param]").forEach(sl => {
+    updateSliderFill(sl);
     sl.oninput = () => {
       const key = sl.dataset.param;
       exploreParams[key] = Number(sl.value);
+      updateSliderFill(sl);
+      // Auto-switch active macro subsection when a slider in that section is moved
+      const sectionInfo = _paramToSection[key];
+      if (sectionInfo && macroSubTab[sectionInfo.tab] !== sectionInfo.section) {
+        macroSubTab[sectionInfo.tab] = sectionInfo.section;
+        // Update subsection active classes in-place (no full re-render)
+        const panel = sl.closest(".macro-panel");
+        if (panel) {
+          panel.querySelectorAll(".macro-subsection").forEach(sec => {
+            sec.classList.toggle("active", sec.dataset.section === sectionInfo.section);
+          });
+        }
+      }
       if (key.startsWith("surprise")) syncSurpriseFeatureParams(exploreParams);
       const out = v.querySelector(`#out_${key}`);
       if (out) out.textContent = fmtOutput(key, sl.value);
@@ -1492,19 +1582,18 @@ function renderExplore() {
       debouncedReplay();
     };
   });
+  // Also apply to any non-data-param sliders (rating, etc.)
+  v.querySelectorAll("input[type=range]:not([data-param])").forEach(sl => updateSliderFill(sl));
 
-  // Compact performance tabs
-  v.querySelector("#performanceTabs").onclick = (e) => {
-    const btn = e.target.closest("[data-performance-tab]");
-    if (!btn) return;
-    performanceTab = btn.dataset.performanceTab;
-    v.querySelectorAll("[data-performance-tab]").forEach(b => {
-      b.classList.toggle("active", b === btn);
-    });
-    v.querySelectorAll("[data-panel]").forEach(panel => {
-      panel.classList.toggle("hidden", panel.dataset.panel !== performanceTab);
-    });
-    drawDistributions();
+  // Production tabs
+  const productionTabs = v.querySelector("#productionTabs");
+  if (productionTabs) productionTabs.onclick = (e) => {
+    const btn = e.target.closest("[data-production-tab]");
+    if (!btn || btn.dataset.productionTab === productionTab) return;
+    const wasPlaying = synth.isPlaying;
+    productionTab = btn.dataset.productionTab;
+    renderExplore();
+    if (wasPlaying) startVisualiser();
   };
 
   // Parameter selectors
@@ -1554,19 +1643,42 @@ function renderExplore() {
     };
   }
 
+  // Checkbox param → section mapping for auto-switch
+  const _checkToSection = {
+    surpriseRestEnabled: { tab: "duration", section: "surprise" },
+    surprisePitchEnabled: { tab: "melody", section: "surprise" },
+    surpriseTuningEnabled: { tab: "tuning", section: "surprise" },
+    surpriseRhythmEnabled: { tab: "duration", section: "surprise" },
+    surpriseDynamicsEnabled: { tab: "dynamics", section: "surprise" },
+  };
   v.querySelectorAll("input[type=checkbox][data-param-check]").forEach(cb => {
     cb.onchange = () => {
       const key = cb.dataset.paramCheck;
+      const wasPlaying = synth.isPlaying;
       exploreParams[key] = cb.checked;
+      // Auto-switch active subsection
+      const secInfo = _checkToSection[key];
+      if (secInfo && macroSubTab[secInfo.tab] !== secInfo.section) {
+        macroSubTab[secInfo.tab] = secInfo.section;
+      }
       syncSurpriseFeatureParams(exploreParams);
       cb.checked = !!exploreParams[key];
+      if ((key.startsWith("surprise") && key.endsWith("Enabled")) || key === "formantEditAll") {
+        renderExplore();
+        if (wasPlaying) {
+          synth.play({ ...exploreParams });
+          startVisualiser();
+        }
+        return;
+      }
       drawDistributions();
       synth.updateGenerationParams({ ...exploreParams });
     };
   });
 
   // Scale mode toggle
-  v.querySelector("#scaleModeGroup").onclick = (e) => {
+  const scaleModeGroup = v.querySelector("#scaleModeGroup");
+  if (scaleModeGroup) scaleModeGroup.onclick = (e) => {
     const btn = e.target.closest(".mode-btn");
     if (!btn) return;
     const mode = btn.dataset.smode;
@@ -1613,22 +1725,13 @@ function renderExplore() {
   }
 
   // Note grid clicks
-  v.querySelector("#noteGridContainer").onclick = (e) => {
+  const noteGridContainer = v.querySelector("#noteGridContainer");
+  if (noteGridContainer) noteGridContainer.onclick = (e) => {
     const cell = e.target.closest(".note-cell");
     if (!cell) return;
     handleNoteGridClick(cell);
     syncRootNotesWithScale(v);
   };
-
-  // Root note grid clicks
-  const rootGrid = v.querySelector("#rootNoteGrid");
-  if (rootGrid) {
-    rootGrid.onclick = (e) => {
-      const cell = e.target.closest(".root-cell");
-      if (!cell || cell.classList.contains("disabled")) return;
-      handleRootNoteClick(cell);
-    };
-  }
 
   // Formant chips
   const formantChips = v.querySelector("#formantChips");
@@ -1652,6 +1755,7 @@ function renderExplore() {
         input.disabled = !active;
         input.closest(".formant-weight")?.classList.toggle("disabled", !active);
       });
+      updateFormantWeightCircle(v);
       drawDistributions();
       debouncedReplay();
     };
@@ -1664,6 +1768,21 @@ function renderExplore() {
       exploreParams.formantWeights[key] = Number(sl.value);
       const out = v.querySelector(`[data-formant-weight-out="${key}"]`);
       if (out) out.textContent = `${Math.round(Number(sl.value) * 100)}%`;
+      updateFormantWeightCircle(v);
+      drawDistributions();
+      synth.updateGenerationParams({ ...exploreParams });
+    };
+  });
+  updateFormantWeightCircle(v);
+
+  v.querySelectorAll("input[data-formant-scope]").forEach(sl => {
+    sl.oninput = () => {
+      ensureFormantWeights(exploreParams);
+      const param = sl.dataset.formantScope;
+      const value = Number(sl.value);
+      applyFormantScopedParam(param, value);
+      const out = v.querySelector(`[data-formant-scope-out="${param}"]`);
+      if (out) out.textContent = fmtOutput(param, value);
       drawDistributions();
       synth.updateGenerationParams({ ...exploreParams });
     };
@@ -1724,16 +1843,23 @@ function renderExplore() {
   const tabGlobal = v.querySelector("#tabGlobal");
   const myList = v.querySelector("#myPresets");
   const globalList = v.querySelector("#globalPresets");
+  const libraryCard = v.querySelector("#libraryCard");
 
   tabMy.onclick = () => {
     tabMy.classList.add("active"); tabGlobal.classList.remove("active");
     myList.classList.remove("hidden"); globalList.classList.add("hidden");
+    libraryCard?.classList.add("is-open");
   };
   tabGlobal.onclick = async () => {
     tabGlobal.classList.add("active"); tabMy.classList.remove("active");
     globalList.classList.remove("hidden"); myList.classList.add("hidden");
+    libraryCard?.classList.add("is-open");
     await loadGlobalPresets(globalList);
   };
+  const topMyPresets = v.querySelector("#topMyPresets");
+  if (topMyPresets) topMyPresets.onclick = () => tabMy.click();
+  const topLibrary = v.querySelector("#topLibrary");
+  if (topLibrary) topLibrary.onclick = () => tabGlobal.click();
 
   // Initial renders
   renderPresetList(myList, loadPresets(), "my");
@@ -1745,6 +1871,292 @@ function renderExplore() {
   drawDistributions();
 }
 
+function macroWorkspaceHTML(p) {
+  return `
+    <div class="card scale-card">
+      <div class="section-label">Scale & Root</div>
+      <div class="mode-btns" id="scaleModeGroup">
+        <button class="mode-btn${p.scaleMode !== 'edo' ? ' active' : ''}" data-smode="12tone">12-tone</button>
+        <button class="mode-btn${p.scaleMode === 'edo' ? ' active' : ''}" data-smode="edo">N-EDO</button>
+      </div>
+      <div id="scaleOptions">
+        ${p.scaleMode !== 'edo' ? `
+          <div class="scale-preset-row">
+            <label class="text-sm">Preset
+              <select id="scalePresetSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem">
+                ${Object.entries(SCALE_PRESETS).map(([k, v]) =>
+                  `<option value="${k}" ${p.scalePreset === k ? 'selected' : ''}>${v.label}</option>`
+                ).join('')}
+              </select>
+            </label>
+          </div>
+        ` : `
+          <div class="edo-row">
+            <span class="text-sm" style="color:var(--text2)">Divisions:</span>
+            <input type="number" id="edoDivisionsInput" class="edo-input"
+                   min="3" max="48" value="${p.edoDivisions}"/>
+          </div>
+        `}
+      </div>
+      <div id="noteGridContainer">${buildNoteGridHTML(p)}</div>
+      <div class="note-grid-legend">
+        <div class="legend-item"><div class="legend-dot off"></div> Off</div>
+        <div class="legend-item"><div class="legend-dot scale"></div> In scale</div>
+        <div class="legend-item"><div class="legend-dot sub"></div> Sub-scale</div>
+        <div class="legend-item"><div class="legend-dot root"></div> Root</div>
+      </div>
+      <div class="section-subhead">Root Pull</div>
+      <div class="controls-grid root-controls">
+        ${controlRow("subScaleWeight", "Sub-scale weight", p.subScaleWeight, 0.5, 1.0, 0.01)}
+        ${controlRow("rootPullStrength", "Root pull", p.rootPullStrength, 0, 1, 0.01)}
+        ${controlRow("rootPullShape", "Pull shape", p.rootPullShape, 0, 1, 0.01)}
+      </div>
+      <div class="dist-display" id="distRoot">
+        <canvas class="dist-canvas" id="cvRoot" width="240" height="72"></canvas>
+        <span class="dist-label">Root pull</span>
+      </div>
+    </div>
+
+    <div class="card macro-card">
+      <div class="macro-card-head">
+        <div>
+          <div class="section-label">Macro Probability</div>
+        </div>
+        <div class="macro-tabs" id="macroTabs">
+          ${macroTabButton("melody", "Melody")}
+          ${macroTabButton("tuning", "Tuning")}
+          ${macroTabButton("duration", "Duration")}
+          ${macroTabButton("dynamics", "Dynamics")}
+        </div>
+      </div>
+      ${macroPanelHTML(p)}
+    </div>
+
+    <div class="card structure-card">
+      <div class="section-label">Markov Sequence &amp; Surprise</div>
+      <div class="section-subhead">Sequence</div>
+      <div class="controls-grid">
+        ${controlRow("motifCount", "Motif states", p.motifCount, 1, 8, 1)}
+        ${controlRow("motifLengthBeats", "Loop length (beats)", p.motifLengthBeats, 1, 16, 1)}
+        ${controlRow("sequenceProb", "Order bias", p.sequenceProb, 0, 1, 0.01)}
+        ${controlRow("motifSurpriseProb", "Motif mutation", p.motifSurpriseProb, 0, 1, 0.01)}
+      </div>
+      <div class="sequence-divider"></div>
+      <div class="section-subhead">Surprise</div>
+      <div class="controls-grid">
+        ${controlRow("surpriseProb", "Surprise chance (per note)", p.surpriseProb, 0, 1, 0.01)}
+        ${controlRow("incorporationRate", "Incorporation chance", p.incorporationRate, 0, 1, 0.01)}
+        ${selectControlRow("surpriseMaxBaked", "Max baked surprises", p.surpriseMaxBaked, bakedSurpriseOptions(p.surpriseMaxBaked))}
+      </div>
+      ${checkboxControl("surpriseAllowMultiple", "Multiple features / note", p.surpriseAllowMultiple)}
+      ${surpriseWeightControlsHTML(p)}
+    </div>
+
+    <div class="card production-card">
+      <div class="production-head">
+        <div>
+          <div class="section-label">Production Context</div>
+          <div class="micro-note">Playback dressing only: percussion and space do not change motif generation.</div>
+        </div>
+      </div>
+      ${productionPanelHTML(p)}
+    </div>
+  `;
+}
+
+function macroTabButton(key, label) {
+  return `<button class="macro-tab${macroTab === key ? " active" : ""}" data-macro-tab="${key}">${label}</button>`;
+}
+
+function macroPanelHTML(p) {
+  if (macroTab === "tuning") {
+    const tunSub = macroSubTab.tuning;
+    return `
+      <div class="macro-panel tuning-panel">
+        <div class="macro-controls">
+          <div class="macro-subsection${tunSub === "accuracy" ? " active" : ""}" data-section="accuracy">
+            <div class="subsection-label">Accuracy</div>
+            ${controlRow("precision", "Probability", p.precision, 0, 1, 0.01)}
+            ${controlRow("precisionRange", "Hit range", p.precisionRange, 0, 100, 1)}
+          </div>
+
+          <div class="macro-subsection${!p.surpriseTuningEnabled ? " surprise-disabled" : ""}${tunSub === "surprise" ? " active" : ""}" data-section="surprise">
+            <div class="subsection-label">Surprise</div>
+            ${checkboxControl("surpriseTuningEnabled", "Enable surprise", p.surpriseTuningEnabled)}
+            ${controlRow("tunSurpriseAmount", "Amount", p.tunSurpriseAmount ?? 0.5, 0, 1, 0.01)}
+            ${controlRow("surpriseTuningDistance", "Range", p.surpriseTuningDistance, 0, 1, 0.01)}
+          </div>
+        </div>
+        <div class="macro-monitor">
+          <div class="monitor-title">Tuning Deviation (Cents)</div>
+          <canvas class="dist-canvas accuracy-canvas" id="cvTuningAccuracy" width="620" height="300"></canvas>
+        </div>
+      </div>`;
+  }
+  if (macroTab === "duration") {
+    const durSub = macroSubTab.duration;
+    return `
+      <div class="macro-panel duration-panel">
+        <div class="macro-controls">
+          <div class="macro-subsection${durSub === "generation" ? " active" : ""}" data-section="generation">
+            <div class="subsection-label">Generation</div>
+            ${controlRow("beatDivisions", "Beat divisions", p.beatDivisions, 1, 6, 1)}
+            ${controlRow("sameLengthProb", "Note length prob", p.sameLengthProb, 0, 1, 0.01)}
+            ${controlRow("onBeatProb", "On-meter onset", p.onBeatProb, 0, 1, 0.01)}
+            ${controlRow("offBeatProb", "Off-meter onset", p.offBeatProb, 0, 1, 0.01)}
+            ${controlRow("restMotifStartRatio", "Rest first", p.restMotifStartRatio, 0, 0.95, 0.01)}
+            ${controlRow("restOnMeterRatio", "Rest on-meter", p.restOnMeterRatio, 0, 0.95, 0.01)}
+            ${controlRow("restOffMeterRatio", "Rest off-meter", p.restOffMeterRatio, 0, 0.95, 0.01)}
+          </div>
+
+          <div class="macro-subsection${!p.surpriseRhythmEnabled ? " surprise-disabled" : ""}${durSub === "surprise" ? " active" : ""}" data-section="surprise">
+            <div class="subsection-label">Surprise</div>
+            ${checkboxControl("surpriseRhythmEnabled", "Enable surprise", p.surpriseRhythmEnabled)}
+            ${controlRow("durSurpriseAmount", "Amount", p.durSurpriseAmount ?? 0.5, 0, 1, 0.01)}
+            ${controlRow("surpriseRhythmDistance", "Range", p.surpriseRhythmDistance, 0, 1, 0.01)}
+            ${checkboxControl("surpriseRestEnabled", "Include surprise rests", p.surpriseRestEnabled)}
+          </div>
+        </div>
+        <div class="macro-monitor duration-monitor">
+          <div class="monitor-title">Duration Difference (Divisions)</div>
+          <canvas class="dist-canvas accuracy-canvas" id="cvDurationAccuracy" width="620" height="260"></canvas>
+          <div class="breaks-block">
+            <div class="section-label">Breaks & Slides</div>
+            <div class="breaks-grid">
+              ${controlRow("gapProb", "Chance", p.gapProb, 0, 1, 0.01)}
+              ${controlRow("gapMin", "Min", p.gapMin, -0.8, 0.8, 0.01)}
+              ${controlRow("gapMax", "Max", p.gapMax, -0.8, 0.8, 0.01)}
+              ${controlRow("gapDistanceSlope", "Distance slope", p.gapDistanceSlope, 0, 1, 0.01)}
+              ${controlRow("gapTimingRange", "Timing range", p.gapTimingRange, 0, 0.4, 0.01)}
+              ${controlRow("slideSpeed", "Slide speed", p.slideSpeed, 0, 1, 0.01)}
+              ${controlRow("phraseGap", "Phrase gap", p.phraseGap, 0, 0.8, 0.01)}
+            </div>
+            <canvas class="mini-canvas" id="cvGap" width="620" height="76"></canvas>
+          </div>
+        </div>
+      </div>`;
+  }
+  if (macroTab === "dynamics") {
+    const dynSub = macroSubTab.dynamics;
+    return `
+      <div class="macro-panel dynamics-panel">
+        <div class="macro-controls">
+          <div class="macro-subsection${dynSub === "generation" ? " active" : ""}" data-section="generation">
+            <div class="subsection-label">Generation</div>
+            ${controlRow("dynamicsRange", "Variability", p.dynamicsRange, 0, 0.75, 0.01)}
+          </div>
+
+          <div class="macro-subsection${dynSub === "accuracy" ? " active" : ""}" data-section="accuracy">
+            <div class="subsection-label">Accuracy</div>
+            ${controlRow("dynamicsPrecision", "Probability", p.dynamicsPrecision, 0, 1, 0.01)}
+            ${controlRow("dynamicsHitRange", "Hit range", p.dynamicsHitRange ?? Math.round(p.dynamicsRange * 100), 0, 75, 1)}
+          </div>
+
+          <div class="macro-subsection${!p.surpriseDynamicsEnabled ? " surprise-disabled" : ""}${dynSub === "surprise" ? " active" : ""}" data-section="surprise">
+            <div class="subsection-label">Surprise</div>
+            ${checkboxControl("surpriseDynamicsEnabled", "Enable surprise", p.surpriseDynamicsEnabled)}
+            ${controlRow("dynSurpriseAmount", "Amount", p.dynSurpriseAmount ?? 0.5, 0, 1, 0.01)}
+            ${controlRow("surpriseDynamicsDistance", "Range", p.surpriseDynamicsDistance, 0, 1, 0.01)}
+          </div>
+
+          <div class="register-mini-section">
+            <div class="subsection-label">Loudness Register</div>
+            ${controlRow("dynamicsLevel", "Centre", p.dynamicsLevel, 0.05, 1, 0.01)}
+            ${controlRow("loudnessRange", "Range", p.loudnessRange, 0, 1, 0.01)}
+            <canvas class="mini-canvas register-mini-canvas" id="cvLoudnessRegister" width="280" height="50"></canvas>
+          </div>
+        </div>
+        <div class="macro-monitor">
+          <div class="monitor-title">Dynamic Difference (%)</div>
+          <canvas class="dist-canvas accuracy-canvas" id="cvDynamicsAccuracy" width="620" height="300"></canvas>
+        </div>
+      </div>`;
+  }
+  const melSub = macroSubTab.melody;
+  return `
+    <div class="macro-panel melody-panel">
+      <div class="macro-controls">
+        <div class="macro-subsection${melSub === "generation" ? " active" : ""}" data-section="generation">
+          <div class="subsection-label">Generation</div>
+          ${controlRow("intervalPeakedness", "Interval shape", p.intervalPeakedness, 0, 4, 0.05)}
+          ${controlRow("intervalRange", "Interval range", p.intervalRange, 1, 24, 1)}
+          ${controlRow("momentum", "Momentum", p.momentum, 0, 1, 0.01)}
+        </div>
+
+        <div class="macro-subsection${melSub === "accuracy" ? " active" : ""}" data-section="accuracy">
+          <div class="subsection-label">Accuracy</div>
+          ${controlRow("motifHitProb", "Probability", p.motifHitProb, 0, 1, 0.01)}
+          ${controlRow("motifHitRange", "Hit range", p.motifHitRange, 0, 12, 1)}
+        </div>
+
+        <div class="macro-subsection${!p.surprisePitchEnabled ? " surprise-disabled" : ""}${melSub === "surprise" ? " active" : ""}" data-section="surprise">
+          <div class="subsection-label">Surprise</div>
+          ${checkboxControl("surprisePitchEnabled", "Enable surprise", p.surprisePitchEnabled)}
+          ${controlRow("melSurpriseAmount", "Amount", p.melSurpriseAmount ?? 0.5, 0, 1, 0.01)}
+          ${controlRow("surprisePitchDistance", "Range", p.surprisePitchDistance, 0, 1, 0.01)}
+        </div>
+
+        <div class="register-mini-section">
+          <div class="subsection-label">Register</div>
+          ${controlRow("registerCenter", "Centre", p.registerCenter, -24, 24, 1)}
+          ${controlRow("registerWidth", "Width", p.registerWidth, 2, 36, 1)}
+          ${controlRow("registerSkew", "Skew", p.registerSkew, -1, 1, 0.05)}
+          <canvas class="mini-canvas register-mini-canvas" id="cvRegister" width="280" height="50"></canvas>
+        </div>
+      </div>
+      <div class="macro-monitor melody-monitor">
+        <div class="monitor-title">Scale Degree Difference (Steps)</div>
+        <canvas class="dist-canvas accuracy-canvas" id="cvMelodyAccuracy" width="620" height="340"></canvas>
+      </div>
+    </div>`;
+}
+
+function productionPanelHTML(p) {
+  return `
+    <div class="perf-panel production-panel production-panel-split">
+      <div class="perf-section space-section">
+        <div class="perf-section-title">Reverb</div>
+        <select data-param-select="reverbType" class="param-select">
+          ${reverbTypeOptions(p.reverbType)}
+        </select>
+        <div class="controls-grid">
+          ${controlRow("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01)}
+          ${controlRow("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1)}
+          ${controlRow("reverbTone", "Tone", p.reverbTone, 0, 1, 0.01)}
+          ${controlRow("reverbPreDelay", "Pre-delay", p.reverbPreDelay, 0, 0.25, 0.005)}
+        </div>
+        <canvas class="mini-canvas" id="cvReverb" width="360" height="54"></canvas>
+      </div>
+      <div class="perf-section percussion-section">
+        <div class="perf-section-title">Percussion</div>
+        <div class="perc-layers">
+          <div class="perc-layer">
+            <div class="perc-header">Beat</div>
+            <select data-perc="percBeatSound" class="perc-select">
+              ${percSoundOptions(p.percBeatSound)}
+            </select>
+            ${controlRow("percBeatVol", "Vol", p.percBeatVol, 0, 1, 0.01)}
+          </div>
+          <div class="perc-layer">
+            <div class="perc-header">Motif</div>
+            <select data-perc="percMotifSound" class="perc-select">
+              ${percSoundOptions(p.percMotifSound)}
+            </select>
+            ${controlRow("percMotifVol", "Vol", p.percMotifVol, 0, 1, 0.01)}
+          </div>
+          <div class="perc-layer">
+            <div class="perc-header">Downbeat</div>
+            <select data-perc="percDownbeatSound" class="perc-select">
+              ${percSoundOptions(p.percDownbeatSound)}
+            </select>
+            ${controlRow("percDownbeatVol", "Vol", p.percDownbeatVol, 0, 1, 0.01)}
+            ${controlRow("percDownbeatEvery", "Every", p.percDownbeatEvery, 1, 16, 1)}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function subnoteWorkspaceHTML(p) {
   const formantMode = isFormantMode(p);
   const fourierDisabled = formantMode ? " mode-disabled" : "";
@@ -1753,22 +2165,39 @@ function subnoteWorkspaceHTML(p) {
   return `
     <div class="card subnote-full-card ${formantMode ? "is-formant-mode" : "is-fourier-mode"}">
       <div class="subnote-full-layout">
-        <div class="harmonic-stage${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
-          <div class="subnote-head">
-            <div>
-              <div class="section-label">Harmonic Decomposition</div>
-              <h2>${esc(profile.label)}</h2>
+        ${formantMode ? `
+          <div class="formant-stage" data-sound-path="formant" aria-disabled="false">
+            <div class="subnote-head">
+              <div>
+                <div class="section-label">Formant Accuracy</div>
+                <h2>All formants</h2>
+              </div>
+              <div class="signature-legend">
+                <span><i class="legend-line acc"></i> accuracy</span>
+                <span><i class="legend-line surp"></i> surprise</span>
+              </div>
             </div>
-            <div class="signature-legend">
-              <span><i class="legend-band spread"></i> SD band</span>
-              <span><i class="legend-line mean"></i> amplitude mean</span>
-              <span><i class="legend-line quiet"></i> low reg</span>
-              <span><i class="legend-line loud"></i> high reg</span>
-              <span><i class="legend-line sample"></i> sampled sum</span>
-            </div>
+            ${formantAccuracyControlsHTML(p)}
+            <canvas class="formant-canvas accuracy-canvas" id="cvFormantAccuracy" width="760" height="360"></canvas>
           </div>
-          <canvas id="cvHarmonicSignature" width="920" height="620"></canvas>
-        </div>
+        ` : `
+          <div class="harmonic-stage" data-sound-path="fourier" aria-disabled="false">
+            <div class="subnote-head">
+              <div>
+                <div class="section-label">Harmonic Decomposition</div>
+                <h2>${esc(profile.label)}</h2>
+              </div>
+              <div class="signature-legend">
+                <span><i class="legend-band spread"></i> SD band</span>
+                <span><i class="legend-line mean"></i> amplitude mean</span>
+                <span><i class="legend-line quiet"></i> low reg</span>
+                <span><i class="legend-line loud"></i> high reg</span>
+                <span><i class="legend-line sample"></i> sampled sum</span>
+              </div>
+            </div>
+            <canvas id="cvHarmonicSignature" width="920" height="620"></canvas>
+          </div>
+        `}
 
         <div class="subnote-side">
           <div class="subnote-side-section sound-source-section">
@@ -1789,9 +2218,8 @@ function subnoteWorkspaceHTML(p) {
             <div class="controls-grid">
               ${controlRow("formantChangeProb", "Formant change", p.formantChangeProb, 0, 1, 0.01)}
             </div>
-            ${featureSurpriseBlock("formant", "Formant", "surpriseFormantEnabled", "surpriseFormantWeight", p.surpriseFormantEnabled, p.surpriseFormantWeight)}
+            ${featureSurpriseBlock("formant", "Formant", "surpriseFormantEnabled", null, p.surpriseFormantEnabled, p.surpriseFormantDistance)}
             ${formantWeightControlsHTML(p)}
-            <canvas class="formant-canvas" id="cvFormantAccuracy" width="260" height="132"></canvas>
           </div>
 
           <div class="subnote-side-section${formantDisabled}" data-sound-path="formant" aria-disabled="${!formantMode}">
@@ -1983,7 +2411,10 @@ function syncHarmonicWorkspace(v) {
   if (!card) return;
   ensureSpectralPartialParams(exploreParams);
   const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
-  const title = card.querySelector(".subnote-head h2");
+  // Only the Fourier/harmonic stage heading reflects the instrument label.
+  // Scope to .harmonic-stage so this never clobbers the formant-stage heading
+  // (which shows the vowel space) when in formant mode.
+  const title = card.querySelector(".harmonic-stage .subnote-head h2");
   if (title) title.textContent = profile.label;
   const editor = card.querySelector("#harmonicEditor");
   if (editor) editor.innerHTML = harmonicEditorHTML(exploreParams);
@@ -2023,14 +2454,17 @@ function buildNoteGridHTML(p) {
   const divisions = isEDO ? (p.edoDivisions || 12) : 12;
   const customDeg = p.customDegrees || [];
   const subNotes = p.subScaleNotes || [];
+  const rootNotes = p.rootNotes || [];
 
   let html = '<div class="note-grid">';
   for (let d = 0; d < divisions; d++) {
     const name = (divisions === 12) ? NOTE_NAMES_12[d] : String(d);
     const inScale = customDeg.includes(d);
     const inSub = subNotes.includes(d) && inScale;
+    const isRoot = rootNotes.includes(d) && inScale;
     let cls = "note-cell";
-    if (inSub) cls += " in-sub";
+    if (isRoot) cls += " is-root";
+    else if (inSub) cls += " in-sub";
     else if (inScale) cls += " in-scale";
     html += `<div class="${cls}" data-degree="${d}">${name}</div>`;
   }
@@ -2053,45 +2487,53 @@ function syncRootNotesWithScale(v) {
   if (exploreParams.rootNotes.length === 0) {
     exploreParams.rootNotes = [scaleDegrees[0] ?? 0];
   }
-  const rootGrid = v.querySelector("#rootNoteGrid");
-  if (rootGrid) {
-    rootGrid.innerHTML = buildRootNoteGridHTML(exploreParams);
-    decorateTooltips(rootGrid);
-  }
+  rerenderNoteGrid(v);
 }
 
 function handleNoteGridClick(cell) {
   const d = parseInt(cell.dataset.degree);
   const p = exploreParams;
+  if (!p.customDegrees) p.customDegrees = [];
+  if (!p.subScaleNotes) p.subScaleNotes = [];
+  if (!p.rootNotes) p.rootNotes = [];
 
-  if (cell.classList.contains("in-sub")) {
-    // Sub-scale -> off
-    cell.classList.remove("in-sub");
-    p.customDegrees = (p.customDegrees || []).filter(x => x !== d);
-    p.subScaleNotes = (p.subScaleNotes || []).filter(x => x !== d);
+  if (cell.classList.contains("is-root")) {
+    // Root -> off, unless this is the last active scale note.
+    const remainingScale = p.customDegrees.filter(x => x !== d);
+    if (remainingScale.length === 0) {
+      p.rootNotes = [d];
+    } else {
+      p.rootNotes = p.rootNotes.filter(x => x !== d);
+      p.subScaleNotes = p.subScaleNotes.filter(x => x !== d);
+      p.customDegrees = remainingScale;
+    }
+  } else if (cell.classList.contains("in-sub")) {
+    // Sub-scale -> root.
+    p.subScaleNotes = p.subScaleNotes.filter(x => x !== d);
+    if (!p.customDegrees.includes(d)) p.customDegrees.push(d);
+    if (!p.rootNotes.includes(d)) p.rootNotes.push(d);
   } else if (cell.classList.contains("in-scale")) {
-    // In scale -> promote to sub-scale
-    cell.classList.remove("in-scale");
-    cell.classList.add("in-sub");
-    if (!p.subScaleNotes) p.subScaleNotes = [];
+    // In scale -> promote to sub-scale.
     if (!p.subScaleNotes.includes(d)) p.subScaleNotes.push(d);
   } else {
-    // Off -> add to scale
-    cell.classList.add("in-scale");
-    if (!p.customDegrees) p.customDegrees = [];
+    // Off -> add to scale.
     if (!p.customDegrees.includes(d)) {
       p.customDegrees.push(d);
-      p.customDegrees.sort((a, b) => a - b);
     }
   }
+  p.customDegrees = [...new Set(p.customDegrees)].sort((a, b) => a - b);
+  p.subScaleNotes = [...new Set(p.subScaleNotes)].filter(x => p.customDegrees.includes(x));
+  p.rootNotes = [...new Set(p.rootNotes)].filter(x => p.customDegrees.includes(x));
 
   // Ensure at least one note remains in scale
   if (!p.customDegrees || p.customDegrees.length === 0) {
-    cell.classList.add("in-scale");
     p.customDegrees = [d];
   }
+  if (!p.rootNotes.length) p.rootNotes = [p.customDegrees[0]];
 
+  rerenderNoteGrid(document);
   debouncedReplay();
+  drawDistributions();
 }
 
 // ─── Explore: Root Note Grid ────────────────────────────────
@@ -2145,31 +2587,76 @@ function handleRootNoteClick(cell) {
 
 // ─── Explore: Distribution Displays ─────────────────────────
 
+function drawMelodyMacroDist() {
+  drawMacroDist("cvMelodyAccuracy", {
+    title: "Melody",
+    activeSection: macroSubTab.melody || "accuracy",
+    range: Math.max(3, Math.round(exploreParams.intervalRange || 12)),
+    step: 1,
+    unit: "deg",
+    xLabel: "scale-degree difference",
+    labelEvery: 2,
+    lockRange: true,
+    markerAxis: "melody",
+    generation: {
+      peakedness: exploreParams.intervalPeakedness ?? 1.5,
+      range: exploreParams.intervalRange ?? 7,
+    },
+    accuracy: {
+      prob: exploreParams.motifHitProb ?? 1,
+      hitRange: exploreParams.motifHitRange ?? 2,
+    },
+    surprise: {
+      amount: exploreParams.melSurpriseAmount ?? 0.5,
+      range: exploreParams.surprisePitchDistance ?? 1,
+      weight: exploreParams.surprisePitchEnabled
+        ? Math.max(0, Math.min(1, exploreParams.surpriseChance ?? 0.08))
+        : 0,
+    },
+  });
+}
+
+function drawTuningMacroDist() {
+  drawMacroDist("cvTuningAccuracy", {
+    title: "Tuning",
+    activeSection: macroSubTab.tuning || "accuracy",
+    range: Math.max(10, Math.ceil((exploreParams.precisionRange || 20) / 5) * 5),
+    step: (exploreParams.precisionRange || 20) > 50 ? 10 : 5,
+    unit: "c",
+    xLabel: "cents difference",
+    markerAxis: "tuning",
+    generation: null,  // tuning has no generation layer
+    accuracy: {
+      prob: exploreParams.precision ?? 1,
+      hitRange: exploreParams.precisionRange ?? 12,
+    },
+    surprise: {
+      amount: exploreParams.tunSurpriseAmount ?? 0.5,
+      range: exploreParams.surpriseTuningDistance ?? 0.9,
+      weight: exploreParams.surpriseTuningEnabled
+        ? Math.max(0, Math.min(1, exploreParams.surpriseChance ?? 0.08))
+        : 0,
+    },
+  });
+}
+
+// The four macro histograms that carry a live note trace — redrawn per-frame while playing.
+function drawMacroDistsAll() {
+  drawMelodyMacroDist();
+  drawTuningMacroDist();
+  drawDurationMacroDist();
+  drawDynamicsMacroDist();
+}
+
 function drawDistributions() {
   drawIntervalDist();
-  drawAccuracyDist("cvMelodyAccuracy", {
-    kind: "melody",
-    range: Math.max(3, Math.round(exploreParams.intervalRange || 12)),
-    accuracyProb: exploreParams.motifHitProb ?? 1,
-    accuracySd: Math.max(0.35, (exploreParams.motifHitRange || 1) / Math.max(1, exploreParams.surpriseRangeSd || 3)),
-    surpriseEnabled: !!exploreParams.surprisePitchEnabled,
-    surpriseWeight: exploreParams.surprisePitchWeight ?? 1,
-    unit: "deg",
-    note: "scale-degree difference",
-  });
-  drawAccuracyDist("cvTuningAccuracy", {
-    kind: "tuning",
-    range: Math.max(10, Math.round(exploreParams.precisionRange || 20)),
-    accuracyProb: exploreParams.precision ?? 1,
-    accuracySd: Math.max(1, (exploreParams.precisionRange || 1) / Math.max(1, exploreParams.surpriseRangeSd || 3)),
-    surpriseEnabled: false,
-    surpriseWeight: 0,
-    unit: "c",
-    note: "cents",
-  });
+  drawMelodyMacroDist();
+  drawTuningMacroDist();
   drawRootPullDist();
   drawRegisterDist();
-  drawDurationAccuracyDist();
+  drawLoudnessRegisterDist();
+  drawDurationMacroDist();
+  drawDynamicsMacroDist();
   drawFormantAccuracyDist();
   drawGapDist();
   drawReverbDist();
@@ -2187,9 +2674,11 @@ function drawIntervalDist() {
   ctx.clearRect(0, 0, w, h);
 
   const peak = exploreParams.intervalPeakedness;
-  const range = exploreParams.intervalRange;
+  const range = Math.max(1, exploreParams.intervalRange);
 
-  // Draw exponential decay curve for intervals
+  // Interval-shape curve: pure Gaussian whose σ narrows with the shape dial.
+  const shapeVal = (dist) => intervalShapeWeight(dist, peak, range);
+
   ctx.fillStyle = "rgba(245,158,11,0.08)";
   ctx.strokeStyle = "rgba(245,158,11,0.7)";
   ctx.lineWidth = 1.5;
@@ -2197,10 +2686,8 @@ function drawIntervalDist() {
   ctx.moveTo(0, h);
   for (let x = 0; x <= w; x++) {
     const dist = (x / w) * range;
-    const val = Math.exp(-dist * peak);
-    const y = h - val * (h - 4);
-    if (x === 0) ctx.lineTo(x, y);
-    else ctx.lineTo(x, y);
+    const y = h - shapeVal(dist) * (h - 4);
+    ctx.lineTo(x, y);
   }
   ctx.lineTo(w, h);
   ctx.closePath();
@@ -2208,8 +2695,7 @@ function drawIntervalDist() {
   ctx.beginPath();
   for (let x = 0; x <= w; x++) {
     const dist = (x / w) * range;
-    const val = Math.exp(-dist * peak);
-    const y = h - val * (h - 4);
+    const y = h - shapeVal(dist) * (h - 4);
     if (x === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
@@ -2223,156 +2709,843 @@ function drawIntervalDist() {
   ctx.fillText(String(range), w - 8, h - 2);
 }
 
-function drawAccuracyDist(canvasId, cfg) {
+/* ── Probability display: 3-layer LED bar chart (Generation / Accuracy / Surprise) ── */
+
+// Phosphor persistence: store previous bar heights for decay trail
+const _prevBars = {};
+
+// Live note "scope trace": how long a played note's vertical marker lingers (burn-in)
+const MARKER_TRAIL_SEC = 2.6;
+
+/**
+ * recentAxisMarkers — recent played-note positions for a given histogram axis.
+ * Returns [{ value, age, sounding }] where `value` is the note's signed position
+ * on that axis (0 = centre), `age` is seconds since onset, `sounding` = still ringing.
+ *   melody   → scale-degree interval from previous note
+ *   tuning   → intonation deviation in cents (0 = in tune)
+ *   duration → change in note length (divs) from previous note
+ *   dynamics → change in velocity (%) from previous note
+ */
+function recentAxisMarkers(axis) {
+  const tl = synth.getNoteTimeline ? synth.getNoteTimeline() : null;
+  if (!tl || !tl.playing || !tl.events || !tl.events.length) return [];
+  const now = tl.now;
+  let prevDeg = null, prevDur = null, prevVel = null;
+  const out = [];
+  for (const e of tl.events) {
+    const sounding = !e.isRest && (e.velocity || 0) > 0;
+    let v = null;
+    if (axis === "melody")        v = (sounding && prevDeg != null) ? (e.degree - prevDeg) : null;
+    else if (axis === "tuning")   v = sounding ? (e.intonationCents || 0) : null;
+    else if (axis === "duration") v = (sounding && prevDur != null) ? (e.durationDivs - prevDur) : null;
+    else if (axis === "dynamics") v = (sounding && prevVel != null) ? ((e.velocity - prevVel) * 100) : null;
+    if (sounding) { prevDeg = e.degree; prevDur = e.durationDivs; prevVel = e.velocity; }
+    if (v == null || e.when > now) continue;
+    const age = now - e.when;
+    if (age > MARKER_TRAIL_SEC) continue;
+    out.push({ value: v, age, sounding: now < e.when + (e.dur || 0), role: e.noteRole || "generation" });
+  }
+  return out;
+}
+
+/**
+ * drawMacroDist — unified 3-layer distribution renderer.
+ *
+ * cfg = {
+ *   title: string,
+ *   activeSection: "generation" | "accuracy" | "surprise",
+ *   range: number,          // ± range in steps
+ *   step: number,           // step size (default 1)
+ *   unit: string,           // x-axis unit label
+ *   xLabel: string,         // x-axis description
+ *   labelEvery: number,     // label every Nth bar
+ *   lockRange: bool,        // if true, don't auto-expand range
+ *
+ *   generation: {           // exponential-decay interval shape (melody only)
+ *     peakedness: number,   // λ in e^(-λ|d|)
+ *     range: number,        // interval range
+ *   } | null,
+ *
+ *   accuracy: {
+ *     prob: number,         // 0–1  (1 = delta at centre, 0.5 = normal, 0 = uniform)
+ *     hitRange: number,     // range in steps (3σ boundary)
+ *   },
+ *
+ *   surprise: {
+ *     amount: number,       // 0–1  (0 = matches accuracy, 0.5 = bimodal zero@mean, 1 = stacked at limits)
+ *     range: number,        // 0–1  distance fraction
+ *     weight: number,       // fraction of total AUC allocated to surprise (from surpriseChance)
+ *   },
+ * }
+ */
+function drawMacroDist(canvasId, cfg) {
   const cv = document.getElementById(canvasId);
   if (!cv) return;
   const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
-  ctx.clearRect(0, 0, w, h);
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
 
-  const padL = 42;
-  const padR = 8;
-  const padT = 8;
-  const padB = 13;
-  const range = Math.max(1, Math.round(cfg.range || 6));
-  const values = [];
-  for (let d = -range; d <= range; d++) values.push(d);
-  const bracketSd = Math.max(1, Number(exploreParams.surpriseRangeSd || 3));
-  const accSd = Math.max(0.1, cfg.accuracySd || range / bracketSd);
-  const accuracy = values.map(v => Math.exp(-0.5 * (v / accSd) ** 2));
-  const surpriseOffset = Math.max(2, Math.min(range, accSd * bracketSd * 0.82));
-  const surpriseSd = Math.max(0.45, accSd * 0.75);
-  const surprise = values.map(v => (
-    Math.exp(-0.5 * ((v - surpriseOffset) / surpriseSd) ** 2) +
-    Math.exp(-0.5 * ((v + surpriseOffset) / surpriseSd) ** 2)
-  ) * (cfg.surpriseEnabled ? Math.max(0, cfg.surpriseWeight || 0) : 0));
-  const maxVal = Math.max(0.001, ...accuracy, ...surprise);
-  const rowH = (h - padT - padB) / values.length;
-  const x0 = padL;
-  const plotW = w - padL - padR;
-  const centerY = (value) => padT + (values.indexOf(value) + 0.5) * rowH;
-  const xLen = (v) => x0 + (v / maxVal) * plotW;
+  // ── Geometry — screen inset from canvas edges
+  const padL = 36, padR = 12, padT = 24, padB = 32;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const axisY = padT + plotH;
 
-  ctx.fillStyle = "rgba(255,255,255,0.025)";
-  ctx.fillRect(x0, padT, plotW, h - padT - padB);
-  ctx.strokeStyle = "rgba(136,153,170,0.18)";
-  ctx.lineWidth = 1;
+  const step    = Math.max(0.01, Number(cfg.step || 1));
+  // Allow fractional ranges (e.g. ±2.5 = half a vowel circle). Integer displays
+  // pass step=1 and an integer range, so this is a no-op for them.
+  const range   = Math.max(step, Number(cfg.range || 7));
+  const numSteps = Math.floor(range / step + 1e-9);
+  const active  = cfg.activeSection || "accuracy";
+
+  // ── Unpack layer configs
+  const gen = cfg.generation || null;  // null if tab has no generation layer
+  const acc = cfg.accuracy   || { prob: 1, hitRange: 1 };
+  const surp = cfg.surprise  || { amount: 0, range: 0, weight: 0 };
+
+  const hitProb  = Math.max(0, Math.min(1, acc.prob ?? 1));
+  const hitRange = Math.max(0, acc.hitRange ?? 1);
+  const surpWeight = Math.max(0, Math.min(1, surp.weight ?? 0));
+  const surpAmount = Math.max(0, Math.min(1, surp.amount ?? 0));
+  const surpRange  = Math.max(0, Math.min(1, surp.range ?? 0));
+
+  // ══════════════════════════════════════════════════════════════
+  // LAYER 1: GENERATION — exponential decay from centre
+  // ══════════════════════════════════════════════════════════════
+  const genProbs = [];
+  let genSum = 0;
+  if (gen) {
+    // Pure Gaussian whose σ narrows with the shape dial; range sets the broad-
+    // end spread. Mirrors intervalShapeWeight() in synth.js.
+    const shape = gen.peakedness ?? 1.5;
+    const genRange = Math.max(1, gen.range ?? (numSteps * step));
+    for (let d = -numSteps; d <= numSteps; d++) {
+      const w = intervalShapeWeight(d * step, shape, genRange);
+      genProbs.push(w);
+      genSum += w;
+    }
+    // Normalize to sum = 1
+    if (genSum > 0) genProbs.forEach((_, i) => { genProbs[i] /= genSum; });
+  } else {
+    for (let d = -numSteps; d <= numSteps; d++) genProbs.push(0);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // LAYER 2: ACCURACY — Gaussian miss distribution
+  //   prob=1 → delta at centre, prob=0.5 → normal σ=hitRange/3,
+  //   prob=0 → uniform across full range
+  // ══════════════════════════════════════════════════════════════
+  const accProbs = [];
+  let accSum = 0;
+  {
+    const sigma = Math.max(0.35, hitRange / 3);
+    // Pre-compute raw Gaussian weights
+    const rawGauss = [];
+    let rawGaussSum = 0;
+    for (let d = -numSteps; d <= numSteps; d++) {
+      const absd = Math.abs(d * step);
+      if (absd > hitRange && hitRange > 0) {
+        rawGauss.push(0);
+      } else {
+        const w = Math.exp(-0.5 * ((d * step) / sigma) ** 2);
+        rawGauss.push(w);
+        rawGaussSum += w;
+      }
+    }
+    // Normalize Gaussian
+    if (rawGaussSum > 0) rawGauss.forEach((_, i) => { rawGauss[i] /= rawGaussSum; });
+
+    // Uniform fallback: equal probability across all bars within range
+    const uniformCount = rawGauss.filter(w => w > 0).length || (2 * numSteps + 1);
+    const uniformP = 1 / uniformCount;
+
+    for (let d = -numSteps; d <= numSteps; d++) {
+      const idx = d + numSteps;
+      // Blend: prob=1 → delta at 0, prob=0.5 → Gaussian, prob=0 → uniform
+      let p;
+      if (hitProb >= 0.5) {
+        // Blend delta ↔ Gaussian: t goes 0→1 as prob goes 0.5→1
+        const t = (hitProb - 0.5) * 2;
+        const delta = d === 0 ? 1 : 0;
+        p = t * delta + (1 - t) * rawGauss[idx];
+      } else {
+        // Blend Gaussian ↔ uniform: t goes 0→1 as prob goes 0.5→0
+        const t = (0.5 - hitProb) * 2;
+        const uniP = (rawGauss[idx] > 0 || hitRange <= 0) ? uniformP : 0;
+        p = (1 - t) * rawGauss[idx] + t * uniP;
+      }
+      accProbs.push(p);
+      accSum += p;
+    }
+    // Re-normalize
+    if (accSum > 0) accProbs.forEach((_, i) => { accProbs[i] /= accSum; });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // LAYER 3: SURPRISE — bimodal distribution
+  //   amount=0 → matches accuracy shape, amount=0.5 → zero at mean (bimodal),
+  //   amount=1 → stacked at range limits
+  //   range controls how far out the bimodal peaks sit
+  // ══════════════════════════════════════════════════════════════
+  const surpProbs = [];
+  let surpSum = 0;
+  {
+    const sigma = Math.max(0.5, hitRange / 3);
+    // Peak offset: from 0 (at mean, matching accuracy) out to the full range edge
+    const maxOffset = Math.max(1, range);
+    const peakOffset = surpAmount * maxOffset * Math.max(0.3, surpRange);
+
+    for (let d = -numSteps; d <= numSteps; d++) {
+      const x = d * step;
+      let w;
+
+      if (surpAmount < 0.01) {
+        // amount ≈ 0: matches accuracy distribution exactly
+        w = accProbs[d + numSteps] || 0;
+      } else if (surpAmount > 0.99) {
+        // amount ≈ 1: two narrow peaks at ±peakOffset
+        const peakPos = Math.max(step, Math.round(peakOffset / step) * step);
+        const nearPeak = Math.min(Math.abs(x - peakPos), Math.abs(x + peakPos));
+        w = nearPeak < step * 0.6 ? 1 : 0;
+      } else {
+        // Bimodal: two Gaussians at ±peakOffset
+        const biSigma = Math.max(0.4, sigma * (1 - surpAmount * 0.5));
+        w = Math.exp(-0.5 * ((x - peakOffset) / biSigma) ** 2)
+          + Math.exp(-0.5 * ((x + peakOffset) / biSigma) ** 2);
+        // Suppress centre for higher amounts when peaks are spread
+        if (surpAmount > 0.2 && peakOffset > step * 0.5) {
+          const suppress = Math.min(1, (Math.abs(x) / Math.max(0.5, peakOffset)) ** (surpAmount * 2));
+          w *= suppress;
+        }
+      }
+      surpProbs.push(w);
+      surpSum += w;
+    }
+    // Normalize
+    if (surpSum > 0) surpProbs.forEach((_, i) => { surpProbs[i] /= surpSum; });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // BARS — each layer is an independent distribution (AUC = 100% each).
+  // Layers are overlaid, not stacked. Active layer renders on top.
+  // ══════════════════════════════════════════════════════════════
+  const bars = [];
+  let maxProb = 0.001;
+  const hasSurp = surpWeight > 0;
+
+  for (let d = -numSteps; d <= numSteps; d++) {
+    const idx = d + numSteps;
+    const genP  = gen ? genProbs[idx] : 0;
+    const accP  = accProbs[idx];
+    const surpP = hasSurp ? surpProbs[idx] : 0;
+
+    bars.push({ d: d * step, genP, accP, surpP });
+    maxProb = Math.max(maxProb, genP, accP, surpP);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CRT SCREEN — bezel, phosphor surface, edge glow
+     ══════════════════════════════════════════════════════════════ */
+  const sX = padL - 6, sY = padT - 6;
+  const sW = plotW + 12, sH = plotH + 12;
+
+  // Outer bezel — dark metallic frame
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.7)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = "#080c10";
   ctx.beginPath();
-  ctx.moveTo(x0, centerY(0));
-  ctx.lineTo(w - padR, centerY(0));
+  ctx.roundRect(sX - 3, sY - 3, sW + 6, sH + 6, 6);
+  ctx.fill();
+  ctx.restore();
+
+  // Inner bezel highlight (subtle edge catch)
+  const bezelGrad = ctx.createLinearGradient(sX, sY, sX, sY + sH);
+  bezelGrad.addColorStop(0, "rgba(60,80,90,0.15)");
+  bezelGrad.addColorStop(0.1, "rgba(20,30,35,0.4)");
+  bezelGrad.addColorStop(0.9, "rgba(10,15,18,0.6)");
+  bezelGrad.addColorStop(1, "rgba(40,55,65,0.1)");
+  ctx.fillStyle = bezelGrad;
+  ctx.beginPath();
+  ctx.roundRect(sX - 1, sY - 1, sW + 2, sH + 2, 5);
+  ctx.fill();
+
+  // Phosphor screen surface — dark green-black CRT glass
+  const screenGrad = ctx.createRadialGradient(
+    sX + sW / 2, sY + sH / 2, 0,
+    sX + sW / 2, sY + sH / 2, sW * 0.75
+  );
+  screenGrad.addColorStop(0, "#060e0a");
+  screenGrad.addColorStop(0.7, "#040a07");
+  screenGrad.addColorStop(1, "#020604");
+  ctx.fillStyle = screenGrad;
+  ctx.beginPath();
+  ctx.roundRect(sX, sY, sW, sH, 4);
+  ctx.fill();
+
+  // Screen edge glow — phosphor bleed at the edges
+  ctx.strokeStyle = "rgba(34,197,94,0.06)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(sX + 1, sY + 1, sW - 2, sH - 2, 3);
   ctx.stroke();
 
-  const bracket = Math.min(range, Math.max(1, Math.round(accSd * bracketSd)));
-  [-bracket, bracket].forEach(v => {
-    if (!values.includes(v)) return;
-    const y = centerY(v);
-    ctx.strokeStyle = "rgba(226,232,240,0.65)";
+  // ── Grid lines: horizontal (phosphor green)
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (let gy = 0; gy <= 4; gy++) {
+    const y = padT + (plotH / 4) * gy;
+    ctx.strokeStyle = gy === 0 ? "rgba(34,197,94,0.04)" : "rgba(34,197,94,0.07)";
+    ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(x0 - 5, y);
-    ctx.lineTo(x0 + 5, y);
+    ctx.setLineDash([2, 3]);
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
     ctx.stroke();
-  });
-  ctx.strokeStyle = "rgba(226,232,240,0.55)";
-  ctx.beginPath();
-  ctx.moveTo(x0 - 5, centerY(-bracket));
-  ctx.lineTo(x0 - 5, centerY(bracket));
-  ctx.stroke();
+  }
+  ctx.setLineDash([]);
 
-  values.forEach((value, i) => {
-    const y = padT + i * rowH + rowH * 0.16;
-    const barH = Math.max(1.2, rowH * 0.28);
-    if (cfg.surpriseEnabled) {
-      ctx.fillStyle = "rgba(59,130,246,0.46)";
-      ctx.fillRect(x0, y + barH * 1.08, xLen(surprise[i]) - x0, barH);
+  // Vertical grid at center and quarter marks
+  for (let gx = 0; gx <= 4; gx++) {
+    const x = padL + (plotW / 4) * gx;
+    ctx.strokeStyle = gx === 2 ? "rgba(34,197,94,0.12)" : "rgba(34,197,94,0.05)";
+    ctx.lineWidth = gx === 2 ? 0.8 : 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x, padT);
+    ctx.lineTo(x, axisY);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  /* ══════════════════════════════════════════════════════════════
+     LED BAR SEGMENTS — 3-layer rendering with active/dimmed opacity
+     ══════════════════════════════════════════════════════════════ */
+  const barCount = bars.length;
+  const barGap = 2;
+  const barW = Math.max(6, Math.floor((plotW - barCount * barGap) / barCount));
+  const segH = 4, segGap = 1;
+  const maxSegs = Math.floor(plotH / (segH + segGap));
+  const totalBarsW = barCount * (barW + barGap);
+  const barStartX = padL + (plotW - totalBarsW) / 2;
+
+  // sqrt scale: compress massive dynamic range so small bars are visible
+  const sqrtMax = Math.sqrt(maxProb);
+
+  // Layer opacity: active layer slightly translucent on top, others dimmed behind
+  const ACTIVE_ALPHA = 0.85;
+  const INACTIVE_ALPHA = 0.30;
+
+  // Render order: inactive layers first, active layer last (on top)
+  const activeLayers = [];
+  if (gen) activeLayers.push("generation");
+  activeLayers.push("accuracy");
+  if (hasSurp) activeLayers.push("surprise");
+  const renderOrder = activeLayers.filter(l => l !== active);
+  if (activeLayers.includes(active)) renderOrder.push(active);
+
+  // ── Phosphor persistence
+  const prevKey = canvasId;
+  const prev = _prevBars[prevKey] || [];
+  const current = [];
+
+  // Layer colors:
+  //   Generation = warm amber/orange
+  //   Accuracy   = phosphor yellow-green
+  //   Surprise   = electric cyan
+  const GEN_COLOR  = { r: 245, g: 166, b: 35 };
+  const ACC_COLOR  = { r: 160, g: 220, b: 50 };
+  const ACC_HIT    = { r: 255, g: 190, b: 30 };
+  const SURP_COLOR = { r: 56,  g: 189, b: 248 };
+  const LAYER_COLORS = { generation: GEN_COLOR, accuracy: ACC_COLOR, surprise: SURP_COLOR };
+
+  bars.forEach((bar, i) => {
+    const bx = barStartX + i * (barW + barGap);
+
+    // Compute segment counts per layer (sqrt-scaled, each independent from baseline)
+    const genSegs  = gen ? Math.round((Math.sqrt(bar.genP) / sqrtMax) * maxSegs * 0.90) : 0;
+    const accSegs  = Math.round((Math.sqrt(bar.accP) / sqrtMax) * maxSegs * 0.90);
+    const surpSegs = hasSurp ? Math.round((Math.sqrt(bar.surpP) / sqrtMax) * maxSegs * 0.90) : 0;
+    const topSegs  = Math.max(genSegs, accSegs, surpSegs);
+
+    // Ghost persistence
+    const prevTotal = prev[i] || 0;
+    const ghostSegs = Math.round(prevTotal * maxSegs * 0.55);
+    current.push(topSegs / maxSegs);
+
+    // ── Unlit segments: dark "off" LED blocks
+    for (let s = 0; s < maxSegs; s++) {
+      const sy = axisY - (s + 1) * (segH + segGap);
+      ctx.fillStyle = "rgba(12,22,18,0.25)";
+      ctx.fillRect(bx, sy, barW, segH);
     }
-    ctx.fillStyle = "rgba(245,158,11,0.82)";
-    ctx.fillRect(x0, y, xLen(accuracy[i]) - x0, barH);
-    if (value === 0 || Math.abs(value) === range || Math.abs(value) === bracket) {
-      ctx.fillStyle = "rgba(136,153,170,0.72)";
-      ctx.font = "8px system-ui";
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${value > 0 ? "+" : ""}${value}${cfg.unit || ""}`, x0 - 8, y + barH);
+
+    // ── Ghost trail
+    if (ghostSegs > topSegs) {
+      for (let s = topSegs; s < ghostSegs; s++) {
+        const sy = axisY - (s + 1) * (segH + segGap);
+        ctx.fillStyle = "rgba(34,197,94,0.04)";
+        ctx.fillRect(bx, sy, barW, segH);
+      }
+    }
+
+    // ── LAYERS: rendered in order (inactive first, active last for overlay)
+    const layerSegs = { generation: genSegs, accuracy: accSegs, surprise: surpSegs };
+    renderOrder.forEach(layerName => {
+      const segs = layerSegs[layerName];
+      if (segs <= 0) return;
+
+      const isActive = layerName === active;
+      const baseAlpha = isActive ? ACTIVE_ALPHA : INACTIVE_ALPHA;
+
+      for (let s = 0; s < segs && s < maxSegs; s++) {
+        const sy = axisY - (s + 1) * (segH + segGap);
+        const t = s / maxSegs;
+        const bright = (0.45 + 0.55 * t) * baseAlpha;
+
+        if (layerName === "generation") {
+          ctx.fillStyle = `rgba(${GEN_COLOR.r},${GEN_COLOR.g},${GEN_COLOR.b},${bright})`;
+        } else if (layerName === "accuracy") {
+          if (bar.d === 0) {
+            ctx.fillStyle = `rgba(${ACC_HIT.r},${ACC_HIT.g},${ACC_HIT.b},${bright})`;
+          } else if (Math.abs(bar.d) <= hitRange) {
+            const r = Math.round(ACC_COLOR.r + 20 * t);
+            const g = Math.round(ACC_COLOR.g + 20 * t);
+            const b = Math.round(ACC_COLOR.b + 15 * t);
+            ctx.fillStyle = `rgba(${r},${g},${b},${bright * 0.85})`;
+          } else {
+            ctx.fillStyle = `rgba(34,197,94,${bright * 0.4})`;
+          }
+        } else {
+          ctx.fillStyle = `rgba(${SURP_COLOR.r},${SURP_COLOR.g},${SURP_COLOR.b},${bright})`;
+        }
+
+        ctx.fillRect(bx + 0.5, sy, barW - 1, segH);
+      }
+    });
+
+    // ── Peak hold indicator (for active layer)
+    const activeSegs = layerSegs[active] || 0;
+    if (activeSegs > 2) {
+      const peakY = axisY - activeSegs * (segH + segGap);
+      let peakColor;
+      if (active === "surprise") {
+        peakColor = `rgba(${SURP_COLOR.r},${SURP_COLOR.g + 30},255,0.85)`;
+      } else if (active === "generation") {
+        peakColor = `rgba(${GEN_COLOR.r},${GEN_COLOR.g + 20},80,0.85)`;
+      } else {
+        peakColor = bar.d === 0 ? "rgba(255,200,50,0.85)" : "rgba(160,230,60,0.75)";
+      }
+      ctx.fillStyle = peakColor;
+      ctx.fillRect(bx, peakY, barW, 1.5);
+    }
+
+    // ── Subtle horizontal spill
+    if (topSegs > 2) {
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      let spillColor;
+      if (active === "surprise" && surpSegs > 0) {
+        spillColor = "rgba(56,189,248,0.02)";
+      } else if (active === "generation" && gen) {
+        spillColor = "rgba(245,166,35,0.02)";
+      } else {
+        spillColor = bar.d === 0 ? "rgba(245,180,30,0.025)" : "rgba(130,200,50,0.015)";
+      }
+      ctx.fillStyle = spillColor;
+      ctx.fillRect(bx - 1, axisY - topSegs * (segH + segGap), barW + 2, topSegs * (segH + segGap));
+      ctx.restore();
     }
   });
 
-  ctx.fillStyle = "rgba(136,153,170,0.72)";
-  ctx.font = "8px system-ui";
+  _prevBars[prevKey] = current;
+
+  // ── Rest zone overlay: tint left half and add center divider when showRests is active
+  if (cfg.showRests) {
+    const centerBarIdx = numSteps;
+    const centerBx = barStartX + centerBarIdx * (barW + barGap) + barW / 2;
+
+    // Tint left half with a subtle warm/red wash to distinguish rests
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    const restTint = ctx.createLinearGradient(padL, 0, centerBx, 0);
+    restTint.addColorStop(0, "rgba(180,80,60,0.35)");
+    restTint.addColorStop(0.7, "rgba(180,80,60,0.20)");
+    restTint.addColorStop(1, "rgba(180,80,60,0.10)");
+    ctx.fillStyle = restTint;
+    ctx.fillRect(padL, padT, centerBx - padL, plotH);
+    ctx.restore();
+
+    // Center divider line
+    ctx.save();
+    ctx.strokeStyle = "rgba(245,180,30,0.25)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(centerBx, padT + 2);
+    ctx.lineTo(centerBx, axisY - 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // "RESTS" / "NOTES" zone labels
+    ctx.save();
+    ctx.font = "bold 7px 'SF Mono', monospace";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "rgba(220,120,80,0.45)";
+    ctx.textAlign = "right";
+    ctx.fillText("RESTS", centerBx - 8, padT + 3);
+    ctx.fillStyle = "rgba(34,197,94,0.4)";
+    ctx.textAlign = "left";
+    ctx.fillText("NOTES", centerBx + 8, padT + 3);
+    ctx.restore();
+  }
+
+  // ── 3σ boundary marker
+  if (hitRange > 0 && hitProb < 1) {
+    ctx.save();
+    ctx.setLineDash([1, 4]);
+    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = "rgba(180,210,50,0.15)";
+    const hri = Math.round(hitRange / step);
+    const missLeftIdx  = numSteps - hri;
+    const missRightIdx = numSteps + hri;
+    [missLeftIdx, missRightIdx].forEach(idx => {
+      if (idx < 0 || idx >= barCount) return;
+      const bx = barStartX + idx * (barW + barGap);
+      const edgeX = idx === missLeftIdx ? bx - 1 : bx + barW + 1;
+      ctx.beginPath();
+      ctx.moveTo(edgeX, axisY - 12);
+      ctx.lineTo(edgeX, axisY);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CRT POST-PROCESSING — scanlines, vignette, reflection
+     ══════════════════════════════════════════════════════════════ */
+
+  // ── Scanlines
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  for (let y = sY; y < sY + sH; y += 2) {
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.fillRect(sX, y, sW, 1);
+  }
+  ctx.restore();
+
+  // ── Vignette
+  const vignette = ctx.createRadialGradient(
+    sX + sW / 2, sY + sH / 2, sW * 0.2,
+    sX + sW / 2, sY + sH / 2, sW * 0.6
+  );
+  vignette.addColorStop(0, "transparent");
+  vignette.addColorStop(0.6, "rgba(0,0,0,0.1)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.35)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(sX, sY, sW, sH);
+
+  /* ══════════════════════════════════════════════════════════════
+     LIVE NOTE TRACE — thin phosphor beam where the current tone sits,
+     with a fading burn-in trail of the last few notes.
+     ══════════════════════════════════════════════════════════════ */
+  if (cfg.markerAxis) {
+    const markers = recentAxisMarkers(cfg.markerAxis);
+    if (markers.length) {
+      const leftCx = barStartX + barW / 2;
+      const spanX = Math.max(1, (barCount - 1) * (barW + barGap));
+      const xForVal = (v) => {
+        const cl = Math.max(-range, Math.min(range, v));
+        return leftCx + ((cl + range) / (2 * range)) * spanX;
+      };
+      const midY = (padT + axisY) / 2;
+      // Hot-core tint: blend a role colour toward white so the beam reads as a
+      // glowing phosphor trace while still carrying its section's hue.
+      const litent = (c, t) => `${Math.round(c.r + (255 - c.r) * t)},${Math.round(c.g + (255 - c.g) * t)},${Math.round(c.b + (255 - c.b) * t)}`;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const m of markers) {
+        const ageF = Math.max(0, 1 - m.age / MARKER_TRAIL_SEC);
+        const a = Math.pow(ageF, 1.6) * 0.9;
+        if (a <= 0.012) continue;
+        // Colour by the note's role: generation / accuracy / surprise.
+        const col = LAYER_COLORS[m.role] || GEN_COLOR;
+
+        // Notes whose value lands beyond the displayed range are NOT pinned to
+        // the edge bar (that would imply a note at exactly ±range). Instead they
+        // get a distinct, dimmer "over-range" chevron at the boundary, pointing
+        // off-chart — analog-meter style — so the spectrum lines only sit where a
+        // note actually falls within the distribution.
+        const over = m.value > range ? 1 : (m.value < -range ? -1 : 0);
+        if (over !== 0) {
+          const edgeX = over > 0 ? leftCx + spanX : leftCx;
+          const dir = over;                 // +1 points right, -1 points left
+          const tipX = edgeX + dir * 7;
+          const baseX = edgeX + dir * 1;
+          const oa = a * 0.55;              // dimmer than an in-range beam
+          // short connector tick at the boundary
+          ctx.strokeStyle = `rgba(${col.r},${col.g},${col.b},${oa * 0.55})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(edgeX, midY - 9); ctx.lineTo(edgeX, midY + 9); ctx.stroke();
+          // chevron pointing off the chart (saturated role hue)
+          ctx.strokeStyle = `rgba(${litent(col, 0.18)},${oa})`;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(baseX, midY - 5); ctx.lineTo(tipX, midY); ctx.lineTo(baseX, midY + 5);
+          ctx.stroke();
+          continue;
+        }
+
+        const x = xForVal(m.value);
+        // soft phosphor halo (saturated role hue)
+        ctx.strokeStyle = `rgba(${col.r},${col.g},${col.b},${a * 0.38})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x, padT + 1); ctx.lineTo(x, axisY - 1); ctx.stroke();
+        // electron-beam core — role hue, only lightly lifted toward white so the
+        // section colour stays clearly readable while the beam still glows.
+        ctx.strokeStyle = `rgba(${litent(col, 0.22)},${a})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, padT + 1); ctx.lineTo(x, axisY - 1); ctx.stroke();
+        // bloom cap on the note still sounding
+        if (m.sounding) {
+          ctx.fillStyle = `rgba(${litent(col, 0.55)},${Math.min(1, a + 0.12)})`;
+          ctx.beginPath(); ctx.arc(x, padT + 2.5, 2.4, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+  }
+
+  // ── Glass reflection
+  const refl = ctx.createLinearGradient(sX, sY, sX + sW * 0.6, sY + sH * 0.5);
+  refl.addColorStop(0, "rgba(255,255,255,0.015)");
+  refl.addColorStop(0.3, "rgba(255,255,255,0.025)");
+  refl.addColorStop(0.5, "rgba(255,255,255,0.005)");
+  refl.addColorStop(1, "transparent");
+  ctx.fillStyle = refl;
+  ctx.fillRect(sX, sY, sW, sH);
+
+  /* ══════════════════════════════════════════════════════════════
+     LABELS — x-axis, y-axis, title, 3-item legend
+     ══════════════════════════════════════════════════════════════ */
+
+  // ── X-axis scale labels
+  ctx.fillStyle = "rgba(130,150,160,0.6)";
+  ctx.font = "bold 8px 'SF Mono', 'Fira Code', 'Cascadia Code', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  const labelEvery = cfg.labelEvery || (numSteps > 8 ? 2 : 1);
+  bars.forEach((bar, i) => {
+    let label;
+    if (cfg.barLabels) {
+      // Custom per-bar labels (e.g. circular vowel names for the formant display)
+      label = cfg.barLabels[i];
+      if (label == null) return;
+    } else {
+      if (bar.d % (labelEvery * step) !== 0 && bar.d !== 0) return;
+      label = bar.d === 0 ? "0" : `${bar.d > 0 ? "+" : ""}${bar.d}`;
+    }
+    const bx = barStartX + i * (barW + barGap) + barW / 2;
+    ctx.fillText(label, bx, axisY + 5);
+  });
+
+  // ── Title (top-left)
+  ctx.fillStyle = "rgba(34,197,94,0.75)";
+  ctx.font = "bold 9px 'SF Mono', 'Fira Code', monospace";
   ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("likelihood ->", x0, h - 3);
+  ctx.textBaseline = "top";
+  ctx.fillText((cfg.title || "DISTRIBUTION").toUpperCase(), padL, 5);
+
+  // ── 3-item legend (top strip)
+  let legendX = padL + 80;
+  const legendItems = [];
+  if (gen) legendItems.push({ label: "GEN",  color: `rgba(${GEN_COLOR.r},${GEN_COLOR.g},${GEN_COLOR.b}`,  section: "generation" });
+  legendItems.push({ label: "ACC",  color: `rgba(${ACC_HIT.r},${ACC_HIT.g},${ACC_HIT.b}`,  section: "accuracy" });
+  legendItems.push({ label: "SURP", color: `rgba(${SURP_COLOR.r},${SURP_COLOR.g},${SURP_COLOR.b}`, section: "surprise" });
+
+  legendItems.forEach(item => {
+    const isActive = active === item.section;
+    const boxAlpha = isActive ? 0.95 : 0.35;
+    const textAlpha = isActive ? 0.9 : 0.4;
+    ctx.fillStyle = `${item.color},${boxAlpha})`;
+    ctx.fillRect(legendX, 7, 7, 7);
+    ctx.fillStyle = `rgba(180,190,200,${textAlpha})`;
+    ctx.font = `${isActive ? "bold " : ""}7px 'SF Mono', monospace`;
+    ctx.fillText(item.label, legendX + 10, 6);
+    legendX += item.label.length * 6 + 22;
+  });
+
+  // ── Y-axis label (rotated)
+  ctx.save();
+  ctx.fillStyle = "rgba(90,110,120,0.45)";
+  ctx.font = "7px 'SF Mono', monospace";
+  ctx.translate(9, padT + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillText("PROBABILITY", 0, 0);
+  ctx.restore();
+
+  // ── X-axis descriptor + unit
+  ctx.fillStyle = "rgba(90,110,120,0.45)";
+  ctx.font = "7px 'SF Mono', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText(cfg.xLabel || "DEVIATION", padL + plotW / 2, H - 11);
   ctx.textAlign = "right";
-  ctx.fillText(cfg.surpriseEnabled ? "orange accuracy / blue surprise" : "accuracy only", w - 2, h - 3);
+  ctx.fillText(cfg.unit || "", W - 6, H - 11);
 }
 
-function drawDurationAccuracyDist() {
+/* ── Legacy wrapper: drawAccuracyDist calls drawMacroDist for backward compat ── */
+function drawAccuracyDist(canvasId, cfg) {
+  drawMacroDist(canvasId, {
+    title: cfg.title,
+    activeSection: "accuracy",
+    range: cfg.range,
+    step: cfg.step,
+    unit: cfg.unit,
+    xLabel: cfg.xLabel,
+    labelEvery: cfg.labelEvery,
+    lockRange: cfg.lockRange,
+    generation: null,
+    accuracy: {
+      prob: cfg.accuracyProb ?? 1,
+      hitRange: Math.round((cfg.accuracySd ?? 1) * 3),
+    },
+    surprise: {
+      amount: 0.5,
+      range: cfg.surpriseDistance ?? 0.5,
+      weight: cfg.surpriseEnabled
+        ? Math.max(0, Math.min(1, exploreParams.surpriseChance ?? 0.08))
+        : 0,
+    },
+  });
+}
+
+function drawDurationMacroDist() {
   const beatDiv = Math.max(1, Math.round(exploreParams.beatDivisions || 1));
   const range = Math.max(2, beatDiv * 2);
-  drawAccuracyDist("cvDurationAccuracy", {
-    kind: "duration",
+  const showRests = !!exploreParams.surpriseRestEnabled;
+  drawMacroDist("cvDurationAccuracy", {
+    title: "Duration",
+    activeSection: macroSubTab.duration || "generation",
     range,
-    accuracyProb: exploreParams.sameLengthProb ?? 0.4,
-    accuracySd: Math.max(0.35, beatDiv / Math.max(1, exploreParams.surpriseRangeSd || 3)),
-    surpriseEnabled: !!exploreParams.surpriseRhythmEnabled,
-    surpriseWeight: exploreParams.surpriseRhythmWeight ?? 0.45,
-    unit: " div",
-    note: "duration difference",
+    step: 1,
+    unit: "div",
+    xLabel: showRests ? "← rests   |   notes →" : "duration difference",
+    labelEvery: Math.max(1, beatDiv),
+    markerAxis: "duration",
+    generation: null,
+    accuracy: {
+      prob: exploreParams.sameLengthProb ?? 0.4,
+      hitRange: beatDiv,
+    },
+    surprise: {
+      amount: exploreParams.durSurpriseAmount ?? 0.5,
+      range: exploreParams.surpriseRhythmDistance ?? 0.8,
+      weight: exploreParams.surpriseRhythmEnabled
+        ? Math.max(0, Math.min(1, exploreParams.surpriseChance ?? 0.08))
+        : 0,
+    },
+    showRests,  // left half = rests when checked
   });
-  const cv = document.getElementById("cvDurationAccuracy");
-  if (!cv) return;
-  const ctx = cv.getContext("2d");
-  ctx.fillStyle = "rgba(136,153,170,0.72)";
-  ctx.font = "8px system-ui";
-  ctx.textAlign = "left";
-  ctx.fillText(`${beatDiv} divisions/beat`, 4, 9);
+}
+
+function drawDynamicsMacroDist() {
+  const dynRange = Math.max(10, Math.ceil(((exploreParams.dynamicsRange || 0.22) * 100) / 10) * 10);
+  const hitRange = exploreParams.dynamicsHitRange ?? Math.round(dynRange * 0.7);
+  drawMacroDist("cvDynamicsAccuracy", {
+    title: "Dynamics",
+    activeSection: macroSubTab.dynamics || "generation",
+    range: dynRange,
+    step: 10,
+    unit: "%",
+    xLabel: "dynamic difference",
+    labelEvery: 20,
+    markerAxis: "dynamics",
+    generation: null,  // dynamics variability isn't a decay curve — keep null for now
+    accuracy: {
+      prob: exploreParams.dynamicsPrecision ?? 0.75,
+      hitRange: hitRange,
+    },
+    surprise: {
+      amount: exploreParams.dynSurpriseAmount ?? 0.5,
+      range: exploreParams.surpriseDynamicsDistance ?? 0.85,
+      weight: exploreParams.surpriseDynamicsEnabled
+        ? Math.max(0, Math.min(1, exploreParams.surpriseChance ?? 0.08))
+        : 0,
+    },
+  });
 }
 
 function drawFormantAccuracyDist() {
   const cv = document.getElementById("cvFormantAccuracy");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
-  ctx.clearRect(0, 0, w, h);
   ensureFormantWeights(exploreParams);
-  const sequence = formantDisplaySequence();
-  const active = exploreParams.activeFormants || ["ah"];
-  const maxWeight = Math.max(0.001, ...sequence.map(key => active.includes(key) ? (exploreParams.formantWeights[key] || 0) : 0));
-  const padL = 35;
-  const padR = 8;
-  const padT = 8;
-  const rowH = 14;
-  const totalH = sequence.length * rowH + padT + 10;
-  cv.height = Math.max(132, totalH);
-  ctx.clearRect(0, 0, w, cv.height);
+  const circle = FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]);
+  if (!circle.length) return;
+  // The vowels sit evenly on a circle, so the axis measures how many circular
+  // steps the sung vowel lands from the intended (pure) one. The biggest possible
+  // miss is half a circle — for 5 vowels that is ±2.5 steps. A miss can land
+  // *between* two vowels, so the axis is continuous: fine bars, with the pure
+  // vowel formants marked along it. This applies to every formant equally.
+  const half = circle.length / 2;          // 2.5 for 5 vowels
+  const step = 0.125;                       // fine bars so in-between misses show
+  const accProb = clamp(exploreParams.formantAccuracy ?? 0.85, 0, 1);
+  const accRange = Math.max(0, Math.min(half, Number(exploreParams.formantAccuracyRange ?? 1)));
+  const dist = clamp(exploreParams.surpriseFormantDistance ?? 0.85, 0, 1);
+  const surpriseOn = !!exploreParams.surpriseFormantEnabled;
 
-  sequence.forEach((key, i) => {
-    const y = padT + i * rowH;
-    const activeFormant = active.includes(key);
-    const weight = activeFormant ? (exploreParams.formantWeights[key] || 0) : 0;
-    const len = (w - padL - padR) * weight / maxWeight;
-    ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.018)" : "rgba(255,255,255,0.03)";
-    ctx.fillRect(padL, y, w - padL - padR, rowH - 2);
-    ctx.fillStyle = activeFormant ? "rgba(245,158,11,0.78)" : "rgba(85,102,119,0.22)";
-    ctx.fillRect(padL, y + 3, len, rowH - 7);
-    if (exploreParams.surpriseFormantEnabled) {
-      ctx.fillStyle = "rgba(59,130,246,0.35)";
-      ctx.fillRect(padL, y + rowH - 5, (w - padL - padR) * (exploreParams.surpriseFormantWeight || 0) * 0.45, 2);
+  // Mark the pure-vowel positions: the integer step offsets carry the actual
+  // vowel names (centred on the neutral vowel) and the half-circle edges carry
+  // the numeric ± limit so the range is legible at a glance.
+  const centerIdx = Math.floor(circle.length / 2);
+  const numSteps = Math.floor(half / step + 1e-9);
+  const barLabels = [];
+  for (let i = -numSteps; i <= numSteps; i++) {
+    const v = i * step;                     // -2.5 .. +2.5
+    if (Math.abs(Math.abs(v) - half) < step / 2) {
+      barLabels.push(`${v > 0 ? "+" : "−"}${half}`);   // half-circle edge
+    } else if (Math.abs(v - Math.round(v)) < step / 2) {
+      const off = Math.round(v);
+      const idx = ((centerIdx + off) % circle.length + circle.length) % circle.length;
+      barLabels.push(circle[idx]);                          // pure vowel marker
+    } else {
+      barLabels.push(null);
     }
-    ctx.fillStyle = activeFormant ? "rgba(226,232,240,0.82)" : "rgba(85,102,119,0.75)";
-    ctx.font = "8px system-ui";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.fillText(key, padL - 6, y + rowH / 2);
-  });
+  }
 
-  ctx.fillStyle = "rgba(136,153,170,0.72)";
-  ctx.font = "8px system-ui";
-  ctx.textAlign = "left";
-  ctx.fillText("circular formant sequence", padL, cv.height - 3);
+  // Reuse the shared LED-bar CRT renderer so the formant distribution matches
+  // the melody / tuning / duration / dynamics displays. No generation layer —
+  // formant generation picks any vowel equally (no note-to-note interval).
+  // Accuracy (hit prob + miss range) and surprise (miss range) only.
+  drawMacroDist("cvFormantAccuracy", {
+    title: "Formant",
+    activeSection: surpriseOn ? "surprise" : "accuracy",
+    range: half,
+    step,
+    unit: "½ circle",
+    xLabel: "vowel position — pure vowels marked, ± half circle max",
+    barLabels,
+    lockRange: true,
+    generation: null,
+    accuracy: {
+      prob: accProb,
+      hitRange: accRange,
+    },
+    surprise: {
+      amount: 0.5,
+      range: dist,
+      weight: surpriseOn
+        ? Math.max(0, Math.min(1, exploreParams.surpriseChance ?? 0.08))
+        : 0,
+    },
+  });
 }
 
 function formantDisplaySequence() {
-  const preferred = ["ee", "eh", "ah", "oh", "oo"];
+  const preferred = FORMANT_CIRCLE;
   const keys = Object.keys(FORMANT_PRESETS);
   const ordered = preferred.filter(k => keys.includes(k));
   keys.forEach(k => { if (!ordered.includes(k)) ordered.push(k); });
@@ -2480,9 +3653,103 @@ function drawRegisterDist() {
 }
 
 function registerCurveValue(offset, width, skew) {
+  // Flat-topped window — mirrors registerWindow() in synth.js so the displayed
+  // curve matches what the engine actually does (a plateau, not a centre peak).
+  const w = Math.max(1, Number(width) || 1);
   const side = offset >= 0 ? 1 : -1;
-  const sigma = Math.max(1, Math.max(1, width) * (1 + skew * side * 0.75));
-  return Math.exp(-0.5 * (offset / sigma) ** 2);
+  const halfWidth = Math.max(1, w * 0.5 * (1 + skew * side * 0.75));
+  const flatness = Math.max(0, Math.min(1, (w - 2) / 12));
+  const shapeExp = 2 + flatness * 6;
+  return Math.exp(-0.5 * Math.pow(Math.abs(offset / halfWidth), shapeExp));
+}
+
+function intervalShapeWeight(stepDist, shape, maxRange) {
+  // Mirrors intervalShapeWeight() in synth.js so the plotted curve matches the
+  // engine: a Gaussian whose σ shrinks geometrically from ~flat (uniform / equal
+  // probability across the range) at the bottom of the dial toward a sharp point
+  // at the top.
+  const range = Math.max(1, Number(maxRange) || 1);
+  const ad = Math.abs(Number(stepDist) || 0);
+  if (ad > range) return 0;
+  const t = clamp((Number(shape) || 0) / 4, 0, 1);
+  const sigmaMin = 0.35;
+  const sigmaMax = range * 5;
+  const sigma = sigmaMin * Math.pow(sigmaMax / sigmaMin, 1 - t);
+  return Math.exp(-0.5 * Math.pow(ad / sigma, 2));
+}
+
+function loudnessRegisterValue(offset, range) {
+  // Flat-topped window over the loudness axis — the loudness analogue of
+  // registerCurveValue(). The plateau is where loudness settles; the falloff
+  // marks the soft/loud limits. Wider range → flatter, wider plateau.
+  const half = Math.max(0.02, (Number(range) || 0) / 2);
+  const flatness = Math.max(0, Math.min(1, Number(range) || 0));
+  const shapeExp = 2 + flatness * 6;
+  return Math.exp(-0.5 * Math.pow(Math.abs(offset / half), shapeExp));
+}
+
+function drawLoudnessRegisterDist() {
+  const cv = document.getElementById("cvLoudnessRegister");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Loudness register: a flat-topped window across the soft→loud axis, centred
+  // on the dynamic centre and spanning the register range. It mirrors the
+  // melodic register exactly and depends ONLY on centre + range — never on
+  // accuracy (reproduction) or generation (note-to-note variability).
+  const center = clamp(Number(exploreParams.dynamicsLevel ?? 0.62), 0.05, 1);
+  const range = Math.max(0, Number(exploreParams.loudnessRange ?? 0.6));
+
+  ctx.fillStyle = "rgba(245,158,11,0.08)";
+  ctx.strokeStyle = "rgba(245,158,11,0.7)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  for (let x = 0; x <= w; x++) {
+    const val = loudnessRegisterValue(x / w - center, range);
+    const y = h - val * (h - 4);
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  for (let x = 0; x <= w; x++) {
+    const val = loudnessRegisterValue(x / w - center, range);
+    const y = h - val * (h - 4);
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Soft/loud limit markers (± half-range) and centre line.
+  const half = range / 2;
+  ctx.strokeStyle = "rgba(245,158,11,0.35)";
+  ctx.setLineDash([1, 3]);
+  for (const lim of [center - half, center + half]) {
+    if (lim <= 0 || lim >= 1) continue;
+    ctx.beginPath();
+    ctx.moveTo(lim * w, 0); ctx.lineTo(lim * w, h);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  const cx = center * w;
+  ctx.strokeStyle = "rgba(59,130,246,0.5)";
+  ctx.setLineDash([2, 2]);
+  ctx.beginPath();
+  ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.fillStyle = "rgba(136,153,170,0.7)";
+  ctx.font = "9px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText("soft", 2, h - 2);
+  ctx.textAlign = "right";
+  ctx.fillText("loud", w - 2, h - 2);
 }
 
 function drawGapDist() {
@@ -3080,6 +4347,15 @@ function drawEnvelopePath(ctx, points, opts) {
 
 // ─── Explore: Helpers ───────────────────────────────────────
 
+/** Update slider filled-track gradient */
+function updateSliderFill(sl) {
+  const min = parseFloat(sl.min) || 0;
+  const max = parseFloat(sl.max) || 100;
+  const val = parseFloat(sl.value) || 0;
+  const pct = ((val - min) / (max - min)) * 100;
+  sl.style.background = `linear-gradient(to right, rgba(245,158,11,0.4) ${pct}%, rgba(20,30,42,0.95) ${pct}%)`;
+}
+
 function controlRow(param, label, value, min, max, step) {
   const desc = `${label}: ${describeParam(param, label)}`;
   return `
@@ -3111,18 +4387,134 @@ function checkboxControl(param, label, checked) {
     </label>`;
 }
 
-function featureSurpriseBlock(feature, label, enabledParam, weightParam, checked, weight) {
+function featureSurpriseBlock(feature, label, enabledParam, distanceParam, checked, distance) {
   return `
     <div class="feature-surprise" data-feature-surprise="${feature}">
       ${checkboxControl(enabledParam, `${label} surprise`, checked)}
-      ${controlRow(weightParam, "Surprise weight", weight, 0, 1, 0.01)}
+      ${distanceParam ? controlRow(distanceParam, "Surprise distance", distance, 0, 1, 0.01) : ""}
     </div>`;
+}
+
+function surpriseWeightControlsHTML(p) {
+  const enabled = SURPRISE_FEATURES.filter(f => p[f.enabled]);
+  if (!enabled.length) {
+    return `<div class="surprise-weight-list"><div class="empty-state">Select a surprise checkbox in a musical section to weight it here.</div></div>`;
+  }
+  return `
+    <div class="surprise-weight-list">
+      <div class="surprise-weight-head">Surprise weights (when surprise occurs)</div>
+      ${enabled.map(f => controlRow(f.weight, f.label, p[f.weight] ?? 0.5, 0, 1, 0.01)).join("")}
+    </div>`;
+}
+
+function formantAccuracyControlsHTML(p) {
+  ensureFormantWeights(p);
+  // Accuracy and surprise apply to every formant equally — no per-formant focus.
+  const acc = p.formantAccuracy;
+  const range = p.formantAccuracyRange;
+  const dist = p.surpriseFormantDistance ?? 0.85;
+  return `
+    <div class="formant-axis-controls">
+      <div class="controls-grid">
+        ${formantScopedControl("formantAccuracy", "Hit prob", acc, 0, 1, 0.01)}
+        ${formantScopedControl("formantAccuracyRange", "Accuracy range", range, 0, (FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]).length || 5) / 2, 0.125)}
+        ${formantScopedControl("surpriseFormantDistance", "Surprise range", dist, 0, 1, 0.01)}
+      </div>
+    </div>`;
+}
+
+function formantScopedControl(param, label, value, min, max, step) {
+  const desc = `${label}: ${describeParam(param, label)}`;
+  return `
+    <div class="control-row"${titleAttr(desc)}>
+      <span class="label"${titleAttr(desc)}>${label}</span>
+      <input type="range" data-formant-scope="${param}" min="${min}" max="${max}" step="${step}" value="${value}"${titleAttr(desc)}/>
+      <output data-formant-scope-out="${param}"${titleAttr(desc)}>${fmtOutput(param, value)}</output>
+    </div>`;
+}
+
+function formantFocusedValue(p, mapKey, allKey, focus = p.formantFocus || "ah") {
+  ensureFormantWeights(p);
+  return p.formantEditAll ? p[allKey] : (p[mapKey]?.[focus] ?? p[allKey]);
+}
+
+function applyFormantScopedParam(param, value) {
+  ensureFormantWeights(exploreParams);
+  const focus = exploreParams.formantFocus || "ah";
+  const config = {
+    formantAccuracy: { all: "formantAccuracy", map: "formantAccuracyByFormant", min: 0, max: 1, integer: false },
+    formantAccuracyRange: { all: "formantAccuracyRange", map: "formantRangeByFormant", min: 0, max: (FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]).length || 5) / 2, integer: false },
+    surpriseFormantDistance: { all: "surpriseFormantDistance", map: "surpriseFormantDistanceByFormant", min: 0, max: 1, integer: false },
+  }[param];
+  if (!config) return;
+  let v = clamp(value, config.min, config.max);
+  if (config.integer) v = Math.round(v);
+  if (exploreParams.formantEditAll) {
+    exploreParams[config.all] = v;
+    Object.keys(FORMANT_PRESETS).forEach(key => {
+      exploreParams[config.map][key] = v;
+    });
+  } else {
+    exploreParams[config.map][focus] = v;
+  }
+}
+
+function formantWeightCircleHTML() {
+  const C = 60, MAXR = 42;
+  const keys = FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]);
+  const n = keys.length || 1;
+  const ang = (i) => (-90 + (i * 360 / n)) * Math.PI / 180;
+  const rings = [0.34, 0.67, 1].map(f =>
+    `<circle cx="${C}" cy="${C}" r="${(MAXR * f).toFixed(1)}" class="fw-ring"/>`).join("");
+  const spokes = keys.map((k, i) => {
+    const a = ang(i);
+    return `<line x1="${C}" y1="${C}" x2="${(C + Math.cos(a) * MAXR).toFixed(1)}" y2="${(C + Math.sin(a) * MAXR).toFixed(1)}" class="fw-spoke"/>`;
+  }).join("");
+  const labels = keys.map((k, i) => {
+    const a = ang(i);
+    const lx = C + Math.cos(a) * (MAXR + 11), ly = C + Math.sin(a) * (MAXR + 11);
+    return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" class="fw-label" data-fw-label="${k}">${k}</text>`;
+  }).join("");
+  const dots = keys.map(k => `<circle r="2.6" class="fw-dot" data-fw-dot="${k}"/>`).join("");
+  return `<svg class="formant-weight-circle" viewBox="0 0 120 120" data-formant-weight-circle aria-hidden="true">
+      ${rings}${spokes}
+      <polygon class="fw-poly" data-fw-poly points=""/>
+      ${dots}${labels}
+    </svg>`;
+}
+
+function updateFormantWeightCircle(root) {
+  const svg = (root || document).querySelector("[data-formant-weight-circle]");
+  if (!svg) return;
+  const C = 60, MAXR = 42;
+  const keys = FORMANT_CIRCLE.filter(k => FORMANT_PRESETS[k]);
+  const n = keys.length || 1;
+  const active = exploreParams.activeFormants || [];
+  const weights = exploreParams.formantWeights || {};
+  const pts = [];
+  keys.forEach((k, i) => {
+    const a = (-90 + (i * 360 / n)) * Math.PI / 180;
+    const on = active.includes(k);
+    const w = on ? Math.max(0, Math.min(1, Number(weights[k]) || 0)) : 0;
+    const r = MAXR * w;
+    const x = C + Math.cos(a) * r, y = C + Math.sin(a) * r;
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    const dot = svg.querySelector(`[data-fw-dot="${k}"]`);
+    if (dot) {
+      dot.setAttribute("cx", x.toFixed(1));
+      dot.setAttribute("cy", y.toFixed(1));
+      dot.classList.toggle("inactive", !on);
+    }
+    svg.querySelector(`[data-fw-label="${k}"]`)?.classList.toggle("inactive", !on);
+  });
+  svg.querySelector("[data-fw-poly]")?.setAttribute("points", pts.join(" "));
 }
 
 function formantWeightControlsHTML(p) {
   ensureFormantWeights(p);
   const active = p.activeFormants || ["ah"];
   return `
+    ${formantWeightCircleHTML()}
     <div class="formant-weight-controls">
       ${Object.keys(FORMANT_PRESETS).map(key => {
         const disabled = active.includes(key) ? "" : " disabled";
@@ -3188,19 +4580,30 @@ function fmtOutput(param, val) {
     case "percDownbeatEvery":
     case "spectralPartials":
     case "registerCenter":
+    case "dynamicsHitRange":
     case "registerWidth": return String(v);
     case "surpriseMaxBaked": return normaliseBakedSurpriseValue(val) === "Infinity" ? "∞" : String(Math.floor(Number(val)));
     case "intervalPeakedness": return v.toFixed(1);
     case "registerSkew": return (v >= 0 ? "+" : "") + v.toFixed(2);
     case "subScaleWeight":
     case "precision":
+    case "dynamicsLevel":
+    case "dynamicsPrecision":
+    case "dynamicsRange":
     case "motifHitProb":
     case "surpriseProb":
     case "surprisePitchWeight":
+    case "surpriseTuningWeight":
     case "surpriseRhythmWeight":
     case "surpriseFormantWeight":
     case "surpriseDynamicsWeight":
     case "surpriseRestWeight":
+    case "surprisePitchDistance":
+    case "surpriseTuningDistance":
+    case "surpriseRhythmDistance":
+    case "surpriseFormantDistance":
+    case "surpriseDynamicsDistance":
+    case "formantAccuracy":
     case "formantChangeProb":
     case "incorporationRate":
     case "sequenceProb":
@@ -3211,6 +4614,8 @@ function fmtOutput(param, val) {
     case "restMotifStartRatio":
     case "restOnMeterRatio":
     case "restOffMeterRatio":
+    case "momentum":
+    case "loudnessRange":
     case "rootPullStrength":
     case "rootPullShape":
     case "percBeatVol":
@@ -3242,9 +4647,9 @@ function fmtOutput(param, val) {
     case "gapDistanceSlope":
     case "gapTimingRange":
     case "slideSpeed":
-    case "phraseGap": return (v * 100).toFixed(0) + "%";
+    case "phraseGap": return v.toFixed(2);
+    case "formantAccuracyRange": return `${v.toFixed(2).replace(/\.?0+$/, "")} step${Number(v) === 1 ? "" : "s"}`;
     case "precisionRange": return `±${v.toFixed(0)}c`;
-    case "surpriseRangeSd": return `${v.toFixed(1)} SD`;
     case "envelopeAttack":
     case "envelopeAttackSd":
     case "envelopeDecay":
@@ -3305,6 +4710,7 @@ function randomiseParams() {
   // Melody
   p.intervalPeakedness = rf(0.2, 3.5);
   p.intervalRange = ri(2, 16);
+  p.momentum = rf(0, 0.9);
   p.motifHitProb = rf(0.75, 1.0);
   p.motifHitRange = ri(1, 5);
   p.precision = rf(0.7, 1.0);
@@ -3316,6 +4722,11 @@ function randomiseParams() {
   if (p.activeFormants.length === 0) p.activeFormants = [rp(allFormants)];
   p.formantWeights = Object.fromEntries(allFormants.map(key => [key, p.activeFormants.includes(key) ? rf(0.35, 1.0) : 0.25]));
   p.formantChangeProb = rf(0.0, 0.4);
+  // Accuracy + surprise are global (applied to every formant equally); the
+  // per-formant maps are derived from these scalars in ensureFormantWeights.
+  p.formantAccuracy = rf(0.65, 1.0);
+  p.formantAccuracyRange = ri(1, 2);
+  p.surpriseFormantDistance = rf(0.35, 1.0);
   p.voiceMode = rp(["formant", "formant", "fourier", "fourier"]);
   p.toneColorProb = rf(0.0, 0.7);
   p.toneFormantDrift = rf(0, 0.25);
@@ -3354,17 +4765,23 @@ function randomiseParams() {
   // Surprise
   p.surpriseProb = rf(0.0, 0.5);
   p.surprisePitchEnabled = true;
+  p.surpriseTuningEnabled = Math.random() < 0.24;
   p.surpriseRhythmEnabled = Math.random() < 0.28;
   p.surpriseFormantEnabled = Math.random() < 0.34;
   p.surpriseDynamicsEnabled = Math.random() < 0.22;
   p.surpriseRestEnabled = Math.random() < 0.12;
   p.surprisePitchWeight = rf(0.55, 1);
+  p.surpriseTuningWeight = rf(0.15, 0.75);
   p.surpriseRhythmWeight = rf(0.15, 0.75);
   p.surpriseFormantWeight = rf(0.15, 0.75);
   p.surpriseDynamicsWeight = rf(0.1, 0.65);
   p.surpriseRestWeight = rf(0.05, 0.45);
+  p.surprisePitchDistance = rf(0.35, 1);
+  p.surpriseTuningDistance = rf(0.35, 1);
+  p.surpriseRhythmDistance = rf(0.35, 1);
+  p.surpriseFormantDistance = rf(0.35, 1);
+  p.surpriseDynamicsDistance = rf(0.35, 1);
   p.surpriseAllowMultiple = Math.random() < 0.18;
-  p.surpriseRangeSd = rf(2.5, 3.5);
   syncSurpriseFeatureParams(p);
   p.incorporationRate = rf(0.1, 0.7);
   p.surpriseMaxBaked = rp(["4", "8", "16", "32", "Infinity"]);
@@ -3398,6 +4815,10 @@ function randomiseParams() {
   p.restMotifStartRatio = rf(0.0, 0.25);
   p.restOnMeterRatio = rf(0.0, 0.35);
   p.restOffMeterRatio = rf(0.0, 0.55);
+  p.dynamicsLevel = rf(0.42, 0.78);
+  p.loudnessRange = rf(0.3, 0.9);
+  p.dynamicsPrecision = rf(0.45, 0.95);
+  p.dynamicsRange = rf(0.08, 0.45);
   p.gapProb = rf(0.4, 1.0);
   p.gapMin = rf(-0.35, 0.22);
   p.gapMax = rf(Math.max(p.gapMin, -0.05), 0.55);
@@ -3568,6 +4989,77 @@ function presetSummary(p) {
 
 // ─── Visualiser ─────────────────────────────────────────────
 
+// ─── Output: master fader + limiter ─────────────────────────
+
+const _MASTER_THUMB_H = 18;
+const _MASTER_DB_LO = -60, _MASTER_DB_HI = 6;   // fader travel range in dB
+let masterFrac = (0 - _MASTER_DB_LO) / (_MASTER_DB_HI - _MASTER_DB_LO);  // start at 0 dB
+
+function _fracToDb(f) {
+  return f <= 0.001 ? -Infinity : _MASTER_DB_LO + f * (_MASTER_DB_HI - _MASTER_DB_LO);
+}
+function _fracToGain(f) {
+  const db = _fracToDb(f);
+  return db === -Infinity ? 0 : Math.pow(10, db / 20);
+}
+
+function wireOutputControls(v) {
+  const fader = v.querySelector("#masterFader");
+  const thumb = fader ? fader.querySelector("span") : null;
+  const readout = v.querySelector("#masterReadout");
+
+  const applyMaster = (f) => {
+    masterFrac = Math.max(0, Math.min(1, f));
+    if (thumb && fader) {
+      const travel = Math.max(0, (fader.clientHeight || 56) - _MASTER_THUMB_H);
+      thumb.style.top = `${(1 - masterFrac) * travel}px`;
+    }
+    if (readout) {
+      const db = _fracToDb(masterFrac);
+      readout.textContent = db === -Infinity ? "-∞ dB"
+        : `${db >= 0 ? "+" : ""}${db.toFixed(1)} dB`;
+    }
+    synth.setMasterVolume(_fracToGain(masterFrac));
+  };
+
+  if (fader && thumb) {
+    applyMaster(masterFrac);
+    // Scale-independent: dashboard may be CSS-transform-scaled to fit viewport,
+    // so derive the fraction directly from the (visual) bounding rect.
+    const fracFromY = (clientY) => {
+      const rect = fader.getBoundingClientRect();
+      return 1 - (clientY - rect.top) / Math.max(1, rect.height);
+    };
+    const onMove = (e) => { e.preventDefault(); applyMaster(fracFromY(e.clientY)); };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    fader.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      applyMaster(fracFromY(e.clientY));
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+    // Scroll wheel for fine adjustment
+    fader.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      applyMaster(masterFrac - Math.sign(e.deltaY) * 0.03);
+    }, { passive: false });
+  }
+
+  const limiterBtn = v.querySelector("#limiterBtn");
+  if (limiterBtn) {
+    synth.setLimiter(limiterBtn.classList.contains("active"));
+    limiterBtn.onclick = () => {
+      const on = !limiterBtn.classList.contains("active");
+      limiterBtn.classList.toggle("active", on);
+      limiterBtn.textContent = on ? "On" : "Off";
+      synth.setLimiter(on);
+    };
+  }
+}
+
 function startVisualiser() {
   cancelAnimationFrame(animFrame);
   drawLoop();
@@ -3579,43 +5071,485 @@ function drawLoop() {
 
   updateEngineState();
 
+  // Live note trace on the macro histograms (throttled; fades out after playback stops)
+  if (synth.isPlaying) {
+    const tnow = performance.now();
+    if (tnow - _lastMarkerTick >= 40) { _lastMarkerTick = tnow; drawMacroDistsAll(); }
+    _markersActive = true;
+  } else if (_markersActive) {
+    _markersActive = false;
+    drawMacroDistsAll();   // one final clean redraw to clear the trace
+  }
+
+  if (visMode === "motifs") { drawMotifTimeline(); return; }
+  if (visMode === "pianoroll") { drawPianoRoll(); return; }
+
   const data = synth.getSpectrum();
   if (!data || !synth.isPlaying) { drawStaticVis(); return; }
 
   const w = canvas.width, h = canvas.height;
   const ctx = canvasCtx;
-  ctx.fillStyle = "#111820";
+  ctx.fillStyle = "#0b1219";
   ctx.fillRect(0, 0, w, h);
 
-  const barW = w / data.length;
-  for (let i = 0; i < data.length; i++) {
-    const barH = (data[i] / 255) * (h - 10);
-    const hue = 30 + (i / data.length) * 40;
-    ctx.fillStyle = `hsl(${hue} 80% ${45 + (data[i] / 255) * 20}%)`;
-    ctx.fillRect(i * barW, h - barH, Math.max(1.5, barW - 0.5), barH);
-  }
+  drawAnalyserGrid(ctx, w, h);
+  drawSpectrumCurve(ctx, data, w, h);
 }
 
 function drawStaticVis() {
   if (!canvas || !canvasCtx) return;
+  if (visMode === "motifs") { drawMotifTimeline(); return; }
+  if (visMode === "pianoroll") { drawPianoRoll(); return; }
   const w = canvas.width, h = canvas.height;
   const ctx = canvasCtx;
-  ctx.fillStyle = "#111820";
+  ctx.fillStyle = "#0b1219";
   ctx.fillRect(0, 0, w, h);
+  drawAnalyserGrid(ctx, w, h);
+}
 
-  ctx.strokeStyle = "rgba(245,158,11,0.15)";
+// ─── Auto-scrolling motif / piano-roll visualisers ──────────────
+
+const VIS_PX_PER_SEC = 132;        // note-view (piano roll) scroll speed
+const MOTIF_PX_PER_SEC = 80;       // motif view: zoomed out so more pattern fits
+const VIS_PLAYHEAD_FRAC = 0.74;    // playhead position (fraction of width from left)
+
+// Stable hue per base-motif index, evenly spread around the colour wheel.
+function motifHue(baseIndex) {
+  const golden = 47.0;          // pleasant spacing
+  return ((baseIndex * golden) % 360 + 360) % 360;
+}
+
+// Deviation "heat" ramp: 0 = cool/calm (teal), 1 = hot (red-orange).
+// Used to show how far a recurring variant drifted from its canonical form.
+function heatColor(t, alpha = 1) {
+  const x = Math.max(0, Math.min(1, t));
+  // teal(185) → green(120) → amber(48) → red(8) as deviation grows
+  const hue = 185 - 177 * Math.pow(x, 0.85);
+  const sat = 70 + 26 * x;
+  const light = 44 + 14 * x;
+  return `hsla(${hue.toFixed(0)},${sat.toFixed(0)}%,${light.toFixed(0)}%,${alpha})`;
+}
+
+function motifLabel(baseIndex) {
+  // A, B, C … then A2, B2 … for safety
+  const letter = String.fromCharCode(65 + (baseIndex % 26));
+  const wrap = Math.floor(baseIndex / 26);
+  return wrap > 0 ? `${letter}${wrap + 1}` : letter;
+}
+
+function visGroupMotifs(events) {
+  // Collapse consecutive notes that share the same motif occurrence into units.
+  const units = [];
+  for (const ev of events) {
+    const last = units[units.length - 1];
+    const sameUnit = last
+      && ev.motifIndex === last.motifIndex
+      && !ev.isMotifStart
+      && ev.when >= last.start - 1e-6;
+    if (sameUnit) {
+      last.end = ev.when + ev.dur;
+      last.notes.push(ev);
+      if (ev.isSurprise) last.hasSurprise = true;
+    } else {
+      units.push({
+        motifIndex: ev.motifIndex,
+        baseIndex: ev.baseIndex ?? ev.motifIndex,
+        isVariant: !!ev.isVariant,
+        hasSurprise: !!ev.isSurprise,
+        pitchDev: ev.pitchDev || 0,
+        rhythmDev: ev.rhythmDev || 0,
+        start: ev.when,
+        end: ev.when + ev.dur,
+        notes: [ev],
+      });
+    }
+  }
+  return units;
+}
+
+function visBackdrop(ctx, w, h) {
+  ctx.fillStyle = "#0b1219";
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawMotifTimeline() {
+  if (!canvas || !canvasCtx) return;
+  const ctx = canvasCtx;
+  const w = canvas.width, h = canvas.height;
+  visBackdrop(ctx, w, h);
+
+  const tl = synth.getNoteTimeline ? synth.getNoteTimeline() : null;
+  const playheadX = Math.round(w * VIS_PLAYHEAD_FRAC);
+  const now = tl ? tl.now : 0;
+  const PPS = MOTIF_PX_PER_SEC;
+
+  // Faint time gridlines (every 1s)
+  ctx.strokeStyle = "rgba(96,165,250,0.08)";
   ctx.lineWidth = 1;
-  for (let y = 20; y < h; y += 20) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  for (let s = -16; s <= 8; s++) {
+    const x = playheadX + s * PPS;
+    if (x < 0 || x > w) continue;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
   }
 
-  ctx.fillStyle = "rgba(245,158,11,0.08)";
-  ctx.font = "11px system-ui";
+  if (!tl || !tl.events.length) {
+    visEmptyMessage(ctx, w, h, "Press play to watch motifs unfold");
+    drawPlayhead(ctx, playheadX, h);
+    return;
+  }
+
+  const units = visGroupMotifs(tl.events);
+  const bandTop = 20, bandBot = h - 26;   // leave room for the heat strip
+  const bandH = bandBot - bandTop;
+  const HEAT_H = 8;                         // height of each deviation micro-row
+
+  for (const u of units) {
+    const x0 = playheadX + (u.start - now) * PPS;
+    const x1 = playheadX + (u.end - now) * PPS;
+    if (x1 < -4 || x0 > w + 4) continue;
+    const bw = Math.max(7, x1 - x0 - 2);
+    const hue = motifHue(u.baseIndex);
+    const played = u.end <= now;
+    const baseAlpha = played ? 0.42 : 0.92;
+
+    // Variants sit slightly inset so identity (hue) still reads as primary.
+    const inset = u.isVariant ? bandH * 0.12 : 0;
+    const top = bandTop + inset;
+    const bh = bandH - inset * 2;
+
+    ctx.save();
+    // ── Identity block (hue = which motif) ──
+    roundRectPath(ctx, x0 + 1, top, bw, bh, 5);
+    const grad = ctx.createLinearGradient(0, top, 0, top + bh);
+    const light = u.isVariant ? 62 : 52;
+    grad.addColorStop(0, `hsla(${hue},70%,${light}%,${baseAlpha})`);
+    grad.addColorStop(1, `hsla(${hue},72%,${light - 16}%,${baseAlpha})`);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.lineWidth = u.hasSurprise ? 2.5 : 1.3;
+    ctx.strokeStyle = u.hasSurprise
+      ? "rgba(255,236,170,0.95)"
+      : `hsla(${hue},80%,${u.isVariant ? 76 : 66}%,0.9)`;
+    ctx.stroke();
+
+    // Surprise glow (genuine novelty = first appearance)
+    if (u.hasSurprise) {
+      ctx.shadowColor = "rgba(255,210,90,0.85)";
+      ctx.shadowBlur = 15;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // Internal rhythm ticks
+    if (bw > 24) {
+      ctx.fillStyle = `hsla(${hue},90%,90%,${played ? 0.35 : 0.62})`;
+      for (const n of u.notes) {
+        if (n.isRest || n.velocity <= 0) continue;
+        const nx = playheadX + (n.when - now) * PPS;
+        if (nx < x0 || nx > x1) continue;
+        ctx.fillRect(Math.round(nx) + 0.5, top + 3, 1.2, bh - 6);
+      }
+    }
+
+    // Label
+    if (bw > 13) {
+      ctx.fillStyle = played ? "rgba(8,14,20,0.7)" : "rgba(6,12,18,0.92)";
+      ctx.font = "700 11px 'SF Mono', ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const tag = motifLabel(u.baseIndex) + (u.isVariant ? "′" : "");
+      ctx.fillText(tag, x0 + 1 + bw / 2, top + bh / 2);
+    }
+    ctx.restore();
+
+    // ── Deviation heat strip (accuracy difference from the base motif) ──
+    // Two micro-rows: melody (pitch) on top, note-length (rhythm) below.
+    const stripA = played ? 0.5 : 0.95;
+    const sy = bandBot + 2;
+    const pd = u.pitchDev || 0, rd = u.rhythmDev || 0;
+    // faint track so originals (dev≈0) still read as a calm baseline
+    ctx.fillStyle = played ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.10)";
+    ctx.fillRect(x0 + 1, sy, bw, HEAT_H * 2 + 1);
+    if (u.isVariant && (pd > 0.001 || rd > 0.001)) {
+      ctx.fillStyle = heatColor(pd, stripA);
+      ctx.fillRect(x0 + 1, sy, bw, HEAT_H);
+      ctx.fillStyle = heatColor(rd, stripA);
+      ctx.fillRect(x0 + 1, sy + HEAT_H + 1, bw, HEAT_H);
+    }
+
+    // "NEW" badge for surprise-introduced units
+    if (u.hasSurprise && bw > 12) {
+      ctx.fillStyle = "rgba(255,222,120,0.95)";
+      ctx.font = "700 8px 'SF Mono', ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText("NEW", x0 + 1 + bw / 2, top - 4);
+    }
+  }
+
+  // Legend + playhead
+  visLegend(ctx, w, [
+    ["hue", "rgba(140,170,210,0.9)", "identity"],
+    ["heat", "heat", "drift ↑mel ↓len"],
+    ["glow", "rgba(255,222,120,0.95)", "surprise"],
+  ]);
+  drawPlayhead(ctx, playheadX, h);
+}
+
+function drawPianoRoll() {
+  if (!canvas || !canvasCtx) return;
+  const ctx = canvasCtx;
+  const w = canvas.width, h = canvas.height;
+  visBackdrop(ctx, w, h);
+
+  const tl = synth.getNoteTimeline ? synth.getNoteTimeline() : null;
+  const playheadX = Math.round(w * VIS_PLAYHEAD_FRAC);
+  const now = tl ? tl.now : 0;
+  const scale = tl ? tl.scale : null;
+
+  if (!tl || !tl.events.length || !scale) {
+    visEmptyMessage(ctx, w, h, "Press play to watch the piano roll");
+    drawPlayhead(ctx, playheadX, h);
+    return;
+  }
+
+  const div = scale.div || 12;
+  const top = 6, bot = h - 6;
+  const plotH = bot - top;
+
+  // Determine visible pitch range from on-screen notes, then smooth it.
+  const leftTime = now - playheadX / VIS_PX_PER_SEC;
+  const rightTime = now + (w - playheadX) / VIS_PX_PER_SEC;
+  let lo = Infinity, hi = -Infinity;
+  for (const ev of tl.events) {
+    if (ev.isRest || ev.velocity <= 0) continue;
+    if (ev.when + ev.dur < leftTime || ev.when > rightTime) continue;
+    if (ev.degree < lo) lo = ev.degree;
+    if (ev.degree > hi) hi = ev.degree;
+  }
+  if (!isFinite(lo)) { lo = -6; hi = 6; }
+  lo -= 2.5; hi += 2.5;
+  const MIN_SPAN = 11;
+  if (hi - lo < MIN_SPAN) { const mid = (lo + hi) / 2; lo = mid - MIN_SPAN / 2; hi = mid + MIN_SPAN / 2; }
+  // Smooth toward target range
+  if (!_pianoRange) _pianoRange = { lo, hi };
+  else {
+    _pianoRange.lo += (lo - _pianoRange.lo) * 0.12;
+    _pianoRange.hi += (hi - _pianoRange.hi) * 0.12;
+  }
+  const rLo = _pianoRange.lo, rHi = _pianoRange.hi;
+  const span = Math.max(1, rHi - rLo);
+  const yFor = (deg) => bot - ((deg - rLo) / span) * plotH;
+  const rowH = plotH / span;
+
+  // Pitch lanes — highlight in-scale (sub) degrees brightest, other scale degrees faint.
+  const subSet = new Set(scale.sub);
+  const allSet = new Set(scale.all);
+  const dLo = Math.floor(rLo), dHi = Math.ceil(rHi);
+  for (let d = dLo; d <= dHi; d++) {
+    const pc = ((d % div) + div) % div;
+    const inSub = subSet.has(pc);
+    const inAll = allSet.has(pc);
+    if (!inAll && !inSub) continue;
+    const y = yFor(d);
+    ctx.fillStyle = inSub ? "rgba(96,165,250,0.10)" : "rgba(120,140,160,0.045)";
+    ctx.fillRect(0, y - rowH, w, rowH);
+    // Tonic (pc 0) gets a stronger lane line
+    if (pc === 0) {
+      ctx.strokeStyle = "rgba(245,158,11,0.22)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+  }
+
+  // Beat + motif gridlines, aligned to motif boundaries in the event stream.
+  drawPianoGrid(ctx, tl, now, playheadX, w, h);
+
+  // Notes — drawn as flat, slim bars (a read-only scrolling display, not editable blocks)
+  const nh = Math.max(2.5, Math.min(9, rowH * 0.5));
+  for (const ev of tl.events) {
+    if (ev.isRest || ev.velocity <= 0) continue;
+    const x0 = playheadX + (ev.when - now) * VIS_PX_PER_SEC;
+    const x1 = playheadX + (ev.when + ev.dur - now) * VIS_PX_PER_SEC;
+    if (x1 < -2 || x0 > w + 2) continue;
+    const y = yFor(ev.degree);
+    const nw = Math.max(3, x1 - x0 - 1.5);
+    const hue = motifHue(ev.baseIndex ?? ev.motifIndex);
+    const played = ev.when + ev.dur <= now;
+    const alpha = (played ? 0.45 : 0.92) * (0.5 + 0.5 * Math.min(1, ev.velocity / 0.9));
+
+    if (ev.isSurprise) {
+      ctx.fillStyle = `rgba(255,224,130,${played ? 0.6 : 0.95})`;
+      ctx.shadowColor = "rgba(255,210,90,0.7)";
+      ctx.shadowBlur = 7;
+      ctx.fillRect(x0 + 0.5, y - nh / 2, nw, nh);
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.fillStyle = `hsla(${hue},70%,60%,${alpha})`;
+      ctx.fillRect(x0 + 0.5, y - nh / 2, nw, nh);
+    }
+  }
+
+  drawPlayhead(ctx, playheadX, h);
+}
+
+function drawPianoGrid(ctx, tl, now, playheadX, w, h) {
+  // Use motif-start events to place strong divisions; subdivide by beats.
+  const starts = tl.events.filter(e => e.isMotifStart);
+  for (const ev of tl.events) {
+    // Beat divisions within each note span
+    const beatDiv = ev.beatDivisions || 1;
+    const divSec = ev.dur / Math.max(1, ev.durationDivs || 1);
+    const firstDiv = ev.when;
+    for (let i = 0; i <= (ev.durationDivs || 1); i++) {
+      const t = firstDiv + i * divSec;
+      const x = playheadX + (t - now) * VIS_PX_PER_SEC;
+      if (x < 0 || x > w) continue;
+      ctx.strokeStyle = "rgba(96,165,250,0.06)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+  }
+  // Strong motif boundary lines
+  for (const s of starts) {
+    const x = playheadX + (s.when - now) * VIS_PX_PER_SEC;
+    if (x < 0 || x > w) continue;
+    ctx.strokeStyle = "rgba(245,158,11,0.28)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    // Motif label tag at top
+    ctx.fillStyle = "rgba(245,180,90,0.8)";
+    ctx.font = "700 9px 'SF Mono', ui-monospace, monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(motifLabel(s.baseIndex ?? s.motifIndex) + (s.isVariant ? "′" : ""), x + 3, 3);
+  }
+}
+
+function drawPlayhead(ctx, x, h) {
+  ctx.strokeStyle = "rgba(245,158,11,0.9)";
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = "rgba(245,158,11,0.7)";
+  ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Top arrow marker
+  ctx.fillStyle = "rgba(245,158,11,0.95)";
+  ctx.beginPath();
+  ctx.moveTo(x - 5, 0); ctx.lineTo(x + 5, 0); ctx.lineTo(x, 7); ctx.closePath();
+  ctx.fill();
+}
+
+function visEmptyMessage(ctx, w, h, msg) {
+  ctx.fillStyle = "rgba(150,170,190,0.4)";
+  ctx.font = "600 12px 'SF Mono', ui-monospace, monospace";
   ctx.textAlign = "center";
-  ctx.fillText("Press Play to start the visualiser", w / 2, h / 2);
+  ctx.textBaseline = "middle";
+  ctx.fillText(msg, w / 2, h / 2);
+}
+
+function visLegend(ctx, w, items) {
+  let x = 12;
+  const y = 14;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = "600 9px 'SF Mono', ui-monospace, monospace";
+  for (const [kind, color, label] of items) {
+    if (kind === "hue") {
+      // filled swatch in a sample motif colour
+      ctx.fillStyle = `hsla(${motifHue(1)},70%,55%,0.95)`;
+      ctx.fillRect(x, y - 5, 14, 10);
+    } else if (kind === "heat") {
+      // cool→hot gradient swatch
+      const g = ctx.createLinearGradient(x, 0, x + 14, 0);
+      g.addColorStop(0, heatColor(0.05)); g.addColorStop(0.5, heatColor(0.5)); g.addColorStop(1, heatColor(1));
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y - 5, 14, 10);
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      if (kind === "dash") ctx.setLineDash([4, 3]);
+      if (kind === "glow") { ctx.shadowColor = color; ctx.shadowBlur = 6; }
+      ctx.strokeRect(x, y - 5, 14, 10);
+      ctx.setLineDash([]); ctx.shadowBlur = 0;
+    }
+    ctx.fillStyle = "rgba(170,190,210,0.75)";
+    ctx.fillText(label, x + 18, y);
+    x += 18 + ctx.measureText(label).width + 14;
+  }
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function drawAnalyserGrid(ctx, w, h) {
+  ctx.strokeStyle = "rgba(245,158,11,0.15)";
+  ctx.lineWidth = 1;
+  for (let y = 20; y < h; y += 24) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(96,165,250,0.08)";
+  for (let x = 36; x < w; x += 56) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+}
+
+function drawSpectrumCurve(ctx, data, w, h) {
+  const pad = 10;
+  const points = [];
+  for (let i = 0; i < data.length; i++) {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const v = Math.max(0, Math.min(1, data[i] / 255));
+    const y = h - pad - v * (h - pad * 2);
+    points.push([x, y]);
+  }
+  ctx.beginPath();
+  points.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.lineTo(w - pad, h - pad);
+  ctx.lineTo(pad, h - pad);
+  ctx.closePath();
+  const fill = ctx.createLinearGradient(0, pad, 0, h - pad);
+  fill.addColorStop(0, "rgba(59,130,246,0.28)");
+  fill.addColorStop(1, "rgba(59,130,246,0.02)");
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.beginPath();
+  points.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.strokeStyle = "rgba(96,165,250,0.95)";
+  ctx.shadowColor = "rgba(59,130,246,0.55)";
+  ctx.shadowBlur = 10;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function resetMeters() {
+  const mL = document.getElementById("meterL");
+  const mR = document.getElementById("meterR");
+  if (mL) mL.style.transform = "scaleY(0.015)";
+  if (mR) mR.style.transform = "scaleY(0.015)";
 }
 
 function updateEngineState() {
+  // Live output meters (reflect master fader + limiter)
+  const lvl = synth.getOutputLevel ? synth.getOutputLevel() : 0;
+  const mL = document.getElementById("meterL");
+  const mR = document.getElementById("meterR");
+  if (mL || mR) {
+    const s = Math.max(0.015, Math.min(1, lvl));
+    if (mL) mL.style.transform = `scaleY(${s})`;
+    if (mR) mR.style.transform = `scaleY(${Math.max(0.015, s * 0.94)})`;
+  }
+
   const state = synth.getEngineState();
   if (!state) return;
   const m = document.getElementById("statMotifs");
@@ -3624,6 +5558,19 @@ function updateEngineState() {
   if (m) m.textContent = state.motifCount;
   if (s) s.textContent = state.seqLen;
   if (n) n.textContent = state.notes;
+  if (Number.isFinite(state.surpriseCount)) {
+    if (state.surpriseCount < lastSurpriseCount) lastSurpriseCount = state.surpriseCount;
+    if (state.surpriseCount > lastSurpriseCount) {
+      const card = document.getElementById("visualCard");
+      if (card) {
+        card.classList.remove("surprise-flash");
+        void card.offsetWidth;
+        card.classList.add("surprise-flash");
+        window.setTimeout(() => card.classList.remove("surprise-flash"), 560);
+      }
+      lastSurpriseCount = state.surpriseCount;
+    }
+  }
 }
 
 // ─── Shared ─────────────────────────────────────────────────
@@ -3641,5 +5588,11 @@ function progressBar(fraction) {
 
 el = document.getElementById("app");
 window.addEventListener("hashchange", route);
+
+// Global slider fill delegation — covers all range inputs everywhere
+document.addEventListener("input", (e) => {
+  if (e.target.matches('input[type="range"]')) updateSliderFill(e.target);
+});
+
 pid();
 route();

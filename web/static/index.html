@@ -4,10 +4,16 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Sound Studio</title>
-<link rel="stylesheet" href="/styles.css"/>
+<link rel="stylesheet" href="/styles.css?v=64"/>
 </head>
 <body>
 <div id="app" role="main"></div>
-<script type="module" src="/app.js"></script>
+<script type="module">
+  import("/app.js?v=64").catch((err) => {
+    const app = document.getElementById("app");
+    if (app) app.textContent = err && err.stack ? err.stack : String(err);
+    console.error(err);
+  });
+</script>
 </body>
 </html>

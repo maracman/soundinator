@@ -19,6 +19,14 @@ export class SeededRNG {
   int(a,b){ return a + Math.floor(this.next()*(b-a)); }
   pick(a) { return a[this.int(0, a.length)]; }
   shuffle(a) { for(let i=a.length-1;i>0;i--){const j=this.int(0,i+1);[a[i],a[j]]=[a[j],a[i]];} return a; }
+  /** Box-Muller transform → N(mean, sd²), using seeded stream */
+  gaussian(mean = 0, sd = 1) {
+    let u1;
+    do { u1 = this.next(); } while (u1 === 0);   // avoid log(0)
+    const u2 = this.next();
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return mean + sd * z;
+  }
 }
 
 // ─── Formant presets (approximate adult male formant frequencies) ─
@@ -30,6 +38,82 @@ export const FORMANT_PRESETS = {
   eh: { f1: 530, f2: 1840, f3: 2480, label: "eh" },
   oh: { f1: 570, f2: 840,  f3: 2410, label: "oh" },
 };
+const FORMANT_ORDER = ["ee", "eh", "ah", "oh", "oo"];
+
+/**
+ * Register window weight for a pitch `offset` (in scale degrees) from the
+ * register centre. This is a flat-topped (super-Gaussian) window, not a peak:
+ * across the comfortable register the weight is ~1 everywhere (so no single
+ * pitch, including the centre, is favoured — the centre note is not
+ * over-repeated), and it only rolls off past the register edge. `width` is the
+ * full plateau width in degrees; wider registers are flatter (exponent → ~8,
+ * near-rectangular) while the narrowest stay near-Gaussian so that — only at
+ * the extreme of narrow widths — the window collapses into a true centre pull.
+ * `skew` widens one shoulder and narrows the other.
+ */
+export function registerWindow(offset, width, skew = 0) {
+  const w = Math.max(1, Number(width) || 1);
+  const side = offset >= 0 ? 1 : -1;
+  const halfWidth = Math.max(1, w * 0.5 * (1 + skew * side * 0.75));
+  const flatness = Math.max(0, Math.min(1, (w - 2) / 12));
+  const shapeExp = 2 + flatness * 6;          // 2 (Gaussian) → 8 (≈ rectangular)
+  return Math.exp(-0.5 * Math.pow(Math.abs(offset / halfWidth), shapeExp));
+}
+
+/**
+ * Relative weight for a melodic interval of `stepDist` scale degrees.
+ *
+ * Always a normal (Gaussian) distribution — no pedestal, no flat top, nothing
+ * artificially capped. Two knobs reshape the same bell:
+ *
+ *   RANGE  sets the spread at the broad end: σ = range/3, so the range edge
+ *          sits at ±3σ and widening the range stretches the whole bell. Beyond
+ *          the range an interval is disallowed (weight 0), but the Gaussian has
+ *          already decayed to ~1% there, so the cut is invisible — not a cap.
+ *
+ *   SHAPE  (0..4 dial) shrinks σ as it rises, so the bell narrows from broad
+ *          (jumpy: big leaps common) toward a sharp point at the extreme
+ *          (stepwise: small intervals strongly favoured). The narrowing is
+ *          concentrated near the top of the dial — the mid-range stays a
+ *          moderate bell instead of spiking to "always repeat" too early.
+ */
+export function intervalShapeWeight(stepDist, shape, maxRange) {
+  const range = Math.max(1, Number(maxRange) || 1);
+  const ad = Math.abs(Number(stepDist) || 0);
+  if (ad > range) return 0;
+  const t = Math.max(0, Math.min(1, (Number(shape) || 0) / 4));
+  // Bottom of the dial: uniform (equal probability of any interval size within
+  // the range). Top of the dial: a sharp point at the centre (stepwise/repeat).
+  // sigmaMax is large enough that within ±range the Gaussian is essentially flat
+  // (edge ≈ 98% of peak), so the low extreme reads as equal probability; sigma
+  // shrinks geometrically toward sigmaMin so it sharpens to a point at the top.
+  const sigmaMin = 0.35;                 // sharp point at the extreme
+  const sigmaMax = range * 5;            // ~flat / uniform across the range
+  const sigma = sigmaMin * Math.pow(sigmaMax / sigmaMin, 1 - t);
+  return Math.exp(-0.5 * Math.pow(ad / sigma, 2));
+}
+
+/**
+ * Interpolate F1/F2/F3 for a continuous position on the vowel circle: the base
+ * vowel offset by `dev` steps. dev=0 → the pure vowel; a fractional dev blends
+ * linearly between the two adjacent pure vowels, so a missed vowel can sit
+ * between them. Shared by the audio engine and any consumer.
+ */
+function formantFreqsAt(formant, dev = 0) {
+  const order = FORMANT_ORDER.filter(f => FORMANT_PRESETS[f]);
+  const n = order.length || 1;
+  const baseIdx = Math.max(0, order.indexOf(FORMANT_PRESETS[formant] ? formant : "ah"));
+  const pos = baseIdx + (dev || 0);
+  const lo = Math.floor(pos);
+  const frac = pos - lo;
+  const a = FORMANT_PRESETS[order[((lo % n) + n) % n]];
+  const b = FORMANT_PRESETS[order[(((lo + 1) % n) + n) % n]];
+  return {
+    f1: a.f1 + (b.f1 - a.f1) * frac,
+    f2: a.f2 + (b.f2 - a.f2) * frac,
+    f3: a.f3 + (b.f3 - a.f3) * frac,
+  };
+}
 
 // ─── Percussion sound definitions ───────────────────────────
 
@@ -466,6 +550,42 @@ class Repertoire {
   get size() { return this.motifs.length; }
   get bakedCount() { return Math.max(0, this.motifs.length - this.baseLen); }
   get sequenceLength() { return this.sequence.length; }
+
+  /**
+   * How far a (variant) motif has drifted from its canonical base form.
+   * Returns normalised {pitch, rhythm} in 0..1 for a deviation "heat" map.
+   * An original (motifIndex < baseLen) has zero deviation by definition.
+   */
+  motifDeviation(motifIndex, div = 12) {
+    const cache = this._devCache || (this._devCache = {});
+    if (cache[motifIndex]) return cache[motifIndex];
+    const base = this.baseIndexFor(motifIndex);
+    const bm = this.motifs[base], vm = this.motifs[motifIndex];
+    let out = { pitch: 0, rhythm: 0 };
+    if (bm && vm && motifIndex !== base) {
+      const a = bm.notes, b = vm.notes;
+      const n = Math.max(a.length, b.length);
+      let pitch = 0, rhythm = 0;
+      for (let i = 0; i < n; i++) {
+        const na = a[i], nb = b[i];
+        if (na && nb) {
+          pitch += Math.abs((nb.degree || 0) - (na.degree || 0));
+          rhythm += Math.abs((nb.durationDivs || 0) - (na.durationDivs || 0));
+        } else {
+          const ref = na || nb;
+          pitch += div;                          // structural change ≈ octave
+          rhythm += Math.abs(ref.durationDivs || 1);
+        }
+      }
+      const baseDur = a.reduce((s, x) => s + (x.durationDivs || 0), 0) || 1;
+      out = {
+        pitch: Math.min(1, pitch / Math.max(1, div * 0.5)),
+        rhythm: Math.min(1, rhythm / Math.max(1, baseDur * 0.5)),
+      };
+    }
+    cache[motifIndex] = out;
+    return out;
+  }
 }
 
 // ─── Generation engine (stateful, produces one note at a time) ─
@@ -529,6 +649,7 @@ export class GenerationEngine {
 
     let note = { ...this._motif.notes[this._noteIdx] };
     let isSurprise = false;
+    let isSurpriseStart = false;
 
     // ── Motif-pass surprise ──
     // Surprise probability is evaluated once per motif pass. If it fires, one
@@ -541,6 +662,7 @@ export class GenerationEngine {
       this._activeSurpriseProjection = this._buildSurpriseProjection(this._noteIdx);
       note = { ...this._activeSurpriseProjection.notes[this._noteIdx] };
       isSurprise = true;
+      isSurpriseStart = true;
       this._maybeBakeProjectedSurprise(this._activeSurpriseProjection);
       this._motifSurprisePlan = null;
     } else if (this._activeSurpriseProjection && this._noteIdx >= this._activeSurpriseProjection.startIndex && this._noteIdx < this._activeSurpriseProjection.snapBackIndex) {
@@ -549,13 +671,16 @@ export class GenerationEngine {
     }
 
     // ── Motif-hit accuracy ──
+    // Gaussian miss distribution: σ = missRange/3, clipped at ±3σ (= ±missRange).
     // This is a transient performance/memory miss in scale degrees. It is not
     // incorporated into the motif repertoire; surprise handles incorporation.
     if (this.rng.next() > (this.p.motifHitProb ?? 1)) {
       const missRange = Math.max(0, Math.round(this.p.motifHitRange ?? 0));
       if (missRange > 0) {
-        let miss = this.rng.int(-missRange, missRange + 1);
-        if (miss === 0) miss = this.rng.next() < 0.5 ? -1 : 1;
+        const sigma = missRange / 3;
+        let miss = Math.round(this.rng.gaussian(0, sigma));
+        miss = Math.max(-missRange, Math.min(missRange, miss));  // clip at ±3σ
+        if (miss === 0) miss = this.rng.next() < 0.5 ? -1 : 1;  // miss ≠ exact
         note.degree = this.scale.stepFrom(note.degree, miss);
       }
     }
@@ -595,17 +720,24 @@ export class GenerationEngine {
 
     // ── Cents-level intonation precision ──
     let intonationCents = 0;
-    if (this.rng.next() > (this.p.precision ?? 1)) {
+    if (Number.isFinite(note.tuningOverrideCents)) {
+      intonationCents = note.tuningOverrideCents;
+    } else if (this.rng.next() > (this.p.precision ?? 1)) {
       const range = Math.max(0, this.p.precisionRange ?? 0);
       intonationCents = (this.rng.next() + this.rng.next() - 1) * range;
     }
 
-    // Motif generation, surprises, and projections own the note formant.
-    // Playback keeps that value instead of overwriting baked formant surprises.
+    // Motif generation, surprises, and projections own the base note vowel.
+    // Playback keeps that vowel and adds a *continuous* accuracy miss on top —
+    // the sung formant can land anywhere on the circle, up to half a circle away,
+    // including between two pure vowels. The base vowel stays stable for tracking.
     note.formant = note.formant || this._currentFormant;
     this._currentFormant = note.formant;
+    note.formantDev = (note.formantDev || 0) + this._formantAccuracyDev(note.formant);
 
     const isMotifEnd = this._noteIdx >= this._motif.notes.length - 1;
+    const motifNoteIndex = this._noteIdx;
+    const motifNotesCount = this._motif.notes.length;
     this._noteIdx++;
     this._notesGenerated++;
 
@@ -617,8 +749,8 @@ export class GenerationEngine {
     const divSec = 60 / ((this.p.tempo || 104) * beatDiv);
     const durationDivs = note.durationDivs || 1;
     const motifBeats = this.p.motifLengthBeats || this.p.motifLength || 4;
-    // Velocity: use override from motif note (dynamics surprise) or default
-    let velocity = note.velocityOverride ?? (0.4 + this.rng.next() * 0.35);
+    // Velocity: use override from motif note (dynamics surprise) or sampled dynamic centre.
+    let velocity = note.velocityOverride ?? this._pickVelocity();
     const restRatio = this._restRatioFor(note, beatDiv, isMotifStart);
     const isRatioRest = !note.isRest && this.rng.next() < restRatio;
     // Rest: silence the note
@@ -639,13 +771,31 @@ export class GenerationEngine {
     this._lastOutputFrequency = velocity > 0 ? fittedFrequency : null;
     this._lastGapFraction = velocity > 0 ? gapFraction : 1;
 
+    // Role classification (for the live histogram marker colour):
+    //   surprise   — the note that triggers a surprise
+    //   generation — a surprise's branching continuation, or a motif's first pass
+    //   accuracy   — a replicated motif note (snapped back, or a repeat pass)
+    const noteRole = isSurpriseStart
+      ? "surprise"
+      : isSurprise
+        ? "generation"
+        : (this._motifFirstPass ? "generation" : "accuracy");
+
     return {
       frequency: fittedFrequency,
+      degree: note.degree,
+      noteRole,
       duration: Math.max(gridDuration * 0.04, duration),
       formant: note.formant,
+      formantDev: note.formantDev || 0,
       velocity,
       isRest: !!note.isRest || isRatioRest,
       isSurprise,
+      motifIndex: this._motifIdx,
+      baseIndex: this.repertoire ? this.repertoire.baseIndexFor(this._motifIdx) : this._motifIdx,
+      isVariant: this.repertoire ? this._motifIdx >= this.repertoire.baseLen : false,
+      motifNoteIndex,
+      motifNotesCount,
       durationDivs,
       gapFraction,
       intonationCents,
@@ -668,6 +818,12 @@ export class GenerationEngine {
       seqLen: this.repertoire.sequenceLength,
       notes: this._notesGenerated,
     };
+  }
+
+  /** Normalised {pitch, rhythm} drift of a motif from its base form (0..1). */
+  motifDeviation(motifIndex) {
+    if (!this.repertoire) return { pitch: 0, rhythm: 0 };
+    return this.repertoire.motifDeviation(motifIndex, this.scale ? this.scale.div : 12);
   }
 
   // ── Private ──
@@ -883,7 +1039,7 @@ export class GenerationEngine {
    * @param {number} current   Current degree
    * @param {number} phrasePos 0..1 position within motif
    */
-  _pickBiasedNote(current, phrasePos) {
+  _pickBiasedNote(current, phrasePos, prevDir = 0, prevDurationDivs = null) {
     const { scale, rng, p } = this;
     const peakedness = p.intervalPeakedness;
     const maxRange = p.intervalRange;
@@ -895,23 +1051,24 @@ export class GenerationEngine {
       const target = scale.stepFrom(center, step);
       const stepDist = Math.abs(step);
 
-      // Base weight: stacked distribution over scale-degree distance.
-      const w = Math.exp(-stepDist * peakedness);
+      // Base weight: interval-shape distribution over scale-degree distance.
+      // RANGE sets the spread (edge = ±3σ); SHAPE blends uniform→Gaussian.
+      const w = intervalShapeWeight(stepDist, peakedness, maxRange);
       // Sub-scale bonus
       const subBonus = scale.sub.includes(scale.norm(target)) ? scale.weight : (1 - scale.weight);
 
-      // Register weight: split-normal curve. Skew widens one tail and
-      // narrows the other while leaving the centre itself anchored.
+      // Register weight: a flat-topped window, NOT a peak. Inside the register
+      // every degree is essentially equally likely, so there is no pull toward
+      // the exact centre and no extra likelihood of repeating the centre note.
+      // The weight only falls off past the register edge. Skew widens one side.
+      // Narrow registers collapse the plateau toward the centre, so a centre
+      // pull is only perceptible at the extreme of narrow widths.
       let regW = 1.0;
       const regCenter = p.registerCenter ?? 0;
       const regWidth = p.registerWidth ?? 12;
       const regSkew = p.registerSkew ?? 0;
       if (regWidth > 0 && regWidth < 100) {
-        const offset = target - regCenter;
-        const side = offset >= 0 ? 1 : -1;
-        const sigma = Math.max(1, regWidth * (1 + regSkew * side * 0.75));
-        regW = Math.exp(-0.5 * (offset / sigma) ** 2);
-        regW = Math.max(0.01, regW); // floor to avoid zero weight
+        regW = Math.max(0.01, registerWindow(target - regCenter, regWidth, regSkew));
       }
 
       // Root pull weight
@@ -935,9 +1092,56 @@ export class GenerationEngine {
         }
       }
 
-      candidates.push({ degree: target, prob: w * subBonus * regW * rootW });
+      candidates.push({ degree: target, dir: Math.sign(step), prob: w * subBonus * regW * rootW });
     }
     if (candidates.length === 0) return current;
+
+    // ── Momentum ────────────────────────────────────────────────
+    // Bias the next move to continue in the same direction as the
+    // previous shift. Strength depends on how recently the previous
+    // change happened in MUSICAL time (note divisions, tempo-agnostic):
+    // the shorter the note just played, the stronger the carry-over.
+    // The continuation probability is capped at 80%, reached only for
+    // maximally-subdivided (1-division) notes near the register centre.
+    // As a note travels toward the register edge in the momentum
+    // direction, the carry-over fades so the natural register pull can
+    // reverse the line before it escapes the comfortable range.
+    const momentum = p.momentum ?? 0;
+    if (momentum > 0 && prevDir !== 0 && prevDurationDivs != null) {
+      // Shorter notes → stronger momentum. 1 division = full strength.
+      const durFactor = 1 / Math.max(1, prevDurationDivs);
+      // Edge attenuation: only when moving further toward the extreme.
+      const regCenter = p.registerCenter ?? 0;
+      const regWidth = p.registerWidth ?? 12;
+      const regSkew = p.registerSkew ?? 0;
+      const offset = current - regCenter;
+      let edgeAtten = 1;
+      const movingOutward = (prevDir > 0 && offset > 0) || (prevDir < 0 && offset < 0);
+      if (movingOutward && regWidth > 0 && regWidth < 100) {
+        edgeAtten = Math.max(0, Math.min(1, registerWindow(offset, regWidth, regSkew)));
+      }
+      const effMom = Math.max(0, Math.min(1, momentum * durFactor * edgeAtten));
+      if (effMom > 0) {
+        let sameTotal = 0, otherTotal = 0;
+        for (const c of candidates) {
+          if (c.dir === prevDir) sameTotal += c.prob; else otherTotal += c.prob;
+        }
+        const grand = sameTotal + otherTotal;
+        if (grand > 0 && sameTotal > 0 && otherTotal > 0) {
+          const basePsame = sameTotal / grand;
+          // Push P(same direction) from its base value up toward 0.8.
+          const targetPsame = Math.max(
+            basePsame,
+            basePsame + (0.8 - basePsame) * effMom
+          );
+          const factorSame = targetPsame / basePsame;
+          const factorOther = (1 - targetPsame) / (1 - basePsame);
+          for (const c of candidates) {
+            c.prob *= (c.dir === prevDir) ? factorSame : factorOther;
+          }
+        }
+      }
+    }
 
     // Normalise and sample
     const total = candidates.reduce((s, c) => s + c.prob, 0);
@@ -1011,11 +1215,19 @@ export class GenerationEngine {
     const notes = [];
     let deg = this._currentDegree || this.scale.pickNote(this.rng);
     let fmt = this._pickFormant();
+    // Momentum state: direction of the most recent completed move, carried
+    // across notes (and across motifs via this._lastDir).
+    let prevDir = this._lastDir || 0;
 
     for (let i = 0; i < rhythm.length; i++) {
       const phrasePos = rhythm.length > 1 ? i / (rhythm.length - 1) : 0;
       if (i > 0) {
-        deg = this._pickBiasedNote(deg, phrasePos);
+        // The previous note's duration sets how recently the prior shift
+        // happened (in tempo-agnostic divisions); shorter = stronger pull.
+        const prevDur = rhythm[i - 1].durationDivs;
+        const before = deg;
+        deg = this._pickBiasedNote(deg, phrasePos, prevDir, prevDur);
+        if (deg !== before) prevDir = Math.sign(deg - before);
       }
       // Check if we landed on a root
       if (this._distToRoot(deg) <= 1) {
@@ -1032,6 +1244,7 @@ export class GenerationEngine {
       });
     }
     this._currentDegree = deg;
+    this._lastDir = prevDir;
     return new Motif(notes);
   }
 
@@ -1048,6 +1261,11 @@ export class GenerationEngine {
   }
 
   _startMotifPass() {
+    // First presentation of a motif = "generation" (new material); any later
+    // pass over the same motif = "accuracy" (replication). Drives marker colour.
+    if (!this._seenMotifs) this._seenMotifs = new Set();
+    this._motifFirstPass = !this._seenMotifs.has(this._motifIdx);
+    this._seenMotifs.add(this._motifIdx);
     this._motifSurprisePlan = null;
     this._activeSurpriseProjection = null;
     const probability = this._clamp01(this.p.surpriseProb ?? 0);
@@ -1067,11 +1285,17 @@ export class GenerationEngine {
 
     let projectedDegree = notes[startIndex].degree;
     let projectedFormant = notes[startIndex].formant || this._currentFormant;
+    let projDir = (startIndex > 0)
+      ? Math.sign(notes[startIndex].degree - (original[startIndex - 1]?.degree ?? notes[startIndex].degree))
+      : 0;
     for (let i = startIndex + 1; i < notes.length; i++) {
       const phrasePos = notes.length > 1 ? i / (notes.length - 1) : 0;
       notes[i] = { ...original[i] };
       if (features.includes("pitch")) {
-        projectedDegree = this._pickBiasedNote(projectedDegree, phrasePos);
+        const prevDur = notes[i - 1].durationDivs;
+        const before = projectedDegree;
+        projectedDegree = this._pickBiasedNote(projectedDegree, phrasePos, projDir, prevDur);
+        if (projectedDegree !== before) projDir = Math.sign(projectedDegree - before);
         notes[i].degree = projectedDegree;
       }
       if (features.includes("formant")) {
@@ -1112,6 +1336,12 @@ export class GenerationEngine {
     if (features.includes("pitch")) {
       const tolerance = Math.max(1, Math.round(this.p.motifHitRange ?? 1));
       if (this.scale.stepDistance(original.degree, projected.degree) > tolerance) return false;
+    }
+    if (features.includes("tuning")) {
+      const tolerance = Math.max(1, Number(this.p.precisionRange ?? 12));
+      const o = original.tuningOverrideCents ?? 0;
+      const p = projected.tuningOverrideCents ?? 0;
+      if (Math.abs(o - p) > tolerance) return false;
     }
     if (features.includes("formant") && original.formant !== projected.formant) return false;
     if (features.includes("rhythm") && (original.durationDivs || 1) !== (projected.durationDivs || 1)) return false;
@@ -1178,9 +1408,68 @@ export class GenerationEngine {
     return formants[formants.length - 1] || "ah";
   }
 
+  _formantMapValue(mapKey, allKey, formant, fallback, integer = false) {
+    const map = this.p[mapKey] || {};
+    let value = Number(map[formant] ?? this.p[allKey] ?? fallback);
+    if (!Number.isFinite(value)) value = fallback;
+    return integer ? Math.round(value) : value;
+  }
+
+  _formantStep(formant, steps) {
+    const order = FORMANT_ORDER.filter(f => FORMANT_PRESETS[f]);
+    const start = Math.max(0, order.indexOf(formant));
+    return order[(start + steps + order.length * 8) % order.length] || formant || "ah";
+  }
+
+  /**
+   * Continuous formant-accuracy miss, in circle steps. Returns 0 on a hit; on a
+   * miss it returns a signed deviation up to ±range, where range is capped at
+   * half a circle (e.g. ±2.5 steps for 5 vowels). The value is continuous, so a
+   * missed vowel can land *between* two pure vowels.
+   */
+  _formantAccuracyDev(formant) {
+    const base = FORMANT_PRESETS[formant] ? formant : "ah";
+    const accuracy = this._clamp01(this._formantMapValue("formantAccuracyByFormant", "formantAccuracy", base, 0.85));
+    if (this.rng.next() <= accuracy) return 0;
+    const half = (FORMANT_ORDER.filter(f => FORMANT_PRESETS[f]).length || 5) / 2;
+    const range = Math.max(0, Math.min(half, this._formantMapValue("formantRangeByFormant", "formantAccuracyRange", base, 1)));
+    if (range <= 0) return 0;
+    const mag = range * this.rng.next();
+    return mag * (this.rng.next() < 0.5 ? -1 : 1);
+  }
+
+  _pickSurpriseFormant(formant) {
+    const base = FORMANT_PRESETS[formant] ? formant : "ah";
+    const distance = this._clamp01(this._formantMapValue("surpriseFormantDistanceByFormant", "surpriseFormantDistance", base, 0.85));
+    const maxStep = Math.max(1, Math.floor(FORMANT_ORDER.length / 2));
+    const stepSize = Math.max(1, Math.round(1 + distance * (maxStep - 1)));
+    return this._formantStep(base, stepSize * (this.rng.next() < 0.5 ? -1 : 1));
+  }
+
+  _pickVelocity() {
+    // Loudness register (analogue of the melodic register): the CENTRE is where
+    // loudness settles; the RANGE sets the soft/loud limits (± half the range).
+    // It is independent of accuracy (reproduction fidelity) and of generation
+    // variability — it only bounds where the loudness can sit.
+    const center = this._clamp(Number(this.p.dynamicsLevel ?? 0.62), 0.05, 1);
+    const regRange = Math.max(0, Number(this.p.loudnessRange ?? 0.6));
+    const half = regRange / 2;
+    const lo = this._clamp(center - half, 0.02, 1);
+    const hi = this._clamp(center + half, 0.02, 1);
+    // Accuracy: probability the dynamic is reproduced exactly at the centre.
+    const precision = this._clamp01(this.p.dynamicsPrecision ?? 0.75);
+    if (this.rng.next() <= precision) return center;
+    // Generation: how variable the loudness is from one note to the next.
+    const range = Math.max(0, Number(this.p.dynamicsRange ?? 0.22));
+    const deviation = (this.rng.next() + this.rng.next() - 1) * range;
+    // Clamp into the register's soft/loud limits.
+    return this._clamp(center + deviation, lo, hi);
+  }
+
   _chooseSurpriseFeatures() {
     const candidates = [
       { key: "pitch", enabled: this.p.surprisePitchEnabled ?? (this.p.surpriseDimensions || ["pitch"]).includes("pitch"), weight: this.p.surprisePitchWeight ?? 1 },
+      { key: "tuning", enabled: this.p.surpriseTuningEnabled ?? (this.p.surpriseDimensions || []).includes("tuning"), weight: this.p.surpriseTuningWeight ?? 0.45 },
       { key: "rhythm", enabled: this.p.surpriseRhythmEnabled ?? (this.p.surpriseDimensions || []).includes("rhythm"), weight: this.p.surpriseRhythmWeight ?? 0.45 },
       { key: "formant", enabled: this.p.surpriseFormantEnabled ?? (this.p.surpriseDimensions || []).includes("formant"), weight: this.p.surpriseFormantWeight ?? 0.45 },
       { key: "dynamics", enabled: this.p.surpriseDynamicsEnabled ?? (this.p.surpriseDimensions || []).includes("dynamics"), weight: this.p.surpriseDynamicsWeight ?? 0.35 },
@@ -1216,19 +1505,28 @@ export class GenerationEngine {
     if (dims.includes("pitch")) {
       const dir = this.rng.next() < 0.5 ? -1 : 1;
       const minStep = Math.max(2, Math.round((this.p.motifHitRange ?? 1) + 1));
-      const maxStep = Math.max(minStep + 1, Math.round((this.p.intervalRange ?? 7) + 2));
+      const distance = this._clamp01(this.p.surprisePitchDistance ?? 1);
+      const maxStep = Math.max(minStep + 1, Math.round(minStep + ((this.p.intervalRange ?? 7) + 2 - minStep) * distance));
       const steps = dir * this.rng.int(minStep, maxStep + 1);
       out.degree = this.scale.stepFrom(expected.degree, steps);
     }
+    if (dims.includes("tuning")) {
+      const range = Math.max(2, Number(this.p.precisionRange ?? 12));
+      const distance = this._clamp01(this.p.surpriseTuningDistance ?? 0.9);
+      const cents = Math.max(1, range * (0.35 + distance * 1.65));
+      out.tuningOverrideCents = cents * (this.rng.next() < 0.5 ? -1 : 1);
+    }
     if (dims.includes("formant")) {
-      out.formant = this._pickFormant(expected.formant);
+      out.formant = this._pickSurpriseFormant(expected.formant);
     }
     if (dims.includes("rhythm")) {
       // Double or halve the note duration
       const dur = expected.durationDivs || 1;
+      const distance = this._clamp01(this.p.surpriseRhythmDistance ?? 0.8);
+      const mult = distance > 0.66 ? 3 : 2;
       out.durationDivs = this.rng.next() < 0.5
         ? Math.max(1, Math.floor(dur / 2))
-        : Math.min(dur * 2, (this.p.motifLengthBeats || 4) * (this.p.beatDivisions || 1));
+        : Math.min(dur * mult, (this.p.motifLengthBeats || 4) * (this.p.beatDivisions || 1));
       out._rhythmOverride = true;
     }
     if (dims.includes("rest")) {
@@ -1236,8 +1534,12 @@ export class GenerationEngine {
       out.isRest = true;
     }
     if (dims.includes("dynamics")) {
-      // Dramatic volume change — very loud or very soft
-      out.velocityOverride = this.rng.next() < 0.5 ? 0.1 : 0.9;
+      const center = this._clamp(Number(this.p.dynamicsLevel ?? 0.62), 0.05, 1);
+      const distance = this._clamp01(this.p.surpriseDynamicsDistance ?? 0.85);
+      const span = 0.18 + distance * 0.58;
+      out.velocityOverride = this.rng.next() < 0.5
+        ? this._clamp(center - span, 0.02, 1)
+        : this._clamp(center + span, 0.02, 1);
     }
     return out;
   }
@@ -1266,6 +1568,13 @@ export class SynthEngine {
     this._vibratoPhase = 0;
     this._vibratoCycleRate = 5.5;
     this._vibratoCycleDepth = 0;
+    this._surpriseCount = 0;
+    this._lastSurpriseAt = 0;
+    this._timeline = [];   // ring buffer of scheduled note events (for visualisers)
+    this._masterOut = null;
+    this._limiter = null;
+    this._masterVolume = 1.0;  // linear; 1.0 == 0 dB user level
+    this._limiterOn = true;
   }
 
   init() {
@@ -1284,6 +1593,16 @@ export class SynthEngine {
     this.analyser.fftSize = 1024;
     this.analyser.smoothingTimeConstant = 0.82;
 
+    // Master output fader + brick-wall limiter (post-analyser → destination)
+    this._masterOut = this.ctx.createGain();
+    this._masterOut.gain.value = this._masterVolume;
+    this._limiter = this.ctx.createDynamicsCompressor();
+    this._limiter.threshold.value = -1.5;
+    this._limiter.knee.value = 0;
+    this._limiter.ratio.value = 20;
+    this._limiter.attack.value = 0.003;
+    this._limiter.release.value = 0.12;
+
     this.master.connect(this._dryGain);
     this._dryGain.connect(this.analyser);
     this.master.connect(this._preDelay);
@@ -1291,7 +1610,9 @@ export class SynthEngine {
     this._convolver.connect(this._reverbTone);
     this._reverbTone.connect(this._wetGain);
     this._wetGain.connect(this.analyser);
-    this.analyser.connect(this.ctx.destination);
+    this.analyser.connect(this._masterOut);
+    this._limiter.connect(this.ctx.destination);
+    this._applyLimiterRouting();
 
     // Percussion bus
     this._percGain = this.ctx.createGain();
@@ -1316,6 +1637,9 @@ export class SynthEngine {
     this._vibratoPhase = 0;
     this._vibratoCycleRate = params.vibratoRate || 5.5;
     this._vibratoCycleDepth = 0;
+    this._surpriseCount = 0;
+    this._lastSurpriseAt = 0;
+    this._timeline = [];
     this._configureReverb(params);
     this._percParams = {
       percBeatVol: params.percBeatVol || 0,
@@ -1365,6 +1689,24 @@ export class SynthEngine {
   updateGenerationParams(params = {}) {
     if (!this._engine) return;
     this._engine.p = { ...this._engine.p, ...params };
+  }
+
+  /**
+   * Rebuild the generative sequence from the very start with the current
+   * parameters, *without* tearing down the audio graph. Playback continues
+   * seamlessly but the Markov repertoire is regenerated, so you hear what the
+   * from-scratch sequence sounds like under the settings as they stand now.
+   * Returns false (and does nothing) when not currently playing.
+   */
+  regenerate(params) {
+    if (!this.playing || !this.ctx) return false;
+    this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
+    this._surpriseCount = 0;
+    this._lastSurpriseAt = 0;
+    this._timeline = [];
+    this._engine = new GenerationEngine(params);
+    this._engine.initialise();
+    return true;
   }
 
   _buildImpulseResponse(type, decay, tone) {
@@ -1423,7 +1765,58 @@ export class SynthEngine {
 
   /** Current generation state for UI feedback. */
   getEngineState() {
-    return this._engine ? this._engine.getState() : null;
+    const state = this._engine ? this._engine.getState() : null;
+    return state ? {
+      ...state,
+      surpriseCount: this._surpriseCount,
+      lastSurpriseAt: this._lastSurpriseAt,
+    } : null;
+  }
+
+  /** Route master output through the limiter or straight to the destination. */
+  _applyLimiterRouting() {
+    if (!this._masterOut || !this.ctx) return;
+    try { this._masterOut.disconnect(); } catch {}
+    if (this._limiterOn) this._masterOut.connect(this._limiter);
+    else this._masterOut.connect(this.ctx.destination);
+  }
+
+  /** Set master output level. Accepts a linear gain (0..~2). */
+  setMasterVolume(linear) {
+    this._masterVolume = Math.max(0, linear);
+    if (this._masterOut && this.ctx) {
+      this._masterOut.gain.setTargetAtTime(this._masterVolume, this.ctx.currentTime, 0.012);
+    }
+  }
+
+  /** Enable/disable the output limiter. */
+  setLimiter(on) {
+    this._limiterOn = !!on;
+    this._applyLimiterRouting();
+  }
+
+  /** Peak level (0..1) of the current output, for the meter. */
+  getOutputLevel() {
+    const d = this.getWaveform();
+    if (!d) return 0;
+    let peak = 0;
+    for (let i = 0; i < d.length; i++) {
+      const v = Math.abs(d[i] - 128) / 128;
+      if (v > peak) peak = v;
+    }
+    return peak;
+  }
+
+  /** Note-event timeline + scale layout for the auto-scrolling visualisers. */
+  getNoteTimeline() {
+    const scale = this._engine ? this._engine.scale : null;
+    return {
+      now: this.ctx ? this.ctx.currentTime : 0,
+      playing: this.playing,
+      events: this._timeline,
+      baseLen: this._engine && this._engine.repertoire ? this._engine.repertoire.baseLen : 0,
+      scale: scale ? { div: scale.div, all: scale.all.slice(), sub: scale.sub.slice() } : null,
+    };
   }
 
   getSpectrum() {
@@ -1449,13 +1842,46 @@ export class SynthEngine {
     while (this._nextTime < now + AHEAD) {
       const note = this._engine.nextNote();
       if (!note) { this.stop(); return; }
+      if (note.isSurprise) {
+        this._surpriseCount += 1;
+        this._lastSurpriseAt = Date.now();
+      }
 
       const beatDiv = note.beatDivisions || 1;
       const divSec = 60 / ((this._engine.p.tempo || 104) * beatDiv);
+      const noteDur = note.durationDivs * divSec;
 
       this._render(note, this._nextTime);
       this._schedulePerc(note, this._nextTime, divSec);
-      this._nextTime += note.durationDivs * divSec;
+
+      const dev = note.isVariant ? this._engine.motifDeviation(note.motifIndex) : { pitch: 0, rhythm: 0 };
+
+      // Record event for the auto-scrolling visualisers
+      this._timeline.push({
+        when: this._nextTime,
+        dur: noteDur,
+        frequency: note.frequency,
+        degree: note.degree,
+        velocity: note.velocity,
+        noteRole: note.noteRole,
+        isRest: note.isRest,
+        isSurprise: note.isSurprise,
+        motifIndex: note.motifIndex,
+        baseIndex: note.baseIndex,
+        isVariant: note.isVariant,
+        motifNoteIndex: note.motifNoteIndex,
+        motifNotesCount: note.motifNotesCount,
+        isMotifStart: note.isMotifStart,
+        beatDivisions: beatDiv,
+        motifLengthDivs: note.motifLengthDivs,
+        durationDivs: note.durationDivs,
+        intonationCents: note.intonationCents || 0,
+        pitchDev: dev.pitch,
+        rhythmDev: dev.rhythm,
+      });
+      if (this._timeline.length > 320) this._timeline.splice(0, this._timeline.length - 320);
+
+      this._nextTime += noteDur;
     }
     this._timer = setTimeout(() => this._schedule(), 90);
   }
@@ -1539,7 +1965,7 @@ export class SynthEngine {
   /** Formant synthesis: sawtooth → 3 parallel bandpass → envelope → master */
   _renderFormant(note, t0) {
     const t1 = t0 + note.duration;
-    const f = FORMANT_PRESETS[note.formant] || FORMANT_PRESETS.ah;
+    const f = formantFreqsAt(note.formant, note.formantDev || 0);
     const spectralMix = this._spectralMix(note);
 
     const osc = this.ctx.createOscillator();
