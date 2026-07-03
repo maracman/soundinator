@@ -22,6 +22,7 @@ import {
   SPECTRAL_PROFILES,
   spectralDefaultRegisterSensitivity,
 } from "./synth.js";
+import { FACTORY_PRESETS } from "./factory-presets.js";
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -1411,10 +1412,12 @@ function renderExplore() {
     <!-- Library -->
     <div class="card library-card" id="libraryCard">
       <div class="tabs">
-        <button class="tab active" id="tabMy">My presets</button>
+        <button class="tab active" id="tabStarters">Starters</button>
+        <button class="tab" id="tabMy">My presets</button>
         <button class="tab" id="tabGlobal">Shared library</button>
       </div>
-      <div id="myPresets" class="preset-list"></div>
+      <div id="starterPresets" class="preset-list"></div>
+      <div id="myPresets" class="preset-list hidden"></div>
       <div id="globalPresets" class="preset-list hidden"></div>
     </div>
 
@@ -1953,21 +1956,28 @@ function renderExplore() {
   };
 
   // Library tabs
+  const tabStarters = v.querySelector("#tabStarters");
   const tabMy = v.querySelector("#tabMy");
   const tabGlobal = v.querySelector("#tabGlobal");
+  const starterList = v.querySelector("#starterPresets");
   const myList = v.querySelector("#myPresets");
   const globalList = v.querySelector("#globalPresets");
   const libraryCard = v.querySelector("#libraryCard");
-
-  tabMy.onclick = () => {
-    tabMy.classList.add("active"); tabGlobal.classList.remove("active");
-    myList.classList.remove("hidden"); globalList.classList.add("hidden");
+  const tabsAndLists = [
+    [tabStarters, starterList], [tabMy, myList], [tabGlobal, globalList],
+  ];
+  const showLibraryTab = (activeTab) => {
+    for (const [tab, list] of tabsAndLists) {
+      tab.classList.toggle("active", tab === activeTab);
+      list.classList.toggle("hidden", tab !== activeTab);
+    }
     libraryCard?.classList.add("is-open");
   };
+
+  tabStarters.onclick = () => showLibraryTab(tabStarters);
+  tabMy.onclick = () => showLibraryTab(tabMy);
   tabGlobal.onclick = async () => {
-    tabGlobal.classList.add("active"); tabMy.classList.remove("active");
-    globalList.classList.remove("hidden"); myList.classList.add("hidden");
-    libraryCard?.classList.add("is-open");
+    showLibraryTab(tabGlobal);
     await loadGlobalPresets(globalList);
   };
   const topMyPresets = v.querySelector("#topMyPresets");
@@ -1976,6 +1986,7 @@ function renderExplore() {
   if (topLibrary) topLibrary.onclick = () => tabGlobal.click();
 
   // Initial renders
+  renderPresetList(starterList, FACTORY_PRESETS, "starter");
   renderPresetList(myList, loadPresets(), "my");
   maybeShowContribute(v);
   syncHarmonicWorkspace(v);
@@ -5170,8 +5181,8 @@ function renderPresetList(container, presets, source) {
     <div class="preset-item">
       <span class="name">${esc(p.name || p.preset_name || "Untitled")}</span>
       <span class="section-chip${sectionKey ? "" : " chip-full"}">${sectionLabel || "Full"}</span>
-      <span class="meta">${sectionLabel ? `${Object.keys(p.parameters || {}).length} settings` : presetSummary(p.parameters)}</span>
-      <span class="score">${p.rating || p.favourite_rating || ""}/7</span>
+      <span class="meta">${p.description ? esc(p.description) : (sectionLabel ? `${Object.keys(p.parameters || {}).length} settings` : presetSummary(p.parameters))}</span>
+      <span class="score">${(p.rating || p.favourite_rating) ? `${p.rating || p.favourite_rating}/7` : ""}</span>
       <div class="actions">
         <button class="btn btn-secondary btn-sm" data-load='${JSON.stringify(p.parameters)}' data-section="${sectionKey || "full"}">Load</button>
         ${source === "my" ? `<button class="btn btn-ghost btn-sm" data-remove="${p.id}">Remove</button>` : ""}

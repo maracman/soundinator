@@ -7,9 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 10
-- Phases A-C done; D1-D3 done. Next: D4 factory starter library, then
-  Phase E deployment readiness.
+- Iteration: 11
+- Phases A-D done. Next: Phase E deployment readiness (E1-E3), then Phase F
+  UI proposals for owner approval.
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -117,8 +117,12 @@ Full audits in the loop transcript; the load-bearing findings:
   section chips in the library; section presets merge over current state on
   load (verified: loading a Space preset reverts reverb, keeps tempo).
   Additive schema — old v3 entries read as "Full", no migration needed.
-- [ ] D4. Curated starter library: 8–12 factory presets (full + per-section)
-  shipped with the app so first-time users have good starting points.
+- [x] D4. Starter library: 11 factory presets in factory-presets.js — 5 full
+  rigs (Glass Bells, Night Choir, Clockwork, Wandering Flute, Restless
+  Weaver) + 6 section starters (Warm Cello, Airy Voice, Pentatonic Drift,
+  Gentle Pulse, Cathedral Wash, Dry Studio) — in a default "Starters"
+  library tab. Keys validated against DEFAULTS; loaded & played in browser.
+  Deeper listening/tuning pass welcome once owner auditions them.
 
 ## Phase E — Deployment readiness (priority 5)
 
