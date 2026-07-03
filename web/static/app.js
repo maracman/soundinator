@@ -570,6 +570,7 @@ let productionTab = "percussion";
 let debounceTimer = null;
 let lastSurpriseCount = 0;
 let lastPlayStartedAt = null; // Date.now() of most recent play start this visit
+let _visResizeObserver = null; // hero display fit observer
 let libraryFilter = "all";    // section filter shared across library tabs
 // In-context preset preview (Tonalic cue): audition a preset merged into the
 // current state without committing it. Non-destructive: exploreParams is
@@ -2109,6 +2110,25 @@ function renderExplore() {
 
   canvas = v.querySelector("#vis");
   canvasCtx = canvas.getContext("2d");
+
+  // Responsive, high-DPI hero display: match the backing store to the CSS
+  // size (capped at 2x DPR) and redraw whenever the layout changes.
+  if (window.ResizeObserver) {
+    if (_visResizeObserver) _visResizeObserver.disconnect();
+    const fitVis = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.round(canvas.clientWidth * dpr);
+      const h = Math.round(canvas.clientHeight * dpr);
+      if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+        canvas.width = w;
+        canvas.height = h;
+        if (!synth.isPlaying) drawStaticVis();
+      }
+    };
+    _visResizeObserver = new ResizeObserver(fitVis);
+    _visResizeObserver.observe(canvas);
+    fitVis();
+  }
 
   const visModeSwitch = v.querySelector("#visModeSwitch");
   if (visModeSwitch) {

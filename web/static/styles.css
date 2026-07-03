@@ -4569,3 +4569,25 @@ body.explore-mode #app {
   height: 3px;
   flex: none;
 }
+
+/* ── Touch ergonomics: coarse pointers get bigger targets ── */
+
+@media (pointer: coarse) {
+  input[type="range"] { height: 6px; }
+  input[type="range"]::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+  }
+  .explore-dashboard input[type="range"]::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+  }
+  .btn, .filter-chip, .m-chip, .tab, .workspace-tab {
+    min-height: 38px;
+  }
+  .preset-item .actions .btn { padding: 0.5rem 0.9rem; }
+}

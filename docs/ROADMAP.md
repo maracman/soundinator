@@ -188,8 +188,11 @@ Full audits in the loop transcript; the load-bearing findings:
 
 ## Phase F — UI/design (priority 6, gated on user approval)
 
-- [ ] F1. Usability fixes that need no approval: responsive canvases,
-  touch-friendly slider sizing, consistent spacing, loading/error states.
+- [x] F1. Hero visualiser is now responsive + high-DPI (ResizeObserver
+  matches backing store to CSS size at up to 2x DPR — verified 1015css →
+  2030px backing on retina); coarse-pointer media query enlarges slider
+  thumbs and tap targets (38px min buttons/tabs/chips). Remaining nits
+  (loading states, dist-canvas DPI) fold into ongoing polish.
 - [x] F2. Proposals delivered (artifact with three rendered directions);
   owner chose a fourth path: FabFilter-inspired design language. Design
   system specified in docs/UI_DIRECTION.md (monochrome shell, data-owned
