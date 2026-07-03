@@ -189,11 +189,13 @@ and flexible; check for obvious missing features. Findings, prioritised:
       ＋8-bars control; ruler/lanes grow accordingly.
 - [x] U7 DONE: double-click the track name for inline rename
       (Enter/blur commits, Escape cancels).
-- [ ] U8 Single-level undo for destructive acts (delete region/track,
-      unbake, overwrite palette item).
-- [ ] U9 Loop-repeat tick marks on extended baked regions so the loop
-      boundary is visible.
-- [ ] U10 Per-track pan.
+- [x] U8 DONE: single-level undo with redo-by-repeat (⌘Z / ↩ button);
+      the undo point is captured automatically on every arrangement save,
+      so all mutations are covered.
+- [x] U9 DONE: thin ticks at each loop boundary inside extended baked
+      regions.
+- [x] U10 DONE: pan slider per track head; StereoPanner in each voice's
+      master chain, honoured live and in mixdown.
 
 ### Flexibility / scope alignment
 - [ ] U11 New/clear arrangement + multiple named arrangements (save slots)

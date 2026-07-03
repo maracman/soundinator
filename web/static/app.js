@@ -989,8 +989,25 @@ function loadArrangement() {
   } catch { /* fall through */ }
   return { name: "Untitled arrangement", version: 2, lengthBeats: 64, tracks: [], palette: [], context: defaultArrangementContext() };
 }
+let undoSlot = null; // single-level; a second undo swaps back (redo)
+
 function saveArrangement() {
-  if (arrangement) localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
+  if (!arrangement) return;
+  // The store still holds the pre-mutation state here — that IS the undo point.
+  const prev = localStorage.getItem(ARRANGEMENT_KEY);
+  if (prev) undoSlot = prev;
+  localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
+}
+
+function undoArrangement() {
+  if (!undoSlot) return;
+  const current = JSON.stringify(arrangement);
+  arrangement = migrateArrangement(JSON.parse(undoSlot));
+  undoSlot = current; // undo again = redo
+  localStorage.setItem(ARRANGEMENT_KEY, JSON.stringify(arrangement));
+  selectedRegion = null;
+  stopArrangement();
+  renderProduce();
 }
 
 // Everything the browser can offer: factory presets, user presets, and
@@ -1356,6 +1373,7 @@ function producerVoice(track) {
     producerVoices.set(track.id, voice);
   }
   voice.setMasterVolume(track.gain ?? 1);
+  voice.setPan(track.pan ?? 0);
   return voice;
 }
 
@@ -1499,6 +1517,7 @@ async function mixdownArrangement(statusEl) {
       const voice = new SynthEngine();
       voice.init(off, off.destination);
       voice.setMasterVolume(track.gain ?? 1);
+      voice.setPan(track.pan ?? 0);
       if (region.type === "baked" && Array.isArray(region.notes)) {
         voice.renderNotesSpan(regionPlayParams(track, region), region.notes,
           region.startBeat * beatSec + 0.05, regionLen(region), region.loopSourceBeats || regionLen(region));
@@ -1553,10 +1572,16 @@ function produceTimelineHTML() {
       const baked = r.type === "baked" ? " baked" : "";
       const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
       const label = pal ? pal.name : t.name;
+      let loopTicks = "";
+      if (r.type === "baked" && r.loopSourceBeats && regionLen(r) > r.loopSourceBeats) {
+        for (let lb = r.loopSourceBeats; lb < regionLen(r); lb += r.loopSourceBeats) {
+          loopTicks += `<span class="tl2-looptick" style="left:${lb * pxPerBeat}px"></span>`;
+        }
+      }
       return `<div class="tl2-region${sel}${baked}" data-region="${r.id}" data-track="${t.id}"
         style="left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
         title="${esc(label)} — drag to move, drag the right edge to extend. Double-click a baked region to edit its notes.">
-        <span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
+        ${loopTicks}<span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
       </div>`;
     }).join("");
@@ -1567,6 +1592,7 @@ function produceTimelineHTML() {
         <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
         <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
         <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
+        <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
         <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
       </div>
       <div class="tl2-lane" data-lane="${t.id}" style="width:${laneW}px">${regions}</div>
@@ -1937,6 +1963,9 @@ if (!window._dawKeysInstalled) {
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
       e.preventDefault();
       duplicateSelectedRegion();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      undoArrangement();
     }
   });
 }
@@ -2037,6 +2066,7 @@ function renderProduce() {
         <span class="daw-sep"></span>
         ${sessionBarControlsHTML()}
         <span class="daw-sep"></span>
+        <button class="btn btn-ghost btn-sm" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">↩</button>
         <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
         <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
         <select id="snapSelect" class="daw-ctx-select" title="Grid snap">
@@ -2306,6 +2336,17 @@ function wireProduce(v) {
     };
   });
 
+  // Per-track pan (live on the playing voice)
+  v.querySelectorAll("[data-track-pan]").forEach(sl => {
+    sl.oninput = () => {
+      const track = arrangement.tracks.find(t => t.id === sl.dataset.trackPan);
+      if (!track) return;
+      track.pan = Number(sl.value);
+      saveArrangement();
+      producerVoices.get(track.id)?.setPan(track.pan);
+    };
+  });
+
   // Per-track gain (live on the playing voice)
   v.querySelectorAll("[data-track-gain]").forEach(sl => {
     sl.oninput = () => {
@@ -2373,6 +2414,9 @@ function wireProduce(v) {
     saveDawLayout();
     renderProduce();
   };
+  const undoBtn = v.querySelector("#undoBtn");
+  if (undoBtn) undoBtn.onclick = () => undoArrangement();
+
   const addBars = v.querySelector("#addBars");
   if (addBars) addBars.onclick = () => {
     arrangement.lengthBeats = totalBeats() + 8 * BEATS_PER_BAR;

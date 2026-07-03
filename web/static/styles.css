@@ -5007,3 +5007,16 @@ body.dragging { cursor: grabbing; user-select: none; }
   font-size: 0.72rem;
   padding: 0.1rem 0.3rem;
 }
+
+/* ── Loop ticks + pan (v2.1 U9, U10) ─────────────────────── */
+
+.tl2-looptick {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: rgba(232,234,238,0.3);
+  pointer-events: none;
+}
+
+.tl2-head .tl-pan { width: 34px; height: 3px; flex: none; }

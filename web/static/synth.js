@@ -2059,6 +2059,8 @@ export class SynthEngine {
       curve[i] = Math.tanh(drive * x) / Math.tanh(drive);
     }
     this._softClip.curve = curve;
+    this._panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+    if (this._panner) this._panner.pan.value = this._panValue || 0;
     this._limiter = this.ctx.createDynamicsCompressor();
     this._limiter.threshold.value = -1.5;
     this._limiter.knee.value = 0;
@@ -2404,12 +2406,25 @@ export class SynthEngine {
     return this._engine ? this._engine.getMetricsSummary() : null;
   }
 
-  /** Route the soft-clipped master through the limiter or straight out. */
+  /** Route the soft-clipped master (via pan) through the limiter or straight out. */
   _applyLimiterRouting() {
     if (!this._softClip || !this.ctx) return;
     try { this._softClip.disconnect(); } catch {}
-    if (this._limiterOn) this._softClip.connect(this._limiter);
-    else this._softClip.connect(this._dest);
+    const tail = this._panner || this._softClip;
+    if (this._panner) {
+      try { this._panner.disconnect(); } catch {}
+      this._softClip.connect(this._panner);
+    }
+    if (this._limiterOn) tail.connect(this._limiter);
+    else tail.connect(this._dest);
+  }
+
+  /** Stereo pan for this voice (-1 left … +1 right). */
+  setPan(v) {
+    this._panValue = Math.max(-1, Math.min(1, Number(v) || 0));
+    if (this._panner && this.ctx) {
+      this._panner.pan.setTargetAtTime(this._panValue, this.ctx.currentTime, 0.02);
+    }
   }
 
   /** Set master output level. Accepts a linear gain (0..~2). */
