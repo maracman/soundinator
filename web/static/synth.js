@@ -608,6 +608,28 @@ export class GenerationEngine {
     this._lastGapFraction = 1;
     this._motifSurprisePlan = null;
     this._activeSurpriseProjection = null;
+    this._resetMetrics();
+  }
+
+  _resetMetrics() {
+    this._metrics = {
+      notes: 0,
+      rests: 0,
+      surpriseNotes: 0,
+      surpriseStarts: 0,
+      repeatNotes: 0,
+      pitchBits: 0,
+      pitchBitsSq: 0,
+      pitchBitsN: 0,
+      dynBits: 0,
+      dynBitsN: 0,
+      restBits: 0,
+      musicalSeconds: 0,
+      bigramEvents: 0,
+      novelBigrams: 0,
+      bigramSeen: new Set(),
+      motifPassCounts: {},
+    };
   }
 
   _pickInitialRoot() {
@@ -617,6 +639,7 @@ export class GenerationEngine {
   }
 
   initialise() {
+    this._resetMetrics();
     const motifs = [];
     for (let m = 0; m < this.p.motifCount; m++) {
       motifs.push(this._generateMotif());
@@ -767,6 +790,31 @@ export class GenerationEngine {
       : gridDuration + legatoTail;
     const subNote = this._subNoteVariation(velocity, hz, note.degree);
 
+    // ── Expectancy metrics (research instrumentation; inaudible) ──
+    const prevDegree = this._lastOutputDegree;
+    const pitchBits = prevDegree == null
+      ? null
+      : this._melodicPitchSurprisal(prevDegree, note.degree, phrasePos);
+    let restBits = null;
+    if (!note.isRest) {
+      const pRest = Math.min(1 - 1e-6, Math.max(1e-6, restRatio));
+      restBits = -Math.log2(isRatioRest ? pRest : 1 - pRest);
+    }
+    let dynBits = null;
+    if (note.velocityOverride == null && velocity > 0) {
+      const dynCenter = this._clamp(Number(this.p.dynamicsLevel ?? 0.62), 0.05, 1);
+      const dynPrecision = this._clamp01(this.p.dynamicsPrecision ?? 0.75);
+      if (velocity === dynCenter) {
+        dynBits = -Math.log2(Math.max(1e-6, dynPrecision));
+      } else {
+        // Triangular deviation density over ±dynamicsRange, 0.05-wide bins.
+        const dynRange = Math.max(1e-6, Number(this.p.dynamicsRange ?? 0.22));
+        const dev = Math.abs(velocity - dynCenter);
+        const density = Math.max(0, (1 - dev / dynRange) / dynRange);
+        dynBits = Math.min(20, -Math.log2(Math.max(1e-6, (1 - dynPrecision) * density * 0.05)));
+      }
+    }
+
     this._lastOutputDegree = note.degree;
     this._lastOutputFrequency = velocity > 0 ? fittedFrequency : null;
     this._lastGapFraction = velocity > 0 ? gapFraction : 1;
@@ -781,7 +829,7 @@ export class GenerationEngine {
         ? "generation"
         : (this._motifFirstPass ? "generation" : "accuracy");
 
-    return {
+    const out = {
       frequency: fittedFrequency,
       degree: note.degree,
       noteRole,
@@ -806,8 +854,18 @@ export class GenerationEngine {
       isMotifStart,
       beatDivisions: beatDiv,
       motifLengthDivs: motifBeats * beatDiv,
+      pitchBits,
       ...subNote,
     };
+    this._recordNoteMetrics(out, {
+      isSurpriseStart,
+      gridDuration,
+      pitchBits,
+      dynBits,
+      restBits,
+      prevDegree,
+    });
+    return out;
   }
 
   /** Info about current repertoire state (for UI display). */
@@ -1151,6 +1209,117 @@ export class GenerationEngine {
       if (r <= 0) return c.degree;
     }
     return candidates[candidates.length - 1].degree;
+  }
+
+  /**
+   * Surprisal (-log2 p) of arriving at `toDegree` from `fromDegree` under the
+   * STATIC melodic prior: interval shape × sub-scale bonus × register window ×
+   * root pull, momentum excluded. This is the same weighting `_pickBiasedNote`
+   * samples from, evaluated as a distribution so every sounded note — freshly
+   * generated, replayed from the repertoire, or surprise-displaced — gets an
+   * expectancy score under the listener-facing melodic model.
+   * Returns bits, capped at 20 (for realised pitches outside the prior's
+   * support, e.g. large surprise leaps).
+   */
+  _melodicPitchSurprisal(fromDegree, toDegree, phrasePos = 0) {
+    if (fromDegree == null || toDegree == null) return null;
+    const { scale, p } = this;
+    const peakedness = p.intervalPeakedness;
+    const maxRange = p.intervalRange;
+    const center = scale.nearest(fromDegree);
+    let total = 0;
+    let chosen = 0;
+    for (let step = -maxRange; step <= maxRange; step++) {
+      const target = scale.stepFrom(center, step);
+      const w = intervalShapeWeight(Math.abs(step), peakedness, maxRange);
+      const subBonus = scale.sub.includes(scale.norm(target)) ? scale.weight : (1 - scale.weight);
+      let regW = 1.0;
+      const regWidth = p.registerWidth ?? 12;
+      if (regWidth > 0 && regWidth < 100) {
+        regW = Math.max(0.01, registerWindow(target - (p.registerCenter ?? 0), regWidth, p.registerSkew ?? 0));
+      }
+      let rootW = 1.0;
+      const pullStrength = p.rootPullStrength ?? 0;
+      if ((p.rootNotes || []).length > 0 && pullStrength > 0) {
+        const effectiveStrength = pullStrength * (1 - (p.rootPullShape ?? 0.7) + (p.rootPullShape ?? 0.7) * phrasePos);
+        let bestRootDist = Infinity;
+        for (let ro = -2; ro <= 2; ro++) {
+          bestRootDist = Math.min(bestRootDist, scale.stepDistance(target, this._currentRootTarget + ro * scale.div));
+        }
+        const currentRootDist = this._distToRoot(fromDegree);
+        if (bestRootDist < currentRootDist) {
+          rootW = 1.0 + effectiveStrength * 3.0 * (1 - bestRootDist / Math.max(1, currentRootDist));
+        } else if (bestRootDist > currentRootDist) {
+          rootW = Math.max(0.05, 1.0 - effectiveStrength * 0.7);
+        }
+      }
+      const prob = w * subBonus * regW * rootW;
+      total += prob;
+      if (target === toDegree) chosen += prob;
+    }
+    if (total <= 0) return 20;
+    const prob = chosen / total;
+    if (prob <= 0) return 20;
+    return Math.min(20, -Math.log2(prob));
+  }
+
+  /** Per-note metrics bookkeeping; called once per generated note. */
+  _recordNoteMetrics(note, ctx) {
+    const m = this._metrics;
+    if (!m) return;
+    m.notes++;
+    if (note.isRest) m.rests++;
+    if (note.isSurprise) m.surpriseNotes++;
+    if (ctx.isSurpriseStart) m.surpriseStarts++;
+    if (note.noteRole === "accuracy") m.repeatNotes++;
+    m.musicalSeconds += ctx.gridDuration;
+    if (note.isMotifStart) {
+      m.motifPassCounts[note.motifIndex] = (m.motifPassCounts[note.motifIndex] || 0) + 1;
+    }
+    if (ctx.pitchBits != null) {
+      m.pitchBits += ctx.pitchBits;
+      m.pitchBitsSq += ctx.pitchBits * ctx.pitchBits;
+      m.pitchBitsN++;
+    }
+    if (ctx.dynBits != null) { m.dynBits += ctx.dynBits; m.dynBitsN++; }
+    if (ctx.restBits != null) m.restBits += ctx.restBits;
+    // Pitch+duration bigram novelty within this performance
+    if (ctx.prevDegree != null) {
+      const key = `${ctx.prevDegree}>${note.degree}|${note.durationDivs}`;
+      m.bigramEvents++;
+      if (!m.bigramSeen.has(key)) { m.bigramSeen.add(key); m.novelBigrams++; }
+    }
+  }
+
+  /**
+   * Performance-level summary of the expectation/surprise/repetition metrics
+   * accumulated since initialise(). Joinable to ratings via stimulus_id.
+   */
+  getMetricsSummary() {
+    const m = this._metrics;
+    if (!m || m.notes === 0) return null;
+    const meanPitch = m.pitchBitsN ? m.pitchBits / m.pitchBitsN : null;
+    const passCounts = Object.values(m.motifPassCounts);
+    return {
+      schema_version: "metrics-1.0",
+      notes: m.notes,
+      rests: m.rests,
+      mean_pitch_surprisal_bits: meanPitch,
+      sd_pitch_surprisal_bits: m.pitchBitsN > 1
+        ? Math.sqrt(Math.max(0, m.pitchBitsSq / m.pitchBitsN - meanPitch * meanPitch))
+        : null,
+      info_rate_bits_per_s: m.musicalSeconds > 0 ? m.pitchBits / m.musicalSeconds : null,
+      surprise_note_rate: m.surpriseNotes / m.notes,
+      surprise_starts: m.surpriseStarts,
+      repetition_ratio: m.repeatNotes / m.notes,
+      bigram_novelty_ratio: m.bigramEvents ? m.novelBigrams / m.bigramEvents : null,
+      mean_dynamics_surprisal_bits: m.dynBitsN ? m.dynBits / m.dynBitsN : null,
+      mean_rest_surprisal_bits: m.notes ? m.restBits / m.notes : null,
+      motif_passes: passCounts.reduce((s, c) => s + c, 0),
+      max_motif_reuse: passCounts.length ? Math.max(...passCounts) : 0,
+      incorporated_variants: this.repertoire ? this.repertoire.size - this.repertoire.baseLen : 0,
+      musical_seconds: m.musicalSeconds,
+    };
   }
 
   /** Shortest distance from a degree to the current root target. */
@@ -1771,6 +1940,14 @@ export class SynthEngine {
       surpriseCount: this._surpriseCount,
       lastSurpriseAt: this._lastSurpriseAt,
     } : null;
+  }
+
+  /**
+   * Expectation/surprise/repetition summary for the current performance
+   * (since play/regenerate). Logged with explore events for appeal modelling.
+   */
+  getPerformanceMetrics() {
+    return this._engine ? this._engine.getMetricsSummary() : null;
   }
 
   /** Route master output through the limiter or straight to the destination. */

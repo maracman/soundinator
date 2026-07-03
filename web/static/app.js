@@ -4959,6 +4959,7 @@ function trackEngagement(type, extra = {}) {
       parameters: { ...exploreParams },
       rating: exploreRating,
       play_count: exploreEngagement.plays,
+      metrics: synth.getPerformanceMetrics?.() || null,
       ...extra,
     }),
   }).catch(() => {});

@@ -7,9 +7,9 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 5
-- Phase A complete. Next: Phase B (surprise/expectancy/repetition metrics),
-  starting with B1 (per-note surprisal in synth.js).
+- Iteration: 6
+- Phase B core (B1-B3) done. Next: B4a formant-space redesign, then Phase C
+  (export CLI + endpoint).
 - Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
 
 ## Audit summary (2026-07-03)
@@ -65,16 +65,20 @@ Full audits in the loop transcript; the load-bearing findings:
 
 ## Phase B — Expectation/surprise & repetition instrumentation (priority 2)
 
-- [ ] B1. Per-note metrics in synth.js at generation time: model surprisal
-  (-log2 p) of each realised pitch/duration/dynamics choice under the actual
-  sampling distributions used; flag distance-from-expectation for surprise
-  notes (continuous, not just boolean).
-- [ ] B2. Repetition metrics: motif reuse counts, variant-vs-base identity,
-  n-gram repetition rate, time-since-last-occurrence; incorporation events
-  (which surprises got baked in) logged.
-- [ ] B3. Phrase/performance summaries: mean & variance of surprisal,
-  information rate (bits/s), repetition ratio — attached to every play event
-  and therefore joinable to ratings via stimulus_id.
+- [x] B1. Per-note surprisal: every sounded note gets -log2 p of its pitch
+  under the static melodic prior (interval shape × sub-scale × register ×
+  root pull, momentum excluded — documented approximation), plus dynamics
+  surprisal (branch + binned triangular density) and rest-branch surprisal.
+  Note: fixed-model surprisal means repertoire replays/motif-boundary leaps
+  can score high under a peaked prior — a property, not a bug (IDyOM-like).
+- [x] B2. Repetition metrics: repetition_ratio (replayed-note fraction),
+  pitch+duration bigram novelty ratio, motif pass counts/max reuse,
+  incorporated-variant count. (time-since-last-occurrence: deferred.)
+- [x] B3. Performance summary (metrics-1.0) from GenerationEngine
+  .getMetricsSummary(), attached to every explore event; rate events carry
+  the summary of everything heard up to the rating moment. Verified
+  headlessly in Node (deterministic per seed; responds correctly to
+  surpriseProb/sequenceProb manipulations) and live in browser.
 - [ ] B4. Keep it invisible to lay users (no UI change beyond maybe a subtle
   "science inside" note in the about card).
 - [ ] B4a. Formant space redesign (owner flag 2026-07-03): replace the
