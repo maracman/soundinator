@@ -1070,24 +1070,57 @@ function loadArrangement() {
   localStorage.setItem(ARRANGEMENT_CURRENT_KEY, a.id);
   return normaliseArrangement(a);
 }
-let undoSlot = null; // single-level; a second undo swaps back (redo)
+// Producer v3 undo model (spec §8): a labelled snapshot stack, >=100
+// deep, with a proper redo stack. The deterministic JSON document makes
+// snapshots tiny; every mutation goes through saveArrangement(label).
+const UNDO_MAX = 120;
+let _undoStack = [];
+let _redoStack = [];
+let _lastSavedAt = 0; // autosave indicator
 
-function saveArrangement() {
+function saveArrangement(label = "edit") {
   if (!arrangement) return;
   if (!arrangement.id) arrangement.id = crypto.randomUUID();
   const reg = loadArrangementRegistry();
   // The registry still holds the pre-mutation state — that IS the undo point.
-  if (reg[arrangement.id]) undoSlot = JSON.stringify(reg[arrangement.id]);
+  if (reg[arrangement.id]) {
+    const prev = JSON.stringify(reg[arrangement.id]);
+    if (prev !== JSON.stringify(arrangement)) {
+      _undoStack.push({ label, json: prev });
+      if (_undoStack.length > UNDO_MAX) _undoStack.shift();
+      _redoStack = [];
+    }
+  }
   reg[arrangement.id] = arrangement;
   saveArrangementRegistry(reg);
   localStorage.setItem(ARRANGEMENT_CURRENT_KEY, arrangement.id);
+  _lastSavedAt = Date.now();
+  const tick = document.getElementById("arrSaved");
+  if (tick) {
+    tick.textContent = "saved";
+    clearTimeout(saveArrangement._t);
+    saveArrangement._t = setTimeout(() => { tick.textContent = ""; }, 1200);
+  }
 }
 
 function undoArrangement() {
-  if (!undoSlot) return;
-  const current = JSON.stringify(arrangement);
-  arrangement = normaliseArrangement(JSON.parse(undoSlot));
-  undoSlot = current; // undo again = redo
+  const entry = _undoStack.pop();
+  if (!entry) return;
+  _redoStack.push({ label: entry.label, json: JSON.stringify(arrangement) });
+  arrangement = normaliseArrangement(JSON.parse(entry.json));
+  const reg = loadArrangementRegistry();
+  reg[arrangement.id] = arrangement;
+  saveArrangementRegistry(reg);
+  selectedRegion = null;
+  stopArrangement();
+  renderProduce();
+}
+
+function redoArrangement() {
+  const entry = _redoStack.pop();
+  if (!entry) return;
+  _undoStack.push({ label: entry.label, json: JSON.stringify(arrangement) });
+  arrangement = normaliseArrangement(JSON.parse(entry.json));
   const reg = loadArrangementRegistry();
   reg[arrangement.id] = arrangement;
   saveArrangementRegistry(reg);
@@ -1102,7 +1135,8 @@ function switchArrangement(id) {
   localStorage.setItem(ARRANGEMENT_CURRENT_KEY, id);
   arrangement = null;
   selectedRegion = null;
-  undoSlot = null;
+  _undoStack = [];
+  _redoStack = [];
   renderProduce();
 }
 
@@ -2087,7 +2121,8 @@ if (!window._dawKeysInstalled) {
       duplicateSelectedRegion();
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
-      undoArrangement();
+      if (e.shiftKey) redoArrangement();
+      else undoArrangement();
     }
   });
 }
