@@ -1553,13 +1553,14 @@ function audioBufferToWavBlob(buffer) {
   return new Blob([ab], { type: "audio/wav" });
 }
 
-async function mixdownArrangement(statusEl) {
+async function mixdownArrangement(statusEl, btn) {
   const ctxP = arrangement.context;
   const beatSec = 60 / Math.max(30, ctxP.tempo || 104);
   const ends = arrangement.tracks.flatMap(t => t.regions.map(r => r.startBeat + regionLen(r)));
   if (!ends.length) { alert("Nothing to mix down — place some regions first."); return; }
   stopArrangement();
   synth.stop();
+  if (btn) btn.disabled = true;
   if (statusEl) statusEl.textContent = "Rendering…";
   const lastEnd = Math.max(...ends);
   const sr = 44100;
@@ -1584,10 +1585,15 @@ async function mixdownArrangement(statusEl) {
   try {
     const rendered = await off.startRendering();
     downloadBlob(audioBufferToWavBlob(rendered), `${(arrangement.name || "arrangement").replace(/[^\w-]+/g, "_")}.wav`);
-    if (statusEl) statusEl.textContent = "";
+    if (statusEl) {
+      statusEl.textContent = "Saved ✓";
+      setTimeout(() => { if (statusEl.textContent === "Saved ✓") statusEl.textContent = ""; }, 3000);
+    }
   } catch (err) {
     if (statusEl) statusEl.textContent = "";
     alert(`Mixdown failed: ${err.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -2571,7 +2577,7 @@ function wireProduce(v) {
   });
 
   const mixBtn = v.querySelector("#arrMixdown");
-  if (mixBtn) mixBtn.onclick = () => mixdownArrangement(v.querySelector("#mixStatus"));
+  if (mixBtn) mixBtn.onclick = () => mixdownArrangement(v.querySelector("#mixStatus"), mixBtn);
   const exportBtn = v.querySelector("#arrExport");
   if (exportBtn) exportBtn.onclick = () => exportArrangement();
   const importBtn = v.querySelector("#arrImport");
@@ -7109,6 +7115,9 @@ function maybeShowContribute(v) {
   area.querySelector("#contribBtn").onclick = async () => {
     const consent = area.querySelector("#contribConsent");
     if (!consent.checked) return;
+    const btn = area.querySelector("#contribBtn");
+    btn.disabled = true;
+    btn.textContent = "Sharing…";
     try {
       await api("/api/presets/contribute", {
         method: "POST",
@@ -7125,9 +7134,15 @@ function maybeShowContribute(v) {
           app_version: APP_VERSION,
         }),
       });
-      area.querySelector("#contribBtn").textContent = "Shared!";
-      setTimeout(() => { area.querySelector("#contribBtn").textContent = "Share preset"; }, 2000);
+      btn.textContent = "Shared!";
+      setTimeout(() => {
+        if (!btn.isConnected) return;
+        btn.disabled = false;
+        btn.textContent = "Share preset";
+      }, 2000);
     } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "Share preset";
       alert("Could not contribute: " + err.message);
     }
   };
@@ -7325,7 +7340,13 @@ async function loadGlobalPresets(container) {
     const entries = await api("/api/presets/global");
     renderPresetList(container, entries, "global");
   } catch (err) {
-    container.innerHTML = `<div class="empty-state">Could not load: ${esc(err.message)}</div>`;
+    container.innerHTML = `
+      <div class="empty-state">
+        Could not load the shared library (${esc(err.message)}).<br/>
+        <button class="btn btn-secondary btn-sm mt-2" id="libRetry">Try again</button>
+      </div>`;
+    const retry = container.querySelector("#libRetry");
+    if (retry) retry.onclick = () => loadGlobalPresets(container);
   }
 }
 
