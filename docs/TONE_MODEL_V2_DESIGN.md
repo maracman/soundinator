@@ -255,21 +255,34 @@ needle at its **realised Hz** for the current fundamental:
    (Hz-defined bands, not rank-defined) jump the focus lens; band-level
    quick faders replace the old six octave-group faders.
 
-**Layout** (tone section, ground-up):
+**Layout** (tone section, ground-up — REVISED per owner feedback
+2026-07-06: "I don't see where the Excitor, resonator, body and space
+paradigm sits" — the signal chain must BE the layout, not an implicit
+grouping of dials):
 
-    ┌──────────────────────────────────────────────────────┐
-    │ INSTRUMENT: [violin ▾]   character preset bar (save/load) │
-    ├──────────────────────────────────────────────────────┤
-    │              THE TONE PRINT  (hero, ~60% height)      │
-    │   needles · afterglow · body ridge · comb underlay    │
-    │   [relationship | focus | band chips]                 │
-    ├──────────────────────────────────────────────────────┤
-    │ CHARACTER: excitation·bright·material·inharm·         │
-    │            transfer·body·human·level   (8 dials)      │
-    ├──────────────────────────────────────────────────────┤
-    │ disclosure: envelope/vibrato distributions · attack   │
-    │ noise · advanced (T60 curve, coupling matrix)         │
-    └──────────────────────────────────────────────────────┘
+    ┌────────────────────────────────────────────────────────────┐
+    │ INSTRUMENT: [violin ▾]        character preset bar (save/load) │
+    ├────────────────────────────────────────────────────────────┤
+    │ 1·EXCITOR → 2·RESONATOR → 3·BODY → 4·SPACE   (stage cards) │
+    │  excite      material       body sel   room/wet             │
+    │  position    inharmonic     ridge vis  (links existing      │
+    │  hardness    transfer       vowel pad   Space section)      │
+    │  human       bright·level   when vocal                      │
+    ├────────────────────────────────────────────────────────────┤
+    │ 2·RESONATOR — TONE PRINT (the resonator's expanded view)    │
+    │   needles · afterglow · body curve · excitor comb           │
+    │   on-canvas legend · axis title · [relationships|focus]     │
+    ├────────────────────────────────────────────────────────────┤
+    │ disclosure: envelope/vibrato · attack noise · T60 curve ·   │
+    │ coupling matrix · per-partial table                         │
+    └────────────────────────────────────────────────────────────┘
+
+Every control lives visibly inside its stage; the arrows are the signal
+path; the print is labelled as the RESONATOR's view, with the body curve
+and excitor comb overlays explicitly attributed to their stages. Owner
+also flagged the print itself as "not amazingly intuitive" — rev B adds
+an on-canvas legend, an axis title, and fewer/clearer coupling arcs, and
+T7 must treat print legibility as a first-class acceptance concern.
 
 Design language: dark pro-audio shell retained; the print's phosphor/CRT
 identity becomes the app's signature element and the reference for the

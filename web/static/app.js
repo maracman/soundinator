@@ -37,6 +37,14 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
 const APP_VERSION = "sound-studio-0.3.0"; // tone model v2 T1: resonator core
+// Visible build tag: semantic version + the asset build number, read from
+// this module's own ?v= cache-buster so the display can never drift from
+// what the browser actually loaded.
+const BUILD_TAG = (() => {
+  let build = "";
+  try { build = new URL(import.meta.url).searchParams.get("v") || ""; } catch { /* non-module load */ }
+  return `v${APP_VERSION.replace(/^sound-studio-/, "")}${build ? ` · ${build}` : ""}`;
+})();
 const EVENT_SCHEMA_VERSION = "explore-event-1.0";
 const SESSION_ID = crypto.randomUUID(); // fresh per page visit
 const CONSENT_KEY = "phase0.consent.v1";
@@ -2152,7 +2160,7 @@ function renderProduce() {
     <div class="daw">
       <div class="daw-transport">
         <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Sound Studio">←</a>
-        <span class="daw-title">Producer</span>
+        <span class="daw-title">Producer <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></span>
         <select id="arrSelect" class="daw-ctx-select" title="Switch arrangement">
           ${Object.values(loadArrangementRegistry()).map(a =>
             `<option value="${a.id}"${a.id === arrangement.id ? " selected" : ""}>${esc(a.name || "Untitled")}</option>`).join("")}
@@ -3096,7 +3104,7 @@ function renderExplore() {
     <div class="explore-dashboard${workspaceTab === 'subnote' ? ' subnote-workspace-mode' : ''}">
     <div class="explore-top">
       <div>
-        <h1>Sound Studio</h1>
+        <h1>Sound Studio <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></h1>
         <div class="studio-subtitle">Probabilistic Synthesiser</div>
       </div>
       <div class="workspace-tabs" id="workspaceTabs">

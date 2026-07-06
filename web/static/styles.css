@@ -2409,6 +2409,15 @@ body.explore-mode #app {
   display: none;
 }
 
+.build-tag {
+  font-size: 0.62em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--text3, #64707e);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
 .workspace-tabs {
   margin: 0;
   padding: 2px;
