@@ -433,10 +433,26 @@ Quality:
   distinctness, AM-on-slope vs stillness-at-peak, A7 inertness).
   Verified live (violin + vowel-ah body + vibrato), zero console
   errors.
-- **T6 Character panel + migration**: eight dials wired; old-preset
-  loader; factory instruments rebuilt.
-- **T7 Tone print**: the interactive display (lenses, arcs, afterglow,
-  editing).
+- **T6 Character panel + migration** — DONE (2026-07-06, 1132744): the
+  tone section IS the staged chain (rev B) — four numbered stage cards
+  with flow arrows; physical B slider replaces legacy Freq stretch
+  (piano re-derived natively at B 1.2e-4); body ridge mini-vis; side
+  panel slimmed to Instrument + Mix + Advanced disclosure (odd/even,
+  comb, octave groups); migrateToneParams() applied at preset,
+  instrument, and palette-edit load (stretch→B exact, drift→Human,
+  dead keys dropped — T-B9 partial). Formant source mode retained;
+  unification decision deferred to T8 owner audition.
+- **T7 Tone print** — DONE (2026-07-06): interactive print replaces the
+  harmonic-signature display, engine-true (same fingerprint code as
+  playback, Human 0): phosphor needles at realised Hz, afterglow = ring
+  time (T60 law), body ridge + excitor comb overlays attributed to
+  their stages, axis title. Relationship lens: tap a partial → true-
+  ratio relatives arc up, labelled "p:q ±¢" with coupling-weighted
+  opacity, readout strip with level/T60/couplings. Direct editing:
+  vertical drag on a needle writes the per-partial level live. Band
+  chips (Hz-defined: fund/low/mid/presence/air) focus-shade the print
+  and scope the per-partial editor strip to the band. Old 64-column
+  editor demoted to the band-scoped strip.
 - **T8 Walkthrough + A/B renders + owner audition** (T-Q5).
 
 ## 10. Open questions (non-blocking, owner input welcome)

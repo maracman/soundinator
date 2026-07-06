@@ -783,6 +783,22 @@ export function transferCoupling(fA, fB, sigmaCents = 20) {
   return best;
 }
 
+// Identify the nearest simple ratio between two frequencies (for the tone
+// print's relationship lens): {p, q, cents error, coupling weight} or null.
+export function nearestRatio(fA, fB) {
+  if (!(fA > 0) || !(fB > 0)) return null;
+  const hi = Math.max(fA, fB), lo = Math.min(fA, fB);
+  const ratio = hi / lo;
+  if (ratio > 4.6) return null;
+  let best = null;
+  for (const [p, q] of TRANSFER_RATIOS) {
+    const cents = 1200 * Math.log2(ratio / (p / q));
+    const weight = Math.exp(-0.5 * (cents / 20) ** 2) / (p * q);
+    if (!best || weight > best.weight) best = { p, q, cents, weight };
+  }
+  return best;
+}
+
 // First-order exchange over one note: energy flows from stronger to weaker
 // coupled partials (pairwise conserving, deterministic — no feedback loop).
 // parts: [{ freq, amp }] → per-partial amplitude deltas that the renderer

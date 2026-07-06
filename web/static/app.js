@@ -29,6 +29,10 @@ import {
   bodyBandsFor,
   bodyResponse,
   migrateToneParams,
+  materialT60,
+  positionComb,
+  nearestRatio,
+  transferCoupling,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -3560,6 +3564,8 @@ function renderExplore() {
     };
   }
 
+  wireTonePrint(v);
+
   // Checkbox param → section mapping for auto-switch
   const _checkToSection = {
     surpriseRestEnabled: { tab: "duration", section: "surprise" },
@@ -4180,12 +4186,14 @@ function subnoteWorkspaceHTML(p) {
                 <div class="section-label">Tone Builder</div>
                 <h2>${esc(profile.label)}</h2>
               </div>
-              <div class="signature-legend">
-                <span><i class="legend-band spread"></i> SD band</span>
-                <span><i class="legend-line mean"></i> amplitude mean</span>
-                <span><i class="legend-line quiet"></i> low reg</span>
-                <span><i class="legend-line loud"></i> high reg</span>
-                <span><i class="legend-line sample"></i> sampled sum</span>
+              <div class="print-bands" id="printBands">
+                <span class="print-hint">tap a partial · drag = level</span>
+                <button class="print-band" data-print-band="all">all</button>
+                <button class="print-band" data-print-band="fund">fund</button>
+                <button class="print-band" data-print-band="low">low</button>
+                <button class="print-band" data-print-band="mid">mid</button>
+                <button class="print-band" data-print-band="presence">presence</button>
+                <button class="print-band" data-print-band="air">air</button>
               </div>
             </div>
             <!-- The signal chain IS the layout (tone v2 rev B):
@@ -4243,7 +4251,8 @@ function subnoteWorkspaceHTML(p) {
                 <div class="ts-space-link">edit in the Space panel (Macro tab → Production Context)</div>
               </div>
             </div>
-            <canvas id="cvHarmonicSignature" width="920" height="620"></canvas>
+            <canvas id="cvTonePrint" width="1200" height="380"></canvas>
+            <div class="print-readout" id="printReadout">tap a partial to see its level, ring time, and who it talks to — true ratios, labelled with their cents error</div>
           </div>
         `}
 
@@ -4443,7 +4452,14 @@ function harmonicEditorHTML(p) {
   ensureSpectralPartialParams(p);
   const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
   const count = Math.max(1, Math.min(profile.partials.length, Math.round(p.spectralPartials || 20)));
+  // T7: the editor strip is scoped to the tone print's focused band —
+  // partials are filtered by their REALISED frequency, not their rank.
+  const [bLo, bHi] = PRINT_BANDS[_printState.band] || PRINT_BANDS.all;
+  const B = Number.isFinite(p.partialB) ? Math.max(0, p.partialB) : legacyStretchToB(p.spectralStretchCents || 0);
+  const f0 = p.tonicHz || 261.63;
   return profile.partials.slice(0, count).map((partial, i) => {
+    const freq = partialFrequency(i + 1, f0, B, p.resonatorClass || "string");
+    if (freq < bLo || freq > bHi) return "";
     const mean = p.spectralPartialMeans[i] ?? profilePartial(partial).amp ?? 0;
     const sd = p.spectralPartialSds[i] ?? 0;
     return `
@@ -4492,6 +4508,8 @@ function syncHarmonicWorkspace(v) {
   });
   applySubnoteModeState(v);
   decorateTooltips(card);
+  drawTonePrint();
+  drawBodyRidge();
 }
 
 function applySubnoteModeState(root = document) {
@@ -4732,7 +4750,7 @@ function drawDistributions() {
   drawSpectrumDist();
   drawVibratoDist();
   drawEnvelopeDist();
-  drawHarmonicSignature();
+  drawTonePrint();
   drawBodyRidge();
 }
 
@@ -6263,6 +6281,243 @@ function drawHarmonicSignature() {
   ctx.fillText("SUM", 12, combinedMid);
   ctx.fillStyle = "rgba(136,153,170,0.76)";
   ctx.fillText("combined waveform", 38, combinedMid);
+}
+
+// ── T7: the tone print — the resonator's interactive view ──────────
+// One display, engine-true: the partial set comes from the SAME
+// fingerprint code playback uses (Human forced to 0 for a noise-free
+// print). Needles sit at realised Hz; afterglow length = ring time;
+// the body ridge and excitor comb overlays show stages 3 and 1.
+
+let _printState = { sel: null, band: "all" };
+let _printGeom = null;
+
+const PRINT_FMIN = 40, PRINT_FMAX = 18000;
+const PRINT_BANDS = {
+  all: [PRINT_FMIN, PRINT_FMAX], fund: [PRINT_FMIN, 160], low: [160, 500],
+  mid: [500, 2000], presence: [2000, 6000], air: [6000, PRINT_FMAX],
+};
+
+function tonePrintModel() {
+  ensureSpectralPartialParams(exploreParams);
+  const engine = new GenerationEngine({ ...exploreParams, excitationHuman: 0 });
+  const fp = engine._spectralFingerprint(0.62, exploreParams.tonicHz || 261.63, 0);
+  return fp;
+}
+
+function drawTonePrint() {
+  const cv = document.getElementById("cvTonePrint");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const fp = tonePrintModel();
+  const parts = fp.harmonicPartials;
+  const material = Math.max(0, Math.min(1, fp.partialMaterial ?? 0));
+  const base = h - 26, top = 34;
+  const X = (f) => w * Math.log(f / PRINT_FMIN) / Math.log(PRINT_FMAX / PRINT_FMIN);
+
+  // axis
+  ctx.strokeStyle = "rgba(140,160,180,0.08)";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "rgba(120,135,150,0.6)";
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  for (const f of [55, 110, 220, 440, 880, 1760, 3520, 7040, 14080]) {
+    const px = X(f);
+    ctx.beginPath(); ctx.moveTo(px, top - 8); ctx.lineTo(px, base + 4); ctx.stroke();
+    ctx.fillText(f >= 1000 ? f / 1000 + "k" : String(f), px, base + 15);
+  }
+  ctx.textAlign = "left";
+  ctx.fillText("frequency (Hz · log)", 6, base + 15);
+
+  // excitor comb underlay (stage 1), faded before it aliases
+  const f0 = exploreParams.tonicHz || 261.63;
+  const pos = Number.isFinite(exploreParams.excitationPosition) ? exploreParams.excitationPosition : 0.5;
+  ctx.beginPath();
+  let combEnd = w;
+  for (let px = 0; px <= w; px += 2) {
+    const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
+    const nEff = f / f0;
+    const pxPerCycle = w / (Math.log(PRINT_FMAX / PRINT_FMIN) / Math.LN2) / (Math.max(0.5, nEff) * pos * 2.5);
+    if (pxPerCycle < 12) { combEnd = px; break; }
+    const y = base - positionComb(nEff, pos) * (base - top) * 0.16;
+    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+  }
+  const combFade = ctx.createLinearGradient(0, 0, Math.max(1, combEnd), 0);
+  combFade.addColorStop(0, "rgba(105,125,140,0.22)");
+  combFade.addColorStop(1, "rgba(105,125,140,0)");
+  ctx.strokeStyle = combFade;
+  ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+  // body ridge (stage 3)
+  const bands = fp.bodyBands || [];
+  const amount = fp.bodyAmount || 0;
+  if (bands.length && amount > 0) {
+    ctx.beginPath(); ctx.moveTo(0, base);
+    for (let px = 0; px <= w; px += 3) {
+      const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
+      const r = bodyResponse(bands, f, amount);
+      ctx.lineTo(px, base - (Math.log2(r) + 2.4) / 4.6 * (base - top) * 0.85);
+    }
+    ctx.lineTo(w, base); ctx.closePath();
+    ctx.fillStyle = "rgba(79,141,212,0.08)"; ctx.fill();
+    ctx.strokeStyle = "rgba(79,141,212,0.4)"; ctx.lineWidth = 1.4; ctx.stroke();
+  }
+
+  // band focus shading
+  if (_printState.band !== "all" && PRINT_BANDS[_printState.band]) {
+    const [b0, b1] = PRINT_BANDS[_printState.band];
+    ctx.fillStyle = "rgba(95,212,200,0.05)";
+    ctx.fillRect(X(Math.max(b0, PRINT_FMIN)), top - 10, X(Math.min(b1, PRINT_FMAX)) - X(Math.max(b0, PRINT_FMIN)), base - top + 14);
+  }
+
+  // needles + afterglow
+  const maxMean = Math.max(0.0001, ...parts.map(p => p.mean));
+  _printGeom = { X, base, top, w, h, needles: [] };
+  parts.forEach((p, i) => {
+    if (p.harmonicFrequency > PRINT_FMAX || p.mean <= 0) return;
+    const px = X(p.harmonicFrequency);
+    const nh = Math.pow(p.mean / maxMean, 0.62) * (base - top);
+    const t60 = material > 0 ? materialT60(p.harmonicFrequency, material) : 6;
+    const glow = Math.min(1, Math.log10(1 + t60) / 0.9);
+    const sel = _printState.sel === i;
+    const grad = ctx.createLinearGradient(px, 0, px + 12 + glow * 26, 0);
+    grad.addColorStop(0, `rgba(255,180,84,${0.3 * glow})`);
+    grad.addColorStop(1, "rgba(255,180,84,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(px, base - nh, 12 + glow * 26, nh);
+    ctx.strokeStyle = sel ? "#ffe3b0" : "#f5a623";
+    ctx.lineWidth = sel ? 3 : 1.8;
+    ctx.shadowColor = "#f5a623";
+    ctx.shadowBlur = sel ? 10 : 4;
+    ctx.beginPath(); ctx.moveTo(px, base); ctx.lineTo(px, base - nh); ctx.stroke();
+    ctx.shadowBlur = 0;
+    _printGeom.needles.push({ i, x: px, topY: base - nh, mean: p.mean, freq: p.harmonicFrequency, harmonic: p.harmonic, t60 });
+  });
+
+  // relationship arcs from the selected partial (true ratios, cents labels)
+  if (_printState.sel != null) {
+    const selN = _printGeom.needles.find(n => n.i === _printState.sel);
+    if (selN) {
+      ctx.font = "10.5px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      let li = 0;
+      for (const other of _printGeom.needles) {
+        if (other.i === selN.i) continue;
+        const C = transferCoupling(selN.freq, other.freq);
+        if (C < 0.04) continue;
+        const r = nearestRatio(selN.freq, other.freq);
+        if (!r) continue;
+        const midX = (selN.x + other.x) / 2;
+        const arcTop = Math.max(12, Math.min(selN.topY, other.topY) - 26 - C * 40);
+        ctx.strokeStyle = "#5fd4c8";
+        ctx.globalAlpha = 0.25 + Math.min(0.6, C * 1.2);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(selN.x, selN.topY - 3);
+        ctx.quadraticCurveTo(midX, arcTop, other.x, other.topY - 3);
+        ctx.stroke();
+        ctx.fillStyle = "#5fd4c8";
+        ctx.fillText(`${r.p}:${r.q} ${r.cents >= 0 ? "+" : ""}${r.cents.toFixed(0)}¢`, midX, Math.max(10, arcTop - 3) + (li % 2) * 11);
+        ctx.globalAlpha = 1;
+        li++;
+      }
+      ctx.fillStyle = "#ffe3b0";
+      ctx.font = "11px ui-monospace, monospace";
+      ctx.fillText(`p${selN.harmonic} · ${Math.round(selN.freq)} Hz`, selN.x, base + 24);
+    }
+  }
+}
+
+function _printUpdateReadout() {
+  const el = document.getElementById("printReadout");
+  if (!el || !_printGeom) return;
+  const selN = _printGeom.needles.find(n => n.i === _printState.sel);
+  if (!selN) {
+    el.textContent = "tap a partial to see its level, ring time, and who it talks to — true ratios, labelled with their cents error";
+    return;
+  }
+  const db = 20 * Math.log10(Math.max(1e-5, selN.mean));
+  const rels = _printGeom.needles
+    .filter(o => o.i !== selN.i)
+    .map(o => ({ o, C: transferCoupling(selN.freq, o.freq), r: nearestRatio(selN.freq, o.freq) }))
+    .filter(x => x.C >= 0.04 && x.r)
+    .sort((a, b) => b.C - a.C)
+    .slice(0, 4)
+    .map(x => `${x.r.p}:${x.r.q}→p${x.o.harmonic} (${x.r.cents >= 0 ? "+" : ""}${x.r.cents.toFixed(0)}¢)`);
+  el.textContent =
+    `p${selN.harmonic} · ${Math.round(selN.freq)} Hz · ${db.toFixed(1)} dB · ring T60 ${selN.t60.toFixed(2)} s` +
+    (rels.length ? ` · couples ${rels.join(" · ")}` : " · couples: none in range");
+}
+
+function wireTonePrint(v) {
+  const cv = v.querySelector("#cvTonePrint");
+  if (!cv) return;
+  const hitNeedle = (e) => {
+    if (!_printGeom) return null;
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * ((cv._cssW || cv.width) / rect.width);
+    let best = null;
+    for (const n of _printGeom.needles) {
+      const d = Math.abs(n.x - x);
+      if (d < 7 && (!best || d < best.d)) best = { ...n, d };
+    }
+    return best;
+  };
+  let drag = null;
+  cv.onmousedown = (e) => {
+    const hit = hitNeedle(e);
+    if (!hit) { _printState.sel = null; drawTonePrint(); _printUpdateReadout(); return; }
+    _printState.sel = hit.i;
+    drag = { i: hit.i, startY: e.clientY, moved: false };
+    drawTonePrint();
+    _printUpdateReadout();
+    e.preventDefault();
+  };
+  cv.onmousemove = (e) => {
+    if (!drag) { cv.style.cursor = hitNeedle(e) ? "ns-resize" : "crosshair"; return; }
+    const dy = drag.startY - e.clientY;
+    if (Math.abs(dy) < 3 && !drag.moved) return;
+    drag.moved = true;
+    // Drag edits the underlying per-partial level: display height is
+    // (mean/max)^0.62 of the plot; the underlying amp scales linearly
+    // with mean, so scale amp by the height ratio uncompressed.
+    ensureSpectralPartialParams(exploreParams);
+    const geomN = _printGeom.needles.find(n => n.i === drag.i);
+    if (!geomN) return;
+    const plotH = _printGeom.base - _printGeom.top;
+    const curH = _printGeom.base - geomN.topY;
+    const newH = clamp(curH + dy, 1, plotH);
+    const ratio = Math.pow(newH / Math.max(1, curH), 1 / 0.62);
+    const oldAmp = exploreParams.spectralPartialMeans[drag.i] ?? 0;
+    exploreParams.spectralPartialMeans[drag.i] = clamp((oldAmp || 0.02) * ratio, 0, 1.5);
+    drag.startY = e.clientY;
+    drawTonePrint();
+    _printUpdateReadout();
+  };
+  const endDrag = () => {
+    if (drag && drag.moved) synth.updateGenerationParams({ ...exploreParams });
+    drag = null;
+  };
+  cv.onmouseup = endDrag;
+  cv.onmouseleave = endDrag;
+
+  const bandsEl = v.querySelector("#printBands");
+  if (bandsEl) {
+    bandsEl.querySelectorAll("[data-print-band]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.printBand === _printState.band);
+      btn.onclick = () => {
+        _printState.band = btn.dataset.printBand;
+        bandsEl.querySelectorAll("[data-print-band]").forEach(b =>
+          b.classList.toggle("active", b === btn));
+        drawTonePrint();
+        // The editor strip below re-scopes to the focused band; its input
+        // wiring is delegated on the container, so a swap keeps working.
+        const editor = v.querySelector("#harmonicEditor");
+        if (editor) editor.innerHTML = harmonicEditorHTML(exploreParams);
+      };
+    });
+  }
 }
 
 // T6: the BODY stage card's ridge mini-vis — the same fixed-Hz law the

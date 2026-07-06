@@ -2456,6 +2456,38 @@ body.explore-mode #app {
   .ts-flow { display: none; }
 }
 
+/* ── T7 tone print ── */
+#cvTonePrint {
+  display: block;
+  width: 100%;
+  height: 300px;
+  background: var(--display);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: crosshair;
+}
+.print-bands { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.print-hint { font-size: 0.58rem; color: var(--text3); margin-right: 6px; }
+.print-band {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text3);
+  font: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.print-band.active { color: var(--gen, #f5a623); border-color: #6b4c22; background: rgba(245,166,35,0.07); }
+.print-readout {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--text2);
+  font-variant-numeric: tabular-nums;
+  min-height: 1.1em;
+}
+
 .build-tag {
   font-size: 0.62em;
   font-weight: 400;
