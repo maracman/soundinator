@@ -449,6 +449,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.75, vibratoRate: 5.2, vibratoRateSd: 0.3, vibratoDepth: 10, vibratoDepthSd: 3,
     attackNoise: { level: 0.4, freq: 2800, q: 0.8, decay: 0.07 },
     partialMaterial: 0.35,
+    excitation: { type: "blow", position: 0.24, hardness: 0.6 },
+    spectralDynamicAmount: 0.7,
   },
   clarinet: {
     envelopeAttack: 0.032, envelopeAttackSd: 0.008, envelopeDecay: 0.04,
@@ -456,6 +458,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.1, vibratoRate: 5.0, vibratoRateSd: 0.2, vibratoDepth: 4, vibratoDepthSd: 1.5,
     attackNoise: { level: 0.12, freq: 1800, q: 1.2, decay: 0.04 },
     partialMaterial: 0.4,
+    excitation: { type: "blow", position: 0.15, hardness: 0.6 },
+    spectralDynamicAmount: 0.75,
   },
   violin: {
     envelopeAttack: 0.085, envelopeAttackSd: 0.025, envelopeDecay: 0.07,
@@ -463,6 +467,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.85, vibratoRate: 5.9, vibratoRateSd: 0.4, vibratoDepth: 16, vibratoDepthSd: 4,
     attackNoise: { level: 0.3, freq: 3400, q: 1.0, decay: 0.09 },
     partialMaterial: 0.5,
+    excitation: { type: "bow", position: 0.13, hardness: 0.6 },
+    spectralDynamicAmount: 0.85,
   },
   cello: {
     envelopeAttack: 0.105, envelopeAttackSd: 0.03, envelopeDecay: 0.08,
@@ -470,6 +476,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.8, vibratoRate: 5.1, vibratoRateSd: 0.35, vibratoDepth: 14, vibratoDepthSd: 4,
     attackNoise: { level: 0.32, freq: 1500, q: 1.0, decay: 0.11 },
     partialMaterial: 0.5,
+    excitation: { type: "bow", position: 0.11, hardness: 0.6 },
+    spectralDynamicAmount: 0.85,
   },
   trumpet: {
     envelopeAttack: 0.03, envelopeAttackSd: 0.008, envelopeDecay: 0.05,
@@ -477,6 +485,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.3, vibratoRate: 5.4, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
     attackNoise: { level: 0.2, freq: 900, q: 1.4, decay: 0.045 },
     partialMaterial: 0.28,
+    excitation: { type: "blow", position: 0.3, hardness: 0.6 },
+    spectralDynamicAmount: 1.25,
   },
   trombone: {
     envelopeAttack: 0.045, envelopeAttackSd: 0.012, envelopeDecay: 0.06,
@@ -484,6 +494,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.25, vibratoRate: 5.0, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
     attackNoise: { level: 0.22, freq: 480, q: 1.3, decay: 0.06 },
     partialMaterial: 0.32,
+    excitation: { type: "blow", position: 0.3, hardness: 0.6 },
+    spectralDynamicAmount: 1.2,
   },
   piano: {
     // Percussive: instant hammer onset, no sustain plateau (decay carries the
@@ -493,6 +505,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0, vibratoRate: 5, vibratoRateSd: 0, vibratoDepth: 0, vibratoDepthSd: 0,
     attackNoise: { level: 0.26, freq: 350, q: 0.7, decay: 0.02 },
     partialMaterial: 0.7,
+    excitation: { type: "strike", position: 0.12, hardness: 0.62 },
+    spectralDynamicAmount: 1.0,
     spectralStretchCents: 8, // string inharmonicity stretches upper partials
   },
   vocal: {
@@ -501,6 +515,8 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.85, vibratoRate: 5.5, vibratoRateSd: 0.5, vibratoDepth: 18, vibratoDepthSd: 6,
     attackNoise: { level: 0.14, freq: 2200, q: 0.9, decay: 0.05 },
     partialMaterial: 0.42,
+    excitation: { type: "bow", position: 0.35, hardness: 0.6 },
+    spectralDynamicAmount: 0.8,
   },
 };
 
@@ -561,6 +577,57 @@ export function materialT60(freqHz, material) {
   const t60Ref = Math.exp((1 - m) * Math.log(7.0) + m * Math.log(0.55));
   const slope = 0.25 + m * 1.1;
   return t60Ref * Math.pow(Math.max(30, freqHz) / 261.63, -slope);
+}
+
+// ── Tone model v2: excitation stage (T2, docs/TONE_MODEL_V2_DESIGN.md §3.1) ──
+//
+// How energy enters the resonator. Pure functions again so T-B1 can be
+// asserted headlessly. The drive spectra are the standard physical initial
+// conditions: bow = sustained Helmholtz motion ≈ 1/n; pluck = displacement
+// release ≈ 1/n²; strike = force impulse, near-flat until the hardness
+// corner; blow = air-jet drive ≈ 1/n^1.15 (its continuous breath-noise
+// floor arrives with the T3 Human stage).
+export function excitationDrive(type, n) {
+  switch (type) {
+    case "pluck":  return 1 / (n * n);
+    case "strike": return Math.pow(n, -0.3);
+    case "blow":   return Math.pow(n, -1.15);
+    case "bow":
+    default:       return 1 / n;
+  }
+}
+
+// Excitation position x ∈ (0, 0.5]: driving a string (or analogous mode
+// shape) at x weights mode n by |sin(nπx)| — at 1/2 every even mode sits on
+// a node and dies, at 1/3 every third does. This is the physical control
+// that absorbs the old odd/even and comb macros.
+export function positionComb(n, position) {
+  const x = Math.min(0.5, Math.max(0.02, position ?? 0.5));
+  return Math.abs(Math.sin(n * Math.PI * x));
+}
+
+// Contact-time rolloff for struck/plucked excitation: a soft hammer stays
+// in contact longer and cannot inject energy above ~1/(2τ). Corner sweeps
+// ~600 Hz (felt, hardness 0) → ~14 kHz (wood/metal, hardness 1); 12 dB/oct
+// above it. Sustained excitations pass through unshaped.
+export function hardnessRolloff(freqHz, hardness, type) {
+  if (type !== "strike" && type !== "pluck") return 1;
+  const h = Math.min(1, Math.max(0, hardness ?? 0.6));
+  const corner = 600 * Math.pow(14000 / 600, h);
+  const r = Math.max(1, (freqHz || 1) / corner);
+  return 1 / (r * r);
+}
+
+export function excitationSpectrum(type, n, { position = 0.5, hardness = 0.6, freqHz = n * 261.63 } = {}) {
+  return excitationDrive(type, n) * positionComb(n, position) * hardnessRolloff(freqHz, hardness, type);
+}
+
+// Louder = brighter (audit A14): one global law replaces the per-partial
+// dyn grids. The velocity exponent grows with mode number so upper partials
+// bloom under force the way strings and air columns actually do (Schelleng
+// bow-force behaviour); spectralDynamicAmount scales the whole law.
+export function dynamicBrightness(n) {
+  return 0.5 * Math.log2(1 + Math.max(1, n));
 }
 
 // ── Extend every profile's partial table to 64 harmonics ─────
@@ -1228,27 +1295,47 @@ export class GenerationEngine {
     const velocityRatio = Math.max(0.08, velocity / 0.62);
     const means = Array.isArray(this.p.spectralPartialMeans) ? this.p.spectralPartialMeans : [];
     const sds = Array.isArray(this.p.spectralPartialSds) ? this.p.spectralPartialSds : [];
-    const dyns = Array.isArray(this.p.spectralPartialDyns) ? this.p.spectralPartialDyns : [];
     const regs = Array.isArray(this.p.spectralPartialRegs) ? this.p.spectralPartialRegs : [];
+    // Tone v2 (T2): resolve the excitation once per note. Current settings
+    // are applied as a transform NORMALISED against the profile's own
+    // excitation defaults — the measured amplitude tables already embody
+    // the instrument played at its natural position, so defaults → exactly
+    // 1 and old presets are untouched; moving position/type/hardness
+    // reshapes the spectrum relative to that natural state.
+    const partialB = Number.isFinite(this.p.partialB)
+      ? Math.max(0, this.p.partialB)
+      : legacyStretchToB(this.p.spectralStretchCents ?? 0);
+    const resClass = this.p.resonatorClass || "string";
+    const excDefault = profile.performance?.excitation || { type: "bow", position: 0.5, hardness: 0.6 };
+    const excType = this.p.excitationType || excDefault.type || "bow";
+    const excPos = Number.isFinite(this.p.excitationPosition) ? this.p.excitationPosition : (excDefault.position ?? 0.5);
+    const excHard = Number.isFinite(this.p.excitationHardness) ? this.p.excitationHardness : (excDefault.hardness ?? 0.6);
     let referenceNorm = 0;
     const partials = profile.partials.slice(0, count).map((partial, i) => {
       const fallbackAmp = typeof partial === "number" ? partial : partial.amp;
       const fallbackSd = fallbackAmp * (typeof partial === "number" ? 0.08 : partial.spread ?? 0.25) * 0.5;
       const amp = this._clamp(means[i] ?? fallbackAmp, 0, 1.5);
       const sd = this._clamp(sds[i] ?? fallbackSd, 0, 0.75);
-      const fallbackDyn = typeof partial === "number" ? 0 : partial.dyn ?? 0;
-      const dyn = this._clamp(dyns[i] ?? fallbackDyn, -1, 4);
       const fallbackReg = typeof partial === "number"
         ? spectralDefaultRegisterSensitivity(i, count)
         : partial.reg ?? spectralDefaultRegisterSensitivity(i, count);
       const reg = this._clamp(regs[i] ?? fallbackReg, -2, 2);
       const harmonic = i + 1;
-      const dynamics = Math.pow(velocityRatio, dyn * dynamicsAmount);
-      const harmonicFrequency = Math.max(1, fundamentalHz * harmonic);
+      // Dynamic-brightness law (T2, audit A14): the per-partial dyn grids
+      // are retired — louder playing brightens the top by one global law.
+      const dynamics = Math.pow(velocityRatio, dynamicBrightness(harmonic) * dynamicsAmount);
+      // Realised mode frequency (T1 law) — body resonances and hardness
+      // rolloff both act on where the partial actually sits.
+      const harmonicFrequency = Math.max(1, partialFrequency(harmonic, fundamentalHz, partialB, resClass));
       const sourceResponse = this._spectralRegisterSourceResponse(reg, registerAmount, fundamentalHz);
       const filterResponse = this._spectralResonanceResponse(profile, harmonicFrequency, resonanceAmount);
       const registerResponse = sourceResponse * filterResponse;
-      const dynamicMean = amp * dynamics * registerResponse * this._partialMacroGain(harmonic);
+      const excCur = excitationSpectrum(excType, harmonic, { position: excPos, hardness: excHard, freqHz: harmonicFrequency });
+      const excBase = excitationSpectrum(excDefault.type || "bow", harmonic, {
+        position: excDefault.position ?? 0.5, hardness: excDefault.hardness ?? 0.6, freqHz: harmonicFrequency,
+      });
+      const excitation = excBase > 1e-6 ? Math.min(8, excCur / excBase) : (excCur > 1e-6 ? 8 : 1);
+      const dynamicMean = amp * dynamics * registerResponse * excitation * this._partialMacroGain(harmonic);
       const sampled = shouldSample ? Math.max(0, dynamicMean + this._gaussian() * sd) : dynamicMean;
       referenceNorm += amp;
       return {
@@ -1256,7 +1343,6 @@ export class GenerationEngine {
         amp: sampled,
         mean: dynamicMean,
         sd,
-        dyn,
         reg,
         registerResponse,
         harmonicFrequency,
@@ -2870,7 +2956,10 @@ export class SynthEngine {
       osc.type = "sine";
       this._setFrequency(osc.frequency, freq, t0, note, multiplier);
       const g = this.ctx.createGain();
-      const gainScale = mix * Math.min(1, 1.4 / Math.sqrt(harmonic)) / norm;
+      // T2 (audit A8): the hidden 1.4/√n rolloff is gone — what the print
+      // shows is exactly what renders; spectral shaping lives only in the
+      // model (excitation × macros × material × body).
+      const gainScale = mix / norm;
       scheduled.push({ param: g.gain, part, gainScale });
       osc.connect(g);
       let tail = g;

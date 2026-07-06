@@ -9,6 +9,11 @@ import {
   partialFrequency,
   legacyStretchToB,
   materialT60,
+  excitationDrive,
+  positionComb,
+  hardnessRolloff,
+  excitationSpectrum,
+  dynamicBrightness,
   SPECTRAL_PROFILES,
   GenerationEngine,
 } from "../web/static/synth.js";
@@ -127,5 +132,57 @@ console.log("Engine wiring (fingerprint carries the v2 resonator fields)");
   }
 }
 
+console.log("T-B1: excitation position comb kills the right partials (measured)");
+{
+  check("middle (0.5) silences mode 2", positionComb(2, 0.5) < 1e-9);
+  check("middle (0.5) silences mode 4", positionComb(4, 0.5) < 1e-9);
+  check("third (1/3) silences mode 3", positionComb(3, 1 / 3) < 1e-9);
+  check("third (1/3) silences mode 6", positionComb(6, 1 / 3) < 1e-9);
+  check("mode 1 never dies", positionComb(1, 0.5) > 0.99 && positionComb(1, 0.13) > 0.3);
+  check("near-bridge keeps highs alive", positionComb(9, 0.05) > 0.3);
+}
+
+console.log("T2: drive spectra, hardness, dynamic brightness");
+{
+  const slope = (type) => excitationDrive(type, 8) / excitationDrive(type, 1);
+  check("pluck rolls off steeper than bow", slope("pluck") < slope("bow"));
+  check("bow rolls off steeper than strike", slope("bow") < slope("strike"));
+  check("hard strike passes 4 kHz, soft doesn't",
+    hardnessRolloff(4000, 1, "strike") > 10 * hardnessRolloff(4000, 0.1, "strike"));
+  check("hardness ignores bow/blow",
+    hardnessRolloff(4000, 0.1, "bow") === 1 && hardnessRolloff(4000, 0.1, "blow") === 1);
+  check("excitationSpectrum composes drive × comb × hardness",
+    near(excitationSpectrum("pluck", 2, { position: 0.5, hardness: 1 }), 0, 1e-9));
+  check("dynamic brightness grows with mode number",
+    dynamicBrightness(1) === 0.5 && dynamicBrightness(8) > dynamicBrightness(4) && dynamicBrightness(32) > 2);
+}
+
+console.log("T2: engine excitation transform (normalised against profile default)");
+{
+  const GEN2 = {
+    seed: 7, tempo: 104, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    voiceMode: "fourier", spectralPartials: 32, spectralProfile: "piano", spectralProb: 0,
+  };
+  const firstNote = (params) => {
+    const e = new GenerationEngine(params); e.initialise();
+    for (let i = 0; i < 24; i++) { const n = e.nextNote(); if (n && n.velocity > 0 && n.harmonicPartials) return n; }
+    return null;
+  };
+  const plain = firstNote(GEN2);
+  const explicitDefaults = firstNote({ ...GEN2, excitationType: "strike", excitationPosition: 0.12, excitationHardness: 0.62 });
+  check("identity: profile-default excitation params change nothing",
+    plain && explicitDefaults &&
+    plain.harmonicPartials.every((p, i) => near(p.mean, explicitDefaults.harmonicPartials[i].mean, 1e-12)));
+  const midString = firstNote({ ...GEN2, excitationPosition: 0.5 });
+  check("position 0.5 through the engine silences partial 2",
+    midString && midString.harmonicPartials[1].mean < 1e-9 && midString.harmonicPartials[0].mean > 0.01);
+  const plucked = firstNote({ ...GEN2, excitationType: "pluck" });
+  check("pluck darkens the top relative to piano's strike",
+    plucked && plain &&
+    (plucked.harmonicPartials[7].mean / Math.max(1e-9, plucked.harmonicPartials[0].mean)) <
+    (plain.harmonicPartials[7].mean / Math.max(1e-9, plain.harmonicPartials[0].mean)));
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
-console.log("\nAll tone-model v2 (T1) assertions passed.");
+console.log("\nAll tone-model v2 assertions passed (T1 + T2).");

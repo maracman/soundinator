@@ -363,8 +363,20 @@ Quality:
   same realised frequencies; Nyquist + 16 kHz + audibility culling;
   headless harness `scripts/verify_tone_model.mjs` (27 assertions,
   T-B2/T-B3 covered) wired into CI; APP_VERSION → 0.3.0.
-- **T2 Excitation**: types, position comb, hardness, drive spectra;
-  dynamic-brightness law; retire A8 hidden shaping.
+- **T2 Excitation** — DONE (2026-07-06): excitationType/Position/Hardness
+  params with per-instrument defaults in SPECTRAL_PERFORMANCE (bow:
+  violin/cello/vocal, blow: winds/brass, strike: piano); drive spectra
+  (bow 1/n, pluck 1/n², strike flat-to-corner, blow 1/n^1.15), position
+  comb |sin(nπx)|, hardness contact-time rolloff (600 Hz–14 kHz corner,
+  12 dB/oct) — applied as a transform NORMALISED against the profile's
+  natural excitation so measured tables/old presets are untouched at
+  defaults; dynamic-brightness law 0.5·log2(1+n)·dynAmount replaces the
+  per-partial dyn grids (D column removed); hidden 1.4/√n renderer
+  shaping retired (A8); body resonances + hardness now act on REALISED
+  frequencies (T1 law). Headless: +15 assertions incl. T-B1 (comb
+  silences modes 2/4 at ½, 3/6 at ⅓, measured through the engine) and
+  the normalisation identity. Verified live (piano re-seats to strike,
+  mid-play pluck switch clean).
 - **T3 Human**: coherent 1/f excitation fluctuation replacing per-partial
   draws/drift/normalisation (A1/A9).
 - **T4 Transfer**: realised-frequency coupling + scheduling.

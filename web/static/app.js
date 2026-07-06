@@ -241,6 +241,11 @@ const DEFAULTS = {
   vibratoRate: 5.5,
   vibratoRateSd: 0.7,
   spectralProfile: "violin",
+  // Tone v2 excitation (T2): how energy enters the resonator. Defaults
+  // match the default profile (violin); choosing a profile re-seats them.
+  excitationType: "bow",
+  excitationPosition: 0.13,
+  excitationHardness: 0.6,
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -379,6 +384,9 @@ const PARAM_DESC = {
   spectralRegisterAmount: "How strongly note range reshapes each harmonic amplitude",
   spectralResonanceAmount: "How strongly fixed instrument resonances reshape absolute harmonic frequencies",
   partialMaterial: "Damping law for the harmonic partials: low values let every partial ring (glass, metal); high values make the upper partials die away quickly (wood, felt). Applied per note, faster decay for higher harmonics",
+  excitationType: "How energy enters the resonator: bow (continuous drive), pluck (displacement release), strike (force impulse), blow (air jet). Sets the physical drive spectrum",
+  excitationPosition: "Where the string/tube/membrane is excited (0.02 near the edge to 0.5 the middle). Modes with a node at this point go silent — 0.5 kills every even partial, 0.33 every third. Applied relative to the instrument's natural position",
+  excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -3420,6 +3428,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
+    "excitationType","excitationPosition","excitationHardness",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF3Level","formantF4Level","formantF5Level","formantBandwidth",
@@ -4221,6 +4230,17 @@ function subnoteWorkspaceHTML(p) {
               ${controlRow("spectralDriftDepth", "Drift depth", p.spectralDriftDepth, 0, 1, 0.01)}
               ${controlRow("spectralDriftRate", "Drift rate", p.spectralDriftRate, 0.5, 20, 0.5)}
               ${controlRow("spectralStretchCents", "Freq stretch", p.spectralStretchCents, -24, 24, 1)}
+              <div class="control-row">
+                <label for="sel_excitationType">Excite</label>
+                <select data-param-select="excitationType" id="sel_excitationType" class="param-select" title="How energy enters the resonator: a bow drives it continuously, a pluck releases it, a strike hits it, air blows through it. Each has its own physical drive spectrum.">
+                  <option value="bow"${p.excitationType === "bow" ? " selected" : ""}>Bow</option>
+                  <option value="pluck"${p.excitationType === "pluck" ? " selected" : ""}>Pluck</option>
+                  <option value="strike"${p.excitationType === "strike" ? " selected" : ""}>Strike</option>
+                  <option value="blow"${p.excitationType === "blow" ? " selected" : ""}>Blow</option>
+                </select>
+              </div>
+              ${controlRow("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01)}
+              ${controlRow("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01)}
               ${controlRow("partialTilt", "Tilt", p.partialTilt, -1, 1, 0.01)}
               ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
               ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
@@ -4274,6 +4294,14 @@ function resetSpectralPartialParams(p) {
   // params afterwards; the onset transient rides the profile itself.
   for (const [key, value] of Object.entries(profile.performance || {})) {
     if (key !== "attackNoise" && key in DEFAULTS) p[key] = value;
+  }
+  // Tone v2 (T2): the instrument's natural excitation is part of its
+  // character — selecting a profile re-seats type/position/hardness.
+  const exc = profile.performance?.excitation;
+  if (exc) {
+    p.excitationType = exc.type || "bow";
+    p.excitationPosition = exc.position ?? 0.5;
+    p.excitationHardness = exc.hardness ?? 0.6;
   }
   p.spectralPartialMeans = profile.partials.map(partial => +(profilePartial(partial).amp || 0).toFixed(3));
   p.spectralPartialSds = profile.partials.map(partial => {
@@ -4356,7 +4384,6 @@ function harmonicEditorHTML(p) {
   return profile.partials.slice(0, count).map((partial, i) => {
     const mean = p.spectralPartialMeans[i] ?? profilePartial(partial).amp ?? 0;
     const sd = p.spectralPartialSds[i] ?? 0;
-    const dyn = p.spectralPartialDyns[i] ?? profilePartial(partial).dyn ?? 0;
     const reg = p.spectralPartialRegs[i] ?? profilePartial(partial).reg ?? spectralDefaultRegisterSensitivity(i, count);
     return `
       <div class="harmonic-control">
@@ -4370,11 +4397,6 @@ function harmonicEditorHTML(p) {
           <span>SD</span>
           <input type="range" data-harmonic-param="sd" data-harmonic-index="${i}" min="0" max="0.75" step="0.005" value="${sd}">
           <output data-harmonic-out="sd-${i}">${harmonicValueLabel("sd", sd)}</output>
-        </label>
-        <label>
-          <span>D</span>
-          <input type="range" data-harmonic-param="dyn" data-harmonic-index="${i}" min="-1" max="4" step="0.05" value="${dyn}">
-          <output data-harmonic-out="dyn-${i}">${harmonicValueLabel("dyn", dyn)}</output>
         </label>
         <label>
           <span>R</span>
