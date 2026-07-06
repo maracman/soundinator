@@ -156,7 +156,7 @@ function saveInstruments(list) {
 const DEFAULTS = {
   tempo: 104,
   seed: 1001,
-  voiceMode: "formant",
+  voiceMode: "fourier",
   scaleMode: "12tone",
   scalePreset: "major",
   edoDivisions: 12,
@@ -696,13 +696,11 @@ function describeParam(param, label = "") {
   return PARAM_DESC[param] || label || param;
 }
 
-function normaliseVoiceMode(mode) {
-  return mode === "formant" ? "formant" : "fourier";
-}
-
-function isFormantMode(p = exploreParams) {
-  return normaliseVoiceMode(p.voiceMode) === "formant";
-}
+// CH-B1: the Formant/Fourier mode split is retired — one chain, always.
+// Vocal character = an ARTICULATED body (bodyType "vocal") that follows
+// the engine's per-note vowel walk. These stay as inert shims.
+function normaliseVoiceMode() { return "fourier"; }
+function isFormantMode() { return false; }
 
 function syncSurpriseFeatureParams(p) {
   const dims = Array.isArray(p.surpriseDimensions) ? p.surpriseDimensions : [];
@@ -3971,10 +3969,10 @@ function renderExplore() {
         synth.updateReverb({ ...exploreParams });
         return;
       }
-      if (key === "spectralProfile") {
+      if (key === "spectralProfile" || key === "bodyType") {
         synth.updateGenerationParams({ ...exploreParams });
-        // The profile applied its performance defaults (envelope, vibrato,
-        // stretch) — re-render so the affected controls show them.
+        // Profile changes re-seat performance defaults; bodyType swaps the
+        // BODY inspector between static and articulated layouts.
         renderExplore();
         return;
       }
@@ -4726,19 +4724,9 @@ function subnoteWorkspaceHTML(p) {
           <div class="subnote-side-section sound-source-section">
             <div class="section-label">Sound Source</div>
             ${panelPresetBarHTML("sound")}
-            <div class="mode-btns sound-source-modes" id="voiceModeGroup">
-              <button class="mode-btn${formantMode ? ' active' : ''}" data-vmode="formant">Formant</button>
-              <button class="mode-btn${!formantMode ? ' active' : ''}" data-vmode="fourier">Fourier</button>
-            </div>
+
           </div>
 
-          <div class="subnote-side-section${formantDisabled}" data-sound-path="formant" aria-disabled="${!formantMode}">
-            <div class="section-label">Formant Voice</div>
-            <div class="formant-chips" id="formantChips">
-              ${Object.keys(FORMANT_PRESETS).map(k =>
-                `<button class="formant-chip${p.activeFormants.includes(k) ? ' active' : ''}" data-formant="${k}">${k}</button>`
-              ).join('')}
-            </div>
             <div class="controls-grid">
               ${controlRow("formantChangeProb", "Formant change", p.formantChangeProb, 0, 1, 0.01)}
             </div>
@@ -4755,14 +4743,6 @@ function subnoteWorkspaceHTML(p) {
             </details>
           </div>
 
-          <div class="subnote-side-section${formantDisabled}" data-sound-path="formant" aria-disabled="${!formantMode}">
-            <div class="section-label">Colour Distribution</div>
-            <div class="controls-grid">
-              ${controlRow("toneColorProb", "Chance", p.toneColorProb, 0, 1, 0.01)}
-              ${controlRow("toneFormantDrift", "Formant", p.toneFormantDrift, 0, 0.5, 0.01)}
-              ${controlRow("toneResonanceDrift", "Resonance", p.toneResonanceDrift, 0, 0.8, 0.01)}
-              ${controlRow("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01)}
-            </div>
           </div>
 
           <div class="subnote-side-section${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
@@ -6702,6 +6682,7 @@ function chInspectorHTML(p) {
       <div class="knob-row">
         ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
         ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
+        ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
       </div>
       <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
       <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field</div>`;
@@ -6727,14 +6708,26 @@ function chInspectorHTML(p) {
       <div class="ch-ins-head"><span class="ch-card-n">03 · BODY</span><span class="ch-ins-d">the box around it</span></div>
       <select data-param-select="bodyType" id="sel_bodyType" class="param-select body-select">
         <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
+        <option value="vocal"${p.bodyType === "vocal" ? " selected" : ""}>Vocal (articulated)</option>
         ${Object.entries(BODY_PRESETS).map(([k, b]) =>
           `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
       </select>
       <div class="knob-row">
         ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 0.35, cool: true })}
+        ${p.bodyType === "vocal" ? knobHTML("formantChangeProb", "Vowel walk", p.formantChangeProb, 0, 1, 0.01, { def: 0.25, cool: true }) : ""}
       </div>
-      <canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>
-      <div class="ch-caption">fixed-Hz resonance bands — vowels are bodies too; with vibrato, partials on the curve's slopes shimmer (FM→AM)</div>`;
+      ${p.bodyType === "vocal" ? `
+        <div class="ch-artic">
+          ${formantWeightControlsHTML(p)}
+          ${featureSurpriseBlock("formant", "Vowel", "surpriseFormantEnabled", null, p.surpriseFormantEnabled, p.surpriseFormantDistance)}
+          <div class="knob-row">
+            ${knobHTML("toneFormantDrift", "Drift", p.toneFormantDrift, 0, 0.5, 0.01, { def: 0.08, cool: true })}
+            ${knobHTML("toneResonanceDrift", "Width drift", p.toneResonanceDrift, 0, 0.8, 0.01, { def: 0.12, cool: true })}
+          </div>
+        </div>` : `<canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>`}
+      <div class="ch-caption">${p.bodyType === "vocal"
+        ? "an ARTICULATED body: the vowel walks per note (weights, change probability, surprise) — the chain keeps its excitor, resonator and stage"
+        : "fixed-Hz resonance bands — vowels are bodies too; with vibrato, partials on the curve's slopes shimmer (FM→AM)"}</div>`;
   }
   return `
     <div class="ch-ins-head"><span class="ch-card-n">04 · SPACE</span><span class="ch-ins-d">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")}</span></div>

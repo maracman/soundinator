@@ -383,5 +383,32 @@ console.log("SPACE positioning laws");
     spaceArrivalDelay(1000) === 30 / 343 && spaceProximityDb(-5) === spaceProximityDb(0.3));
 }
 
+console.log("CH-B1: articulated bodies, formant mode retired");
+{
+  const GEN6 = {
+    seed: 9, tempo: 104, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    spectralPartials: 24, spectralProfile: "vocal", bodyType: "vocal",
+    activeFormants: ["ah", "ee"], excitationHuman: 0, formantChangeProb: 1,
+  };
+  const e = new GenerationEngine(GEN6); e.initialise();
+  const bandsSeen = [];
+  for (let i = 0; i < 30; i++) {
+    const nn = e.nextNote();
+    if (nn && nn.velocity > 0 && nn.bodyBands) bandsSeen.push(nn.bodyBands.map(b => Math.round(b.freq)).join(","));
+  }
+  check("vocal body: per-note bands exist (5 formants)", bandsSeen.length > 4 &&
+    bandsSeen.every(s => s.split(",").length === 5));
+  check("the body MOVES: bands differ across notes (vowel walk)",
+    new Set(bandsSeen).size > 1, `distinct=${new Set(bandsSeen).size}`);
+  const stat = new GenerationEngine({ ...GEN6, bodyType: "violin" }); stat.initialise();
+  let sNote = null;
+  for (let i = 0; i < 20 && !sNote; i++) { const nn = stat.nextNote(); if (nn && nn.velocity > 0) sNote = nn; }
+  check("static bodies stay still", sNote && JSON.stringify(sNote.bodyBands) === JSON.stringify(BODY_PRESETS.violin.bands));
+  const m = migrateToneParams({ voiceMode: "formant", spectralMix: 0.1, spectralProfile: "violin" });
+  check("formant-mode presets migrate to vocal-bodied chain patches",
+    m.voiceMode === "fourier" && m.bodyType === "vocal" && m.spectralProfile === "vocal" && m.spectralMix >= 0.6);
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
 console.log("\nAll tone-model v2 assertions passed (T1-T6 + space).");

@@ -478,6 +478,14 @@ export function migrateToneParams(p) {
       out.excitationHuman = Math.max(0, Math.min(0.7, 0.1 + (prob ?? 1) * (depth ?? 0.35) * 0.7));
     }
   }
+  // CH-B1: the Formant sound-source mode retires — old formant presets
+  // become vocal-bodied chain patches (articulation params carry over).
+  if (out.voiceMode === "formant") {
+    out.bodyType = out.bodyType && out.bodyType !== "auto" ? out.bodyType : "vocal";
+    if (!out.spectralProfile || out.spectralProfile === "violin") out.spectralProfile = "vocal";
+    out.spectralMix = Math.max(0.6, Number(out.spectralMix) || 0);
+    out.voiceMode = "fourier";
+  }
   for (const dead of [
     "spectralProb", "spectralDriftProb", "spectralDriftDepth", "spectralDriftRate",
     "spectralLoudnessNorm", "spectralRegisterAmount", "spectralPartialDyns", "spectralPartialRegs",
@@ -490,6 +498,7 @@ export function migrateToneParams(p) {
 // untouched).
 export function bodyBandsFor(p, profile) {
   const key = p?.bodyType;
+  if (key === "vocal") return BODY_PRESETS["vowel-ah"].bands; // articulated: 'ah' baseline for displays
   if (key && key !== "auto" && BODY_PRESETS[key]) return BODY_PRESETS[key].bands;
   return (profile && profile.resonances) || [];
 }
@@ -1339,7 +1348,7 @@ export class GenerationEngine {
     const duration = gapFraction > 0
       ? gridDuration * (1 - gapFraction)
       : gridDuration + legatoTail;
-    const subNote = this._subNoteVariation(velocity, hz, note.degree);
+    const subNote = this._subNoteVariation(velocity, hz, note.degree, note.formantPos);
 
     // ── Expectancy metrics (research instrumentation; inaudible) ──
     const prevDegree = this._lastOutputDegree;
@@ -1459,11 +1468,11 @@ export class GenerationEngine {
     return new Scale(div, allDeg, subDeg, this.p.subScaleWeight, this.p.tonicHz || 261.63);
   }
 
-  _subNoteVariation(velocity = 0.6, fundamentalHz = 261.63, degree = 0) {
+  _subNoteVariation(velocity = 0.6, fundamentalHz = 261.63, degree = 0, formantPos = null) {
     return {
       ...this._toneColourImperfection(),
       ...this._vibratoParams(),
-      ...this._spectralFingerprint(velocity, fundamentalHz, degree),
+      ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
       ...this._envelopeVariation(),
     };
   }
@@ -1491,9 +1500,28 @@ export class GenerationEngine {
     };
   }
 
-  _spectralFingerprint(velocity = 0.6, fundamentalHz = 261.63, degree = 0) {
+  // CH-B1 articulated bodies: when the body is "vocal", its bands FOLLOW
+  // the engine's per-note vowel walk (change probability, surprise, and
+  // accuracy misses included) — a voice is a body that moves, not a
+  // different synthesiser. F3-F5 level and bandwidth shaping apply here.
+  _articulatedBands(formantPos) {
+    if ((this.p.bodyType || "auto") !== "vocal" || !formantPos) return null;
+    const f = formantFreqsAtPoint(formantPos);
+    const gains = [2.0, 1.7, 1.2, 0.9, 0.7];
+    const lvl = [1, 1,
+      this._clamp(this.p.formantF3Level ?? 1, 0, 2),
+      this._clamp(this.p.formantF4Level ?? 1, 0, 2),
+      this._clamp(this.p.formantF5Level ?? 1, 0, 2)];
+    const bwScale = this._clamp(this.p.formantBandwidth ?? 1, 0.4, 2.5);
+    return [f.f1, f.f2, f.f3, f.f4, f.f5].map((freq, i) => ({
+      freq,
+      gain: gains[i] * lvl[i],
+      width: Math.max(0.1, ((f.bw && f.bw[i]) || 90) / Math.max(60, freq) * 1.9 * bwScale),
+    }));
+  }
+
+  _spectralFingerprint(velocity = 0.6, fundamentalHz = 261.63, degree = 0, formantPos = null) {
     const profile = SPECTRAL_PROFILES[this.p.spectralProfile] || SPECTRAL_PROFILES.violin;
-    const fourierMode = (this.p.voiceMode || "formant") !== "formant";
     const count = Math.max(1, Math.min(profile.partials.length, Math.round(this.p.spectralPartials ?? 12)));
     const dynamicsAmount = Math.max(0, this.p.spectralDynamicAmount ?? 0.8);
     const resonanceAmount = this._clamp(this.p.spectralResonanceAmount ?? 0.35, 0, 1.5);
@@ -1505,7 +1533,7 @@ export class GenerationEngine {
     // is the ONLY register-dependent shaping now: the per-partial reg
     // grids are retired (audit A7 — register timbre emerges from where
     // the partials fall against fixed-Hz bands, not hand-set exponents).
-    const bodyBands = bodyBandsFor(this.p, profile);
+    const bodyBands = this._articulatedBands(formantPos) || bodyBandsFor(this.p, profile);
     // Tone v2 (T2): resolve the excitation once per note. Current settings
     // are applied as a transform NORMALISED against the profile's own
     // excitation defaults — the measured amplitude tables already embody
@@ -1572,7 +1600,7 @@ export class GenerationEngine {
       harmonicPartials: partials,
       attackNoise: profile.performance?.attackNoise || null,
       partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
-      spectralMix: fourierMode ? (this.p.spectralMix ?? 0) : 0,
+      spectralMix: this.p.spectralMix ?? 0,
       excitationType: excType,
       excitationHuman: human,
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
@@ -3012,9 +3040,7 @@ export class SynthEngine {
     if (t0 < this.ctx.currentTime - 0.02) return;
     if (note.isRest || note.velocity <= 0) return; // silence for rest surprises
     note._vibratoEvents = this._buildVibratoEvents(note, t0, t0 + note.duration);
-    if (this._voiceMode === "formant") {
-      this._renderFormant(note, t0);
-    } else if (this._voiceMode === "fourier") {
+    if (this._voiceMode === "formant" || this._voiceMode === "fourier") {
       this._renderFourier(note, t0);
     } else {
       this._renderOsc(note, t0);

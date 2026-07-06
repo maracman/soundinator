@@ -5430,3 +5430,8 @@ body.dragging { cursor: grabbing; user-select: none; }
 .ch-mix { display: flex; gap: 5px; align-items: center; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
 .ch-mix input { width: 70px; height: 12px; }
 .ch-mix output { font-size: 0.62rem; color: var(--text2); }
+
+/* CH-B1 articulated body block inside the inspector */
+.ch-artic { display: flex; flex-direction: column; gap: 6px; }
+.ch-artic .formant-weight-circle, .ch-artic .vowel-pad { max-width: 100%; }
+.ch-artic .controls-grid { gap: 0.2rem; }
