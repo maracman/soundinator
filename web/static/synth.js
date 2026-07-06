@@ -450,6 +450,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.4, freq: 2800, q: 0.8, decay: 0.07 },
     partialMaterial: 0.35,
     excitation: { type: "blow", position: 0.24, hardness: 0.6, human: 0.5 },
+    partialTransfer: 0.08,
     spectralDynamicAmount: 0.7,
   },
   clarinet: {
@@ -459,6 +460,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.12, freq: 1800, q: 1.2, decay: 0.04 },
     partialMaterial: 0.4,
     excitation: { type: "blow", position: 0.15, hardness: 0.6, human: 0.35 },
+    partialTransfer: 0.08,
     spectralDynamicAmount: 0.75,
   },
   violin: {
@@ -468,6 +470,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.3, freq: 3400, q: 1.0, decay: 0.09 },
     partialMaterial: 0.5,
     excitation: { type: "bow", position: 0.13, hardness: 0.6, human: 0.4 },
+    partialTransfer: 0.15,
     spectralDynamicAmount: 0.85,
   },
   cello: {
@@ -477,6 +480,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.32, freq: 1500, q: 1.0, decay: 0.11 },
     partialMaterial: 0.5,
     excitation: { type: "bow", position: 0.11, hardness: 0.6, human: 0.4 },
+    partialTransfer: 0.15,
     spectralDynamicAmount: 0.85,
   },
   trumpet: {
@@ -486,6 +490,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.2, freq: 900, q: 1.4, decay: 0.045 },
     partialMaterial: 0.28,
     excitation: { type: "blow", position: 0.3, hardness: 0.6, human: 0.35 },
+    partialTransfer: 0.1,
     spectralDynamicAmount: 1.25,
   },
   trombone: {
@@ -495,6 +500,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.22, freq: 480, q: 1.3, decay: 0.06 },
     partialMaterial: 0.32,
     excitation: { type: "blow", position: 0.3, hardness: 0.6, human: 0.35 },
+    partialTransfer: 0.1,
     spectralDynamicAmount: 1.2,
   },
   piano: {
@@ -506,6 +512,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.26, freq: 350, q: 0.7, decay: 0.02 },
     partialMaterial: 0.7,
     excitation: { type: "strike", position: 0.12, hardness: 0.62, human: 0.1 },
+    partialTransfer: 0.3,
     spectralDynamicAmount: 1.0,
     spectralStretchCents: 8, // string inharmonicity stretches upper partials
   },
@@ -516,6 +523,7 @@ const SPECTRAL_PERFORMANCE = {
     attackNoise: { level: 0.14, freq: 2200, q: 0.9, decay: 0.05 },
     partialMaterial: 0.42,
     excitation: { type: "bow", position: 0.35, hardness: 0.6, human: 0.5 },
+    partialTransfer: 0.2,
     spectralDynamicAmount: 0.8,
   },
 };
@@ -664,6 +672,54 @@ export function humanFluctuationTrace(nextRandom, durationSec, type, human) {
 // everything moves together, the top proportionally more.
 export function humanPartialShape(n) {
   return 0.35 + 0.65 * Math.log2(1 + Math.max(1, n)) / Math.log2(65);
+}
+
+// ── Tone model v2: resonant transfer (T4, §3.4) ──
+//
+// Sympathetic energy exchange between modes whose REALISED frequencies sit
+// near small-integer ratios. Everything is computed from actual Hz — no
+// 12-TET grid anywhere: a true 3:2 (702.0¢) couples harder than an
+// equal-tempered fifth (700¢), and rising inharmonicity detunes partials
+// out of resonance exactly as real sympathetic strings do.
+const TRANSFER_RATIOS = [
+  [2, 1], [3, 2], [4, 3], [5, 4], [5, 3], [6, 5], [7, 4], [8, 5], [3, 1], [4, 1],
+];
+
+// Coupling weight between two frequencies: Gaussian in cents distance from
+// the nearest simple ratio, weighted by 1/(p·q) (Tenney height) so octaves
+// couple hardest, then fifths, fourths, thirds…
+export function transferCoupling(fA, fB, sigmaCents = 20) {
+  if (!(fA > 0) || !(fB > 0)) return 0;
+  const hi = Math.max(fA, fB), lo = Math.min(fA, fB);
+  const ratio = hi / lo;
+  if (ratio > 4.6) return 0; // beyond the simplest-ratio table
+  let best = 0;
+  for (const [p, q] of TRANSFER_RATIOS) {
+    const cents = 1200 * Math.log2(ratio / (p / q));
+    const w = Math.exp(-0.5 * (cents / sigmaCents) ** 2) / (p * q);
+    if (w > best) best = w;
+  }
+  return best;
+}
+
+// First-order exchange over one note: energy flows from stronger to weaker
+// coupled partials (pairwise conserving, deterministic — no feedback loop).
+// parts: [{ freq, amp }] → per-partial amplitude deltas that the renderer
+// approaches over the sustain (the sympathetic bloom).
+export function transferDeltas(parts, transfer, sigmaCents = 20) {
+  const t = Math.max(0, Math.min(1, transfer || 0));
+  const deltas = new Array(parts.length).fill(0);
+  if (t <= 0) return deltas;
+  for (let i = 0; i < parts.length; i++) {
+    for (let j = i + 1; j < parts.length; j++) {
+      const C = transferCoupling(parts[i].freq, parts[j].freq, sigmaCents);
+      if (C < 0.01) continue;
+      const flow = t * C * (parts[j].amp - parts[i].amp) * 0.35;
+      deltas[i] += flow;
+      deltas[j] -= flow;
+    }
+  }
+  return deltas;
 }
 
 // ── Extend every profile's partial table to 64 harmonics ─────
@@ -1405,6 +1461,7 @@ export class GenerationEngine {
       spectralMix: fourierMode ? (this.p.spectralMix ?? 0) : 0,
       excitationType: excType,
       excitationHuman: human,
+      partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
       spectralReferenceNorm: Math.max(0.001, referenceNorm),
       spectralStretchCents: this.p.spectralStretchCents ?? 0,
       // Tone v2 resonator (T1): inharmonicity as a physical B constant
@@ -3034,22 +3091,39 @@ export class SynthEngine {
     if ((note.excitationType || "") === "blow") this._renderBlowFloor(note, t0, t1, env);
   }
 
-  // T3 Human: one seeded fluctuation trace per note drives every partial
-  // together (audit A1 — the old independent per-partial redraws and the
-  // loudness-norm slew hack (A9) are gone; a coherent excitation conserves
-  // its own energy, and its level wobble IS the player).
+  // T3 Human + T4 Transfer: one seeded fluctuation trace per note drives
+  // every partial together (audit A1; the loudness-norm hack (A9) is gone —
+  // a coherent excitation conserves its own energy), while sympathetic
+  // transfer blooms weak partials toward their strong true-ratio relatives
+  // over the sustain. Both share one merged automation timeline.
   _schedulePartialAmplitudes(partials, note, t0, t1) {
     if (partials.length === 0) return;
     partials.forEach(item => item.param.setValueAtTime(item.gainScale * Math.max(0, item.part.amp), t0));
     const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
     const trace = humanFluctuationTrace(() => this._nextRandom(), t1 - t0, note.excitationType || "bow", human);
-    for (const pt of trace) {
-      for (const item of partials) {
+    const transfer = this._clamp(note.partialTransfer ?? 0, 0, 1);
+    const deltas = transfer > 0 && partials.length > 1
+      ? transferDeltas(partials.map(item => ({ freq: item.part.harmonicFrequency, amp: item.part.amp })), transfer)
+      : null;
+    const anyBloom = deltas && deltas.some(d => Math.abs(d) > 1e-5);
+    // Time grid: the human trace when present; otherwise fixed checkpoints
+    // so the bloom still develops on machine-steady notes.
+    const points = trace.map(p => ({ t: p.t, f: p.f }));
+    if (anyBloom && points.length === 0) {
+      for (const t of [0.12, 0.3, 0.6, 1.0, 1.6, 2.4, 3.6]) {
+        if (t < t1 - t0 - 0.02) points.push({ t, f: 0 });
+      }
+    }
+    const tauBloom = 0.9; // s — sympathetic energy arrives over the sustain
+    for (const pt of points) {
+      const bloom = anyBloom ? 1 - Math.exp(-pt.t / tauBloom) : 0;
+      partials.forEach((item, i) => {
         const n = item.part.harmonic || 1;
         const sens = item.part.sens ?? 0.3;
-        const v = Math.max(0, item.part.amp * (1 + human * sens * pt.f * humanPartialShape(n)));
-        item.param.linearRampToValueAtTime(item.gainScale * v, t0 + pt.t);
-      }
+        let v = item.part.amp * (1 + human * sens * pt.f * humanPartialShape(n));
+        if (anyBloom) v += deltas[i] * bloom;
+        item.param.linearRampToValueAtTime(item.gainScale * Math.max(0, v), t0 + pt.t);
+      });
     }
   }
 

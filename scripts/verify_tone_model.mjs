@@ -16,6 +16,8 @@ import {
   dynamicBrightness,
   humanFluctuationTrace,
   humanPartialShape,
+  transferCoupling,
+  transferDeltas,
   SPECTRAL_PROFILES,
   GenerationEngine,
 } from "../web/static/synth.js";
@@ -233,5 +235,50 @@ console.log("T-B4: Human fluctuation — coherent, deterministic, silent at zero
     probOn && probOff && probOn.harmonicPartials.every((p, i) => p.amp === probOff.harmonicPartials[i].amp));
 }
 
+console.log("T-B5: resonant transfer — true ratios, cents falloff, inharmonicity decoupling");
+{
+  check("exact octave couples at the Tenney maximum (1/2)",
+    near(transferCoupling(440, 880), 0.5, 1e-9));
+  check("octave couples harder than true fifth, fifth harder than major third",
+    transferCoupling(440, 880) > transferCoupling(440, 660) &&
+    transferCoupling(440, 660) > transferCoupling(440, 550));
+  check("coupling falls with cents distance",
+    transferCoupling(440, 880) > transferCoupling(440, 880 * Math.pow(2, 10 / 1200)) &&
+    transferCoupling(440, 880 * Math.pow(2, 10 / 1200)) > transferCoupling(440, 880 * Math.pow(2, 30 / 1200)));
+  check("NOT equal temperament: true 3:2 beats the 12-TET fifth",
+    transferCoupling(440, 440 * 1.5) > transferCoupling(440, 440 * Math.pow(2, 7 / 12)));
+  // 1.29 sits ~55¢ from both 5:4 and 4:3 — no simple ratio nearby
+  check("unrelated frequencies do not couple", transferCoupling(440, 440 * 1.29) < 0.005);
+  // Inharmonicity decoupling: partials 4 and 8 of a stiff string drift off 2:1
+  const f0 = 261.63;
+  const cB = (B) => transferCoupling(partialFrequency(4, f0, B), partialFrequency(8, f0, B));
+  check("rising B detunes the 4:8 octave pair out of resonance",
+    cB(0) > cB(3e-4) && cB(3e-4) > cB(1.5e-3),
+    `C(B=0)=${cB(0).toFixed(3)} C(3e-4)=${cB(3e-4).toFixed(3)} C(1.5e-3)=${cB(1.5e-3).toFixed(3)}`);
+
+  // First-order exchange: a silent partial an exact octave above a strong
+  // one blooms; the donor pays; the exchange conserves energy pairwise.
+  const parts = [
+    { freq: 440, amp: 1.0 },   // strong fundamental
+    { freq: 880, amp: 0.0 },   // silent octave — the sympathetic case
+    { freq: 1237, amp: 0.4 },  // unrelated bystander
+  ];
+  const d = transferDeltas(parts, 0.6);
+  check("silent octave partial gains energy", d[1] > 0.05);
+  check("strong donor loses what the receiver gains", d[0] < 0 && near(d[0] + d[1], 0, 1e-9));
+  check("unrelated bystander untouched", Math.abs(d[2]) < 1e-6);
+  check("transfer 0 → all deltas zero", transferDeltas(parts, 0).every(x => x === 0));
+  // Engine wiring: fingerprint carries the dial
+  const GEN4 = {
+    seed: 5, tempo: 104, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    voiceMode: "fourier", spectralPartials: 16, spectralProfile: "piano", partialTransfer: 0.3,
+  };
+  const e = new GenerationEngine(GEN4); e.initialise();
+  let note = null;
+  for (let i = 0; i < 24 && !note; i++) { const n = e.nextNote(); if (n && n.velocity > 0 && n.harmonicPartials) note = n; }
+  check("fingerprint carries partialTransfer", note && near(note.partialTransfer, 0.3, 1e-12));
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
-console.log("\nAll tone-model v2 assertions passed (T1 + T2 + T3).");
+console.log("\nAll tone-model v2 assertions passed (T1-T4).");

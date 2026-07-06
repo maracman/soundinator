@@ -391,7 +391,18 @@ Quality:
   determinism, coherence direction test, zero-at-0, spectralProb proven
   inert). Verified live on flute (blow floor + trace), zero console
   errors.
-- **T4 Transfer**: realised-frequency coupling + scheduling.
+- **T4 Transfer** — DONE (2026-07-06): transferCoupling() — Gaussian in
+  cents (σ 20) from the nearest of ten simple ratios, Tenney-weighted
+  1/(p·q); transferDeltas() — pairwise-conserving first-order exchange
+  from strong to weak coupled partials, computed on REALISED frequencies;
+  renderer blooms the deltas over the sustain (τ 0.9 s) on the same
+  automation timeline as the Human trace (checkpoint grid when Human 0);
+  partialTransfer param + slider, per-instrument defaults (piano 0.3
+  sympathetic bloom … winds 0.08). Headless: +11 assertions (T-B5 —
+  octave max, Tenney ordering, cents falloff, true-3:2-beats-12-TET,
+  inharmonicity decoupling of the 4:8 pair, silent-octave bloom with
+  pairwise conservation). Verified live (piano re-seats to 0.3), zero
+  console errors.
 - **T5 Body**: unify formants; FM→AM; vowel pad over body space.
 - **T6 Character panel + migration**: eight dials wired; old-preset
   loader; factory instruments rebuilt.

@@ -247,6 +247,7 @@ const DEFAULTS = {
   excitationPosition: 0.13,
   excitationHardness: 0.6,
   excitationHuman: 0.4,
+  partialTransfer: 0.15,
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -389,6 +390,7 @@ const PARAM_DESC = {
   excitationPosition: "Where the string/tube/membrane is excited (0.02 near the edge to 0.5 the middle). Modes with a node at this point go silent — 0.5 kills every even partial, 0.33 every third. Applied relative to the instrument's natural position",
   excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
   excitationHuman: "The player: one seeded fluctuation per note wobbles bow pressure / breath support, moving the whole spectrum together (brighter when pushed), with bow slips or breath bursts. Struck/plucked notes get per-note velocity and hardness jitter instead. 0 = machine",
+  partialTransfer: "Sympathetic resonance: energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Inharmonicity detunes pairs out of resonance, weakening the transfer — exactly like real sympathetic strings",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -3430,7 +3432,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF3Level","formantF4Level","formantF5Level","formantBandwidth",
@@ -4221,6 +4223,7 @@ function subnoteWorkspaceHTML(p) {
             </select>
             <div class="controls-grid">
               ${controlRow("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01)}
+              ${controlRow("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01)}
               ${controlRow("spectralMix", "Mix", p.spectralMix, 0, 1, 0.01)}
               ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1)}
               ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
