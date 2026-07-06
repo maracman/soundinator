@@ -2527,6 +2527,14 @@ body.explore-mode #app {
 .ch-ins-d { font-size: 0.6rem; color: var(--text3); }
 .ch-caption { font-size: 0.62rem; color: var(--text3); line-height: 1.5; margin-top: auto; }
 .ch-inspector .body-mini { height: 46px; }
+.ch-string {
+  width: 100%;
+  height: 46px;
+  display: block;
+  background: var(--display);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
 .ch-inspector .space-pad { width: 100%; height: 110px; }
 
 .ch-field-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }

@@ -6162,12 +6162,16 @@ const KNOB_EMPHASIS = {
   bodyType: "ridge", spectralResonanceAmount: "ridge",
 };
 let _printEmphasis = null; // { kind, until } — the overlay a fresh change lights up
+let _printGhosts = null; // pre-change needle dots, shown while emphasis is fresh
 function printEmphasis(key) {
   const kind = KNOB_EMPHASIS[key];
   if (!kind) return;
+  if (_printGeom && _printGeom.needles.length) {
+    _printGhosts = _printGeom.needles.map(n => ({ i: n.i, x: n.x, topY: n.topY }));
+  }
   _printEmphasis = { kind, until: performance.now() + 750 };
   clearTimeout(printEmphasis._t);
-  printEmphasis._t = setTimeout(() => { _printEmphasis = null; drawTonePrint(); drawBodyRidge(); }, 780);
+  printEmphasis._t = setTimeout(() => { _printEmphasis = null; _printGhosts = null; drawTonePrint(); drawBodyRidge(); }, 780);
 }
 function _emph(kind) {
   return !!(_printEmphasis && _printEmphasis.kind === kind && performance.now() < _printEmphasis.until);
@@ -6261,6 +6265,7 @@ function chInspectorHTML(p) {
         ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
         ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
       </div>
+      <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
       <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field</div>`;
   }
   if (_chStage === "resonator") {
@@ -6382,6 +6387,7 @@ function drawChThumbs() {
     g.ctx.fillStyle = "rgba(200,215,230,0.8)";
     g.ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
   }
+  drawStringDiag();
   // rail summaries track live values
   document.querySelectorAll("#chRail .ch-card").forEach(card => {
     const sum = card.querySelector(".ch-card-sum");
@@ -6519,6 +6525,19 @@ function drawTonePrint() {
     const t60 = material > 0 ? materialT60(pp.harmonicFrequency, material) : 6;
     _printGeom.needles.push({ i, x: px, topY: y, mean: pp.mean, db, freq: pp.harmonicFrequency, harmonic: pp.harmonic, t60, sens: pp.sens });
   });
+  // ghost pre-change dots: while a knob is fresh, show where each partial
+  // WAS so the move reads as motion, not replacement (CHORDA C3)
+  if (_printGhosts && _printEmphasis && performance.now() < _printEmphasis.until) {
+    ctx.strokeStyle = "rgba(200,215,230,0.5)";
+    ctx.lineWidth = 1;
+    for (const g of _printGhosts) {
+      const cur = _printGeom.needles.find(n => n.i === g.i);
+      if (cur && Math.abs(cur.topY - g.topY) < 2 && Math.abs(cur.x - g.x) < 2) continue;
+      ctx.beginPath();
+      ctx.arc(g.x, g.topY, 2.6, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+  }
   const focusable = _chFocus.chip !== "all" || _chFocus.lensLo != null;
   const needleHot = _emph("needles");
   for (const n of _printGeom.needles) {
@@ -6807,6 +6826,50 @@ function _spaceDistToR(d, rMax) {
 }
 function _spaceRToDist(r, rMax) {
   return clamp(SPACE_DMIN * Math.pow(SPACE_DMAX / SPACE_DMIN, clamp(r / rMax, 0, 1)), SPACE_DMIN, SPACE_DMAX);
+}
+
+function drawStringDiag() {
+  const cv = document.getElementById("cvStringDiag");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const pos = clamp(Number.isFinite(exploreParams.excitationPosition) ? exploreParams.excitationPosition : 0.13, 0.02, 0.5);
+  // the lowest mode with a node closest to the contact point
+  const mode = Math.max(2, Math.round(1 / pos));
+  const mid = h / 2 - 5, amp = h / 2 - 12;
+  // string rest line
+  ctx.strokeStyle = "rgba(120,135,150,0.3)";
+  ctx.beginPath(); ctx.moveTo(4, mid); ctx.lineTo(w - 4, mid); ctx.stroke();
+  // the standing wave of that mode
+  ctx.beginPath();
+  for (let px = 4; px <= w - 4; px += 2) {
+    const x01 = (px - 4) / (w - 8);
+    const y = mid - Math.sin(x01 * Math.PI * mode) * amp;
+    px === 4 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+  }
+  ctx.strokeStyle = "rgba(148,196,255,0.7)";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  // node dots
+  ctx.fillStyle = "rgba(148,196,255,0.8)";
+  for (let k = 0; k <= mode; k++) {
+    const px = 4 + (k / mode) * (w - 8);
+    ctx.beginPath(); ctx.arc(px, mid, 2, 0, 2 * Math.PI); ctx.fill();
+  }
+  // contact point marker (amber)
+  const bx = 4 + pos * (w - 8);
+  ctx.strokeStyle = "#f5a623";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(bx, 6); ctx.lineTo(bx, h - 12); ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#f5a623";
+  ctx.font = "8px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(pos.toFixed(2), bx, h - 2);
+  ctx.fillStyle = "rgba(120,135,150,0.6)";
+  ctx.textAlign = "right";
+  ctx.fillText(`mode ${mode} shown`, w - 4, 9);
 }
 
 function drawSpacePad() {
