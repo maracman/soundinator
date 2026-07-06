@@ -1,0 +1,744 @@
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+CHORDA — PRODUCER v3 · static mockup
+Companion to docs/PRODUCER_V3_SPEC.md. Designed from the program's idea
+(deterministic generative regions on a Logic-shaped timeline); the current
+implementation was deliberately not consulted.
+
+WHAT THIS SCREEN DEPICTS
+· Browser → Palette → Tracks funnel down the left edge (owner's requested
+  Pro-Tools mental model). Palette slots carry the hue their track will get.
+· Five tracks, hue-cycled through the CHORDA stage colours. Regions render
+  their TRUTH: generative regions draw a contour+event sparkline computed from
+  their actual seed; the baked region draws its literal note dashes, tiled at
+  every source-loop boundary with ⟳ ticks (the same event list feeds the
+  piano roll below — one model, two views).
+· Seed chips (s·nnnn) on every generative region: the seed is a first-class,
+  visible object. One pair of cello regions shares a seed — determinism as a
+  compositional device (exact repetition, no bounce).
+· One SELECTED violin region: bright border, edge trim handles, region-gain
+  tag. One MID-DRAG glass-marimba region: dashed ghost at origin, body under
+  the cursor, full-height snap guide at the target bar, mono delta tooltip
+  ("bar 17 · +8 bars · snap bar").
+· Kalimba track is TALL, exposing the STAGE MINI-PAD — the mixer's pan is a
+  top-down half-disc (listener at bottom, log-distance rings, draggable player
+  dot) in exactly the drawing language of CHORDA's SPACE thumbnail. ● marks a
+  per-track override of the instrument's saved position. The room itself is
+  session-owned, up in the transport strip next to tempo and key.
+· The PIANO-ROLL DRAWER is open on the baked kalimba region: degree-space rows
+  (1̂…7̂ of D minor), source-boundary lines with ghosted loop repeats, a
+  velocity lane, and a selected note showing the dual pitch readout
+  (precise A4 +14¢ · intended 5̂).
+· Transport owns the session context (tempo · key · scale · dynamics · room)
+  because those are arrangement-level engine parameters — never hidden in a
+  settings page. Loop/cycle range drawn in the ruler. Muted track lane dims.
+· Status bar teaches one gesture set at a time; right side restates the
+  contract: same seed → same take · mixdown = live.
+Static: nothing is wired; the depicted states carry the interaction model.
+═══════════════════════════════════════════════════════════════════════════════
+-->
+<meta charset="utf-8">
+<title>CHORDA — producer v3 (mockup)</title>
+<style>
+  :root{
+    --bg0:#0b0d11; --bg1:#12151b; --bg2:#171b23; --bg3:#1d222c;
+    --line:#252b37; --line2:#2e3543;
+    --ink:#e7ebf3; --ink2:#9aa3b5; --ink3:#5d6577;
+    --exc:#e8a05a; --res:#56c8f2; --body:#b78cf5; --space:#6fd39c;
+    --exc-dim:#8a6236; --res-dim:#2f6f88; --body-dim:#6b528f; --space-dim:#3f7a5b;
+    --pin:#ffd166;
+    --sans:"Inter","SF Pro Text",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --hw:188px;          /* track header width  */
+    --pxb:10.5;          /* px per beat         */
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{background:radial-gradient(1200px 700px at 50% -10%, #10141c 0%, var(--bg0) 60%);
+    color:var(--ink); font-family:var(--sans); font-size:13px;
+    -webkit-font-smoothing:antialiased; overflow-x:auto}
+  #app{min-width:1560px; max-width:1720px; margin:0 auto; height:100vh; min-height:920px;
+    display:flex; flex-direction:column; padding:10px 14px 8px}
+  .mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .cap{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); font-weight:600}
+
+  /* ── header ─────────────────────────────────────────────── */
+  header{display:flex; align-items:center; gap:12px; height:42px; padding:0 4px 8px}
+  .brand{font-weight:700; font-size:15px; letter-spacing:.22em}
+  .brand em{font-style:normal; color:var(--ink3); font-weight:500; font-size:10px; letter-spacing:.18em; margin-left:8px}
+  .arr{display:flex; align-items:center; gap:8px; background:var(--bg1); border:1px solid var(--line);
+    border-radius:6px; padding:5px 12px; cursor:default}
+  .arr .dot{width:6px;height:6px;border-radius:50%;background:var(--space)}
+  .arr .car{color:var(--ink3); font-size:9px}
+  .arr small{color:var(--ink3); font-size:10px; margin-left:2px}
+  .hbtn{height:26px; border:1px solid var(--line); border-radius:6px; background:var(--bg1);
+    display:flex; align-items:center; gap:6px; padding:0 10px; color:var(--ink2); font-size:11px;
+    font-weight:600; letter-spacing:.05em; cursor:default}
+  .hbtn.icon{width:26px; padding:0; justify-content:center; color:var(--ink3); font-size:12px}
+  .hbtn.accent{border-color:var(--exc-dim); color:var(--exc); background:#1c150d}
+  .hgap{flex:1}
+  .undopair{display:flex; gap:0; border:1px solid var(--line); border-radius:6px; overflow:hidden}
+  .undopair div{width:28px; height:26px; display:grid; place-items:center; color:var(--ink2);
+    background:var(--bg1); font-size:12px; cursor:default}
+  .undopair div+div{border-left:1px solid var(--line); color:var(--ink3)}
+  .undopair div span{font-size:12px}
+
+  /* ── transport ──────────────────────────────────────────── */
+  .transport{display:flex; align-items:center; gap:14px; height:40px; padding:0 10px;
+    background:var(--bg1); border:1px solid var(--line); border-radius:9px}
+  .tbtns{display:flex; gap:2px; border:1px solid var(--line); border-radius:6px; overflow:hidden}
+  .tbtns div{width:34px; height:26px; display:grid; place-items:center; background:var(--bg0);
+    color:var(--ink2); font-size:12px; cursor:default; border-right:1px solid var(--line)}
+  .tbtns div:last-child{border-right:none}
+  .tbtns div.on{color:var(--exc); background:#1c150d}
+  .tbtns div.cyc.on{color:var(--pin); background:#1e1908}
+  .pos{font-family:var(--mono); font-size:16px; font-weight:600; letter-spacing:.04em; color:var(--ink);
+    background:var(--bg0); border:1px solid var(--line); border-radius:6px; padding:3px 12px}
+  .pos small{color:var(--ink3); font-size:9px; letter-spacing:.14em; display:block; font-family:var(--sans); font-weight:600}
+  .ctx{display:flex; gap:8px; align-items:center}
+  .cchip{display:flex; flex-direction:column; gap:1px; background:var(--bg0); border:1px solid var(--line);
+    border-radius:6px; padding:3px 10px; min-width:64px; cursor:default}
+  .cchip label{font-size:8.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink3); font-weight:600}
+  .cchip .v{font-family:var(--mono); font-size:11.5px; color:var(--ink)}
+  .cchip .v .car{color:var(--ink3); font-size:8px}
+  .cchip .bar{height:3px; border-radius:2px; background:var(--bg3); margin-top:2px; position:relative; overflow:hidden; width:52px}
+  .cchip .bar i{position:absolute; inset:0 auto 0 0; border-radius:2px; background:var(--space-dim)}
+  .snapseg{display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden}
+  .snapseg div{padding:5px 9px; font-size:9.5px; font-weight:700; letter-spacing:.08em; color:var(--ink3);
+    background:var(--bg0); border-right:1px solid var(--line); cursor:default}
+  .snapseg div:last-child{border-right:none}
+  .snapseg div.on{background:#10202a; color:var(--res); box-shadow:inset 0 -2px 0 var(--res)}
+  .zoomer{display:flex; align-items:center; gap:6px; color:var(--ink3); font-size:12px}
+  .zoomer .rail{width:80px; height:3px; border-radius:2px; background:var(--bg3); position:relative}
+  .zoomer .rail i{position:absolute; left:38%; top:-3.5px; width:9px; height:9px; border-radius:50%;
+    background:var(--ink2); border:1px solid var(--bg0)}
+  canvas#mmeter{width:88px; height:26px; border:1px solid var(--line); border-radius:6px; background:var(--bg0)}
+
+  /* ── main ───────────────────────────────────────────────── */
+  main{flex:1; display:grid; grid-template-columns:248px 1fr; gap:10px; padding:10px 4px 0; min-height:0}
+
+  /* left: browser + palette */
+  #left{display:flex; flex-direction:column; gap:10px; min-height:0}
+  .lpanel{background:var(--bg1); border:1px solid var(--line); border-radius:10px;
+    display:flex; flex-direction:column; overflow:hidden}
+  #browser{flex:1.15; min-height:0}
+  #palette{flex:1; min-height:0}
+  .lhead{display:flex; align-items:center; gap:8px; padding:9px 12px 7px; border-bottom:1px solid var(--line)}
+  .lhead .t{font-size:10px; letter-spacing:.16em; font-weight:700; color:var(--ink2)}
+  .lhead .n{margin-left:auto; font-family:var(--mono); font-size:9.5px; color:var(--ink3)}
+  .search{margin:8px 10px 2px; display:flex; align-items:center; gap:7px; background:var(--bg0);
+    border:1px solid var(--line); border-radius:6px; padding:5px 9px; color:var(--ink3); font-size:11px}
+  .search span{color:var(--ink3)}
+  .blist{overflow:hidden; padding:6px 6px 8px; display:flex; flex-direction:column; gap:1px}
+  .bsec{font-size:8.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--ink3);
+    font-weight:700; padding:7px 8px 3px}
+  .brow{display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px; cursor:default}
+  .brow .hue{width:7px; height:7px; border-radius:50%; flex:none}
+  .brow .nm{font-size:11.5px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .brow .gl{font-family:var(--mono); font-size:8.5px; color:var(--ink3); border:1px solid var(--line);
+    border-radius:3px; padding:1px 4px; flex:none}
+  .brow .rg{margin-left:auto; font-family:var(--mono); font-size:9.5px; color:var(--ink3); flex:none}
+  .brow .aud{display:none; margin-left:auto; color:var(--res); font-size:10px}
+  .brow.hov{background:var(--bg3)}
+  .brow.hov .rg{display:none}
+  .brow.hov .aud{display:block}
+  .brow .edit{color:var(--ink3); font-size:10px; flex:none; display:none}
+  .brow.hov .edit{display:block}
+
+  .pgrid{flex:1; display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:min-content; gap:7px;
+    padding:9px 10px 6px; min-height:0; align-content:start; overflow:hidden}
+  .pslot{border:1px solid var(--line); border-radius:8px; background:var(--bg0); padding:7px 9px 6px;
+    display:flex; flex-direction:column; gap:4px; cursor:default; position:relative}
+  .pslot .ph{display:flex; align-items:center; gap:6px}
+  .pslot .hue{width:7px; height:7px; border-radius:50%}
+  .pslot .nm{font-size:10.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .pslot canvas{width:100%; height:18px}
+  .pslot .meta{font-family:var(--mono); font-size:8.5px; color:var(--ink3)}
+  .pslot.empty{border-style:dashed; background:transparent; align-items:center; justify-content:center;
+    color:var(--ink3); font-size:9.5px; text-align:center; line-height:1.5; gap:2px}
+  .pslot.empty b{font-size:13px; color:var(--ink3); font-weight:400}
+  .pfoot{padding:0 12px 9px; font-size:9.5px; color:var(--ink3); line-height:1.45}
+  .pfoot b{color:var(--ink2); font-weight:600}
+
+  /* timeline */
+  #tl{background:var(--bg1); border:1px solid var(--line); border-radius:10px; min-width:0;
+    display:flex; flex-direction:column; overflow:hidden; position:relative}
+  #tlscroll{flex:1; overflow:auto; position:relative}
+  #tlwrap{position:relative; width:calc(var(--hw) + 1092px)}
+  .rrow{display:flex; height:34px; position:sticky; top:0; z-index:6; background:var(--bg1);
+    border-bottom:1px solid var(--line)}
+  .rcorner{width:var(--hw); flex:none; border-right:1px solid var(--line); display:flex; align-items:center;
+    gap:8px; padding:0 10px}
+  .rcorner .t{font-size:9.5px; letter-spacing:.15em; font-weight:700; color:var(--ink3)}
+  .rcorner .add{margin-left:auto; width:20px; height:20px; border:1px solid var(--line); border-radius:5px;
+    display:grid; place-items:center; color:var(--ink2); font-size:12px; background:var(--bg0); cursor:default}
+  canvas#ruler{width:1092px; height:34px; display:block}
+
+  .trow{display:flex; border-bottom:1px solid var(--line); position:relative}
+  .thead{width:var(--hw); flex:none; border-right:1px solid var(--line); background:var(--bg2);
+    padding:7px 9px 6px 12px; position:relative; display:flex; flex-direction:column; gap:4px; cursor:default}
+  .thead::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--th)}
+  .thead .tn{display:flex; align-items:baseline; gap:6px}
+  .thead .tn b{font-size:11px; letter-spacing:.04em; color:var(--ink)}
+  .thead .tn small{font-size:9px; color:var(--ink3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .thead .tr2{display:flex; align-items:center; gap:6px}
+  .ms{display:flex; gap:3px}
+  .ms i{font-style:normal; width:16px; height:15px; border:1px solid var(--line); border-radius:3px;
+    font-size:8.5px; font-weight:700; display:grid; place-items:center; color:var(--ink3); background:var(--bg0)}
+  .ms i.mon{color:#f0b0a0; border-color:#6b3a30; background:#221310}
+  .ms i.son{color:var(--pin); border-color:#6b5a26; background:#201a0a}
+  .gsl{flex:1; height:3px; border-radius:2px; background:var(--bg0); position:relative}
+  .gsl i{position:absolute; inset:0 auto 0 0; border-radius:2px; background:var(--th); opacity:.55}
+  .gsl b{position:absolute; top:-3.5px; width:8px; height:10px; border-radius:2px; background:var(--ink2);
+    border:1px solid var(--bg0); margin-left:-4px}
+  .gdb{font-family:var(--mono); font-size:8.5px; color:var(--ink3); flex:none; width:44px; text-align:right}
+  .stagepad{display:flex; gap:8px; align-items:center; margin-top:1px}
+  .stagepad canvas{width:86px; height:46px; background:var(--bg0); border:1px solid var(--line); border-radius:5px}
+  .stagepad .sr{display:flex; flex-direction:column; gap:2px}
+  .stagepad .sr .v{font-family:var(--mono); font-size:9.5px; color:var(--ink2)}
+  .stagepad .sr .v i{font-style:normal; color:var(--th)}
+  .stagepad .sr label{font-size:8px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink3); font-weight:600}
+  .stagepad .sr small{font-size:8px; color:var(--ink3); line-height:1.4}
+
+  .lane{position:relative; width:1092px; flex:none;
+    background:repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--pxb)*4px - 1px), #191e27 calc(var(--pxb)*4px - 1px), #191e27 calc(var(--pxb)*4px))}
+  .trow.muted .lane{opacity:.4}
+  .trow.muted .thead .tn b{color:var(--ink3)}
+
+  .region{position:absolute; top:5px; bottom:5px; border:1px solid var(--rhd); border-radius:6px;
+    background:linear-gradient(180deg, var(--rbg) 0%, rgba(11,13,17,.85) 100%); overflow:visible; cursor:default}
+  .region .rin{position:absolute; inset:0; border-radius:5px; overflow:hidden}
+  .region .rh{position:absolute; top:2px; left:6px; right:6px; display:flex; align-items:center; gap:5px;
+    font-size:8.5px; letter-spacing:.08em; font-weight:700; color:var(--rh); z-index:2; pointer-events:none;
+    white-space:nowrap; overflow:hidden}
+  .region .rh .bk{font-size:8px; border:1px solid var(--rhd); border-radius:2.5px; padding:0 3px; letter-spacing:.05em}
+  .region canvas{position:absolute; left:0; right:0; bottom:0; top:0; width:100%; height:100%}
+  .region .seed{position:absolute; left:5px; bottom:3px; z-index:2; font-family:var(--mono); font-size:8.5px;
+    color:var(--ink2); background:rgba(11,13,17,.75); border:1px solid var(--line); border-radius:3px; padding:.5px 4px}
+  .region .seed i{font-style:normal; color:var(--rh)}
+  .region.sel{box-shadow:0 0 0 1.5px var(--rh), 0 4px 16px rgba(0,0,0,.45)}
+  .region.sel .rh{color:#fff}
+  .region .hdl{display:none; position:absolute; top:0; bottom:0; width:7px; z-index:3;
+    background:linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,.04)); cursor:ew-resize}
+  .region .hdl::after{content:""; position:absolute; left:2.5px; top:50%; margin-top:-6px; width:1.5px; height:12px;
+    background:rgba(255,255,255,.6); box-shadow:3px 0 0 rgba(255,255,255,0)}
+  .region .hdl.r{right:0; border-radius:0 5px 5px 0}
+  .region .hdl.l{left:0; border-radius:5px 0 0 5px}
+  .region.sel .hdl{display:block}
+  .region .gtag{display:none; position:absolute; top:2px; right:5px; z-index:3; font-family:var(--mono);
+    font-size:8.5px; color:var(--pin); background:rgba(11,13,17,.8); border:1px solid #4d431f;
+    border-radius:3px; padding:.5px 4px}
+  .region.sel .gtag{display:block}
+  .region.editing{box-shadow:0 0 0 1.5px var(--rh)}
+  .region.editing::after{content:"EDITING ▾"; position:absolute; left:50%; bottom:-9px; transform:translateX(-50%);
+    background:var(--rh); color:#10131a; font-size:7.5px; font-weight:800; letter-spacing:.1em;
+    border-radius:3px; padding:1px 5px; z-index:4}
+  .region.ghost{border-style:dashed; background:transparent; opacity:.45}
+  .region.ghost .rh,.region.ghost .seed{opacity:.6}
+  .region.dragging{box-shadow:0 10px 26px rgba(0,0,0,.6), 0 0 0 1.5px var(--rh); transform:translateY(-2px); z-index:8}
+
+  .ghostlane{position:relative; width:1092px; margin-left:var(--hw); height:44px; display:flex; align-items:center}
+  .ghostlane .in{margin:8px 10px; flex:1; border:1px dashed var(--line2); border-radius:7px; height:30px;
+    display:flex; align-items:center; justify-content:center; gap:8px; color:var(--ink3); font-size:10px; letter-spacing:.05em}
+  .ghostlane .in b{color:var(--ink2); font-weight:600}
+
+  /* overlays across lanes */
+  #playhead{position:absolute; top:0; bottom:0; width:1px; background:var(--exc); z-index:7; pointer-events:none}
+  #playhead::before{content:""; position:absolute; top:24px; left:-4.5px; border:5px solid transparent; border-top-color:var(--exc)}
+  #snapguide{position:absolute; top:34px; bottom:0; width:0; border-left:1px dashed rgba(111,211,156,.8); z-index:7; pointer-events:none}
+  #snapguide::before{content:"17"; position:absolute; top:-22px; left:-8px; font-family:var(--mono); font-size:9px;
+    color:var(--space); background:#0e1a14; border:1px solid var(--space-dim); border-radius:3px; padding:0 3px}
+  .dragtip{position:absolute; z-index:9; background:#0e1a14; border:1px solid var(--space-dim); border-radius:6px;
+    padding:5px 9px; font-family:var(--mono); font-size:10.5px; color:var(--space); white-space:nowrap;
+    box-shadow:0 6px 18px rgba(0,0,0,.55); line-height:1.5; pointer-events:none}
+  .dragtip small{display:block; color:var(--ink2); font-family:var(--sans); font-size:9px; letter-spacing:.02em}
+  svg.cursor{position:absolute; z-index:10; width:17px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.7)); pointer-events:none}
+
+  /* ── drawer (piano roll) ────────────────────────────────── */
+  #drawer{height:252px; margin:10px 4px 0; background:var(--bg1); border:1px solid var(--body-dim);
+    border-radius:10px; display:flex; flex-direction:column; overflow:hidden; position:relative}
+  #drawer .grip{height:5px; cursor:ns-resize; display:grid; place-items:center}
+  #drawer .grip i{width:34px; height:2.5px; border-radius:2px; background:var(--line2)}
+  .dhead{display:flex; align-items:center; gap:10px; padding:2px 14px 7px; border-bottom:1px solid var(--line)}
+  .dhead .t{font-size:10.5px; letter-spacing:.14em; font-weight:700; color:var(--body)}
+  .dhead .t .bk{font-size:8px; border:1px solid var(--body-dim); border-radius:2.5px; padding:.5px 4px; margin-right:6px; vertical-align:1px}
+  .dhead .meta{font-family:var(--mono); font-size:9.5px; color:var(--ink3)}
+  .dtool{display:flex; border:1px solid var(--line); border-radius:5px; overflow:hidden}
+  .dtool div{padding:3.5px 9px; font-size:10px; color:var(--ink3); background:var(--bg0); border-right:1px solid var(--line); cursor:default}
+  .dtool div:last-child{border-right:none}
+  .dtool div.on{background:#191227; color:var(--body); box-shadow:inset 0 -2px 0 var(--body)}
+  .dchip{border:1px solid var(--line); border-radius:12px; padding:2.5px 9px; font-size:9px; font-weight:600;
+    letter-spacing:.06em; color:var(--ink3); background:var(--bg0); cursor:default}
+  .dchip.on{border-color:var(--body-dim); color:var(--body); background:#171126}
+  .dhead .sel{margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--ink2)}
+  .dhead .sel b{color:var(--body); font-weight:600}
+  .dhead .cls{width:20px; height:20px; border:1px solid var(--line); border-radius:5px; display:grid;
+    place-items:center; color:var(--ink3); font-size:10px; cursor:default}
+  canvas#roll{flex:1; display:block; width:100%}
+  .notetip{position:absolute; z-index:5; background:#171126; border:1px solid var(--body-dim); border-radius:6px;
+    padding:5px 9px; font-family:var(--mono); font-size:10px; color:var(--ink2); line-height:1.6;
+    box-shadow:0 6px 18px rgba(0,0,0,.55); pointer-events:none}
+  .notetip b{color:var(--body)} .notetip i{font-style:normal; color:var(--pin)}
+
+  /* ── status bar ─────────────────────────────────────────── */
+  footer{display:flex; align-items:center; gap:20px; height:26px; margin-top:8px; padding:0 8px;
+    border-top:1px solid var(--line); font-family:var(--mono); font-size:10px; color:var(--ink3)}
+  footer .hint b{color:var(--ink2); font-weight:600}
+  footer .truth{margin-left:auto}
+  footer .truth i{font-style:normal; color:var(--space)}
+</style>
+
+<div id="app">
+  <header>
+    <div class="brand">CHORDA<em>PRODUCER</em></div>
+    <div class="arr"><span class="dot"></span> Take I — Quartet study <small>5 tracks · 02:41</small> <span class="car">▼</span></div>
+    <div class="hbtn icon" title="new arrangement">＋</div>
+    <div class="undopair" title="Undo: reroll region 'Glass Marimba 2'"><div>↺</div><div><span>↻</span></div></div>
+    <div class="hgap"></div>
+    <div class="hbtn">⇣ IMPORT</div>
+    <div class="hbtn">⇡ EXPORT JSON</div>
+    <div class="hbtn accent">● MIXDOWN WAV</div>
+    <div class="hbtn icon">?</div>
+  </header>
+
+  <div class="transport">
+    <div class="tbtns">
+      <div>⏮</div><div class="on">▶</div><div>⏹</div><div class="cyc on">⟳</div>
+    </div>
+    <div class="pos"><small>POSITION</small>009.2.120</div>
+    <div class="ctx">
+      <div class="cchip"><label>tempo</label><span class="v">96.0</span></div>
+      <div class="cchip"><label>key</label><span class="v">D minor <span class="car">▼</span></span></div>
+      <div class="cchip"><label>scale</label><span class="v">natural <span class="car">▼</span></span></div>
+      <div class="cchip"><label>dynamics</label><span class="v">0.62</span><div class="bar"><i style="width:62%"></i></div></div>
+      <div class="cchip"><label>room · shared</label><span class="v">0.28</span><div class="bar"><i style="width:28%"></i></div></div>
+    </div>
+    <div class="hgap"></div>
+    <span class="cap">snap</span>
+    <div class="snapseg"><div class="on">BAR</div><div>BEAT</div><div>½</div><div>OFF</div></div>
+    <div class="zoomer">−<span class="rail"><i></i></span>＋</div>
+    <canvas id="mmeter"></canvas>
+  </div>
+
+  <main>
+    <!-- ── left: browser + palette ── -->
+    <aside id="left">
+      <div class="lpanel" id="browser">
+        <div class="lhead"><span class="t">BROWSER</span><span class="n">14 instruments</span></div>
+        <div class="search"><span>⌕</span> search instruments…</div>
+        <div class="blist" id="blist"></div>
+      </div>
+      <div class="lpanel" id="palette">
+        <div class="lhead"><span class="t">PALETTE</span><span class="n">this piece · saved with arrangement</span></div>
+        <div class="pgrid" id="pgrid"></div>
+        <div class="pfoot"><b>drag a slot onto a lane</b> to place a region</div>
+      </div>
+    </aside>
+
+    <!-- ── timeline ── -->
+    <section id="tl">
+      <div id="tlscroll"><div id="tlwrap">
+        <div class="rrow">
+          <div class="rcorner"><span class="t">TRACKS</span><div class="add">＋</div></div>
+          <canvas id="ruler"></canvas>
+        </div>
+        <div id="trows"></div>
+        <div class="ghostlane"><div class="in">＋ &nbsp;drop an instrument here to <b>create a track</b></div></div>
+        <div id="playhead"></div>
+        <div id="snapguide"></div>
+        <div class="dragtip" id="dragtip">bar 17 · <b style="color:#fff">+8 bars</b><small>snap: bar · ⌥ bypass · same seed s·5530</small></div>
+        <svg class="cursor" id="dragcursor" viewBox="0 0 24 24">
+          <path d="M5 2 L5 19 L9.6 15.2 L12.6 21.6 L15.2 20.4 L12.3 14.2 L18 13.6 Z" fill="#fff" stroke="#000" stroke-width="1.1"/>
+        </svg>
+      </div></div>
+    </section>
+  </main>
+
+  <!-- ── piano-roll drawer ── -->
+  <div id="drawer">
+    <div class="grip"><i></i></div>
+    <div class="dhead">
+      <span class="t"><span class="bk">▦ BAKED</span>KALIMBA · MOTIF A</span>
+      <span class="meta">bars 5–11 · source 8 beats · ⟳ ×3 · 14 notes</span>
+      <div class="dtool"><div class="on">✎ draw</div><div>▭ select</div><div>⌫ erase</div></div>
+      <div class="dchip on">scale-snap</div>
+      <div class="dchip">quantise ½</div>
+      <div class="dchip on">intended + precise</div>
+      <span class="sel">note <b>A4 +14¢</b> · intended <i>5̂</i> · vel 92 · 1.0 beat</span>
+      <div class="cls">▾</div>
+    </div>
+    <div style="position:relative; flex:1; min-height:0">
+      <canvas id="roll" style="height:100%"></canvas>
+      <div class="notetip" id="notetip"><b>A4 +14¢</b> · intended <i>5̂</i><br>vel 92 · dur 1.0 · ⌥-drag = cents</div>
+    </div>
+  </div>
+
+  <footer>
+    <span>engine 48 kHz · 5 voices · cpu 9%</span>
+    <span class="hint"><b>drag</b> region to move (⌥ bypass snap) · <b>R</b> reroll seed · <b>⇧R</b> previous seed · <b>B</b> bake · <b>⌘D</b> duplicate · <b>double-click</b> baked region to edit · <b>?</b> all keys</span>
+    <span class="truth">same seed → same take · <i>mixdown = live playback</i></span>
+  </footer>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   MODEL — regions, seeds and notes; every canvas is computed
+   from this. The baked kalimba's event list feeds BOTH its
+   region body and the piano roll (one model, two views).
+   ════════════════════════════════════════════════════════════ */
+const PXB = 10.5, BPB = 4, BARS = 26, LANE_W = 1092, HW = 188;
+const HUES = {
+  amber :{c:[232,160,90],  v:'--exc',  d:'--exc-dim'},
+  blue  :{c:[86,200,242],  v:'--res',  d:'--res-dim'},
+  purple:{c:[183,140,245], v:'--body', d:'--body-dim'},
+  green :{c:[111,211,156], v:'--space',d:'--space-dim'}
+};
+const rgba=(h,a)=>`rgba(${HUES[h].c[0]},${HUES[h].c[1]},${HUES[h].c[2]},${a})`;
+const bt=b=>b*PXB;                       // beat → px
+const bar=n=>(n-1)*BPB;                  // bar number → beat
+
+function prng(seed){let s=seed%2147483647;if(s<=0)s+=2147483646;
+  return()=>((s=s*16807%2147483647)-1)/2147483646;}
+
+/* deterministic event list for a generative region */
+function genEvents(seed,lenBeats){
+  const r=prng(seed); const ev=[]; let t=0,p=.5;
+  while(t<lenBeats){
+    p=Math.max(.06,Math.min(.94,p+(r()-.5)*.4));
+    const d=[.5,.5,1,1,2][~~(r()*5)];
+    ev.push({t,p,d:Math.min(d,lenBeats-t),v:.35+r()*.65});
+    t+=[.5,.5,1,1,1.5][~~(r()*5)];
+  }
+  return ev;
+}
+
+/* the baked kalimba — one source pass of 8 beats, degree rows 0..9 */
+const KAL={seed:908, srcBeats:8, lenBeats:24, startBeat:bar(5), rows:10, events:[]};
+{ const r=prng(KAL.seed); let t=0,row=4;
+  while(t<KAL.srcBeats){
+    row=Math.max(0,Math.min(KAL.rows-1,row+Math.round((r()-.46)*3)));
+    const d=[.5,.5,1,1,1.5][~~(r()*5)];
+    KAL.events.push({t,dur:Math.min(d,KAL.srcBeats-t),row,vel:.45+r()*.55});
+    t+=[.5,.5,1,1][~~(r()*4)];
+  } }
+const KAL_SEL=5;   // index of the selected note
+const DEG=[['D4','1̂'],['E4','2̂'],['F4','3̂'],['G4','4̂'],['A4','5̂'],
+           ['B♭4','6̂'],['C5','7̂'],['D5','1̂'],['E5','2̂'],['F5','3̂']]; // row 0 bottom
+
+/* tracks */
+const TRACKS=[
+ {name:'VIOLIN I', inst:'violin · arco · chamber', hue:'blue', gain:'−1.5 dB', gv:.66, regions:[
+   {kind:'gen', name:'PHRASE 1', start:bar(3),  len:BPB*6, seed:4271},
+   {kind:'gen', name:'PHRASE 2', start:bar(11), len:BPB*6, seed:552, sel:true, gain:'−2.5 dB'} ]},
+ {name:'CELLO', inst:'cello · arco · dark', hue:'amber', gain:'−0.8 dB', gv:.72, regions:[
+   {kind:'gen', name:'GROUND', start:bar(1),  len:BPB*8, seed:1189},
+   {kind:'gen', name:'GROUND', start:bar(13), len:BPB*8, seed:1189, lock:true} ]},   // exact repeat: same seed
+ {name:'KALIMBA', inst:'kalimba · pluck · glass', hue:'purple', gain:'−4.1 dB', gv:.5, tall:true,
+  stage:{d:1.8, az:25, ovr:true}, regions:[
+   {kind:'baked', name:'MOTIF A', start:KAL.startBeat, len:KAL.lenBeats, editing:true} ]},
+ {name:'GLASS MARIMBA', inst:'marimba · strike · glass', hue:'green', gain:'−3.2 dB', gv:.56, regions:[
+   {kind:'gen', name:'SHIMMER', start:bar(9),  len:BPB*4, seed:5530, ghost:true},
+   {kind:'gen', name:'SHIMMER', start:bar(17), len:BPB*4, seed:5530, dragging:true} ]},
+ {name:'FRAME DRUM', inst:'frame drum · strike', hue:'amber', gain:'−6.0 dB', gv:.38, muted:true, regions:[
+   {kind:'gen', name:'PULSE', start:bar(1), len:BPB*16, seed:77} ]}
+];
+const LOOP={a:bar(9), b:bar(17)};         // cycle range
+const PLAYHEAD=bar(9)+1.5;                // beat 33.5 → 009.2.120
+const SNAP_TARGET=bar(17);
+
+/* ── canvas plumbing ── */
+function cv(el){
+  const c=typeof el==='string'?document.getElementById(el):el;
+  const r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr);
+  const x=c.getContext('2d'); x.scale(dpr,dpr);
+  return {x,w:r.width,h:r.height,el:c};
+}
+const MONO=()=>getComputedStyle(document.body).getPropertyValue('--mono');
+
+/* ════════ browser ════════ */
+const BROWSE=[
+ ['sec','MY INSTRUMENTS'],
+ ['row','blue',  'Violin · arco · chamber','bow','A3'],
+ ['row','amber', 'Cello · arco · dark','bow','C2'],
+ ['row','purple','Kalimba · glass','pluck','D4', true],   // hovered → audition affordance
+ ['row','green', 'Glass marimba','strike','G4'],
+ ['row','amber', 'Frame drum · dry','strike','—'],
+ ['sec','FACTORY'],
+ ['row','blue',  'Violin · chamber 2.5 m','bow','A3'],
+ ['row','green', 'Blown bottle · close','blow','C4'],
+ ['row','purple','Struck bronze · far','strike','F3'],
+ ['row','amber', 'Plucked steel · 1.2 m','pluck','E2'],
+ ['row','blue',  'Bowed glass · halo','bow','A4']
+];
+{ const host=document.getElementById('blist');
+  for(const it of BROWSE){
+    if(it[0]==='sec'){const d=document.createElement('div');d.className='bsec';d.textContent=it[1];host.appendChild(d);continue;}
+    const [,hue,nm,gl,rg,hov]=it;
+    const d=document.createElement('div'); d.className='brow'+(hov?' hov':'');
+    d.innerHTML=`<span class="hue" style="background:${rgba(hue,.9)}"></span>
+      <span class="nm">${nm}</span><span class="gl">${gl}</span>
+      <span class="rg mono">${rg}</span><span class="edit" title="edit in tone designer">⤴</span><span class="aud">▶ audition</span>`;
+    host.appendChild(d);
+  } }
+
+/* ════════ palette ════════ */
+{ const host=document.getElementById('pgrid');
+  const slots=[
+    {hue:'blue',  nm:'Violin · arco',   meta:'bow · A3',  seed:4271},
+    {hue:'amber', nm:'Cello · dark',    meta:'bow · C2',  seed:1189},
+    {hue:'purple',nm:'Kalimba · glass', meta:'pluck · D4',seed:908},
+    {hue:'green', nm:'Glass marimba',   meta:'strike · G4',seed:5530},
+    {hue:'amber', nm:'Frame drum',      meta:'strike',    seed:77},
+    null
+  ];
+  for(const s of slots){
+    const d=document.createElement('div');
+    if(!s){d.className='pslot empty';d.innerHTML='<b>＋</b>drag an instrument<br>from the browser';host.appendChild(d);continue;}
+    d.className='pslot';
+    d.innerHTML=`<div class="ph"><span class="hue" style="background:${rgba(s.hue,.9)}"></span>
+      <span class="nm">${s.nm}</span></div><canvas></canvas><span class="meta">${s.meta}</span>`;
+    host.appendChild(d);
+    const {x,w,h}=cv(d.querySelector('canvas'));
+    const ev=genEvents(s.seed,16);
+    x.beginPath();
+    ev.forEach((q,i)=>{const px=q.t/16*w, py=2+q.p*(h-5); i?x.lineTo(px,py):x.moveTo(px,py);});
+    x.strokeStyle=rgba(s.hue,.5); x.stroke();
+    for(const q of ev){const px=q.t/16*w, py=2+q.p*(h-5);
+      x.fillStyle=rgba(s.hue,.35+q.v*.5); x.fillRect(px,py-1,Math.max(2,q.d/16*w*.6),2);}
+  } }
+
+/* ════════ ruler ════════ */
+function drawRuler(){
+  const {x,w,h}=cv('ruler');
+  x.fillStyle='#12151b'; x.fillRect(0,0,w,h);
+  // loop / cycle range (session-owned, pin colour)
+  x.fillStyle='rgba(255,209,102,.13)'; x.fillRect(bt(LOOP.a),0,bt(LOOP.b-LOOP.a),12);
+  x.fillStyle='rgba(255,209,102,.75)'; x.fillRect(bt(LOOP.a),0,bt(LOOP.b-LOOP.a),2.5);
+  x.fillRect(bt(LOOP.a),0,2.5,12); x.fillRect(bt(LOOP.b)-2.5,0,2.5,12);
+  x.font='9px '+MONO();
+  for(let n=1;n<=BARS;n++){
+    const px=bt(bar(n));
+    x.strokeStyle=n%4===1?'#39404f':'#252b37';
+    x.beginPath(); x.moveTo(px,n%2===1?14:22); x.lineTo(px,h); x.stroke();
+    if(n%2===1){x.fillStyle='#9aa3b5'; x.textAlign='left'; x.fillText(n,px+4,22);}
+    for(let b=1;b<BPB;b++){const bx=bt(bar(n)+b);
+      x.strokeStyle='#1a1f29'; x.beginPath(); x.moveTo(bx,28); x.lineTo(bx,h); x.stroke();}
+  }
+  x.fillStyle='rgba(255,209,102,.85)'; x.font='8px '+MONO();
+  x.fillText('CYCLE 9–17', bt(LOOP.a)+5, 9.5);
+}
+
+/* ════════ region bodies ════════ */
+function drawGenBody(canvas,seed,lenBeats,hue){
+  const {x,w,h}=cv(canvas); const ev=genEvents(seed,lenBeats);
+  const Y=p=>12+p*(h-22);
+  x.beginPath();
+  ev.forEach((q,i)=>{const px=q.t/lenBeats*w; i?x.lineTo(px,Y(q.p)):x.moveTo(px,Y(q.p));});
+  x.strokeStyle=rgba(hue,.25); x.stroke();
+  for(const q of ev){
+    const px=q.t/lenBeats*w, py=Y(q.p), pw=Math.max(3,q.d/lenBeats*w*.7);
+    x.fillStyle=rgba(hue,.3+q.v*.6); x.fillRect(px,py-1.2,pw,2.4);
+    x.beginPath(); x.arc(px,py,1.6,0,7); x.fill();
+  }
+}
+function drawBakedBody(canvas,hue){
+  const {x,w,h}=cv(canvas);
+  const bw=w/KAL.lenBeats, rows=KAL.rows, Y=r=>h-8-(r+.5)*(h-22)/rows;
+  for(let off=0; off<KAL.lenBeats; off+=KAL.srcBeats){
+    const rep=off>0;
+    if(rep){ // loop-boundary tick
+      const px=off*bw;
+      x.strokeStyle=rgba(hue,.55); x.setLineDash([2.5,3]);
+      x.beginPath(); x.moveTo(px,3); x.lineTo(px,h-3); x.stroke(); x.setLineDash([]);
+      x.fillStyle=rgba(hue,.8); x.font='8px '+MONO(); x.textAlign='center';
+      x.fillText('⟳',px,11);
+    }
+    for(const e of KAL.events){
+      if(off+e.t>=KAL.lenBeats)break;
+      x.fillStyle=rgba(hue,(rep?.32:.55)+e.vel*(rep?.15:.4));
+      x.fillRect((off+e.t)*bw+.5, Y(e.row)-1.6, Math.max(3,e.dur*bw-1.5), 3.2);
+    }
+  }
+}
+
+/* ════════ tracks ════════ */
+function buildTracks(){
+  const host=document.getElementById('trows');
+  TRACKS.forEach(tr=>{
+    const H=tr.tall?106:64;
+    const row=document.createElement('div');
+    row.className='trow'+(tr.muted?' muted':''); row.style.height=H+'px';
+    row.style.setProperty('--th', rgba(tr.hue,.9));
+    const stage=tr.stage?`
+      <div class="stagepad">
+        <canvas class="spad"></canvas>
+        <div class="sr"><label>stage · pan</label>
+          <span class="v"><i>${tr.stage.d.toFixed(1)} m · ${tr.stage.az>0?'+':''}${tr.stage.az}°</i> ●</span>
+          <small>closer = bassier, drier<br>● overrides instrument</small></div>
+      </div>`:'';
+    row.innerHTML=`
+      <div class="thead">
+        <div class="tn"><b>${tr.name}</b><small>${tr.inst}</small></div>
+        <div class="tr2">
+          <span class="ms"><i class="${tr.muted?'mon':''}">M</i><i>S</i></span>
+          <span class="gsl"><i style="width:${tr.gv*100}%"></i><b style="left:${tr.gv*100}%"></b></span>
+          <span class="gdb">${tr.gain}</span>
+        </div>${stage}
+      </div>
+      <div class="lane"></div>`;
+    host.appendChild(row);
+    const lane=row.querySelector('.lane');
+    for(const rg of tr.regions){
+      const el=document.createElement('div');
+      el.className='region'+(rg.sel?' sel':'')+(rg.editing?' editing':'')+(rg.ghost?' ghost':'')+(rg.dragging?' dragging':'');
+      el.style.left=bt(rg.start)+'px'; el.style.width=bt(rg.len)-2+'px';
+      el.style.setProperty('--rh', rgba(tr.hue,.95));
+      el.style.setProperty('--rhd', rgba(tr.hue,.45));
+      el.style.setProperty('--rbg', rgba(tr.hue,.13));
+      const bk=rg.kind==='baked';
+      el.innerHTML=`
+        <div class="rin">${rg.ghost?'':'<canvas></canvas>'}</div>
+        <div class="rh">${bk?'<span class="bk">▦</span>':''}${rg.name}</div>
+        ${bk?'':`<span class="seed"><i>⚄</i> s·${(''+rg.seed).padStart(4,'0')}${rg.lock?' 🔒':''}</span>`}
+        ${rg.sel?'<div class="hdl l"></div><div class="hdl r"></div>':''}
+        ${rg.gain?`<span class="gtag">${rg.gain}</span>`:''}`;
+      lane.appendChild(el);
+      const c=el.querySelector('canvas');
+      if(c){ bk?drawBakedBody(c,tr.hue):drawGenBody(c,rg.seed,rg.len,tr.hue); }
+      if(rg.dragging){
+        // snap guide + tooltip + cursor, positioned in timeline coords
+        const rowTop=row.offsetTop;
+        const g=document.getElementById('snapguide');
+        g.style.left=(HW+bt(SNAP_TARGET))+'px';
+        const tip=document.getElementById('dragtip');
+        tip.style.left=(HW+bt(rg.start)+8)+'px';
+        tip.style.top=(rowTop-34)+'px';
+        const cur=document.getElementById('dragcursor');
+        cur.style.left=(HW+bt(rg.start)+bt(rg.len)*.45)+'px';
+        cur.style.top=(rowTop+26)+'px';
+      }
+    }
+    if(tr.stage){
+      const {x,w,h}=cv(row.querySelector('.spad'));
+      const hx=w/2, hy=h-6;
+      for(const d of [1,1.8,7,20]){
+        const r=8+Math.log(d/0.3)/Math.log(30/0.3)*(h-12);
+        x.strokeStyle=d===1.8?rgba(tr.hue,.4):'#232833';
+        x.beginPath(); x.arc(hx,hy,r,Math.PI,2*Math.PI); x.stroke();
+      }
+      const rS=8+Math.log(tr.stage.d/0.3)/Math.log(30/0.3)*(h-12), a=(-90+tr.stage.az)*Math.PI/180;
+      const sx=hx+rS*Math.cos(a), sy=hy+rS*Math.sin(a);
+      x.setLineDash([2,3]); x.strokeStyle=rgba(tr.hue,.5);
+      x.beginPath(); x.moveTo(hx,hy); x.lineTo(sx,sy); x.stroke(); x.setLineDash([]);
+      x.fillStyle=rgba(tr.hue,1); x.beginPath(); x.arc(sx,sy,3,0,7); x.fill();
+      x.strokeStyle=rgba(tr.hue,.35); x.beginPath(); x.arc(sx,sy,5.6,0,7); x.stroke();
+      x.fillStyle='#9aa3b5'; x.beginPath(); x.arc(hx,hy,4,0,7); x.fill();
+      x.beginPath(); x.moveTo(hx-2.5,hy-3.4); x.lineTo(hx,hy-7); x.lineTo(hx+2.5,hy-3.4); x.fill();
+    }
+  });
+  document.getElementById('playhead').style.left=(HW+bt(PLAYHEAD))+'px';
+}
+
+/* ════════ master meter ════════ */
+function drawMeter(){
+  const {x,w,h}=cv('mmeter');
+  const seg=(y,frac,pk)=>{
+    for(let i=0;i<26;i++){const on=i/26<frac;
+      x.fillStyle=on?(i>22?'#e8a05a':'#6fd39c'):'#1b202a';
+      x.fillRect(5+i*(w-10)/26, y, (w-10)/26-1.5, 6);}
+    x.fillStyle='#e7ebf3'; x.fillRect(5+pk*(w-10), y, 1.5, 6);
+  };
+  seg(6,.55,.70); seg(15,.49,.63);
+}
+
+/* ════════ piano roll ════════ */
+function drawRoll(){
+  const {x,w,h}=cv('roll');
+  const GUT=64, TOP=16, VEL=34, PR=14;
+  const gy0=TOP, gy1=h-VEL-6;
+  const rows=KAL.rows, rh=(gy1-gy0)/rows;
+  const X=b=>GUT+b/KAL.lenBeats*(w-GUT-PR);
+  const Y=r=>gy1-(r+1)*rh;
+
+  x.font='9px '+MONO();
+  // rows (degree space of D minor)
+  for(let r=0;r<rows;r++){
+    const y=Y(r);
+    x.fillStyle=r%2?'#12151b':'#141822'; x.fillRect(GUT,y,w-GUT-PR,rh);
+    x.strokeStyle='#1a1f29'; x.beginPath(); x.moveTo(GUT,y); x.lineTo(w-PR,y); x.stroke();
+    const tonic=DEG[r][1]==='1̂';
+    x.fillStyle=tonic?'rgba(183,140,245,.9)':'#5d6577'; x.textAlign='right';
+    x.fillText(DEG[r][0], GUT-26, y+rh/2+3);
+    x.fillStyle=tonic?'rgba(183,140,245,.7)':'#39404f';
+    x.fillText(DEG[r][1], GUT-8, y+rh/2+3);
+    if(tonic){x.fillStyle='rgba(183,140,245,.05)'; x.fillRect(GUT,y,w-GUT-PR,rh);}
+  }
+  // beat grid + bar numbers (region starts at bar 5)
+  for(let b=0;b<=KAL.lenBeats;b++){
+    const px=X(b), isBar=b%BPB===0;
+    x.strokeStyle=isBar?'#2a3140':'#1a1f29';
+    x.beginPath(); x.moveTo(px,gy0-4); x.lineTo(px,h-6); x.stroke();
+    if(isBar){x.fillStyle='#5d6577'; x.textAlign='left'; x.fillText(5+b/BPB, px+3, gy0-6);}
+  }
+  // source-loop boundaries
+  for(let off=KAL.srcBeats; off<KAL.lenBeats; off+=KAL.srcBeats){
+    const px=X(off);
+    x.strokeStyle='rgba(183,140,245,.55)'; x.setLineDash([3,3]);
+    x.beginPath(); x.moveTo(px,gy0-4); x.lineTo(px,h-6); x.stroke(); x.setLineDash([]);
+    x.fillStyle='rgba(183,140,245,.85)'; x.textAlign='center';
+    x.fillText('⟳ ×'+(off/KAL.srcBeats+1), px, gy0-6);
+  }
+  x.fillStyle='#5d6577'; x.textAlign='left';
+  x.fillText('edits apply to the source pass — repeats follow', X(KAL.srcBeats)+8, gy1-6);
+  // velocity lane label
+  x.fillStyle='#5d6577'; x.textAlign='right'; x.fillText('VEL', GUT-8, h-VEL+14);
+
+  // notes: source pass solid, repeats ghosted (tiled from the same events)
+  let selPos=null;
+  for(let off=0; off<KAL.lenBeats; off+=KAL.srcBeats){
+    const rep=off>0;
+    KAL.events.forEach((e,i)=>{
+      if(off+e.t>=KAL.lenBeats)return;
+      const nx=X(off+e.t), ny=Y(e.row)+2, nw=Math.max(6,e.dur/KAL.lenBeats*(w-GUT-PR)-2), nh=rh-4;
+      const sel=!rep&&i===KAL_SEL;
+      x.fillStyle=rep?'rgba(183,140,245,.18)':`rgba(183,140,245,${.35+e.vel*.5})`;
+      x.beginPath(); x.roundRect(nx,ny,nw,nh,2.5); x.fill();
+      if(!rep){x.strokeStyle='rgba(183,140,245,.55)'; x.stroke();}
+      if(sel){
+        x.strokeStyle='var(--pin)'; x.strokeStyle='#ffd166'; x.lineWidth=1.6;
+        x.beginPath(); x.roundRect(nx-1,ny-1,nw+2,nh+2,3); x.stroke(); x.lineWidth=1;
+        // cents offset marker: precise pitch sits +14¢ above the degree row
+        x.strokeStyle='rgba(255,209,102,.8)';
+        x.beginPath(); x.moveTo(nx+nw/2,ny); x.lineTo(nx+nw/2,ny-4); x.stroke();
+        selPos=[nx+nw/2, ny];
+      }
+      // velocity lane (source pass only)
+      if(!rep){
+        x.fillStyle=sel?'#ffd166':`rgba(183,140,245,${.3+e.vel*.5})`;
+        const vh=e.vel*(VEL-12);
+        x.fillRect(nx, h-8-vh, 3, vh);
+      }
+    });
+  }
+  // playhead inside the roll (global playhead falls inside this region)
+  const ph=PLAYHEAD-KAL.startBeat;
+  if(ph>0&&ph<KAL.lenBeats){
+    const px=X(ph);
+    x.strokeStyle='rgba(232,160,90,.9)';
+    x.beginPath(); x.moveTo(px,gy0-4); x.lineTo(px,h-6); x.stroke();
+  }
+  // place the selected-note tooltip
+  if(selPos){
+    const tip=document.getElementById('notetip');
+    tip.style.left=Math.min(w-190,selPos[0]+12)+'px';
+    tip.style.top=Math.max(6,selPos[1]-44)+'px';
+  }
+}
+
+function drawAll(){
+  drawRuler(); drawMeter(); drawRoll();
+}
+buildTracks(); drawAll();
+window.addEventListener('resize',()=>{drawAll();});
+</script>
