@@ -23,6 +23,9 @@ import {
   bodyResponse,
   FORMANT_PRESETS,
   migrateToneParams,
+  spaceArrivalDelay,
+  spaceAirCutoff,
+  spaceProximityDb,
   SPECTRAL_PROFILES,
   GenerationEngine,
 } from "../web/static/synth.js";
@@ -366,5 +369,19 @@ console.log("T6: preset migration (T-B9 partial)");
   check("migration does not mutate its input", old.spectralProb === 0.7);
 }
 
+console.log("SPACE positioning laws");
+{
+  check("arrival delay is distance over the speed of sound",
+    near(spaceArrivalDelay(3.43), 0.01, 1e-9) && near(spaceArrivalDelay(34.3), 30 / 343, 1e-9));
+  check("air absorption: full band close, ~3.6 kHz at 30 m",
+    spaceAirCutoff(0.5) === 20000 && spaceAirCutoff(30) < 4000 &&
+    spaceAirCutoff(4) < spaceAirCutoff(2));
+  check("proximity effect exists only inside ~1.2 m and grows as you approach",
+    spaceProximityDb(2) === 0 && spaceProximityDb(1.19) > 0 &&
+    spaceProximityDb(0.3) > spaceProximityDb(0.8));
+  check("laws clamp to the 0.3–30 m range",
+    spaceArrivalDelay(1000) === 30 / 343 && spaceProximityDb(-5) === spaceProximityDb(0.3));
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
-console.log("\nAll tone-model v2 assertions passed (T1-T6).");
+console.log("\nAll tone-model v2 assertions passed (T1-T6 + space).");

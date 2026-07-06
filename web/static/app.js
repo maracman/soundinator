@@ -107,7 +107,7 @@ const _SURPRISE_EXTRAS = new Set([
 
 function sectionForParam(key) {
   if (key === "seed") return null;
-  if (key.startsWith("reverb")) return "space";
+  if (key.startsWith("reverb") || key.startsWith("space")) return "space";
   if (key.startsWith("perc")) return "percussion";
   if (key.startsWith("surprise") || _SURPRISE_EXTRAS.has(key)) return "surprise";
   if (key.startsWith("dynamics") || key === "loudnessRange") return "dynamics";
@@ -267,6 +267,9 @@ const DEFAULTS = {
   bodyType: "auto",
   // null = derive from legacy spectralStretchCents; a finite value wins
   partialB: null,
+  // SPACE positioning: where the instrument stands relative to the listener
+  spaceDistance: 2.5,
+  spaceAzimuth: 0,
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -412,6 +415,8 @@ const PARAM_DESC = {
   partialTransfer: "Sympathetic resonance: energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Inharmonicity detunes pairs out of resonance, weakening the transfer — exactly like real sympathetic strings",
   bodyType: "The box around the resonator: a set of fixed-Hz resonance bands. Auto keeps the instrument's own measured body; vowels are bodies too (F1–F5 bands). With vibrato, partials on body slopes shimmer in amplitude — real FM→AM",
   partialB: "Stiff-string inharmonicity: partials sharpen as f·n·√(1+Bn²). Piano bass ≈ 1e-4, treble ≈ 1e-3; 0 = perfectly harmonic. Rising B detunes partial pairs out of sympathetic resonance, weakening Transfer",
+  spaceDistance: "How far the instrument stands from you (0.3–30 m). Distance delays the sound's arrival (~3 ms/m), rolls off the highs (air absorption), lowers the direct level against the room, and inside ~1 m adds the proximity bass lift",
+  spaceAzimuth: "The instrument's bearing (−90° left … +90° right): true interaural timing/level differences and head-shadow filtering via HRTF, not simple panning",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -3565,6 +3570,7 @@ function renderExplore() {
   }
 
   wireTonePrint(v);
+  wireSpacePad(v);
 
   // Rotary knobs (tone chain): vertical drag, shift = fine, double-click
   // resets to the stage default. Every change lights up the overlay it
@@ -4287,11 +4293,14 @@ function subnoteWorkspaceHTML(p) {
               <div class="ts-flow">→</div>
               <div class="tone-stage ts-cool ts-space">
                 <div class="ts-head"><span class="ts-n">4 · SPACE</span><span class="ts-d">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")}</span></div>
-                <div class="knob-row">
-                  ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
-                  ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
+                <div class="ts-body-row">
+                  <canvas class="space-pad" id="cvSpacePad" width="280" height="150" title="Drag the instrument around the listener: distance delays arrival, softens highs, trades direct sound for room, and adds bass up close; bearing uses true interaural (HRTF) filtering."></canvas>
+                  <div class="knob-col">
+                    ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
+                    ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
+                  </div>
                 </div>
-                <div class="ts-space-link">room type &amp; more in the Space panel</div>
+                <div class="ts-space-link" id="spaceReadout">${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}°</div>
               </div>
             </div>
             <canvas id="cvTonePrint" width="1200" height="380"></canvas>
@@ -4799,6 +4808,7 @@ function drawDistributions() {
   drawEnvelopeDist();
   drawTonePrint();
   drawBodyRidge();
+  drawSpacePad();
 }
 
 // Match a canvas backing store to its CSS layout size × devicePixelRatio so
@@ -6496,6 +6506,96 @@ function wireTonePrint(v) {
       };
     });
   }
+}
+
+// ── SPACE position pad: the instrument on a stage in front of the
+// listener. Polar layout — angle = azimuth (±90°), radius = distance on a
+// log scale (0.3–30 m). Dragging repositions live.
+const SPACE_DMIN = 0.3, SPACE_DMAX = 30;
+function _spacePadGeom(w, h) {
+  return { cx: w / 2, cy: h - 12, rMax: Math.min(h - 22, w / 2 - 8) };
+}
+function _spaceDistToR(d, rMax) {
+  return (Math.log(d / SPACE_DMIN) / Math.log(SPACE_DMAX / SPACE_DMIN)) * rMax;
+}
+function _spaceRToDist(r, rMax) {
+  return clamp(SPACE_DMIN * Math.pow(SPACE_DMAX / SPACE_DMIN, clamp(r / rMax, 0, 1)), SPACE_DMIN, SPACE_DMAX);
+}
+
+function drawSpacePad() {
+  const cv = document.getElementById("cvSpacePad");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const { cx, cy, rMax } = _spacePadGeom(w, h);
+  // distance rings (1, 3, 10, 30 m)
+  ctx.strokeStyle = "rgba(90,110,130,0.25)";
+  ctx.fillStyle = "rgba(120,135,150,0.55)";
+  ctx.font = "8px ui-monospace, monospace";
+  ctx.textAlign = "left";
+  ctx.lineWidth = 1;
+  for (const dm of [1, 3, 10, 30]) {
+    const r = _spaceDistToR(dm, rMax);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI);
+    ctx.stroke();
+    ctx.fillText(`${dm}m`, cx + r * 0.06 + 2, cy - r + 8);
+  }
+  // bearing spokes at ±45°, ±90°
+  ctx.strokeStyle = "rgba(90,110,130,0.15)";
+  for (const a of [-90, -45, 0, 45, 90]) {
+    const rad = (a - 90) * Math.PI / 180;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax);
+    ctx.stroke();
+  }
+  // listener (you) at the bottom centre
+  ctx.fillStyle = "rgba(200,215,230,0.85)";
+  ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "rgba(120,135,150,0.6)";
+  ctx.textAlign = "center";
+  ctx.fillText("you", cx, cy + 9);
+  // instrument dot
+  const d = clamp(exploreParams.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
+  const az = clamp(exploreParams.spaceAzimuth ?? 0, -90, 90);
+  const rad = (az - 90) * Math.PI / 180;
+  const r = _spaceDistToR(d, rMax);
+  const ix = cx + Math.cos(rad) * r, iy = cy + Math.sin(rad) * r;
+  ctx.strokeStyle = "rgba(79,141,212,0.4)";
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ix, iy); ctx.stroke();
+  ctx.fillStyle = "#4f8dd4";
+  ctx.shadowColor = "#4f8dd4"; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(ix, iy, 5, 0, 2 * Math.PI); ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function wireSpacePad(v) {
+  const cv = v.querySelector("#cvSpacePad");
+  if (!cv) return;
+  const apply = (e) => {
+    const rect = cv.getBoundingClientRect();
+    const w = cv._cssW || rect.width, h = cv._cssH || rect.height;
+    const { cx, cy, rMax } = _spacePadGeom(w, h);
+    const x = (e.clientX - rect.left) * (w / rect.width) - cx;
+    const y = (e.clientY - rect.top) * (h / rect.height) - cy;
+    const az = clamp(Math.atan2(x, -y) * 180 / Math.PI, -90, 90);
+    const dist = _spaceRToDist(Math.hypot(x, y), rMax);
+    exploreParams.spaceAzimuth = Math.round(az);
+    exploreParams.spaceDistance = Number(dist.toFixed(2));
+    const readout = v.querySelector("#spaceReadout");
+    if (readout) readout.textContent = `${exploreParams.spaceDistance.toFixed(1)} m · ${exploreParams.spaceAzimuth}°`;
+    drawSpacePad();
+    synth.updateReverb({ ...exploreParams });
+  };
+  cv.onmousedown = (e) => {
+    e.preventDefault();
+    apply(e);
+    const move = (ev) => apply(ev);
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
 }
 
 // T6: the BODY stage card's ridge mini-vis — the same fixed-Hz law the

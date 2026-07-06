@@ -494,6 +494,26 @@ export function bodyBandsFor(p, profile) {
   return (profile && profile.resonances) || [];
 }
 
+// ── Tone model v2: SPACE positioning (owner request 2026-07-06) ──
+// The instrument sits at a distance and bearing from the listener. The
+// direct path gets true physics; the reverb stays diffuse, so the
+// direct-to-reverb balance falls with distance by construction. Pure
+// laws exported for headless assertion.
+export function spaceArrivalDelay(distM) {
+  return Math.max(0.3, Math.min(30, distM ?? 2.5)) / 343; // speed of sound
+}
+// Air absorbs highs with distance: ~full band close-up, ~3.6 kHz at 30 m.
+export function spaceAirCutoff(distM) {
+  const d = Math.max(0.3, Math.min(30, distM ?? 2.5));
+  return Math.max(3500, Math.min(20000, 20000 * Math.pow(1 / Math.max(1, d), 0.5)));
+}
+// Proximity effect: bass lift that only exists inside ~1.2 m, growing as
+// the source approaches the listener's head.
+export function spaceProximityDb(distM) {
+  const d = Math.max(0.3, Math.min(30, distM ?? 2.5));
+  return d < 1.2 ? 10 * (1.2 - d) / 1.2 : 0;
+}
+
 // Body gain at one frequency: Gaussian bands in log-frequency space,
 // summed in log gain. Pure so T-B6 asserts it headlessly, and so the
 // renderer can evaluate it against a partial's MODULATED frequency
@@ -2399,7 +2419,37 @@ export class SynthEngine {
     this._limiter.attack.value = 0.003;
     this._limiter.release.value = 0.12;
 
-    this.master.connect(this._dryGain);
+    // SPACE positioning (direct path only — the reverb stays diffuse, so
+    // walking away naturally trades direct sound for room): proximity
+    // bass shelf → air-absorption lowpass → arrival delay → HRTF panner
+    // (interaural time/level + head shadow + 1/r attenuation).
+    this._spaceProximity = this.ctx.createBiquadFilter();
+    this._spaceProximity.type = "lowshelf";
+    this._spaceProximity.frequency.value = 180;
+    this._spaceProximity.gain.value = 0;
+    this._spaceAir = this.ctx.createBiquadFilter();
+    this._spaceAir.type = "lowpass";
+    this._spaceAir.frequency.value = 20000;
+    this._spaceAir.Q.value = 0.5;
+    this._spaceDelay = this.ctx.createDelay(0.12);
+    this._spacePanner = this.ctx.createPanner ? this.ctx.createPanner() : null;
+    if (this._spacePanner) {
+      this._spacePanner.panningModel = "HRTF";
+      this._spacePanner.distanceModel = "inverse";
+      this._spacePanner.refDistance = 1;
+      this._spacePanner.rolloffFactor = 1;
+      this._spacePanner.positionZ ? this._spacePanner.positionZ.value = -2.5 : this._spacePanner.setPosition(0, 0, -2.5);
+    }
+
+    this.master.connect(this._spaceProximity);
+    this._spaceProximity.connect(this._spaceAir);
+    this._spaceAir.connect(this._spaceDelay);
+    if (this._spacePanner) {
+      this._spaceDelay.connect(this._spacePanner);
+      this._spacePanner.connect(this._dryGain);
+    } else {
+      this._spaceDelay.connect(this._dryGain);
+    }
     this._dryGain.connect(this.analyser);
     this.master.connect(this._preDelay);
     this._preDelay.connect(this._convolver);
@@ -2600,6 +2650,7 @@ export class SynthEngine {
 
   _configureReverb(params = {}) {
     if (!this._dryGain || !this._wetGain || !this._convolver) return;
+    this._configureSpace(params); // position rides every reverb configure
     const wet = this._clamp(params.reverbWet ?? 0, 0, 0.95);
     const decay = this._clamp(params.reverbDecay ?? 1.4, 0.2, 8);
     const tone = this._clamp(params.reverbTone ?? 0.6, 0, 1);
@@ -2625,6 +2676,32 @@ export class SynthEngine {
   updateReverb(params = {}) {
     if (!this.ctx) return;
     this._configureReverb(params);
+  }
+
+  // SPACE positioning: distance + azimuth → arrival delay, air absorption,
+  // proximity shelf, and the HRTF panner position. Smoothed for live moves;
+  // deterministic (no randomness).
+  _configureSpace(p = {}) {
+    if (!this.ctx || !this._spaceDelay) return;
+    const d = Math.max(0.3, Math.min(30, Number(p.spaceDistance ?? 2.5)));
+    const azDeg = Math.max(-90, Math.min(90, Number(p.spaceAzimuth ?? 0)));
+    const az = azDeg * Math.PI / 180;
+    const now = this.ctx.currentTime;
+    const smooth = (param, v) => {
+      try { param.setTargetAtTime(v, now, 0.05); } catch { param.value = v; }
+    };
+    smooth(this._spaceDelay.delayTime, spaceArrivalDelay(d));
+    smooth(this._spaceAir.frequency, spaceAirCutoff(d));
+    smooth(this._spaceProximity.gain, spaceProximityDb(d));
+    if (this._spacePanner) {
+      const x = Math.sin(az) * d, z = -Math.cos(az) * d;
+      if (this._spacePanner.positionX) {
+        smooth(this._spacePanner.positionX, x);
+        smooth(this._spacePanner.positionZ, z);
+      } else {
+        this._spacePanner.setPosition(x, 0, z);
+      }
+    }
   }
 
   updateGenerationParams(params = {}) {
