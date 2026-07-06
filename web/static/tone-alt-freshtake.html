@@ -1,0 +1,744 @@
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+CHORDA — physical tone designer · fresh-take mockup
+Design rationale (senior product design pass, functional spec only — the
+existing implementation was deliberately not consulted)
+═══════════════════════════════════════════════════════════════════════════════
+
+LAYOUT CONCEPT — "one truth-canvas, four annotators"
+The screen is organised around a single large PARTIAL FIELD: a log-frequency
+plot of the 64 partials exactly as the engine realises them (inharmonic Hz,
+post-excitor level, ring-time glow, coupling arcs, body & air transfer
+overlays). The four stages do not each get a private plot; instead each stage
+is a LAYER on the shared canvas, so every knob's consequence lands in the same
+place the eye already is. Above the canvas sits the SIGNAL CHAIN RAIL —
+EXCITOR → RESONATOR → BODY → SPACE — four cards, each with a live thumbnail of
+that stage's transfer function. Selecting a card swaps the left INSPECTOR
+(deep controls); the truth-canvas never changes identity. Below the canvas, a
+LENS overview strip (DAW-style brush) sets the frequency focus, and the
+FOCUS STRIP materialises exactly the partials inside the brush as editable
+channel strips.
+
+WHAT I DID DIFFERENTLY THAN THE OBVIOUS FIRST IDEA
+The obvious layout is four equal panels of knobs, each with its own mini
+visualisation — a rack of modules. I rejected it because (a) it fragments the
+"display is truth" promise into four small lies of omission, and (b) it makes
+the stages read as effects, not as one instrument. Here:
+· One composited spectrum is the hero; stage thumbnails are indexes into it.
+· Frequency navigation is a BRUSH (lens overview + filter chips), never
+  pagination or 64 sliders. Brushing 400 Hz–1.6 kHz yields six strips (P2–P7),
+  each with a level fader, realised Hz, T60, wobble sensitivity and its
+  strongest coupling partner — per-partial editing without a wall of controls.
+· Knobs are ANNOTATED WITH PHYSICS, not just values: the position knob being
+  dragged (depicted mid-drag, cursor + halo + tooltip) reads "0.130 ≈ 1/7.7 —
+  node dips at P8 · P15 · P23 · P31", and the canvas shows those partials
+  collapsing with ghost-dots of their pre-drag levels. Cause → effect in one
+  glance.
+· A tiny string diagram in the inspector draws mode 8's standing wave against
+  the bow point — it EXPLAINS why P8 dies, which is what makes a lay volunteer
+  brave and a producer respectful.
+
+HOW THE SIX HARD REQUIREMENTS ARE MET
+1. Professional-grade at first read — dense-but-calm dark composition, 10px
+   letter-spaced micro-caps, tabular-numeral mono readouts, hairline panels,
+   restrained per-stage hue system (ember/ice/violet/sage), a real header with
+   preset · A/B · f0 · meters. No toy chrome, no skeuomorphism.
+2. Immediate, legible visual feedback — the depicted mid-drag of POSITION
+   shows ghost dots + delta arrows on the affected partials, amber node rails,
+   and a physics tooltip; the pinned P3 readout links canvas ↔ focus strip.
+   Every control's consequence is drawn where the spectrum lives.
+3. Chain visible in layout — the four-stage rail is the top-level navigation,
+   ordered left→right in signal order with flow chevrons; each card carries a
+   live thumbnail of its stage transform (drive comb, T60 law, body curve,
+   room plan).
+4. Filter/focus navigation — lens brush + filter chips (odd/even/coupled/long
+   ring/wobbly) + click-to-pin; strips exist only for focused partials.
+5. Dark UI, display-is-truth — every pixel of every canvas is computed at load
+   from the model formulas in the <script> (f_n = n·f0·√((1+Bn²)/(1+B)), bow
+   drive 1/n × |sin nπp|, T60 power law, Gaussian-in-log-f body bands, air
+   absorption, ITD/ILD geometry). Log-frequency axis throughout. Nothing is
+   drawn that isn't computed.
+6. Mouse-first, dual-audience — big drag targets (knobs, brush handles,
+   partial head-dots, faders), hint line in the status bar teaching ⌥-drag and
+   double-click-reset; plain-language physics captions keep volunteers safe
+   while realised-Hz/¢/T60 readouts keep producers home.
+
+Static mockup: nothing is wired, but the depicted states (mid-drag position
+knob, pinned partial P3, active lens brush) show the interaction model.
+═══════════════════════════════════════════════════════════════════════════════
+-->
+<meta charset="utf-8">
+<title>CHORDA — tone designer (fresh-take mockup)</title>
+<style>
+  :root{
+    --bg0:#0b0d11; --bg1:#12151b; --bg2:#171b23; --bg3:#1d222c;
+    --line:#252b37; --line2:#2e3543;
+    --ink:#e7ebf3; --ink2:#9aa3b5; --ink3:#5d6577;
+    --exc:#e8a05a; --res:#56c8f2; --body:#b78cf5; --space:#6fd39c;
+    --exc-dim:#8a6236; --res-dim:#2f6f88; --body-dim:#6b528f; --space-dim:#3f7a5b;
+    --pin:#ffd166;
+    --sans:"Inter","SF Pro Text",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 50% -10%, #10141c 0%, var(--bg0) 60%);
+    color:var(--ink); font-family:var(--sans); font-size:13px;
+    -webkit-font-smoothing:antialiased; overflow-x:auto;
+  }
+  #app{min-width:1240px; max-width:1560px; margin:0 auto; height:100vh; min-height:860px;
+    display:flex; flex-direction:column; padding:10px 14px 8px}
+  .mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .cap{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); font-weight:600}
+
+  /* ── header ─────────────────────────────────────────────── */
+  header{display:flex; align-items:center; gap:14px; height:44px; padding:0 4px 8px}
+  .brand{font-weight:700; font-size:15px; letter-spacing:.22em}
+  .brand em{font-style:normal; color:var(--ink3); font-weight:500; font-size:10px; letter-spacing:.18em; margin-left:8px}
+  .preset{display:flex; align-items:center; gap:8px; background:var(--bg1); border:1px solid var(--line);
+    border-radius:6px; padding:5px 12px; color:var(--ink); cursor:default}
+  .preset .dot{width:6px; height:6px; border-radius:50%; background:var(--res)}
+  .preset .car{color:var(--ink3); font-size:9px}
+  .ab{display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:11px; font-weight:600}
+  .ab span{padding:5px 10px; color:var(--ink3)}
+  .ab span.on{background:var(--bg3); color:var(--ink)}
+  .hgap{flex:1}
+  .f0read{font-family:var(--mono); font-size:12px; color:var(--ink2)}
+  .f0read b{color:var(--ink); font-weight:600}
+  .hicons{display:flex; gap:6px}
+  .hicons div{width:26px;height:26px;border:1px solid var(--line);border-radius:6px;background:var(--bg1);
+    display:grid;place-items:center;color:var(--ink3);font-size:12px;cursor:default}
+  canvas#meter{width:74px;height:26px;border:1px solid var(--line);border-radius:6px;background:var(--bg1)}
+
+  /* ── chain rail ─────────────────────────────────────────── */
+  .chain{display:grid; grid-template-columns:1fr 22px 1fr 22px 1fr 22px 1fr; gap:0; align-items:stretch; padding:0 4px}
+  .flow{display:grid; place-items:center; color:var(--ink3); font-size:13px}
+  .card{background:var(--bg1); border:1px solid var(--line); border-radius:9px; padding:9px 11px 8px;
+    display:flex; flex-direction:column; gap:6px; position:relative; cursor:default}
+  .card .chead{display:flex; align-items:baseline; gap:8px}
+  .card .idx{font-family:var(--mono); font-size:10px; color:var(--ink3)}
+  .card .cname{font-size:11px; font-weight:700; letter-spacing:.13em}
+  .card .led{margin-left:auto; width:7px; height:7px; border-radius:50%}
+  .card canvas{width:100%; height:58px; display:block; border-radius:4px; background:var(--bg0)}
+  .card .cvals{font-family:var(--mono); font-size:10.5px; color:var(--ink2); white-space:nowrap; overflow:hidden}
+  .card.sel{border-color:var(--exc-dim); background:linear-gradient(180deg,#181510 0%, var(--bg1) 45%)}
+  .card.sel::after{content:""; position:absolute; left:24px; bottom:-9px; width:14px; height:14px;
+    background:var(--bg1); border-left:1px solid var(--exc-dim); border-bottom:1px solid var(--exc-dim);
+    transform:rotate(-45deg); border-radius:0 0 0 3px}
+  .c-exc .cname{color:var(--exc)} .c-exc .led{background:var(--exc); box-shadow:0 0 6px var(--exc)}
+  .c-res .cname{color:var(--res)} .c-res .led{background:var(--res); box-shadow:0 0 6px var(--res)}
+  .c-body .cname{color:var(--body)} .c-body .led{background:var(--body); box-shadow:0 0 6px var(--body)}
+  .c-space .cname{color:var(--space)} .c-space .led{background:var(--space); box-shadow:0 0 6px var(--space)}
+
+  /* ── workbench ──────────────────────────────────────────── */
+  main{flex:1; display:grid; grid-template-columns:252px 1fr; gap:10px; padding:10px 4px 0; min-height:0}
+
+  /* inspector */
+  .insp{background:var(--bg1); border:1px solid var(--exc-dim); border-radius:10px; padding:12px 14px;
+    display:flex; flex-direction:column; gap:12px; position:relative; overflow:hidden}
+  .insp h2{font-size:11px; letter-spacing:.16em; color:var(--exc); font-weight:700}
+  .insp h2 small{color:var(--ink3); font-weight:500; letter-spacing:.1em; margin-left:6px}
+  .seg{display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); border-radius:6px; overflow:hidden}
+  .seg div{padding:6px 0; text-align:center; font-size:10.5px; font-weight:600; letter-spacing:.06em;
+    color:var(--ink3); background:var(--bg0); border-right:1px solid var(--line)}
+  .seg div:last-child{border-right:none}
+  .seg div.on{background:#241b10; color:var(--exc); box-shadow:inset 0 -2px 0 var(--exc)}
+  canvas#stringviz{width:100%; height:64px; background:var(--bg0); border-radius:6px}
+  .whynote{font-size:10.5px; line-height:1.5; color:var(--ink2)}
+  .whynote b{color:var(--exc); font-weight:600}
+  .knobs{display:grid; grid-template-columns:1fr 1fr; gap:14px 8px; margin-top:2px}
+  .knob{display:flex; flex-direction:column; align-items:center; gap:4px; position:relative}
+  .knob canvas{width:58px; height:58px}
+  .knob .kl{font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink3); font-weight:600}
+  .knob .kv{font-family:var(--mono); font-size:11px; color:var(--ink2)}
+  .knob.big canvas{width:74px; height:74px}
+  .knob.dis{opacity:.38}
+  .knob.dis .kv{font-size:9px; letter-spacing:.05em}
+  .knob.drag .kl,.knob.drag .kv{color:var(--exc)}
+  .dragtip{position:absolute; top:56px; left:52px; z-index:5; background:#241b10; border:1px solid var(--exc-dim);
+    border-radius:6px; padding:6px 9px; font-family:var(--mono); font-size:10.5px; color:var(--exc);
+    white-space:nowrap; box-shadow:0 6px 18px rgba(0,0,0,.55); line-height:1.5}
+  .dragtip small{display:block; color:var(--ink2); font-family:var(--sans); font-size:9.5px; letter-spacing:.02em}
+  svg.cursor{position:absolute; z-index:6; width:17px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+  canvas#humanviz{width:100%; height:30px; background:var(--bg0); border-radius:5px}
+  .hlbl{display:flex; justify-content:space-between; align-items:baseline}
+  .hlbl .mono{font-size:10px; color:var(--ink3)}
+
+  /* stage pane */
+  .pane{display:flex; flex-direction:column; gap:8px; min-width:0}
+  .chips{display:flex; align-items:center; gap:6px}
+  .chip{border:1px solid var(--line); border-radius:20px; padding:3.5px 11px; font-size:10.5px;
+    font-weight:600; letter-spacing:.05em; color:var(--ink3); background:var(--bg1); cursor:default}
+  .chip.on{border-color:var(--res-dim); color:var(--res); background:#10202a}
+  .chips .lab{margin-right:2px}
+  .chips .focusread{margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--ink2)}
+  .chips .focusread b{color:var(--res); font-weight:600}
+  .legend{display:flex; gap:12px; margin-left:10px}
+  .legend span{font-size:10px; color:var(--ink3); letter-spacing:.04em}
+  .legend i{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:4px; vertical-align:-1px}
+
+  .herowrap{position:relative; background:var(--bg1); border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  canvas#hero{width:100%; height:352px; display:block}
+  .pintip{position:absolute; z-index:4; background:#10202a; border:1px solid var(--res-dim); border-radius:7px;
+    padding:7px 10px; font-family:var(--mono); font-size:10.5px; line-height:1.65; color:var(--ink2);
+    box-shadow:0 8px 22px rgba(0,0,0,.55)}
+  .pintip .t{color:var(--res); font-weight:700; font-size:11px}
+  .pintip .t em{font-style:normal; color:var(--pin); font-size:9px; letter-spacing:.1em; margin-left:6px}
+  .pintip b{color:var(--ink)}
+
+  canvas#lens{width:100%; height:46px; display:block; background:var(--bg1); border:1px solid var(--line); border-radius:8px}
+
+  /* focus strip */
+  .fwrap{background:var(--bg1); border:1px solid var(--line); border-radius:10px; padding:9px 12px 10px;
+    display:flex; gap:12px; align-items:stretch}
+  .fmeta{width:118px; display:flex; flex-direction:column; gap:6px; justify-content:center}
+  .fmeta .t{font-size:10px; letter-spacing:.14em; color:var(--res); font-weight:700}
+  .fmeta .d{font-size:10.5px; color:var(--ink3); line-height:1.5}
+  .strips{flex:1; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:8px}
+  .ps{background:var(--bg0); border:1px solid var(--line); border-radius:8px; padding:8px 9px 7px;
+    display:flex; flex-direction:column; gap:5px; position:relative}
+  .ps .ph{display:flex; align-items:baseline; gap:6px}
+  .ps .pn{font-family:var(--mono); font-weight:700; font-size:12px; color:var(--ink)}
+  .ps .note{font-family:var(--mono); font-size:9.5px; color:var(--ink3)}
+  .ps .sm{margin-left:auto; display:flex; gap:3px}
+  .ps .sm i{font-style:normal; width:14px; height:14px; border:1px solid var(--line); border-radius:3px;
+    font-size:8.5px; display:grid; place-items:center; color:var(--ink3)}
+  .ps .hz{font-family:var(--mono); font-size:10px; color:var(--ink2)}
+  .ps .frow{display:flex; gap:9px; align-items:stretch; flex:1}
+  .ps canvas.fader{width:16px; height:86px}
+  .ps .fvals{display:flex; flex-direction:column; gap:5px; justify-content:flex-end; flex:1; padding-bottom:2px}
+  .ps .fv{display:flex; flex-direction:column; gap:2px}
+  .ps .fv label{font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); font-weight:600}
+  .ps .fv .val{font-family:var(--mono); font-size:10px; color:var(--ink2)}
+  .ps .bar{height:3px; border-radius:2px; background:var(--bg3); position:relative; overflow:hidden}
+  .ps .bar i{position:absolute; inset:0 auto 0 0; border-radius:2px}
+  .ps .cpl{font-family:var(--mono); font-size:9px; color:var(--res-dim); border:1px solid #1c3844;
+    border-radius:4px; padding:2px 5px; align-self:flex-start; background:#0d1820}
+  .ps.pinned{border-color:var(--res-dim); box-shadow:0 0 0 1px #1c3844, 0 4px 16px rgba(0,0,0,.4)}
+  .ps.pinned .pn{color:var(--res)}
+  .ps .pinflag{position:absolute; top:-8px; right:8px; background:var(--pin); color:#141414; font-size:8px;
+    letter-spacing:.1em; font-weight:800; border-radius:3px; padding:1.5px 5px}
+
+  /* status bar */
+  footer{display:flex; align-items:center; gap:20px; height:28px; margin-top:8px; padding:0 8px;
+    border-top:1px solid var(--line); font-family:var(--mono); font-size:10px; color:var(--ink3)}
+  footer .hint{color:var(--ink3)} footer .hint b{color:var(--ink2); font-weight:600}
+  footer .truth{margin-left:auto; color:var(--ink3)}
+  footer .truth i{font-style:normal; color:var(--space)}
+</style>
+
+<div id="app">
+  <header>
+    <div class="brand">CHORDA<em>TONE DESIGNER</em></div>
+    <div class="preset"><span class="dot"></span> Violin · arco · chamber 2.5 m <span class="car">▼</span></div>
+    <div class="ab"><span class="on">A</span><span>B</span></div>
+    <div class="hgap"></div>
+    <div class="f0read">f₀ <b>220.00 Hz</b> · A3 &nbsp;·&nbsp; 64 partials</div>
+    <canvas id="meter"></canvas>
+    <div class="hicons"><div>↺</div><div>↻</div><div>?</div></div>
+  </header>
+
+  <!-- signal chain rail -->
+  <nav class="chain">
+    <div class="card c-exc sel">
+      <div class="chead"><span class="idx">01</span><span class="cname">EXCITOR</span><span class="led"></span></div>
+      <canvas id="mExc"></canvas>
+      <div class="cvals">bow · pos 0.130 · human 0.35 · dyn 0.50</div>
+    </div>
+    <div class="flow">›</div>
+    <div class="card c-res">
+      <div class="chead"><span class="idx">02</span><span class="cname">RESONATOR</span><span class="led"></span></div>
+      <canvas id="mRes"></canvas>
+      <div class="cvals">wood 0.35 · B 3.0e-5 · xfer 0.55 · 64p</div>
+    </div>
+    <div class="flow">›</div>
+    <div class="card c-body">
+      <div class="chead"><span class="idx">03</span><span class="cname">BODY</span><span class="led"></span></div>
+      <canvas id="mBody"></canvas>
+      <div class="cvals">violin · amount 0.70</div>
+    </div>
+    <div class="flow">›</div>
+    <div class="card c-space">
+      <div class="chead"><span class="idx">04</span><span class="cname">SPACE</span><span class="led"></span></div>
+      <canvas id="mSpace"></canvas>
+      <div class="cvals">2.5 m · −20° · room 0.28 · d/r 61%</div>
+    </div>
+  </nav>
+
+  <main>
+    <!-- inspector: selected stage (EXCITOR) -->
+    <aside class="insp">
+      <h2>01 · EXCITOR <small>how energy enters</small></h2>
+      <div class="seg"><div class="on">BOW</div><div>PLUCK</div><div>STRIKE</div><div>BLOW</div></div>
+
+      <div>
+        <div class="hlbl"><span class="cap">on the string</span><span class="mono">mode 8 shown</span></div>
+        <canvas id="stringviz"></canvas>
+        <div class="whynote">The bow sits at <b>0.130</b> of the string — almost on a node of mode 8,
+          so <b>P8</b> (and P15 · P23 · P31) can barely be driven. Watch them dip in the field →</div>
+      </div>
+
+      <div class="knobs">
+        <div class="knob big drag" style="grid-column:1/3; align-items:flex-start; flex-direction:row; gap:12px; margin-bottom:22px">
+          <canvas data-knob data-v="0.229" data-c="exc" data-drag="1"></canvas>
+          <div style="display:flex;flex-direction:column;gap:3px;padding-top:8px">
+            <span class="kl">position</span>
+            <span class="kv">0.130 ≈ 1/7.7</span>
+          </div>
+          <div class="dragtip">0.150 → <b style="color:#fff">0.130</b>
+            <small>node dips: P8 · P15 · P23 · P31</small></div>
+          <svg class="cursor" style="left:44px; top:46px" viewBox="0 0 24 24">
+            <path d="M5 2 L5 19 L9.6 15.2 L12.6 21.6 L15.2 20.4 L12.3 14.2 L18 13.6 Z" fill="#fff" stroke="#000" stroke-width="1.1"/>
+          </svg>
+        </div>
+        <div class="knob dis">
+          <canvas data-knob data-v="0.42" data-c="exc"></canvas>
+          <span class="kl">hardness</span><span class="kv">strike/pluck only</span>
+        </div>
+        <div class="knob">
+          <canvas data-knob data-v="0.50" data-c="exc"></canvas>
+          <span class="kl">dynamics</span><span class="kv">0.50</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="hlbl"><span class="cap">human · 0.35</span><span class="mono">one drift per note</span></div>
+        <canvas id="humanviz"></canvas>
+      </div>
+      <div class="knobs" style="grid-template-columns:1fr">
+        <div class="knob" style="flex-direction:row; gap:12px; align-items:center">
+          <canvas data-knob data-v="0.35" data-c="exc"></canvas>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <span class="kl">human</span>
+            <span class="kv" style="font-size:10px;color:var(--ink3)">bow-pressure drift · brighter when pushed · rare slips</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- shared truth-canvas -->
+    <section class="pane">
+      <div class="chips">
+        <span class="cap lab">focus</span>
+        <span class="chip on">Brush</span><span class="chip">All</span><span class="chip">Odd</span>
+        <span class="chip">Even</span><span class="chip">Coupled ⌒</span><span class="chip">Long ring</span><span class="chip">Wobbly</span>
+        <div class="legend">
+          <span><i style="background:var(--res)"></i>partial · glow = ring time</span>
+          <span><i style="background:var(--body)"></i>body ±dB</span>
+          <span><i style="background:var(--space)"></i>air @ 2.5 m</span>
+          <span><i style="background:var(--res-dim)"></i>coupling</span>
+        </div>
+        <span class="focusread"><b>400 Hz – 1.6 kHz</b> · 6 partials · P2–P7</span>
+      </div>
+
+      <div class="herowrap">
+        <canvas id="hero"></canvas>
+        <div class="pintip" id="pintip">
+          <div class="t">P3 <em>PINNED</em></div>
+          f <b id="ptHz"></b> · level <b id="ptDb"></b><br>
+          T60 <b id="ptT60"></b> · wobble <b id="ptWob"></b><br>
+          strongest link <b id="ptCpl"></b>
+        </div>
+      </div>
+
+      <canvas id="lens"></canvas>
+
+      <div class="fwrap">
+        <div class="fmeta">
+          <div class="t">FOCUS STRIP</div>
+          <div class="d">Only brushed partials become strips. Drag level · ⌥-drag ring time · double-click resets.</div>
+        </div>
+        <div class="strips" id="strips"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>engine 48 kHz · block 128 · cpu 6%</span>
+    <span class="hint"><b>drag</b> a partial dot to trim level · <b>⌥-drag</b> ring time · <b>brush</b> the lens to focus · <b>click</b> a partial to pin its readout</span>
+    <span class="truth">display = engine truth · <i>log-f axis</i></span>
+  </footer>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   MODEL — every canvas below is computed from these formulas.
+   ════════════════════════════════════════════════════════════ */
+const M = {
+  f0:220, B:3.0e-5, N:64,
+  pos:0.130, posPrev:0.150,          // mid-drag: previous → current
+  material:0.35, transfer:0.55, brightTilt:0,
+  bodyAmt:0.70,
+  dist:2.5, az:-20,
+  FMIN:40, FMAX:16000, DBMIN:-60, DBMAX:6
+};
+const fn = n => n*M.f0*Math.sqrt((1+M.B*n*n)/(1+M.B));
+const combBow = (n,p) => (1/n)*Math.abs(Math.sin(Math.PI*n*p));   // bow drive ~1/n × position comb
+const T60f = f => 3.2*Math.pow(f/M.f0, -(0.30+0.72*M.material));  // material T60-vs-f law (wood)
+const BANDS = [ // violin body: [fc Hz, gain dB, width in ln(f)]
+  [275,7,.18],[460,9,.16],[700,4,.22],[1000,5,.20],[1550,-4,.25],[2600,6,.30],[4200,-3,.35]
+];
+const bodyDB = f => M.bodyAmt*BANDS.reduce((s,[fc,g,w])=>{const x=Math.log(f/fc)/w; return s+g*Math.exp(-x*x)},0);
+const airDB  = (f,d) => -0.030*d*Math.pow(f/1000,1.7);            // distance high rolloff
+const rawDB  = (n,p) => 20*Math.log10(Math.max(combBow(n,p),1e-6)) + bodyDB(fn(n)) + airDB(fn(n),M.dist)
+                        + M.brightTilt*Math.log2(fn(n)/M.f0);
+// normalise so loudest partial sits at −4 dB
+let NORM=0;{let mx=-999;for(let n=1;n<=M.N;n++)mx=Math.max(mx,rawDB(n,M.pos));NORM=-4-mx;}
+const lvlDB = (n,p=M.pos) => Math.max(M.DBMIN, rawDB(n,p)+NORM);
+// wobble sensitivity: human drift is FM → AM via local body-curve slope
+const wobble = n=>{
+  const f=fn(n), d=(bodyDB(f*1.02)-bodyDB(f/1.02));
+  return Math.min(1, Math.abs(d)/2.2*0.85 + n/M.N*0.25);
+};
+// sympathetic coupling: near-simple-ratio pairs, detuned out by B
+const RATIOS=[[2,0.95],[1.5,0.60],[4/3,0.42],[2.5,0.30]];
+function couplings(maxN=16){
+  const out=[];
+  for(let i=1;i<=maxN;i++)for(let j=i+1;j<=maxN;j++){
+    const r=fn(j)/fn(i);
+    for(const[R,base]of RATIOS){
+      const cents=1200*Math.log2(r/R);
+      if(Math.abs(cents)<40){
+        out.push({i,j,w:M.transfer*base*Math.exp(-(cents*cents)/(2*14*14)),cents,R});
+      }
+    }
+  }
+  return out.filter(c=>c.w>0.05).sort((a,b)=>b.w-a.w);
+}
+const CPL=couplings();
+const noteName=f=>{
+  const names=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  const m=Math.round(12*Math.log2(f/440))+69;
+  const c=Math.round(1200*Math.log2(f/(440*Math.pow(2,(m-69)/12))));
+  return names[(m%12+12)%12]+(Math.floor(m/12)-1)+(c?((c>0?'+':'')+c+'¢'):'');
+};
+
+/* focus (lens brush) */
+const FOCUS={lo:400,hi:1600};
+const focused=[];for(let n=1;n<=M.N;n++){const f=fn(n);if(f>=FOCUS.lo&&f<=FOCUS.hi)focused.push(n);}
+const PIN=3; // pinned partial
+
+/* ── canvas plumbing ── */
+function cv(id){
+  const c=typeof id==='string'?document.getElementById(id):id;
+  const r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr);
+  const x=c.getContext('2d'); x.scale(dpr,dpr);
+  return {x,w:r.width,h:r.height,el:c};
+}
+const lx=(f,w,pad=[0,0])=>pad[0]+(Math.log(f/M.FMIN)/Math.log(M.FMAX/M.FMIN))*(w-pad[0]-pad[1]);
+
+/* ════════ HERO — the partial field ════════ */
+function drawHero(){
+  const {x,w,h}=cv('hero');
+  const PL=44,PR=14,PT=14, AX=20, CB=30;         // pads, x-axis, coupling band
+  const py0=PT, py1=h-AX-CB-8, cb0=h-AX-CB+2, cb1=h-AX-4;
+  const X=f=>lx(f,w,[PL,PR]);
+  const Y=db=>py1-(db-M.DBMIN)/(M.DBMAX-M.DBMIN)*(py1-py0);
+
+  // grid
+  x.font='9px '+getComputedStyle(document.body).getPropertyValue('--mono');
+  const oct=[50,100,200,400,800,1600,3200,6400,12800];
+  for(const f of oct){
+    x.strokeStyle='#1a1f29'; x.beginPath(); x.moveTo(X(f),py0); x.lineTo(X(f),py1); x.stroke();
+    x.fillStyle='#5d6577'; x.textAlign='center';
+    x.fillText(f>=1000?(f/1000)+'k':f, X(f), h-7);
+  }
+  for(let db=0;db>=M.DBMIN;db-=12){
+    x.strokeStyle='#161a22'; x.beginPath(); x.moveTo(PL,Y(db)); x.lineTo(w-PR,Y(db)); x.stroke();
+    x.fillStyle='#5d6577'; x.textAlign='right'; x.fillText(db+' dB', PL-6, Y(db)+3);
+  }
+  // f0 marker
+  x.strokeStyle='rgba(232,160,90,.35)'; x.setLineDash([2,3]);
+  x.beginPath(); x.moveTo(X(M.f0),py0); x.lineTo(X(M.f0),py1); x.stroke(); x.setLineDash([]);
+  x.fillStyle='rgba(232,160,90,.8)'; x.textAlign='center'; x.fillText('f₀',X(M.f0),py0-3);
+
+  // BODY transfer (violet, drawn about its own 0 at −30 dB reference)
+  const bref=-30, BY=db=>Y(bref+db);
+  x.beginPath();
+  for(let px=PL;px<=w-PR;px++){const f=M.FMIN*Math.pow(M.FMAX/M.FMIN,(px-PL)/(w-PL-PR));
+    const y=BY(bodyDB(f)); px===PL?x.moveTo(px,y):x.lineTo(px,y);}
+  x.strokeStyle='rgba(183,140,245,.75)'; x.lineWidth=1.4; x.stroke();
+  x.lineTo(w-PR,Y(M.DBMIN)); x.lineTo(PL,Y(M.DBMIN)); x.closePath();
+  x.fillStyle='rgba(183,140,245,.07)'; x.fill(); x.lineWidth=1;
+  x.fillStyle='rgba(183,140,245,.55)'; x.textAlign='left';
+  x.fillText('body (violin) ±dB', X(2650)+6, BY(bodyDB(2650))-6);
+
+  // AIR absorption at 2.5 m (sage, about 0 dB top)
+  x.beginPath(); x.setLineDash([4,4]);
+  for(let px=PL;px<=w-PR;px++){const f=M.FMIN*Math.pow(M.FMAX/M.FMIN,(px-PL)/(w-PL-PR));
+    const y=Y(airDB(f,M.dist)); px===PL?x.moveTo(px,y):x.lineTo(px,y);}
+  x.strokeStyle='rgba(111,211,156,.55)'; x.stroke(); x.setLineDash([]);
+  x.fillStyle='rgba(111,211,156,.6)';
+  x.fillText('air @ 2.5 m', X(9000), Y(airDB(9000,M.dist))-6);
+
+  // COUPLING band (arcs under the axis)
+  x.fillStyle='#5d6577'; x.textAlign='left'; x.fillText('coupling', PL, cb0+7);
+  for(const c of CPL.slice(0,12)){
+    const x1=X(fn(c.i)), x2=X(fn(c.j)), mid=(x1+x2)/2, ht=6+c.w*20;
+    x.beginPath(); x.moveTo(x1,cb0+10);
+    x.quadraticCurveTo(mid, cb0+10+ht, x2, cb0+10);
+    x.strokeStyle=`rgba(86,200,242,${.15+c.w*.55})`; x.lineWidth=.6+c.w*2.2; x.stroke();
+  }
+  x.lineWidth=1;
+
+  // node rails for comb dips at the NEW position (mid-drag feedback)
+  const nodes=[8,15,23,31];
+  for(const n of nodes){
+    const px=X(fn(n));
+    x.strokeStyle='rgba(232,160,90,.4)'; x.setLineDash([3,3]);
+    x.beginPath(); x.moveTo(px,py0+10); x.lineTo(px,py1); x.stroke(); x.setLineDash([]);
+  }
+
+  // PARTIALS: ghost (pre-drag) → arrow → current, glow ∝ T60
+  for(let n=1;n<=M.N;n++){
+    const f=fn(n), px=X(f), db=lvlDB(n), y=Y(db);
+    const inF=f>=FOCUS.lo&&f<=FOCUS.hi;
+    const t=Math.min(T60f(f)/4,1);
+    // ghost of previous position where the drag changed things (node partials tell the story)
+    const dbP=lvlDB(n,M.posPrev);
+    if(nodes.includes(n) && Math.abs(dbP-db)>1.5){
+      const yP=Y(dbP);
+      x.strokeStyle='rgba(255,255,255,.22)';
+      x.beginPath(); x.moveTo(px,yP); x.lineTo(px,y-4*Math.sign(y-yP)); x.stroke();
+      x.beginPath(); x.arc(px,yP,2.2,0,7); x.stroke();
+      // arrowhead
+      x.beginPath(); x.moveTo(px-3,y-6*Math.sign(y-yP)); x.lineTo(px,y-1*Math.sign(y-yP)); x.lineTo(px+3,y-6*Math.sign(y-yP));
+      x.strokeStyle='rgba(232,160,90,.7)'; x.stroke();
+    }
+    // ring-time glow
+    x.strokeStyle=`rgba(86,200,242,${.05+t*.16})`; x.lineWidth=5+t*4;
+    x.beginPath(); x.moveTo(px,py1); x.lineTo(px,y); x.stroke();
+    // core
+    x.strokeStyle=inF?'rgba(140,220,250,.95)':'rgba(86,200,242,.55)'; x.lineWidth=inF?1.8:1.2;
+    x.beginPath(); x.moveTo(px,py1); x.lineTo(px,y); x.stroke();
+    // head dot (drag target)
+    x.fillStyle=n===PIN?'#ffd166':(inF?'#8cdcfa':'rgba(86,200,242,.6)');
+    x.beginPath(); x.arc(px,y,n===PIN?3.4:(inF?2.6:1.7),0,7); x.fill();
+    x.lineWidth=1;
+  }
+
+  // dim outside the focus brush
+  x.fillStyle='rgba(11,13,17,.5)';
+  x.fillRect(PL,py0-8,X(FOCUS.lo)-PL,py1-py0+8);
+  x.fillRect(X(FOCUS.hi),py0-8,(w-PR)-X(FOCUS.hi),py1-py0+8);
+  for(const fb of [FOCUS.lo,FOCUS.hi]){
+    x.strokeStyle='rgba(86,200,242,.5)'; x.beginPath();
+    x.moveTo(X(fb),py0-6); x.lineTo(X(fb),py1); x.stroke();
+  }
+
+  // node-dip caption (drawn last so it reads at full strength)
+  x.font='10px '+getComputedStyle(document.body).getPropertyValue('--sans');
+  {const cap='◈ node @ position 0.130 — P8 · P15 · P23 · P31 pulled down';
+   const cw=x.measureText(cap).width, cx0=X(fn(8))-6, cy0=py1-26;
+   x.fillStyle='rgba(11,13,17,.82)'; x.fillRect(cx0-6,cy0-10,cw+12,16);
+   x.fillStyle='rgba(232,160,90,.95)'; x.textAlign='left'; x.fillText(cap,cx0,cy0+2);}
+  x.font='9px '+getComputedStyle(document.body).getPropertyValue('--mono');
+
+  // place pinned tooltip near P3
+  const tip=document.getElementById('pintip');
+  const p3x=X(fn(PIN)), p3y=Y(lvlDB(PIN));
+  tip.style.left=(p3x+16)+'px'; tip.style.top=Math.max(10,p3y-64)+'px';
+  document.getElementById('ptHz').textContent=fn(PIN).toFixed(1)+' Hz ('+noteName(fn(PIN))+')';
+  document.getElementById('ptDb').textContent=lvlDB(PIN).toFixed(1)+' dB';
+  document.getElementById('ptT60').textContent=T60f(fn(PIN)).toFixed(2)+' s';
+  document.getElementById('ptWob').textContent=wobble(PIN).toFixed(2);
+  const best=CPL.filter(c=>c.i===PIN||c.j===PIN).sort((a,b)=>b.w-a.w)[0];
+  document.getElementById('ptCpl').textContent=best?('P'+(best.i===PIN?best.j:best.i)+' · '+(best.R===2?'octave':best.R===1.5?'fifth':'fourth')+' · '+best.w.toFixed(2)):'—';
+}
+
+/* ════════ LENS — overview + brush ════════ */
+function drawLens(){
+  const {x,w,h}=cv('lens'); const PL=44,PR=14;
+  const X=f=>lx(f,w,[PL,PR]);
+  x.fillStyle='#5d6577'; x.font='8.5px '+getComputedStyle(document.body).getPropertyValue('--mono');
+  x.textAlign='right'; x.fillText('LENS',PL-8,h/2+3);
+  for(let n=1;n<=M.N;n++){
+    const px=X(fn(n)), hh=Math.max(2,(lvlDB(n)-M.DBMIN)/(M.DBMAX-M.DBMIN)*(h-14));
+    x.strokeStyle='rgba(86,200,242,.5)';
+    x.beginPath(); x.moveTo(px,h-6); x.lineTo(px,h-6-hh); x.stroke();
+  }
+  // scrim + brush window
+  x.fillStyle='rgba(11,13,17,.55)';
+  x.fillRect(PL,3,X(FOCUS.lo)-PL,h-6); x.fillRect(X(FOCUS.hi),3,w-PR-X(FOCUS.hi),h-6);
+  x.strokeStyle='rgba(86,200,242,.8)'; x.strokeRect(X(FOCUS.lo),3,X(FOCUS.hi)-X(FOCUS.lo),h-6);
+  x.fillStyle='rgba(86,200,242,.06)'; x.fillRect(X(FOCUS.lo),3,X(FOCUS.hi)-X(FOCUS.lo),h-6);
+  for(const fb of [FOCUS.lo,FOCUS.hi]){ // handles
+    x.fillStyle='#56c8f2'; x.fillRect(X(fb)-2,h/2-7,4,14);
+  }
+}
+
+/* ════════ chain-rail thumbnails ════════ */
+function drawMiniExc(){
+  const {x,w,h}=cv('mExc');
+  for(let n=1;n<=28;n++){
+    const v=combBow(n,M.pos)/combBow(1,M.pos);
+    const bx=6+(n-1)*(w-12)/28, bh=Math.max(1.5,v*(h-12));
+    x.fillStyle=[8,15,23].includes(n)?'rgba(232,160,90,.95)':'rgba(232,160,90,.45)';
+    x.fillRect(bx,h-5-bh,(w-12)/28*.62,bh);
+  }
+  x.fillStyle='rgba(231,235,243,.35)'; x.font='8px monospace';
+  x.fillText('drive 1/n × comb', 6, 10);
+}
+function drawMiniRes(){
+  const {x,w,h}=cv('mRes'); const X=f=>lx(f,w,[8,8]);
+  x.beginPath();
+  for(let px=8;px<=w-8;px++){const f=M.FMIN*Math.pow(M.FMAX/M.FMIN,(px-8)/(w-16));
+    const y=h-6-Math.min(T60f(f)/4,1)*(h-16); px===8?x.moveTo(px,y):x.lineTo(px,y);}
+  x.strokeStyle='rgba(86,200,242,.85)'; x.lineWidth=1.4; x.stroke(); x.lineWidth=1;
+  for(const n of [1,4,16,48]){x.fillStyle='rgba(86,200,242,.9)';
+    x.beginPath();x.arc(X(fn(n)),h-6-Math.min(T60f(fn(n))/4,1)*(h-16),2,0,7);x.fill();}
+  x.fillStyle='rgba(231,235,243,.35)'; x.font='8px monospace'; x.fillText('T60 vs f', 6, 10);
+}
+function drawMiniBody(){
+  const {x,w,h}=cv('mBody');
+  x.beginPath();
+  for(let px=6;px<=w-6;px++){const f=M.FMIN*Math.pow(M.FMAX/M.FMIN,(px-6)/(w-12));
+    const y=h/2+6-bodyDB(f)/9*(h/2-8); px===6?x.moveTo(px,y):x.lineTo(px,y);}
+  x.strokeStyle='rgba(183,140,245,.9)'; x.lineWidth=1.4; x.stroke();
+  x.lineTo(w-6,h);x.lineTo(6,h);x.closePath();x.fillStyle='rgba(183,140,245,.10)';x.fill();x.lineWidth=1;
+  x.fillStyle='rgba(231,235,243,.35)'; x.font='8px monospace'; x.fillText('violin ±dB', 6, 10);
+}
+function drawMiniSpace(){
+  const {x,w,h}=cv('mSpace');
+  const hx=w/2, hy=h-8;                              // listener
+  for(const d of [1,2.5,7,20]){                      // log distance rings
+    const r=12+Math.log(d/0.3)/Math.log(30/0.3)*(h-18);
+    x.strokeStyle=d===2.5?'rgba(111,211,156,.4)':'#232833';
+    x.beginPath(); x.arc(hx,hy,r,Math.PI,2*Math.PI); x.stroke();
+  }
+  const rS=12+Math.log(M.dist/0.3)/Math.log(30/0.3)*(h-18), a=(-90+M.az)*Math.PI/180;
+  const sx=hx+rS*Math.cos(a), sy=hy+rS*Math.sin(a);
+  x.setLineDash([2,3]); x.strokeStyle='rgba(111,211,156,.5)';
+  x.beginPath(); x.moveTo(hx,hy); x.lineTo(sx,sy); x.stroke(); x.setLineDash([]);
+  x.fillStyle='#6fd39c'; x.beginPath(); x.arc(sx,sy,3.4,0,7); x.fill();
+  x.strokeStyle='rgba(111,211,156,.35)'; x.beginPath(); x.arc(sx,sy,6.5,0,7); x.stroke();
+  x.fillStyle='#9aa3b5';                             // head
+  x.beginPath(); x.arc(hx,hy,5,0,7); x.fill();
+  x.beginPath(); x.moveTo(hx-3,hy-4); x.lineTo(hx,hy-8); x.lineTo(hx+3,hy-4); x.fill();
+  x.fillStyle='rgba(231,235,243,.35)'; x.font='8px monospace';
+  x.fillText('itd 0.16ms · ild 2.1dB · Δt 7.3ms', 6, 10);
+}
+
+/* ════════ inspector visuals ════════ */
+function drawString(){
+  const {x,w,h}=cv('stringviz'); const x0=10,x1=w-10,ym=h/2+6;
+  x.strokeStyle='#39404f'; x.beginPath(); x.moveTo(x0,ym); x.lineTo(x1,ym); x.stroke();
+  x.fillStyle='#39404f'; x.fillRect(x0-3,ym-10,3,20); x.fillRect(x1,ym-10,3,20);
+  // mode-8 standing wave
+  x.beginPath();
+  for(let px=x0;px<=x1;px++){const u=(px-x0)/(x1-x0);
+    const y=ym-Math.sin(8*Math.PI*u)*10; px===x0?x.moveTo(px,y):x.lineTo(px,y);}
+  x.strokeStyle='rgba(86,200,242,.4)'; x.stroke();
+  for(let k=1;k<8;k++){const px=x0+(x1-x0)*k/8;   // nodes of mode 8
+    x.fillStyle='rgba(86,200,242,.5)'; x.beginPath(); x.arc(px,ym,1.8,0,7); x.fill();}
+  // bow position 0.130
+  const bp=x0+(x1-x0)*M.pos;
+  x.strokeStyle='#e8a05a'; x.lineWidth=2.4;
+  x.beginPath(); x.moveTo(bp,ym-16); x.lineTo(bp,ym+16); x.stroke(); x.lineWidth=1;
+  x.fillStyle='#e8a05a'; x.font='8.5px monospace'; x.textAlign='center';
+  x.fillText('bow 0.130', bp+2, ym-20);
+  x.fillStyle='rgba(86,200,242,.65)'; x.fillText('node ⅛', x0+(x1-x0)/8, ym+22);
+}
+function drawHuman(){
+  const {x,w,h}=cv('humanviz');
+  x.strokeStyle='#252b37'; x.beginPath(); x.moveTo(0,h/2); x.lineTo(w,h/2); x.stroke();
+  x.beginPath();
+  let seed=7;
+  const rnd=()=> (seed=(seed*16807)%2147483647)/2147483647;
+  let v=0;
+  for(let px=0;px<=w;px++){
+    const u=px/w;
+    v = Math.sin(u*9.5)*0.5 + Math.sin(u*23+1.3)*0.22 + Math.sin(u*4.1)*0.35;
+    if(u>0.62&&u<0.655) v+=Math.sin((u-0.62)/0.035*Math.PI)*1.5;   // a bow slip
+    const y=h/2 - v*h*0.24;
+    px===0?x.moveTo(px,y):x.lineTo(px,y);
+  }
+  x.strokeStyle='rgba(232,160,90,.85)'; x.lineWidth=1.3; x.stroke(); x.lineWidth=1;
+  x.fillStyle='rgba(232,160,90,.7)'; x.font='8px monospace';
+  x.fillText('slip', w*0.62, 9);
+}
+
+/* ════════ knobs (canvas) ════════ */
+function drawKnobs(){
+  document.querySelectorAll('[data-knob]').forEach(el=>{
+    const {x,w,h}=cv(el), v=+el.dataset.v, drag=!!el.dataset.drag;
+    const cx=w/2, cy=h/2, r=Math.min(w,h)/2-6;
+    const a0=Math.PI*0.75, a1=Math.PI*2.25, av=a0+v*(a1-a0);
+    if(drag){ x.beginPath(); x.arc(cx,cy,r+4.5,0,7);
+      x.strokeStyle='rgba(232,160,90,.25)'; x.lineWidth=3; x.stroke(); }
+    x.lineWidth=3; x.lineCap='round';
+    x.beginPath(); x.arc(cx,cy,r,a0,a1); x.strokeStyle='#323a4a'; x.stroke();
+    x.beginPath(); x.arc(cx,cy,r,a0,av); x.strokeStyle=drag?'#ffb877':'#e8a05a'; x.stroke();
+    const g=x.createRadialGradient(cx-r*.3,cy-r*.4,1,cx,cy,r);
+    g.addColorStop(0,'#262d3a'); g.addColorStop(1,'#141821');
+    x.fillStyle=g; x.beginPath(); x.arc(cx,cy,r-4,0,7); x.fill();
+    x.strokeStyle=drag?'#ffb877':'#c9cfdd'; x.lineWidth=2;
+    x.beginPath(); x.moveTo(cx+Math.cos(av)*(r-14),cy+Math.sin(av)*(r-14));
+    x.lineTo(cx+Math.cos(av)*(r-5),cy+Math.sin(av)*(r-5)); x.stroke();
+    x.lineWidth=1;
+  });
+}
+
+/* ════════ header meter ════════ */
+function drawMeter(){
+  const {x,w,h}=cv('meter');
+  const seg=(y,frac,pk)=>{
+    for(let i=0;i<24;i++){const on=i/24<frac;
+      x.fillStyle=on?(i>20?'#e8a05a':'#6fd39c'):'#1b202a';
+      x.fillRect(5+i*(w-10)/24, y, (w-10)/24-1.5, 6);}
+    x.fillStyle='#e7ebf3'; x.fillRect(5+pk*(w-10), y, 1.5, 6);
+  };
+  seg(6,.58,.72); seg(15,.52,.66);
+}
+
+/* ════════ focus strips ════════ */
+function buildStrips(){
+  const host=document.getElementById('strips'); host.innerHTML='';
+  for(const n of focused){
+    const f=fn(n), db=lvlDB(n), t=T60f(f), wb=wobble(n);
+    const best=CPL.filter(c=>c.i===n||c.j===n).sort((a,b)=>b.w-a.w)[0];
+    const el=document.createElement('div');
+    el.className='ps'+(n===PIN?' pinned':'');
+    el.innerHTML=`
+      ${n===PIN?'<span class="pinflag">PINNED</span>':''}
+      <div class="ph"><span class="pn">P${n}</span><span class="note">${noteName(f)}</span>
+        <span class="sm"><i>S</i><i>M</i></span></div>
+      <div class="hz">${f.toFixed(1)} Hz</div>
+      <div class="frow">
+        <canvas class="fader" data-db="${db}" data-pin="${n===PIN?1:0}"></canvas>
+        <div class="fvals">
+          <div class="fv"><label>level</label><span class="val">${db.toFixed(1)} dB</span></div>
+          <div class="fv"><label>t60</label>
+            <div class="bar"><i style="width:${Math.min(t/4,1)*100}%;background:var(--res-dim)"></i></div>
+            <span class="val">${t.toFixed(2)} s</span></div>
+          <div class="fv"><label>wobble</label>
+            <div class="bar"><i style="width:${wb*100}%;background:var(--exc-dim)"></i></div></div>
+          ${best?`<span class="cpl">⌒ P${best.i===n?best.j:best.i} ${(best.R===2?'oct':best.R===1.5?'5th':'4th')} ${best.w.toFixed(2)}</span>`:''}
+        </div>
+      </div>`;
+    host.appendChild(el);
+  }
+  // draw faders
+  host.querySelectorAll('canvas.fader').forEach(el=>{
+    const {x,w,h}=cv(el), db=+el.dataset.db, pin=el.dataset.pin==='1';
+    const frac=(db-M.DBMIN)/(0-M.DBMIN), y=h-4-frac*(h-8);
+    x.fillStyle='#1b202a'; x.fillRect(w/2-2.5,4,5,h-8);
+    const g=x.createLinearGradient(0,h,0,y);
+    g.addColorStop(0,'rgba(86,200,242,.25)'); g.addColorStop(1,'rgba(86,200,242,.75)');
+    x.fillStyle=g; x.fillRect(w/2-2.5,y,5,h-4-y);
+    x.fillStyle=pin?'#ffd166':'#c9cfdd';
+    x.fillRect(w/2-7,y-2,14,4.5);
+    if(pin){x.strokeStyle='rgba(255,209,102,.4)';x.strokeRect(w/2-9,y-4,18,8.5);}
+  });
+}
+
+function drawAll(){
+  drawHero(); drawLens();
+  drawMiniExc(); drawMiniRes(); drawMiniBody(); drawMiniSpace();
+  drawString(); drawHuman(); drawKnobs(); drawMeter(); buildStrips();
+}
+window.addEventListener('resize',()=>drawAll());
+drawAll();
+</script>
