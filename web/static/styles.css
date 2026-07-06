@@ -5435,3 +5435,20 @@ body.dragging { cursor: grabbing; user-select: none; }
 .ch-artic { display: flex; flex-direction: column; gap: 6px; }
 .ch-artic .formant-weight-circle, .ch-artic .vowel-pad { max-width: 100%; }
 .ch-artic .controls-grid { gap: 0.2rem; }
+
+/* drop preview + roll head */
+.tl2-drop-preview {
+  position: fixed;
+  z-index: 40;
+  display: none;
+  pointer-events: none;
+  background: rgba(95,212,200,0.14);
+  border: 1.5px dashed rgba(95,212,200,0.8);
+  border-radius: 4px;
+}
+.roll-head { display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; }
+.roll-meta { font-size: 0.64rem; color: var(--text3); font-variant-numeric: tabular-nums; }
+.roll-meta b { color: var(--text2); font-weight: 600; }
+.roll-dyncheck { font-size: 0.62rem; color: var(--text3); display: flex; gap: 4px; align-items: center; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.roll-panel.dyn canvas { height: 300px; }

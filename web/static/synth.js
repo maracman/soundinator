@@ -2662,7 +2662,12 @@ export class SynthEngine {
           note.slideFromFrequency = note.legatoFromPrevious ? prevFreq : null;
         }
         if (note.velocity > 0) prevFreq = note.frequency;
-        const t = t0 + offDivs * divSec;
+        // Micro-timing deviations (owner spec): fractional div offsets edited
+        // in the roll ride on top of the grid values without changing them.
+        const t = t0 + (offDivs + (note.onsetDevDivs || 0)) * divSec;
+        if (note.durationDevDivs) {
+          note.duration = Math.max(0.03, (note.duration || note.durationDivs * divSec) + note.durationDevDivs * divSec);
+        }
         this._render(note, t);
         this._schedulePerc(note, t, divSec);
       }

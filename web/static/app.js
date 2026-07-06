@@ -370,7 +370,7 @@ const PARAM_DESC = {
   surpriseDynamicsDistance: "How far dynamic surprises sit from the ordinary loudness distribution",
   surpriseAllowMultiple: "Allow multiple feature changes on the same surprised note",
   incorporationRate: "When a motif-pass surprise occurs, chance it gets baked into the growing repertoire loop",
-  surpriseMaxBaked: "Maximum number of baked-in surprise variants allowed. Infinity lets the loop keep growing",
+  surpriseMaxBaked: "Maximum number of incorporated surprise variants allowed. Infinity lets the loop keep growing",
   formantChangeProb: "Probability of switching vowel sound between notes",
   formantFocus: "The formant at the centre of the visible accuracy/surprise distribution",
   formantEditAll: "Apply formant accuracy and surprise-distance edits to every formant at once",
@@ -383,7 +383,7 @@ const PARAM_DESC = {
   motifCount: "Number of distinct melodic patterns generated at the start",
   motifLengthBeats: "Length of each motif in beats (multiplied by beat divisions for total grid)",
   sequenceProb: "How strictly motifs follow a fixed order vs. random selection",
-  motifSurpriseProb: "Chance of a whole-motif repertoire mutation at a motif boundary. Counts toward the baked surprise limit",
+  motifSurpriseProb: "Chance of a whole-motif repertoire mutation at a motif boundary. Counts toward the incorporated surprise limit",
   percBeatVol: "Volume of the beat tick percussion layer",
   percMotifVol: "Volume of the accent that marks motif boundaries",
   percDownbeatVol: "Volume of the downbeat emphasis",
@@ -1817,13 +1817,25 @@ function selectedBakedRegion() {
   return null;
 }
 
+let rollDynLane = false; // Logic-style velocity pins lane toggle
+
 function rollPanelHTML() {
   const region = selectedBakedRegion();
   if (!rollOpen || !region) return "";
+  const ctxP = arrangement.context;
+  const beatDiv = region.notes[0]?.beatDivisions || ctxP.beatDivisions || 1;
+  const scaleLabel = ctxP.scaleMode === "edo"
+    ? `${ctxP.edoDivisions}-EDO`
+    : (SCALE_PRESETS[ctxP.scalePreset]?.label || ctxP.scalePreset || "major");
+  const keyName = NOTE_NAMES[((ctxP.keyRoot ?? 0) % 12 + 12) % 12] || "C";
   return `
-    <div class="roll-panel">
-      <canvas id="rollCanvas" width="960" height="240"></canvas>
-      <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies sit at the exact pitch sung; ghost outlines mark the intended scale note.</div>
+    <div class="roll-panel${rollDynLane ? " dyn" : ""}">
+      <div class="roll-head">
+        <span class="roll-meta">grid <b>${beatDiv}/beat</b> · scale <b>${esc(scaleLabel)}</b> · key <b>${esc(keyName)}</b></span>
+        <label class="roll-dyncheck"><input type="checkbox" id="rollDynToggle"${rollDynLane ? " checked" : ""}/> dynamics</label>
+      </div>
+      <canvas id="rollCanvas" width="960" height="${rollDynLane ? 300 : 240}"></canvas>
+      <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies show the realised pitch AND timing; ghost outlines mark the intended scale note and grid slot. ⇧-drag = micro-timing off the grid.</div>
     </div>`;
 }
 
@@ -1853,8 +1865,10 @@ function drawRoll(region) {
 
   const degs = notes.map(n => n.degree);
   const minDeg = Math.min(...degs) - 2, maxDeg = Math.max(...degs) + 2;
+  const laneH = rollDynLane ? 52 : 0; // Logic-style velocity pins lane
+  const pitchH = plotH - laneH;
   const rows = maxDeg - minDeg + 1;
-  const rowH = plotH / rows;
+  const rowH = pitchH / rows;
   const beatDivRoll = notes[0]?.beatDivisions || arrangement.context.beatDivisions || 1;
   const totalDivs = Math.max(regionLen(region) * beatDivRoll,
     1, ...notes.map(n => (n.offsetDivs || 0) + (n.durationDivs || 1)));
@@ -1870,7 +1884,7 @@ function drawRoll(region) {
       pc,
     };
   }
-  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, totalDivs, W, H, rowInfo, div };
+  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, totalDivs, W, H, rowInfo, div, laneH, laneTop: padT + pitchH };
 
   // Display well + scale-aware rows: out-of-scale divisions render dark
   // and are LOCKED from drags; sub-scale rows gold; root rows violet.
@@ -1913,26 +1927,36 @@ function drawRoll(region) {
   }
 
   _rollHits = [];
+  const pxPerDiv = plotW / totalDivs;
   notes.forEach((n, i) => {
     if (n.isRest || !n.velocity) return;
-    const x = xFor(n.offsetDivs || 0);
-    const w = Math.max(3, xFor((n.offsetDivs || 0) + (n.durationDivs || 1)) - x - 1.5);
+    // GRID slot (intended timing) vs REALISED timing: micro-devs and
+    // articulation gaps make the body deviate from its outline — same
+    // dual representation as pitch (owner spec).
+    const gx = xFor(n.offsetDivs || 0);
+    const gw = Math.max(3, (n.durationDivs || 1) * pxPerDiv - 1.5);
+    const x = gx + (n.onsetDevDivs || 0) * pxPerDiv;
+    const soundDivs = Math.max(0.1, ((n.durationDivs || 1) + (n.durationDevDivs || 0)) * (1 - Math.max(0, Math.min(0.9, n.gapFraction || 0))));
+    const w = Math.max(3, soundDivs * pxPerDiv - 1.5);
     const bodyH = Math.max(4, rowH * 0.7);
     const cents = n.intonationCents || 0;
-    // Ghost: the intended scale note, whenever the realised pitch missed it
-    if (Math.abs(cents) > 1) {
+    const timingDeviates = Math.abs(n.onsetDevDivs || 0) > 0.01
+      || Math.abs(n.durationDevDivs || 0) > 0.01 || (n.gapFraction || 0) > 0.05;
+    // Ghost: intended pitch row and/or intended grid slot
+    if (Math.abs(cents) > 1 || timingDeviates) {
       const gy = yForPitch(n.degree, 0) + rowH / 2 - bodyH / 2;
       ctx.strokeStyle = "rgba(154,160,171,0.35)";
       ctx.setLineDash([2, 2]);
       ctx.lineWidth = 1;
-      ctx.strokeRect(x, gy, w, bodyH);
+      ctx.strokeRect(gx, gy, gw, bodyH);
       ctx.setLineDash([]);
     }
-    // Body at the precise pitch
+    // Body at the precise pitch AND precise timing; shade = dynamics
     const y = yForPitch(n.degree, cents) + rowH / 2 - bodyH / 2;
     const sel = i === rollNoteSel;
     const col = n.isSurprise ? "56,189,248" : "245,166,35";
-    ctx.fillStyle = `rgba(${col},${sel ? 0.95 : 0.7})`;
+    const shade = 0.3 + 0.65 * Math.max(0, Math.min(1, n.velocity || 0));
+    ctx.fillStyle = `rgba(${col},${sel ? Math.max(0.95, shade) : shade})`;
     ctx.fillRect(x, y, w, bodyH);
     if (sel) {
       ctx.strokeStyle = "rgba(232,234,238,0.9)";
@@ -1947,12 +1971,37 @@ function drawRoll(region) {
     }
     _rollHits.push({ i, x, y, w, h: bodyH });
   });
+  // Dynamics lane: velocity pins under each onset (Logic-style)
+  if (rollDynLane) {
+    const laneTop = padT + pitchH;
+    ctx.strokeStyle = "rgba(154,160,171,0.25)";
+    ctx.beginPath(); ctx.moveTo(padL, laneTop + 2); ctx.lineTo(padL + plotW, laneTop + 2); ctx.stroke();
+    notes.forEach((n, i) => {
+      if (n.isRest || !n.velocity) return;
+      const px = xFor((n.offsetDivs || 0)) + (n.onsetDevDivs || 0) * pxPerDiv;
+      const ph = Math.max(2, (laneH - 8) * Math.max(0, Math.min(1, n.velocity)));
+      const sel = i === rollNoteSel;
+      ctx.strokeStyle = sel ? "#ffe3b0" : `rgba(245,166,35,${0.4 + 0.5 * n.velocity})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px, laneTop + laneH - 4);
+      ctx.lineTo(px, laneTop + laneH - 4 - ph);
+      ctx.stroke();
+      ctx.fillStyle = sel ? "#ffe3b0" : "#f5a623";
+      ctx.beginPath(); ctx.arc(px, laneTop + laneH - 4 - ph, 2.6, 0, 2 * Math.PI); ctx.fill();
+    });
+    ctx.lineWidth = 1;
+  }
   window._rollHitsQA = _rollHits; // QA hook: exact note rects for tests
 }
 
 function rollReadoutText(n) {
   const cents = Math.round(n.intonationCents || 0);
-  return `deg ${n.degree}  ·  ${cents >= 0 ? "+" : ""}${cents}¢${Math.abs(cents) > 1 ? ` off deg ${n.degree}` : " (on pitch)"}  ·  vel ${(n.velocity || 0).toFixed(2)}  ·  ${n.durationDivs || 1} div${(n.durationDivs || 1) > 1 ? "s" : ""}${n.isSurprise ? "  ·  surprise" : ""}`;
+  const od = n.onsetDevDivs || 0, dd = n.durationDevDivs || 0;
+  const timing = (Math.abs(od) > 0.01 || Math.abs(dd) > 0.01)
+    ? `  ·  micro ${od >= 0 ? "+" : ""}${od.toFixed(2)}/${dd >= 0 ? "+" : ""}${dd.toFixed(2)} div`
+    : "";
+  return `deg ${n.degree}  ·  ${cents >= 0 ? "+" : ""}${cents}¢${Math.abs(cents) > 1 ? "" : " (on pitch)"}  ·  vel ${(n.velocity || 0).toFixed(2)}  ·  ${n.durationDivs || 1} div${(n.durationDivs || 1) > 1 ? "s" : ""}${timing}${n.isSurprise ? "  ·  surprise" : ""}`;
 }
 
 function wireRoll(v) {
@@ -1960,6 +2009,11 @@ function wireRoll(v) {
   const region = selectedBakedRegion();
   if (!cv || !region) return;
   drawRoll(region);
+  const dynToggle = v.querySelector("#rollDynToggle");
+  if (dynToggle) dynToggle.onchange = () => {
+    rollDynLane = dynToggle.checked;
+    renderProduce();
+  };
   const readout = v.querySelector("#rollReadout");
   const setReadout = (text) => { if (readout) readout.textContent = text; };
   const canvasXY = (e) => {
@@ -1985,6 +2039,23 @@ function wireRoll(v) {
   };
   cv.onmousedown = (e) => {
     const { x, y } = canvasXY(e);
+    // dynamics lane: grab the nearest velocity pin
+    if (rollDynLane && _rollGeom && y > _rollGeom.laneTop) {
+      let best = null;
+      _rollHits.forEach(h => {
+        const d = Math.abs(h.x - x);
+        if (d < 8 && (!best || d < best.d)) best = { i: h.i, d };
+      });
+      if (best) {
+        rollNoteSel = best.i;
+        const note = region.notes[best.i];
+        drag = { i: best.i, note, mode: "velocity", startY: y, orig: { velocity: note.velocity || 0 }, moved: false };
+        drawRoll(region);
+        setReadout(rollReadoutText(note));
+        e.preventDefault();
+        return;
+      }
+    }
     const hit = _rollHits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y - 2 && y <= h.y + h.h + 2);
     if (!hit) {
       rollNoteSel = -1;
@@ -1997,10 +2068,13 @@ function wireRoll(v) {
     drag = {
       i: hit.i, note,
       mode: e.altKey ? "move" : edgeFor(hit, x),
+      micro: e.shiftKey, // ⇧ = fractional deviations riding on the grid value
       startX: x, startY: y,
       orig: {
         degree: note.degree, cents: note.intonationCents || 0,
         offsetDivs: note.offsetDivs || 0, durationDivs: note.durationDivs || 1,
+        onsetDevDivs: note.onsetDevDivs || 0, durationDevDivs: note.durationDevDivs || 0,
+        velocity: note.velocity || 0,
       },
       fine: e.altKey,
       moved: false,
@@ -2026,6 +2100,25 @@ function wireRoll(v) {
     const dy = y - drag.startY;
     if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
     const note = drag.note;
+    if (drag.mode === "velocity") {
+      note.velocity = Math.max(0.05, Math.min(1, drag.orig.velocity + (drag.startY - y) / Math.max(20, g.laneH - 8)));
+      drawRoll(region);
+      setReadout(rollReadoutText(note));
+      return;
+    }
+    const pxPerDivW = g.plotW / g.totalDivs;
+    if (drag.micro) {
+      // ⇧: micro-deviations — fractional divs off the grid, underlying
+      // grid values untouched (the timing twin of cents).
+      if (drag.mode === "trimR" || drag.mode === "trimL") {
+        note.durationDevDivs = Math.max(-0.9, Math.min(0.9, drag.orig.durationDevDivs + dx / pxPerDivW * (drag.mode === "trimL" ? -1 : 1)));
+      } else {
+        note.onsetDevDivs = Math.max(-0.9, Math.min(0.9, drag.orig.onsetDevDivs + dx / pxPerDivW));
+      }
+      drawRoll(region);
+      setReadout(rollReadoutText(note));
+      return;
+    }
     const divDelta = Math.round(dx / (g.plotW / g.totalDivs));
     // monophonic neighbours bound the trims
     const prevEnd = Math.max(0, ...region.notes
@@ -2058,7 +2151,7 @@ function wireRoll(v) {
         }
       }
       note.degree = target;
-      note.intonationCents = e.shiftKey ? 0 : drag.orig.cents;
+      note.intonationCents = drag.orig.cents; // cents ride along; ⌥ edits them
       const maxOffset = Math.max(0, g.totalDivs - (note.durationDivs || 1));
       note.offsetDivs = Math.max(0, Math.min(maxOffset, drag.orig.offsetDivs + divDelta));
     }
@@ -2075,11 +2168,17 @@ function wireRoll(v) {
       note.intonationCents = drag.orig.cents;
       note.offsetDivs = drag.orig.offsetDivs;
       note.durationDivs = drag.orig.durationDivs;
+      if ("onsetDevDivs" in drag.orig) note.onsetDevDivs = drag.orig.onsetDevDivs;
+      if ("durationDevDivs" in drag.orig) note.durationDevDivs = drag.orig.durationDevDivs;
+      if (drag.mode === "velocity") note.velocity = drag.orig.velocity;
     } else {
       const changed = note.degree !== drag.orig.degree
         || (note.intonationCents || 0) !== drag.orig.cents
         || (note.offsetDivs || 0) !== drag.orig.offsetDivs
-        || (note.durationDivs || 1) !== drag.orig.durationDivs;
+        || (note.durationDivs || 1) !== drag.orig.durationDivs
+        || (note.onsetDevDivs || 0) !== (drag.orig.onsetDevDivs || 0)
+        || (note.durationDevDivs || 0) !== (drag.orig.durationDevDivs || 0)
+        || (drag.mode === "velocity" && note.velocity !== drag.orig.velocity);
       if (changed) {
         note.frequency = freqFor(note.degree, note.intonationCents);
         note.edited = true;
@@ -2117,8 +2216,6 @@ function produceToolbarHTML() {
     <button class="btn btn-ghost btn-sm" id="regionSeedBack" title="Step back to the previous seed (⇧R)"${baked ? " disabled" : ""}>⤺ seed</button>
     <button class="btn btn-ghost btn-sm" id="regionSplit" title="Split at the playhead (⌘T) — both halves keep the same take">✂ Split</button>
     <button class="btn btn-ghost btn-sm" id="regionMute" title="Mute this region (playback and mixdown skip it)">Mute</button>
-    <button class="btn btn-secondary btn-sm" id="regionLonger" title="Extend this region by one slot">＋ Longer</button>
-    <button class="btn btn-secondary btn-sm" id="regionShorter" title="Shorten this region by one slot">− Shorter</button>
     <label class="region-gain-label" title="Region level (multiplies the track level during this region)">Lvl
       <input type="range" id="regionGain" min="0" max="1.5" step="0.05" value="${sel?.gain ?? 1}"/>
     </label>
@@ -2383,8 +2480,42 @@ function beginPointerDrag(kind, data, label, e) {
   document.addEventListener("mouseup", pointerDragUp);
 }
 
+function _dropPreviewEl() {
+  let el = document.getElementById("dropPreview");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "dropPreview";
+    el.className = "tl2-drop-preview";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 function pointerDragMove(e) {
   if (pointerDrag) pointerDrag.ctrl = e.ctrlKey;
+  // Insertion preview: while dragging over a lane, show EXACTLY where the
+  // region will land (snapped beat + width) before the mouse is released.
+  if (pointerDrag && pointerDrag.started) {
+    const lane = laneAtPoint(e.clientX, e.clientY);
+    const prev = _dropPreviewEl();
+    if (lane && lane.dataset.lane !== "__new__") {
+      const beat = beatAtClientX(lane, e.clientX);
+      let lenBeats = 8;
+      if (pointerDrag.kind === "region") {
+        const srcTrack = arrangement.tracks.find(t => t.id === pointerDrag.data.trackId);
+        const srcRegion = srcTrack?.regions.find(r => r.id === pointerDrag.data.regionId);
+        if (srcRegion) lenBeats = regionLen(srcRegion);
+      }
+      const rect = lane.getBoundingClientRect();
+      prev.style.display = "block";
+      prev.style.left = `${rect.left + beat * pxPerBeat}px`;
+      prev.style.top = `${rect.top}px`;
+      prev.style.width = `${lenBeats * pxPerBeat}px`;
+      prev.style.height = `${rect.height}px`;
+    } else {
+      prev.style.display = "none";
+    }
+  }
   if (!pointerDrag) return;
   if (!pointerDrag.started) {
     if (Math.abs(e.clientX - pointerDrag.startX) + Math.abs(e.clientY - pointerDrag.startY) < 5) return;
@@ -2411,6 +2542,8 @@ function pointerDragMove(e) {
 function pointerDragUp(e) {
   document.removeEventListener("mousemove", pointerDragMove);
   document.removeEventListener("mouseup", pointerDragUp);
+  const prevEl = document.getElementById("dropPreview");
+  if (prevEl) prevEl.style.display = "none";
   const drag = pointerDrag;
   pointerDrag = null;
   if (!drag) return;
@@ -2830,23 +2963,6 @@ function wireProduce(v) {
     renderProduce();
   };
 
-  const longerBtn = v.querySelector("#regionLonger");
-  if (longerBtn) longerBtn.onclick = () => {
-    const { track, region } = selected();
-    if (!track || !region) return;
-    region.lengthBeats = Math.min(maxRegionLength(track, region), regionLen(region) + BEATS_PER_BAR);
-    saveArrangement();
-    renderProduce();
-  };
-
-  const shorterBtn = v.querySelector("#regionShorter");
-  if (shorterBtn) shorterBtn.onclick = () => {
-    const { track, region } = selected();
-    if (!track || !region) return;
-    region.lengthBeats = Math.max(1, regionLen(region) - BEATS_PER_BAR);
-    saveArrangement();
-    renderProduce();
-  };
 
   // Mute / Solo (live: silences voices immediately, playback skips)
   v.querySelectorAll("[data-track-mute]").forEach(btn => {
@@ -4430,7 +4546,7 @@ function macroWorkspaceHTML(p) {
       <div class="controls-grid">
         ${controlRow("surpriseProb", "Surprise chance (per note)", p.surpriseProb, 0, 1, 0.01)}
         ${controlRow("incorporationRate", "Incorporation chance", p.incorporationRate, 0, 1, 0.01)}
-        ${selectControlRow("surpriseMaxBaked", "Max baked surprises", p.surpriseMaxBaked, bakedSurpriseOptions(p.surpriseMaxBaked))}
+        ${selectControlRow("surpriseMaxBaked", "Max incorporated surprises", p.surpriseMaxBaked, bakedSurpriseOptions(p.surpriseMaxBaked))}
       </div>
       ${checkboxControl("surpriseAllowMultiple", "Multiple features / note", p.surpriseAllowMultiple)}
       ${surpriseWeightControlsHTML(p)}
