@@ -5368,3 +5368,30 @@ body.dragging { cursor: grabbing; user-select: none; }
   color: var(--text2);
 }
 .region-gain-label input[type="range"] { width: 70px; }
+
+/* Producer v3 transport (block A) */
+.daw-pos {
+  font-size: 0.72rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  background: var(--display);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 8px;
+  min-width: 44px;
+  text-align: center;
+  cursor: pointer;
+}
+.daw-saved { font-size: 0.58rem; color: #58d6a9; min-width: 32px; }
+#arrLoop.loop-on { color: #5fd4c8; border-color: #2c5b56; background: rgba(95,212,200,0.08); }
+.zoom-slider { width: 74px; height: 12px; }
+.tl2-loop-range {
+  position: absolute;
+  top: 0;
+  height: 42%;
+  background: rgba(95,212,200,0.18);
+  border: 1px solid rgba(95,212,200,0.55);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.tl2-loop-range.dim { opacity: 0.35; }

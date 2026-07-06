@@ -1511,10 +1511,33 @@ function producerVoice(track) {
 
 function updatePlayhead(beat) {
   const line = document.getElementById("tlPlayhead");
-  if (!line) return;
-  if (beat == null || beat < 0) { line.classList.add("hidden"); return; }
-  line.classList.remove("hidden");
-  line.style.left = `${beat * pxPerBeat}px`;
+  if (line) {
+    if (beat == null || beat < 0) line.classList.add("hidden");
+    else {
+      line.classList.remove("hidden");
+      line.style.left = `${beat * pxPerBeat}px`;
+    }
+  }
+  // bar.beat position readout (spec T2)
+  const pos = document.getElementById("arrPos");
+  if (pos && beat != null && beat >= 0) {
+    pos.textContent = `${Math.floor(beat / BEATS_PER_BAR) + 1}.${(Math.floor(beat) % BEATS_PER_BAR) + 1}`;
+  }
+  // page-follow during playback (spec T11)
+  if (arrPlay && line) {
+    const scroller = document.querySelector(".timeline-grid");
+    if (scroller) {
+      const px = beat * pxPerBeat;
+      if (px > scroller.scrollLeft + scroller.clientWidth - 40) scroller.scrollLeft = px - 40;
+      else if (px < scroller.scrollLeft) scroller.scrollLeft = Math.max(0, px - 40);
+    }
+  }
+}
+
+function pauseArrangement() {
+  if (!arrPlay) return;
+  playheadBeat = arrPlay.beat; // resume point
+  stopArrangement();
 }
 
 function stopArrangement() {
@@ -1534,11 +1557,19 @@ function playArrangement(fromBeat = 0) {
   arrPlay = { beat: Math.max(0, Math.floor(fromBeat)), lastBeat, timer: null };
   const step = () => {
     if (!arrPlay) return;
-    const b = arrPlay.beat;
-    if (b > arrPlay.lastBeat) {
+    let b = arrPlay.beat;
+    // loop/cycle range (spec T4)
+    const lr = arrangement.loopOn && arrangement.loopRange ? arrangement.loopRange : null;
+    if (lr && b >= lr.b) {
+      producerVoices.forEach(vv => vv.stop());
+      b = Math.max(0, Math.floor(lr.a));
+      arrPlay.beat = b;
+      arrPlay.startAt = b;
+    }
+    if (!lr && b > arrPlay.lastBeat) {
       stopArrangement();
       const btn = document.querySelector("#arrPlayBtn");
-      if (btn) btn.textContent = "▶ Play";
+      if (btn) btn.textContent = "▶";
       return;
     }
     for (const track of arrangement.tracks) {
@@ -1756,6 +1787,7 @@ function produceTimelineHTML() {
       <div class="tl2-row tl2-ruler-row">
         <div class="tl2-head tl2-corner"></div>
         <div class="tl2-ruler" id="tlRuler" style="width:${laneW}px">${rulerMarks}
+          <div class="tl2-loop-range${arrangement.loopRange ? (arrangement.loopOn ? "" : " dim") : " hidden"}" id="tlLoopRange" style="left:${(arrangement.loopRange?.a || 0) * pxPerBeat}px;width:${((arrangement.loopRange?.b || 0) - (arrangement.loopRange?.a || 0)) * pxPerBeat}px"></div>
           <div class="tl2-playhead hidden" id="tlPlayhead"></div>
         </div>
       </div>
@@ -2017,8 +2049,10 @@ function paletteZoneAtPoint(x, y) {
 function beatAtClientX(lane, clientX) {
   const rect = lane.getBoundingClientRect();
   const raw = (clientX - rect.left) / pxPerBeat;
-  const snapped = Math.round(raw / snapBeats) * snapBeats;
-  return Math.max(0, Math.min(totalBeats() - snapBeats, snapped));
+  // snap Off (0) and ⌃-drag both bypass the grid (spec T10; ⌥ stays copy)
+  const grid = (pointerDrag && pointerDrag.ctrl) ? 0 : snapBeats;
+  const snapped = grid > 0 ? Math.round(raw / grid) * grid : Math.round(raw * 100) / 100;
+  return Math.max(0, Math.min(totalBeats() - Math.max(0.25, grid), snapped));
 }
 
 function trackAudible(track) {
@@ -2109,6 +2143,38 @@ if (!window._dawKeysInstalled) {
     if (e.code === "Space") {
       e.preventDefault();
       document.querySelector("#arrPlayBtn")?.click();
+    } else if (e.key === "Enter" && !e.metaKey) {
+      e.preventDefault();
+      document.querySelector("#arrRTZ")?.click();
+    } else if (e.key.toLowerCase() === "z" && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      // Z = zoom-to-fit arrangement; ⇧Z = zoom-to-selection (spec T9)
+      const grid = document.querySelector(".timeline-grid");
+      if (grid) {
+        if (e.shiftKey && selectedRegion) {
+          const tr = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+          const rg = tr && tr.regions.find(r => r.id === selectedRegion.regionId);
+          if (rg) {
+            dawLayout.pxPerBeat = Math.max(6, Math.min(32, Math.floor(grid.clientWidth * 0.8 / Math.max(4, regionLen(rg)))));
+            saveDawLayout();
+            renderProduce();
+          }
+        } else {
+          dawLayout.pxPerBeat = Math.max(6, Math.min(32, Math.floor((grid.clientWidth - 160) / Math.max(8, totalBeats()))));
+          saveDawLayout();
+          renderProduce();
+        }
+      }
+    } else if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      dawLayout.pxPerBeat = Math.min(32, (dawLayout.pxPerBeat || 14) + 3);
+      saveDawLayout();
+      renderProduce();
+    } else if ((e.metaKey || e.ctrlKey) && e.key === "-") {
+      e.preventDefault();
+      dawLayout.pxPerBeat = Math.max(6, (dawLayout.pxPerBeat || 14) - 3);
+      saveDawLayout();
+      renderProduce();
     } else if ((e.key === "Delete" || e.key === "Backspace") && selectedRegion) {
       e.preventDefault();
       document.querySelector("#regionDelete")?.click();
@@ -2134,6 +2200,7 @@ function beginPointerDrag(kind, data, label, e) {
 }
 
 function pointerDragMove(e) {
+  if (pointerDrag) pointerDrag.ctrl = e.ctrlKey;
   if (!pointerDrag) return;
   if (!pointerDrag.started) {
     if (Math.abs(e.clientX - pointerDrag.startX) + Math.abs(e.clientY - pointerDrag.startY) < 5) return;
@@ -2225,19 +2292,25 @@ function renderProduce() {
         <button class="btn btn-ghost btn-sm" id="arrNew" title="New empty arrangement">New</button>
         <button class="btn btn-ghost btn-sm" id="arrRename" title="Rename this arrangement">Aa</button>
         <button class="btn btn-ghost btn-sm" id="arrDelete" title="Delete this arrangement">🗑</button>
-        <button class="btn btn-primary btn-sm" id="arrPlayBtn">▶ Play</button>
-        <button class="btn btn-secondary btn-sm" id="prodStop">■</button>
+        <button class="btn btn-ghost btn-sm" id="arrRTZ" title="Return to bar 1 (Return)">⏮</button>
+        <button class="btn btn-primary btn-sm" id="arrPlayBtn" title="Play / pause (Space)">▶</button>
+        <button class="btn btn-secondary btn-sm" id="prodStop" title="Stop (returns to the start marker)">■</button>
+        <button class="btn btn-ghost btn-sm${arrangement.loopOn ? " loop-on" : ""}" id="arrLoop" title="Cycle the loop range (drag the ruler's top half to set it)">⟳</button>
+        <span class="daw-pos" id="arrPos" title="Position bar.beat — click to locate">${Math.floor(playheadBeat / BEATS_PER_BAR) + 1}.${(Math.floor(playheadBeat) % BEATS_PER_BAR) + 1}</span>
+        <span class="daw-saved" id="arrSaved"></span>
         <span class="daw-sep"></span>
         ${sessionBarControlsHTML()}
         <span class="daw-sep"></span>
         <button class="btn btn-ghost btn-sm" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">↩</button>
         <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
         <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
-        <select id="snapSelect" class="daw-ctx-select" title="Grid snap">
+        <select id="snapSelect" class="daw-ctx-select" title="Grid snap (⌃-drag bypasses)">
           <option value="4"${snapBeats === 4 ? " selected" : ""}>Bar</option>
           <option value="1"${snapBeats === 1 ? " selected" : ""}>Beat</option>
           <option value="0.5"${snapBeats === 0.5 ? " selected" : ""}>½ beat</option>
+          <option value="0"${snapBeats === 0 ? " selected" : ""}>Off</option>
         </select>
+        <input type="range" id="zoomSlider" min="6" max="32" step="1" value="${pxPerBeat}" title="Zoom (Z = fit arrangement, ⇧Z = fit selection)" class="zoom-slider"/>
         <button class="btn btn-ghost btn-sm" id="addBars" title="Lengthen the arrangement by 8 bars">＋8 bars</button>
         <span class="daw-sep"></span>
         <button class="btn btn-secondary btn-sm" id="arrMixdown" title="Render the arrangement offline and download it as a WAV">⬇ WAV</button>
@@ -2388,11 +2461,55 @@ function wireProduce(v) {
 
   // Click the ruler to set the playhead
   const ruler = v.querySelector("#tlRuler");
-  if (ruler) ruler.onclick = (e) => {
-    const rect = ruler.getBoundingClientRect();
-    playheadBeat = Math.max(0, Math.min(totalBeats() - 1, Math.round((e.clientX - rect.left) / pxPerBeat)));
-    updatePlayhead(playheadBeat);
-  };
+  if (ruler) {
+    const beatAt = (e) => {
+      const rect = ruler.getBoundingClientRect();
+      return Math.max(0, Math.min(totalBeats() - 1, Math.round((e.clientX - rect.left) / pxPerBeat)));
+    };
+    ruler.onmousedown = (e) => {
+      e.preventDefault();
+      const rect = ruler.getBoundingClientRect();
+      const topHalf = (e.clientY - rect.top) < rect.height * 0.45;
+      if (topHalf) {
+        // drag the top half to set the loop/cycle range (spec T4)
+        const a0 = beatAt(e);
+        let moved = false;
+        const move = (ev) => {
+          const b1 = beatAt(ev);
+          if (b1 !== a0) moved = true;
+          arrangement.loopRange = { a: Math.min(a0, b1), b: Math.max(a0, b1) + 1 };
+          const lr = document.getElementById("tlLoopRange");
+          if (lr) {
+            lr.classList.remove("hidden");
+            lr.style.left = `${arrangement.loopRange.a * pxPerBeat}px`;
+            lr.style.width = `${(arrangement.loopRange.b - arrangement.loopRange.a) * pxPerBeat}px`;
+          }
+        };
+        const up = () => {
+          window.removeEventListener("mousemove", move);
+          window.removeEventListener("mouseup", up);
+          if (moved) {
+            arrangement.loopOn = true;
+            saveArrangement("set loop range");
+            renderProduce();
+          }
+        };
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+        return;
+      }
+      // bottom half: locate + scrub (silent — determinism makes scrub-audio misleading)
+      const locate = (ev) => {
+        playheadBeat = beatAt(ev);
+        updatePlayhead(playheadBeat);
+      };
+      locate(e);
+      const move = (ev) => locate(ev);
+      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+  }
   updatePlayhead(arrPlay ? arrPlay.beat : playheadBeat);
 
   wireRoll(v);
@@ -2572,11 +2689,11 @@ function wireProduce(v) {
   const arrPlayBtn = v.querySelector("#arrPlayBtn");
   if (arrPlayBtn) arrPlayBtn.onclick = () => {
     if (arrPlay) {
-      stopArrangement();
-      arrPlayBtn.textContent = "▶ Play arrangement";
+      pauseArrangement();               // pause keeps the resume point
+      arrPlayBtn.textContent = "▶";
     } else {
       playArrangement(playheadBeat);
-      arrPlayBtn.textContent = "■ Stop";
+      arrPlayBtn.textContent = "⏸";
     }
   };
 
@@ -2631,6 +2748,34 @@ function wireProduce(v) {
 
   const undoBtn = v.querySelector("#undoBtn");
   if (undoBtn) undoBtn.onclick = () => undoArrangement();
+
+  const rtz = v.querySelector("#arrRTZ");
+  if (rtz) rtz.onclick = () => {
+    playheadBeat = 0;
+    if (arrPlay) playArrangement(0);
+    else updatePlayhead(0);
+  };
+  const loopBtn = v.querySelector("#arrLoop");
+  if (loopBtn) loopBtn.onclick = () => {
+    if (!arrangement.loopRange) {
+      arrangement.loopRange = { a: 0, b: Math.min(totalBeats(), 8 * BEATS_PER_BAR) };
+    }
+    arrangement.loopOn = !arrangement.loopOn;
+    saveArrangement("loop toggle");
+    renderProduce();
+  };
+  const posEl = v.querySelector("#arrPos");
+  if (posEl) posEl.onclick = () => {
+    const raw = prompt("Go to (bar or bar.beat):", posEl.textContent);
+    if (!raw) return;
+    const [bar, beat] = raw.split(".").map(Number);
+    if (!Number.isFinite(bar)) return;
+    playheadBeat = Math.max(0, Math.min(totalBeats() - 1,
+      (bar - 1) * BEATS_PER_BAR + (Number.isFinite(beat) ? beat - 1 : 0)));
+    updatePlayhead(playheadBeat);
+  };
+  const zoomSlider = v.querySelector("#zoomSlider");
+  if (zoomSlider) zoomSlider.onchange = () => setZoom(Number(zoomSlider.value));
 
   const addBars = v.querySelector("#addBars");
   if (addBars) addBars.onclick = () => {
