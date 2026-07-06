@@ -358,3 +358,25 @@ overlaps resolved Logic-style by trimming the previous note):
   stage position; toggleable
 - Keep: dual precise/intended pitch, ⌥ cents drag, loop-source ghosts,
   loop-aware editing, region highlight while editing
+
+## Addendum 2 (owner, 2026-07-07 morning): paradigm corrections
+
+1. **Patches, not presets, are the palette's currency**: a patch =
+   macro/behaviour params (melody, rhythm, sequence, surprise) × subnote/
+   tone params, combined. Palette slots display both halves; dropping a
+   SECTION preset onto an existing slot replaces just that half
+   ("Warm Cello × Pentatonic Drift"). Only palette patches create regions.
+2. **Roll duration editing is mandatory** (both-edge trim) — was already
+   in the Logic-parity addendum; owner re-flagged. Build first.
+3. **Roll rows must show the pitch system**: all scale divisions as rows;
+   in-scale rows normal; sub-scale rows gold-tinted; root rows violet;
+   out-of-scale divisions rendered dim and LOCKED from note drags by
+   default (engine notes are degree-indexed; chromatic escape would need
+   a note-model extension — documented, not built).
+4. **Key = pitch reference of scale degree 0** (already true since U1) —
+   relabel to make the semantics obvious ("Key (root pitch)").
+5. **Paradigm audit** of producer concepts that assume a sample-DAW world:
+   only patches are region sources (browser section presets act on palette
+   slots instead); pan superseded by stage placement; re-instrument rules
+   on cross-track drag; tempo/scale stay session-tier. Audit note kept in
+   this spec; fixes land with blocks.
