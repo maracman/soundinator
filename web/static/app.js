@@ -4681,6 +4681,15 @@ function subnoteWorkspaceHTML(p) {
                 <div class="section-label">Tone Designer</div>
                 <h2>${esc(profile.label)}</h2>
               </div>
+              <div class="ch-head-mid">
+                <select data-param-select="spectralProfile" class="param-select" title="Starting points — carefully shaped instruments to depart from; tweak anything, then save the result as your own instrument">
+                  ${spectralProfileOptions(p.spectralProfile)}
+                </select>
+                <label class="ch-mix">mix
+                  <input type="range" data-param="spectralMix" min="0" max="1" step="0.01" value="${p.spectralMix}"/>
+                  <output id="out_spectralMix">${fmtOutput("spectralMix", p.spectralMix)}</output>
+                </label>
+              </div>
               <div class="ch-readout">f₀ <b>${(p.tonicHz || 261.63).toFixed(1)} Hz</b> · ${esc(noteNameForHz(p.tonicHz || 261.63))} · ${Math.round(p.spectralPartials || 20)} partials</div>
             </div>
             <div class="ch-rail" id="chRail">
@@ -4757,13 +4766,7 @@ function subnoteWorkspaceHTML(p) {
           </div>
 
           <div class="subnote-side-section${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
-            <div class="section-label">Instrument</div>
-            <select data-param-select="spectralProfile" class="param-select">
-              ${spectralProfileOptions(p.spectralProfile)}
-            </select>
-            <div class="controls-grid">
-              ${controlRow("spectralMix", "Mix", p.spectralMix, 0, 1, 0.01)}
-            </div>
+            <div class="section-label">Advanced shaping</div>
             <details class="formant-detail">
               <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery until the tone print's focus editing replaces them.">Advanced</summary>
               <div class="controls-grid">

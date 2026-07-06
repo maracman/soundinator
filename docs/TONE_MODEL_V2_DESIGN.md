@@ -493,3 +493,79 @@ coupling lane + pinned readout, status bar), C2 focus system (filter
 chips, lens brush, channel strips), C3 polish parity (ghost pre-drag
 dots, physics captions/diagrams, A/B compare, per-partial S/M).
 Producer v2's Q4 re-audition remains a separate open item.*
+
+---
+
+## CH-B — Sub-note builder audit (owner, 2026-07-07 morning)
+
+Owner questions answered with decisions; build arcs CH-B1..B4.
+
+**1. Where does the voice/formant path belong?** Considered the two named
+options and a third:
+- (a) instrument/voice switcher — rejected: it preserves the false split
+  the chain was built to remove (a voice is not a different synth).
+- (b) formant probabilities as part of BODY — right direction, incomplete
+  as stated (a static body can't sing).
+- **(c) CHOSEN: ARTICULATED BODIES.** A body is a set of fixed-Hz bands
+  (T5). What makes a voice a voice is that its body MOVES: per-note vowel
+  selection probabilities, vowel-change probability, vowel surprise, and
+  drift are ARTICULATION parameters of the BODY stage. Any body may be
+  articulated (a "wah" violin is the same machinery). The separate
+  Formant sound-source mode and its saw+bandpass render path retire; the
+  vowel pad, weights, change/surprise probabilities and Colour
+  Distribution (drift = body wobble; breath → EXCITOR) move into the
+  BODY inspector. Engine: per-note body-band selection from the existing
+  vowel-space walk (B4a machinery), applied through the T5 body response;
+  vibrato FM→AM already works. = **CH-B1** (engine + BODY inspector UI +
+  formant-mode retirement with preset migration).
+
+**2. P1/P2 strips hidden** — FIXED now (v137): the field column is its
+own scroller, print 150 px, strips land in view; duplicate CSS height
+rule removed.
+
+**3. Instrument select placement** — FIXED now: the instrument (starting
+point) select + Mix live in the Tone Designer header, where the mockup
+had them.
+
+**4. Attack/release placement + "doesn't change with preset"** — presets
+DO apply (verified flute 0.055 s vs piano 0.004 s attack); the panel just
+lives in the far column where the change is invisible. **CH-B2**: move
+envelope + vibrato + attack-noise into a PERFORMANCE block of the
+EXCITOR inspector (they are how energy enters over time), with the ADSR
+canvas beside the knobs so preset changes visibly reshape it.
+
+**5. What instrument presets are for** — they are full sub-note starting
+points (spectrum + performance + excitation + body). Decision: keep a
+curated set of ~8, explicitly labelled starting points; users tweak and
+re-save as their own instruments (save flow exists). **CH-B3**: a
+curation listening pass (each starting point re-tuned under the v2
+engine: excitation defaults, Human, Transfer, body, B) + a prominent
+"Save as my instrument" in the designer header.
+
+**6. Missing imperfections (audit)** — gaps against real instruments:
+  - onset pitch scoop/overshoot (attack glide into the note) — biggest
+    audible absence; bowed/blown notes approach pitch from below.
+  - per-partial ATTACK stagger (audit A13: bowed attacks develop low→
+    high; struck shed high→low) — planned, never built.
+  - release ring: dampers/decay tails when a note ends (struck/plucked
+    notes currently gate with the envelope rather than ring down).
+  - breath/bow pitch instability as slow f0 wander (Human currently
+    modulates amplitude/brightness only, not pitch).
+  - velocity→attack-noise coupling (harder hit = louder hammer/chiff).
+  = **CH-B4**, in that priority order; each is a small engine addition
+  with a headless assertion.
+
+**7. Layering (multiphonic with interaction)** — accepted as a major
+feature: an instrument may hold up to 3 LAYERS (each a patch + level +
+octave/register offset + stage position). One generative stream drives
+all layers (orchestration doubling, preserving determinism); layers
+interact physically via CROSS-LAYER TRANSFER — the T4 coupling computed
+over the union of layers' realised partials, so a struck layer's strong
+partials stimulate a sustained layer's coincident modes (sympathetic
+stimulation, exactly as the owner asked). Shared room; per-layer stage
+position. = **CH-B5** (engine: multi-fingerprint render + cross-set
+transferDeltas; UI: layer list in the designer header; producer patches
+carry layers transparently).
+
+Build order: CH-B1 (articulated bodies) → CH-B2 (performance block) →
+CH-B4 imperfections → CH-B5 layering → CH-B3 curation listening pass.

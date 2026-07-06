@@ -2537,7 +2537,9 @@ body.explore-mode #app {
 }
 .ch-inspector .space-pad { width: 100%; height: 110px; }
 
-.ch-field-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ch-field-wrap { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.ch-field-wrap::-webkit-scrollbar { width: 7px; }
+.ch-field-wrap::-webkit-scrollbar-thumb { background: rgba(245,166,35,0.35); border-radius: 4px; }
 .ch-field-pos { position: relative; }
 .ch-focus-row { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .ch-focus-label, .ch-lens-label { font-size: 0.58rem; letter-spacing: 0.14em; color: var(--text3); margin-right: 2px; }
@@ -2554,7 +2556,7 @@ body.explore-mode #app {
 .ch-chip.active { color: #5fd4c8; border-color: #2c5b56; background: rgba(95, 212, 200, 0.07); }
 .ch-focus-sum { margin-left: auto; font-size: 0.62rem; color: var(--text2); font-variant-numeric: tabular-nums; }
 
-#cvTonePrint { height: 208px; }
+#cvTonePrint { flex: none; }
 .ch-pin {
   position: absolute;
   z-index: 5;
@@ -2574,10 +2576,12 @@ body.explore-mode #app {
 .ch-pin-head { color: #5fd4c8; font-size: 0.62rem; letter-spacing: 0.1em; margin-bottom: 2px; }
 .ch-pin-head span { font-size: 0.54rem; background: rgba(95, 212, 200, 0.15); padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
 
-.ch-lens-row { display: flex; gap: 6px; align-items: center; }
+.ch-lens-row { display: flex; gap: 6px; align-items: center; flex: none; }
 #cvLens { flex: 1; height: 26px; background: var(--display); border: 1px solid var(--border); border-radius: 5px; cursor: ew-resize; display: block; }
 
-.ch-strip { display: flex; gap: 6px; overflow-x: auto; min-height: 30px; }
+.ch-strip { display: flex; gap: 6px; overflow-x: auto; min-height: 30px; flex: none; padding-bottom: 2px; }
+.harmonic-stage::-webkit-scrollbar { width: 7px; }
+.harmonic-stage::-webkit-scrollbar-thumb { background: rgba(245,166,35,0.3); border-radius: 4px; }
 .ch-ch {
   flex: 0 0 128px;
   border: 1px solid var(--border);
@@ -2688,7 +2692,7 @@ body.explore-mode #app {
 #cvTonePrint {
   display: block;
   width: 100%;
-  height: 225px;
+  height: 150px;
   background: var(--display);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -5420,3 +5424,9 @@ body.dragging { cursor: grabbing; user-select: none; }
   cursor: ns-resize;
   font-variant-numeric: tabular-nums;
 }
+
+.ch-head-mid { display: flex; gap: 10px; align-items: center; flex: 1; justify-content: center; min-width: 0; }
+.ch-head-mid .param-select { max-width: 150px; }
+.ch-mix { display: flex; gap: 5px; align-items: center; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+.ch-mix input { width: 70px; height: 12px; }
+.ch-mix output { font-size: 0.62rem; color: var(--text2); }
