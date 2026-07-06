@@ -4747,7 +4747,6 @@ function drawDistributions() {
   drawFormantAccuracyDist();
   drawGapDist();
   drawReverbDist();
-  drawSpectrumDist();
   drawVibratoDist();
   drawEnvelopeDist();
   drawTonePrint();
@@ -6057,46 +6056,6 @@ function drawReverbDist() {
   ctx.fillText(`${duration.toFixed(1)}s`, w - 2, h - 2);
 }
 
-function drawSpectrumDist() {
-  const cv = document.getElementById("cvSpectrum");
-  if (!cv) return;
-  const { ctx, w, h } = crisp2d(cv);
-  ctx.clearRect(0, 0, w, h);
-
-  const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
-  const count = Math.max(1, Math.min(profile.partials.length, Math.round(exploreParams.spectralPartials || 20)));
-  ensureSpectralPartialParams(exploreParams);
-  const mix = exploreParams.spectralMix || 0;
-  const levels = exploreParams.spectralPartialMeans.slice(0, count).map((amp, i) => {
-    const reg = exploreParams.spectralPartialRegs[i] || 0;
-    return amp * spectralVisualResponse(profile, i + 1, reg, 0);
-  });
-  const peak = Math.max(0.001, ...levels);
-  const barGap = 2;
-  const barW = Math.max(4, (w - barGap * (count + 1)) / count);
-
-  ctx.fillStyle = "rgba(245,158,11,0.08)";
-  ctx.fillRect(0, 0, w, h);
-  levels.forEach((amp, i) => {
-    const x = barGap + i * (barW + barGap);
-    const norm = amp / peak;
-    const y = h - norm * (h - 7) - 3;
-    const top = Math.max(1, y);
-    const sd = exploreParams.spectralPartialSds[i] || 0;
-    const band = Math.min(h - 3, (sd / peak) * (h - 7));
-    ctx.fillStyle = "rgba(59,130,246,0.16)";
-    ctx.fillRect(x, Math.max(2, top - band), barW, Math.max(2, band * 2));
-    ctx.fillStyle = `rgba(245,158,11,${0.25 + mix * 0.55})`;
-    ctx.fillRect(x, top, barW, h - top - 3);
-  });
-
-  ctx.fillStyle = "rgba(136,153,170,0.72)";
-  ctx.font = "8px system-ui";
-  ctx.textAlign = "left";
-  ctx.fillText("1", 2, h - 2);
-  ctx.textAlign = "right";
-  ctx.fillText(String(count), w - 2, h - 2);
-}
 
 function drawVibratoDist() {
   const canvases = document.querySelectorAll(".js-vibrato-canvas");
@@ -6163,125 +6122,6 @@ function drawVibratoDist() {
   });
 }
 
-function drawHarmonicSignature() {
-  const cv = document.getElementById("cvHarmonicSignature");
-  if (!cv) return;
-  const { ctx, w, h } = crisp2d(cv);
-  ctx.clearRect(0, 0, w, h);
-
-  ensureSpectralPartialParams(exploreParams);
-  const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
-  const count = Math.max(1, Math.min(profile.partials.length, Math.round(exploreParams.spectralPartials || 20)));
-  // Tone v2 (T1): the display shows the same realised frequencies the
-  // renderer produces — ratio table + anchored stiff-string B law.
-  const partialB = Number.isFinite(exploreParams.partialB)
-    ? Math.max(0, exploreParams.partialB)
-    : legacyStretchToB(exploreParams.spectralStretchCents || 0);
-  const resClass = exploreParams.resonatorClass || "string";
-  const partials = profile.partials.slice(0, count).map((partial, i) => {
-    const harmonic = i + 1;
-    const baseMean = exploreParams.spectralPartialMeans[i] || 0;
-    const reg = exploreParams.spectralPartialRegs[i] || 0;
-    return {
-      harmonic,
-      baseMean,
-      mean: baseMean * spectralVisualResponse(profile, harmonic, reg, 0),
-      lowMean: baseMean * spectralVisualResponse(profile, harmonic, reg, -1),
-      highMean: baseMean * spectralVisualResponse(profile, harmonic, reg, 1),
-      sd: exploreParams.spectralPartialSds[i] || 0,
-      reg,
-      freq: partialFrequency(harmonic, 1, partialB, resClass),
-    };
-  });
-  const peak = Math.max(0.001, ...partials.map(p => Math.max(p.mean, p.lowMean, p.highMean) + p.sd * 2));
-  const plotX0 = 86;
-  const plotX1 = w - 18;
-  const plotW = plotX1 - plotX0;
-  const top = 12;
-  const bottom = h - 12;
-  const gap = 4;
-  const combinedH = Math.max(92, h * 0.17);
-  const laneH = Math.max(14, (bottom - top - combinedH - gap * count) / count);
-
-  ctx.font = "10px system-ui";
-  ctx.textBaseline = "middle";
-
-  partials.forEach((part, i) => {
-    const y0 = top + i * (laneH + gap);
-    const mid = y0 + laneH / 2;
-    const ampPx = laneH * 0.43;
-    const meanNorm = part.mean / peak;
-    const lowNorm = part.lowMean / peak;
-    const highNorm = part.highMean / peak;
-    const sdNorm = part.sd / peak;
-    const phaseCycles = part.freq;
-
-    ctx.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.026)" : "rgba(255,255,255,0.015)";
-    ctx.fillRect(plotX0, y0, plotW, laneH);
-    ctx.strokeStyle = "rgba(136,153,170,0.12)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(plotX0, mid);
-    ctx.lineTo(plotX1, mid);
-    ctx.stroke();
-
-    drawSinePath(ctx, plotX0, plotX1, mid, phaseCycles, ampPx * meanNorm, {
-      stroke: "rgba(59,130,246,0.30)",
-      width: Math.max(2, sdNorm * ampPx * 2.5),
-    });
-    drawSinePath(ctx, plotX0, plotX1, mid, phaseCycles, ampPx * lowNorm, {
-      stroke: "rgba(148,163,184,0.46)",
-      width: 1,
-    });
-    drawSinePath(ctx, plotX0, plotX1, mid, phaseCycles, ampPx * highNorm, {
-      stroke: "rgba(34,197,94,0.62)",
-      width: 1,
-    });
-    drawSinePath(ctx, plotX0, plotX1, mid, phaseCycles, ampPx * meanNorm, {
-      stroke: "rgba(245,158,11,0.88)",
-      width: 1.4,
-    });
-
-    ctx.fillStyle = "rgba(245,158,11,0.86)";
-    ctx.textAlign = "left";
-    ctx.fillText(`H${part.harmonic}`, 12, mid);
-    ctx.fillStyle = "rgba(136,153,170,0.76)";
-    ctx.fillText(`${part.freq.toFixed(part.freq >= 10 ? 1 : 2)}x f0`, 38, mid);
-    ctx.textAlign = "right";
-    ctx.fillText(`M ${Math.round(part.mean * 100)}%`, plotX1 - 48, mid);
-    ctx.fillText(`R ${part.reg >= 0 ? "+" : ""}${part.reg.toFixed(1)}`, plotX1, mid);
-  });
-
-  const combinedY0 = bottom - combinedH;
-  const combinedMid = combinedY0 + combinedH / 2;
-  const combinedAmp = combinedH * 0.42;
-  ctx.fillStyle = "rgba(245,158,11,0.045)";
-  ctx.fillRect(plotX0, combinedY0, plotW, combinedH);
-  ctx.strokeStyle = "rgba(136,153,170,0.18)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(plotX0, combinedMid);
-  ctx.lineTo(plotX1, combinedMid);
-  ctx.stroke();
-
-  const meanWave = combinedWave(partials, 0);
-  for (let sample = 1; sample <= 3; sample++) {
-    drawCombinedPath(ctx, plotX0, plotX1, combinedMid, combinedAmp, combinedWave(partials, sample), {
-      stroke: "rgba(226,232,240,0.22)",
-      width: 1,
-    });
-  }
-  drawCombinedPath(ctx, plotX0, plotX1, combinedMid, combinedAmp, meanWave, {
-    stroke: "rgba(34,197,94,0.90)",
-    width: 1.8,
-  });
-
-  ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(245,158,11,0.86)";
-  ctx.fillText("SUM", 12, combinedMid);
-  ctx.fillStyle = "rgba(136,153,170,0.76)";
-  ctx.fillText("combined waveform", 38, combinedMid);
-}
 
 // ── T7: the tone print — the resonator's interactive view ──────────
 // One display, engine-true: the partial set comes from the SAME
@@ -6548,14 +6388,6 @@ function drawBodyRidge() {
   ctx.stroke();
 }
 
-// T5: register response is body-only (audit A7) — the display shows the
-// same fixed-Hz body law the engine uses, evaluated an octave down/up.
-function spectralVisualResponse(profile, harmonic, _reg, registerOctaves) {
-  const resonanceAmount = clamp(exploreParams.spectralResonanceAmount ?? 0.35, 0, 1.5);
-  const bands = bodyBandsFor(exploreParams, profile);
-  const freq = Math.max(1, (exploreParams.tonicHz || 261.63) * harmonic * Math.pow(2, registerOctaves));
-  return bodyResponse(bands, freq, resonanceAmount);
-}
 
 function drawSinePath(ctx, x0, x1, mid, cycles, amplitude, opts) {
   ctx.strokeStyle = opts.stroke;
@@ -6574,41 +6406,7 @@ function drawSinePath(ctx, x0, x1, mid, cycles, amplitude, opts) {
   ctx.stroke();
 }
 
-function combinedWave(partials, sampleIndex) {
-  const samples = [];
-  const steps = 420;
-  let maxAbs = 0;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    let y = 0;
-    partials.forEach((part, j) => {
-      const sampledAmp = sampleIndex === 0
-        ? part.mean
-        : Math.max(0, part.mean + visualGaussian(j, sampleIndex) * part.sd);
-      y += sampledAmp * Math.sin(Math.PI * 2 * part.freq * t);
-    });
-    samples.push(y);
-    maxAbs = Math.max(maxAbs, Math.abs(y));
-  }
-  const norm = maxAbs || 1;
-  return samples.map(y => y / norm);
-}
 
-function drawCombinedPath(ctx, x0, x1, mid, amplitude, samples, opts) {
-  ctx.strokeStyle = opts.stroke;
-  ctx.lineWidth = opts.width;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  samples.forEach((v, i) => {
-    const t = i / Math.max(1, samples.length - 1);
-    const x = x0 + (x1 - x0) * t;
-    const y = mid - v * amplitude;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-}
 
 function visualGaussian(i, j) {
   const u1 = visualUniform(i * 17 + j * 31 + 1);

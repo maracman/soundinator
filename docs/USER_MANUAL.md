@@ -1,6 +1,6 @@
 # Sound Studio User Manual
 
-Last checked against `web/static/app.js` and `web/static/synth.js` on 2026-07-03.
+Last checked against `web/static/app.js` and `web/static/synth.js` on 2026-07-06 (tone model v2).
 
 This manual describes the current web app: the volunteer study flow, the
 Sound Studio (Explore), the preset system, the Sub-note timbre workshop, and
@@ -350,61 +350,76 @@ formant-filter/body colour inside individual notes.
 | Resonance | Random shift of formant filter resonance/Q. | Narrower or wider vowel resonance. |
 | Breath | Adds probabilistic noise/breath component. | Air in the tone. |
 
-### Instrument Fourier Print
+### The Tone Builder (Fourier path)
 
-Active when `Sound Source > Fourier` is selected. This is the instrument-like
-spectral fingerprint. Each harmonic has a fixed frequency slot: H1 = 1 × f0
-(the fundamental), H2 = 2 × f0, and so on, with each amplitude controlled by
-a probability distribution.
+Active when `Sound Source > Fourier` is selected. Since tone model v2, this
+is a physical signal chain, laid out as four numbered stage cards with the
+signal flowing left to right:
 
-The **Instrument profile** selector loads one of eight profiles built from
-published spectral data: flute, clarinet, violin, cello, trumpet, trombone,
-piano, or vocal. A profile carries more than amplitudes — each has a
-*performance character*: its own envelope tendencies, vibrato behaviour,
-attack noise (breath, bow, hammer), and a Material damping setting, so a
-piano decays like a struck string and a flute breathes.
+    1·EXCITOR  →  2·RESONATOR  →  3·BODY  →  4·SPACE
+    how energy     what rings,      the box     the room
+    enters         how long,        around it   (the Space
+                   what couples                 panel)
 
-| Control | Meaning | Musical analogy |
+**1 · EXCITOR — how energy enters**
+
+| Control | Meaning | Physics |
 |---|---|---|
-| Instrument profile | Loads the harmonic fingerprint plus performance character for one of the eight instruments. | Choosing the instrument family. |
-| Sample chance | Chance that each new note samples every harmonic amplitude from its current mean/SD distribution. If it does not sample, it uses the current dynamics/register/resonance-shaped means. | Whether each note gets a fresh spectral fingerprint. |
-| Mix | Overall level of the additive harmonic fingerprint. At zero, Fourier mode is effectively silent except for any breath/noise. | How much the instrument body dominates. |
-| Harmonics | Number of harmonic partials used, from 1 to 32. | How rich/bright the spectrum can be. |
-| Dyn response | Global strength of each harmonic's dynamics sensitivity. | Upper harmonics blooming when played louder. |
-| Reg response | Global strength of register sensitivity. | Timbre changing across low and high notes. |
-| Resonance | Strength of fixed instrument resonances acting on harmonic frequencies. | Body resonances or formant-like spectral peaks. |
-| Loud norm | How much random harmonic amplitude draws are normalised back toward expected loudness. | Timbre variation without huge volume jumps. |
-| Hold drift | Chance that harmonic amplitudes continue wandering during a held note long enough for drift to be scheduled. | Living tone rather than static oscillator. |
-| Drift depth | How much of each harmonic's SD is used for held-note drift. | Subtle shimmer vs unstable tone. |
-| Drift rate | How often held-note harmonic amplitudes redraw and glide. | Slow timbral breathing vs rapid flicker. |
-| Freq stretch | Optional high-harmonic frequency stretch in cents. `0` keeps harmonic frequencies fixed at integer multiples. | Piano-string-like inharmonicity. |
+| Excite | Bow, pluck, strike, or blow. | Each type has its real drive spectrum: a bow drives ≈1/n continuously, a pluck releases ≈1/n², a strike is near-flat below its hardness corner, blown air ≈1/n with a breath-noise floor. |
+| Position | Where the string/tube/membrane is excited (0.02–0.5). | Modes with a node at that point go silent — 0.5 kills every even partial, ⅓ every third. Applied relative to the instrument's natural playing position. |
+| Hardness | Contact hardness for strike/pluck. | Soft felt stays in contact longer and cannot inject highs; hard wood can. No effect on bow/blow. |
+| Human | The player. | One seeded fluctuation per note wobbles bow pressure / breath support — the whole spectrum moves together, brighter when pushed, with occasional bow slips or breath bursts. Struck notes get per-note velocity/hardness jitter (a hammer cannot wobble after contact). 0 = machine. |
+| Dyn response | How much louder playing brightens the tone. | One global louder-is-brighter law; upper partials bloom more. |
 
-### Partial Macros
+**2 · RESONATOR — what rings, how long, what couples**
 
-Rather than editing 32 harmonics one at a time, the macro controls transform
-the whole harmonic set at once (an approach borrowed from physical-modelling
-synths like RipplerX and Resonarium):
-
-| Control | Meaning | Musical analogy |
+| Control | Meaning | Physics |
 |---|---|---|
-| Tilt | Spectral slope: negative darkens (rolls off highs), positive brightens. | Playing closer to or further from the bridge. |
-| Odd / even | Rebalances odd vs even harmonics. Fully negative mutes evens (hollow, clarinet-like); fully positive mutes odds. | Cylindrical vs conical bore character. |
-| Comb boost / Comb centre | Boosts harmonics near a chosen harmonic number and its multiples. | Emphasising a body resonance. |
-| Material | Damping law applied per note: low values let every partial ring (glass, metal); high values kill upper partials quickly (wood, felt). Higher harmonics always decay faster. | What the instrument is made of. |
-| Octave-group faders: Fund (1), Oct (2), 3–4, 5–8, 9–16, 17+ | Level fader per octave band of harmonics. | A six-band graphic EQ over the harmonic series. |
+| Material | Damping law, glass/metal → wood → felt. | Ring time is a function of each partial's REAL frequency (T60 law): a 4 kHz mode rings the same wherever it sits in the series. |
+| Inharmonic | Stiff-string constant B. | Partials sharpen as n·f0·√(1+Bn²); piano bass ≈ 1e-4. Rising B detunes pairs out of sympathetic resonance. |
+| Transfer | Sympathetic resonance between partials. | Energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Never based on equal temperament. |
+| Brightness | Spectral slope. | Negative darkens, positive brightens (±~4.5 dB/oct). |
+| Harmonics | Number of partials, 1–64. | Instrument-modeller parity; inaudible and above-16 kHz partials are culled automatically. |
 
-The per-harmonic detail table (below the macros) still allows exact editing:
+**3 · BODY — the box around it**
 
-| Label | Meaning |
+| Control | Meaning |
 |---|---|
-| Hn | Harmonic number. H5 means 5 × f0 before optional stretch. |
-| M | Mean amplitude for this harmonic. |
-| SD | Standard deviation for this harmonic's amplitude distribution. |
-| D | Dynamics sensitivity. Positive values bloom with higher velocity. |
-| R | Register sensitivity. Positive values favour higher registers. |
+| Body | A set of fixed-Hz resonance bands. `Auto (instrument)` keeps the instrument's measured body; **vowels are bodies too** — put an "ah" around violin partials if you like. The mini display shows the ridge curve live. |
+| Amount | How strongly the body shapes the spectrum. |
 
-The display shows the amplitude mean (orange), SD band (blue), low/high
-register response (grey/green), and the combined waveform sum at the bottom.
+With vibrato, partials sitting on a body ridge shimmer in amplitude,
+phase-locked to the pitch wobble (real FM→AM) — a large part of why
+vibrato sounds alive.
+
+**4 · SPACE** — the existing Space panel (reverb), shown as the chain's
+final stage with a live readout.
+
+**The tone print** below the chain is the resonator's interactive view,
+and shows exactly what renders (no hidden shaping):
+
+- Each needle is a partial at its **realised frequency** (log axis); the
+  **afterglow trail length is its ring time** — Material is literally
+  visible.
+- The blue ridge is the Body curve (stage 3); the faint dashed comb is the
+  Excitor's node pattern (stage 1).
+- **Tap a partial**: its true-ratio relatives arc up, labelled `3:2 −2¢`
+  etc., with a readout of level, ring time, and couplings.
+- **Drag a needle vertically** to rewrite that partial's level, live.
+- **Band chips** (fund / low / mid / presence / air — real Hz bands)
+  focus the print and scope the per-partial M/SD strip to just that band.
+
+The side panel keeps the **Instrument** selector (eight profiles built from
+published spectral data, each with envelope/vibrato/attack-noise character
+and its natural excitation) and **Mix**, plus an **Advanced** disclosure
+(odd/even, comb, octave-group faders) for surgery the physical controls
+don't cover.
+
+**Migration**: presets and instruments saved on the old tone model load
+cleanly — the old `Freq stretch` becomes the exact equivalent B, old
+Hold-drift wobble seeds the Human dial, and the retired controls (Sample
+chance, Hold drift, Drift depth/rate, Loud norm, Reg response, per-partial
+D/R columns) are translated or absorbed by the physical stages.
 
 ### Vibrato Distribution
 
@@ -555,10 +570,13 @@ Not necessarily bugs, but places where the interface can confuse users:
 5. Surprise `Probability` and Repertoire `Whole motif` both grow the
    repertoire and both count toward `Max baked`; the former surprises one
    note in a pass, the latter varies one note at a motif boundary.
-6. `Sample chance` randomises harmonic amplitudes once at note onset;
-   `Hold drift` keeps sampling during a held note.
-7. `Freq stretch` above zero breaks strictly fixed harmonic frequencies.
-   Research designs requiring exact integer harmonics should leave it at 0.
+6. All within-note timbral randomness now comes from the single `Human`
+   dial (one coherent player fluctuation per note, seeded and exactly
+   reproducible). If a research design needs machine-steady timbre, set
+   Human to 0.
+7. `Inharmonic` (B) above zero bends partials away from exact integer
+   multiples. Research designs requiring strictly harmonic spectra should
+   leave it at 0 — this also maximises the Transfer coupling.
 8. Very high `Incorporation`, `Whole motif`, and `Max baked = Infinity`
    grow the loop continuously — musically interesting, less controlled for
    comparison tasks. Use a finite `Max baked` for structured listening.
