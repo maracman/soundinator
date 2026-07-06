@@ -449,7 +449,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.75, vibratoRate: 5.2, vibratoRateSd: 0.3, vibratoDepth: 10, vibratoDepthSd: 3,
     attackNoise: { level: 0.4, freq: 2800, q: 0.8, decay: 0.07 },
     partialMaterial: 0.35,
-    excitation: { type: "blow", position: 0.24, hardness: 0.6 },
+    excitation: { type: "blow", position: 0.24, hardness: 0.6, human: 0.5 },
     spectralDynamicAmount: 0.7,
   },
   clarinet: {
@@ -458,7 +458,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.1, vibratoRate: 5.0, vibratoRateSd: 0.2, vibratoDepth: 4, vibratoDepthSd: 1.5,
     attackNoise: { level: 0.12, freq: 1800, q: 1.2, decay: 0.04 },
     partialMaterial: 0.4,
-    excitation: { type: "blow", position: 0.15, hardness: 0.6 },
+    excitation: { type: "blow", position: 0.15, hardness: 0.6, human: 0.35 },
     spectralDynamicAmount: 0.75,
   },
   violin: {
@@ -467,7 +467,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.85, vibratoRate: 5.9, vibratoRateSd: 0.4, vibratoDepth: 16, vibratoDepthSd: 4,
     attackNoise: { level: 0.3, freq: 3400, q: 1.0, decay: 0.09 },
     partialMaterial: 0.5,
-    excitation: { type: "bow", position: 0.13, hardness: 0.6 },
+    excitation: { type: "bow", position: 0.13, hardness: 0.6, human: 0.4 },
     spectralDynamicAmount: 0.85,
   },
   cello: {
@@ -476,7 +476,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.8, vibratoRate: 5.1, vibratoRateSd: 0.35, vibratoDepth: 14, vibratoDepthSd: 4,
     attackNoise: { level: 0.32, freq: 1500, q: 1.0, decay: 0.11 },
     partialMaterial: 0.5,
-    excitation: { type: "bow", position: 0.11, hardness: 0.6 },
+    excitation: { type: "bow", position: 0.11, hardness: 0.6, human: 0.4 },
     spectralDynamicAmount: 0.85,
   },
   trumpet: {
@@ -485,7 +485,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.3, vibratoRate: 5.4, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
     attackNoise: { level: 0.2, freq: 900, q: 1.4, decay: 0.045 },
     partialMaterial: 0.28,
-    excitation: { type: "blow", position: 0.3, hardness: 0.6 },
+    excitation: { type: "blow", position: 0.3, hardness: 0.6, human: 0.35 },
     spectralDynamicAmount: 1.25,
   },
   trombone: {
@@ -494,7 +494,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.25, vibratoRate: 5.0, vibratoRateSd: 0.3, vibratoDepth: 7, vibratoDepthSd: 2.5,
     attackNoise: { level: 0.22, freq: 480, q: 1.3, decay: 0.06 },
     partialMaterial: 0.32,
-    excitation: { type: "blow", position: 0.3, hardness: 0.6 },
+    excitation: { type: "blow", position: 0.3, hardness: 0.6, human: 0.35 },
     spectralDynamicAmount: 1.2,
   },
   piano: {
@@ -505,7 +505,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0, vibratoRate: 5, vibratoRateSd: 0, vibratoDepth: 0, vibratoDepthSd: 0,
     attackNoise: { level: 0.26, freq: 350, q: 0.7, decay: 0.02 },
     partialMaterial: 0.7,
-    excitation: { type: "strike", position: 0.12, hardness: 0.62 },
+    excitation: { type: "strike", position: 0.12, hardness: 0.62, human: 0.1 },
     spectralDynamicAmount: 1.0,
     spectralStretchCents: 8, // string inharmonicity stretches upper partials
   },
@@ -515,7 +515,7 @@ const SPECTRAL_PERFORMANCE = {
     vibratoProb: 0.85, vibratoRate: 5.5, vibratoRateSd: 0.5, vibratoDepth: 18, vibratoDepthSd: 6,
     attackNoise: { level: 0.14, freq: 2200, q: 0.9, decay: 0.05 },
     partialMaterial: 0.42,
-    excitation: { type: "bow", position: 0.35, hardness: 0.6 },
+    excitation: { type: "bow", position: 0.35, hardness: 0.6, human: 0.5 },
     spectralDynamicAmount: 0.8,
   },
 };
@@ -628,6 +628,42 @@ export function excitationSpectrum(type, n, { position = 0.5, hardness = 0.6, fr
 // bow-force behaviour); spectralDynamicAmount scales the whole law.
 export function dynamicBrightness(n) {
   return 0.5 * Math.log2(1 + Math.max(1, n));
+}
+
+// ── Tone model v2: the Human dial (T3, §3.1) ──
+//
+// One seeded fluctuation per note stands in for the player: bow pressure /
+// breath support drifting slowly with faster grain on top, occasional bow
+// slips or breath bursts. It modulates the WHOLE spectrum coherently —
+// replacing the old independent per-partial Gaussian draws and Hold-drift
+// (audit A1) — with upper partials moving proportionally more (Schelleng:
+// force brightens). Struck/plucked notes get no mid-note trace: a hammer
+// cannot wobble after contact (their humanity is per-note jitter instead).
+export function humanFluctuationTrace(nextRandom, durationSec, type, human) {
+  const h = Math.max(0, Math.min(1, human ?? 0));
+  if (h <= 0 || type === "strike" || type === "pluck" || durationSec < 0.12) return [];
+  const gauss = () => {
+    const u1 = Math.max(1e-6, nextRandom()), u2 = Math.max(1e-6, nextRandom());
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  };
+  const rate = type === "blow" ? 7 : 10;
+  const pts = [];
+  let slow = 0, fast = 0;
+  for (let t = 1 / rate; t < durationSec - 0.015; t += (1 / rate) * (0.8 + nextRandom() * 0.4)) {
+    slow = slow * 0.86 + gauss() * 0.3;   // pressure/support drift (mean-reverting)
+    fast = fast * 0.45 + gauss() * 0.5;   // grain / turbulence
+    let f = slow * 0.75 + fast * 0.35;
+    if (type === "bow" && nextRandom() < 0.05 * h) f -= 0.8 + nextRandom() * 0.6;  // slip
+    if (type === "blow" && nextRandom() < 0.06 * h) f += 0.6 + nextRandom() * 0.5; // burst
+    pts.push({ t, f: Math.max(-1, Math.min(1, f)) });
+  }
+  return pts;
+}
+
+// Schelleng shaping: how strongly mode n follows the shared fluctuation —
+// everything moves together, the top proportionally more.
+export function humanPartialShape(n) {
+  return 0.35 + 0.65 * Math.log2(1 + Math.max(1, n)) / Math.log2(65);
 }
 
 // ── Extend every profile's partial table to 64 harmonics ─────
@@ -1286,12 +1322,9 @@ export class GenerationEngine {
     const profile = SPECTRAL_PROFILES[this.p.spectralProfile] || SPECTRAL_PROFILES.violin;
     const fourierMode = (this.p.voiceMode || "formant") !== "formant";
     const count = Math.max(1, Math.min(profile.partials.length, Math.round(this.p.spectralPartials ?? 12)));
-    const sampleChance = this._clamp(this.p.spectralProb ?? 1, 0, 1);
-    const shouldSample = this.rng.next() < sampleChance;
     const dynamicsAmount = Math.max(0, this.p.spectralDynamicAmount ?? 0.8);
     const registerAmount = this._clamp(this.p.spectralRegisterAmount ?? 0.55, 0, 1.5);
     const resonanceAmount = this._clamp(this.p.spectralResonanceAmount ?? 0.35, 0, 1.5);
-    const loudnessNorm = this._clamp(this.p.spectralLoudnessNorm ?? 0.65, 0, 1);
     const velocityRatio = Math.max(0.08, velocity / 0.62);
     const means = Array.isArray(this.p.spectralPartialMeans) ? this.p.spectralPartialMeans : [];
     const sds = Array.isArray(this.p.spectralPartialSds) ? this.p.spectralPartialSds : [];
@@ -1309,7 +1342,19 @@ export class GenerationEngine {
     const excDefault = profile.performance?.excitation || { type: "bow", position: 0.5, hardness: 0.6 };
     const excType = this.p.excitationType || excDefault.type || "bow";
     const excPos = Number.isFinite(this.p.excitationPosition) ? this.p.excitationPosition : (excDefault.position ?? 0.5);
-    const excHard = Number.isFinite(this.p.excitationHardness) ? this.p.excitationHardness : (excDefault.hardness ?? 0.6);
+    let excHard = Number.isFinite(this.p.excitationHardness) ? this.p.excitationHardness : (excDefault.hardness ?? 0.6);
+    // The Human dial (T3): one coherent draw stands in for the player's
+    // onset variation (audit A1 — no more independent per-partial draws).
+    // Struck/plucked humanity is per-note only: hardness and level jitter,
+    // since a hammer cannot wobble after contact.
+    const human = this._clamp(
+      Number.isFinite(this.p.excitationHuman) ? this.p.excitationHuman : (excDefault.human ?? 0.35), 0, 1);
+    const onsetF = human > 0 ? Math.max(-1, Math.min(1, this._gaussian() * 0.45)) : 0;
+    let levelJitter = 1;
+    if (human > 0 && (excType === "strike" || excType === "pluck")) {
+      excHard = this._clamp(excHard + this._gaussian() * 0.05 * human, 0, 1);
+      levelJitter = Math.max(0.5, 1 + this._gaussian() * 0.04 * human);
+    }
     let referenceNorm = 0;
     const partials = profile.partials.slice(0, count).map((partial, i) => {
       const fallbackAmp = typeof partial === "number" ? partial : partial.amp;
@@ -1336,13 +1381,18 @@ export class GenerationEngine {
       });
       const excitation = excBase > 1e-6 ? Math.min(8, excCur / excBase) : (excCur > 1e-6 ? 8 : 1);
       const dynamicMean = amp * dynamics * registerResponse * excitation * this._partialMacroGain(harmonic);
-      const sampled = shouldSample ? Math.max(0, dynamicMean + this._gaussian() * sd) : dynamicMean;
+      // Per-partial sensitivity to the shared fluctuation — the old SD grid
+      // reinterpreted: partials that used to wobble a lot follow the player
+      // harder, but always in the same direction as everyone else.
+      const sens = this._clamp(sd / Math.max(0.005, amp), 0, 2);
+      const sampled = Math.max(0, dynamicMean * levelJitter * (1 + human * sens * onsetF * humanPartialShape(harmonic)));
       referenceNorm += amp;
       return {
         harmonic,
         amp: sampled,
         mean: dynamicMean,
         sd,
+        sens,
         reg,
         registerResponse,
         harmonicFrequency,
@@ -1353,10 +1403,8 @@ export class GenerationEngine {
       attackNoise: profile.performance?.attackNoise || null,
       partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
       spectralMix: fourierMode ? (this.p.spectralMix ?? 0) : 0,
-      spectralDriftProb: this.p.spectralDriftProb ?? 1,
-      spectralDriftDepth: this.p.spectralDriftDepth ?? 0.35,
-      spectralDriftRate: this.p.spectralDriftRate ?? 6,
-      spectralLoudnessNorm: loudnessNorm,
+      excitationType: excType,
+      excitationHuman: human,
       spectralReferenceNorm: Math.max(0.001, referenceNorm),
       spectralStretchCents: this.p.spectralStretchCents ?? 0,
       // Tone v2 resonator (T1): inharmonicity as a physical B constant
@@ -2253,7 +2301,6 @@ export class SynthEngine {
       this._masterOut.gain.cancelScheduledValues(now);
       this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
     }
-    this._lastLoudnessCorr = null;
 
     this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
     this._vibratoActive = false;
@@ -2412,7 +2459,6 @@ export class SynthEngine {
       this._masterOut.gain.cancelScheduledValues(now);
       this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
     }
-    this._lastLoudnessCorr = null;
     this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05, totalBeats, loopBeats);
     this.playing = true;
   }
@@ -2985,47 +3031,53 @@ export class SynthEngine {
       this._track(osc);
     });
     this._schedulePartialAmplitudes(scheduled, note, t0, t1);
+    if ((note.excitationType || "") === "blow") this._renderBlowFloor(note, t0, t1, env);
   }
 
+  // T3 Human: one seeded fluctuation trace per note drives every partial
+  // together (audit A1 — the old independent per-partial redraws and the
+  // loudness-norm slew hack (A9) are gone; a coherent excitation conserves
+  // its own energy, and its level wobble IS the player).
   _schedulePartialAmplitudes(partials, note, t0, t1) {
     if (partials.length === 0) return;
-    const drawAndSchedule = (draws, time, method = "setValueAtTime") => {
-      const correction = this._partialLoudnessCorrection(partials, draws, note);
-      partials.forEach((item, i) => {
-        item.param[method](item.gainScale * Math.max(0, draws[i]) * correction, time);
-      });
-    };
-
-    drawAndSchedule(partials.map(item => item.part.amp), t0);
-
-    const chance = this._clamp(note.spectralDriftProb ?? 0, 0, 1);
-    const depth = this._clamp(note.spectralDriftDepth ?? 0, 0, 1);
-    const rate = this._clamp(note.spectralDriftRate ?? 0, 0, 30);
-    const duration = t1 - t0;
-    const canDrift = partials.some(item => item.part.sd > 0);
-    if (duration < 0.12 || depth <= 0 || rate <= 0 || !canDrift || this._nextRandom() >= chance) return;
-
-    let t = t0 + 1 / rate;
-    while (t < t1 - 0.015) {
-      const draws = partials.map(item => Math.max(0, item.part.mean + this._gaussian() * item.part.sd * depth));
-      drawAndSchedule(draws, t, "linearRampToValueAtTime");
-      t += (1 / rate) * (0.75 + this._nextRandom() * 0.5);
+    partials.forEach(item => item.param.setValueAtTime(item.gainScale * Math.max(0, item.part.amp), t0));
+    const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
+    const trace = humanFluctuationTrace(() => this._nextRandom(), t1 - t0, note.excitationType || "bow", human);
+    for (const pt of trace) {
+      for (const item of partials) {
+        const n = item.part.harmonic || 1;
+        const sens = item.part.sens ?? 0.3;
+        const v = Math.max(0, item.part.amp * (1 + human * sens * pt.f * humanPartialShape(n)));
+        item.param.linearRampToValueAtTime(item.gainScale * v, t0 + pt.t);
+      }
     }
   }
 
-  _partialLoudnessCorrection(partials, draws, note) {
-    const amount = this._clamp(note.spectralLoudnessNorm ?? 0.65, 0, 1);
-    if (amount <= 0) return 1;
-    const target = partials.reduce((sum, item) => sum + Math.max(0, item.part.mean || 0), 0);
-    const actual = draws.reduce((sum, amp) => sum + Math.max(0, amp), 0);
-    if (target <= 0.0001 || actual <= 0.0001) return 1;
-    let corr = Math.pow(this._clamp(target / actual, 0.25, 4), amount);
-    // Slew-limit the correction so re-normalisation can't jump the level
-    // audibly between consecutive draws/notes (max ±30% per step).
-    const prev = this._lastLoudnessCorr;
-    if (prev) corr = this._clamp(corr, prev * 0.7, prev * 1.3);
-    this._lastLoudnessCorr = corr;
-    return corr;
+  // Continuous breath-noise floor for blown excitation (T3): air is always
+  // audibly moving through a wind instrument; level follows the Human dial.
+  _renderBlowFloor(note, t0, t1, env) {
+    if (!this._noiseBuffer || !note.velocity || t1 - t0 < 0.15) return;
+    const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
+    if (human <= 0) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    src.loop = true;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.setValueAtTime(2200, t0);
+    bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    const level = Math.max(0.0001, note.velocity * human * 0.035);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(level, t0 + 0.08);
+    g.gain.setValueAtTime(level, Math.max(t0 + 0.08, t1 - 0.06));
+    g.gain.linearRampToValueAtTime(0.0001, t1);
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(env);
+    src.start(t0);
+    src.stop(t1 + 0.02);
+    this._track(src);
   }
 
   _nextRandom() {

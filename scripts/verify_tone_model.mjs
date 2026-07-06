@@ -14,6 +14,8 @@ import {
   hardnessRolloff,
   excitationSpectrum,
   dynamicBrightness,
+  humanFluctuationTrace,
+  humanPartialShape,
   SPECTRAL_PROFILES,
   GenerationEngine,
 } from "../web/static/synth.js";
@@ -184,5 +186,52 @@ console.log("T2: engine excitation transform (normalised against profile default
     (plain.harmonicPartials[7].mean / Math.max(1e-9, plain.harmonicPartials[0].mean)));
 }
 
+console.log("T-B4: Human fluctuation — coherent, deterministic, silent at zero");
+{
+  const mkRng = (seed) => { let s = seed >>> 0; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
+  const a = humanFluctuationTrace(mkRng(99), 3, "bow", 0.6);
+  const b = humanFluctuationTrace(mkRng(99), 3, "bow", 0.6);
+  check("trace deterministic per seed", a.length > 0 && a.length === b.length &&
+    a.every((p, i) => p.t === b[i].t && p.f === b[i].f));
+  check("trace differs across seeds",
+    JSON.stringify(a) !== JSON.stringify(humanFluctuationTrace(mkRng(100), 3, "bow", 0.6)));
+  check("zero at Human 0", humanFluctuationTrace(mkRng(99), 3, "bow", 0).length === 0);
+  check("no mid-note trace for strike/pluck",
+    humanFluctuationTrace(mkRng(99), 3, "strike", 0.8).length === 0 &&
+    humanFluctuationTrace(mkRng(99), 3, "pluck", 0.8).length === 0);
+  check("trace bounded to ±1", a.every(p => p.f >= -1 && p.f <= 1));
+  check("Schelleng shape: top follows harder, all positive (coherent)",
+    humanPartialShape(1) > 0 && humanPartialShape(32) > humanPartialShape(8) && humanPartialShape(8) > humanPartialShape(1));
+
+  const GEN3 = {
+    seed: 11, tempo: 104, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    voiceMode: "fourier", spectralPartials: 24, spectralProfile: "violin",
+  };
+  const firstNote = (params) => {
+    const e = new GenerationEngine(params); e.initialise();
+    for (let i = 0; i < 24; i++) { const n = e.nextNote(); if (n && n.velocity > 0 && n.harmonicPartials) return n; }
+    return null;
+  };
+  const h1 = firstNote({ ...GEN3, excitationHuman: 0.7 });
+  const h2 = firstNote({ ...GEN3, excitationHuman: 0.7 });
+  check("onset draw deterministic per seed",
+    h1 && h2 && h1.harmonicPartials.every((p, i) => p.amp === h2.harmonicPartials[i].amp));
+  const base = firstNote({ ...GEN3, excitationHuman: 0 });
+  check("Human 0: sounded amps equal computed means exactly (A1 closed)",
+    base && base.harmonicPartials.every(p => near(p.amp, p.mean, 1e-12)));
+  // Coherence: every partial with sensitivity deviates in the SAME direction
+  const dirs = h1.harmonicPartials
+    .map(p => (p.sens > 0.02 && p.mean > 1e-6 ? Math.sign(p.amp - p.mean) : null))
+    .filter(d => d !== null);
+  check("onset variation coherent across the spectrum (single shared draw)",
+    dirs.length > 6 && (dirs.every(d => d >= 0) || dirs.every(d => d <= 0)));
+  // Old independent-sampling params are dead: spectralProb no longer changes anything
+  const probOn = firstNote({ ...GEN3, excitationHuman: 0, spectralProb: 1 });
+  const probOff = firstNote({ ...GEN3, excitationHuman: 0, spectralProb: 0 });
+  check("spectralProb retired (identical output either way)",
+    probOn && probOff && probOn.harmonicPartials.every((p, i) => p.amp === probOff.harmonicPartials[i].amp));
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
-console.log("\nAll tone-model v2 assertions passed (T1 + T2).");
+console.log("\nAll tone-model v2 assertions passed (T1 + T2 + T3).");

@@ -377,8 +377,20 @@ Quality:
   silences modes 2/4 at ½, 3/6 at ⅓, measured through the engine) and
   the normalisation identity. Verified live (piano re-seats to strike,
   mid-play pluck switch clean).
-- **T3 Human**: coherent 1/f excitation fluctuation replacing per-partial
-  draws/drift/normalisation (A1/A9).
+- **T3 Human** — DONE (2026-07-06): excitationHuman param (per-instrument
+  defaults: piano 0.1 … flute/vocal 0.5); one seeded mean-reverting
+  fluctuation per note (slow pressure drift + faster grain, bow-slip dips
+  / breath bursts) drives every partial together with Schelleng shaping
+  (humanPartialShape); old SD grid reinterpreted as per-partial
+  sensitivity (sd/mean); coherent single-draw onset variation replaces
+  per-partial Gaussian sampling (A1 closed); strike/pluck get per-note
+  hardness+level jitter only; continuous breath-noise floor for blown
+  excitation; Sample chance / Hold drift / Drift depth / Drift rate /
+  Loud norm retired from engine and UI (A9 closed — coherent excitation
+  conserves its own energy). Headless: +10 assertions (T-B4 —
+  determinism, coherence direction test, zero-at-0, spectralProb proven
+  inert). Verified live on flute (blow floor + trace), zero console
+  errors.
 - **T4 Transfer**: realised-frequency coupling + scheduling.
 - **T5 Body**: unify formants; FM→AM; vowel pad over body space.
 - **T6 Character panel + migration**: eight dials wired; old-preset
