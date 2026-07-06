@@ -329,13 +329,17 @@ tone section first; formant path unified (excitation → resonator → body);
 best-effort preset migration. Supersedes the D5/D7 tone line: remaining
 tone-fidelity concerns fold into this model.
 
-- [x] H0 (=T0). Plan + audit (14 physics findings verified in synth.js)
-  + static direction mockup, committed 2a9caf7. **Gate T-Q4: owner
-  sign-off on plan/mockup required before any engine work.**
-- [ ] H1–H8 (=T1–T8). Resonator core → excitation → Human imperfection →
-  transfer coupling → body unification → character panel + migration →
-  interactive tone print → walkthrough/A-B renders/owner audition
-  (T-Q5). Full acceptance bar T-B1..9 / T-Q1..5 in the design doc.
+- [x] H0 (=T0). Plan + audit + mockup (2a9caf7); T-Q4 APPROVED
+  2026-07-06; rev B mockup made the staged chain the layout (ad42f0f).
+- [x] H1–H7 (=T1–T7). ALL BUILT 2026-07-06, one commit per stage:
+  resonator core (2804dab) → excitation (6ad3bfd) → Human (bb083b2) →
+  transfer (d05b2d1) → body/vowels-as-bodies + FM→AM (babee65) →
+  staged-chain tone builder + migration (1132744) → interactive tone
+  print (ed591e2). 85 headless physics assertions in CI.
+- [~] H8 (=T8). Walkthrough clean (T-Q1), CPU benchmarked (T-B7), live
+  A/B servers standing (old engine :8766 / new :8765).
+  **AWAITING T-Q5 OWNER AUDITION** — plus owner decision on retiring
+  the separate Formant source mode now that vowels are bodies.
 
 ## Cross-cutting
 

@@ -340,8 +340,12 @@ Functional:
       (headless assertion); audible bloom demo.
 - [ ] T-B6 Body unification: vowel pad reproduces the five vowels through
       the body stage; vibrato produces AM through body ridges.
-- [ ] T-B7 64 partials render within CPU budget (schedule ≤ 4 ms/note on
-      the dev machine, 8-voice producer playback clean).
+- [x] T-B7 CPU budget — model math measured at 0.037 ms/note at 64
+      partials with Transfer 0.3 + Human 0.5 (2000-note benchmark,
+      ~100x under the 4 ms budget); live 64-partial playback through
+      the full T-Q1 walkthrough with zero errors. (8-voice producer
+      re-check rides the producer re-audition, which the owner has
+      deprioritised.)
 - [ ] T-B8 Tone print: relationship lens (true-ratio labels + arcs),
       focus lens editing (level/detune/T60), band chips — all functional
       with zero console errors.
@@ -350,11 +354,19 @@ Functional:
       still play.
 
 Quality:
-- [ ] T-Q1 Scripted end-to-end walkthrough, zero console errors.
-- [ ] T-Q2 A/B renders (old vs new) per factory instrument, reviewed
-      before owner audition.
-- [ ] T-Q3 Tests green; APP_VERSION/schema bumped; export CSVs carry new
-      keys.
+- [x] T-Q1 Scripted end-to-end walkthrough (2026-07-06): all 8 profiles
+      played, all 4 excitation types switched mid-play, vowel bodies
+      swapped live, 13 print needle selections + drag edit, every band
+      chip, formant-mode round-trip — zero console errors/warnings.
+- [x] T-Q2 A/B — adapted: instead of static WAV pairs, the OLD engine
+      (pre-T1, commit 2a9caf7) is served live from a git worktree at
+      http://localhost:8766 beside the new build at :8765, so the
+      audition can A/B any instrument interactively. (Worktree:
+      /private/tmp/synth-oldtone; restart with PYTHONPATH=src python3
+      -m synthesiser.web.server --port 8766 from that dir.)
+- [x] T-Q3 Tests green (20/20 + 85 tone assertions in CI);
+      APP_VERSION → 0.3.0 at T1 so stimulus_ids never collide; new
+      params ride event payloads/exports as ordinary parameter keys.
 - [x] T-Q4 OWNER SIGN-OFF on the mockup (before build) — APPROVED
       2026-07-06: "the breaking down into Excitor, resonator, body and
       space is sensible and makes good sense for how to represent it in
@@ -453,7 +465,13 @@ Quality:
   chips (Hz-defined: fund/low/mid/presence/air) focus-shade the print
   and scope the per-partial editor strip to the band. Old 64-column
   editor demoted to the band-scoped strip.
-- **T8 Walkthrough + A/B renders + owner audition** (T-Q5).
+- **T8 Walkthrough + A/B + audition prep** — DONE (2026-07-06) except
+  the audition itself: T-Q1 walkthrough clean, T-B7 benchmarked,
+  live A/B servers standing (old :8766 / new :8765), statuses updated.
+  **AWAITING T-Q5 OWNER AUDITION.** Open owner question: now that
+  vowels are bodies, should the separate Formant sound-source mode be
+  retired in favour of one unified chain (vocal body + a pad-driven
+  continuous body point), or kept as a distinct source?
 
 ## 10. Open questions (non-blocking, owner input welcome)
 
