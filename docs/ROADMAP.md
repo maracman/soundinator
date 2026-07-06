@@ -7,12 +7,18 @@ owner on 2026-07-03.
 
 ## Loop state
 
-- Iteration: 16
-- F3a reskin + F3b-1 preset browser landed. Next: F3b-2 display-forward
-  layout (hero visualiser, curve-styled distribution canvases), then F3c
-  contextual panels (incl. B4a vowel pad), F1 leftovers (responsive
-  canvases, touch sizing).
-- Baseline commit: 2c4eec7 (in-progress macro workspace committed, tests green)
+- Updated: 2026-07-06 (commit 65c759d)
+- Phases A–F complete; producer rebuilt as v2 + full v2.1 usability
+  backlog (see Phase G / docs/PRODUCER_V2_DESIGN.md).
+- **Two owner gates open — nothing ships past them:**
+  1. Producer v2 Q4 re-audition (docs/PRODUCER_V2_DESIGN.md).
+  2. Tone model v2 plan sign-off T-Q4 (Phase H below); no tone engine
+     work until the plan/mockup is approved.
+- While gated: safe idle polish only. Recently landed: USER_MANUAL
+  refresh (b30933a), device-pixel distribution canvases (dada8d5),
+  first-visit welcome-card overlay fix (8607998), loading/feedback
+  states (f27da48), mixdown progress % + scheduling yields (65c759d).
+- Baseline commit: 2c4eec7
 
 ## Audit summary (2026-07-03)
 
@@ -292,10 +298,44 @@ synth configuration pulled into arrangement tracks.
   I wanted… needs to be rethought from the ground up… follows the same
   logic as a DAW like Pro Tools or Logic." Full redesign specified in
   docs/PRODUCER_V2_DESIGN.md with an explicit acceptance bar (B1-B9 +
-  Q1-Q4 incl. owner sign-off). Producer status: IN PROGRESS, not done.
-  ── G7 roll internals survive (they dock into the v2 editor drawer) (remaining: minor polish backlog —
-  per-track pan/locks, take-history UI, dist-canvas DPI, loading states —
-  and owner audition feedback on D5/D7 tone work and starters).
+  Q1-Q4 incl. owner sign-off).
+- [~] G8. **Producer v2 rebuild — BUILT, AWAITING OWNER SIGN-OFF (Q4).**
+  All stages P1–P7 and the entire v2.1 usability backlog U0–U13 are done
+  and verified (docs/PRODUCER_V2_DESIGN.md is the source of truth):
+  three-zone DAW layout with persisted resizable/collapsible panels,
+  card browser → palette rack → beat-based lanes with pointer drag,
+  regions that move/copy/extend/loop with collision blocking, bake →
+  double-click piano-roll drawer (G7 roll internals docked), palette
+  edit round-trip, M/S/pan/gain per track, keyboard transport, zoom +
+  snap, multiple named arrangements, single-level undo, per-region
+  level, →Studio, JSON export/import, WAV mixdown with live progress %.
+  The key control now truly transposes (tonic moves; baked notes
+  recompute from degree-space). Producer stays IN PROGRESS until the
+  owner re-auditions (Q4).
+  Remaining post-sign-off polish candidates: per-track context locks,
+  region take-history UI. (Dist-canvas DPI and loading states: done,
+  see Loop state.)
+
+## Phase H — Tone model v2: physics-grounded redesign (owner brief 2026-07-05)
+
+Design doc: `docs/TONE_MODEL_V2_DESIGN.md`; direction mockup:
+`docs/mockups/tone-print-v2.html`. Owner brief: ground-up rethink of the
+tone design — resonant-frequency transfer grounded in actual frequencies
+(never 12-TET), bow-style imperfection instead of amplitude probability,
+partial count at instrument-modeller parity, key character variables
+surfaced, every interaction re-grounded in acoustics, and a tone-print UI
+that filters frequencies visually instead of showing them all. Decisions:
+tone section first; formant path unified (excitation → resonator → body);
+best-effort preset migration. Supersedes the D5/D7 tone line: remaining
+tone-fidelity concerns fold into this model.
+
+- [x] H0 (=T0). Plan + audit (14 physics findings verified in synth.js)
+  + static direction mockup, committed 2a9caf7. **Gate T-Q4: owner
+  sign-off on plan/mockup required before any engine work.**
+- [ ] H1–H8 (=T1–T8). Resonator core → excitation → Human imperfection →
+  transfer coupling → body unification → character panel + migration →
+  interactive tone print → walkthrough/A-B renders/owner audition
+  (T-Q5). Full acceptance bar T-B1..9 / T-Q1..5 in the design doc.
 
 ## Cross-cutting
 
