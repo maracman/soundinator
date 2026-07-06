@@ -23,6 +23,8 @@ import {
   SPECTRAL_PROFILES,
   spectralDefaultRegisterSensitivity,
   VOWEL_POINTS,
+  partialFrequency,
+  legacyStretchToB,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -34,7 +36,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.2.0";
+const APP_VERSION = "sound-studio-0.3.0"; // tone model v2 T1: resonator core
 const EVENT_SCHEMA_VERSION = "explore-event-1.0";
 const SESSION_ID = crypto.randomUUID(); // fresh per page visit
 const CONSENT_KEY = "phase0.consent.v1";
@@ -4209,7 +4211,7 @@ function subnoteWorkspaceHTML(p) {
             <div class="controls-grid">
               ${controlRow("spectralProb", "Sample chance", p.spectralProb, 0, 1, 0.01)}
               ${controlRow("spectralMix", "Mix", p.spectralMix, 0, 1, 0.01)}
-              ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 32, 1)}
+              ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1)}
               ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
               ${controlRow("spectralRegisterAmount", "Reg response", p.spectralRegisterAmount, 0, 1.5, 0.01)}
               ${controlRow("spectralResonanceAmount", "Resonance", p.spectralResonanceAmount, 0, 1.5, 0.01)}
@@ -4222,7 +4224,7 @@ function subnoteWorkspaceHTML(p) {
               ${controlRow("partialTilt", "Tilt", p.partialTilt, -1, 1, 0.01)}
               ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
               ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
-              ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 32, 1)}
+              ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
             </div>
             <div class="subsection-label">Octave groups</div>
             <div class="controls-grid">
@@ -6073,10 +6075,14 @@ function drawHarmonicSignature() {
   ensureSpectralPartialParams(exploreParams);
   const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
   const count = Math.max(1, Math.min(profile.partials.length, Math.round(exploreParams.spectralPartials || 20)));
-  const stretchCents = exploreParams.spectralStretchCents || 0;
+  // Tone v2 (T1): the display shows the same realised frequencies the
+  // renderer produces — ratio table + anchored stiff-string B law.
+  const partialB = Number.isFinite(exploreParams.partialB)
+    ? Math.max(0, exploreParams.partialB)
+    : legacyStretchToB(exploreParams.spectralStretchCents || 0);
+  const resClass = exploreParams.resonatorClass || "string";
   const partials = profile.partials.slice(0, count).map((partial, i) => {
     const harmonic = i + 1;
-    const stretch = stretchCents * ((harmonic - 1) / Math.max(1, count - 1)) ** 2;
     const baseMean = exploreParams.spectralPartialMeans[i] || 0;
     const reg = exploreParams.spectralPartialRegs[i] || 0;
     return {
@@ -6087,7 +6093,7 @@ function drawHarmonicSignature() {
       highMean: baseMean * spectralVisualResponse(profile, harmonic, reg, 1),
       sd: exploreParams.spectralPartialSds[i] || 0,
       reg,
-      freq: harmonic * Math.pow(2, stretch / 1200),
+      freq: partialFrequency(harmonic, 1, partialB, resClass),
     };
   });
   const peak = Math.max(0.001, ...partials.map(p => Math.max(p.mean, p.lowMean, p.highMean) + p.sd * 2));

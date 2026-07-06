@@ -24,5 +24,7 @@ jobs:
           node --check web/static/app.js
           node --check web/static/synth.js
           node --check web/static/factory-presets.js
+      - name: Tone model assertions
+        run: node scripts/verify_tone_model.mjs
       - name: Tests
         run: python -m pytest -q

@@ -508,13 +508,69 @@ for (const [profileKey, performance] of Object.entries(SPECTRAL_PERFORMANCE)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].performance = performance;
 }
 
-// ── Extend every profile's partial table to 32 harmonics ─────
+// ── Tone model v2: resonator core (docs/TONE_MODEL_V2_DESIGN.md §3.2) ──
+//
+// The resonator's mode frequencies come from a physical ratio table bent by
+// true stiff-string inharmonicity; its decay comes from a material damping
+// law expressed in real Hz. These are pure functions so the acceptance-bar
+// assertions (T-B2, T-B3) can verify them headlessly.
+
+export const RESONATOR_CLASSES = {
+  string:     { label: "String / open tube", ratio: (n) => n },
+  closedTube: { label: "Closed tube",        ratio: (n) => 2 * n - 1 },
+  // First transverse modes of an ideal membrane (Bessel zeros, ratios to
+  // the fundamental) and of a free bar; tails extend geometrically.
+  membrane:   { label: "Membrane", table: [1, 1.594, 2.136, 2.296, 2.653, 2.918, 3.156, 3.501, 3.600, 3.652, 4.060, 4.154] },
+  bar:        { label: "Bar / plate", table: [1, 2.756, 5.404, 8.933, 13.344, 18.638] },
+};
+
+export function resonatorRatio(className, n) {
+  const cls = RESONATOR_CLASSES[className] || RESONATOR_CLASSES.string;
+  if (cls.ratio) return cls.ratio(n);
+  const t = cls.table;
+  if (n <= t.length) return t[n - 1];
+  const step = t[t.length - 1] / t[t.length - 2];
+  return t[t.length - 1] * Math.pow(step, n - t.length);
+}
+
+// True stiff-string inharmonicity, anchored so mode 1 stays at the played
+// pitch: f_n = ratio_n · f0 · sqrt((1 + B·n²) / (1 + B)). B is a physical
+// constant (piano bass ≈ 1e-4, treble ≈ 1e-3) and gives the same
+// frequencies regardless of how many partials are rendered (audit A4).
+export function partialFrequency(n, f0, B = 0, className = "string") {
+  const b = Math.max(0, B || 0);
+  return resonatorRatio(className, n) * f0 * Math.sqrt((1 + b * n * n) / (1 + b));
+}
+
+// Legacy conversion: the old spectralStretchCents pinned a quadratic cents
+// ramp to the top of a 32-partial table. Map it to the B whose detune at
+// n=32 matches (negative "compression" has no stiff-string analogue → 0).
+export function legacyStretchToB(cents) {
+  const c = Math.max(0, Math.min(24, cents || 0));
+  if (c === 0) return 0;
+  const k = Math.pow(2, c / 600); // target (1+1024B)/(1+B)
+  return (k - 1) / (1024 - k);
+}
+
+// Material as a true-Hz damping law (audits A2/A3): T60 is a property of
+// the instrument, not of note duration or harmonic rank. material 0 =
+// glass/metal (long ring, shallow slope), 1 = felt/skin (short, steep).
+// Log-interpolated anchors, referenced to middle C.
+export function materialT60(freqHz, material) {
+  const m = Math.max(0, Math.min(1, material ?? 0));
+  const t60Ref = Math.exp((1 - m) * Math.log(7.0) + m * Math.log(0.55));
+  const slope = 0.25 + m * 1.1;
+  return t60Ref * Math.pow(Math.max(30, freqHz) / 261.63, -slope);
+}
+
+// ── Extend every profile's partial table to 64 harmonics ─────
 // The hand-tuned tables specify the first 20; the tail is extrapolated by
 // stride-2 geometric continuation so alternating odd/even patterns
 // (clarinet) keep their parity structure while monotone spectra continue
-// their decay. The Nyquist guard in the renderer skips whatever a given
-// fundamental can't fit.
-const TARGET_PARTIALS = 32;
+// their decay. 64 partials is instrument-modeller parity (RipplerX-class);
+// the renderer's Nyquist + audibility culling keeps the live oscillator
+// count far lower.
+const TARGET_PARTIALS = 64;
 for (const profile of Object.values(SPECTRAL_PROFILES)) {
   const parts = profile.partials;
   while (parts.length < TARGET_PARTIALS) {
@@ -1217,6 +1273,12 @@ export class GenerationEngine {
       spectralLoudnessNorm: loudnessNorm,
       spectralReferenceNorm: Math.max(0.001, referenceNorm),
       spectralStretchCents: this.p.spectralStretchCents ?? 0,
+      // Tone v2 resonator (T1): inharmonicity as a physical B constant
+      // (new param wins; legacy cents map onto it) and the mode ratio class.
+      partialB: Number.isFinite(this.p.partialB)
+        ? Math.max(0, this.p.partialB)
+        : legacyStretchToB(this.p.spectralStretchCents ?? 0),
+      resonatorClass: this.p.resonatorClass || "string",
     };
   }
 
@@ -2791,15 +2853,19 @@ export class SynthEngine {
       0.001,
       note.spectralReferenceNorm || partials.reduce((sum, part) => sum + Math.max(0, part.mean || part.amp), 0) || 1
     );
-    const stretchCents = Math.max(-24, Math.min(24, note.spectralStretchCents || 0));
-    const maxIndex = Math.max(1, partials.length - 1);
+    const partialB = Math.max(0, note.partialB || 0);
+    const resClass = note.resonatorClass || "string";
     const scheduled = [];
     partials.forEach((part) => {
       const harmonic = part.harmonic || 1;
-      const stretch = stretchCents * ((harmonic - 1) / maxIndex) ** 2;
-      const multiplier = harmonic * Math.pow(2, stretch / 1200);
+      // Tone v2 (T1): realised mode frequency from the ratio table bent by
+      // true stiff-string inharmonicity — count-independent (audit A4).
+      const multiplier = partialFrequency(harmonic, 1, partialB, resClass);
       const freq = note.frequency * multiplier;
-      if (freq > this.ctx.sampleRate * 0.45) return;
+      if (freq > this.ctx.sampleRate * 0.45 || freq > 16000) return;
+      // Audibility cull: partials that can never rise above ~-66 dB of the
+      // print are dead weight (typical live set stays at 20-40 oscillators).
+      if (Math.max(part.amp, part.mean) / norm < 0.0005 && harmonic > 8) return;
       const osc = this.ctx.createOscillator();
       osc.type = "sine";
       this._setFrequency(osc.frequency, freq, t0, note, multiplier);
@@ -2808,18 +2874,18 @@ export class SynthEngine {
       scheduled.push({ param: g.gain, part, gainScale });
       osc.connect(g);
       let tail = g;
-      // Material damping law (docs/PARTIAL_MACROS_DESIGN.md): each partial
-      // gets its own decay, faster for higher harmonics — wood/felt kills
-      // the highs, glass/metal lets them ring. This is what makes struck
-      // and plucked tones read as real; on sustained tones it shaves the
-      // top naturally over the note.
+      // Material damping law, tone v2 (T1): each partial decays with the
+      // instrument's T60 at that partial's REAL frequency (audits A2/A3) —
+      // a 4 kHz mode rings the same whether it is n=4 of a high note or
+      // n=16 of a low one, and decay no longer depends on note duration.
+      // Wood/felt kills the highs, glass/metal lets them ring.
       const material = Math.max(0, Math.min(1, note.partialMaterial ?? 0));
       if (material > 0 && harmonic > 1) {
         const decayG = this.ctx.createGain();
-        const baseTau = Math.max(0.25, (t1 - t0) * 0.9);
-        const tau = baseTau / (1 + material * Math.pow(harmonic - 1, 0.9) * 0.6);
+        const t60 = materialT60(freq, material);
+        const tau = Math.max(0.02, t60 / 6.91); // setTargetAtTime hits -60 dB at ~6.91τ
         decayG.gain.setValueAtTime(1, t0);
-        decayG.gain.setTargetAtTime(0.0001, t0 + 0.01, tau / 3);
+        decayG.gain.setTargetAtTime(0.0001, t0 + 0.01, tau);
         g.connect(decayG);
         decayG.connect(env);
         tail = null;

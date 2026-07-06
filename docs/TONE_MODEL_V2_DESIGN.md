@@ -342,7 +342,10 @@ Quality:
       before owner audition.
 - [ ] T-Q3 Tests green; APP_VERSION/schema bumped; export CSVs carry new
       keys.
-- [ ] T-Q4 OWNER SIGN-OFF on the mockup (before build) — gate for T1+.
+- [x] T-Q4 OWNER SIGN-OFF on the mockup (before build) — APPROVED
+      2026-07-06: "the breaking down into Excitor, resonator, body and
+      space is sensible and makes good sense for how to represent it in
+      a UI too. I approve." T1+ unlocked.
 - [ ] T-Q5 OWNER SIGN-OFF on the built tone section (after T8). Until
       then the roadmap marks tone v2 in progress.
 
@@ -350,8 +353,16 @@ Quality:
 
 - **T0 Mockup**: static tone-print + character-panel mockup for sign-off
   (T-Q4 gate). *No engine work before this is approved.*
-- **T1 Resonator core**: 64 modes, ratio tables, true B law, true-Hz T60
-  Material; headless verification harness.
+- **T1 Resonator core** — DONE (2026-07-06): 64-partial tables (parity-
+  preserving extrapolation), RESONATOR_CLASSES ratio tables (string /
+  closed tube / membrane / bar), anchored stiff-string law
+  `f_n = n·f0·√((1+Bn²)/(1+B))` via exported `partialFrequency` (new
+  `partialB` param; legacy spectralStretchCents maps exactly at n=32 via
+  `legacyStretchToB`), Material regrounded as `materialT60(fHz, m)` —
+  duration- and rank-independent; harmonic-signature display shows the
+  same realised frequencies; Nyquist + 16 kHz + audibility culling;
+  headless harness `scripts/verify_tone_model.mjs` (27 assertions,
+  T-B2/T-B3 covered) wired into CI; APP_VERSION → 0.3.0.
 - **T2 Excitation**: types, position comb, hardness, drive spectra;
   dynamic-brightness law; retire A8 hidden shaping.
 - **T3 Human**: coherent 1/f excitation fluctuation replacing per-partial
@@ -374,5 +385,6 @@ Quality:
    palettes eagerly on load, or lazily per region play?
 
 ---
-*Status: PLAN — awaiting owner review. T-Q4 mockup gate before any
-engine change. Producer v2's Q4 re-audition remains a separate open item.*
+*Status: APPROVED 2026-07-06 (T-Q4). Implementation in progress, stage
+by stage per §9. Producer v2's Q4 re-audition remains a separate open
+item.*
