@@ -3566,6 +3566,54 @@ function renderExplore() {
 
   wireTonePrint(v);
 
+  // Rotary knobs (tone chain): vertical drag, shift = fine, double-click
+  // resets to the stage default. Every change lights up the overlay it
+  // controls in the tone print (comb / ridge / afterglow / arcs).
+  v.querySelectorAll("[data-knob]").forEach(cell => {
+    const key = cell.dataset.knob;
+    const min = Number(cell.dataset.min), max = Number(cell.dataset.max), step = Number(cell.dataset.step);
+    const applyKnob = (raw) => {
+      let val = clamp(raw, min, max);
+      val = clamp(Number((Math.round(val / step) * step).toFixed(6)), min, max);
+      if (exploreParams[key] === val) return;
+      noteParamChange(key, exploreParams[key], val);
+      exploreParams[key] = val;
+      _setKnobVisual(cell, (val - min) / (max - min));
+      const out = cell.querySelector(".knob-out");
+      if (out) out.textContent = fmtOutput(key, val);
+      printEmphasis(key);
+      drawDistributions();
+      if (liveReverbParams.has(key)) { synth.updateReverb({ ...exploreParams }); return; }
+      if (liveSubnoteParams.has(key)) { synth.updateGenerationParams({ ...exploreParams }); return; }
+      debouncedReplay();
+    };
+    cell.onmousedown = (e) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const cur = exploreParams[key];
+      const startVal = Number.isFinite(cur) ? cur : Number(cell.dataset.def);
+      const move = (ev) => applyKnob(startVal + (startY - ev.clientY) * (max - min) / (ev.shiftKey ? 1400 : 160));
+      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+    cell.ondblclick = () => applyKnob(Number(cell.dataset.def));
+  });
+
+  // Excite segmented control (the four physical drive types)
+  v.querySelectorAll("[data-exc-type]").forEach(btn => {
+    btn.onclick = () => {
+      const val = btn.dataset.excType;
+      if (exploreParams.excitationType === val) return;
+      noteParamChange("excitationType", exploreParams.excitationType, val);
+      exploreParams.excitationType = val;
+      v.querySelectorAll("[data-exc-type]").forEach(b => b.classList.toggle("active", b === btn));
+      printEmphasis("excitationType");
+      drawDistributions();
+      synth.updateGenerationParams({ ...exploreParams });
+    };
+  });
+
   // Checkbox param → section mapping for auto-switch
   const _checkToSection = {
     surpriseRestEnabled: { tab: "duration", section: "surprise" },
@@ -4201,54 +4249,49 @@ function subnoteWorkspaceHTML(p) {
             <div class="tone-chain">
               <div class="tone-stage">
                 <div class="ts-head"><span class="ts-n">1 · EXCITOR</span><span class="ts-d">how energy enters</span></div>
-                <div class="controls-grid tone-stage-grid">
-                  <div class="control-row">
-                    <label for="sel_excitationType">Excite</label>
-                    <select data-param-select="excitationType" id="sel_excitationType" class="param-select" title="How energy enters the resonator: a bow drives it continuously, a pluck releases it, a strike hits it, air blows through it. Each has its own physical drive spectrum.">
-                      <option value="bow"${p.excitationType === "bow" ? " selected" : ""}>Bow</option>
-                      <option value="pluck"${p.excitationType === "pluck" ? " selected" : ""}>Pluck</option>
-                      <option value="strike"${p.excitationType === "strike" ? " selected" : ""}>Strike</option>
-                      <option value="blow"${p.excitationType === "blow" ? " selected" : ""}>Blow</option>
-                    </select>
-                  </div>
-                  ${controlRow("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01)}
-                  ${controlRow("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01)}
-                  ${controlRow("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01)}
-                  ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
+                <div class="seg-control" role="group" title="How energy enters the resonator: a bow drives it continuously, a pluck releases it, a strike hits it, air blows through it. Each has its own physical drive spectrum.">
+                  ${["bow", "pluck", "strike", "blow"].map(t =>
+                    `<button class="seg-btn${p.excitationType === t ? " active" : ""}" data-exc-type="${t}">${t[0].toUpperCase()}${t.slice(1)}</button>`).join("")}
+                </div>
+                <div class="knob-row">
+                  ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
+                  ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
+                  ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
+                  ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
                 </div>
               </div>
               <div class="ts-flow">→</div>
               <div class="tone-stage ts-active">
                 <div class="ts-head"><span class="ts-n">2 · RESONATOR</span><span class="ts-d">what rings, how long, what couples</span></div>
-                <div class="controls-grid tone-stage-grid">
-                  ${controlRow("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01)}
-                  ${controlRow("partialB", "Inharmonic", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002)}
-                  ${controlRow("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01)}
-                  ${controlRow("partialTilt", "Brightness", p.partialTilt, -1, 1, 0.01)}
-                  ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1)}
+                <div class="knob-row">
+                  ${knobHTML("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01, { def: 0.45 })}
+                  ${knobHTML("partialB", "Inharmonic", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002, { def: 0 })}
+                  ${knobHTML("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01, { def: 0.15 })}
+                  ${knobHTML("partialTilt", "Brightness", p.partialTilt, -1, 1, 0.01, { def: 0 })}
+                  ${knobHTML("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1, { def: 20 })}
                 </div>
               </div>
               <div class="ts-flow">→</div>
               <div class="tone-stage ts-cool">
                 <div class="ts-head"><span class="ts-n">3 · BODY</span><span class="ts-d">the box around it</span></div>
-                <div class="controls-grid tone-stage-grid">
-                  <div class="control-row">
-                    <label for="sel_bodyType">Body</label>
-                    <select data-param-select="bodyType" id="sel_bodyType" class="param-select" title="The box around the resonator: fixed-Hz resonance bands. Auto keeps the instrument's own body; vowels are bodies too — this is where the voice lives.">
-                      <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
-                      ${Object.entries(BODY_PRESETS).map(([k, b]) =>
-                        `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
-                    </select>
-                  </div>
-                  ${controlRow("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01)}
+                <div class="ts-body-row">
+                  <select data-param-select="bodyType" id="sel_bodyType" class="param-select body-select" title="The box around the resonator: fixed-Hz resonance bands. Auto keeps the instrument's own body; vowels are bodies too — this is where the voice lives.">
+                    <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
+                    ${Object.entries(BODY_PRESETS).map(([k, b]) =>
+                      `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
+                  </select>
+                  ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 0.35, cool: true })}
                 </div>
                 <canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>
               </div>
               <div class="ts-flow">→</div>
               <div class="tone-stage ts-cool ts-space">
-                <div class="ts-head"><span class="ts-n">4 · SPACE</span><span class="ts-d">the room</span></div>
-                <div class="ts-space-note">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")} · wet ${(p.reverbWet ?? 0).toFixed(2)} · decay ${(p.reverbDecay ?? 0).toFixed(1)}s</div>
-                <div class="ts-space-link">edit in the Space panel (Macro tab → Production Context)</div>
+                <div class="ts-head"><span class="ts-n">4 · SPACE</span><span class="ts-d">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")}</span></div>
+                <div class="knob-row">
+                  ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
+                  ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
+                </div>
+                <div class="ts-space-link">room type &amp; more in the Space panel</div>
               </div>
             </div>
             <canvas id="cvTonePrint" width="1200" height="380"></canvas>
@@ -4454,6 +4497,11 @@ function harmonicEditorHTML(p) {
   const count = Math.max(1, Math.min(profile.partials.length, Math.round(p.spectralPartials || 20)));
   // T7: the editor strip is scoped to the tone print's focused band —
   // partials are filtered by their REALISED frequency, not their rank.
+  // With no band focused there is no slider wall: the print itself is
+  // the editor (drag needles), and the chips open per-band detail.
+  if (_printState.band === "all") {
+    return `<div class="editor-hint">drag needles in the print to shape levels · pick a band above (fund / low / mid / presence / air) to edit those partials' level &amp; wobble individually</div>`;
+  }
   const [bLo, bHi] = PRINT_BANDS[_printState.band] || PRINT_BANDS.all;
   const B = Number.isFinite(p.partialB) ? Math.max(0, p.partialB) : legacyStretchToB(p.spectralStretchCents || 0);
   const f0 = p.tonicHz || 261.63;
@@ -6123,6 +6171,57 @@ function drawVibratoDist() {
 }
 
 
+// ── Pro-audio rotary knobs for the tone chain (T-Q5 owner feedback:
+// the stage cards must read as an instrument, and every turn of a dial
+// must visibly answer in the print) ────────────────────────────────
+const KNOB_EMPHASIS = {
+  excitationType: "comb", excitationPosition: "comb", excitationHardness: "comb",
+  excitationHuman: "needles", spectralDynamicAmount: "needles",
+  partialMaterial: "glow", partialB: "shift", partialTransfer: "arcs",
+  partialTilt: "needles", spectralPartials: "needles",
+  bodyType: "ridge", spectralResonanceAmount: "ridge",
+};
+let _printEmphasis = null; // { kind, until } — the overlay a fresh change lights up
+function printEmphasis(key) {
+  const kind = KNOB_EMPHASIS[key];
+  if (!kind) return;
+  _printEmphasis = { kind, until: performance.now() + 750 };
+  clearTimeout(printEmphasis._t);
+  printEmphasis._t = setTimeout(() => { _printEmphasis = null; drawTonePrint(); drawBodyRidge(); }, 780);
+}
+function _emph(kind) {
+  return !!(_printEmphasis && _printEmphasis.kind === kind && performance.now() < _printEmphasis.until);
+}
+
+function knobArcs(frac, cool) {
+  const f = clamp(frac, 0, 1);
+  const a0 = 0.75 * Math.PI, a1 = 2.25 * Math.PI, a = a0 + f * (a1 - a0);
+  const c = 22, r = 16;
+  const pt = (ang) => `${(c + r * Math.cos(ang)).toFixed(2)} ${(c + r * Math.sin(ang)).toFixed(2)}`;
+  const arc = (from, to, col, w) =>
+    `<path d="M ${pt(from)} A ${r} ${r} 0 ${to - from > Math.PI ? 1 : 0} 1 ${pt(to)}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
+  const hue = cool ? "#4f8dd4" : "#f5a623";
+  const tip = cool ? "#bcd8f4" : "#ffe3b0";
+  return arc(a0, a1, "rgba(49,69,86,0.9)", 4)
+    + (f > 0.002 ? arc(a0, a, hue, 4) : "")
+    + `<line x1="${(c + 6 * Math.cos(a)).toFixed(2)}" y1="${(c + 6 * Math.sin(a)).toFixed(2)}" x2="${(c + (r - 3) * Math.cos(a)).toFixed(2)}" y2="${(c + (r - 3) * Math.sin(a)).toFixed(2)}" stroke="${tip}" stroke-width="2.4" stroke-linecap="round"/>`;
+}
+
+function knobHTML(key, label, value, min, max, step, opts = {}) {
+  const v = Number.isFinite(value) ? value : min;
+  return `
+    <div class="knob-cell${opts.cool ? " cool" : ""}" data-knob="${key}" data-min="${min}" data-max="${max}" data-step="${step}" data-def="${opts.def ?? v}" title="${esc(PARAM_DESC[key] || label)}">
+      <svg class="knob-svg" viewBox="0 0 44 44">${knobArcs((v - min) / (max - min), !!opts.cool)}</svg>
+      <div class="knob-label">${esc(label)}</div>
+      <output class="knob-out" id="out_${key}">${fmtOutput(key, v)}</output>
+    </div>`;
+}
+
+function _setKnobVisual(cell, frac) {
+  const svg = cell.querySelector(".knob-svg");
+  if (svg) svg.innerHTML = knobArcs(frac, cell.classList.contains("cool"));
+}
+
 // ── T7: the tone print — the resonator's interactive view ──────────
 // One display, engine-true: the partial set comes from the SAME
 // fingerprint code playback uses (Human forced to 0 for a noise-free
@@ -6167,8 +6266,16 @@ function drawTonePrint() {
     ctx.beginPath(); ctx.moveTo(px, top - 8); ctx.lineTo(px, base + 4); ctx.stroke();
     ctx.fillText(f >= 1000 ? f / 1000 + "k" : String(f), px, base + 15);
   }
+  ctx.textAlign = "right";
+  ctx.fillText("frequency · Hz (log)", w - 6, base + 15);
+  // on-canvas legend: each overlay names its stage
   ctx.textAlign = "left";
-  ctx.fillText("frequency (Hz · log)", 6, base + 15);
+  ctx.fillStyle = "rgba(245,166,35,0.75)";
+  ctx.fillText("▍partial · trail = ring time", 8, 12);
+  ctx.fillStyle = "rgba(79,141,212,0.8)";
+  ctx.fillText("◠ body (3)", 172, 12);
+  ctx.fillStyle = "rgba(125,145,160,0.8)";
+  ctx.fillText("┄ excitor comb (1)", 244, 12);
 
   // excitor comb underlay (stage 1), faded before it aliases
   const f0 = exploreParams.tonicHz || 261.63;
@@ -6183,11 +6290,14 @@ function drawTonePrint() {
     const y = base - positionComb(nEff, pos) * (base - top) * 0.16;
     px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
   }
+  const combHot = _emph("comb");
   const combFade = ctx.createLinearGradient(0, 0, Math.max(1, combEnd), 0);
-  combFade.addColorStop(0, "rgba(105,125,140,0.22)");
+  combFade.addColorStop(0, combHot ? "rgba(160,190,210,0.7)" : "rgba(105,125,140,0.22)");
   combFade.addColorStop(1, "rgba(105,125,140,0)");
   ctx.strokeStyle = combFade;
+  ctx.lineWidth = combHot ? 1.8 : 1;
   ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.lineWidth = 1;
 
   // body ridge (stage 3)
   const bands = fp.bodyBands || [];
@@ -6200,8 +6310,27 @@ function drawTonePrint() {
       ctx.lineTo(px, base - (Math.log2(r) + 2.4) / 4.6 * (base - top) * 0.85);
     }
     ctx.lineTo(w, base); ctx.closePath();
-    ctx.fillStyle = "rgba(79,141,212,0.08)"; ctx.fill();
-    ctx.strokeStyle = "rgba(79,141,212,0.4)"; ctx.lineWidth = 1.4; ctx.stroke();
+    const ridgeHot = _emph("ridge");
+    ctx.fillStyle = ridgeHot ? "rgba(79,141,212,0.22)" : "rgba(79,141,212,0.11)";
+    ctx.fill();
+    ctx.strokeStyle = ridgeHot ? "rgba(120,175,235,0.95)" : "rgba(79,141,212,0.55)";
+    ctx.lineWidth = ridgeHot ? 2.2 : 1.6;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  // inharmonicity emphasis: ghost ticks at the perfect integer positions so
+  // turning the Inharmonic knob visibly bends the needles away from them
+  if (_emph("shift")) {
+    ctx.strokeStyle = "rgba(200,215,230,0.4)";
+    ctx.setLineDash([2, 3]);
+    for (let n = 1; n <= 64; n++) {
+      const fInt = n * f0;
+      if (fInt > PRINT_FMAX) break;
+      const px = X(fInt);
+      ctx.beginPath(); ctx.moveTo(px, top + 4); ctx.lineTo(px, base); ctx.stroke();
+    }
+    ctx.setLineDash([]);
   }
 
   // band focus shading
@@ -6221,23 +6350,32 @@ function drawTonePrint() {
     const t60 = material > 0 ? materialT60(p.harmonicFrequency, material) : 6;
     const glow = Math.min(1, Math.log10(1 + t60) / 0.9);
     const sel = _printState.sel === i;
-    const grad = ctx.createLinearGradient(px, 0, px + 12 + glow * 26, 0);
-    grad.addColorStop(0, `rgba(255,180,84,${0.3 * glow})`);
+    const glowBoost = _emph("glow") ? 1.8 : 1;
+    const trailLen = (12 + glow * 26) * (_emph("glow") ? 1.35 : 1);
+    const grad = ctx.createLinearGradient(px, 0, px + trailLen, 0);
+    grad.addColorStop(0, `rgba(255,180,84,${Math.min(0.85, 0.3 * glow * glowBoost)})`);
     grad.addColorStop(1, "rgba(255,180,84,0)");
     ctx.fillStyle = grad;
-    ctx.fillRect(px, base - nh, 12 + glow * 26, nh);
+    ctx.fillRect(px, base - nh, trailLen, nh);
+    const needleHot = _emph("needles");
     ctx.strokeStyle = sel ? "#ffe3b0" : "#f5a623";
-    ctx.lineWidth = sel ? 3 : 1.8;
+    ctx.lineWidth = (sel ? 3 : 1.8) * (needleHot ? 1.4 : 1);
     ctx.shadowColor = "#f5a623";
-    ctx.shadowBlur = sel ? 10 : 4;
+    ctx.shadowBlur = sel ? 10 : (needleHot ? 8 : 4);
     ctx.beginPath(); ctx.moveTo(px, base); ctx.lineTo(px, base - nh); ctx.stroke();
     ctx.shadowBlur = 0;
     _printGeom.needles.push({ i, x: px, topY: base - nh, mean: p.mean, freq: p.harmonicFrequency, harmonic: p.harmonic, t60 });
   });
 
-  // relationship arcs from the selected partial (true ratios, cents labels)
-  if (_printState.sel != null) {
-    const selN = _printGeom.needles.find(n => n.i === _printState.sel);
+  // relationship arcs from the selected partial (true ratios, cents labels).
+  // While the Transfer knob is fresh, arcs show from the loudest partial
+  // even with nothing selected — the dial answers visibly.
+  let arcSel = _printState.sel;
+  if (arcSel == null && _emph("arcs") && _printGeom.needles.length) {
+    arcSel = _printGeom.needles.reduce((a, b) => (b.mean > a.mean ? b : a)).i;
+  }
+  if (arcSel != null) {
+    const selN = _printGeom.needles.find(n => n.i === arcSel);
     if (selN) {
       ctx.font = "10.5px ui-monospace, monospace";
       ctx.textAlign = "center";
@@ -6381,10 +6519,11 @@ function drawBodyRidge() {
   }
   ctx.lineTo(w, h);
   ctx.closePath();
-  ctx.fillStyle = "rgba(79,141,212,0.14)";
+  const hot = _emph("ridge");
+  ctx.fillStyle = hot ? "rgba(79,141,212,0.28)" : "rgba(79,141,212,0.14)";
   ctx.fill();
-  ctx.strokeStyle = "rgba(79,141,212,0.6)";
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = hot ? "rgba(130,185,240,0.95)" : "rgba(79,141,212,0.6)";
+  ctx.lineWidth = hot ? 2.2 : 1.5;
   ctx.stroke();
 }
 
