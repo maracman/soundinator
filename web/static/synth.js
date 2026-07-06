@@ -2519,7 +2519,7 @@ export class SynthEngine {
    * minus timers and visual bookkeeping. init(offlineCtx, dest) must have
    * been called first.
    */
-  renderSpan(params, t0, spanSec) {
+  renderSpan(params, t0, spanSec, skipBeats = 0) {
     if (!this.ctx) return;
     this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
     this._vibratoActive = false;
@@ -2539,17 +2539,24 @@ export class SynthEngine {
     };
     this._engine = new GenerationEngine(params);
     this._engine.initialise();
-    let t = t0;
+    // Producer v3 split support: skipBeats fast-forwards through the take
+    // deterministically — the same seed generates the same stream, and we
+    // begin sounding notes only once we pass the split point, so the later
+    // half of a split region plays the LATER part of the same take.
+    const skipSec = Math.max(0, skipBeats) * (60 / Math.max(30, params.tempo || 104));
+    let t = t0 - skipSec;
     let guard = 0;
-    while (t < t0 + spanSec && guard++ < 4000) {
+    while (t < t0 + spanSec && guard++ < 6000) {
       const note = this._engine.nextNote();
       if (!note) break;
       const beatDiv = note.beatDivisions || 1;
       const divSec = 60 / ((this._engine.p.tempo || 104) * beatDiv);
       const noteDur = note.durationDivs * divSec;
       if (t + noteDur > t0 + spanSec + 1e-6) break; // don't spill past the region
-      this._render(note, t);
-      this._schedulePerc(note, t, divSec);
+      if (t >= t0 - 1e-6) {
+        this._render(note, t);
+        this._schedulePerc(note, t, divSec);
+      }
       t += noteDur;
     }
   }

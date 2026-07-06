@@ -5395,3 +5395,28 @@ body.dragging { cursor: grabbing; user-select: none; }
   pointer-events: none;
 }
 .tl2-loop-range.dim { opacity: 0.35; }
+
+/* Producer v3 block B */
+.tl2-region.muted { opacity: 0.35; }
+.tl2-seed {
+  position: absolute;
+  right: 14px;
+  top: 2px;
+  font-size: 0.54rem;
+  color: rgba(148,196,255,0.75);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.tl2-gain-tag {
+  position: absolute;
+  left: 3px;
+  bottom: 2px;
+  font-size: 0.56rem;
+  color: #ffe3b0;
+  background: rgba(10,13,17,0.75);
+  border: 1px solid rgba(245,166,35,0.4);
+  border-radius: 3px;
+  padding: 0 4px;
+  cursor: ns-resize;
+  font-variant-numeric: tabular-nums;
+}

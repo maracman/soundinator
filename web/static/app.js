@@ -1576,15 +1576,22 @@ function playArrangement(fromBeat = 0) {
       const region = regionAtBeat(track, b);
       const voice = producerVoice(track);
       if (!trackAudible(track)) { voice.stop(); continue; }
-      if (region && (b === Math.ceil(region.startBeat) || b === arrPlay.startAt)) {
+      if (region && !region.muted && (b === Math.ceil(region.startBeat) || b === arrPlay.startAt)) {
         voice.setMasterVolume((track.gain ?? 1) * (region.gain ?? 1));
         if (region.type === "baked" && Array.isArray(region.notes)) {
           voice.playNotes(regionPlayParams(track, region), region.notes,
             regionLen(region), region.loopSourceBeats || regionLen(region));
+        } else if (region.takeOffsetBeats) {
+          // split tail: schedule the later part of the same take upfront
+          voice.stop();
+          voice.renderSpan(regionPlayParams(track, region),
+            synth.ctx.currentTime + 0.03,
+            (60 / Math.max(30, ctx.tempo || 104)) * regionLen(region),
+            region.takeOffsetBeats);
         } else {
           voice.play(regionPlayParams(track, region));
         }
-      } else if (!region) {
+      } else if (!region || region.muted) {
         voice.stop();
       }
       // mid-region beats: leave the voice playing through its span
@@ -1678,6 +1685,7 @@ async function mixdownArrangement(statusEl, btn) {
   for (const track of arrangement.tracks) {
     if (!trackAudible(track)) continue;
     for (const region of track.regions) {
+      if (region.muted) continue;
       // A fresh voice per region: deterministic take, exactly as live playback
       const voice = new SynthEngine();
       voice.init(off, off.destination);
@@ -1687,7 +1695,8 @@ async function mixdownArrangement(statusEl, btn) {
         voice.renderNotesSpan(regionPlayParams(track, region), region.notes,
           region.startBeat * beatSec + 0.05, regionLen(region), region.loopSourceBeats || regionLen(region));
       } else {
-        voice.renderSpan(regionPlayParams(track, region), region.startBeat * beatSec + 0.05, beatSec * regionLen(region));
+        voice.renderSpan(regionPlayParams(track, region), region.startBeat * beatSec + 0.05,
+          beatSec * regionLen(region), region.takeOffsetBeats || 0);
       }
       // Scheduling is synchronous per region; yield so large arrangements
       // never freeze the UI while the graph is being built.
@@ -1762,10 +1771,13 @@ function produceTimelineHTML() {
           loopTicks += `<span class="tl2-looptick" style="left:${lb * pxPerBeat}px"></span>`;
         }
       }
-      return `<div class="tl2-region${sel}${baked}" data-region="${r.id}" data-track="${t.id}"
+      const gainDb = 20 * Math.log10(Math.max(0.02, r.gain ?? 1));
+      return `<div class="tl2-region${sel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
         style="left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
-        title="${esc(label)} — drag to move, drag the right edge to extend. Double-click a baked region to edit its notes.">
+        title="${esc(label)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
         ${loopTicks}<span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
+        ${r.type !== "baked" ? `<span class="tl2-seed" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">s·${r.seed}</span>` : ""}
+        ${sel ? `<span class="tl2-gain-tag" data-gain-tag="${r.id}" title="Region level — drag vertically">${gainDb >= 0 ? "+" : ""}${gainDb.toFixed(1)}dB</span>` : ""}
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
       </div>`;
     }).join("");
@@ -2019,7 +2031,10 @@ function produceToolbarHTML() {
       ? `<button class="btn btn-secondary btn-sm" id="regionEditNotes">${rollOpen ? "Hide notes" : "✎ Edit notes"}</button>
          <button class="btn btn-secondary btn-sm" id="regionUnbake" title="Return this region to generative playback (the baked notes are discarded; the seed regenerates the same take)">Unbake</button>`
       : `<button class="btn btn-secondary btn-sm" id="regionBake" title="Freeze this take into editable notes — the piano-roll editor works on baked regions">◆ Bake</button>`}
-    <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context"${baked ? " disabled" : ""}>↻ Reroll take</button>
+    <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context (R)"${baked ? " disabled" : ""}>↻ Reroll</button>
+    <button class="btn btn-ghost btn-sm" id="regionSeedBack" title="Step back to the previous seed (⇧R)"${baked ? " disabled" : ""}>⤺ seed</button>
+    <button class="btn btn-ghost btn-sm" id="regionSplit" title="Split at the playhead (⌘T) — both halves keep the same take">✂ Split</button>
+    <button class="btn btn-ghost btn-sm" id="regionMute" title="Mute this region (playback and mixdown skip it)">Mute</button>
     <button class="btn btn-secondary btn-sm" id="regionLonger" title="Extend this region by one slot">＋ Longer</button>
     <button class="btn btn-secondary btn-sm" id="regionShorter" title="Shorten this region by one slot">− Shorter</button>
     <label class="region-gain-label" title="Region level (multiplies the track level during this region)">Lvl
@@ -2114,8 +2129,9 @@ function dropRegionOnLane(laneId, payload, beat, copy = false) {
   return true;
 }
 
-// U3: duplicate the selected region into the first free span after it
-function duplicateSelectedRegion() {
+// Spec R4: ⌘D duplicates with the SAME seed (exact repetition is the
+// point of determinism); ⇧⌘D duplicates with a fresh seed (variation).
+function duplicateSelectedRegion(withNewSeed = false) {
   if (!selectedRegion) return;
   const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
   const region = track?.regions.find(r => r.id === selectedRegion.regionId);
@@ -2127,9 +2143,82 @@ function duplicateSelectedRegion() {
   const copy = JSON.parse(JSON.stringify(region));
   copy.id = crypto.randomUUID();
   copy.startBeat = start;
+  if (withNewSeed && copy.type !== "baked") copy.seed = newSeed();
   track.regions.push(copy);
   selectedRegion = { trackId: track.id, regionId: copy.id };
-  saveArrangement();
+  saveArrangement(withNewSeed ? "duplicate (new seed)" : "duplicate");
+  renderProduce();
+}
+
+// Spec R5: split at the playhead. Generative halves keep the SAME seed —
+// the tail carries takeOffsetBeats so it plays the later part of the same
+// take. Baked regions split their note lists.
+function splitSelectedRegionAtPlayhead() {
+  if (!selectedRegion) return;
+  const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+  const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+  if (!track || !region) return;
+  const cut = Math.round(playheadBeat * 4) / 4;
+  const rel = cut - region.startBeat;
+  if (rel <= 0 || rel >= regionLen(region)) return; // playhead not inside
+  if (region.type === "baked") {
+    if (region.loopSourceBeats && regionLen(region) > region.loopSourceBeats && rel > region.loopSourceBeats) {
+      alert("Split inside the first loop pass of a baked region (or unbake first).");
+      return;
+    }
+    const beatDiv = (arrangement.context.beatDivisions || 1);
+    const cutDivs = rel * beatDiv;
+    const tailNotes = region.notes.filter(nn => (nn.offsetDivs || 0) >= cutDivs)
+      .map(nn => ({ ...nn, offsetDivs: (nn.offsetDivs || 0) - cutDivs }));
+    region.notes = region.notes.filter(nn => (nn.offsetDivs || 0) < cutDivs);
+    const tail = JSON.parse(JSON.stringify(region));
+    tail.id = crypto.randomUUID();
+    tail.startBeat = cut;
+    tail.lengthBeats = regionLen(region) - rel;
+    tail.notes = tailNotes;
+    tail.loopSourceBeats = tail.lengthBeats;
+    region.lengthBeats = rel;
+    region.loopSourceBeats = Math.min(region.loopSourceBeats || rel, rel);
+    track.regions.push(tail);
+  } else {
+    const tail = JSON.parse(JSON.stringify(region));
+    tail.id = crypto.randomUUID();
+    tail.startBeat = cut;
+    tail.lengthBeats = regionLen(region) - rel;
+    tail.takeOffsetBeats = (region.takeOffsetBeats || 0) + rel;
+    region.lengthBeats = rel;
+    track.regions.push(tail);
+  }
+  selectedRegion = { trackId: track.id, regionId: region.id };
+  saveArrangement("split");
+  renderProduce();
+}
+
+// Spec R7: clipboard — paste lands at the playhead on the source track
+// (or the selected region's track), sliding right past collisions.
+let _regionClipboard = null;
+function copySelectedRegion() {
+  if (!selectedRegion) return;
+  const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+  const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+  if (!region) return;
+  _regionClipboard = { trackId: track.id, region: JSON.parse(JSON.stringify(region)) };
+}
+function pasteRegionAtPlayhead() {
+  if (!_regionClipboard) return;
+  const track = arrangement.tracks.find(t => t.id === (selectedRegion?.trackId || _regionClipboard.trackId))
+    || arrangement.tracks[0];
+  if (!track) return;
+  const copy = JSON.parse(JSON.stringify(_regionClipboard.region));
+  copy.id = crypto.randomUUID();
+  const len = regionLen(copy);
+  let start = Math.max(0, Math.round(playheadBeat));
+  while (start + len <= totalBeats() && !spanFree(track, start, len)) start++;
+  if (start + len > totalBeats()) return;
+  copy.startBeat = start;
+  track.regions.push(copy);
+  selectedRegion = { trackId: track.id, regionId: copy.id };
+  saveArrangement("paste");
   renderProduce();
 }
 
@@ -2184,7 +2273,20 @@ if (!window._dawKeysInstalled) {
       renderProduce();
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
       e.preventDefault();
-      duplicateSelectedRegion();
+      duplicateSelectedRegion(e.shiftKey); // ⇧⌘D = duplicate with a NEW seed
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "t") {
+      e.preventDefault();
+      splitSelectedRegionAtPlayhead();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      copySelectedRegion();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") {
+      e.preventDefault();
+      pasteRegionAtPlayhead();
+    } else if (e.key.toLowerCase() === "r" && !e.metaKey && !e.ctrlKey && selectedRegion) {
+      e.preventDefault();
+      if (e.shiftKey) document.querySelector("#regionSeedBack")?.click();
+      else document.querySelector("#regionReroll")?.click();
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
       if (e.shiftKey) redoArrangement();
@@ -2510,6 +2612,28 @@ function wireProduce(v) {
       window.addEventListener("mouseup", up);
     };
   }
+  // double-click empty lane space = new region at the grid (spec R1)
+  v.querySelectorAll(".tl2-lane").forEach(lane => {
+    lane.ondblclick = (e) => {
+      if (e.target !== lane) return;
+      const track = arrangement.tracks.find(t => t.id === lane.dataset.lane);
+      if (!track) return;
+      const beat = beatAtClientX(lane, e.clientX);
+      const pal = (arrangement.palette || []).find(pl => pl.id === (track.regions[track.regions.length - 1]?.paletteId))
+        || (arrangement.palette || [])[0];
+      if (!pal) return;
+      // longest free run at the drop point, capped at 8 beats
+      let len = 0;
+      while (len < 8 && spanFree(track, beat, len + 1)) len++;
+      if (len < 1) return;
+      const region = { id: crypto.randomUUID(), paletteId: pal.id, startBeat: beat, lengthBeats: len, seed: newSeed() };
+      track.regions.push(region);
+      selectedRegion = { trackId: track.id, regionId: region.id };
+      saveArrangement("create region");
+      renderProduce();
+    };
+  });
+
   updatePlayhead(arrPlay ? arrPlay.beat : playheadBeat);
 
   wireRoll(v);
@@ -2539,12 +2663,59 @@ function wireProduce(v) {
   if (rerollBtn) rerollBtn.onclick = () => {
     const { track, region } = selected();
     if (!track || !region) return;
-    region.previousSeeds = [...(region.previousSeeds || []), region.seed];
+    region.previousSeeds = [...(region.previousSeeds || []), region.seed].slice(-8);
     region.seed = newSeed();
-    saveArrangement();
+    saveArrangement("reroll");
     if (synth.isPlaying) synth.play(regionPlayParams(track, region));
     renderProduce();
   };
+  const seedBackBtn = v.querySelector("#regionSeedBack");
+  if (seedBackBtn) seedBackBtn.onclick = () => {
+    const { track, region } = selected();
+    if (!track || !region || !(region.previousSeeds || []).length) return;
+    region.seed = region.previousSeeds.pop();
+    saveArrangement("seed back");
+    if (synth.isPlaying) synth.play(regionPlayParams(track, region));
+    renderProduce();
+  };
+  const splitBtn = v.querySelector("#regionSplit");
+  if (splitBtn) splitBtn.onclick = () => splitSelectedRegionAtPlayhead();
+  const muteBtn = v.querySelector("#regionMute");
+  if (muteBtn) muteBtn.onclick = () => {
+    const { region } = selected();
+    if (!region) return;
+    region.muted = !region.muted;
+    saveArrangement(region.muted ? "mute region" : "unmute region");
+    renderProduce();
+  };
+  // Region gain tag: vertical drag trims the region level in dB
+  v.querySelectorAll("[data-gain-tag]").forEach(tag => {
+    tag.onmousedown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const { track, region } = selected();
+      if (!region) return;
+      const startY = e.clientY;
+      const startGain = region.gain ?? 1;
+      const move = (ev) => {
+        const db = 20 * Math.log10(Math.max(0.02, startGain)) + (startY - ev.clientY) * 0.15;
+        region.gain = clamp(Math.pow(10, db / 20), 0.02, 1.5);
+        tag.textContent = `${db >= 0 ? "+" : ""}${db.toFixed(1)}dB`;
+        if (arrPlay && track) {
+          const voice = producerVoices.get(track.id);
+          if (voice) voice.setMasterVolume((track.gain ?? 1) * region.gain);
+        }
+      };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        saveArrangement("region gain");
+        renderProduce();
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+  });
 
   const bakeBtn = v.querySelector("#regionBake");
   if (bakeBtn) bakeBtn.onclick = () => {
