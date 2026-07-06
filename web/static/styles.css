@@ -2468,6 +2468,140 @@ body.explore-mode #app {
   .ts-flow { display: none; }
 }
 
+/* ── CHORDA tone designer (owner-chosen direction 2026-07-07) ── */
+.chorda { gap: 0.35rem; }
+.ch-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.ch-readout { font-size: 0.68rem; color: var(--text3); font-variant-numeric: tabular-nums; }
+.ch-readout b { color: var(--text); font-weight: 600; }
+
+.ch-rail { display: flex; gap: 4px; align-items: stretch; }
+.ch-sep { display: flex; align-items: center; color: #3d4756; font-size: 0.8rem; }
+.ch-card {
+  flex: 1;
+  min-width: 0;
+  background: rgba(10, 13, 17, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 8px 4px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ch-card-head { display: flex; justify-content: space-between; align-items: center; }
+.ch-card-n { font-size: 0.6rem; letter-spacing: 0.14em; color: var(--text2); }
+.ch-dot { width: 6px; height: 6px; border-radius: 50%; }
+.ch-excitor .ch-dot { background: #f5a623; }
+.ch-resonator .ch-dot { background: #58a6ff; }
+.ch-body .ch-dot { background: #b48ede; }
+.ch-space .ch-dot { background: #58d6a9; }
+.ch-excitor.active { border-color: #6b4c22; }
+.ch-resonator.active { border-color: #2b5892; }
+.ch-body.active { border-color: #5b3f80; }
+.ch-space.active { border-color: #2b6e57; }
+.ch-card.active .ch-card-n { color: var(--text); }
+.ch-thumb { width: 100%; height: 34px; display: block; background: var(--display); border-radius: 4px; }
+.ch-card-sum { font-size: 0.58rem; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+.ch-main { display: flex; gap: 0.5rem; min-height: 0; flex: 1; }
+.ch-inspector {
+  width: 218px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(10, 13, 17, 0.5);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow-y: auto;
+}
+.ch-inspector.ch-excitor { border-color: #4a3517; }
+.ch-inspector.ch-resonator { border-color: #223f63; }
+.ch-inspector.ch-body { border-color: #3f2d58; }
+.ch-inspector.ch-space { border-color: #224d3e; }
+.ch-ins-head { display: flex; flex-direction: column; gap: 1px; }
+.ch-ins-d { font-size: 0.6rem; color: var(--text3); }
+.ch-caption { font-size: 0.62rem; color: var(--text3); line-height: 1.5; margin-top: auto; }
+.ch-inspector .body-mini { height: 46px; }
+.ch-inspector .space-pad { width: 100%; height: 110px; }
+
+.ch-field-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ch-field-pos { position: relative; }
+.ch-focus-row { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.ch-focus-label, .ch-lens-label { font-size: 0.58rem; letter-spacing: 0.14em; color: var(--text3); margin-right: 2px; }
+.ch-chip {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text3);
+  font: inherit;
+  font-size: 0.62rem;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.ch-chip.active { color: #5fd4c8; border-color: #2c5b56; background: rgba(95, 212, 200, 0.07); }
+.ch-focus-sum { margin-left: auto; font-size: 0.62rem; color: var(--text2); font-variant-numeric: tabular-nums; }
+
+#cvTonePrint { height: 208px; }
+.ch-pin {
+  position: absolute;
+  z-index: 5;
+  min-width: 200px;
+  max-width: 250px;
+  background: rgba(14, 24, 34, 0.95);
+  border: 1px solid #2c5b56;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 0.64rem;
+  line-height: 1.55;
+  color: var(--text2);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.ch-pin b { color: var(--text); font-weight: 600; }
+.ch-pin-head { color: #5fd4c8; font-size: 0.62rem; letter-spacing: 0.1em; margin-bottom: 2px; }
+.ch-pin-head span { font-size: 0.54rem; background: rgba(95, 212, 200, 0.15); padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
+
+.ch-lens-row { display: flex; gap: 6px; align-items: center; }
+#cvLens { flex: 1; height: 26px; background: var(--display); border: 1px solid var(--border); border-radius: 5px; cursor: ew-resize; display: block; }
+
+.ch-strip { display: flex; gap: 6px; overflow-x: auto; min-height: 30px; }
+.ch-ch {
+  flex: 0 0 128px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(10, 13, 17, 0.55);
+  padding: 5px 7px;
+  font-size: 0.6rem;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+.ch-ch.pinned { border-color: #2c5b56; }
+.ch-ch-name { color: var(--text); font-size: 0.66rem; }
+.ch-ch-name span { color: var(--text3); font-size: 0.58rem; margin-left: 3px; }
+.ch-ch-hz { color: var(--text3); margin-bottom: 3px; }
+.ch-ch-row { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.ch-ch-row input[type="range"] { flex: 1; min-width: 0; height: 10px; }
+.ch-ch-row i {
+  display: block; height: 3px; background: rgba(88, 166, 255, 0.6); border-radius: 2px; flex: none;
+  max-width: 56px;
+}
+.ch-ch-row span { width: 20px; }
+.ch-ch-row output { margin-left: auto; }
+.ch-ch-link { margin-top: 3px; color: #5fd4c8; }
+.ch-ch-link.muted { color: var(--text3); }
+
+.ch-status {
+  display: flex; justify-content: space-between; gap: 1rem;
+  font-size: 0.6rem; color: var(--text3); padding-top: 2px;
+  border-top: 1px solid var(--border);
+}
+.ch-status b { color: var(--text2); font-weight: 600; }
+
 /* ── Tone chain rotary knobs + segmented excite (T-Q5 polish) ── */
 .knob-row {
   display: flex;

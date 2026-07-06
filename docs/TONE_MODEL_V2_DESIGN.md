@@ -483,6 +483,13 @@ Quality:
    palettes eagerly on load, or lazily per region play?
 
 ---
-*Status: APPROVED 2026-07-06 (T-Q4). Implementation in progress, stage
-by stage per §9. Producer v2's Q4 re-audition remains a separate open
-item.*
+*Status: APPROVED 2026-07-06 (T-Q4); engine T1–T8 built. UI DIRECTION
+DECISION 2026-07-07: owner chose the CHORDA design
+(docs/mockups/tone-alt-freshtake.html, from the independent fresh-eyes
+agent) as the spec — "chorda is better lets hard move over to that
+design". Rebuild plan: C1 core structure (stage rail with live
+thumbnails, selected-stage inspector, dB-axis partial field with
+coupling lane + pinned readout, status bar), C2 focus system (filter
+chips, lens brush, channel strips), C3 polish parity (ghost pre-drag
+dots, physics captions/diagrams, A/B compare, per-partial S/M).
+Producer v2's Q4 re-audition remains a separate open item.*

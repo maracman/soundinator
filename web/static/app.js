@@ -33,6 +33,8 @@ import {
   positionComb,
   nearestRatio,
   transferCoupling,
+  excitationSpectrum,
+  spaceAirCutoff,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -4234,77 +4236,45 @@ function subnoteWorkspaceHTML(p) {
             <canvas class="formant-canvas accuracy-canvas" id="cvFormantAccuracy" width="760" height="360"></canvas>
           </div>
         ` : `
-          <div class="harmonic-stage" data-sound-path="fourier" aria-disabled="false">
-            <div class="subnote-head">
+          <div class="harmonic-stage chorda" data-sound-path="fourier" aria-disabled="false">
+            <!-- CHORDA (owner-chosen direction 2026-07-07): one truth-canvas,
+                 four annotators. The chain is a rail of thumbnail cards; the
+                 selected stage expands into the inspector; the partial field
+                 is the shared display everything indexes into. -->
+            <div class="ch-head">
               <div>
-                <div class="section-label">Tone Builder</div>
+                <div class="section-label">Tone Designer</div>
                 <h2>${esc(profile.label)}</h2>
               </div>
-              <div class="print-bands" id="printBands">
-                <span class="print-hint">tap a partial · drag = level</span>
-                <button class="print-band" data-print-band="all">all</button>
-                <button class="print-band" data-print-band="fund">fund</button>
-                <button class="print-band" data-print-band="low">low</button>
-                <button class="print-band" data-print-band="mid">mid</button>
-                <button class="print-band" data-print-band="presence">presence</button>
-                <button class="print-band" data-print-band="air">air</button>
+              <div class="ch-readout">f₀ <b>${(p.tonicHz || 261.63).toFixed(1)} Hz</b> · ${esc(noteNameForHz(p.tonicHz || 261.63))} · ${Math.round(p.spectralPartials || 20)} partials</div>
+            </div>
+            <div class="ch-rail" id="chRail">
+              ${chRailCardHTML(p, "excitor", "01", "EXCITOR")}
+              <div class="ch-sep">›</div>
+              ${chRailCardHTML(p, "resonator", "02", "RESONATOR")}
+              <div class="ch-sep">›</div>
+              ${chRailCardHTML(p, "body", "03", "BODY")}
+              <div class="ch-sep">›</div>
+              ${chRailCardHTML(p, "space", "04", "SPACE")}
+            </div>
+            <div class="ch-main">
+              <div class="ch-inspector ch-${_chStage}" id="chInspector">${chInspectorHTML(p)}</div>
+              <div class="ch-field-wrap">
+                <div class="ch-focus-row" id="chFocus">
+                  <span class="ch-focus-label">FOCUS</span>
+                  ${[["all", "All"], ["odd", "Odd"], ["even", "Even"], ["coupled", "Coupled"], ["longring", "Long ring"], ["wobbly", "Wobbly"]].map(([c, label]) =>
+                    `<button class="ch-chip${_chFocus.chip === c ? " active" : ""}" data-ch-chip="${c}">${label}</button>`).join("")}
+                  <span class="ch-focus-sum" id="chFocusSum"></span>
+                </div>
+                <div class="ch-field-pos">
+                  <canvas id="cvTonePrint" width="1200" height="330"></canvas>
+                  <div class="ch-pin" id="chPin" hidden></div>
+                </div>
+                <div class="ch-lens-row"><span class="ch-lens-label">LENS</span><canvas id="cvLens" width="1200" height="34"></canvas></div>
+                <div class="ch-strip" id="chStrip"></div>
               </div>
             </div>
-            <!-- The signal chain IS the layout (tone v2 rev B):
-                 1·EXCITOR → 2·RESONATOR → 3·BODY → 4·SPACE -->
-            <div class="tone-chain">
-              <div class="tone-stage">
-                <div class="ts-head"><span class="ts-n">1 · EXCITOR</span><span class="ts-d">how energy enters</span></div>
-                <div class="seg-control" role="group" title="How energy enters the resonator: a bow drives it continuously, a pluck releases it, a strike hits it, air blows through it. Each has its own physical drive spectrum.">
-                  ${["bow", "pluck", "strike", "blow"].map(t =>
-                    `<button class="seg-btn${p.excitationType === t ? " active" : ""}" data-exc-type="${t}">${t[0].toUpperCase()}${t.slice(1)}</button>`).join("")}
-                </div>
-                <div class="knob-row">
-                  ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
-                  ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
-                  ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
-                  ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
-                </div>
-              </div>
-              <div class="ts-flow">→</div>
-              <div class="tone-stage ts-active">
-                <div class="ts-head"><span class="ts-n">2 · RESONATOR</span><span class="ts-d">what rings, how long, what couples</span></div>
-                <div class="knob-row">
-                  ${knobHTML("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01, { def: 0.45 })}
-                  ${knobHTML("partialB", "Inharmonic", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002, { def: 0 })}
-                  ${knobHTML("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01, { def: 0.15 })}
-                  ${knobHTML("partialTilt", "Brightness", p.partialTilt, -1, 1, 0.01, { def: 0 })}
-                  ${knobHTML("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1, { def: 20 })}
-                </div>
-              </div>
-              <div class="ts-flow">→</div>
-              <div class="tone-stage ts-cool">
-                <div class="ts-head"><span class="ts-n">3 · BODY</span><span class="ts-d">the box around it</span></div>
-                <div class="ts-body-row">
-                  <select data-param-select="bodyType" id="sel_bodyType" class="param-select body-select" title="The box around the resonator: fixed-Hz resonance bands. Auto keeps the instrument's own body; vowels are bodies too — this is where the voice lives.">
-                    <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
-                    ${Object.entries(BODY_PRESETS).map(([k, b]) =>
-                      `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
-                  </select>
-                  ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 0.35, cool: true })}
-                </div>
-                <canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>
-              </div>
-              <div class="ts-flow">→</div>
-              <div class="tone-stage ts-cool ts-space">
-                <div class="ts-head"><span class="ts-n">4 · SPACE</span><span class="ts-d">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")}</span></div>
-                <div class="ts-body-row">
-                  <canvas class="space-pad" id="cvSpacePad" width="280" height="150" title="Drag the instrument around the listener: distance delays arrival, softens highs, trades direct sound for room, and adds bass up close; bearing uses true interaural (HRTF) filtering."></canvas>
-                  <div class="knob-col">
-                    ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
-                    ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
-                  </div>
-                </div>
-                <div class="ts-space-link" id="spaceReadout">${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}°</div>
-              </div>
-            </div>
-            <canvas id="cvTonePrint" width="1200" height="380"></canvas>
-            <div class="print-readout" id="printReadout">tap a partial to see its level, ring time, and who it talks to — true ratios, labelled with their cents error</div>
+            <div class="ch-status"><span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span></div>
           </div>
         `}
 
@@ -4400,9 +4370,6 @@ function subnoteWorkspaceHTML(p) {
           </div>
         </div>
 
-        <div class="harmonic-editor${fourierDisabled}" id="harmonicEditor" data-sound-path="fourier" aria-disabled="${formantMode}">
-          ${harmonicEditorHTML(p)}
-        </div>
       </div>
     </div>
   `;
@@ -4567,6 +4534,8 @@ function syncHarmonicWorkspace(v) {
   decorateTooltips(card);
   drawTonePrint();
   drawBodyRidge();
+  drawSpacePad();
+  drawChThumbs();
 }
 
 function applySubnoteModeState(root = document) {
@@ -4809,6 +4778,7 @@ function drawDistributions() {
   drawTonePrint();
   drawBodyRidge();
   drawSpacePad();
+  drawChThumbs();
 }
 
 // Match a canvas backing store to its CSS layout size × devicePixelRatio so
@@ -6232,6 +6202,193 @@ function _setKnobVisual(cell, frac) {
   if (svg) svg.innerHTML = knobArcs(frac, cell.classList.contains("cool"));
 }
 
+// ── CHORDA: stage rail, inspector, focus system ─────────────────────
+// Owner-chosen direction (docs/mockups/tone-alt-freshtake.html): the
+// chain is a rail of live-thumbnail cards; the selected stage expands
+// into the inspector; the partial field is the one shared display.
+
+let _chStage = "excitor";
+let _chFocus = { chip: "all", lensLo: null, lensHi: null };
+
+function noteNameForHz(hz) {
+  const midi = Math.round(69 + 12 * Math.log2(Math.max(20, hz) / 440));
+  return NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+function noteAndCents(hz) {
+  const exact = 69 + 12 * Math.log2(Math.max(20, hz) / 440);
+  const midi = Math.round(exact);
+  const cents = Math.round((exact - midi) * 100);
+  return `${NOTE_NAMES[((midi % 12) + 12) % 12]}${Math.floor(midi / 12) - 1}${cents === 0 ? "" : (cents > 0 ? "+" : "") + cents + "¢"}`;
+}
+
+function chCardSummary(p, stage) {
+  if (stage === "excitor") {
+    return `${p.excitationType || "bow"} · pos ${(p.excitationPosition ?? 0.13).toFixed(2)} · human ${(p.excitationHuman ?? 0.4).toFixed(2)}`;
+  }
+  if (stage === "resonator") {
+    const B = Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0);
+    return `mat ${(p.partialMaterial ?? 0.45).toFixed(2)} · ${B > 0 ? fmtOutput("partialB", B) : "harmonic"} · xfer ${(p.partialTransfer ?? 0.15).toFixed(2)} · ${Math.round(p.spectralPartials || 20)}p`;
+  }
+  if (stage === "body") {
+    const label = !p.bodyType || p.bodyType === "auto" ? "auto" : (BODY_PRESETS[p.bodyType]?.label || p.bodyType);
+    return `${label} · amount ${(p.spectralResonanceAmount ?? 0.35).toFixed(2)}`;
+  }
+  return `${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}° · wet ${(p.reverbWet ?? 0).toFixed(2)}`;
+}
+
+function chRailCardHTML(p, stage, num, name) {
+  return `
+    <button class="ch-card ch-${stage}${_chStage === stage ? " active" : ""}" data-ch-stage="${stage}">
+      <div class="ch-card-head"><span class="ch-card-n">${num} ${name}</span><span class="ch-dot"></span></div>
+      <canvas class="ch-thumb" id="chThumb_${stage}" width="380" height="64"></canvas>
+      <div class="ch-card-sum">${esc(chCardSummary(p, stage))}</div>
+    </button>`;
+}
+
+function chInspectorHTML(p) {
+  if (_chStage === "excitor") {
+    return `
+      <div class="ch-ins-head"><span class="ch-card-n">01 · EXCITOR</span><span class="ch-ins-d">how energy enters</span></div>
+      <div class="seg-control" role="group">
+        ${["bow", "pluck", "strike", "blow"].map(t =>
+          `<button class="seg-btn${p.excitationType === t ? " active" : ""}" data-exc-type="${t}">${t[0].toUpperCase()}${t.slice(1)}</button>`).join("")}
+      </div>
+      <div class="knob-row">
+        ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
+        ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
+      </div>
+      <div class="knob-row">
+        ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
+        ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
+      </div>
+      <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field</div>`;
+  }
+  if (_chStage === "resonator") {
+    return `
+      <div class="ch-ins-head"><span class="ch-card-n">02 · RESONATOR</span><span class="ch-ins-d">what rings, how long, what couples</span></div>
+      <div class="knob-row">
+        ${knobHTML("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01, { def: 0.45 })}
+        ${knobHTML("partialB", "Inharmonic", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002, { def: 0 })}
+      </div>
+      <div class="knob-row">
+        ${knobHTML("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01, { def: 0.15 })}
+        ${knobHTML("partialTilt", "Brightness", p.partialTilt, -1, 1, 0.01, { def: 0 })}
+      </div>
+      <div class="knob-row">
+        ${knobHTML("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1, { def: 20 })}
+      </div>
+      <div class="ch-caption">material sets each partial's ring time from its REAL frequency; transfer lets true-ratio neighbours feed each other — inharmonicity detunes them apart</div>`;
+  }
+  if (_chStage === "body") {
+    return `
+      <div class="ch-ins-head"><span class="ch-card-n">03 · BODY</span><span class="ch-ins-d">the box around it</span></div>
+      <select data-param-select="bodyType" id="sel_bodyType" class="param-select body-select">
+        <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
+        ${Object.entries(BODY_PRESETS).map(([k, b]) =>
+          `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
+      </select>
+      <div class="knob-row">
+        ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 0.35, cool: true })}
+      </div>
+      <canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>
+      <div class="ch-caption">fixed-Hz resonance bands — vowels are bodies too; with vibrato, partials on the curve's slopes shimmer (FM→AM)</div>`;
+  }
+  return `
+    <div class="ch-ins-head"><span class="ch-card-n">04 · SPACE</span><span class="ch-ins-d">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")}</span></div>
+    <canvas class="space-pad" id="cvSpacePad" width="280" height="170"></canvas>
+    <div class="ts-space-link" id="spaceReadout">${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}°</div>
+    <div class="knob-row">
+      ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
+      ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
+    </div>
+    <div class="ch-caption">distance delays arrival (~3 ms/m), softens highs, trades direct for room, and lifts bass inside 1 m; bearing is true interaural (HRTF)</div>`;
+}
+
+// Stage thumbnails: each card's live mini-visualisation, computed from the
+// same laws as the engine.
+function drawChThumbs() {
+  const p = exploreParams;
+  const f0 = p.tonicHz || 261.63;
+  const th = (id) => {
+    const cv = document.getElementById(id);
+    if (!cv) return null;
+    const g = crisp2d(cv);
+    g.ctx.clearRect(0, 0, g.w, g.h);
+    return g;
+  };
+  // 01 excitor: drive × comb bar spectrum
+  let g = th("chThumb_excitor");
+  if (g) {
+    const type = p.excitationType || "bow";
+    const pos = Number.isFinite(p.excitationPosition) ? p.excitationPosition : 0.13;
+    const hard = Number.isFinite(p.excitationHardness) ? p.excitationHardness : 0.6;
+    const ref = excitationSpectrum(type, 1, { position: pos, hardness: hard, freqHz: f0 });
+    const hot = _emph("comb");
+    g.ctx.fillStyle = hot ? "#ffd28a" : "rgba(245,166,35,0.75)";
+    const n0 = 24, bw = g.w / n0;
+    for (let n = 1; n <= n0; n++) {
+      const v = ref > 0 ? excitationSpectrum(type, n, { position: pos, hardness: hard, freqHz: n * f0 }) / ref : 0;
+      const bh = Math.pow(Math.min(1, v), 0.5) * (g.h - 6);
+      g.ctx.fillRect((n - 1) * bw + 1, g.h - 3 - bh, Math.max(1, bw - 2), bh);
+    }
+  }
+  // 02 resonator: T60-vs-frequency law
+  g = th("chThumb_resonator");
+  if (g) {
+    const mat = Math.max(0, Math.min(1, p.partialMaterial ?? 0.45));
+    g.ctx.beginPath();
+    for (let px = 0; px <= g.w; px += 3) {
+      const f = 60 * Math.pow(12000 / 60, px / g.w);
+      const t60 = materialT60(f, mat);
+      const y = g.h - 4 - clamp((Math.log10(t60) + 1.3) / 2.3, 0, 1) * (g.h - 8);
+      px === 0 ? g.ctx.moveTo(px, y) : g.ctx.lineTo(px, y);
+    }
+    g.ctx.strokeStyle = "rgba(88,166,255,0.85)";
+    g.ctx.lineWidth = 1.6;
+    g.ctx.stroke();
+  }
+  // 03 body: resonance curve
+  g = th("chThumb_body");
+  if (g) {
+    const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
+    const bands = bodyBandsFor(p, profile);
+    const amount = clamp(p.spectralResonanceAmount ?? 0.35, 0, 1.5);
+    g.ctx.beginPath();
+    for (let px = 0; px <= g.w; px += 3) {
+      const f = 60 * Math.pow(12000 / 60, px / g.w);
+      const r = bodyResponse(bands, f, amount);
+      g.ctx.lineTo(px, g.h - 4 - (Math.log2(r) + 2.4) / 4.6 * (g.h - 8));
+    }
+    g.ctx.strokeStyle = "rgba(180,142,222,0.85)";
+    g.ctx.lineWidth = 1.6;
+    g.ctx.stroke();
+  }
+  // 04 space: mini room plan
+  g = th("chThumb_space");
+  if (g) {
+    const cx = g.w / 2, cy = g.h - 6, rMax = Math.min(g.h - 12, g.w / 2 - 6);
+    g.ctx.strokeStyle = "rgba(88,214,169,0.3)";
+    for (const dm of [1, 10]) {
+      const r = _spaceDistToR(dm, rMax);
+      g.ctx.beginPath(); g.ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI); g.ctx.stroke();
+    }
+    const d = clamp(p.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
+    const az = (clamp(p.spaceAzimuth ?? 0, -90, 90) - 90) * Math.PI / 180;
+    const r = _spaceDistToR(d, rMax);
+    g.ctx.fillStyle = "#58d6a9";
+    g.ctx.beginPath();
+    g.ctx.arc(cx + Math.cos(az) * r, cy + Math.sin(az) * r, 3, 0, 2 * Math.PI);
+    g.ctx.fill();
+    g.ctx.fillStyle = "rgba(200,215,230,0.8)";
+    g.ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
+  }
+  // rail summaries track live values
+  document.querySelectorAll("#chRail .ch-card").forEach(card => {
+    const sum = card.querySelector(".ch-card-sum");
+    if (sum) sum.textContent = chCardSummary(p, card.dataset.chStage);
+  });
+}
+
 // ── T7: the tone print — the resonator's interactive view ──────────
 // One display, engine-true: the partial set comes from the SAME
 // fingerprint code playback uses (Human forced to 0 for a noise-free
@@ -6254,6 +6411,20 @@ function tonePrintModel() {
   return fp;
 }
 
+function chFocusPass(needle, allNeedles) {
+  if (_chFocus.lensLo != null && (needle.freq < _chFocus.lensLo || needle.freq > _chFocus.lensHi)) return false;
+  const c = _chFocus.chip;
+  if (c === "odd") return needle.harmonic % 2 === 1;
+  if (c === "even") return needle.harmonic % 2 === 0;
+  if (c === "longring") return needle.t60 > 2;
+  if (c === "wobbly") return (needle.sens ?? 0) > 0.6;
+  if (c === "coupled") {
+    return allNeedles.some(o => o.i !== needle.i && o.mean > needle.mean * 0.5 &&
+      transferCoupling(needle.freq, o.freq) > 0.15);
+  }
+  return true;
+}
+
 function drawTonePrint() {
   const cv = document.getElementById("cvTonePrint");
   if (!cv) return;
@@ -6262,180 +6433,246 @@ function drawTonePrint() {
   const fp = tonePrintModel();
   const parts = fp.harmonicPartials;
   const material = Math.max(0, Math.min(1, fp.partialMaterial ?? 0));
-  const base = h - 26, top = 34;
+  const LANE = 26;                 // coupling lane above the Hz labels
+  const base = h - 18 - LANE, top = 14;
   const X = (f) => w * Math.log(f / PRINT_FMIN) / Math.log(PRINT_FMAX / PRINT_FMIN);
 
-  // axis
-  ctx.strokeStyle = "rgba(140,160,180,0.08)";
-  ctx.lineWidth = 1;
-  ctx.fillStyle = "rgba(120,135,150,0.6)";
+  // dB grid (0 … −60)
   ctx.font = "10px ui-monospace, monospace";
+  ctx.lineWidth = 1;
+  for (let db = 0; db >= -60; db -= 12) {
+    const y = top + (-db / 60) * (base - top);
+    ctx.strokeStyle = db === 0 ? "rgba(140,160,180,0.18)" : "rgba(140,160,180,0.07)";
+    ctx.beginPath(); ctx.moveTo(34, y); ctx.lineTo(w, y); ctx.stroke();
+    ctx.fillStyle = "rgba(120,135,150,0.6)";
+    ctx.textAlign = "right";
+    ctx.fillText(`${db}`, 30, y + 3);
+  }
+  // Hz ticks
   ctx.textAlign = "center";
   for (const f of [55, 110, 220, 440, 880, 1760, 3520, 7040, 14080]) {
     const px = X(f);
-    ctx.beginPath(); ctx.moveTo(px, top - 8); ctx.lineTo(px, base + 4); ctx.stroke();
-    ctx.fillText(f >= 1000 ? f / 1000 + "k" : String(f), px, base + 15);
+    if (px < 36) continue;
+    ctx.strokeStyle = "rgba(140,160,180,0.07)";
+    ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, base + LANE); ctx.stroke();
+    ctx.fillStyle = "rgba(120,135,150,0.55)";
+    ctx.fillText(f >= 1000 ? f / 1000 + "k" : String(f), px, h - 5);
   }
-  ctx.textAlign = "right";
-  ctx.fillText("frequency · Hz (log)", w - 6, base + 15);
-  // on-canvas legend: each overlay names its stage
   ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(245,166,35,0.75)";
-  ctx.fillText("▍partial · trail = ring time", 8, 12);
-  ctx.fillStyle = "rgba(79,141,212,0.8)";
-  ctx.fillText("◠ body (3)", 172, 12);
-  ctx.fillStyle = "rgba(125,145,160,0.8)";
-  ctx.fillText("┄ excitor comb (1)", 244, 12);
+  ctx.fillStyle = "rgba(120,135,150,0.5)";
+  ctx.fillText("coupling", 36, base + 12);
 
-  // excitor comb underlay (stage 1), faded before it aliases
-  const f0 = exploreParams.tonicHz || 261.63;
-  const pos = Number.isFinite(exploreParams.excitationPosition) ? exploreParams.excitationPosition : 0.5;
-  ctx.beginPath();
-  let combEnd = w;
-  for (let px = 0; px <= w; px += 2) {
-    const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
-    const nEff = f / f0;
-    const pxPerCycle = w / (Math.log(PRINT_FMAX / PRINT_FMIN) / Math.LN2) / (Math.max(0.5, nEff) * pos * 2.5);
-    if (pxPerCycle < 12) { combEnd = px; break; }
-    const y = base - positionComb(nEff, pos) * (base - top) * 0.16;
-    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
-  }
-  const combHot = _emph("comb");
-  const combFade = ctx.createLinearGradient(0, 0, Math.max(1, combEnd), 0);
-  combFade.addColorStop(0, combHot ? "rgba(160,190,210,0.7)" : "rgba(105,125,140,0.22)");
-  combFade.addColorStop(1, "rgba(105,125,140,0)");
-  ctx.strokeStyle = combFade;
-  ctx.lineWidth = combHot ? 1.8 : 1;
-  ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
-  ctx.lineWidth = 1;
-
-  // body ridge (stage 3)
+  // body overlay (stage 3): its own dB curve, centred on the −30 line
   const bands = fp.bodyBands || [];
   const amount = fp.bodyAmount || 0;
   if (bands.length && amount > 0) {
-    ctx.beginPath(); ctx.moveTo(0, base);
-    for (let px = 0; px <= w; px += 3) {
-      const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
-      const r = bodyResponse(bands, f, amount);
-      ctx.lineTo(px, base - (Math.log2(r) + 2.4) / 4.6 * (base - top) * 0.85);
-    }
-    ctx.lineTo(w, base); ctx.closePath();
     const ridgeHot = _emph("ridge");
-    ctx.fillStyle = ridgeHot ? "rgba(79,141,212,0.22)" : "rgba(79,141,212,0.11)";
-    ctx.fill();
-    ctx.strokeStyle = ridgeHot ? "rgba(120,175,235,0.95)" : "rgba(79,141,212,0.55)";
-    ctx.lineWidth = ridgeHot ? 2.2 : 1.6;
+    ctx.beginPath();
+    for (let px = 36; px <= w; px += 3) {
+      const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
+      const bdb = 20 * Math.log10(bodyResponse(bands, f, amount));
+      const y = top + ((30 - bdb) / 60) * (base - top);
+      px === 36 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+    }
+    ctx.strokeStyle = ridgeHot ? "rgba(200,160,240,0.95)" : "rgba(180,142,222,0.45)";
+    ctx.lineWidth = ridgeHot ? 2.2 : 1.4;
     ctx.stroke();
     ctx.lineWidth = 1;
+    ctx.fillStyle = ridgeHot ? "rgba(200,160,240,0.95)" : "rgba(180,142,222,0.5)";
+    ctx.fillText("body ±dB", w - 64, top + ((30 - 20 * Math.log10(bodyResponse(bands, PRINT_FMAX * 0.7, amount))) / 60) * (base - top) - 6);
   }
+  // air absorption at the current distance (stage 4)
+  const airCut = spaceAirCutoff(exploreParams.spaceDistance ?? 2.5);
+  ctx.beginPath();
+  for (let px = 36; px <= w; px += 4) {
+    const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
+    const drop = f > airCut ? -12 * Math.log2(f / airCut) : 0;
+    const y = top + (-drop / 60) * (base - top);
+    px === 36 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+  }
+  ctx.strokeStyle = "rgba(88,214,169,0.35)";
+  ctx.setLineDash([3, 4]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(88,214,169,0.55)";
+  ctx.fillText(`air @ ${(exploreParams.spaceDistance ?? 2.5).toFixed(1)} m`, w - 92, top + 10);
 
-  // inharmonicity emphasis: ghost ticks at the perfect integer positions so
-  // turning the Inharmonic knob visibly bends the needles away from them
+  // inharmonicity ghost ticks while the knob is fresh
+  const f0 = exploreParams.tonicHz || 261.63;
   if (_emph("shift")) {
-    ctx.strokeStyle = "rgba(200,215,230,0.4)";
+    ctx.strokeStyle = "rgba(200,215,230,0.35)";
     ctx.setLineDash([2, 3]);
     for (let n = 1; n <= 64; n++) {
       const fInt = n * f0;
       if (fInt > PRINT_FMAX) break;
-      const px = X(fInt);
-      ctx.beginPath(); ctx.moveTo(px, top + 4); ctx.lineTo(px, base); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(X(fInt), top + 4); ctx.lineTo(X(fInt), base); ctx.stroke();
     }
     ctx.setLineDash([]);
   }
 
-  // band focus shading
-  if (_printState.band !== "all" && PRINT_BANDS[_printState.band]) {
-    const [b0, b1] = PRINT_BANDS[_printState.band];
-    ctx.fillStyle = "rgba(95,212,200,0.05)";
-    ctx.fillRect(X(Math.max(b0, PRINT_FMIN)), top - 10, X(Math.min(b1, PRINT_FMAX)) - X(Math.max(b0, PRINT_FMIN)), base - top + 14);
+  // partial stems + dots (ring-time glow), focus dimming
+  const maxMean = Math.max(0.0001, ...parts.map(pp => pp.mean));
+  _printGeom = { X, base, top, w, h, needles: [] };
+  parts.forEach((pp, i) => {
+    if (pp.harmonicFrequency > PRINT_FMAX || pp.mean <= 0) return;
+    const db = Math.max(-60, 20 * Math.log10(pp.mean / maxMean));
+    const px = X(pp.harmonicFrequency);
+    const y = top + (-db / 60) * (base - top);
+    const t60 = material > 0 ? materialT60(pp.harmonicFrequency, material) : 6;
+    _printGeom.needles.push({ i, x: px, topY: y, mean: pp.mean, db, freq: pp.harmonicFrequency, harmonic: pp.harmonic, t60, sens: pp.sens });
+  });
+  const focusable = _chFocus.chip !== "all" || _chFocus.lensLo != null;
+  const needleHot = _emph("needles");
+  for (const n of _printGeom.needles) {
+    const pass = !focusable || chFocusPass(n, _printGeom.needles);
+    n.pass = pass;
+    const sel = _printState.sel === n.i;
+    const alpha = pass ? 1 : 0.22;
+    const glow = Math.min(1, Math.log10(1 + n.t60) / 0.9);
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = sel ? "#eaf2ff" : "rgba(148,196,255,0.75)";
+    ctx.lineWidth = (sel ? 2.4 : 1.4) * (needleHot ? 1.4 : 1);
+    ctx.beginPath(); ctx.moveTo(n.x, base); ctx.lineTo(n.x, n.topY); ctx.stroke();
+    // ring-time halo behind the dot
+    if (glow > 0.05) {
+      const halo = ctx.createRadialGradient(n.x, n.topY, 0, n.x, n.topY, 4 + glow * 10 * (_emph("glow") ? 1.6 : 1));
+      halo.addColorStop(0, `rgba(148,196,255,${0.5 * glow})`);
+      halo.addColorStop(1, "rgba(148,196,255,0)");
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(n.x, n.topY, 4 + glow * 10 * 1.6, 0, 2 * Math.PI); ctx.fill();
+    }
+    ctx.fillStyle = sel ? "#ffffff" : "#bcd8f4";
+    ctx.beginPath(); ctx.arc(n.x, n.topY, sel ? 3.4 : 2.4, 0, 2 * Math.PI); ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
-  // needles + afterglow
-  const maxMean = Math.max(0.0001, ...parts.map(p => p.mean));
-  _printGeom = { X, base, top, w, h, needles: [] };
-  parts.forEach((p, i) => {
-    if (p.harmonicFrequency > PRINT_FMAX || p.mean <= 0) return;
-    const px = X(p.harmonicFrequency);
-    const nh = Math.pow(p.mean / maxMean, 0.62) * (base - top);
-    const t60 = material > 0 ? materialT60(p.harmonicFrequency, material) : 6;
-    const glow = Math.min(1, Math.log10(1 + t60) / 0.9);
-    const sel = _printState.sel === i;
-    const glowBoost = _emph("glow") ? 1.8 : 1;
-    const trailLen = (12 + glow * 26) * (_emph("glow") ? 1.35 : 1);
-    const grad = ctx.createLinearGradient(px, 0, px + trailLen, 0);
-    grad.addColorStop(0, `rgba(255,180,84,${Math.min(0.85, 0.3 * glow * glowBoost)})`);
-    grad.addColorStop(1, "rgba(255,180,84,0)");
-    ctx.fillStyle = grad;
-    ctx.fillRect(px, base - nh, trailLen, nh);
-    const needleHot = _emph("needles");
-    ctx.strokeStyle = sel ? "#ffe3b0" : "#f5a623";
-    ctx.lineWidth = (sel ? 3 : 1.8) * (needleHot ? 1.4 : 1);
-    ctx.shadowColor = "#f5a623";
-    ctx.shadowBlur = sel ? 10 : (needleHot ? 8 : 4);
-    ctx.beginPath(); ctx.moveTo(px, base); ctx.lineTo(px, base - nh); ctx.stroke();
-    ctx.shadowBlur = 0;
-    _printGeom.needles.push({ i, x: px, topY: base - nh, mean: p.mean, freq: p.harmonicFrequency, harmonic: p.harmonic, t60 });
-  });
-
-  // relationship arcs from the selected partial (true ratios, cents labels).
-  // While the Transfer knob is fresh, arcs show from the loudest partial
-  // even with nothing selected — the dial answers visibly.
+  // coupling lane: arcs for the pinned partial (or, while Transfer is
+  // fresh, the loudest one)
   let arcSel = _printState.sel;
-  if (arcSel == null && _emph("arcs") && _printGeom.needles.length) {
+  if (arcSel == null && (_emph("arcs") || true) && _printGeom.needles.length) {
     arcSel = _printGeom.needles.reduce((a, b) => (b.mean > a.mean ? b : a)).i;
   }
-  if (arcSel != null) {
-    const selN = _printGeom.needles.find(n => n.i === arcSel);
-    if (selN) {
-      ctx.font = "10.5px ui-monospace, monospace";
-      ctx.textAlign = "center";
-      let li = 0;
-      for (const other of _printGeom.needles) {
-        if (other.i === selN.i) continue;
-        const C = transferCoupling(selN.freq, other.freq);
-        if (C < 0.04) continue;
-        const r = nearestRatio(selN.freq, other.freq);
-        if (!r) continue;
-        const midX = (selN.x + other.x) / 2;
-        const arcTop = Math.max(12, Math.min(selN.topY, other.topY) - 26 - C * 40);
-        ctx.strokeStyle = "#5fd4c8";
-        ctx.globalAlpha = 0.25 + Math.min(0.6, C * 1.2);
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.moveTo(selN.x, selN.topY - 3);
-        ctx.quadraticCurveTo(midX, arcTop, other.x, other.topY - 3);
-        ctx.stroke();
-        ctx.fillStyle = "#5fd4c8";
-        ctx.fillText(`${r.p}:${r.q} ${r.cents >= 0 ? "+" : ""}${r.cents.toFixed(0)}¢`, midX, Math.max(10, arcTop - 3) + (li % 2) * 11);
-        ctx.globalAlpha = 1;
-        li++;
-      }
-      ctx.fillStyle = "#ffe3b0";
-      ctx.font = "11px ui-monospace, monospace";
-      ctx.fillText(`p${selN.harmonic} · ${Math.round(selN.freq)} Hz`, selN.x, base + 24);
+  const selN = _printGeom.needles.find(n => n.i === arcSel);
+  if (selN) {
+    const laneY = base + 4;
+    for (const other of _printGeom.needles) {
+      if (other.i === selN.i) continue;
+      const C = transferCoupling(selN.freq, other.freq);
+      if (C < 0.04) continue;
+      const midX = (selN.x + other.x) / 2;
+      ctx.strokeStyle = "rgba(95,212,200,0.8)";
+      ctx.globalAlpha = 0.25 + Math.min(0.65, C * 1.3);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(selN.x, laneY + LANE - 8);
+      ctx.quadraticCurveTo(midX, laneY - 2 + (1 - Math.min(1, C * 2)) * (LANE - 10), other.x, laneY + LANE - 8);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
+    if (_printState.sel != null) {
+      ctx.fillStyle = "#eaf2ff";
+      ctx.textAlign = "center";
+      ctx.fillText(`P${selN.harmonic}`, selN.x, Math.max(10, selN.topY - 10));
+      ctx.textAlign = "left";
+    }
+  }
+  drawLens();
+  chUpdateFocusSum();
+}
+
+function drawLens() {
+  const cv = document.getElementById("cvLens");
+  if (!cv || !_printGeom) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const maxMean = Math.max(0.0001, ..._printGeom.needles.map(n => n.mean));
+  for (const n of _printGeom.needles) {
+    const bh = Math.pow(n.mean / maxMean, 0.5) * (h - 8);
+    ctx.strokeStyle = "rgba(148,196,255,0.5)";
+    ctx.beginPath(); ctx.moveTo(n.x, h - 3); ctx.lineTo(n.x, h - 3 - bh); ctx.stroke();
+  }
+  if (_chFocus.lensLo != null) {
+    const x0 = _printGeom.X(_chFocus.lensLo), x1 = _printGeom.X(_chFocus.lensHi);
+    ctx.fillStyle = "rgba(95,212,200,0.12)";
+    ctx.fillRect(x0, 1, x1 - x0, h - 2);
+    ctx.strokeStyle = "rgba(95,212,200,0.7)";
+    ctx.strokeRect(x0, 1, x1 - x0, h - 2);
   }
 }
 
-function _printUpdateReadout() {
-  const el = document.getElementById("printReadout");
+function chUpdateFocusSum() {
+  const el = document.getElementById("chFocusSum");
   if (!el || !_printGeom) return;
-  const selN = _printGeom.needles.find(n => n.i === _printState.sel);
-  if (!selN) {
-    el.textContent = "tap a partial to see its level, ring time, and who it talks to — true ratios, labelled with their cents error";
+  const focusable = _chFocus.chip !== "all" || _chFocus.lensLo != null;
+  const inFocus = focusable ? _printGeom.needles.filter(n => n.pass) : _printGeom.needles;
+  if (!focusable) { el.textContent = `${inFocus.length} partials`; return; }
+  const range = _chFocus.lensLo != null
+    ? `${Math.round(_chFocus.lensLo)} Hz – ${_chFocus.lensHi >= 1000 ? (_chFocus.lensHi / 1000).toFixed(1) + " kHz" : Math.round(_chFocus.lensHi) + " Hz"} · `
+    : "";
+  const names = inFocus.length ? `P${inFocus[0].harmonic}–P${inFocus[inFocus.length - 1].harmonic}` : "none";
+  el.textContent = `${range}${inFocus.length} partials · ${names}`;
+  chRenderStrip(inFocus);
+}
+
+// Channel strips for the focused partials (CHORDA focus strip)
+function chRenderStrip(inFocus) {
+  const host = document.getElementById("chStrip");
+  if (!host) return;
+  const focusable = _chFocus.chip !== "all" || _chFocus.lensLo != null;
+  if (!focusable) {
+    host.innerHTML = `<div class="editor-hint">brush the lens or pick a focus chip — matching partials appear here as channel strips</div>`;
     return;
   }
-  const db = 20 * Math.log10(Math.max(1e-5, selN.mean));
+  const strips = inFocus.slice(0, 8);
+  const dropped = inFocus.length - strips.length;
+  host.innerHTML = strips.map(n => {
+    const link = _printGeom.needles
+      .filter(o => o.i !== n.i)
+      .map(o => ({ o, C: transferCoupling(n.freq, o.freq) }))
+      .sort((a, b) => b.C - a.C)[0];
+    return `
+      <div class="ch-ch${_printState.sel === n.i ? " pinned" : ""}" data-ch-part="${n.i}">
+        <div class="ch-ch-name">P${n.harmonic} <span>${esc(noteAndCents(n.freq))}</span></div>
+        <div class="ch-ch-hz">${n.freq >= 1000 ? (n.freq / 1000).toFixed(2) + " kHz" : n.freq.toFixed(1) + " Hz"}</div>
+        <label class="ch-ch-row">lvl
+          <input type="range" data-ch-level="${n.i}" min="-60" max="0" step="0.5" value="${n.db.toFixed(1)}"/>
+          <output>${n.db.toFixed(1)}</output>
+        </label>
+        <div class="ch-ch-row"><span>T60</span><i style="width:${Math.min(100, n.t60 / 4 * 100)}%"></i><output>${n.t60.toFixed(2)}s</output></div>
+        <div class="ch-ch-row"><span>wob</span><i style="width:${Math.min(100, (n.sens ?? 0) / 2 * 100)}%"></i><output>${(n.sens ?? 0).toFixed(2)}</output></div>
+        ${link && link.C > 0.04 ? `<div class="ch-ch-link">⌒ P${link.o.harmonic} · ${link.C.toFixed(2)}</div>` : `<div class="ch-ch-link muted">no strong link</div>`}
+      </div>`;
+  }).join("") + (dropped > 0 ? `<div class="editor-hint">+${dropped} more — narrow the lens</div>` : "");
+}
+
+function chPinShow(n) {
+  const pin = document.getElementById("chPin");
+  const wrap = pin ? pin.parentElement : null;
+  if (!pin || !wrap || !n) return;
   const rels = _printGeom.needles
-    .filter(o => o.i !== selN.i)
-    .map(o => ({ o, C: transferCoupling(selN.freq, o.freq), r: nearestRatio(selN.freq, o.freq) }))
+    .filter(o => o.i !== n.i)
+    .map(o => ({ o, C: transferCoupling(n.freq, o.freq), r: nearestRatio(n.freq, o.freq) }))
     .filter(x => x.C >= 0.04 && x.r)
-    .sort((a, b) => b.C - a.C)
-    .slice(0, 4)
-    .map(x => `${x.r.p}:${x.r.q}→p${x.o.harmonic} (${x.r.cents >= 0 ? "+" : ""}${x.r.cents.toFixed(0)}¢)`);
-  el.textContent =
-    `p${selN.harmonic} · ${Math.round(selN.freq)} Hz · ${db.toFixed(1)} dB · ring T60 ${selN.t60.toFixed(2)} s` +
-    (rels.length ? ` · couples ${rels.join(" · ")}` : " · couples: none in range");
+    .sort((a, b) => b.C - a.C);
+  const strongest = rels[0];
+  pin.innerHTML = `
+    <div class="ch-pin-head">P${n.harmonic} <span>PINNED</span></div>
+    <div>f <b>${n.freq.toFixed(1)} Hz</b> (${esc(noteAndCents(n.freq))}) · level <b>${n.db.toFixed(1)} dB</b></div>
+    <div>T60 <b>${n.t60.toFixed(2)} s</b> · wobble <b>${(n.sens ?? 0).toFixed(2)}</b></div>
+    <div>${strongest ? `strongest link <b>P${strongest.o.harmonic}</b> · ${strongest.r.p}:${strongest.r.q} · ${strongest.C.toFixed(2)}` : "no strong links in range"}</div>`;
+  pin.hidden = false;
+  const cvRect = document.getElementById("cvTonePrint").getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const scale = cvRect.width / (_printGeom.w || cvRect.width);
+  let left = (n.x * scale) + (cvRect.left - wrapRect.left) + 12;
+  let topPx = (n.topY * scale) + (cvRect.top - wrapRect.top) - 8;
+  left = Math.min(left, wrapRect.width - 250);
+  topPx = Math.max(4, Math.min(topPx, wrapRect.height - 96));
+  pin.style.left = `${left}px`;
+  pin.style.top = `${topPx}px`;
+}
+
+function chPinHide() {
+  const pin = document.getElementById("chPin");
+  if (pin) pin.hidden = true;
 }
 
 function wireTonePrint(v) {
@@ -6455,11 +6692,11 @@ function wireTonePrint(v) {
   let drag = null;
   cv.onmousedown = (e) => {
     const hit = hitNeedle(e);
-    if (!hit) { _printState.sel = null; drawTonePrint(); _printUpdateReadout(); return; }
+    if (!hit) { _printState.sel = null; chPinHide(); drawTonePrint(); return; }
     _printState.sel = hit.i;
     drag = { i: hit.i, startY: e.clientY, moved: false };
     drawTonePrint();
-    _printUpdateReadout();
+    chPinShow(_printGeom.needles.find(n => n.i === hit.i));
     e.preventDefault();
   };
   cv.onmousemove = (e) => {
@@ -6467,21 +6704,18 @@ function wireTonePrint(v) {
     const dy = drag.startY - e.clientY;
     if (Math.abs(dy) < 3 && !drag.moved) return;
     drag.moved = true;
-    // Drag edits the underlying per-partial level: display height is
-    // (mean/max)^0.62 of the plot; the underlying amp scales linearly
-    // with mean, so scale amp by the height ratio uncompressed.
     ensureSpectralPartialParams(exploreParams);
     const geomN = _printGeom.needles.find(n => n.i === drag.i);
     if (!geomN) return;
-    const plotH = _printGeom.base - _printGeom.top;
-    const curH = _printGeom.base - geomN.topY;
-    const newH = clamp(curH + dy, 1, plotH);
-    const ratio = Math.pow(newH / Math.max(1, curH), 1 / 0.62);
+    // dB-space drag: 1 px = 0.4 dB
+    const newDb = clamp(geomN.db + dy * 0.4, -60, 0);
+    const ratio = Math.pow(10, (newDb - geomN.db) / 20);
     const oldAmp = exploreParams.spectralPartialMeans[drag.i] ?? 0;
     exploreParams.spectralPartialMeans[drag.i] = clamp((oldAmp || 0.02) * ratio, 0, 1.5);
     drag.startY = e.clientY;
     drawTonePrint();
-    _printUpdateReadout();
+    const nn = _printGeom.needles.find(n => n.i === drag.i);
+    if (nn) chPinShow(nn);
   };
   const endDrag = () => {
     if (drag && drag.moved) synth.updateGenerationParams({ ...exploreParams });
@@ -6490,23 +6724,76 @@ function wireTonePrint(v) {
   cv.onmouseup = endDrag;
   cv.onmouseleave = endDrag;
 
-  const bandsEl = v.querySelector("#printBands");
-  if (bandsEl) {
-    bandsEl.querySelectorAll("[data-print-band]").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.printBand === _printState.band);
-      btn.onclick = () => {
-        _printState.band = btn.dataset.printBand;
-        bandsEl.querySelectorAll("[data-print-band]").forEach(b =>
-          b.classList.toggle("active", b === btn));
+  // focus chips
+  v.querySelectorAll("[data-ch-chip]").forEach(btn => {
+    btn.onclick = () => {
+      _chFocus.chip = btn.dataset.chChip;
+      v.querySelectorAll("[data-ch-chip]").forEach(b => b.classList.toggle("active", b === btn));
+      drawTonePrint();
+    };
+  });
+
+  // lens brush
+  const lens = v.querySelector("#cvLens");
+  if (lens) {
+    let lensDrag = null;
+    const lensFreq = (e) => {
+      const rect = lens.getBoundingClientRect();
+      const frac = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+      return PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, frac);
+    };
+    lens.onmousedown = (e) => {
+      lensDrag = { f0: lensFreq(e), moved: false };
+      e.preventDefault();
+    };
+    lens.onmousemove = (e) => {
+      if (!lensDrag) return;
+      const f1 = lensFreq(e);
+      if (Math.abs(Math.log2(f1 / lensDrag.f0)) > 0.02) lensDrag.moved = true;
+      if (lensDrag.moved) {
+        _chFocus.lensLo = Math.min(lensDrag.f0, f1);
+        _chFocus.lensHi = Math.max(lensDrag.f0, f1);
         drawTonePrint();
-        // The editor strip below re-scopes to the focused band; its input
-        // wiring is delegated on the container, so a swap keeps working.
-        const editor = v.querySelector("#harmonicEditor");
-        if (editor) editor.innerHTML = harmonicEditorHTML(exploreParams);
-      };
-    });
+      }
+    };
+    const lensUp = () => {
+      if (lensDrag && !lensDrag.moved) { _chFocus.lensLo = null; _chFocus.lensHi = null; drawTonePrint(); }
+      lensDrag = null;
+    };
+    lens.onmouseup = lensUp;
+    lens.onmouseleave = () => { if (lensDrag && lensDrag.moved) lensDrag = null; else lensUp(); };
   }
+
+  // channel-strip level faders (delegated — strips re-render on focus change)
+  const strip = v.querySelector("#chStrip");
+  if (strip) {
+    strip.oninput = (e) => {
+      const sl = e.target.closest("input[data-ch-level]");
+      if (!sl || !_printGeom) return;
+      ensureSpectralPartialParams(exploreParams);
+      const i = Number(sl.dataset.chLevel);
+      const n = _printGeom.needles.find(x => x.i === i);
+      if (!n) return;
+      const newDb = Number(sl.value);
+      const ratio = Math.pow(10, (newDb - n.db) / 20);
+      exploreParams.spectralPartialMeans[i] = clamp((exploreParams.spectralPartialMeans[i] || 0.02) * ratio, 0, 1.5);
+      const out = sl.parentElement.querySelector("output");
+      if (out) out.textContent = newDb.toFixed(1);
+      drawTonePrint();
+      synth.updateGenerationParams({ ...exploreParams });
+    };
+  }
+
+  // stage rail: select a stage -> its inspector expands
+  v.querySelectorAll("[data-ch-stage]").forEach(card => {
+    card.onclick = () => {
+      if (_chStage === card.dataset.chStage) return;
+      _chStage = card.dataset.chStage;
+      renderExplore();
+    };
+  });
 }
+
 
 // ── SPACE position pad: the instrument on a stage in front of the
 // listener. Polar layout — angle = azimuth (±90°), radius = distance on a
@@ -6528,7 +6815,6 @@ function drawSpacePad() {
   const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
   const { cx, cy, rMax } = _spacePadGeom(w, h);
-  // distance rings (1, 3, 10, 30 m)
   ctx.strokeStyle = "rgba(90,110,130,0.25)";
   ctx.fillStyle = "rgba(120,135,150,0.55)";
   ctx.font = "8px ui-monospace, monospace";
@@ -6541,7 +6827,6 @@ function drawSpacePad() {
     ctx.stroke();
     ctx.fillText(`${dm}m`, cx + r * 0.06 + 2, cy - r + 8);
   }
-  // bearing spokes at ±45°, ±90°
   ctx.strokeStyle = "rgba(90,110,130,0.15)";
   for (const a of [-90, -45, 0, 45, 90]) {
     const rad = (a - 90) * Math.PI / 180;
@@ -6550,22 +6835,20 @@ function drawSpacePad() {
     ctx.lineTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax);
     ctx.stroke();
   }
-  // listener (you) at the bottom centre
   ctx.fillStyle = "rgba(200,215,230,0.85)";
   ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, 2 * Math.PI); ctx.fill();
   ctx.fillStyle = "rgba(120,135,150,0.6)";
   ctx.textAlign = "center";
   ctx.fillText("you", cx, cy + 9);
-  // instrument dot
   const d = clamp(exploreParams.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
   const az = clamp(exploreParams.spaceAzimuth ?? 0, -90, 90);
   const rad = (az - 90) * Math.PI / 180;
   const r = _spaceDistToR(d, rMax);
   const ix = cx + Math.cos(rad) * r, iy = cy + Math.sin(rad) * r;
-  ctx.strokeStyle = "rgba(79,141,212,0.4)";
+  ctx.strokeStyle = "rgba(88,214,169,0.4)";
   ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ix, iy); ctx.stroke();
-  ctx.fillStyle = "#4f8dd4";
-  ctx.shadowColor = "#4f8dd4"; ctx.shadowBlur = 8;
+  ctx.fillStyle = "#58d6a9";
+  ctx.shadowColor = "#58d6a9"; ctx.shadowBlur = 8;
   ctx.beginPath(); ctx.arc(ix, iy, 5, 0, 2 * Math.PI); ctx.fill();
   ctx.shadowBlur = 0;
 }
@@ -6586,6 +6869,7 @@ function wireSpacePad(v) {
     const readout = v.querySelector("#spaceReadout");
     if (readout) readout.textContent = `${exploreParams.spaceDistance.toFixed(1)} m · ${exploreParams.spaceAzimuth}°`;
     drawSpacePad();
+    drawChThumbs();
     synth.updateReverb({ ...exploreParams });
   };
   cv.onmousedown = (e) => {
@@ -6598,8 +6882,6 @@ function wireSpacePad(v) {
   };
 }
 
-// T6: the BODY stage card's ridge mini-vis — the same fixed-Hz law the
-// engine uses, drawn over 60 Hz–12 kHz (log axis).
 function drawBodyRidge() {
   const cv = document.getElementById("cvBodyRidge");
   if (!cv) return;
