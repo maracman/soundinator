@@ -569,3 +569,16 @@ carry layers transparently).
 
 Build order: CH-B1 (articulated bodies) → CH-B2 (performance block) →
 CH-B4 imperfections → CH-B5 layering → CH-B3 curation listening pass.
+
+### CH-B3 upgrade (owner, 2026-07-07): measured profiles from real samples
+
+Decision: presets get realistic by MEASUREMENT, not sample playback —
+free single-note recordings (Univ. of Iowa MIS / VSCO2 CE / Philharmonia)
+are analysed offline and the model's parameters fitted to them: 64-partial
+tables, inharmonicity B from real partial detunes, per-instrument T60-law
+fits, attack stagger + transient (attackNoise), vibrato stats, ADSR.
+Only derived parameters enter the repo (web/data/measured_profiles.json +
+docs/MEASURED_PROFILES.md with provenance/licences); a reusable
+scripts/fit_profiles_from_samples.py performs the analysis. Pipeline
+running as a background agent; CH-B3 curation applies the fits with a
+listening check.
