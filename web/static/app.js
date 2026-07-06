@@ -1580,7 +1580,21 @@ async function mixdownArrangement(statusEl, btn) {
       } else {
         voice.renderSpan(regionPlayParams(track, region), region.startBeat * beatSec + 0.05, beatSec * regionLen(region));
       }
+      // Scheduling is synchronous per region; yield so large arrangements
+      // never freeze the UI while the graph is being built.
+      await new Promise(r => setTimeout(r, 0));
     }
+  }
+  // The offline render runs well below realtime for heavy arrangements
+  // (measured ~0.5x), so surface real progress: suspend checkpoints every
+  // couple of rendered seconds update the status, then resume. Checkpoints
+  // don't alter the audio — the render is deterministic either way.
+  const renderTotal = off.length / off.sampleRate;
+  for (let cp = 2; cp < renderTotal; cp += 2) {
+    off.suspend(cp).then(() => {
+      if (statusEl) statusEl.textContent = `Rendering… ${Math.min(99, Math.round((cp / renderTotal) * 100))}%`;
+      off.resume();
+    }).catch(() => {});
   }
   try {
     const rendered = await off.startRendering();
