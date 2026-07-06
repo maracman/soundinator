@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Tone Print v2 — design mockup (T0)</title>
+<style>
+  :root {
+    --bg: #0b0e13;
+    --panel: #12161d;
+    --panel2: #171c25;
+    --display: #0a0d11;
+    --border: #232b37;
+    --border2: #3b4a5c;
+    --text: #dfe6ee;
+    --text2: #9aa7b5;
+    --text3: #64707e;
+    --phosphor: #ffb454;
+    --phosphor-hot: #ffe3b0;
+    --body-ridge: #4f8dd4;
+    --arc: #5fd4c8;
+    --danger: #e0645c;
+    --radius: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--text); font: 13px/1.45 "SF Mono", "JetBrains Mono", ui-monospace, monospace; }
+  .frame { max-width: 1240px; margin: 24px auto 60px; padding: 0 16px; }
+  .mock-note {
+    font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 10px; display: flex; justify-content: space-between;
+  }
+  .tone-section {
+    background: linear-gradient(180deg, var(--panel2), var(--panel));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  /* ── header: instrument + preset bar ─────────────────── */
+  .ts-head {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+  }
+  .ts-head .label { font-size: 10px; letter-spacing: 0.14em; color: var(--text3); }
+  .select {
+    background: var(--display); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 5px 26px 5px 10px; font: inherit; position: relative;
+  }
+  .select::after { content: "▾"; position: absolute; right: 9px; color: var(--text3); }
+  .spacer { flex: 1; }
+  .chip-btn {
+    background: none; border: 1px solid var(--border); color: var(--text2);
+    border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px;
+  }
+  .chip-btn.primary { border-color: #7a5a2b; color: var(--phosphor); }
+
+  /* ── the tone print ──────────────────────────────────── */
+  .print-wrap { position: relative; background: var(--display); }
+  canvas { display: block; width: 100%; }
+  .lens-tools {
+    position: absolute; top: 10px; left: 14px; display: flex; gap: 6px; align-items: center;
+  }
+  .lens-tools .tool {
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    border: 1px solid var(--border); border-radius: 5px; padding: 3px 9px; color: var(--text3);
+  }
+  .lens-tools .tool.active { color: var(--arc); border-color: #2c5b56; background: rgba(95,212,200,0.07); }
+  .band-chips { position: absolute; top: 10px; right: 14px; display: flex; gap: 5px; }
+  .band-chips .chip {
+    font-size: 10.5px; border: 1px solid var(--border); border-radius: 5px;
+    padding: 3px 8px; color: var(--text3);
+  }
+  .band-chips .chip.active { color: var(--phosphor); border-color: #6b4c22; background: rgba(255,180,84,0.07); }
+
+  /* ── focused band inset ──────────────────────────────── */
+  .focus-inset {
+    border-top: 1px dashed #24435c;
+    background: #0c1016;
+    padding: 8px 16px 12px;
+  }
+  .focus-inset .fi-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; }
+  .focus-inset .fi-title { color: var(--arc); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .focus-inset .fi-hint { color: var(--text3); font-size: 11px; }
+  .fi-table { display: flex; gap: 22px; margin-top: 6px; font-size: 11.5px; }
+  .fi-col b { color: var(--text2); font-weight: 500; display: block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
+  .fi-col .v { color: var(--phosphor); }
+  .fi-col .muted { color: var(--text3); }
+
+  /* ── character panel ─────────────────────────────────── */
+  .character {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 8px;
+    padding: 14px 16px 12px; border-top: 1px solid var(--border);
+  }
+  .dial { text-align: center; }
+  .dial svg { display: block; margin: 0 auto 4px; }
+  .dial .dn { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text2); }
+  .dial .dv { font-size: 10.5px; color: var(--text3); }
+  .dial.hero .dn { color: var(--phosphor); }
+
+  /* ── disclosure strip ────────────────────────────────── */
+  .disclosure {
+    display: flex; gap: 18px; padding: 9px 16px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3);
+  }
+  .disclosure span::before { content: "▸ "; color: #3d4756; }
+
+  /* ── annotations ─────────────────────────────────────── */
+  .legend {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 26px;
+    margin-top: 18px; font-size: 12px; color: var(--text2);
+  }
+  .legend b { color: var(--text); font-weight: 600; }
+  .legend .k { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="mock-note"><span>tone model v2 · T0 mockup · static, for direction sign-off</span><span>docs/TONE_MODEL_V2_DESIGN.md</span></div>
+
+  <div class="tone-section">
+    <div class="ts-head">
+      <span class="label">INSTRUMENT</span>
+      <span class="select">violin</span>
+      <span class="label">A=220 Hz · playing</span>
+      <span class="spacer"></span>
+      <button class="chip-btn">Sound presets…</button>
+      <button class="chip-btn primary">+ Save</button>
+    </div>
+
+    <div class="print-wrap">
+      <div class="lens-tools">
+        <span class="tool active">Relationships</span>
+        <span class="tool">Focus</span>
+      </div>
+      <div class="band-chips">
+        <span class="chip">fund</span><span class="chip">low body</span>
+        <span class="chip active">mid</span><span class="chip">presence</span><span class="chip">air</span>
+      </div>
+      <canvas id="print" width="2400" height="760"></canvas>
+      <div class="focus-inset">
+        <div class="fi-head">
+          <span class="fi-title">Focus · 880 – 2600 Hz (partials 4–11)</span>
+          <span class="fi-hint">drag = level · ⌥drag = detune ¢ · scroll = ring time</span>
+        </div>
+        <canvas id="focus" width="2400" height="230"></canvas>
+        <div class="fi-table">
+          <div class="fi-col"><b>partial</b><span class="v">5 · 1104 Hz</span></div>
+          <div class="fi-col"><b>level</b><span class="v">−14.2 dB</span> <span class="muted">(model −13.0, offset −1.2)</span></div>
+          <div class="fi-col"><b>detune</b><span class="v">+3.1 ¢</span> <span class="muted">(B 2.1e-4)</span></div>
+          <div class="fi-col"><b>ring</b><span class="v">T60 1.9 s</span> <span class="muted">(material: wood)</span></div>
+          <div class="fi-col"><b>couples</b><span class="v">2:1 → p10 (−1¢) · 3:2 → p7½ ✕ · 5:4 → p4 (+3¢)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="character" id="dials"></div>
+
+    <div class="disclosure">
+      <span>Envelope distribution</span><span>Vibrato distribution</span>
+      <span>Attack noise</span><span>Ring-time curve (T60 vs Hz)</span><span>Coupling matrix</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><b><span class="k" style="background:#ffb454"></span>Phosphor needles</b> — one per partial, at its <i>realised</i> Hz (log axis). Height = final computed level (excitation × position comb × material state × body). Trail length = ring time: glassy materials leave long afterglow, felt snuffs out. The decay law is literally visible.</div>
+    <div><b><span class="k" style="background:#4f8dd4"></span>Body ridge</b> — the fixed-Hz resonance profile behind everything (violin body here; a vowel when a vocal body is chosen). Explains why the same partial blooms on one note and hides on another.</div>
+    <div><b><span class="k" style="background:#5fd4c8"></span>Relationship arcs</b> — tap a partial (p4 selected): relatives by <i>true frequency ratio</i> light up, labelled with the ratio and its cents error. Arc opacity = transfer coupling strength; inharmonicity visibly weakens arcs as ratios drift.</div>
+    <div><b><span class="k" style="background:#39424e"></span>Excitation comb</b> — faint underlay: the sin(nπx) node pattern of bow position. Turn Position and you watch the comb sweep and partials die at its zeros. No hidden shaping anywhere: the print is the truth.</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const PHOS = "#ffb454", PHOS_HOT = "#ffe3b0", RIDGE = "#4f8dd4", ARC = "#5fd4c8";
+  const f0 = 220, B = 2.1e-4, position = 0.13, N = 64;
+  const FMIN = 55, FMAX = 18000;
+  const x = (f, W) => W * Math.log(f / FMIN) / Math.log(FMAX / FMIN);
+
+  // model: realised freqs, levels, T60s
+  const bodyBands = [[280,4,.5],[460,5,.4],[700,3.4,.45],[1100,2.6,.5],[2600,5,.55],[4200,2.2,.6]];
+  const bodyGain = f => bodyBands.reduce((g,[bf,bg,bw]) => g + bg*Math.exp(-0.5*((Math.log2(f/bf))/bw)**2), 0);
+  const parts = [];
+  for (let n = 1; n <= N; n++) {
+    const f = n * f0 * Math.sqrt(1 + B * n * n);
+    if (f > FMAX) break;
+    const drive = 1 / n;                                   // bow
+    const comb = Math.abs(Math.sin(n * Math.PI * position));
+    const body = Math.pow(2, bodyGain(f) / 6);
+    let lv = drive * comb * body;
+    const t60 = 4 * Math.pow(f / f0, -0.55);               // material: wood
+    parts.push({ n, f, lv, t60 });
+  }
+  const lvMax = Math.max(...parts.map(p => p.lv));
+  parts.forEach(p => p.lv /= lvMax);
+
+  // ── main print ──
+  const cv = document.getElementById("print"), ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height, base = H - 64, top = 150;
+
+  // grid + Hz labels
+  ctx.fillStyle = "#0a0d11"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(140,160,180,0.07)"; ctx.lineWidth = 1;
+  ctx.fillStyle = "rgba(120,135,150,0.55)"; ctx.font = "20px ui-monospace";
+  ctx.textAlign = "center";
+  for (const f of [55,110,220,440,880,1760,3520,7040,14080]) {
+    const px = x(f, W);
+    ctx.beginPath(); ctx.moveTo(px, top - 14); ctx.lineTo(px, base + 8); ctx.stroke();
+    ctx.fillText(f >= 1000 ? (f/1000)+"k" : f, px, base + 34);
+  }
+
+  // excitation comb underlay — drawn only while its oscillation is
+  // resolvable on the log axis; fades out where it would alias into noise
+  ctx.beginPath();
+  let combEnd = W;
+  for (let px = 0; px <= W; px += 2) {
+    const f = FMIN * Math.pow(FMAX / FMIN, px / W);
+    const nEff = f / f0;
+    const pxPerCycle = W / (Math.log(FMAX / FMIN) / Math.LN2) / (nEff * position * 2.5);
+    if (pxPerCycle < 14) { combEnd = px; break; }
+    const c = Math.abs(Math.sin(nEff * Math.PI * position));
+    const y = base - c * (base - top) * 0.22;
+    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+  }
+  const combFade = ctx.createLinearGradient(0, 0, combEnd, 0);
+  combFade.addColorStop(0, "rgba(105,125,140,0.26)");
+  combFade.addColorStop(0.85, "rgba(105,125,140,0.22)");
+  combFade.addColorStop(1, "rgba(105,125,140,0)");
+  ctx.strokeStyle = combFade; ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
+
+  // body ridge
+  ctx.beginPath(); ctx.moveTo(0, base);
+  for (let px = 0; px <= W; px += 3) {
+    const f = FMIN * Math.pow(FMAX / FMIN, px / W);
+    ctx.lineTo(px, base - (bodyGain(f) / 7) * (base - top) * 0.72);
+  }
+  ctx.lineTo(W, base); ctx.closePath();
+  ctx.fillStyle = "rgba(79,141,212,0.10)"; ctx.fill();
+  ctx.strokeStyle = "rgba(79,141,212,0.45)"; ctx.lineWidth = 2; ctx.stroke();
+
+  // focus band marker (880-2600)
+  const fx0 = x(880, W), fx1 = x(2600, W);
+  ctx.fillStyle = "rgba(95,212,200,0.05)"; ctx.fillRect(fx0, top - 20, fx1 - fx0, base - top + 26);
+  ctx.strokeStyle = "rgba(95,212,200,0.35)"; ctx.setLineDash([7,6]);
+  ctx.strokeRect(fx0, top - 20, fx1 - fx0, base - top + 26); ctx.setLineDash([]);
+
+  // needles + afterglow
+  const selN = 4;
+  for (const p of parts) {
+    const px = x(p.f, W), h = Math.pow(p.lv, 0.62) * (base - top);
+    const glow = Math.min(1, Math.log10(1 + p.t60) / 0.9);
+    // afterglow trail (phosphor persistence → ring time)
+    const grad = ctx.createLinearGradient(px, base - h, px + 26 + glow * 55, base - h);
+    grad.addColorStop(0, `rgba(255,180,84,${0.34 * glow})`);
+    grad.addColorStop(1, "rgba(255,180,84,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(px, base - h, 26 + glow * 55, h);
+    // needle
+    ctx.strokeStyle = p.n === selN ? PHOS_HOT : PHOS;
+    ctx.lineWidth = p.n === selN ? 6 : 3.4;
+    ctx.shadowColor = PHOS; ctx.shadowBlur = p.n === selN ? 22 : 9;
+    ctx.beginPath(); ctx.moveTo(px, base); ctx.lineTo(px, base - h); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // relationship arcs from selected partial 4 (true ratios)
+  const rel = [
+    { to: 8,  label: "2:1  −1¢", w: 1.0 },
+    { to: 6,  label: "3:2  −2¢", w: 0.62 },
+    { to: 5,  label: "5:4  +3¢", w: 0.38 },
+    { to: 2,  label: "1:2  +1¢", w: 0.9 },
+  ];
+  const sel = parts[selN - 1];
+  const selX = x(sel.f, W), selH = Math.pow(sel.lv, 0.62) * (base - top);
+  ctx.font = "26px ui-monospace"; ctx.textAlign = "center";
+  let li = 0;
+  for (const r of rel) {
+    const q = parts[r.to - 1]; if (!q) continue;
+    const qx = x(q.f, W), qh = Math.pow(q.lv, 0.62) * (base - top);
+    const midX = (selX + qx) / 2;
+    const arcTop = Math.max(34, Math.min(base - selH, base - qh) - 70 - r.w * 60);
+    ctx.strokeStyle = ARC; ctx.globalAlpha = 0.25 + r.w * 0.6; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(selX, base - selH - 8);
+    ctx.quadraticCurveTo(midX, arcTop, qx, base - qh - 8); ctx.stroke();
+    ctx.fillStyle = ARC;
+    // stagger labels vertically so neighbouring arcs never collide
+    ctx.fillText(r.label, midX, Math.max(28, arcTop - 8) + (li % 2) * 34);
+    ctx.globalAlpha = 1;
+    li++;
+  }
+  // selected partial tag, anchored at the axis where nothing collides
+  ctx.fillStyle = PHOS_HOT; ctx.font = "26px ui-monospace";
+  ctx.fillText("p4 · 881 Hz", selX, base + 62);
+
+  // ── focus inset canvas ──
+  const fc = document.getElementById("focus"), fctx = fc.getContext("2d");
+  const FW = fc.width, FH = fc.height, fbase = FH - 12;
+  const inBand = parts.filter(p => p.f >= 880 && p.f <= 2600);
+  const bx = f => FW * Math.log(f / 860) / Math.log(2680 / 860);
+  const bandMax = Math.max(...inBand.map(p => p.lv));
+  fctx.fillStyle = "#0c1016"; fctx.fillRect(0, 0, FW, FH);
+  for (const p of inBand) {
+    const px = bx(p.f), h = Math.pow(p.lv / bandMax, 0.62) * (FH - 52);
+    const glow = Math.min(1, Math.log10(1 + p.t60) / 0.9);
+    const grad = fctx.createLinearGradient(px, fbase - h, px + 60 * glow + 20, fbase - h);
+    grad.addColorStop(0, `rgba(255,180,84,${0.3 * glow})`); grad.addColorStop(1, "rgba(255,180,84,0)");
+    fctx.fillStyle = grad; fctx.fillRect(px, fbase - h, 60 * glow + 20, h);
+    fctx.strokeStyle = p.n === 5 ? PHOS_HOT : PHOS; fctx.lineWidth = p.n === 5 ? 7 : 4.6;
+    fctx.shadowColor = PHOS; fctx.shadowBlur = 10;
+    fctx.beginPath(); fctx.moveTo(px, fbase); fctx.lineTo(px, fbase - h); fctx.stroke();
+    fctx.shadowBlur = 0;
+    fctx.fillStyle = "rgba(200,215,230,0.7)"; fctx.font = "19px ui-monospace"; fctx.textAlign = "center";
+    fctx.fillText("p" + p.n, px, fbase - h - 10);
+  }
+  // drag handle affordance on p5
+  const p5 = inBand.find(p => p.n === 5);
+  if (p5) {
+    const px = bx(p5.f), h = Math.pow(p5.lv / bandMax, 0.62) * (FH - 52);
+    fctx.strokeStyle = "rgba(95,212,200,0.9)"; fctx.lineWidth = 2;
+    fctx.strokeRect(px - 13, fbase - h - 13, 26, 26);
+  }
+
+  // ── character dials ──
+  const DIALS = [
+    ["Excitation", "bow · pos 0.13", 0.13, true],
+    ["Brightness", "+0.6 dB/oct", 0.62, false],
+    ["Material", "wood", 0.55, true],
+    ["Inharmonic", "B 2.1e-4", 0.22, false],
+    ["Transfer", "0.30", 0.30, true],
+    ["Body", "violin", 0.68, false],
+    ["Human", "0.40", 0.40, true],
+    ["Level", "−6.0 dB", 0.72, false],
+  ];
+  const host = document.getElementById("dials");
+  for (const [name, val, frac, hero] of DIALS) {
+    const a0 = 0.75 * Math.PI, a1 = 2.25 * Math.PI, a = a0 + frac * (a1 - a0);
+    const cx0 = 27, cy0 = 27, r = 20;
+    const arc = (from, to, col, w) =>
+      `<path d="M ${cx0 + r * Math.cos(from)} ${cy0 + r * Math.sin(from)} A ${r} ${r} 0 ${to - from > Math.PI ? 1 : 0} 1 ${cx0 + r * Math.cos(to)} ${cy0 + r * Math.sin(to)}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
+    const el = document.createElement("div");
+    el.className = "dial" + (hero ? " hero" : "");
+    el.innerHTML = `<svg width="54" height="54" viewBox="0 0 54 54">
+        ${arc(a0, a1, "#232b37", 5)}${arc(a0, a, hero ? PHOS : "#8fa0b3", 5)}
+        <line x1="${cx0}" y1="${cy0}" x2="${cx0 + (r - 7) * Math.cos(a)}" y2="${cy0 + (r - 7) * Math.sin(a)}" stroke="${hero ? PHOS_HOT : "#c9d4df"}" stroke-width="3" stroke-linecap="round"/>
+      </svg><div class="dn">${name}</div><div class="dv">${val}</div>`;
+    host.appendChild(el);
+  }
+})();
+</script>
+</body>
+</html>
