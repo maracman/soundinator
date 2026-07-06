@@ -334,3 +334,27 @@ takeOffsetBeats, arrangement.loopRange):
 Deferred honestly to P1 follow-ups: per-track/master METERS (needs a
 shared analyser bus), browser audition phrase (B3 — existing preview
 retained), track duplicate, drawer zoom-sync niceties, freeze/bounce.
+
+## Addendum (owner, 2026-07-07 01:05): piano-roll parity bar
+
+"Get to parity with something like Logic Pro for editing the baked notes."
+Block D checklist (within the engine's monophonic-sequence note model,
+overlaps resolved Logic-style by trimming the previous note):
+
+- Selection: click, ⇧click, rubber-band, ⌘A; multi-select verbs
+- Move: drag rows (degree) + time (snap; ⌥ bypass); arrow-key nudge
+  (←→ grid, ↑↓ degree, ⌥↑↓ cents via the dual-pitch model)
+- Trim: BOTH edges (right = duration, left = start+duration)
+- Create: pencil (double-click empty cell) at grid, default duration =
+  grid, velocity = neighbour's
+- Delete: ⌫ on selection
+- Clipboard: ⌘C/⌘V at playhead-in-region, ⌘D duplicate after selection
+- Velocity: collapsible lane with draggable bars; note body brightness
+  encodes velocity; multi-select velocity drag scales
+- Note mute (M) — muted notes render hollow, skip at schedule
+- Quantize Q to current grid (onsets)
+- Zoom h/v in the drawer + scroll, auto-scroll to region on open
+- Audition on create/move/click through the track instrument AT its
+  stage position; toggleable
+- Keep: dual precise/intended pitch, ⌥ cents drag, loop-source ghosts,
+  loop-aware editing, region highlight while editing
