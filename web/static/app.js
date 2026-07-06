@@ -28,6 +28,7 @@ import {
   BODY_PRESETS,
   bodyBandsFor,
   bodyResponse,
+  migrateToneParams,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -260,6 +261,8 @@ const DEFAULTS = {
   excitationHuman: 0.4,
   partialTransfer: 0.15,
   bodyType: "auto",
+  // null = derive from legacy spectralStretchCents; a finite value wins
+  partialB: null,
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -404,6 +407,7 @@ const PARAM_DESC = {
   excitationHuman: "The player: one seeded fluctuation per note wobbles bow pressure / breath support, moving the whole spectrum together (brighter when pushed), with bow slips or breath bursts. Struck/plucked notes get per-note velocity and hardness jitter instead. 0 = machine",
   partialTransfer: "Sympathetic resonance: energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Inharmonicity detunes pairs out of resonance, weakening the transfer — exactly like real sympathetic strings",
   bodyType: "The box around the resonator: a set of fixed-Hz resonance bands. Auto keeps the instrument's own measured body; vowels are bodies too (F1–F5 bands). With vibrato, partials on body slopes shimmer in amplitude — real FM→AM",
+  partialB: "Stiff-string inharmonicity: partials sharpen as f·n·√(1+Bn²). Piano bass ≈ 1e-4, treble ≈ 1e-3; 0 = perfectly harmonic. Rising B detunes partial pairs out of sympathetic resonance, weakening Transfer",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -1122,10 +1126,12 @@ function browserItems() {
   return items;
 }
 
-// A browser item as a complete voice (session-context params excluded)
+// A browser item as a complete voice (session-context params excluded).
+// Tone v2 migration (T6) runs here so saved instruments made on the old
+// tone model translate wherever they are used.
 function voiceParamsFor(item) {
-  if (item.section === "instrument") return { ...item.params };
-  return extractInstrumentParams({ ...DEFAULTS, ...item.params });
+  if (item.section === "instrument") return migrateToneParams({ ...item.params });
+  return extractInstrumentParams(migrateToneParams({ ...DEFAULTS, ...item.params }));
 }
 
 // Palette edit round-trip (producer v2 P6): the palette item under edit in
@@ -1283,7 +1289,7 @@ function wireBrowserPalette(v) {
       synth.stop();
       setPaletteEditState({ paletteId: pl.id, name: pl.name });
       // Load the voice as it sounds in the arrangement: session context + voice
-      exploreParams = { ...DEFAULTS, ...arrangement.context, ...pl.params };
+      exploreParams = migrateToneParams({ ...DEFAULTS, ...arrangement.context, ...pl.params });
       navigate("explore");
     };
   });
@@ -3445,7 +3451,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType","partialB",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF3Level","formantF4Level","formantF5Level","formantBandwidth",
@@ -4171,7 +4177,7 @@ function subnoteWorkspaceHTML(p) {
           <div class="harmonic-stage" data-sound-path="fourier" aria-disabled="false">
             <div class="subnote-head">
               <div>
-                <div class="section-label">Harmonic Decomposition</div>
+                <div class="section-label">Tone Builder</div>
                 <h2>${esc(profile.label)}</h2>
               </div>
               <div class="signature-legend">
@@ -4180,6 +4186,61 @@ function subnoteWorkspaceHTML(p) {
                 <span><i class="legend-line quiet"></i> low reg</span>
                 <span><i class="legend-line loud"></i> high reg</span>
                 <span><i class="legend-line sample"></i> sampled sum</span>
+              </div>
+            </div>
+            <!-- The signal chain IS the layout (tone v2 rev B):
+                 1·EXCITOR → 2·RESONATOR → 3·BODY → 4·SPACE -->
+            <div class="tone-chain">
+              <div class="tone-stage">
+                <div class="ts-head"><span class="ts-n">1 · EXCITOR</span><span class="ts-d">how energy enters</span></div>
+                <div class="controls-grid tone-stage-grid">
+                  <div class="control-row">
+                    <label for="sel_excitationType">Excite</label>
+                    <select data-param-select="excitationType" id="sel_excitationType" class="param-select" title="How energy enters the resonator: a bow drives it continuously, a pluck releases it, a strike hits it, air blows through it. Each has its own physical drive spectrum.">
+                      <option value="bow"${p.excitationType === "bow" ? " selected" : ""}>Bow</option>
+                      <option value="pluck"${p.excitationType === "pluck" ? " selected" : ""}>Pluck</option>
+                      <option value="strike"${p.excitationType === "strike" ? " selected" : ""}>Strike</option>
+                      <option value="blow"${p.excitationType === "blow" ? " selected" : ""}>Blow</option>
+                    </select>
+                  </div>
+                  ${controlRow("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01)}
+                  ${controlRow("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01)}
+                  ${controlRow("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01)}
+                  ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
+                </div>
+              </div>
+              <div class="ts-flow">→</div>
+              <div class="tone-stage ts-active">
+                <div class="ts-head"><span class="ts-n">2 · RESONATOR</span><span class="ts-d">what rings, how long, what couples</span></div>
+                <div class="controls-grid tone-stage-grid">
+                  ${controlRow("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01)}
+                  ${controlRow("partialB", "Inharmonic", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002)}
+                  ${controlRow("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01)}
+                  ${controlRow("partialTilt", "Brightness", p.partialTilt, -1, 1, 0.01)}
+                  ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1)}
+                </div>
+              </div>
+              <div class="ts-flow">→</div>
+              <div class="tone-stage ts-cool">
+                <div class="ts-head"><span class="ts-n">3 · BODY</span><span class="ts-d">the box around it</span></div>
+                <div class="controls-grid tone-stage-grid">
+                  <div class="control-row">
+                    <label for="sel_bodyType">Body</label>
+                    <select data-param-select="bodyType" id="sel_bodyType" class="param-select" title="The box around the resonator: fixed-Hz resonance bands. Auto keeps the instrument's own body; vowels are bodies too — this is where the voice lives.">
+                      <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
+                      ${Object.entries(BODY_PRESETS).map(([k, b]) =>
+                        `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
+                    </select>
+                  </div>
+                  ${controlRow("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01)}
+                </div>
+                <canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>
+              </div>
+              <div class="ts-flow">→</div>
+              <div class="tone-stage ts-cool ts-space">
+                <div class="ts-head"><span class="ts-n">4 · SPACE</span><span class="ts-d">the room</span></div>
+                <div class="ts-space-note">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")} · wet ${(p.reverbWet ?? 0).toFixed(2)} · decay ${(p.reverbDecay ?? 0).toFixed(1)}s</div>
+                <div class="ts-space-link">edit in the Space panel (Macro tab → Production Context)</div>
               </div>
             </div>
             <canvas id="cvHarmonicSignature" width="920" height="620"></canvas>
@@ -4230,52 +4291,30 @@ function subnoteWorkspaceHTML(p) {
           </div>
 
           <div class="subnote-side-section${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
-            <div class="section-label">Instrument Fourier Print</div>
+            <div class="section-label">Instrument</div>
             <select data-param-select="spectralProfile" class="param-select">
               ${spectralProfileOptions(p.spectralProfile)}
             </select>
             <div class="controls-grid">
-              ${controlRow("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01)}
-              ${controlRow("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01)}
               ${controlRow("spectralMix", "Mix", p.spectralMix, 0, 1, 0.01)}
-              ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1)}
-              ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
-              <div class="control-row">
-                <label for="sel_bodyType">Body</label>
-                <select data-param-select="bodyType" id="sel_bodyType" class="param-select" title="The box around the resonator: fixed-Hz resonance bands. Auto keeps the instrument's own body; vowels are bodies too — this is where the voice lives.">
-                  <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
-                  ${Object.entries(BODY_PRESETS).map(([k, b]) =>
-                    `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
-                </select>
-              </div>
-              ${controlRow("spectralResonanceAmount", "Body amount", p.spectralResonanceAmount, 0, 1.5, 0.01)}
-              ${controlRow("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01)}
-              ${controlRow("spectralStretchCents", "Freq stretch", p.spectralStretchCents, -24, 24, 1)}
-              <div class="control-row">
-                <label for="sel_excitationType">Excite</label>
-                <select data-param-select="excitationType" id="sel_excitationType" class="param-select" title="How energy enters the resonator: a bow drives it continuously, a pluck releases it, a strike hits it, air blows through it. Each has its own physical drive spectrum.">
-                  <option value="bow"${p.excitationType === "bow" ? " selected" : ""}>Bow</option>
-                  <option value="pluck"${p.excitationType === "pluck" ? " selected" : ""}>Pluck</option>
-                  <option value="strike"${p.excitationType === "strike" ? " selected" : ""}>Strike</option>
-                  <option value="blow"${p.excitationType === "blow" ? " selected" : ""}>Blow</option>
-                </select>
-              </div>
-              ${controlRow("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01)}
-              ${controlRow("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01)}
-              ${controlRow("partialTilt", "Tilt", p.partialTilt, -1, 1, 0.01)}
-              ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
-              ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
-              ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
             </div>
-            <div class="subsection-label">Octave groups</div>
-            <div class="controls-grid">
-              ${controlRow("partialGroup1", "Fund (1)", p.partialGroup1, 0, 2, 0.01)}
-              ${controlRow("partialGroup2", "Oct (2)", p.partialGroup2, 0, 2, 0.01)}
-              ${controlRow("partialGroup3", "3–4", p.partialGroup3, 0, 2, 0.01)}
-              ${controlRow("partialGroup4", "5–8", p.partialGroup4, 0, 2, 0.01)}
-              ${controlRow("partialGroup5", "9–16", p.partialGroup5, 0, 2, 0.01)}
-              ${controlRow("partialGroup6", "17+", p.partialGroup6, 0, 2, 0.01)}
-            </div>
+            <details class="formant-detail">
+              <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery until the tone print's focus editing replaces them.">Advanced</summary>
+              <div class="controls-grid">
+                ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
+                ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
+                ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
+              </div>
+              <div class="subsection-label">Octave groups</div>
+              <div class="controls-grid">
+                ${controlRow("partialGroup1", "Fund (1)", p.partialGroup1, 0, 2, 0.01)}
+                ${controlRow("partialGroup2", "Oct (2)", p.partialGroup2, 0, 2, 0.01)}
+                ${controlRow("partialGroup3", "3–4", p.partialGroup3, 0, 2, 0.01)}
+                ${controlRow("partialGroup4", "5–8", p.partialGroup4, 0, 2, 0.01)}
+                ${controlRow("partialGroup5", "9–16", p.partialGroup5, 0, 2, 0.01)}
+                ${controlRow("partialGroup6", "17+", p.partialGroup6, 0, 2, 0.01)}
+              </div>
+            </details>
           </div>
 
           <div class="subnote-side-section">
@@ -4694,6 +4733,7 @@ function drawDistributions() {
   drawVibratoDist();
   drawEnvelopeDist();
   drawHarmonicSignature();
+  drawBodyRidge();
 }
 
 // Match a canvas backing store to its CSS layout size × devicePixelRatio so
@@ -6225,6 +6265,34 @@ function drawHarmonicSignature() {
   ctx.fillText("combined waveform", 38, combinedMid);
 }
 
+// T6: the BODY stage card's ridge mini-vis — the same fixed-Hz law the
+// engine uses, drawn over 60 Hz–12 kHz (log axis).
+function drawBodyRidge() {
+  const cv = document.getElementById("cvBodyRidge");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
+  const bands = bodyBandsFor(exploreParams, profile);
+  const amount = clamp(exploreParams.spectralResonanceAmount ?? 0.35, 0, 1.5);
+  const FMIN = 60, FMAX = 12000;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  for (let px = 0; px <= w; px += 2) {
+    const f = FMIN * Math.pow(FMAX / FMIN, px / w);
+    const r = bodyResponse(bands, f, amount);           // 0.2 … 4.5
+    const y = h - 3 - (Math.log2(r) + 2.4) / 4.6 * (h - 6); // log scale, 0.2→bottom, 4.5→top
+    ctx.lineTo(px, Math.max(2, Math.min(h - 2, y)));
+  }
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(79,141,212,0.14)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(79,141,212,0.6)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
 // T5: register response is body-only (audit A7) — the display shows the
 // same fixed-Hz body law the engine uses, evaluated an octave down/up.
 function spectralVisualResponse(profile, harmonic, _reg, registerOctaves) {
@@ -6665,6 +6733,7 @@ function normaliseBakedSurpriseValue(value) {
 function fmtOutput(param, val) {
   const v = Number(val);
   switch (param) {
+    case "partialB": return v <= 0 ? "0" : `B ${(v * 1e4).toFixed(1)}e-4`;
     case "tempo": return `${v} BPM`;
     case "intervalRange":
     case "motifHitRange":
@@ -7252,7 +7321,10 @@ function wirePanelPresetBars(v) {
 }
 
 function mergedPresetParams(entry) {
-  const loaded = { ...entry.parameters };
+  // Tone v2 migration (T6): pre-v2 tone keys translate on load — stretch
+  // cents become a physical B, old drift wobble seeds the Human dial,
+  // dead keys stop travelling.
+  const loaded = migrateToneParams({ ...entry.parameters });
   if (loaded.motifLength && !loaded.motifLengthBeats) loaded.motifLengthBeats = loaded.motifLength;
   const merged = entry.section && entry.section !== "full"
     ? { ...exploreParams, ...loaded }

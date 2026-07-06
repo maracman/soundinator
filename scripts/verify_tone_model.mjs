@@ -22,6 +22,7 @@ import {
   bodyBandsFor,
   bodyResponse,
   FORMANT_PRESETS,
+  migrateToneParams,
   SPECTRAL_PROFILES,
   GenerationEngine,
 } from "../web/static/synth.js";
@@ -343,5 +344,27 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
     vowel && Array.isArray(vowel.bodyBands) && vowel.bodyBands.length === 5 && vowel.bodyAmount > 0);
 }
 
+console.log("T6: preset migration (T-B9 partial)");
+{
+  const old = {
+    spectralStretchCents: 8, spectralProb: 0.7, spectralDriftProb: 0.8,
+    spectralDriftDepth: 0.5, spectralDriftRate: 6, spectralLoudnessNorm: 0.65,
+    spectralRegisterAmount: 0.55, spectralPartialDyns: [1, 2], spectralPartialRegs: [0.5],
+    partialTilt: 0.2, tempo: 104,
+  };
+  const m = migrateToneParams(old);
+  check("legacy stretch cents become the exact B", near(m.partialB, legacyStretchToB(8), 1e-15));
+  check("old drift wobble seeds the Human dial",
+    Number.isFinite(m.excitationHuman) && m.excitationHuman > 0.1 && m.excitationHuman <= 0.7);
+  check("dead keys stop travelling",
+    !("spectralProb" in m) && !("spectralDriftProb" in m) && !("spectralLoudnessNorm" in m) &&
+    !("spectralRegisterAmount" in m) && !("spectralPartialDyns" in m) && !("spectralPartialRegs" in m));
+  check("living keys pass through untouched", m.partialTilt === 0.2 && m.tempo === 104);
+  const native = migrateToneParams({ partialB: 5e-4, excitationHuman: 0.3, spectralStretchCents: 8, spectralDriftDepth: 0.9 });
+  check("explicit v2 values are never overwritten",
+    native.partialB === 5e-4 && native.excitationHuman === 0.3);
+  check("migration does not mutate its input", old.spectralProb === 0.7);
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
-console.log("\nAll tone-model v2 assertions passed (T1-T5).");
+console.log("\nAll tone-model v2 assertions passed (T1-T6).");

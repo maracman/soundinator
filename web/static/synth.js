@@ -459,6 +459,32 @@ export const BODY_PRESETS = (() => {
   return presets;
 })();
 
+// ── Tone model v2: preset migration (T6, §7) ──
+// Best-effort translation of pre-v2 tone parameters. The engine's own
+// fallbacks already keep old presets SOUNDING right; this normalises the
+// stored values so the UI shows the migrated model and dead keys stop
+// travelling. Pure — returns a new object.
+export function migrateToneParams(p) {
+  if (!p || typeof p !== "object") return p;
+  const out = { ...p };
+  if (!Number.isFinite(out.partialB) && Number.isFinite(out.spectralStretchCents) && out.spectralStretchCents > 0) {
+    out.partialB = legacyStretchToB(out.spectralStretchCents);
+  }
+  if (!Number.isFinite(out.excitationHuman)) {
+    const prob = Number.isFinite(out.spectralDriftProb) ? out.spectralDriftProb : null;
+    const depth = Number.isFinite(out.spectralDriftDepth) ? out.spectralDriftDepth : null;
+    if (prob !== null || depth !== null) {
+      // Old within-note wobble maps onto the Human dial, capped modest
+      out.excitationHuman = Math.max(0, Math.min(0.7, 0.1 + (prob ?? 1) * (depth ?? 0.35) * 0.7));
+    }
+  }
+  for (const dead of [
+    "spectralProb", "spectralDriftProb", "spectralDriftDepth", "spectralDriftRate",
+    "spectralLoudnessNorm", "spectralRegisterAmount", "spectralPartialDyns", "spectralPartialRegs",
+  ]) delete out[dead];
+  return out;
+}
+
 // Which bands apply: an explicit bodyType wins; "auto" keeps the
 // instrument's own body (the pre-T5 behaviour, so old presets are
 // untouched).
@@ -569,7 +595,7 @@ const SPECTRAL_PERFORMANCE = {
     excitation: { type: "strike", position: 0.12, hardness: 0.62, human: 0.1 },
     partialTransfer: 0.3,
     spectralDynamicAmount: 1.0,
-    spectralStretchCents: 8, // string inharmonicity stretches upper partials
+    partialB: 1.2e-4, // native stiff-string inharmonicity (was legacy 8-cent stretch)
   },
   vocal: {
     envelopeAttack: 0.06, envelopeAttackSd: 0.02, envelopeDecay: 0.06,
