@@ -429,6 +429,61 @@ for (const [profileKey, resonances] of Object.entries(SPECTRAL_RESONANCES)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].resonances = resonances;
 }
 
+// ── Tone model v2: the Body stage (T5, docs/TONE_MODEL_V2_DESIGN.md §3.3) ──
+//
+// A body is a set of fixed-Hz resonance bands — the box around the
+// resonator. Instrument bodies come from the measured resonance tables;
+// VOWELS ARE BODIES TOO: each formant preset becomes a five-band vocal
+// body (F1–F5 with Klatt-ish descending gains, widths from the measured
+// bandwidths), which is what unifies the old formant path into the chain.
+export const BODY_PRESETS = (() => {
+  const presets = {};
+  for (const [key, bands] of Object.entries(SPECTRAL_RESONANCES)) {
+    presets[key] = { label: `${key} body`, bands };
+  }
+  // log2 units, F1 strongest — scaled so a full-strength F1 peak (2^2 = 4x)
+  // stays inside bodyResponse's 4.5x ceiling instead of saturating flat.
+  const vowelGains = [2.0, 1.7, 1.2, 0.9, 0.7];
+  for (const [v, f] of Object.entries(FORMANT_PRESETS)) {
+    const freqs = [f.f1, f.f2, f.f3, f.f4, f.f5];
+    presets[`vowel-${v}`] = {
+      label: `vowel ${f.label || v}`,
+      vocal: true,
+      bands: freqs.map((freq, i) => ({
+        freq,
+        gain: vowelGains[i],
+        width: Math.max(0.1, ((f.bw && f.bw[i]) || 90) / freq * 1.9),
+      })),
+    };
+  }
+  return presets;
+})();
+
+// Which bands apply: an explicit bodyType wins; "auto" keeps the
+// instrument's own body (the pre-T5 behaviour, so old presets are
+// untouched).
+export function bodyBandsFor(p, profile) {
+  const key = p?.bodyType;
+  if (key && key !== "auto" && BODY_PRESETS[key]) return BODY_PRESETS[key].bands;
+  return (profile && profile.resonances) || [];
+}
+
+// Body gain at one frequency: Gaussian bands in log-frequency space,
+// summed in log gain. Pure so T-B6 asserts it headlessly, and so the
+// renderer can evaluate it against a partial's MODULATED frequency
+// (vibrato FM → body AM).
+export function bodyResponse(bands, freqHz, amount) {
+  if (!amount || amount <= 0 || !bands || bands.length === 0) return 1;
+  let logGain = 0;
+  for (const band of bands) {
+    const freq = Math.max(20, band.freq || 1000);
+    const width = Math.max(0.08, band.width || 0.5);
+    const octDist = Math.log2(Math.max(20, freqHz) / freq);
+    logGain += (band.gain || 0) * Math.exp(-0.5 * (octDist / width) ** 2);
+  }
+  return Math.max(0.2, Math.min(4.5, Math.pow(2, logGain * amount)));
+}
+
 // ── Per-instrument performance character ─────────────────────
 //
 // A static spectrum alone never reads as "violin" — the temporal envelope,
@@ -1379,12 +1434,16 @@ export class GenerationEngine {
     const fourierMode = (this.p.voiceMode || "formant") !== "formant";
     const count = Math.max(1, Math.min(profile.partials.length, Math.round(this.p.spectralPartials ?? 12)));
     const dynamicsAmount = Math.max(0, this.p.spectralDynamicAmount ?? 0.8);
-    const registerAmount = this._clamp(this.p.spectralRegisterAmount ?? 0.55, 0, 1.5);
     const resonanceAmount = this._clamp(this.p.spectralResonanceAmount ?? 0.35, 0, 1.5);
     const velocityRatio = Math.max(0.08, velocity / 0.62);
     const means = Array.isArray(this.p.spectralPartialMeans) ? this.p.spectralPartialMeans : [];
     const sds = Array.isArray(this.p.spectralPartialSds) ? this.p.spectralPartialSds : [];
-    const regs = Array.isArray(this.p.spectralPartialRegs) ? this.p.spectralPartialRegs : [];
+    // The Body stage (T5): fixed-Hz resonance bands — instrument body by
+    // default ("auto"), or any BODY_PRESETS entry incl. the vowels. This
+    // is the ONLY register-dependent shaping now: the per-partial reg
+    // grids are retired (audit A7 — register timbre emerges from where
+    // the partials fall against fixed-Hz bands, not hand-set exponents).
+    const bodyBands = bodyBandsFor(this.p, profile);
     // Tone v2 (T2): resolve the excitation once per note. Current settings
     // are applied as a transform NORMALISED against the profile's own
     // excitation defaults — the measured amplitude tables already embody
@@ -1417,10 +1476,6 @@ export class GenerationEngine {
       const fallbackSd = fallbackAmp * (typeof partial === "number" ? 0.08 : partial.spread ?? 0.25) * 0.5;
       const amp = this._clamp(means[i] ?? fallbackAmp, 0, 1.5);
       const sd = this._clamp(sds[i] ?? fallbackSd, 0, 0.75);
-      const fallbackReg = typeof partial === "number"
-        ? spectralDefaultRegisterSensitivity(i, count)
-        : partial.reg ?? spectralDefaultRegisterSensitivity(i, count);
-      const reg = this._clamp(regs[i] ?? fallbackReg, -2, 2);
       const harmonic = i + 1;
       // Dynamic-brightness law (T2, audit A14): the per-partial dyn grids
       // are retired — louder playing brightens the top by one global law.
@@ -1428,9 +1483,7 @@ export class GenerationEngine {
       // Realised mode frequency (T1 law) — body resonances and hardness
       // rolloff both act on where the partial actually sits.
       const harmonicFrequency = Math.max(1, partialFrequency(harmonic, fundamentalHz, partialB, resClass));
-      const sourceResponse = this._spectralRegisterSourceResponse(reg, registerAmount, fundamentalHz);
-      const filterResponse = this._spectralResonanceResponse(profile, harmonicFrequency, resonanceAmount);
-      const registerResponse = sourceResponse * filterResponse;
+      const registerResponse = bodyResponse(bodyBands, harmonicFrequency, resonanceAmount);
       const excCur = excitationSpectrum(excType, harmonic, { position: excPos, hardness: excHard, freqHz: harmonicFrequency });
       const excBase = excitationSpectrum(excDefault.type || "bow", harmonic, {
         position: excDefault.position ?? 0.5, hardness: excDefault.hardness ?? 0.6, freqHz: harmonicFrequency,
@@ -1449,7 +1502,6 @@ export class GenerationEngine {
         mean: dynamicMean,
         sd,
         sens,
-        reg,
         registerResponse,
         harmonicFrequency,
       };
@@ -1462,6 +1514,10 @@ export class GenerationEngine {
       excitationType: excType,
       excitationHuman: human,
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
+      // Body stage (T5): carried on the note so the renderer can evaluate
+      // the body against MODULATED frequencies (vibrato FM → body AM).
+      bodyBands,
+      bodyAmount: resonanceAmount,
       spectralReferenceNorm: Math.max(0.001, referenceNorm),
       spectralStretchCents: this.p.spectralStretchCents ?? 0,
       // Tone v2 resonator (T1): inharmonicity as a physical B constant
@@ -1505,26 +1561,6 @@ export class GenerationEngine {
     const groupGain = Number(p[groupKeys[gi]] ?? 1);
     if (Number.isFinite(groupGain)) gain *= this._clamp(groupGain, 0, 2);
     return gain;
-  }
-
-  _spectralRegisterSourceResponse(reg, amount, fundamentalHz) {
-    if (amount <= 0 || reg === 0) return 1;
-    const tonicHz = Math.max(20, this.p.tonicHz || 261.63);
-    const registerOctaves = this._clamp(Math.log2(Math.max(20, fundamentalHz) / tonicHz), -2.5, 2.5);
-    return this._clamp(Math.pow(2, reg * amount * registerOctaves * 0.55), 0.18, 4);
-  }
-
-  _spectralResonanceResponse(profile, harmonicFrequency, amount) {
-    const resonances = profile.resonances || [];
-    if (amount <= 0 || resonances.length === 0) return 1;
-    let logGain = 0;
-    for (const band of resonances) {
-      const freq = Math.max(20, band.freq || 1000);
-      const width = Math.max(0.08, band.width || 0.5);
-      const octDist = Math.log2(Math.max(20, harmonicFrequency) / freq);
-      logGain += (band.gain || 0) * Math.exp(-0.5 * (octDist / width) ** 2);
-    }
-    return this._clamp(Math.pow(2, logGain * amount), 0.2, 4.5);
   }
 
   _gaussian() {
@@ -3066,6 +3102,31 @@ export class SynthEngine {
       scheduled.push({ param: g.gain, part, gainScale });
       osc.connect(g);
       let tail = g;
+      // FM→AM through the body (T5): the SAME vibrato events that bend the
+      // pitch re-evaluate the body gain at the modulated frequency, so a
+      // partial sitting on a body ridge shimmers in amplitude exactly in
+      // phase with the vibrato. Only partials on meaningful slopes get the
+      // extra node; symmetric peaks stay still, as physics says they should.
+      const vibEvents = note._vibratoEvents || [];
+      if (vibEvents.length > 2 && note.bodyBands && note.bodyBands.length && (note.bodyAmount || 0) > 0) {
+        const r0 = bodyResponse(note.bodyBands, freq, note.bodyAmount);
+        let minC = 0, maxC = 0;
+        for (const e of vibEvents) { if (e.cents < minC) minC = e.cents; if (e.cents > maxC) maxC = e.cents; }
+        const rHi = bodyResponse(note.bodyBands, freq * Math.pow(2, maxC / 1200), note.bodyAmount);
+        const rLo = bodyResponse(note.bodyBands, freq * Math.pow(2, minC / 1200), note.bodyAmount);
+        if (Math.abs(rHi - rLo) / r0 > 0.03) {
+          const am = this.ctx.createGain();
+          am.gain.setValueAtTime(1, t0);
+          const stride = Math.max(1, Math.ceil(vibEvents.length / 96));
+          for (let k = 1; k < vibEvents.length; k += stride) {
+            const e = vibEvents[k];
+            const r = bodyResponse(note.bodyBands, freq * Math.pow(2, e.cents / 1200), note.bodyAmount);
+            am.gain.linearRampToValueAtTime(r / r0, e.time);
+          }
+          g.connect(am);
+          tail = am;
+        }
+      }
       // Material damping law, tone v2 (T1): each partial decays with the
       // instrument's T60 at that partial's REAL frequency (audits A2/A3) —
       // a 4 kHz mode rings the same whether it is n=4 of a high note or
@@ -3078,7 +3139,7 @@ export class SynthEngine {
         const tau = Math.max(0.02, t60 / 6.91); // setTargetAtTime hits -60 dB at ~6.91τ
         decayG.gain.setValueAtTime(1, t0);
         decayG.gain.setTargetAtTime(0.0001, t0 + 0.01, tau);
-        g.connect(decayG);
+        tail.connect(decayG); // tail is g, or the body-AM node when vibrato rides a ridge
         decayG.connect(env);
         tail = null;
       }

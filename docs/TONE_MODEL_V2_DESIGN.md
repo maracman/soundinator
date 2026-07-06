@@ -416,7 +416,23 @@ Quality:
   inharmonicity decoupling of the 4:8 pair, silent-octave bloom with
   pairwise conservation). Verified live (piano re-seats to 0.3), zero
   console errors.
-- **T5 Body**: unify formants; FM→AM; vowel pad over body space.
+- **T5 Body** — DONE (2026-07-06): BODY_PRESETS registry — instrument
+  bodies from SPECTRAL_RESONANCES plus all five vowels as vocal bodies
+  (F1–F5 bands, Klatt-descending log2 gains scaled inside the response
+  ceiling, widths from measured bandwidths); bodyType param + Body
+  select ("Auto (instrument)" default = pre-T5 behaviour); exported
+  bodyBandsFor/bodyResponse; fingerprint register response is body-only
+  (per-partial reg grids + Reg response amount retired and PROVEN inert
+  — audit A7; R column removed); FM→AM — the same vibrato events that
+  bend pitch re-evaluate body gain at the modulated frequency per
+  partial (AM node only on meaningful slopes, stride-capped, phase-
+  locked, deterministic); notes carry bodyBands/bodyAmount. Remaining
+  for T6: vowel-PAD continuous point as a body (per-vowel presets in
+  now), full formant-mode unification. Headless: +12 assertions (T-B6
+  — vowels-as-bodies frequencies, peak/slope behaviour, ee/oo
+  distinctness, AM-on-slope vs stillness-at-peak, A7 inertness).
+  Verified live (violin + vowel-ah body + vibrato), zero console
+  errors.
 - **T6 Character panel + migration**: eight dials wired; old-preset
   loader; factory instruments rebuilt.
 - **T7 Tone print**: the interactive display (lenses, arcs, afterglow,

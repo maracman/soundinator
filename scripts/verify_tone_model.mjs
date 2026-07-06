@@ -18,6 +18,10 @@ import {
   humanPartialShape,
   transferCoupling,
   transferDeltas,
+  BODY_PRESETS,
+  bodyBandsFor,
+  bodyResponse,
+  FORMANT_PRESETS,
   SPECTRAL_PROFILES,
   GenerationEngine,
 } from "../web/static/synth.js";
@@ -280,5 +284,64 @@ console.log("T-B5: resonant transfer — true ratios, cents falloff, inharmonici
   check("fingerprint carries partialTransfer", note && near(note.partialTransfer, 0.3, 1e-12));
 }
 
+console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired");
+{
+  check("all five vowels exist as vocal bodies",
+    Object.keys(FORMANT_PRESETS).every(v => BODY_PRESETS[`vowel-${v}`]?.vocal));
+  check("instrument bodies present (violin, piano)",
+    !!BODY_PRESETS.violin && !!BODY_PRESETS.piano);
+  const ah = BODY_PRESETS["vowel-ah"].bands;
+  check("vowel-ah body carries F1-F5 at the measured frequencies",
+    ah.length === 5 && ah[0].freq === FORMANT_PRESETS.ah.f1 && ah[4].freq === FORMANT_PRESETS.ah.f5);
+  check("ah body peaks at F1 (730 Hz), not beside it",
+    bodyResponse(ah, 730, 1) > bodyResponse(ah, 500, 1) &&
+    bodyResponse(ah, 730, 1) > bodyResponse(ah, 1000, 1));
+  const ee = BODY_PRESETS["vowel-ee"].bands, oo = BODY_PRESETS["vowel-oo"].bands;
+  // 870 Hz is oo's F2 and sits in ee's F1-F2 gap — the classic back/front cue
+  check("ee and oo bodies are acoustically distinct at oo's F2 (870 Hz)",
+    bodyResponse(oo, 870, 1) > 1.8 * bodyResponse(ee, 870, 1));
+  check("bodyBandsFor: auto resolves the instrument's own body",
+    bodyBandsFor({ bodyType: "auto" }, SPECTRAL_PROFILES.violin) === SPECTRAL_PROFILES.violin.resonances);
+  check("bodyBandsFor: explicit vowel body wins over the profile",
+    bodyBandsFor({ bodyType: "vowel-ah" }, SPECTRAL_PROFILES.violin) === ah);
+  // FM→AM: gain swing across ±20 cents is large on a formant slope,
+  // near-zero at the symmetric ridge peak
+  // 600 Hz sits on F1's lower shoulder — a clean one-sided slope. (900 Hz
+  // would be wrong: it's the saddle where F1's fall cancels F2's rise.)
+  const slopeF = 600;
+  const dAt = (f) => Math.abs(
+    bodyResponse(ah, f * Math.pow(2, 20 / 1200), 1) - bodyResponse(ah, f * Math.pow(2, -20 / 1200), 1)
+  ) / bodyResponse(ah, f, 1);
+  check("vibrato swing produces AM on a body slope, stillness at the peak",
+    dAt(slopeF) > 5 * dAt(730), `slope ${dAt(slopeF).toFixed(4)} vs peak ${dAt(730).toFixed(4)}`);
+
+  // Audit A7: the per-partial reg grids are dead
+  const GEN5 = {
+    seed: 3, tempo: 104, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    voiceMode: "fourier", spectralPartials: 24, spectralProfile: "violin", excitationHuman: 0,
+  };
+  const firstNote = (params) => {
+    const e = new GenerationEngine(params); e.initialise();
+    for (let i = 0; i < 24; i++) { const n = e.nextNote(); if (n && n.velocity > 0 && n.harmonicPartials) return n; }
+    return null;
+  };
+  const regA = firstNote({ ...GEN5, spectralPartialRegs: new Array(64).fill(2) });
+  const regB = firstNote({ ...GEN5, spectralPartialRegs: new Array(64).fill(-2) });
+  check("A7: extreme reg grids produce identical output",
+    regA && regB && regA.harmonicPartials.every((p, i) => p.amp === regB.harmonicPartials[i].amp));
+  const regAmtA = firstNote({ ...GEN5, spectralRegisterAmount: 0 });
+  const regAmtB = firstNote({ ...GEN5, spectralRegisterAmount: 1.5 });
+  check("A7: Reg response amount is inert",
+    regAmtA && regAmtB && regAmtA.harmonicPartials.every((p, i) => p.amp === regAmtB.harmonicPartials[i].amp));
+  // Engine wiring: vowel body changes the spectrum; note carries the bands
+  const auto = firstNote(GEN5);
+  const vowel = firstNote({ ...GEN5, bodyType: "vowel-ee" });
+  check("vowel-ee body reshapes the fingerprint",
+    auto && vowel && auto.harmonicPartials.some((p, i) => Math.abs(p.amp - vowel.harmonicPartials[i].amp) > 1e-6));
+  check("note carries bodyBands + bodyAmount for the renderer",
+    vowel && Array.isArray(vowel.bodyBands) && vowel.bodyBands.length === 5 && vowel.bodyAmount > 0);
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
-console.log("\nAll tone-model v2 assertions passed (T1-T4).");
+console.log("\nAll tone-model v2 assertions passed (T1-T5).");

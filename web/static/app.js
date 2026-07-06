@@ -25,6 +25,9 @@ import {
   VOWEL_POINTS,
   partialFrequency,
   legacyStretchToB,
+  BODY_PRESETS,
+  bodyBandsFor,
+  bodyResponse,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -256,6 +259,7 @@ const DEFAULTS = {
   excitationHardness: 0.6,
   excitationHuman: 0.4,
   partialTransfer: 0.15,
+  bodyType: "auto",
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -399,6 +403,7 @@ const PARAM_DESC = {
   excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
   excitationHuman: "The player: one seeded fluctuation per note wobbles bow pressure / breath support, moving the whole spectrum together (brighter when pushed), with bow slips or breath bursts. Struck/plucked notes get per-note velocity and hardness jitter instead. 0 = machine",
   partialTransfer: "Sympathetic resonance: energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Inharmonicity detunes pairs out of resonance, weakening the transfer — exactly like real sympathetic strings",
+  bodyType: "The box around the resonator: a set of fixed-Hz resonance bands. Auto keeps the instrument's own measured body; vowels are bodies too (F1–F5 bands). With vibrato, partials on body slopes shimmer in amplitude — real FM→AM",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -3440,7 +3445,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF3Level","formantF4Level","formantF5Level","formantBandwidth",
@@ -4235,8 +4240,15 @@ function subnoteWorkspaceHTML(p) {
               ${controlRow("spectralMix", "Mix", p.spectralMix, 0, 1, 0.01)}
               ${controlRow("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1)}
               ${controlRow("spectralDynamicAmount", "Dyn response", p.spectralDynamicAmount, 0, 1.5, 0.01)}
-              ${controlRow("spectralRegisterAmount", "Reg response", p.spectralRegisterAmount, 0, 1.5, 0.01)}
-              ${controlRow("spectralResonanceAmount", "Resonance", p.spectralResonanceAmount, 0, 1.5, 0.01)}
+              <div class="control-row">
+                <label for="sel_bodyType">Body</label>
+                <select data-param-select="bodyType" id="sel_bodyType" class="param-select" title="The box around the resonator: fixed-Hz resonance bands. Auto keeps the instrument's own body; vowels are bodies too — this is where the voice lives.">
+                  <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
+                  ${Object.entries(BODY_PRESETS).map(([k, b]) =>
+                    `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
+                </select>
+              </div>
+              ${controlRow("spectralResonanceAmount", "Body amount", p.spectralResonanceAmount, 0, 1.5, 0.01)}
               ${controlRow("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01)}
               ${controlRow("spectralStretchCents", "Freq stretch", p.spectralStretchCents, -24, 24, 1)}
               <div class="control-row">
@@ -4313,6 +4325,7 @@ function resetSpectralPartialParams(p) {
     p.excitationHardness = exc.hardness ?? 0.6;
     p.excitationHuman = exc.human ?? 0.35;
   }
+  p.bodyType = "auto"; // a new instrument brings its own body
   p.spectralPartialMeans = profile.partials.map(partial => +(profilePartial(partial).amp || 0).toFixed(3));
   p.spectralPartialSds = profile.partials.map(partial => {
     const spec = profilePartial(partial);
@@ -4394,7 +4407,6 @@ function harmonicEditorHTML(p) {
   return profile.partials.slice(0, count).map((partial, i) => {
     const mean = p.spectralPartialMeans[i] ?? profilePartial(partial).amp ?? 0;
     const sd = p.spectralPartialSds[i] ?? 0;
-    const reg = p.spectralPartialRegs[i] ?? profilePartial(partial).reg ?? spectralDefaultRegisterSensitivity(i, count);
     return `
       <div class="harmonic-control">
         <div class="h-head"><span>H${i + 1}</span><span>${i + 1}x f0</span></div>
@@ -4407,11 +4419,6 @@ function harmonicEditorHTML(p) {
           <span>SD</span>
           <input type="range" data-harmonic-param="sd" data-harmonic-index="${i}" min="0" max="0.75" step="0.005" value="${sd}">
           <output data-harmonic-out="sd-${i}">${harmonicValueLabel("sd", sd)}</output>
-        </label>
-        <label>
-          <span>R</span>
-          <input type="range" data-harmonic-param="reg" data-harmonic-index="${i}" min="-2" max="2" step="0.05" value="${reg}">
-          <output data-harmonic-out="reg-${i}">${harmonicValueLabel("reg", reg)}</output>
         </label>
       </div>
     `;
@@ -6218,25 +6225,13 @@ function drawHarmonicSignature() {
   ctx.fillText("combined waveform", 38, combinedMid);
 }
 
-function spectralVisualResponse(profile, harmonic, reg, registerOctaves) {
-  const registerAmount = clamp(exploreParams.spectralRegisterAmount ?? 0.55, 0, 1.5);
+// T5: register response is body-only (audit A7) — the display shows the
+// same fixed-Hz body law the engine uses, evaluated an octave down/up.
+function spectralVisualResponse(profile, harmonic, _reg, registerOctaves) {
   const resonanceAmount = clamp(exploreParams.spectralResonanceAmount ?? 0.35, 0, 1.5);
-  const source = Math.pow(2, reg * registerAmount * registerOctaves * 0.55);
+  const bands = bodyBandsFor(exploreParams, profile);
   const freq = Math.max(1, (exploreParams.tonicHz || 261.63) * harmonic * Math.pow(2, registerOctaves));
-  return clamp(source * spectralVisualResonance(profile, freq, resonanceAmount), 0.18, 4.5);
-}
-
-function spectralVisualResonance(profile, frequency, amount) {
-  const resonances = profile.resonances || [];
-  if (amount <= 0 || resonances.length === 0) return 1;
-  let logGain = 0;
-  resonances.forEach(band => {
-    const freq = Math.max(20, band.freq || 1000);
-    const width = Math.max(0.08, band.width || 0.5);
-    const octDist = Math.log2(Math.max(20, frequency) / freq);
-    logGain += (band.gain || 0) * Math.exp(-0.5 * (octDist / width) ** 2);
-  });
-  return clamp(Math.pow(2, logGain * amount), 0.2, 4.5);
+  return bodyResponse(bands, freq, resonanceAmount);
 }
 
 function drawSinePath(ctx, x0, x1, mid, cycles, amplitude, opts) {
