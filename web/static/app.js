@@ -1840,32 +1840,71 @@ function drawRoll(region) {
   const { ctx, w: W, h: H } = crisp2d(cv);
   ctx.clearRect(0, 0, W, H);
   const notes = region.notes;
-  const padL = 34, padR = 8, padT = 8, padB = 18;
+  const padL = 40, padR = 8, padT = 8, padB = 18;
   const plotW = W - padL - padR, plotH = H - padT - padB;
 
+  // The pitch system for THIS region under the session context: every
+  // division is a row; the scale decides which rows are open.
+  const track = arrangement.tracks.find(t => t.id === selectedRegion?.trackId);
+  const scale = track ? new GenerationEngine(regionPlayParams(track, region)).scale : null;
+  const allSet = new Set(scale ? scale.all : []);
+  const subIsSubset = scale && scale.sub.length && scale.sub.length < scale.all.length;
+  const subSet = new Set(subIsSubset ? scale.sub : []);
+  const rootPcs = new Set((arrangement.context.rootNotes || [0]).map(r => scale ? scale.norm(r) : 0));
+  const div = scale ? scale.div : 12;
+
   const degs = notes.map(n => n.degree);
-  const minDeg = Math.min(...degs) - 1, maxDeg = Math.max(...degs) + 1;
+  const minDeg = Math.min(...degs) - 2, maxDeg = Math.max(...degs) + 2;
   const rows = maxDeg - minDeg + 1;
   const rowH = plotH / rows;
-  const totalDivs = Math.max(1, ...notes.map(n => (n.offsetDivs || 0) + (n.durationDivs || 1)));
+  const beatDivRoll = notes[0]?.beatDivisions || arrangement.context.beatDivisions || 1;
+  const totalDivs = Math.max(regionLen(region) * beatDivRoll,
+    1, ...notes.map(n => (n.offsetDivs || 0) + (n.durationDivs || 1)));
   const xFor = (divs) => padL + (divs / totalDivs) * plotW;
   const yForPitch = (deg, cents) => padT + (maxDeg - (deg + (cents || 0) / 100)) * rowH;
-  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, totalDivs, W, H };
+  const rowInfo = {};
+  for (let d = minDeg; d <= maxDeg; d++) {
+    const pc = scale ? scale.norm(d) : ((d % 12) + 12) % 12;
+    rowInfo[d] = {
+      inScale: allSet.size === 0 || allSet.has(pc),
+      isSub: subSet.has(pc),
+      isRoot: rootPcs.has(pc),
+      pc,
+    };
+  }
+  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, totalDivs, W, H, rowInfo, div };
 
-  // Display well + row/beat grid
+  // Display well + scale-aware rows: out-of-scale divisions render dark
+  // and are LOCKED from drags; sub-scale rows gold; root rows violet.
   ctx.fillStyle = "#101216";
   ctx.fillRect(padL - 2, padT - 2, plotW + 4, plotH + 4);
-  ctx.strokeStyle = "rgba(154,160,171,0.08)";
-  ctx.lineWidth = 0.6;
+  ctx.font = "8px 'SF Mono', monospace";
   for (let d = minDeg; d <= maxDeg; d++) {
-    const y = padT + (maxDeg - d) * rowH + rowH / 2;
+    const yTop = padT + (maxDeg - d) * rowH;
+    const info = rowInfo[d];
+    if (!info.inScale) {
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.fillRect(padL, yTop, plotW, rowH);
+    } else if (info.isRoot) {
+      ctx.fillStyle = "rgba(139,124,246,0.10)";
+      ctx.fillRect(padL, yTop, plotW, rowH);
+    } else if (info.isSub) {
+      ctx.fillStyle = "rgba(245,166,35,0.06)";
+      ctx.fillRect(padL, yTop, plotW, rowH);
+    }
+    const y = yTop + rowH / 2;
+    ctx.strokeStyle = "rgba(154,160,171,0.08)";
+    ctx.lineWidth = 0.6;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
-    if ((((d % 12) + 12) % 12) === 0) {
-      ctx.fillStyle = "rgba(139,124,246,0.5)"; // root rows in violet
-      ctx.font = "8px 'SF Mono', monospace";
+    // pitch labels on in-scale rows (names in 12-EDO, numbers otherwise)
+    if (info.inScale && rowH >= 7) {
+      ctx.fillStyle = info.isRoot ? "rgba(139,124,246,0.8)"
+        : info.isSub ? "rgba(245,166,35,0.65)" : "rgba(154,160,171,0.45)";
       ctx.textAlign = "right";
-      ctx.fillText(String(d), padL - 5, y + 2.5);
-      ctx.fillStyle = "rgba(154,160,171,0.08)";
+      const label = div === 12
+        ? `${NOTE_NAMES[info.pc]}${Math.floor(d / 12) + 4}`
+        : String(d);
+      ctx.fillText(label, padL - 4, y + 2.5);
     }
   }
   const beatDiv = region.notes[0]?.beatDivisions || 1;
@@ -1910,6 +1949,7 @@ function drawRoll(region) {
     }
     _rollHits.push({ i, x, y, w, h: bodyH });
   });
+  window._rollHitsQA = _rollHits; // QA hook: exact note rects for tests
 }
 
 function rollReadoutText(n) {
@@ -1939,21 +1979,31 @@ function wireRoll(v) {
 
   let drag = null; // { i, note, startX, startY, orig, fine, moved }
 
+  const EDGE = 5; // px hit zone for duration trims
+  const edgeFor = (hit, x) => {
+    if (x >= hit.x + hit.w - Math.max(EDGE, Math.min(8, hit.w * 0.25))) return "trimR";
+    if (x <= hit.x + Math.max(EDGE, Math.min(8, hit.w * 0.25)) && hit.w > EDGE * 2.5) return "trimL";
+    return "move";
+  };
   cv.onmousedown = (e) => {
     const { x, y } = canvasXY(e);
     const hit = _rollHits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y - 2 && y <= h.y + h.h + 2);
     if (!hit) {
       rollNoteSel = -1;
       drawRoll(region);
-      setReadout("Drag a note to move it (its cents offset rides along); shift-drag snaps clean; alt-drag fine-tunes cents only.");
+      setReadout("Drag a note to move it (cents ride along; out-of-scale rows are locked); drag its EDGES to trim duration; ⇧ snaps clean; ⌥ fine-tunes cents.");
       return;
     }
     rollNoteSel = hit.i;
     const note = region.notes[hit.i];
     drag = {
       i: hit.i, note,
+      mode: e.altKey ? "move" : edgeFor(hit, x),
       startX: x, startY: y,
-      orig: { degree: note.degree, cents: note.intonationCents || 0, offsetDivs: note.offsetDivs || 0 },
+      orig: {
+        degree: note.degree, cents: note.intonationCents || 0,
+        offsetDivs: note.offsetDivs || 0, durationDivs: note.durationDivs || 1,
+      },
       fine: e.altKey,
       moved: false,
     };
@@ -1963,22 +2013,54 @@ function wireRoll(v) {
   };
 
   cv.onmousemove = (e) => {
-    if (!drag || !_rollGeom) return;
+    if (!drag || !_rollGeom) {
+      // hover cursors: resize at note edges, grab over bodies
+      if (_rollGeom && !drag) {
+        const { x, y } = canvasXY(e);
+        const hit = _rollHits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y - 2 && y <= h.y + h.h + 2);
+        cv.style.cursor = hit ? (edgeFor(hit, x) === "move" ? "grab" : "ew-resize") : "default";
+      }
+      return;
+    }
     const { x, y } = canvasXY(e);
     const g = _rollGeom;
     const dx = x - drag.startX;
     const dy = y - drag.startY;
     if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
     const note = drag.note;
-    if (drag.fine) {
+    const divDelta = Math.round(dx / (g.plotW / g.totalDivs));
+    // monophonic neighbours bound the trims
+    const prevEnd = Math.max(0, ...region.notes
+      .filter((nn, ix) => ix !== drag.i && (nn.offsetDivs || 0) < drag.orig.offsetDivs)
+      .map(nn => (nn.offsetDivs || 0) + (nn.durationDivs || 1)));
+    const nextStart = Math.min(g.totalDivs, ...region.notes
+      .filter((nn, ix) => ix !== drag.i && (nn.offsetDivs || 0) > drag.orig.offsetDivs)
+      .map(nn => nn.offsetDivs || 0));
+    if (drag.mode === "trimR") {
+      note.durationDivs = Math.max(1, Math.min(nextStart - drag.orig.offsetDivs,
+        drag.orig.durationDivs + divDelta));
+    } else if (drag.mode === "trimL") {
+      const newOff = Math.max(prevEnd, Math.min(drag.orig.offsetDivs + drag.orig.durationDivs - 1,
+        drag.orig.offsetDivs + divDelta));
+      note.offsetDivs = newOff;
+      note.durationDivs = drag.orig.durationDivs - (newOff - drag.orig.offsetDivs);
+    } else if (drag.fine) {
       // Fine-tune: vertical motion edits cents only (one row = 100 cents)
       note.intonationCents = Math.round(drag.orig.cents - (dy / g.rowH) * 100);
     } else {
-      // Snap-drag: whole scale rows; the intonation character rides along
+      // Snap-drag whole rows — out-of-scale divisions are LOCKED: the
+      // note lands on the nearest in-scale row instead (owner spec).
       const stepDelta = Math.round(-dy / g.rowH);
-      note.degree = drag.orig.degree + stepDelta;
+      let target = drag.orig.degree + stepDelta;
+      const info = g.rowInfo && g.rowInfo[target];
+      if (info && !info.inScale) {
+        for (let off = 1; off <= g.div; off++) {
+          if (g.rowInfo[target + off]?.inScale) { target = target + off; break; }
+          if (g.rowInfo[target - off]?.inScale) { target = target - off; break; }
+        }
+      }
+      note.degree = target;
       note.intonationCents = e.shiftKey ? 0 : drag.orig.cents;
-      const divDelta = Math.round(dx / (g.plotW / g.totalDivs));
       const maxOffset = Math.max(0, g.totalDivs - (note.durationDivs || 1));
       note.offsetDivs = Math.max(0, Math.min(maxOffset, drag.orig.offsetDivs + divDelta));
     }
@@ -1994,10 +2076,12 @@ function wireRoll(v) {
       note.degree = drag.orig.degree;
       note.intonationCents = drag.orig.cents;
       note.offsetDivs = drag.orig.offsetDivs;
+      note.durationDivs = drag.orig.durationDivs;
     } else {
       const changed = note.degree !== drag.orig.degree
         || (note.intonationCents || 0) !== drag.orig.cents
-        || (note.offsetDivs || 0) !== drag.orig.offsetDivs;
+        || (note.offsetDivs || 0) !== drag.orig.offsetDivs
+        || (note.durationDivs || 1) !== drag.orig.durationDivs;
       if (changed) {
         note.frequency = freqFor(note.degree, note.intonationCents);
         note.edited = true;
