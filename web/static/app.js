@@ -2610,8 +2610,11 @@ function drawRoll(region) {
   const rootPcs = new Set((arrangement.context.rootNotes || [0]).map(r => scale ? scale.norm(r) : 0));
   const div = scale ? scale.div : 12;
 
-  const degs = notes.map(n => n.degree);
-  const minDeg = Math.min(...degs) - 2, maxDeg = Math.max(...degs) + 2;
+  // Defensive: a note with a non-finite degree must never NaN the row
+  // math and blank the whole roll.
+  const degs = notes.map(n => n.degree).filter(Number.isFinite);
+  const minDeg = (degs.length ? Math.min(...degs) : 0) - 2;
+  const maxDeg = (degs.length ? Math.max(...degs) : 0) + 2;
   const laneH = rollDynLane ? 52 : 0; // Logic-style velocity pins lane
   const pitchH = plotH - laneH;
   const rows = maxDeg - minDeg + 1;
@@ -2740,6 +2743,7 @@ function drawRoll(region) {
     ctx.lineWidth = 1;
   }
   window._rollHitsQA = _rollHits; // QA hook: exact note rects for tests
+  window._rollGeomQA = _rollGeom; // QA hook: lane/row geometry for tests
 }
 
 function rollReadoutText(n) {
@@ -2831,7 +2835,9 @@ function wireRoll(v) {
       if (best) {
         rollNoteSel = best.i;
         const note = region.notes[best.i];
-        drag = { i: best.i, note, mode: "velocity", startY: y, orig: { velocity: note.velocity || 0 }, moved: false };
+        // startX matters: moved-detection computes dx from it, and NaN
+        // (undefined startX) kept `moved` false so the drag always reverted
+        drag = { i: best.i, note, mode: "velocity", startX: x, startY: y, orig: { velocity: note.velocity || 0 }, moved: false };
         drawRoll(region);
         showNote(note);
         e.preventDefault();
@@ -2972,24 +2978,29 @@ function wireRoll(v) {
     if (!drag) return;
     const note = drag.note;
     if (!commit || !drag.moved) {
-      // Plain click or cancel: restore values, keep the selection
-      note.degree = drag.orig.degree;
-      note.intonationCents = drag.orig.cents;
-      note.offsetDivs = drag.orig.offsetDivs;
-      note.durationDivs = drag.orig.durationDivs;
+      // Plain click or cancel: restore values, keep the selection.
+      // Restore ONLY what this drag snapshotted — a velocity drag's orig
+      // carries just {velocity}, and writing the missing fields poisoned
+      // the note with undefined degree/offset (NaN row math blanked the
+      // whole roll — owner bug report 07-07).
+      if ("degree" in drag.orig) note.degree = drag.orig.degree;
+      if ("cents" in drag.orig) note.intonationCents = drag.orig.cents;
+      if ("offsetDivs" in drag.orig) note.offsetDivs = drag.orig.offsetDivs;
+      if ("durationDivs" in drag.orig) note.durationDivs = drag.orig.durationDivs;
       if ("onsetDevDivs" in drag.orig) note.onsetDevDivs = drag.orig.onsetDevDivs;
       if ("durationDevDivs" in drag.orig) note.durationDevDivs = drag.orig.durationDevDivs;
       if (drag.mode === "velocity") note.velocity = drag.orig.velocity;
     } else {
-      const changed = note.degree !== drag.orig.degree
-        || (note.intonationCents || 0) !== drag.orig.cents
-        || (note.offsetDivs || 0) !== drag.orig.offsetDivs
-        || (note.durationDivs || 1) !== drag.orig.durationDivs
-        || (note.onsetDevDivs || 0) !== (drag.orig.onsetDevDivs || 0)
-        || (note.durationDevDivs || 0) !== (drag.orig.durationDevDivs || 0)
-        || (drag.mode === "velocity" && note.velocity !== drag.orig.velocity);
+      const o = drag.orig;
+      const changed = ("degree" in o && note.degree !== o.degree)
+        || ("cents" in o && (note.intonationCents || 0) !== o.cents)
+        || ("offsetDivs" in o && (note.offsetDivs || 0) !== o.offsetDivs)
+        || ("durationDivs" in o && (note.durationDivs || 1) !== o.durationDivs)
+        || (note.onsetDevDivs || 0) !== (o.onsetDevDivs || 0)
+        || (note.durationDevDivs || 0) !== (o.durationDevDivs || 0)
+        || (drag.mode === "velocity" && note.velocity !== o.velocity);
       if (changed) {
-        note.frequency = freqFor(note.degree, note.intonationCents);
+        if ("degree" in o) note.frequency = freqFor(note.degree, note.intonationCents);
         note.edited = true;
         saveArrangement();
       }

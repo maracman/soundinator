@@ -5455,8 +5455,10 @@ body.explore-mode #app {
 .tl2-sp-row { min-height: 20px; }
 .sp-panel {
   display: flex;
+  flex-wrap: wrap; /* head panel drops under the canvases instead of clipping */
   gap: 0.6rem;
   align-items: stretch;
+  max-width: 980px;
   padding: 0.4rem;
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -5469,7 +5471,13 @@ body.explore-mode #app {
   border-radius: 4px;
   cursor: crosshair;
 }
-#spCylinder { cursor: ns-resize; }
+/* Fixed CSS sizes are LOAD-BEARING: crisp2d sizes the backing store from
+   clientWidth×dpr every draw, and these canvases redraw per animation
+   frame — without a CSS size the attribute growth feeds back into
+   clientWidth and the canvas doubles forever (the "global space is
+   completely broken" bug: it reached 634,882 px wide). */
+#spSection { width: 150px; height: 150px; flex: none; }
+#spCylinder { width: 620px; height: 150px; flex: none; cursor: ns-resize; }
 .sp-head-panel { display: flex; flex-direction: column; gap: 0.3rem; min-width: 170px; }
 .sp-ctl {
   display: flex;
@@ -5480,6 +5488,14 @@ body.explore-mode #app {
   color: var(--text3);
 }
 .sp-ctl select, .sp-ctl input[type=range] { max-width: 110px; }
+.sp-ctl select {
+  background: var(--surface);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.62rem;
+  padding: 0.1rem 0.25rem;
+}
 
 /* ── Q3: baked-note performance drill-down (roll drawer) ─── */
 .roll-perf {
