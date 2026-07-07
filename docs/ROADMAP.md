@@ -142,6 +142,7 @@ never blindly reset. Claim an item by committing early and often.
 | Q11 vocabulary audit: docs/TERMINOLOGY.md, "fingerprint"→"tone print" everywhere user-facing, tab explainers; Sub-note/Macro renames left as owner decisions | 07-07 brief | `d54042e` v162 |
 | Owner-decision docs: HARMONY_PATCHES_PROPOSAL.md + HOSTING_STRATEGY.md (+ committed a parallel context's HOSTING_PLAN.md runbook) | ledger §3 | `5053a18` |
 | Q12 QA + panels: FOUND & FIXED the scale-to-fit CSS was invalid since it shipped (scale() given a length — small viewports clipped instead of scaling; now JS fitStudioScale), workspace tabs no longer overlap, page-wide grid overflow at ≤1280 fixed (min-width auto), BODY inspector scrolls instead of clipping, draggable dividers for the studio left column + CHORDA inspector (scale-aware, persisted) | 07-07 brief | v168 |
+| Owner feedback round: roll velocity-pin fix (restore path poisoned notes → NaN blanked the roll; drags also never committed — missing startX), global space runaway canvas (crisp2d feedback loop, 634k px — fixed CSS sizes now load-bearing), scale strip = persistent mini piano-roll (bar-snap dblclick change points, click-off closes editor), layers = rows underneath with head diagrams + ⟳ recapture + truly synced env triggers (`layerEnvProb`, shared z around per-layer baselines; APP_VERSION → 0.7.0) | 07-07 owner review | `67c9c01`→`dcf42bd` v175 |
 
 ### Queued — build order
 
