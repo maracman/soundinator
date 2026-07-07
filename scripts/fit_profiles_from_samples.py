@@ -56,11 +56,9 @@ Dependencies: numpy, scipy, soundfile (pure analysis — writes no audio).
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import math
 import os
-import sys
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -131,8 +129,11 @@ def segment_notes(x: np.ndarray, sr: int,
         return []
     peak = float(env.max())
     floor = float(np.percentile(env, 10))
-    # Above whichever is larger: −46 dB re peak, or 4× the noise floor.
-    thr = max(peak * 10 ** (-46 / 20), floor * 4.0, 1e-6)
+    # Above whichever is larger: −46 dB re peak, or 4× the noise floor —
+    # but the floor term is capped at −20 dB re peak (a short single-note
+    # file is mostly signal, so its 10th percentile IS signal, and an
+    # uncapped floor-based gate would swallow the note).
+    thr = max(peak * 10 ** (-46 / 20), min(floor * 4.0, peak * 0.1), 1e-6)
     active = env > thr
     # region extraction
     regions = []
@@ -170,12 +171,38 @@ def segment_notes(x: np.ndarray, sr: int,
         if core.size == 0:
             continue
         start_f = a + max(0, core[0] - int(0.2 * sr / hop))
-        tail = np.where(seg_env >= 0.01 * seg_peak)[0]
-        end_f = a + (tail[-1] if tail.size else core[-1]) + 1
+        # tail: keep the decay down to −40 dB re the segment peak, but stop
+        # at the region's own noise bed (bow/breath/room noise after the
+        # note rings out sits above the global gate and would otherwise
+        # keep seconds of junk glued to the note).  The bed level is what
+        # the region decays INTO — its last half second.
+        # No fixed dB-re-peak floor here: a piano strike peak sits 40+ dB
+        # above its (audible, relevant) ring, so a peak-relative cut would
+        # truncate exactly the decay we need for T60.
+        bed = float(np.median(seg_env[-max(1, int(0.5 * sr / hop)):]))
+        tail_thr = max(1.5 * bed, thr)
+        after_core = seg_env[core[-1]:]
+        below = np.where(after_core < tail_thr)[0]
+        end_f = a + core[-1] + (below[0] if below.size else after_core.size)
+        # Percussive-shaped region (early peak, no sustain plateau)?  Then
+        # the broadband gate underestimates the tail badly: a quiet piano
+        # recording may have only ~30 dB of broadband range while individual
+        # partial tracks (narrowband) decay measurably for far longer.
+        # Extend the tail generously; silence is harmless to the percussive
+        # analyses (they are onset/peak-referenced).
+        pk_rel = int(np.argmax(seg_env))
+        mid_slice = seg_env[len(seg_env) // 4: 3 * len(seg_env) // 4]
+        mid_med = float(np.median(mid_slice if mid_slice.size else seg_env))
+        if pk_rel < len(seg_env) * 0.25 and mid_med < 0.35 * seg_peak:
+            end_f = b + int(8.0 * sr / hop)
         s, e = start_f * hop, end_f * hop
         if (e - s) / sr < min_dur_s:
             continue
         out.append((max(0, s - int(0.05 * sr)), min(len(x), e + int(0.30 * sr))))
+    # never overlap into the next region (its attack would pollute tails)
+    for i in range(len(out) - 1):
+        if out[i][1] > out[i + 1][0]:
+            out[i] = (out[i][0], out[i + 1][0])
     return out
 
 
@@ -709,7 +736,10 @@ def vibrato_stats(seg: np.ndarray, sr: int, f0: float, amps: np.ndarray):
     ref = float(np.median(spec[(fax >= 0.5) & (fax <= 15)]) + 1e-12)
     prominent = spec[band][pk] > 4 * ref
     depth = float(np.sqrt(2) * np.std(cents - trend))  # ≈ sinusoid peak dev
-    return dict(rate=rate, depth=depth, present=bool(prominent and depth > 3.0))
+    # short notes have poor modulation-spectrum resolution, so also accept
+    # unambiguous depth without the prominence test
+    present = (prominent and depth > 3.0) or depth > 12.0
+    return dict(rate=rate, depth=depth, present=bool(present))
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -748,7 +778,8 @@ def fit_material(t60_points: list[tuple[float, float, str]]):
                 freqRangeHz=[float(fr.min()), float(fr.max())])
 
 
-def robust_mean(vals, lo_q=25, hi_q=75):
+def robust_mean(vals):
+    """Median of the finite values (None when empty)."""
     v = np.asarray([x for x in vals if x is not None and np.isfinite(x)])
     if v.size == 0:
         return None
@@ -857,7 +888,7 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         # The raw measured ratio is kept alongside (measuredLevelRatio).
         ratio = an["level"] if an["level"] is not None else 0.02
         attack_noise = dict(
-            level=float(np.clip(ratio * 10.0, 0.05, 0.6)),
+            level=round(float(np.clip(ratio * 10.0, 0.05, 0.6)), 3),
             freq=float(round(an["freq"])),
             q=float(round(an["q"], 2)) if an["q"] else 1.0,
             decay=float(round(an["decay"], 3)) if an["decay"] else None,
@@ -881,8 +912,20 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             vibratoDepth=robust_mean(depths),
             vibratoDepthSd=float(np.std(depths, ddof=1)) if len(depths) >= 4 else None,
             nNotes=len(vib),
+            # on designated vibrato takes every note has vibrato by design,
+            # so `vibratoProb` is CONDITIONAL (depth/rate when vibrating),
+            # not how often the player chooses to vibrate
+            vibratoBasis=("designated vibrato takes (prob conditional)"
+                          if vib_notes else "ordinary notes"),
         )
 
+    r4 = lambda v: (round(float(v), 4) if v is not None and np.isfinite(v) else None)
+    if material:
+        material = {k: (round(v, 4) if isinstance(v, float) else v)
+                    for k, v in material.items()}
+    if vibrato:
+        vibrato = {k: (round(v, 3) if isinstance(v, float) else v)
+                   for k, v in vibrato.items()}
     return dict(
         partials=[dict(amp=round(float(a), 5), spread=round(float(s), 3))
                   for a, s in zip(amp, spread)],
@@ -891,9 +934,9 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         tailSlopeDbPerOct=round(tail_db_oct, 1) if tail_db_oct is not None else None,
         material=material,
         performance=dict(
-            envelopeAttack=adsr["attack"], envelopeAttackSd=attack_sd,
-            envelopeDecay=adsr["decay"], envelopeSustain=adsr["sustain"],
-            envelopeRelease=adsr["release"],
+            envelopeAttack=r4(adsr["attack"]), envelopeAttackSd=r4(attack_sd),
+            envelopeDecay=r4(adsr["decay"]), envelopeSustain=r4(adsr["sustain"]),
+            envelopeRelease=r4(adsr["release"]),
             **(vibrato or dict(vibratoProb=0.0, vibratoRate=None, vibratoRateSd=None,
                                vibratoDepth=None, vibratoDepthSd=None)),
             attackNoise=attack_noise,
@@ -910,17 +953,19 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
 # Driver
 # ──────────────────────────────────────────────────────────────────────────
 
-AUDIO_EXT = (".aif", ".aiff", ".wav", ".flac", ".ogg")
-
-
-def is_vib_name(name: str) -> bool:
-    low = name.lower()
-    return ".vib" in low or low.startswith("vib") or "_vib" in low
+AUDIO_EXT = (".aif", ".aiff", ".wav", ".flac", ".ogg", ".mp3")
 
 
 def is_nonvib_name(name: str) -> bool:
     low = name.lower()
-    return "nonvib" in low or "novib" in low
+    return "nonvib" in low or "novib" in low or "non-vib" in low or "non_vib" in low
+
+
+def is_vib_name(name: str) -> bool:
+    low = name.lower()
+    if is_nonvib_name(low):
+        return False
+    return ".vib" in low or low.startswith("vib") or "_vib" in low or "vibrato" in low
 
 
 def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
@@ -928,12 +973,14 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
                    if f.lower().endswith(AUDIO_EXT))
     if not files:
         return None
-    nonvib = [f for f in files if is_nonvib_name(f)]
-    vib = [f for f in files if is_vib_name(f) and not is_nonvib_name(f)]
-    if nonvib and vib:
-        spectral_files, vibrato_files = nonvib, vib
-    else:
-        spectral_files, vibrato_files = files, []
+    # Role split: vibrato-marked files feed ONLY the vibrato analysis (they
+    # may even come from a different source than the spectral set); all
+    # other files feed the spectral/envelope/attack analyses.  When there
+    # are no vibrato-marked files, vibrato is measured on the ordinary
+    # notes (arco strings, vocal — vibrato is part of normal production).
+    vib = [f for f in files if is_vib_name(f)]
+    spectral_files = [f for f in files if f not in vib] or files
+    vibrato_files = vib
 
     def run(file_list):
         result = []

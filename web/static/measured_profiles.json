@@ -1,0 +1,3380 @@
+{
+ "cello": {
+  "partials": [
+   {
+    "amp": 0.78826,
+    "spread": 0.8
+   },
+   {
+    "amp": 1.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.47873,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.27118,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.40954,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.19522,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.17546,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.08452,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.07681,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.03996,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.03239,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.02017,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0179,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.01268,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00719,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00675,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00636,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00666,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00407,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00331,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00264,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00265,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00256,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.002,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00192,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00112,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00121,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00154,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00113,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00142,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0018,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00112,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00151,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00105,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00078,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00113,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00108,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0007,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00071,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00062,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00079,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00086,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00066,
+    "spread": 0.512
+   },
+   {
+    "amp": 0.00085,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00106,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00056,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00049,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00076,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00049,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00133,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00098,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00066,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00063,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00073,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00079,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00055,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00051,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00087,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00062,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00053,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   }
+  ],
+  "partialB": 0.0,
+  "partialBByNote": [
+   {
+    "note": "C4",
+    "f0": 260.81,
+    "B": 2.4e-07
+   },
+   {
+    "note": "C#4",
+    "f0": 277.18,
+    "B": 1.4e-06
+   },
+   {
+    "note": "D4",
+    "f0": 292.72,
+    "B": 2.07e-06
+   },
+   {
+    "note": "D#4",
+    "f0": 317.64,
+    "B": 4.2e-07
+   },
+   {
+    "note": "E4",
+    "f0": 331.24,
+    "B": 1.8e-07
+   },
+   {
+    "note": "F4",
+    "f0": 349.06,
+    "B": 0.0
+   },
+   {
+    "note": "F#4",
+    "f0": 366.29,
+    "B": 0.0
+   },
+   {
+    "note": "G4",
+    "f0": 386.07,
+    "B": 0.0
+   },
+   {
+    "note": "G#4",
+    "f0": 404.72,
+    "B": 0.0
+   },
+   {
+    "note": "G#4",
+    "f0": 423.74,
+    "B": 0.0
+   },
+   {
+    "note": "A4",
+    "f0": 445.86,
+    "B": 0.0
+   },
+   {
+    "note": "A#4",
+    "f0": 467.58,
+    "B": 2.5e-07
+   },
+   {
+    "note": "D3",
+    "f0": 146.71,
+    "B": 0.0
+   },
+   {
+    "note": "D#3",
+    "f0": 153.46,
+    "B": 1.9e-07
+   },
+   {
+    "note": "E3",
+    "f0": 161.87,
+    "B": 4.9e-07
+   },
+   {
+    "note": "E3",
+    "f0": 169.28,
+    "B": 0.0
+   },
+   {
+    "note": "F3",
+    "f0": 178.25,
+    "B": 0.0
+   },
+   {
+    "note": "F#3",
+    "f0": 188.34,
+    "B": 9e-08
+   },
+   {
+    "note": "G#3",
+    "f0": 203.78,
+    "B": 0.0
+   },
+   {
+    "note": "A3",
+    "f0": 219.83,
+    "B": 0.0
+   },
+   {
+    "note": "A#3",
+    "f0": 232.96,
+    "B": 0.0
+   },
+   {
+    "note": "B3",
+    "f0": 246.8,
+    "B": 5e-08
+   }
+  ],
+  "tailSlopeDbPerOct": -14.0,
+  "material": {
+   "t60Ref": 0.7342,
+   "slope": 0.3301,
+   "suggestedMaterial": 0.49,
+   "nPoints": 523,
+   "basis": "release tails (player-damped: lower bound on free T60)",
+   "freqRangeHz": [
+    146.70550371393628,
+    13552.739809950714
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.5039,
+   "envelopeAttackSd": 0.0403,
+   "envelopeDecay": 0.0998,
+   "envelopeSustain": 0.8534,
+   "envelopeRelease": 0.3392,
+   "vibratoProb": 1.0,
+   "vibratoRate": 5.275,
+   "vibratoRateSd": 0.094,
+   "vibratoDepth": 10.834,
+   "vibratoDepthSd": 7.13,
+   "nNotes": 8,
+   "vibratoBasis": "designated vibrato takes (prob conditional)",
+   "attackNoise": {
+    "level": 0.4,
+    "freq": 1557.0,
+    "q": 0.97,
+    "decay": 0.169,
+    "measuredBandwidthHz": 637.0,
+    "measuredLevelRatio": 0.04
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "125": 139.7,
+    "250": 379.1,
+    "500": 372.9,
+    "1000": 370.4,
+    "2000": 362.9,
+    "4000": 326.8,
+    "8000": 178.3
+   },
+   "lowToHighStaggerMs": -6.9
+  },
+  "notesAnalysed": [
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "C4",
+    "f0": 260.81,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "C#4",
+    "f0": 277.18,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "D4",
+    "f0": 292.72,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "D#4",
+    "f0": 317.64,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "E4",
+    "f0": 331.24,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "F4",
+    "f0": 349.06,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "F#4",
+    "f0": 366.29,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "G4",
+    "f0": 386.07,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "G#4",
+    "f0": 404.72,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "G#4",
+    "f0": 423.74,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "A4",
+    "f0": 445.86,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "note": "A#4",
+    "f0": 467.58,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "D3",
+    "f0": 146.71,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "D#3",
+    "f0": 153.46,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "E3",
+    "f0": 161.87,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "E3",
+    "f0": 169.28,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "F3",
+    "f0": 178.25,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "F#3",
+    "f0": 188.34,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "G#3",
+    "f0": 203.78,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "A3",
+    "f0": 219.83,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "A#3",
+    "f0": 232.96,
+    "percussive": false
+   },
+   {
+    "file": "Cello.arco.mf.sulD.D3B3.aiff",
+    "note": "B3",
+    "f0": 246.8,
+    "percussive": false
+   }
+  ],
+  "provenance": {
+   "source": "University of Iowa EMS Musical Instrument Samples (MIS) \u2014 spectral/envelope/attack; Philharmonia Orchestra sound samples (philharmonia.co.uk) \u2014 vibrato statistics only (Iowa pre-2012 cello arco is played senza/minimal vibrato; Philharmonia arco-normal is con vibrato)",
+   "licence": "Iowa MIS: free and unrestricted use. Philharmonia: free to use in your own projects (philharmonia.co.uk sound-samples licence)",
+   "dynamic": "mf (Iowa); mf/f (Philharmonia vibrato notes)",
+   "recording": "Iowa: anechoic chamber, Neumann KM 84; Philharmonia: studio, mp3",
+   "files": [
+    "Cello.arco.mf.sulD.C4Bb4.aiff",
+    "Cello.arco.mf.sulD.D3B3.aiff",
+    "cello_A3_15_forte_arco-normal.vib.mp3",
+    "cello_A3_15_mezzo-piano_arco-normal.vib.mp3",
+    "cello_B3_15_forte_arco-normal.vib.mp3",
+    "cello_B3_15_mezzo-piano_arco-normal.vib.mp3",
+    "cello_C3_15_forte_arco-normal.vib.mp3",
+    "cello_D3_15_forte_arco-normal.vib.mp3",
+    "cello_G3_15_forte_arco-normal.vib.mp3",
+    "cello_G3_15_mezzo-piano_arco-normal.vib.mp3"
+   ]
+  }
+ },
+ "clarinet": {
+  "partials": [
+   {
+    "amp": 1.0,
+    "spread": 0.08
+   },
+   {
+    "amp": 0.02452,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.58473,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.06184,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.08965,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0359,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.02073,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00846,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00533,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00496,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00332,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00259,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00194,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00329,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00131,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00181,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0012,
+    "spread": 0.26
+   },
+   {
+    "amp": 0.00115,
+    "spread": 0.728
+   },
+   {
+    "amp": 0.00101,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00177,
+    "spread": 0.768
+   },
+   {
+    "amp": 0.00179,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00083,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0008,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00056,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00117,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00074,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   }
+  ],
+  "partialB": 4e-08,
+  "partialBByNote": [
+   {
+    "note": "C4",
+    "f0": 260.92,
+    "B": 8e-08
+   },
+   {
+    "note": "C#4",
+    "f0": 275.32,
+    "B": 0.0
+   },
+   {
+    "note": "D4",
+    "f0": 291.69,
+    "B": 0.0
+   },
+   {
+    "note": "D#4",
+    "f0": 309.63,
+    "B": 0.0
+   },
+   {
+    "note": "E4",
+    "f0": 329.63,
+    "B": 2.1e-07
+   },
+   {
+    "note": "F4",
+    "f0": 347.32,
+    "B": 3.6e-07
+   },
+   {
+    "note": "F#4",
+    "f0": 367.43,
+    "B": 0.0
+   },
+   {
+    "note": "G4",
+    "f0": 391.13,
+    "B": 7.1e-07
+   },
+   {
+    "note": "G#4",
+    "f0": 412.67,
+    "B": 1.844e-05
+   },
+   {
+    "note": "A4",
+    "f0": 440.12,
+    "B": 1e-07
+   },
+   {
+    "note": "A#4",
+    "f0": 464.75,
+    "B": 0.0
+   },
+   {
+    "note": "B4",
+    "f0": 493.48,
+    "B": 0.0
+   }
+  ],
+  "tailSlopeDbPerOct": -10.9,
+  "material": {
+   "t60Ref": 0.1001,
+   "slope": -0.5423,
+   "suggestedMaterial": 0.39,
+   "nPoints": 54,
+   "basis": "release tails (player-damped: lower bound on free T60)",
+   "freqRangeHz": [
+    260.91892212135895,
+    6125.420712586371
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.1048,
+   "envelopeAttackSd": 0.0623,
+   "envelopeDecay": 0.0,
+   "envelopeSustain": 0.9626,
+   "envelopeRelease": 0.0948,
+   "vibratoProb": 0.0,
+   "vibratoRate": null,
+   "vibratoRateSd": null,
+   "vibratoDepth": null,
+   "vibratoDepthSd": null,
+   "nNotes": 12,
+   "vibratoBasis": "ordinary notes",
+   "attackNoise": {
+    "level": 0.05,
+    "freq": 2520.0,
+    "q": 1.35,
+    "decay": 0.148,
+    "measuredBandwidthHz": 817.0,
+    "measuredLevelRatio": 0.004
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "125": 82.3,
+    "250": 97.3,
+    "500": 111.0,
+    "1000": 124.7,
+    "2000": 144.7,
+    "4000": 175.9,
+    "8000": 158.4
+   },
+   "lowToHighStaggerMs": 77.3
+  },
+  "notesAnalysed": [
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "C4",
+    "f0": 260.92,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "C#4",
+    "f0": 275.32,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "D4",
+    "f0": 291.69,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "D#4",
+    "f0": 309.63,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "E4",
+    "f0": 329.63,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "F4",
+    "f0": 347.32,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "F#4",
+    "f0": 367.43,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "G4",
+    "f0": 391.13,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "G#4",
+    "f0": 412.67,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "A4",
+    "f0": 440.12,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "A#4",
+    "f0": 464.75,
+    "percussive": false
+   },
+   {
+    "file": "BbClar.mf.C4B4.aiff",
+    "note": "B4",
+    "f0": 493.48,
+    "percussive": false
+   }
+  ],
+  "provenance": {
+   "source": "University of Iowa Electronic Music Studios \u2014 Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
+   "licence": "Free and unrestricted use (as stated on the MIS website)",
+   "dynamic": "mf",
+   "recording": "anechoic chamber, Neumann KM 84 microphones (per MIS documentation)",
+   "files": [
+    "BbClar.mf.C4B4.aiff"
+   ]
+  }
+ },
+ "flute": {
+  "partials": [
+   {
+    "amp": 0.85827,
+    "spread": 0.316
+   },
+   {
+    "amp": 1.0,
+    "spread": 0.178
+   },
+   {
+    "amp": 0.6148,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.15419,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.1114,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.1565,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.02617,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.02334,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.02184,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00753,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00687,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0074,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00397,
+    "spread": 0.43
+   },
+   {
+    "amp": 0.0033,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0018,
+    "spread": 0.577
+   },
+   {
+    "amp": 0.00224,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00205,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00139,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00289,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00199,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00148,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00133,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00146,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   }
+  ],
+  "partialB": 0.0,
+  "partialBByNote": [
+   {
+    "note": "B3",
+    "f0": 247.66,
+    "B": 1.068e-05
+   },
+   {
+    "note": "C4",
+    "f0": 260.06,
+    "B": 0.0
+   },
+   {
+    "note": "C#4",
+    "f0": 275.17,
+    "B": 0.0
+   },
+   {
+    "note": "D4",
+    "f0": 292.24,
+    "B": 4.74e-06
+   },
+   {
+    "note": "D#4",
+    "f0": 310.63,
+    "B": 0.0
+   },
+   {
+    "note": "E4",
+    "f0": 329.42,
+    "B": 0.0
+   },
+   {
+    "note": "F4",
+    "f0": 348.81,
+    "B": 0.0
+   },
+   {
+    "note": "F#4",
+    "f0": 372.0,
+    "B": 0.0
+   },
+   {
+    "note": "G4",
+    "f0": 393.54,
+    "B": 0.0
+   },
+   {
+    "note": "G#4",
+    "f0": 414.23,
+    "B": 6.297e-05
+   },
+   {
+    "note": "A4",
+    "f0": 442.08,
+    "B": 3.64e-06
+   },
+   {
+    "note": "A#4",
+    "f0": 469.05,
+    "B": 0.0
+   },
+   {
+    "note": "B4",
+    "f0": 496.9,
+    "B": 2.47e-06
+   }
+  ],
+  "tailSlopeDbPerOct": -13.3,
+  "material": {
+   "t60Ref": 0.1532,
+   "slope": -0.346,
+   "suggestedMaterial": 0.5,
+   "nPoints": 119,
+   "basis": "release tails (player-damped: lower bound on free T60)",
+   "freqRangeHz": [
+    247.6555822069355,
+    11436.115891731124
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.3243,
+   "envelopeAttackSd": 0.0804,
+   "envelopeDecay": 0.0,
+   "envelopeSustain": 0.9498,
+   "envelopeRelease": 0.1197,
+   "vibratoProb": 1.0,
+   "vibratoRate": 4.701,
+   "vibratoRateSd": 0.152,
+   "vibratoDepth": 13.479,
+   "vibratoDepthSd": 5.218,
+   "nNotes": 13,
+   "vibratoBasis": "designated vibrato takes (prob conditional)",
+   "attackNoise": {
+    "level": 0.101,
+    "freq": 2566.0,
+    "q": 1.21,
+    "decay": 0.145,
+    "measuredBandwidthHz": 892.0,
+    "measuredLevelRatio": 0.01
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "125": 109.8,
+    "250": 132.2,
+    "500": 239.5,
+    "1000": 261.9,
+    "2000": 212.0,
+    "4000": 79.8,
+    "8000": 259.4
+   },
+   "lowToHighStaggerMs": 48.6
+  },
+  "notesAnalysed": [
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "B3",
+    "f0": 247.66,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "C4",
+    "f0": 260.06,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "C#4",
+    "f0": 275.17,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "D4",
+    "f0": 292.24,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "D#4",
+    "f0": 310.63,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "E4",
+    "f0": 329.42,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "F4",
+    "f0": 348.81,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "F#4",
+    "f0": 372.0,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "G4",
+    "f0": 393.54,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "G#4",
+    "f0": 414.23,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "A4",
+    "f0": 442.08,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "A#4",
+    "f0": 469.05,
+    "percussive": false
+   },
+   {
+    "file": "Flute.nonvib.mf.B3B4.aiff",
+    "note": "B4",
+    "f0": 496.9,
+    "percussive": false
+   }
+  ],
+  "provenance": {
+   "source": "University of Iowa Electronic Music Studios \u2014 Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
+   "licence": "Free and unrestricted use (as stated on the MIS website)",
+   "dynamic": "mf",
+   "recording": "anechoic chamber, Neumann KM 84 microphones (per MIS documentation)",
+   "files": [
+    "Flute.nonvib.mf.B3B4.aiff",
+    "Flute.vib.mf.B3B4.aiff"
+   ]
+  }
+ },
+ "piano": {
+  "partials": [
+   {
+    "amp": 1.0,
+    "spread": 0.29
+   },
+   {
+    "amp": 0.46632,
+    "spread": 0.33
+   },
+   {
+    "amp": 0.20081,
+    "spread": 0.33
+   },
+   {
+    "amp": 0.08192,
+    "spread": 0.37
+   },
+   {
+    "amp": 0.05215,
+    "spread": 0.37
+   },
+   {
+    "amp": 0.10814,
+    "spread": 0.41
+   },
+   {
+    "amp": 0.08198,
+    "spread": 0.41
+   },
+   {
+    "amp": 0.01236,
+    "spread": 0.45
+   },
+   {
+    "amp": 0.00452,
+    "spread": 0.45
+   },
+   {
+    "amp": 0.0023,
+    "spread": 0.49
+   },
+   {
+    "amp": 0.00431,
+    "spread": 0.49
+   },
+   {
+    "amp": 0.00143,
+    "spread": 0.53
+   },
+   {
+    "amp": 0.00097,
+    "spread": 0.53
+   },
+   {
+    "amp": 0.00067,
+    "spread": 0.57
+   },
+   {
+    "amp": 0.00035,
+    "spread": 0.57
+   },
+   {
+    "amp": 0.00044,
+    "spread": 0.61
+   },
+   {
+    "amp": 0.00016,
+    "spread": 0.61
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.65
+   },
+   {
+    "amp": 0.00038,
+    "spread": 0.65
+   },
+   {
+    "amp": 0.00023,
+    "spread": 0.69
+   },
+   {
+    "amp": 0.00022,
+    "spread": 0.69
+   },
+   {
+    "amp": 0.00043,
+    "spread": 0.73
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.73
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.77
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.77
+   },
+   {
+    "amp": 0.00027,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00018,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00029,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   }
+  ],
+  "partialB": 0.00035995,
+  "partialBByNote": [
+   {
+    "note": "A4",
+    "f0": 441.54,
+    "B": 0.00073339
+   },
+   {
+    "note": "B3",
+    "f0": 248.19,
+    "B": 0.00033152
+   },
+   {
+    "note": "C2",
+    "f0": 65.84,
+    "B": 0.00014257
+   },
+   {
+    "note": "C4",
+    "f0": 262.39,
+    "B": 0.00035995
+   }
+  ],
+  "tailSlopeDbPerOct": -17.4,
+  "material": {
+   "t60Ref": 12.2511,
+   "slope": 0.4111,
+   "suggestedMaterial": 0.0,
+   "nPoints": 69,
+   "basis": "struck free decay",
+   "freqRangeHz": [
+    65.83717055911144,
+    3612.9406742656033
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.016,
+   "envelopeAttackSd": 0.0079,
+   "envelopeDecay": 0.9977,
+   "envelopeSustain": 0.0852,
+   "envelopeRelease": 9.7129,
+   "vibratoProb": 0.0,
+   "vibratoRate": null,
+   "vibratoRateSd": null,
+   "vibratoDepth": null,
+   "vibratoDepthSd": null,
+   "attackNoise": {
+    "level": 0.6,
+    "freq": 525.0,
+    "q": 0.86,
+    "decay": 0.25,
+    "measuredBandwidthHz": 323.0,
+    "measuredLevelRatio": 1.183
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "125": 39.9,
+    "250": 41.2,
+    "500": 67.3,
+    "1000": 31.2,
+    "2000": 29.9,
+    "4000": 28.7
+   },
+   "lowToHighStaggerMs": -11.2
+  },
+  "notesAnalysed": [
+   {
+    "file": "Piano.mf.A4.aiff",
+    "note": "A4",
+    "f0": 441.54,
+    "percussive": true
+   },
+   {
+    "file": "Piano.mf.B3.aiff",
+    "note": "B3",
+    "f0": 248.19,
+    "percussive": true
+   },
+   {
+    "file": "Piano.mf.C2.aiff",
+    "note": "C2",
+    "f0": 65.84,
+    "percussive": true
+   },
+   {
+    "file": "Piano.mf.C4.aiff",
+    "note": "C4",
+    "f0": 262.39,
+    "percussive": true
+   }
+  ],
+  "provenance": {
+   "source": "University of Iowa Electronic Music Studios \u2014 Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
+   "licence": "Free and unrestricted use (as stated on the MIS website)",
+   "dynamic": "mf",
+   "recording": "anechoic chamber, Neumann KM 84 microphones (per MIS documentation)",
+   "files": [
+    "Piano.mf.A4.aiff",
+    "Piano.mf.B3.aiff",
+    "Piano.mf.C2.aiff",
+    "Piano.mf.C4.aiff"
+   ]
+  }
+ },
+ "trombone": {
+  "partials": [
+   {
+    "amp": 0.69931,
+    "spread": 0.263
+   },
+   {
+    "amp": 0.99248,
+    "spread": 0.232
+   },
+   {
+    "amp": 1.0,
+    "spread": 0.266
+   },
+   {
+    "amp": 0.81721,
+    "spread": 0.334
+   },
+   {
+    "amp": 0.57368,
+    "spread": 0.379
+   },
+   {
+    "amp": 0.44268,
+    "spread": 0.399
+   },
+   {
+    "amp": 0.2829,
+    "spread": 0.418
+   },
+   {
+    "amp": 0.19601,
+    "spread": 0.452
+   },
+   {
+    "amp": 0.14205,
+    "spread": 0.423
+   },
+   {
+    "amp": 0.10088,
+    "spread": 0.564
+   },
+   {
+    "amp": 0.06956,
+    "spread": 0.439
+   },
+   {
+    "amp": 0.05077,
+    "spread": 0.456
+   },
+   {
+    "amp": 0.03729,
+    "spread": 0.502
+   },
+   {
+    "amp": 0.02628,
+    "spread": 0.713
+   },
+   {
+    "amp": 0.01843,
+    "spread": 0.592
+   },
+   {
+    "amp": 0.01222,
+    "spread": 0.627
+   },
+   {
+    "amp": 0.00857,
+    "spread": 0.561
+   },
+   {
+    "amp": 0.00629,
+    "spread": 0.7
+   },
+   {
+    "amp": 0.00563,
+    "spread": 0.661
+   },
+   {
+    "amp": 0.00465,
+    "spread": 0.731
+   },
+   {
+    "amp": 0.00288,
+    "spread": 0.79
+   },
+   {
+    "amp": 0.00358,
+    "spread": 0.777
+   },
+   {
+    "amp": 0.00284,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00212,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00162,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00094,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00089,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00073,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0007,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00058,
+    "spread": 0.799
+   },
+   {
+    "amp": 0.00035,
+    "spread": 0.667
+   },
+   {
+    "amp": 0.00032,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00033,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0003,
+    "spread": 0.693
+   },
+   {
+    "amp": 0.0002,
+    "spread": 0.599
+   },
+   {
+    "amp": 0.00016,
+    "spread": 0.759
+   },
+   {
+    "amp": 0.00027,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00026,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00023,
+    "spread": 0.744
+   },
+   {
+    "amp": 0.00015,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00017,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00016,
+    "spread": 0.723
+   },
+   {
+    "amp": 0.00015,
+    "spread": 0.705
+   },
+   {
+    "amp": 0.00012,
+    "spread": 0.281
+   },
+   {
+    "amp": 0.00013,
+    "spread": 0.745
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.321
+   },
+   {
+    "amp": 0.0001,
+    "spread": 0.785
+   },
+   {
+    "amp": 9e-05,
+    "spread": 0.361
+   },
+   {
+    "amp": 0.00029,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0001,
+    "spread": 0.401
+   },
+   {
+    "amp": 9e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 9e-05,
+    "spread": 0.441
+   },
+   {
+    "amp": 7e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.481
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 9e-05,
+    "spread": 0.521
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.561
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.601
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.641
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.681
+   }
+  ],
+  "partialB": 8e-08,
+  "partialBByNote": [
+   {
+    "note": "C3",
+    "f0": 131.1,
+    "B": 1e-07
+   },
+   {
+    "note": "C#3",
+    "f0": 138.5,
+    "B": 3.85e-06
+   },
+   {
+    "note": "D3",
+    "f0": 146.97,
+    "B": 0.0
+   },
+   {
+    "note": "D#3",
+    "f0": 155.78,
+    "B": 0.0
+   },
+   {
+    "note": "E3",
+    "f0": 164.52,
+    "B": 0.0
+   },
+   {
+    "note": "F3",
+    "f0": 174.89,
+    "B": 0.0
+   },
+   {
+    "note": "F#3",
+    "f0": 183.92,
+    "B": 0.0
+   },
+   {
+    "note": "G3",
+    "f0": 196.73,
+    "B": 2.6e-07
+   },
+   {
+    "note": "G#3",
+    "f0": 207.74,
+    "B": 8e-08
+   },
+   {
+    "note": "A3",
+    "f0": 219.32,
+    "B": 4.4e-07
+   },
+   {
+    "note": "A#3",
+    "f0": 233.76,
+    "B": 1.09e-06
+   },
+   {
+    "note": "B3",
+    "f0": 246.82,
+    "B": 7.4e-07
+   },
+   {
+    "note": "C4",
+    "f0": 262.4,
+    "B": 7e-08
+   },
+   {
+    "note": "C#4",
+    "f0": 278.07,
+    "B": 0.0
+   },
+   {
+    "note": "D4",
+    "f0": 295.62,
+    "B": 0.0
+   },
+   {
+    "note": "D#4",
+    "f0": 310.9,
+    "B": 6.7e-07
+   },
+   {
+    "note": "E4",
+    "f0": 329.49,
+    "B": 6.1e-07
+   },
+   {
+    "note": "F4",
+    "f0": 350.47,
+    "B": 1.23e-06
+   },
+   {
+    "note": "F#4",
+    "f0": 371.29,
+    "B": 0.0
+   },
+   {
+    "note": "G4",
+    "f0": 396.66,
+    "B": 2.7e-07
+   },
+   {
+    "note": "G#4",
+    "f0": 417.74,
+    "B": 0.0
+   },
+   {
+    "note": "A4",
+    "f0": 443.13,
+    "B": 0.0
+   },
+   {
+    "note": "A#4",
+    "f0": 470.18,
+    "B": 0.0
+   },
+   {
+    "note": "B4",
+    "f0": 499.46,
+    "B": 1.2e-07
+   }
+  ],
+  "tailSlopeDbPerOct": -26.3,
+  "material": {
+   "t60Ref": 0.1398,
+   "slope": -0.5984,
+   "suggestedMaterial": 0.35,
+   "nPoints": 581,
+   "basis": "release tails (player-damped: lower bound on free T60)",
+   "freqRangeHz": [
+    131.09607016699394,
+    13186.240670672305
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.3218,
+   "envelopeAttackSd": 0.0516,
+   "envelopeDecay": 0.0,
+   "envelopeSustain": 0.9386,
+   "envelopeRelease": 0.3143,
+   "vibratoProb": 0.0,
+   "vibratoRate": null,
+   "vibratoRateSd": null,
+   "vibratoDepth": null,
+   "vibratoDepthSd": null,
+   "nNotes": 24,
+   "vibratoBasis": "ordinary notes",
+   "attackNoise": {
+    "level": 0.173,
+    "freq": 653.0,
+    "q": 1.26,
+    "decay": 0.19,
+    "measuredBandwidthHz": 207.0,
+    "measuredLevelRatio": 0.017
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "125": 229.5,
+    "250": 251.9,
+    "500": 263.2,
+    "1000": 304.3,
+    "2000": 334.2,
+    "4000": 340.5,
+    "8000": 184.6
+   },
+   "lowToHighStaggerMs": 21.8
+  },
+  "notesAnalysed": [
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "C3",
+    "f0": 131.1,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "C#3",
+    "f0": 138.5,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "D3",
+    "f0": 146.97,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "D#3",
+    "f0": 155.78,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "E3",
+    "f0": 164.52,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "F3",
+    "f0": 174.89,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "F#3",
+    "f0": 183.92,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "G3",
+    "f0": 196.73,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "G#3",
+    "f0": 207.74,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "A3",
+    "f0": 219.32,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "A#3",
+    "f0": 233.76,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C3B3.aiff",
+    "note": "B3",
+    "f0": 246.82,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "C4",
+    "f0": 262.4,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "C#4",
+    "f0": 278.07,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "D4",
+    "f0": 295.62,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "D#4",
+    "f0": 310.9,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "E4",
+    "f0": 329.49,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "F4",
+    "f0": 350.47,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "F#4",
+    "f0": 371.29,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "G4",
+    "f0": 396.66,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "G#4",
+    "f0": 417.74,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "A4",
+    "f0": 443.13,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "A#4",
+    "f0": 470.18,
+    "percussive": false
+   },
+   {
+    "file": "TenorTrombone.mf.C4B4.aiff",
+    "note": "B4",
+    "f0": 499.46,
+    "percussive": false
+   }
+  ],
+  "provenance": {
+   "source": "University of Iowa Electronic Music Studios \u2014 Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
+   "licence": "Free and unrestricted use (as stated on the MIS website)",
+   "dynamic": "mf",
+   "recording": "anechoic chamber, Neumann KM 84 microphones (per MIS documentation)",
+   "files": [
+    "TenorTrombone.mf.C3B3.aiff",
+    "TenorTrombone.mf.C4B4.aiff"
+   ]
+  }
+ },
+ "trumpet": {
+  "partials": [
+   {
+    "amp": 0.27661,
+    "spread": 0.341
+   },
+   {
+    "amp": 0.50653,
+    "spread": 0.181
+   },
+   {
+    "amp": 1.0,
+    "spread": 0.245
+   },
+   {
+    "amp": 0.87181,
+    "spread": 0.218
+   },
+   {
+    "amp": 0.5676,
+    "spread": 0.377
+   },
+   {
+    "amp": 0.38752,
+    "spread": 0.37
+   },
+   {
+    "amp": 0.22085,
+    "spread": 0.336
+   },
+   {
+    "amp": 0.11529,
+    "spread": 0.32
+   },
+   {
+    "amp": 0.0735,
+    "spread": 0.308
+   },
+   {
+    "amp": 0.04598,
+    "spread": 0.413
+   },
+   {
+    "amp": 0.02972,
+    "spread": 0.427
+   },
+   {
+    "amp": 0.0201,
+    "spread": 0.509
+   },
+   {
+    "amp": 0.01072,
+    "spread": 0.526
+   },
+   {
+    "amp": 0.00684,
+    "spread": 0.531
+   },
+   {
+    "amp": 0.00497,
+    "spread": 0.775
+   },
+   {
+    "amp": 0.00427,
+    "spread": 0.653
+   },
+   {
+    "amp": 0.00354,
+    "spread": 0.617
+   },
+   {
+    "amp": 0.00236,
+    "spread": 0.681
+   },
+   {
+    "amp": 0.00169,
+    "spread": 0.714
+   },
+   {
+    "amp": 0.00151,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00094,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00042,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00035,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00022,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00022,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00014,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00012,
+    "spread": 0.8
+   },
+   {
+    "amp": 9e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 7e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 9e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 8e-05,
+    "spread": 0.76
+   },
+   {
+    "amp": 7e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 7e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00011,
+    "spread": 0.8
+   },
+   {
+    "amp": 5e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 6e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 8e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 7e-05,
+    "spread": 0.178
+   },
+   {
+    "amp": 6e-05,
+    "spread": 0.591
+   },
+   {
+    "amp": 5e-05,
+    "spread": 0.662
+   },
+   {
+    "amp": 5e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 6e-05,
+    "spread": 0.381
+   },
+   {
+    "amp": 4e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 6e-05,
+    "spread": 0.421
+   },
+   {
+    "amp": 5e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 5e-05,
+    "spread": 0.461
+   },
+   {
+    "amp": 4e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 5e-05,
+    "spread": 0.501
+   },
+   {
+    "amp": 5e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 4e-05,
+    "spread": 0.541
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 4e-05,
+    "spread": 0.581
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 4e-05,
+    "spread": 0.621
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.661
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.701
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.741
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.781
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   }
+  ],
+  "partialB": 4e-08,
+  "partialBByNote": [
+   {
+    "note": "C4",
+    "f0": 260.34,
+    "B": 5.1e-07
+   },
+   {
+    "note": "C#4",
+    "f0": 274.53,
+    "B": 1.4e-07
+   },
+   {
+    "note": "D4",
+    "f0": 293.0,
+    "B": 3.5e-07
+   },
+   {
+    "note": "D#4",
+    "f0": 308.15,
+    "B": 5e-08
+   },
+   {
+    "note": "E4",
+    "f0": 328.01,
+    "B": 0.0
+   },
+   {
+    "note": "F4",
+    "f0": 345.15,
+    "B": 3.7e-07
+   },
+   {
+    "note": "F#4",
+    "f0": 367.48,
+    "B": 0.0
+   },
+   {
+    "note": "G4",
+    "f0": 389.97,
+    "B": 0.0
+   },
+   {
+    "note": "G#4",
+    "f0": 412.06,
+    "B": 5e-08
+   },
+   {
+    "note": "A4",
+    "f0": 437.45,
+    "B": 0.0
+   },
+   {
+    "note": "A#4",
+    "f0": 463.85,
+    "B": 0.0
+   },
+   {
+    "note": "B4",
+    "f0": 492.94,
+    "B": 3e-08
+   }
+  ],
+  "tailSlopeDbPerOct": -25.5,
+  "material": {
+   "t60Ref": 0.1119,
+   "slope": -0.5314,
+   "suggestedMaterial": 0.31,
+   "nPoints": 196,
+   "basis": "release tails (player-damped: lower bound on free T60)",
+   "freqRangeHz": [
+    2343.104672052578,
+    12248.473663707015
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.2045,
+   "envelopeAttackSd": 0.0503,
+   "envelopeDecay": 0.0,
+   "envelopeSustain": 0.9303,
+   "envelopeRelease": 0.1796,
+   "vibratoProb": 1.0,
+   "vibratoRate": 4.853,
+   "vibratoRateSd": 0.098,
+   "vibratoDepth": 6.655,
+   "vibratoDepthSd": 1.297,
+   "nNotes": 12,
+   "vibratoBasis": "designated vibrato takes (prob conditional)",
+   "attackNoise": {
+    "level": 0.6,
+    "freq": 1419.0,
+    "q": 1.76,
+    "decay": 0.102,
+    "measuredBandwidthHz": 348.0,
+    "measuredLevelRatio": 0.124
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "250": 112.2,
+    "500": 122.2,
+    "1000": 175.9,
+    "2000": 234.5,
+    "4000": 279.4,
+    "8000": 299.3
+   },
+   "lowToHighStaggerMs": 172.1
+  },
+  "notesAnalysed": [
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "C4",
+    "f0": 260.34,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "C#4",
+    "f0": 274.53,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "D4",
+    "f0": 293.0,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "D#4",
+    "f0": 308.15,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "E4",
+    "f0": 328.01,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "F4",
+    "f0": 345.15,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "F#4",
+    "f0": 367.48,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "G4",
+    "f0": 389.97,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "G#4",
+    "f0": 412.06,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "A4",
+    "f0": 437.45,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "A#4",
+    "f0": 463.85,
+    "percussive": false
+   },
+   {
+    "file": "Trumpet.novib.mf.C4B4.aiff",
+    "note": "B4",
+    "f0": 492.94,
+    "percussive": false
+   }
+  ],
+  "provenance": {
+   "source": "University of Iowa Electronic Music Studios \u2014 Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
+   "licence": "Free and unrestricted use (as stated on the MIS website)",
+   "dynamic": "mf",
+   "recording": "anechoic chamber, Neumann KM 84 microphones (per MIS documentation)",
+   "files": [
+    "Trumpet.novib.mf.C4B4.aiff",
+    "Trumpet.vib.mf.C4B4.aiff"
+   ]
+  }
+ },
+ "violin": {
+  "partials": [
+   {
+    "amp": 1.0,
+    "spread": 0.539
+   },
+   {
+    "amp": 0.39428,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.1436,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.20271,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.10464,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.08075,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.04845,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.03294,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.04276,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.03391,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.01706,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.01804,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00942,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00607,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00473,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0027,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00347,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00242,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0016,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00141,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00207,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00163,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00114,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00113,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00056,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00076,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00124,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00137,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00089,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00053,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00077,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00065,
+    "spread": 0.665
+   },
+   {
+    "amp": 0.00059,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00063,
+    "spread": 0.705
+   },
+   {
+    "amp": 0.00117,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00081,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00048,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00067,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00067,
+    "spread": 0.749
+   },
+   {
+    "amp": 0.00053,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0009,
+    "spread": 0.789
+   },
+   {
+    "amp": 0.00033,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00034,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0002,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00058,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00042,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0003,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0,
+    "spread": 0.8
+   }
+  ],
+  "partialB": 0.0,
+  "partialBByNote": [
+   {
+    "note": "A4",
+    "f0": 438.06,
+    "B": 0.0
+   },
+   {
+    "note": "A#4",
+    "f0": 460.7,
+    "B": 0.0
+   },
+   {
+    "note": "B4",
+    "f0": 487.5,
+    "B": 0.0
+   },
+   {
+    "note": "B3",
+    "f0": 251.81,
+    "B": 6e-08
+   },
+   {
+    "note": "C4",
+    "f0": 263.95,
+    "B": 2.6e-07
+   },
+   {
+    "note": "C#4",
+    "f0": 284.2,
+    "B": 0.0
+   },
+   {
+    "note": "D4",
+    "f0": 291.61,
+    "B": 0.0
+   },
+   {
+    "note": "D#4",
+    "f0": 307.18,
+    "B": 9.3e-07
+   },
+   {
+    "note": "E4",
+    "f0": 328.33,
+    "B": 0.0
+   },
+   {
+    "note": "F4",
+    "f0": 348.61,
+    "B": 2e-08
+   },
+   {
+    "note": "G4",
+    "f0": 385.5,
+    "B": 0.0
+   },
+   {
+    "note": "G#4",
+    "f0": 406.5,
+    "B": 7.78e-06
+   },
+   {
+    "note": "A4",
+    "f0": 431.83,
+    "B": 3.2e-06
+   },
+   {
+    "note": "A#4",
+    "f0": 465.66,
+    "B": 1.56e-05
+   },
+   {
+    "note": "B4",
+    "f0": 505.23,
+    "B": 0.0
+   }
+  ],
+  "tailSlopeDbPerOct": -15.9,
+  "material": {
+   "t60Ref": 1.6221,
+   "slope": -0.0502,
+   "suggestedMaterial": 0.06,
+   "nPoints": 238,
+   "basis": "release tails (player-damped: lower bound on free T60)",
+   "freqRangeHz": [
+    291.61245483476563,
+    18037.6370978457
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.459,
+   "envelopeAttackSd": 0.1065,
+   "envelopeDecay": 0.0,
+   "envelopeSustain": 0.9728,
+   "envelopeRelease": 0.9578,
+   "vibratoProb": 1.0,
+   "vibratoRate": 5.739,
+   "vibratoRateSd": 0.136,
+   "vibratoDepth": 25.252,
+   "vibratoDepthSd": 4.053,
+   "nNotes": 4,
+   "vibratoBasis": "designated vibrato takes (prob conditional)",
+   "attackNoise": {
+    "level": 0.088,
+    "freq": 1000.0,
+    "q": 0.84,
+    "decay": 0.194,
+    "measuredBandwidthHz": 555.0,
+    "measuredLevelRatio": 0.009
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "125": 20.0,
+    "250": 232.0,
+    "500": 301.8,
+    "1000": 296.8,
+    "2000": 291.8,
+    "4000": 281.9,
+    "8000": 291.8
+   },
+   "lowToHighStaggerMs": 160.9
+  },
+  "notesAnalysed": [
+   {
+    "file": "Violin.arco.mf.sulA.A4B4.aiff",
+    "note": "A4",
+    "f0": 438.06,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulA.A4B4.aiff",
+    "note": "A#4",
+    "f0": 460.7,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulA.A4B4.aiff",
+    "note": "B4",
+    "f0": 487.5,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "B3",
+    "f0": 251.81,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "C4",
+    "f0": 263.95,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "C#4",
+    "f0": 284.2,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "D4",
+    "f0": 291.61,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "D#4",
+    "f0": 307.18,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "E4",
+    "f0": 328.33,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "F4",
+    "f0": 348.61,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "G4",
+    "f0": 385.5,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "G#4",
+    "f0": 406.5,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "A4",
+    "f0": 431.83,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "A#4",
+    "f0": 465.66,
+    "percussive": false
+   },
+   {
+    "file": "Violin.arco.mf.sulG.B3B4.aiff",
+    "note": "B4",
+    "f0": 505.23,
+    "percussive": false
+   }
+  ],
+  "provenance": {
+   "source": "University of Iowa EMS Musical Instrument Samples (MIS) \u2014 spectral/envelope/attack; Philharmonia Orchestra sound samples (philharmonia.co.uk) \u2014 vibrato statistics only (Iowa pre-2012 arco is played senza vibrato)",
+   "licence": "Iowa MIS: free and unrestricted use. Philharmonia: free to use in your own projects (philharmonia.co.uk sound-samples licence)",
+   "dynamic": "mf (Iowa); mf/f (Philharmonia vibrato notes)",
+   "recording": "Iowa: anechoic chamber, Neumann KM 84; Philharmonia: studio, mp3",
+   "files": [
+    "Violin.arco.mf.sulA.A4B4.aiff",
+    "Violin.arco.mf.sulG.B3B4.aiff",
+    "violin_As4_long_forte_molto-vibrato.mp3",
+    "violin_B4_long_mezzo-forte_molto-vibrato.mp3",
+    "violin_C5_long_mezzo-forte_molto-vibrato.mp3",
+    "violin_G4_long_mezzo-forte_molto-vibrato.mp3"
+   ]
+  }
+ }
+}
