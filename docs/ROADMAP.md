@@ -1,353 +1,241 @@
-# Improvement Roadmap (autonomous loop working document)
+# Roadmap — every recent feature request and the execution plan
 
-This file is the working state of the autonomous improvement loop. Each
-iteration picks the next unchecked task, implements it as a reviewable commit,
-and updates this file in the same commit. Priorities were set by the project
-owner on 2026-07-03.
+Single source of truth for what was asked, what's shipped, and how the
+rest gets built. Verbatim owner quotes:
+[OWNER_BRIEF_2026-07-07.md](OWNER_BRIEF_2026-07-07.md). Tone-model
+design detail: [TONE_MODEL_V2_DESIGN.md](TONE_MODEL_V2_DESIGN.md).
+Producer detail: [PRODUCER_V3_SPEC.md](PRODUCER_V3_SPEC.md).
+Updated 2026-07-07. Historical loop phases A–H are archived at the
+bottom of this file.
 
-## Loop state
+---
 
-- Updated: 2026-07-06 (commit 65c759d)
-- Phases A–F complete; producer rebuilt as v2 + full v2.1 usability
-  backlog (see Phase G / docs/PRODUCER_V2_DESIGN.md).
-- **Two owner gates open — nothing ships past them:**
-  1. Producer v2 Q4 re-audition (docs/PRODUCER_V2_DESIGN.md).
-  2. Tone model v2 plan sign-off T-Q4 (Phase H below); no tone engine
-     work until the plan/mockup is approved.
-- While gated: safe idle polish only. Recently landed: USER_MANUAL
-  refresh (b30933a), device-pixel distribution canvases (dada8d5),
-  first-visit welcome-card overlay fix (8607998), loading/feedback
-  states (f27da48), mixdown progress % + scheduling yields (65c759d).
-- Baseline commit: 2c4eec7
+## 1 · Ledger — requests and status
 
-## Audit summary (2026-07-03)
+### Shipped (commit · build)
 
-Full audits in the loop transcript; the load-bearing findings:
+| Request | Asked | Landed |
+|---|---|---|
+| Tone model v2: excitor→resonator→body→space, true-ratio transfer, bow imperfection replacing amplitude probability, 64 partials, character variables surfaced | 07-05 brief | T1–T8, 97+ physics assertions |
+| CHORDA sub-note UI ("hard move over to that design") | 07-06 | stage rail + inspectors + tone print + lens |
+| Space v1: distance/angle positioning, arrival delay, air absorption, proximity effect | 07-06 | space pad + headless laws |
+| Producer v3 overnight rebuild: undo/redo, loop range, seed chips, split/duplicate, drop preview, dbl-click create | 07-06 | blocks E/A/B1/D1 |
+| Roll batch: intended-vs-realised duration/onset ghosts, velocity pins behind a checkbox, ⇧ micro-drag off grid, grid/scale/key readout, drop-location preview, "incorporated" not "baked" for surprises | 07-06 | `9ac003a` v141 |
+| Formant/body rethink: articulation manipulates the SELECTED body; click each formant to see its EQ in the field; per-band more/less extreme; bodies as editable presets | 07-07 | `aaf2914` v143 |
+| Realistic presets from downloaded samples (measure-and-fit, no audio ships) | 07-06 | `b08b37b` + `9e6b913` v145 (7 instruments) |
+| P1 Arpeggiator: up/down over the same interval notes | 07-07 brief | `270b50b` v146 |
+| Surprise walk-only in arps + can't-turn-surprise-off bug | 07-07 | `151823a` v147 |
+| CH-B2 performance block: draggable ADSR, vibrato, onset-noise scaling in EXCITOR | tone audit | `fb76fbb` v148 |
+| P2 family starter patches: percussive / bass / atmos / melody + library family filters | 07-07 brief | `b17a63a` v149 |
+| P3 note connection: glide (mono) ↔ ring (multiphonic) where glide lives | 07-07 brief | `da5111b` v150 |
 
-- Ratings are logged with full parameters but **not** with the seed of the
-  audio actually heard, no per-play stimulus identity, no session id (only a
-  persistent participant uuid), no consent audit trail in explore mode.
-- Surprise machinery (`surpriseProb`, per-feature weights/distances,
-  `incorporationRate`, motif repertoire) drives generation only. **No
-  expectancy/information-rate/repetition metrics are computed or logged** —
-  the timeline built in synth.js (noteRole, isSurprise, motifIndex, devs) is
-  discarded after visualisation.
-- Presets are monolithic snapshots in localStorage (`phase0.presets.v3`);
-  global submissions go to `web/data/global_presets.json`. No per-section
-  (modular) presets. UI already has natural section boundaries: Sound Source,
-  Formant Voice, Colour, Fourier Print, Vibrato, Envelope, Scale & Root,
-  Macro Probability, Sequence & Surprise, Percussion, Space.
-- Sound: formant (saw → 3 bandpass), Fourier additive, simple modes; hard
-  brick-wall limiter only; oscillator start/stop without ramps (clicks),
-  short default release, no soft clip, no master EQ; spectral renorm can jump.
-- Server: dependency-light stdlib HTTP server; endpoints for study submit,
-  explore events, preset contribute/list, server render. Append-only JSONL
-  with **no locking**; open CORS; no rate limiting; PaaS-ready except
-  ephemeral-disk risk (needs `PHASE0_DATA_DIR` on a volume) and no export API.
-- No export tooling (JSONL → CSV), no CI, no lint config. Stimulus regen from
-  seed works server-side via preset hash + sidecars.
-- Frontend is a single 5.6k-line app.js with template-string rendering; a11y
-  basics present; canvases not responsive; no code splitting.
+### Queued — build order (Q1 first)
 
-## Phase A — Volunteer appeal-data study flow (priority 1)
+| # | Request | Source |
+|---|---|---|
+| Q1 | P4+P11 patch transparency in producer + macro/subnote module halves | brief + notes batch 2 |
+| Q2 | P5 remove standalone global reverb (room/cathedral type → Global Space only) | brief, owner-clarified |
+| Q3 | P6 baked-note drill-down (per-note glide, envelope, vibrato, tuning…) | brief |
+| Q4 | P7 binaural head model + space in front AND behind | brief |
+| Q5 | P8a global scale strip above the timeline | brief |
+| Q6 | P8b global space designer (cylinder + cross-section) | brief |
+| Q7 | CH-B5 layered subnote modules (coloured block strip) | audit + notes batch 2 |
+| Q8 | CH-B4 imperfections (pitch scoop, attack stagger, release ring, f0 wander) | tone audit |
+| Q9 | Producer remainders: roll parity, multi-select, track headers, onboarding | producer spec |
+| Q10 | P10 MIDI recording + the three N-EDO keyboard-mapping choices | notes batch 2 |
+| Q11 | P9 whole-app vocabulary audit | brief |
+| Q12 | CAPSTONE: browser QA screenshot sweep + adjustable/resizable panels | 07-07 morning |
 
-- [x] A1. Stimulus identity & provenance: every event now carries
-  `stimulus_id` (FNV-1a over canonical params + APP_VERSION), per-visit
-  `session_id`, `app_version`, `client_ts`, and `schema_version`
-  ("explore-event-1.0"); presets and contributions stamped too.
-- [x] A2. Rate-what-you-hear: committed rating changes log a "rate" event
-  with the stimulus_id, rating latency since play start, and play count.
-- [x] A3. Friendly opt-in flow: welcome card in explore view (plain language,
-  optional age band + musical training, "Play and share my ratings" vs "Just
-  play"), version-stamped consent event; **no events leave the browser unless
-  opted in**; footer note shows sharing status with a Change link.
-  Verified end-to-end in browser preview.
-- [x] A4. Parameter-change telemetry: slider/select/checkbox changes buffer
-  per control and flush as one "adjust" event ({from, to} per param) 3s
-  after the last tweak or before the next play/rate/save event.
-- [x] A5. Server hardening: flock-locked JSONL appends (verified by a
-  concurrent-post test), type validation on numeric/dict payload fields,
-  512KB body cap (pre-existing), per-IP sliding-window rate limiting
-  (PHASE0_RATE_LIMIT env, default 120 POSTs/min, 429 on excess),
-  schema_version on study records.
+### Requires owner decision (docs to write, no build)
 
-## Phase B — Expectation/surprise & repetition instrumentation (priority 2)
+- **Harmony instrument patches** — distinct from overlap-multiphonic and
+  from sub-note layering. Proposal to spec: a voicing layer on the
+  melody walk (chord degrees in scale-degree space, satellite voices per
+  generated note, composes with arp mode).
+- **Hosting / monetisation** — moat analysis + sharing-platform write-up.
 
-- [x] B1. Per-note surprisal: every sounded note gets -log2 p of its pitch
-  under the static melodic prior (interval shape × sub-scale × register ×
-  root pull, momentum excluded — documented approximation), plus dynamics
-  surprisal (branch + binned triangular density) and rest-branch surprisal.
-  Note: fixed-model surprisal means repertoire replays/motif-boundary leaps
-  can score high under a peaked prior — a property, not a bug (IDyOM-like).
-- [x] B2. Repetition metrics: repetition_ratio (replayed-note fraction),
-  pitch+duration bigram novelty ratio, motif pass counts/max reuse,
-  incorporated-variant count. (time-since-last-occurrence: deferred.)
-- [x] B3. Performance summary (metrics-1.0) from GenerationEngine
-  .getMetricsSummary(), attached to every explore event; rate events carry
-  the summary of everything heard up to the rating moment. Verified
-  headlessly in Node (deterministic per seed; responds correctly to
-  surpriseProb/sequenceProb manipulations) and live in browser.
-- [x] B4. Research machinery is invisible to lay users: metrics ride the
-  event payloads only; the welcome card + footer sharing note are the only
-  research-facing UI, in plain language.
-- [x] B4a. Formant space redesign (engine): vowels are landmarks in
-  continuous log-F1 × log-F2 space; accuracy misses and surprises displace
-  by random direction + magnitude, clamped to the vowel region (verified:
-  deviations from extreme "ee" cover all directions symmetrically). Legacy
-  step/distance params mapped to acoustic units; realised-vs-intended
-  distance logged per note and summarised as mean_formant_deviation_loghz.
-  Remaining: 2D vowel-pad UI (do with Phase F restyle).
+---
 
-## Phase C — Data export & regeneration (priority 3)
+## 2 · Execution plan
 
-- [x] C1. `synthesiser export` CLI → events.csv, ratings.csv, stimuli.csv,
-  study_trials.csv, presets.csv with param_/metric_/demo_ flattening,
-  schema-tolerant (skips torn lines; legacy records export cleanly).
-- [x] C2. `/api/export.csv?table=…&token=…` gated on PHASE0_ADMIN_TOKEN
-  (constant-time compare; disabled when unset).
-- [x] C3. Regeneration bundle: stimuli.csv holds one row per stimulus_id
-  with the complete parameter set + seed (verified exact round-trip in
-  tests); engine determinism per seed verified headlessly in iteration 6;
-  server-side Phase0 re-render remains available via /api/render.
+Ordering rule: engine data before the UI that reads it; the head model
+(Q4) before the space designer (Q6) that edits it; vocabulary (Q11) and
+QA (Q12) last so they sweep finished surfaces.
 
-## Phase D — Music production quality (priority 4)
+### Q1 — Patch transparency + module halves (producer)
+**What.** Regions/palette entries surface: surprise on/off + which
+dimensions (P·T·R·F·D·rest), scale name + number of splits, grid
+divisions, the patch's original tempo with a "set session tempo to
+this" action, and a glide/ring badge. Patch browser gains a
+filter-by-splits control. The palette loads a preset into the MACRO
+half or the SUBNOTE half of an instrument independently, with the
+active half unmistakably visible.
+**How.** Patches already store full params — derive all badges at
+render time, no schema change. Adopt-tempo writes arrangement.tempo.
+Half-loading merges preset params filtered through PRESET_SECTIONS
+(sound → subnote half; melody/rhythm/dynamics/sequence → macro half);
+palette chips get a two-segment target switch.
+**Verify.** Badge truth vs params headlessly; adopt-tempo determinism
+(stimulus ids stable); live click-through.
 
-- [x] D1. Click/harshness pass: tanh soft clipper (2x oversampled) before
-  the limiter; master 28Hz low-cut + -2.5dB high shelf @9.5kHz; click-free
-  stop (25ms master fade, deferred node kill, gain restored on next play);
-  spectral loudness renorm slew-limited to ±30%/step. (Per-note envelopes
-  already ramped to zero — verified, no change needed.)
-- [x] D2. Defaults: reverbWet 0→0.16 (room), envelopeRelease 0.08→0.12 so
-  first play isn't clinical-dry. Further tone tuning rides with D4
-  audition pass.
-- [x] D3. Modular presets: 7 sections (sound source, melody & scale,
-  rhythm & rests, dynamics, sequence & surprise, percussion, space) via a
-  parameter classifier; save-scope selector next to the preset name;
-  section chips in the library; section presets merge over current state on
-  load (verified: loading a Space preset reverts reverb, keeps tempo).
-  Additive schema — old v3 entries read as "Full", no migration needed.
-- [x] D4. Starter library: 11 factory presets in factory-presets.js — 5 full
-  rigs (Glass Bells, Night Choir, Clockwork, Wandering Flute, Restless
-  Weaver) + 6 section starters (Warm Cello, Airy Voice, Pentatonic Drift,
-  Gentle Pulse, Cathedral Wash, Dry Studio) — in a default "Starters"
-  library tab. Keys validated against DEFAULTS; loaded & played in browser.
-  Deeper listening/tuning pass welcome once owner auditions them.
+### Q2 — Global reverb removal
+**What.** The standalone reverb card leaves the macro production tab;
+each patch keeps its own space. Reverb TYPE (room/cathedral…) returns
+only inside the Global Space Designer (Q6) as a property of the shared
+performance space.
+**How.** Remove section markup; one-time migration folds saved global
+reverb values into patch space params on load. Engine reverb path stays
+(per patch).
+**Verify.** Old presets A/B render identically; the card is gone.
 
-- [x] D5 (owner feedback 2026-07-03): instruments didn't sound like the
-  instruments. Root cause: all profiles shared one generic envelope/vibrato
-  and Fourier mode had no onset transient. Added SPECTRAL_PERFORMANCE per
-  instrument (envelope speech times, vibrato idiom, piano inharmonic
-  stretch) applied on profile selection, plus per-profile attack-noise
-  transients (breath chiff / bow noise / lip buzz / hammer thump) rendered
-  at note onset. Needs owner listening pass; harmonic tables can be
-  refined further against published spectra if still off.
-- [x] D6 (owner feedback 2026-07-03): per-panel preset bars — each section
-  panel now has its own load-select (factory + user presets for that
-  section) and Save button: Scale & Root (melody), Duration tab (rhythm),
-  Dynamics tab, Sequence & Surprise, Reverb (space), Percussion, Sound
-  Source (sound). Loads merge into that section only; saves capture only
-  that section. Verified live: Cathedral Wash loaded from the Reverb
-  panel, a percussion kit saved from its panel appears in its dropdown
-  with exactly the 7 percussion params. Top-bar scope selector retained.
+### Q3 — Baked-note drill-down
+**What.** Click a baked note in the roll → card showing what varies per
+note but isn't drawn: glide in/out, the envelope draw actually used,
+vibrato draw, vowel position, tuning deviation, micro-timing, velocity.
+**How.** renderSpan already computes these — persist the per-note draw
+record at bake time (region.notes[i].performance); read-only card
+first, editing later through the same record.
+**Verify.** Drill-down values equal the audible render params in a
+headless bake; live click-through.
 
-- [ ] D7 (owner cue 2026-07-03): partial macros & higher-fidelity formants
-  per docs/PARTIAL_MACROS_DESIGN.md (RipplerX/Resonarium patterns):
-  - [x] D7a. Partial macro layer: partialTilt (spectral slope, ±4.5dB/oct),
-    partialOddEven (−1 mutes evens → clarinet, +1 mutes odds; fundamental
-    exempt), partialComb + centre (movable keytracked group boost), six
-    octave-group faders (1|2|3-4|5-8|9-16|17+) — all applied in the
-    fingerprint over the profile base table, live-updating. Headlessly
-    verified exact (odd −1 → evens ×0.08; tilt −1 → h8 ×0.044; comb@8 →
-    h8 ×3; group1=0 zeroes fundamental only). Harmonic editor unchanged as
-    the dig-down; full write-through/disclosure polish rides with D7c.
-  - [x] D7b. Material damping law: each partial above the fundamental gets
-    its own decay node, tau falling with harmonic number scaled by the new
-    partialMaterial param (0 glass/metal → 1 wood/felt). Per-instrument
-    defaults ride the profiles (piano 0.7 … trumpet 0.28); Material slider
-    in the Fourier print panel, live-updating. Verified: piano profile
-    sets slider to 0.7, playback clean.
-  - [x] D7c. 32 partials: profile tables extrapolated 20→32 by stride-2
-    geometric continuation (clarinet odd/even parity preserved in the
-    tail); Harmonics + Comb centre sliders to 32; harmonic editor renders
-    all 32 in its scrollable grid (explicit pagination unnecessary).
-    Nyquist guard already skips unfittable partials. Verified in browser
-    at 32 partials, playback clean.
-  - [x] D7d. 5-formant bank: FORMANT_PRESETS carry F4/F5 + per-formant
-    bandwidths (Klatt-style tables); renderer runs five parallel bandpasses
-    with Q derived from vowel bandwidth × user scale; F3-F5 levels +
-    bandwidth behind a native "Formant detail" disclosure; vowel pad
-    unchanged (F3-F5/bw resolve by inverse-distance weighting). Verified:
-    ah resolves 2440/3300/3750 Hz with bw 90; live playback clean.
-    D7 COMPLETE — owner audition pass requested.
+### Q4 — Binaural head model + front/behind (owner design confirmed)
+**What.** earDistance (0.12–0.25 m) drives interaural time difference;
+headDensity (0–1) drives the far-ear level shadow; a pinna filter makes
+behind audibly different from in front ("head size" was the redundant
+third — it IS ear distance). The space pad becomes a full circle.
+**How.** Replace the HRTF panner with an explicit per-ear chain:
+delay (Woodworth ITD = (d/2)(θ+sinθ)/c) → lowpass+gain (ILD × density)
+→ merger; sources behind get a high-shelf cut + ~8 kHz notch scaling
+with |angle| beyond ±90°. Pure functions (itdSeconds, ildDb,
+pinnaParams) so the laws are headlessly testable; keep the v1
+distance/air/proximity laws.
+**Verify.** ITD zero at 0°/180°, max at ±90°, scales with earDistance;
+ILD grows with density; notch only behind; live left/right flip.
 
-## Phase E — Deployment readiness (priority 5)
+### Q5 — Global scale strip (P8a)
+**What.** Collapsible strip above the timeline. User drops MARKERS; per
+marker a mini piano-roll where clicking a division cycles its operator:
+in-scale / out-of-scale / sub-scale / tonic (same operators as
+patches). Tracks opt in per track; opted-in tracks follow the marker
+from its beat onward. Baked notes never change.
+**How.** arrangement.globalScale = [{atBeat, degrees, subs, roots}];
+regionPlayParams merges marker state over track params for opted-in
+tracks (same merge point as track.space). Baked regions replay stored
+notes, so they bypass by construction.
+**Verify.** Headless: opted-in render follows the marker, opted-out
+unchanged, baked region byte-identical.
 
-- [x] E1. Health endpoint now reports data/cache-dir writability, schema
-  versions, rate limit, and export-enabled state; PORT/HOST env handling
-  verified (PORT read from env, Procfile passes 0.0.0.0).
-- [x] E2. docs/DEPLOYMENT.md: Railway/Render/Fly runbooks with persistent
-  volume setup, env table, health verification, and no-shell data pulls
-  via the export endpoint.
-- [x] E3. Request logging pre-existed; dirs are mkdir'd at startup; test
-  suite hits every endpoint (health/render/presets/events/export/rate
-  limit) — 20 tests.
+### Q6 — Global space designer (P8b, after Q4)
+**What.** Two linked views per the owner's spec. CYLINDER: collapsible
+above the timeline, horizontal along time, the space implied only by
+each instrument's THREAD (distance + radial angle around the listener);
+slow slight rocking conveys depth; dragging vertically rolls the space
+and it snaps back on release. CROSS-SECTION at the playhead: the head
+(ear distance/density) and each track as a dot; selected track
+highlighted; drag position or add anchors — first anchor auto-creates
+start+end anchors, double-click adds more, dragging an anchor curves
+between neighbours by chosen smoothness, non-anchored drags snap back;
+clicking a highlighted anchor jumps the playhead. On activation:
+"smartly arrange instruments in space, or keep patch positions?"
+Override-or-offset per that choice; owns head params + reverb type.
+**How.** arrangement.space = {head:{earDistance, density, reverbType},
+tracks:{id:[{beat, angle, dist, smooth}]}}; per-frame interpolation
+feeds the Q4 chain. Two canvases, pseudo-3D line rendering, no libs.
+**Verify.** Interpolation assertions (smoothness 0 = linear, anchors
+hit exactly); live drag/anchor/playhead interactions; determinism.
 
-## Phase F — UI/design (priority 6, gated on user approval)
+### Q7 — Layered subnote modules (CH-B5, per notes batch 2)
+**What.** ＋ adds the current subnote module as a layer; coloured
+blocks along the bottom, one per layer; per-block distance/position and
+volume; every new layer inherits head size/density unless "independent
+head"; block strip offers "override envelope probabilities" to drive
+all layers' envelope variation in sync.
+**How.** params.layers = [{subnoteParams, space, gain, independentHead,
+envOverride}]; engine renders layers as ONE stream — union of partials
+with cross-layer transfer coupling (the T-series law is already pure);
+single seed. The sync override reuses envelopeProbBlockHTML verbatim
+(built liftable in CH-B2 for exactly this).
+**Verify.** Layered fingerprint = union with coupling; sync override
+yields identical envelope draws across layers; per-layer space audible.
 
-- [x] F1. Hero visualiser is now responsive + high-DPI (ResizeObserver
-  matches backing store to CSS size at up to 2x DPR — verified 1015css →
-  2030px backing on retina); coarse-pointer media query enlarges slider
-  thumbs and tap targets (38px min buttons/tabs/chips). Remaining nits
-  (loading states, dist-canvas DPI) fold into ongoing polish.
-- [x] F2. Proposals delivered (artifact with three rendered directions);
-  owner chose a fourth path: FabFilter-inspired design language. Design
-  system specified in docs/UI_DIRECTION.md (monochrome shell, data-owned
-  colour, display-forward, contextual editing, precision readouts).
-- [x] F3a. Reskin: FabFilter token system applied (blue-charcoal shell,
-  layer-hue vars); sliders are thin monochrome precision controls with
-  data-hued fills keyed to their subsection (generation amber / accuracy
-  green / surprise cyan); amber glows retired; readouts tabular mono.
-  Verified in browser; playback regression clean.
-- [x] F3b-1. Tonalic preset browser: section filter chips across all
-  library tabs + per-preset in-context preview (non-destructive: auditions
-  the preset merged into current settings, reverts exactly on toggle-off;
-  Load commits). Verified in browser.
-- [x] F3b-2 (partial). Hero visualiser: main display row raised across all
-  three layout variants (~2x taller); distribution displays harmonised into
-  the new shell (neutral glass/grid replacing green phosphor tint, softer
-  scanlines/vignette; layer-colour data unchanged). Owner decision: KEEP the
-  CRT/LED display character (harmonised); FabFilter curve replacement
-  rejected. Hover readouts pending (F3c).
-- [x] F3c-1. 2D vowel pad: the formant weight circle is now a true vowel
-  pad (log-F1 × log-F2, classic vowel-chart orientation: ee front-closed
-  top-left, oo back-closed top-right, ah open bottom), weights as dot
-  sizes, horseshoe outline, display-well styling. Completes B4a's UI.
-- [x] F3c-2a. Hover readouts: probability displays show a floating
-  layer-coloured readout at the cursor (step offset + exact gen/acc/surp
-  probabilities), hidden when the pointer leaves. Verified in browser.
-- [ ] F3c-2b. Direct manipulation: note-grid / vowel-pad click-to-edit with
-  floating per-item editors (deferred; candidates for the producer-mode
-  editor pass).
+### Q8 — Imperfections (CH-B4)
+Onset pitch scoop (excitation-scaled f0 approach) → attack stagger (the
+measured lowToHighStaggerMs is already in the fit JSON) → release ring
+(T60 tail after note-off) → slow f0 wander. Each one: a pure law + an
+assertion + a knob only if audible.
 
-## Phase G — Producer mode: orchestration / DAW-ish arrangement (owner request 2026-07-03)
+### Q9 — Producer remainders
+D2 roll parity (pencil add, ⌫ delete, M note-mute, Q quantize, arrow
+nudges, audition-on-edit) → B2 multi-select (⇧click, rubber-band, bulk
+ops) → C track headers (hue, dB readout, per-track space mini-pad —
+folds into Q6's data) → F onboarding + ? shortcut overlay. Also:
+relabel Key as "Key (root pitch)".
 
-Design doc: `docs/DAW_MODE_DESIGN.md` (parameter scoping, take/seed model,
-repertoire state). Builds on D3 modular presets — an "instrument" is a saved
-synth configuration pulled into arrangement tracks.
+### Q10 — MIDI recording (P10)
+**What.** Web MIDI input, record-arm per track. Incoming notes override
+melody/duration/dynamics; the patch still supplies glide/ring,
+envelope-probability draws, and the whole subnote voice. The three
+owner mapping choices become a per-patch MIDI-map setting: (1) white
+keys only vs white+black; (2) all subdivisions mapped vs all mapped
+with out-of-scale muted vs in-scale packed consecutively; (3) degree 0
+anchored to C repeating at the next C vs repeating at the very next
+key. Recorded notes are baked notes (Q3 drill-down applies).
+**Verify.** Mapping-table assertions for every option combination; live
+via synthesized MIDIMessageEvents (virtual device if available).
 
-- [ ] G1. Design sign-off: parameter scoping tiers (session context vs
-  instrument vs region) and return-to-pattern semantics reviewed by owner.
-- [x] G2. Instrument library: "Save current voice as instrument" captures
-  everything timbral/behavioural (116 params) excluding the session-context
-  tier (tempo, key/scale, master dynamics, space, seed); Instruments tab in
-  the library with preview/load/remove; loading merges over current state
-  so the musical context survives (verified: session tempo preserved).
-  These entries become the draggable sources for the G3 timeline.
-- [x] G3 (v1). Arrangement view at #produce: Tonalic dual-panel (instrument
-  browser above — saved instruments + factory voices; timeline below).
-  Tracks × 16 slots; click-to-place regions each holding a deterministic
-  take (seed, with reroll + seed history); loop-region playback via the
-  single synth voice; arrangement persists to localStorage. Producer link
-  in the studio header; volunteers at #explore never see it. Verified live
-  end-to-end. v2 needs: drag placement/extend, region length, playhead.
-- [x] G4. Session context bar: the arrangement owns its Tier-1 context
-  (tempo, key, scale, master dynamics, space) shown as an editable Session
-  bar in #produce; regions inherit it live (playing region re-parameterises
-  on change); persists with the arrangement. Per-track lock overrides
-  deferred to a later polish pass. Verified: key→G, tempo→92 stored and
-  played.
-- [x] G5. Multi-voice arrangement playback: SynthEngine.init() accepts a
-  shared AudioContext + destination, so each track runs its own engine
-  voice into a common producer bus; per-track gain via setMasterVolume;
-  "Play arrangement" transport walks the slot grid at session tempo (4
-  beats/slot), starting each track's region take at its slot and silencing
-  empty cells, with a cyan playhead sweeping the timeline. Verified live
-  (playhead 0→1 at tempo, clean stop).
-- [x] G-v2 polish (partial): multi-slot regions (grid-span rendering, ×N
-  badge, +/− Longer/Shorter with collision clamping; playback sustains a
-  voice through its span; mixdown honours lengthSlots), per-track gain
-  slider in the track head (live on the playing voice), drag regions
-  between cells/tracks with span-fit checks. Remaining polish: per-track
-  pan, per-track context locks, region take history UI.
-- [x] G6. Export/Import: self-contained arrangement JSON (context + tracks
-  with inline instrument params + region seeds) downloads/uploads via
-  buttons in the producer bar. WAV mixdown: SynthEngine.renderSpan()
-  deterministically schedules each region's notes into an
-  OfflineAudioContext (fresh voice per region, timing mirrors the realtime
-  scheduler), rendered and encoded to 16-bit stereo WAV. Verified: 3
-  regions render 12.4s with energy at their slots, peak 0.42.
-- [~] G7. (Stretch) Bake to piano roll — STAGE 1 DONE: ◆ Bake captures the
-  region's deterministic take as data (captureSpan: beat-space offsets,
-  degree, cents, velocity, frozen per-note spectral fingerprint); baked
-  regions play/mix via renderNotesSpan/playNotes at the CURRENT session
-  tempo; Unbake reverts (seed retained, non-destructive); reroll disabled
-  while baked. Verified live round-trip (11 notes, badge, playback,
-  revert). STAGE 2 DONE: '✎ Edit notes' opens a piano-roll canvas — rows
-  are scale degrees (root rows violet), columns beat divisions; note bodies
-  sit at their PRECISE pitch (cents as fractional row offset) with dashed
-  ghost outlines at the intended degree when intonation missed; surprise
-  notes cyan; click-to-inspect readout (degree, ±cents, velocity,
-  duration). Verified live with screenshot.
-  STAGE 3 DONE: snap-drag moves notes between scale rows with the cents
-  offset riding along (verified: deg −3→−1, 220→246.95 Hz exact, cents
-  preserved); shift-drag snaps clean; alt-drag fine-tunes cents only;
-  horizontal drag moves onset on the division grid clamped to the region;
-  frequency recomputed from the region's scale context; edited notes wear
-  a dot; edits persist and play in baked playback/mixdown.
-  ── OWNER REVIEW (2026-07-03): producer section REJECTED — "nothing like
-  I wanted… needs to be rethought from the ground up… follows the same
-  logic as a DAW like Pro Tools or Logic." Full redesign specified in
-  docs/PRODUCER_V2_DESIGN.md with an explicit acceptance bar (B1-B9 +
-  Q1-Q4 incl. owner sign-off).
-- [~] G8. **Producer v2 rebuild — BUILT, AWAITING OWNER SIGN-OFF (Q4).**
-  All stages P1–P7 and the entire v2.1 usability backlog U0–U13 are done
-  and verified (docs/PRODUCER_V2_DESIGN.md is the source of truth):
-  three-zone DAW layout with persisted resizable/collapsible panels,
-  card browser → palette rack → beat-based lanes with pointer drag,
-  regions that move/copy/extend/loop with collision blocking, bake →
-  double-click piano-roll drawer (G7 roll internals docked), palette
-  edit round-trip, M/S/pan/gain per track, keyboard transport, zoom +
-  snap, multiple named arrangements, single-level undo, per-region
-  level, →Studio, JSON export/import, WAV mixdown with live progress %.
-  The key control now truly transposes (tonic moves; baked notes
-  recompute from degree-space). Producer stays IN PROGRESS until the
-  owner re-auditions (Q4).
-  Remaining post-sign-off polish candidates: per-track context locks,
-  region take-history UI. (Dist-canvas DPI and loading states: done,
-  see Loop state.)
+### Q11 — Vocabulary audit (P9)
+Full-surface terminology pass: replace jargon where a plain word exists;
+hover explainers where a term must stay; produce a terminology table in
+docs so future features stay consistent.
 
-## Phase H — Tone model v2: physics-grounded redesign (owner brief 2026-07-05)
+### Q12 — QA capstone + adjustable panels
+Screenshot sweep of every view (macro, sub-note × 4 stage inspectors,
+producer, roll, library, welcome) at ≥3 widths via preview_resize
+(1280 / 1000 / 768); fix every quirk found; then the layout rework:
+draggable column dividers + grid minmax so panels adapt and nothing
+becomes unreachable on resize (known offender: the BODY inspector's
+271 px scroll-clip; the dashboard's overflow:hidden at 790 px).
 
-Design doc: `docs/TONE_MODEL_V2_DESIGN.md`; direction mockup:
-`docs/mockups/tone-print-v2.html`. Owner brief: ground-up rethink of the
-tone design — resonant-frequency transfer grounded in actual frequencies
-(never 12-TET), bow-style imperfection instead of amplitude probability,
-partial count at instrument-modeller parity, key character variables
-surfaced, every interaction re-grounded in acoustics, and a tone-print UI
-that filters frequencies visually instead of showing them all. Decisions:
-tone section first; formant path unified (excitation → resonator → body);
-best-effort preset migration. Supersedes the D5/D7 tone line: remaining
-tone-fidelity concerns fold into this model.
+---
 
-- [x] H0 (=T0). Plan + audit + mockup (2a9caf7); T-Q4 APPROVED
-  2026-07-06; rev B mockup made the staged chain the layout (ad42f0f).
-- [x] H1–H7 (=T1–T7). ALL BUILT 2026-07-06, one commit per stage:
-  resonator core (2804dab) → excitation (6ad3bfd) → Human (bb083b2) →
-  transfer (d05b2d1) → body/vowels-as-bodies + FM→AM (babee65) →
-  staged-chain tone builder + migration (1132744) → interactive tone
-  print (ed591e2). 85 headless physics assertions in CI.
-- [~] H8 (=T8). Walkthrough clean (T-Q1), CPU benchmarked (T-B7), live
-  A/B servers standing (old engine :8766 / new :8765).
-  **AWAITING T-Q5 OWNER AUDITION** — plus owner decision on retiring
-  the separate Formant source mode now that vowels are bodies.
+## 3 · Working discipline
 
-## Cross-cutting
+pytest + `node scripts/verify_tone_model.mjs` before every commit;
+cache-buster bump on every change; live browser verification with a
+window.onerror probe before claiming done; one reviewable commit per
+chunk; milestone reports to the owner; web/data/ stays gitignored;
+sample audio never enters the repo — only fitted parameters.
 
-- [x] X1. CI: GitHub Actions (pytest + node --check) on push/PR.
-- [x] X2. Tests for locking, validation, rate limiting, export, health
-  (20 tests total as of iteration 12).
+---
 
-## Completed
+# Archive — original loop phases A–H (2026-07-03 → 2026-07-06)
 
-- [x] Iteration 1 (2026-07-03): environment set up, baseline commit 2c4eec7,
-  full frontend + backend audits, this roadmap.
+Historical working state, kept for provenance. Everything below is
+superseded by the ledger and plan above (producer v2 was signed off and
+rebuilt as v3; tone v2 audition passed; formant mode was retired into
+articulated bodies).
+
+- **Phase A — study flow** (A1–A5 done): stimulus identity + provenance,
+  rate-what-you-hear, plain-language opt-in consent, parameter-change
+  telemetry, server hardening (locked appends, validation, rate limits).
+- **Phase B — expectancy instrumentation** (B1–B4a done): per-note
+  surprisal, repetition metrics, metrics-1.0 summaries on events,
+  research machinery invisible to lay users, continuous vowel space.
+- **Phase C — export & regeneration** (C1–C3 done): export CLI → CSVs,
+  token-gated /api/export.csv, exact stimulus round-trip from seeds.
+- **Phase D — production quality** (D1–D7 done): soft clip + master EQ +
+  click-free stop, defaults, modular section presets, factory starters,
+  per-instrument performance + attack noise, per-panel preset bars,
+  partial macros / material damping / 32 partials / 5-formant bank.
+- **Phase E — deployment** (E1–E3 done): health endpoint, DEPLOYMENT.md
+  runbooks, endpoint test suite.
+- **Phase F — UI/design** (done exc. F3c-2b, folded into producer line):
+  responsive hero, FabFilter-inspired reskin, Tonalic preset browser,
+  vowel pad, hover readouts.
+- **Phase G — producer**: v1 → owner rejection ("rethought from the
+  ground up… like Pro Tools or Logic") → v2 rebuild (P1–P7 + U0–U13) →
+  signed off → superseded by v3 (PRODUCER_V3_SPEC.md).
+- **Phase H — tone model v2** (T0–T8 done): physics chain, audition
+  passed, formant mode retired into articulated bodies.
+- **Cross-cutting**: GitHub Actions CI (pytest + node --check); 20-test
+  endpoint/behaviour suite.
