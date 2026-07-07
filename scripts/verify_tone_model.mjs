@@ -592,6 +592,64 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q10: MIDI mapping — the full 2×3×2 option grid ──
+{
+  const { midiMapDegree, GenerationEngine } = await import("../web/static/synth.js");
+  const majorScale = new GenerationEngine({ scaleMode: "12tone", scalePreset: "major", subScaleWeight: 0.7 })._buildScale();
+  const edoScale = new GenerationEngine({ scaleMode: "edo", edoDivisions: 19,
+    customDegrees: [0, 3, 6, 8, 11, 14, 17], subScaleWeight: 0.7 })._buildScale();
+  const m = (nn, opts, scale = majorScale) => midiMapDegree(nn, scale, opts);
+  // white + packed + octave (default): white keys walk the scale, restart each C
+  const WPO = { keys: "white", coverage: "packed", anchor: "octave" };
+  check("Q10 W/packed/oct: C4→0 D4→2 E4→4 B4→11",
+    m(60, WPO) === 0 && m(62, WPO) === 2 && m(64, WPO) === 4 && m(71, WPO) === 11);
+  check("Q10 W/packed/oct: next C repeats an octave up", m(72, WPO) === 12 && m(48, WPO) === -12);
+  check("Q10 W/packed/oct: black keys silent", m(61, WPO) === null && m(66, WPO) === null);
+  // white + packed + consecutive: 7 degrees then straight on
+  const WPC = { keys: "white", coverage: "packed", anchor: "consecutive" };
+  check("Q10 W/packed/consec: same inside the first octave", m(64, WPC) === 4 && m(71, WPC) === 11);
+  check("Q10 W/packed/consec: identical to octave for 7-degree scales (7 white keys)",
+    m(72, WPC) === 12 && m(74, WPC) === 14);
+  // white + all + octave: white keys walk RAW divisions 0..6, divisions 7-11 unreachable
+  const WAO = { keys: "white", coverage: "all", anchor: "octave" };
+  check("Q10 W/all/oct: E4 is division 2 (third white key)", m(64, WAO) === 2);
+  check("Q10 W/all/oct: next C restarts at division 12", m(72, WAO) === 12);
+  // white + all + consecutive: divisions run on across octaves — C5 is the 8th white key
+  const WAC = { keys: "white", coverage: "all", anchor: "consecutive" };
+  check("Q10 W/all/consec: C5 continues at division 7", m(72, WAC) === 7 && m(74, WAC) === 8);
+  // white + muted variants: division must be in scale
+  check("Q10 W/muted/oct: D4 (2nd white key → raw division 1 = C#) is muted",
+    m(62, { keys: "white", coverage: "muted", anchor: "octave" }) === null);
+  check("Q10 W/muted/consec: C4 passes (division 0 in scale), black keys still absent",
+    m(60, { keys: "white", coverage: "muted", anchor: "consecutive" }) === 0 &&
+    m(63, { keys: "white", coverage: "muted", anchor: "consecutive" }) === null);
+  // all keys variants
+  const AAO = { keys: "all", coverage: "all", anchor: "octave" };
+  check("Q10 A/all/oct: chromatic identity around C4", m(61, AAO) === 1 && m(59, AAO) === -1 && m(72, AAO) === 12);
+  check("Q10 A/all/consec: same as octave in 12-EDO (12 keys = 12 divisions)",
+    m(61, { keys: "all", coverage: "all", anchor: "consecutive" }) === 1);
+  check("Q10 A/muted/oct: C#4 muted, D4 passes",
+    m(61, { keys: "all", coverage: "muted", anchor: "octave" }) === null &&
+    m(62, { keys: "all", coverage: "muted", anchor: "octave" }) === 2);
+  const APO = { keys: "all", coverage: "packed", anchor: "octave" };
+  check("Q10 A/packed/oct: 12 keys walk 7 degrees, spares silent",
+    m(60, APO) === 0 && m(61, APO) === 2 && m(66, APO) === 11 && m(67, APO) === null && m(72, APO) === 12);
+  const APC = { keys: "all", coverage: "packed", anchor: "consecutive" };
+  check("Q10 A/packed/consec: repeats at the very next key (8th key = octave)",
+    m(67, APC) === 12 && m(74, APC) === 24);
+  // 19-EDO (7 in-scale degrees of 19 divisions)
+  check("Q10 19-EDO W/packed/oct: white keys walk the 7 custom degrees",
+    m(60, WPO, edoScale) === 0 && m(62, WPO, edoScale) === 3 && m(71, WPO, edoScale) === 17);
+  check("Q10 19-EDO W/packed/oct: next C is +19 divisions", m(72, WPO, edoScale) === 19);
+  check("Q10 19-EDO A/all/oct: 12 keys reach only divisions 0-11 before the C restart",
+    m(71, { keys: "all", coverage: "all", anchor: "octave" }, edoScale) === 11 &&
+    m(72, { keys: "all", coverage: "all", anchor: "octave" }, edoScale) === 19);
+  check("Q10 19-EDO A/all/consec: keys keep counting past 11 into the same EDO octave",
+    m(72, { keys: "all", coverage: "all", anchor: "consecutive" }, edoScale) === 12 &&
+    m(79, { keys: "all", coverage: "all", anchor: "consecutive" }, edoScale) === 19);
+  check("Q10: invalid input maps to nothing", m(NaN, WPO) === null && midiMapDegree(60, null, WPO) === null);
+}
+
 // ── Q8: imperfections — four small physical truths ──
 {
   const { onsetScoopCents, partialOnsetDelay, releaseRingSeconds, f0WanderTrace, materialT60 } =

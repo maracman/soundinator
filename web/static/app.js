@@ -41,6 +41,7 @@ import {
   nearestVowel,
   globalScaleAt,
   trackSpaceAt,
+  midiMapDegree,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -339,6 +340,9 @@ const DEFAULTS = {
   headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
   layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
   layerEnvOverride: false, // Q7: true = one envelope draw shared by base + all layers
+  midiMapKeys: "white",       // Q10: which keys play — "white" | "all"
+  midiMapCoverage: "packed",  // Q10: "all" divisions | "muted" out-of-scale | "packed" in-scale only
+  midiMapAnchor: "octave",    // Q10: degree 0 repeats at each C ("octave") or right after the last degree ("consecutive")
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -495,6 +499,9 @@ const PARAM_DESC = {
   headDensity: "How opaque your head is to sound (0–1). Denser = the far ear loses more level and more treble when a source sits to one side",
   layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
   layerEnvOverride: "Sync the envelope variation: one draw per note shared by the base sound and every layer, instead of each layer varying independently",
+  midiMapKeys: "Which keys of a MIDI keyboard play this patch: only the white keys, or every key",
+  midiMapCoverage: "What the keys cover: every scale subdivision, every subdivision with out-of-scale keys silent, or only in-scale degrees packed onto consecutive keys",
+  midiMapAnchor: "Where the mapping repeats: degree 0 sits at C and restarts at every C, or the scale restarts on the very next key after its last degree",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -2315,6 +2322,152 @@ function wireGlobalSpace(v) {
   if (_spOpen && !_spRaf) _spRaf = requestAnimationFrame(_spAnimate);
 }
 
+// ── Q10: MIDI recording ─────────────────────────────────────
+// MIDI input overrides duration/dynamics/melody; the armed track's patch
+// supplies the voice and its midiMap setting decides how keys land in the
+// scale. Recording stops → a BAKED region in beat-space, so the roll and
+// the Q3 drill-down work unchanged.
+let _midi = { access: null, deviceId: null, armedTrackId: null, rec: null, engine: null };
+
+function _midiTrackParams(track) {
+  const region0 = track.regions[0];
+  const voice = region0 ? regionVoiceParams(track, region0) : (track.instrumentParams || {});
+  return { ...DEFAULTS, ...arrangement.context, ...voice };
+}
+
+function onMidiMessage(ev) {
+  if (_midi.deviceId && ev.target && ev.target.id !== _midi.deviceId) return;
+  const [status, noteNumber, rawVel] = ev.data || [];
+  const cmd = status & 0xf0;
+  if (cmd !== 0x90 && cmd !== 0x80) return;
+  const isOn = cmd === 0x90 && rawVel > 0;
+  const track = arrangement.tracks.find(t => t.id === _midi.armedTrackId);
+  if (!track) return;
+  const params = _midiTrackParams(track);
+  if (!_midi.engine) { _midi.engine = new GenerationEngine(params); _midi.engine.initialise(); }
+  const engine = _midi.engine;
+  const degree = midiMapDegree(noteNumber, engine.scale, {
+    keys: params.midiMapKeys, coverage: params.midiMapCoverage, anchor: params.midiMapAnchor,
+  });
+  if (degree == null) return;
+  const now = performance.now();
+  if (isOn) {
+    if (!_midi.rec) _midi.rec = { t0: now, startBeat: Math.max(0, Math.round(playheadBeat)), notes: [], open: new Map() };
+    _midi.rec.open.set(noteNumber, { degree, velocity: Math.max(0.05, rawVel / 127), tOn: now });
+    // monitor: hear the key through the patch voice (velocity → dynamics)
+    const hz = engine.scale.degreeToHz(degree);
+    const monitor = {
+      degree, frequency: hz, velocity: Math.max(0.05, rawVel / 127),
+      duration: 0.5, durationDivs: 1, offsetDivs: 0,
+      beatDivisions: params.beatDivisions || 1, intonationCents: 0,
+      gapFraction: 0, legatoFromPrevious: false, isRest: false,
+      ...engine._subNoteVariation(rawVel / 127, hz, degree, null),
+    };
+    synth.playNotes(params, [monitor]);
+  } else {
+    const open = _midi.rec?.open.get(noteNumber);
+    if (!open) return;
+    _midi.rec.open.delete(noteNumber);
+    _midi.rec.notes.push({ ...open, tOff: now });
+  }
+}
+
+function finishMidiRecording() {
+  const rec = _midi.rec;
+  const track = arrangement.tracks.find(t => t.id === _midi.armedTrackId);
+  _midi.rec = null;
+  _midi.engine = null;
+  if (!rec || !track) return;
+  const now = performance.now();
+  rec.open.forEach((open) => rec.notes.push({ ...open, tOff: now })); // close hanging keys
+  if (!rec.notes.length) return;
+  const params = _midiTrackParams(track);
+  const beatDiv = params.beatDivisions || 1;
+  const divMs = 60000 / (Math.max(30, arrangement.context.tempo || 104) * beatDiv);
+  const scale = new GenerationEngine(params).scale;
+  const t0 = rec.notes.reduce((min, n) => Math.min(min, n.tOn), Infinity);
+  const notes = rec.notes.map(n => {
+    const durationDivs = Math.max(1, Math.round((n.tOff - n.tOn) / divMs));
+    return {
+      degree: n.degree,
+      offsetDivs: Math.max(0, Math.round((n.tOn - t0) / divMs)),
+      durationDivs,
+      velocity: n.velocity,
+      intonationCents: 0,
+      beatDivisions: beatDiv,
+      gapFraction: 0,
+      legatoFromPrevious: false,
+      isSurprise: false,
+      noteRole: "midi",
+      edited: true,
+      frequency: scale.degreeToHz(n.degree),
+      duration: (durationDivs * divMs) / 1000,
+    };
+  }).sort((a, b) => a.offsetDivs - b.offsetDivs);
+  const lengthBeats = Math.max(1, Math.ceil(Math.max(...notes.map(n => n.offsetDivs + n.durationDivs)) / beatDiv));
+  const free = trackFreeFrom(track, rec.startBeat);
+  if (free < 1) { alert("No free space on the armed track at the playhead — recording kept in memory was discarded."); return; }
+  track.regions.push({
+    id: crypto.randomUUID(),
+    paletteId: track.regions[0]?.paletteId,
+    startBeat: rec.startBeat,
+    lengthBeats: Math.min(lengthBeats, free),
+    seed: newSeed(),
+    type: "baked",
+    notes,
+    loopSourceBeats: Math.min(lengthBeats, free),
+  });
+  saveArrangement("MIDI recording");
+  renderProduce();
+}
+
+function midiToolbarHTML() {
+  if (!("requestMIDIAccess" in navigator)) return "";
+  if (!_midi.access) {
+    return `<button class="btn btn-ghost btn-sm" id="midiBtn" title="Connect a MIDI keyboard — arm a track with its ● button, play, and stop the arm to bake the take">⌨ MIDI</button>`;
+  }
+  const inputs = [..._midi.access.inputs.values()];
+  return `
+    <select id="midiDevice" class="splits-filter" title="Which MIDI input records">
+      <option value="">All inputs</option>
+      ${inputs.map(inp => `<option value="${esc(inp.id)}"${_midi.deviceId === inp.id ? " selected" : ""}>${esc(inp.name || inp.id)}</option>`).join("")}
+    </select>
+    ${_midi.armedTrackId ? `<span class="midi-rec-dot" title="Recording arms on the ● track — playing keys records; disarm to bake">●</span>` : ""}`;
+}
+
+function wireMidi(v) {
+  const midiBtn = v.querySelector("#midiBtn");
+  if (midiBtn) midiBtn.onclick = async () => {
+    try {
+      _midi.access = await navigator.requestMIDIAccess();
+      _midi.access.inputs.forEach(inp => { inp.onmidimessage = onMidiMessage; });
+      _midi.access.onstatechange = () => {
+        _midi.access.inputs.forEach(inp => { inp.onmidimessage = onMidiMessage; });
+        renderProduce();
+      };
+      renderProduce();
+    } catch (err) {
+      alert(`MIDI unavailable: ${err.message}`);
+    }
+  };
+  const devSel = v.querySelector("#midiDevice");
+  if (devSel) devSel.onchange = () => { _midi.deviceId = devSel.value || null; };
+  v.querySelectorAll("[data-track-arm]").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.trackArm;
+      if (_midi.armedTrackId === id) {
+        finishMidiRecording(); // disarming commits the take
+        _midi.armedTrackId = null;
+      } else {
+        if (_midi.armedTrackId) finishMidiRecording();
+        _midi.armedTrackId = id;
+        _midi.engine = null;
+      }
+      renderProduce();
+    };
+  });
+}
+
 function produceTimelineHTML() {
   const laneW = totalBeats() * pxPerBeat;
   // Ruler: bar numbers every BEATS_PER_BAR
@@ -2366,6 +2519,7 @@ function produceTimelineHTML() {
         <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
         <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
         <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the global scale strip: this track's takes regenerate under the marker in force (baked notes stay put)">G</button>
+        ${_midi.access ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
         <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
         <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
         <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
@@ -3444,6 +3598,8 @@ function renderProduce() {
         <button class="btn btn-ghost btn-sm" id="arrExport" title="Download this arrangement as a self-contained JSON file (instruments included)">Export</button>
         <button class="btn btn-ghost btn-sm" id="arrImport" title="Load an arrangement JSON file">Import</button>
         <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
+        <span class="daw-sep"></span>
+        ${midiToolbarHTML()}
         <span class="toolbar-hint" id="mixStatus"></span>
       </div>
       <div class="daw-main">
@@ -3594,6 +3750,7 @@ function wireProduce(v) {
   wireBrowserPalette(v);
   wireGlobalScale(v);
   wireGlobalSpace(v);
+  wireMidi(v);
 
   v.querySelectorAll("[data-add-track]").forEach(btn => {
     btn.onclick = () => {

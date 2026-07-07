@@ -993,6 +993,60 @@ export const SCALE_PRESETS = {
 
 const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// ─── MIDI mapping (Q10) ─────────────────────────────────────
+// How a MIDI keyboard reaches an N-division scale. Three owner-specified
+// choices multiply out: which physical keys participate (white-only or
+// all), what they cover (every subdivision, every subdivision with
+// out-of-scale keys muted, or in-scale degrees packed consecutively), and
+// where the mapping repeats (each C, or immediately after the last
+// degree). Degree 0 sits at middle C (60). Returns an absolute degree in
+// scale space, or null for unmapped/muted keys. Pure — table-tested.
+const _WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
+export function midiMapDegree(noteNumber, scale, opts = {}) {
+  if (!Number.isFinite(noteNumber) || !scale) return null;
+  const keys = opts.keys === "all" ? "all" : "white";
+  const coverage = opts.coverage === "muted" ? "muted" : (opts.coverage === "all" ? "all" : "packed");
+  const anchor = opts.anchor === "consecutive" ? "consecutive" : "octave";
+  // position of this key in the participating-key sequence, 0 at C4
+  let kIdx;
+  const kPerOct = keys === "white" ? 7 : 12;
+  if (keys === "white") {
+    const pc = ((noteNumber % 12) + 12) % 12;
+    const wi = _WHITE_PCS.indexOf(pc);
+    if (wi < 0) return null; // black keys don't participate
+    kIdx = (Math.floor(noteNumber / 12) - 5) * 7 + wi;
+  } else {
+    kIdx = noteNumber - 60;
+  }
+  const div = scale.div;
+  const inScale = [...new Set(scale.all.map(d => scale.norm(d)))].sort((a, b) => a - b);
+  const oct = Math.floor(kIdx / kPerOct);
+  const pos = ((kIdx % kPerOct) + kPerOct) % kPerOct;
+  if (coverage === "packed") {
+    const len = inScale.length;
+    if (!len) return null;
+    if (anchor === "consecutive") {
+      const o = Math.floor(kIdx / len);
+      return inScale[((kIdx % len) + len) % len] + o * div;
+    }
+    if (pos >= len) return null; // octave anchor: spare keys in the octave stay silent
+    return inScale[pos] + oct * div;
+  }
+  // coverage "all"/"muted": participating keys walk the raw subdivisions
+  let degree;
+  if (anchor === "consecutive") {
+    degree = kIdx;
+  } else {
+    if (pos >= div) return null; // more keys per octave than divisions
+    degree = pos + oct * div;
+  }
+  if (coverage === "muted") {
+    const pc = ((degree % div) + div) % div;
+    if (!inScale.includes(pc)) return null;
+  }
+  return degree;
+}
+
 // ─── Imperfections (Q8) ─────────────────────────────────────
 // Four small physical truths of played notes, each a pure law asserted
 // headlessly, each scaled by the Human dial so machine-precise settings

@@ -5274,6 +5274,12 @@ body.explore-mode #app {
 .gs-cell.gs-root { background: rgba(180,142,222,0.3); color: #d9c2f0; border-color: rgba(180,142,222,0.55); }
 .tl2-gsbtn.on { color: #b8d8ff; border-color: rgba(148,196,255,0.5); }
 
+/* ── Q10: MIDI recording ─────────────────────────────────── */
+.tl2-arm { color: var(--text3); }
+.tl2-arm.on { color: #ff5d5d; border-color: rgba(255,93,93,0.6); background: rgba(255,93,93,0.12); }
+.midi-rec-dot { color: #ff5d5d; font-size: 0.8rem; animation: midiPulse 1.2s ease-in-out infinite; }
+@keyframes midiPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
 /* ── Q9: producer remainders ─────────────────────────────── */
 .tl2-hue {
   width: 10px;
