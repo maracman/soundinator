@@ -341,6 +341,7 @@ const DEFAULTS = {
   spaceAzimuth: 0,
   earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
   headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
+  spaceOwnHead: false, // owner 07-07: keep THIS patch's head even when the global space is on
   layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
   layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own means kept)
   layerEnvProb: 0.5,       // Q7: the shared variation chance when layerEnvOverride is on
@@ -505,6 +506,7 @@ const PARAM_DESC = {
   spaceAzimuth: "The instrument's bearing, all the way around you (−180°…180°): per-ear arrival times, far-ear head shadow, and a pinna cue that makes sounds behind you duller than in front — real binaural physics, not simple panning",
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences AND head shadowing from lower frequencies (the shadow corner is c/2πa)",
   headDensity: "How strongly your head shadows the far ear (0–1). 0.5 = the published spherical-head model (Brown & Duda 1998: lows diffract around, highs shadow up to -20 dB); 0 = transparent, 1 = doubled",
+  spaceOwnHead: "Keep this patch's own ear span and head density even when the producer's global space is active (normally the global listener overrides them)",
   layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
   layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
   layerEnvProb: "How often the shared variation trigger fires (per note) when synchronisation is on",
@@ -1383,7 +1385,9 @@ function regionPlayParams(track, region, atBeat = null) {
         params.spaceDistance = pos.dist;
       }
     }
-    if (sp.head) {
+    if (sp.head && !params.spaceOwnHead) {
+      // the global listener overrides the patch head — unless the patch's
+      // SPACE section opted out (owner 07-07)
       if (Number.isFinite(sp.head.earDistance)) params.earDistance = sp.head.earDistance;
       if (Number.isFinite(sp.head.headDensity)) params.headDensity = sp.head.headDensity;
       if (sp.head.reverbType) params.reverbType = sp.head.reverbType;
@@ -6408,7 +6412,6 @@ function layerStripHTML(p) {
   // variation controls live in their own panel to the RIGHT of the rows,
   // greyed out unless synchronisation is on.
   const rows = layers.map((l, i) => {
-    const sn = l.subnote || {};
     const envStr = layerEnvLineText(l, p);
     return `
     <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}">
@@ -6419,10 +6422,7 @@ function layerStripHTML(p) {
           <label class="sp-ctl">Vol <input type="range" data-layer-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}" title="This layer's level relative to the base sound"/></label>
           <label class="sp-ctl">Angle <input type="range" data-layer-angle="${l.id}" min="-180" max="180" step="1" value="${l.space?.angle ?? (p.spaceAzimuth ?? 0)}" title="Where this layer sits around you"/></label>
           <label class="sp-ctl">Dist <input type="range" data-layer-dist="${l.id}" min="0.3" max="30" step="0.1" value="${l.space?.dist ?? (p.spaceDistance ?? 2.5)}" title="How far away this layer stands"/></label>
-          <label class="sp-ctl layer-ownhead" title="Give this layer its own head (ear span + density) instead of inheriting the listener's"><input type="checkbox" data-layer-head="${l.id}"${l.independentHead ? " checked" : ""}/> own head</label>
-          ${l.independentHead ? `
-            <label class="sp-ctl">Ears <input type="range" data-layer-ear="${l.id}" min="0.12" max="0.25" step="0.005" value="${sn.earDistance ?? p.earDistance ?? 0.175}" title="${esc(PARAM_DESC.earDistance)}"/></label>
-            <label class="sp-ctl">Density <input type="range" data-layer-density="${l.id}" min="0" max="1" step="0.01" value="${sn.headDensity ?? p.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>` : ""}
+          <button class="pal-btn layer-solo${l.solo ? " on" : ""}" data-layer-solo="${l.id}" title="Solo this layer — hear it alone (the base and other unsoloed layers go quiet)">S</button>
           <button class="pal-btn" data-layer-recapture="${l.id}" title="Re-capture the CURRENT sound half into this layer (a layer is a snapshot — reshape the sound above, then update the layer)">⟳</button>
           <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
         </div>
@@ -6558,9 +6558,13 @@ function subnoteWorkspaceHTML(p) {
         `}
 
         <div class="subnote-side">
-          <div class="subnote-side-section sound-source-section">
-            <div class="section-label">Sound Source</div>
-            ${panelPresetBarHTML("sound")}
+          <!-- Space audit 07-07: the legacy "Sound Source" save box is gone —
+               the top bar's Preset name + section + SAVE is the one true
+               preset save. The envelope moved here from the excitor panel:
+               it matters, and this column had the room. -->
+          <div class="subnote-side-section env-side-section">
+            <div class="section-label">Envelope</div>
+            ${envelopeProbBlockHTML(p)}
           </div>
 
           <div class="subnote-side-section${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
@@ -8547,32 +8551,25 @@ function bodyBandChipsHTML(p) {
 
 function chInspectorHTML(p) {
   if (_chStage === "excitor") {
-    // Owner 07-07: the envelope is important — it sits beside the other
-    // excitor settings instead of buried in the performance drawer.
+    // Space audit 07-07: the envelope lives in the right column now (a
+    // proper panel, always visible) — the excitor inspector is one
+    // comfortable column again.
     return `
       <div class="ch-ins-head"><span class="ch-card-n">01 · EXCITOR</span><span class="ch-ins-d">how energy enters</span></div>
       <div class="seg-control" role="group">
         ${["bow", "pluck", "strike", "blow"].map(t =>
           `<button class="seg-btn${p.excitationType === t ? " active" : ""}" data-exc-type="${t}">${t[0].toUpperCase()}${t.slice(1)}</button>`).join("")}
       </div>
-      <div class="ch-exc-cols">
-        <div class="ch-exc-main">
-          <div class="knob-row">
-            ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
-            ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
-          </div>
-          <div class="knob-row">
-            ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
-            ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
-            ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
-          </div>
-          <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
-        </div>
-        <div class="ch-exc-env">
-          <div class="subsection-label">Envelope</div>
-          ${envelopeProbBlockHTML(p)}
-        </div>
+      <div class="knob-row">
+        ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
+        ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
       </div>
+      <div class="knob-row">
+        ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
+        ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
+        ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
+      </div>
+      <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
       <details class="ch-perf" ${_chPerfOpen ? "open" : ""} id="chPerfDetails">
         <summary>Performance — vibrato · onset noise</summary>
         ${vibratoBlockHTML(p)}
@@ -8580,7 +8577,7 @@ function chInspectorHTML(p) {
           ${knobHTML("attackNoiseLevel", "Onset noise", p.attackNoiseLevel ?? 1, 0, 2, 0.01, { def: 1 })}
         </div>
       </details>
-      <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field</div>`;
+      <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field. The envelope has its own panel on the right →</div>`;
   }
   if (_chStage === "resonator") {
     return `
@@ -8636,6 +8633,7 @@ function chInspectorHTML(p) {
       ${knobHTML("earDistance", "Ear span", p.earDistance ?? 0.175, 0.12, 0.25, 0.005, { def: 0.175, cool: true })}
       ${knobHTML("headDensity", "Head density", p.headDensity ?? 0.5, 0, 1, 0.01, { def: 0.5, cool: true })}
     </div>
+    ${checkboxControl("spaceOwnHead", "Own head — ignore the global listener", p.spaceOwnHead)}
     <div class="ch-caption">the full circle: drag anywhere around your head — behind you (shaded half) sounds duller via the pinna law. Distance delays arrival (~3 ms/m), softens highs, trades direct for room; ear span and head density shape the interaural cues</div>`;
 }
 
@@ -9415,17 +9413,15 @@ function wireLayerStrip(v) {
   bindSlider("data-layer-gain", (l, val) => { l.gain = val; });
   bindSlider("data-layer-angle", (l, val) => { l.space = { angle: val, dist: l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5) }; });
   bindSlider("data-layer-dist", (l, val) => { l.space = { angle: l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0), dist: val }; });
-  // the layer's own head (engine reads these from layer.subnote)
-  bindSlider("data-layer-ear", (l, val) => { l.subnote = { ...(l.subnote || {}), earDistance: val }; });
-  bindSlider("data-layer-density", (l, val) => { l.subnote = { ...(l.subnote || {}), headDensity: val }; });
-  v.querySelectorAll("[data-layer-head]").forEach(el => {
-    el.onchange = () => {
-      const l = layerOf(el.dataset.layerHead);
-      if (l) {
-        l.independentHead = el.checked;
-        applyLive();
-        renderExplore(); // the ear/density sliders appear with the toggle
-      }
+  // Owner 07-07: solo a layer to hear it alone (base + unsoloed layers
+  // silent); multiple solos combine like track solos
+  v.querySelectorAll("[data-layer-solo]").forEach(el => {
+    el.onclick = () => {
+      const l = layerOf(el.dataset.layerSolo);
+      if (!l) return;
+      l.solo = !l.solo;
+      el.classList.toggle("on", l.solo);
+      applyLive();
     };
   });
   v.querySelectorAll("[data-layer-recapture]").forEach(el => {

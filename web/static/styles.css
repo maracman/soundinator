@@ -1163,10 +1163,40 @@ body.explore-mode .view {
 }
 
 .subnote-workspace-mode .subnote-full-card {
+  /* Space audit 07-07: the sub-note workspace owns the ENTIRE plugin area
+     below the transport row — previously it shared the grid with implicit
+     rows (the bottom notes) and lost ~180px to them while empty space
+     showed elsewhere. Absolute fill; a small bottom margin keeps the
+     palette-edit / research-note strip visible. */
   display: block;
-  grid-column: 1 / -1;
-  grid-row: 2 / 6;
+  position: absolute;
+  top: 44px;
+  left: 3px;
+  right: 3px;
+  bottom: 46px;
+  z-index: 2;
   overflow: hidden;
+}
+/* …and the bottom strips pin to the reserved bottom band instead of
+   floating into the vacated grid rows */
+.subnote-workspace-mode .palette-edit-banner {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  z-index: 3;
+  margin: 0;
+  max-width: 60%;
+  padding: 0.3rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.subnote-workspace-mode .research-note {
+  position: absolute;
+  right: 3px;
+  bottom: 8px;
+  z-index: 3;
+  margin: 0;
 }
 
 .subnote-workspace-mode .visual-card,
@@ -1414,6 +1444,18 @@ body.explore-mode .view {
   overflow-y: auto;
   overflow-x: hidden;
 }
+/* Space audit 07-07: the CHORDA stage FILLS its grid cell so the tone
+   print + inspector take all remaining height — previously the stage
+   sized to content and only looked right because the (since-moved)
+   envelope block propped the inspector up. */
+.harmonic-stage.chorda {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+/* the editors never collapse below usable — the stage scrolls instead */
+.harmonic-stage.chorda .ch-main { min-height: 200px; }
 .harmonic-editor {
   max-height: 170px;
   overflow-y: auto;
@@ -1528,7 +1570,9 @@ body.explore-mode .view {
 
 .subnote-side {
   grid-column: 2;
-  grid-row: 1 / 3;
+  /* row 1 only: a 1/3 span let this column's content inflate the auto row
+     and steal ~150px from the stage — it scrolls internally instead */
+  grid-row: 1;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
@@ -5434,15 +5478,10 @@ body.explore-mode #app {
    flex-shrink into nothing when content exceeds the panel height (the
    Bow/Pluck/Strike/Blow segment was crushed to 2 px). */
 .ch-inspector > * { flex-shrink: 0; }
+.ch-inspector .ch-string { max-width: 100%; }
 
-/* Owner 07-07: envelope beside the excitor knobs (it matters) — two
-   columns that fit the 320px default inspector side by side */
-.ch-exc-cols { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.ch-exc-main { flex: 1 1 135px; min-width: 130px; display: flex; flex-direction: column; gap: 7px; }
-.ch-exc-env { flex: 1 1 140px; min-width: 135px; }
-.ch-exc-env .envelope-canvas { max-width: 100%; height: auto; }
-.ch-exc-env .envelope-dist-controls { font-size: 0.58rem; }
-.ch-exc-main .ch-string { max-width: 100%; }
+/* Space audit 07-07: the envelope has a proper home in the right column */
+.env-side-section .envelope-canvas { max-width: 100%; height: auto; }
 
 /* ── Q7: layered subnote modules ─────────────────────────── */
 .layer-strip {
@@ -5455,7 +5494,23 @@ body.explore-mode #app {
 }
 .layer-strip-label { font-size: 0.58rem; letter-spacing: 0.08em; color: var(--text3); }
 .layer-area { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.2rem 0.5rem 0.4rem; }
-.layer-rows { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
+/* Space audit 07-07: the rows never crowd the editors — they cap at two
+   rows tall and scroll (the whole CHORDA area shares one fixed canvas) */
+.layer-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 128px;
+  overflow-y: auto;
+  scrollbar-color: rgba(245,166,35,0.42) rgba(10,14,20,0.55);
+}
+.layer-solo.on {
+  color: #ffd28a;
+  border-color: rgba(245,166,35,0.6);
+  background: rgba(245,166,35,0.15);
+}
 .layer-row {
   display: flex;
   align-items: center;
@@ -5493,10 +5548,16 @@ body.explore-mode #app {
   text-overflow: ellipsis;
 }
 .layer-ownhead { white-space: nowrap; }
-/* the synchronised-variation panel sits to the RIGHT of the rows */
+/* the synchronised-variation panel sits to the RIGHT of the rows — and
+   scrolls internally rather than squeezing the editors above (the whole
+   layer band is height-capped) */
+.layer-area { max-height: 170px; }
+.layer-rows { max-height: 162px; }
 .layer-sync {
   flex: none;
   width: 230px;
+  max-height: 162px;
+  overflow-y: auto;
   padding: 0.4rem 0.55rem;
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -5504,6 +5565,7 @@ body.explore-mode #app {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  scrollbar-color: rgba(245,166,35,0.42) rgba(10,14,20,0.55);
 }
 .layer-sync .layer-env-sync { margin-left: 0; }
 .layer-sync-body.off { opacity: 0.35; pointer-events: none; }

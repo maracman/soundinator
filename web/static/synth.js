@@ -1927,9 +1927,7 @@ export class GenerationEngine {
       id: layer.id || `layer${index}`,
       gain: layer.gain ?? 1,
       space: layer.space || null,
-      independentHead: !!layer.independentHead,
-      earDistance: layer.subnote?.earDistance,
-      headDensity: layer.subnote?.headDensity,
+      solo: !!layer.solo, // owner 07-07: soloed layers play alone
       note: fields,
     };
   }
@@ -3733,30 +3731,28 @@ export class SynthEngine {
         this._renderOsc(n, t0);
       }
     };
-    dispatch(note);
     // Q7 layered subnotes: every layer renders the SAME note through its own
-    // fingerprint into its own spatial chain (inheriting the base space and
-    // head unless the layer positions itself / declares an independent head).
-    if (Array.isArray(note.layerRenders) && note.layerRenders.length && this._dryGain) {
-      for (const lr of note.layerRenders) {
-        const ln = {
-          ...note,
-          ...lr.note,
-          velocity: note.velocity * this._clamp(lr.gain ?? 1, 0, 2),
-          layerRenders: null,
-        };
-        const chain = this._layerChain(lr.id);
-        const sp = { ...(this._spaceP || {}) };
-        if (lr.space) { sp.spaceAzimuth = lr.space.angle; sp.spaceDistance = lr.space.dist; }
-        if (lr.independentHead) {
-          if (Number.isFinite(lr.earDistance)) sp.earDistance = lr.earDistance;
-          if (Number.isFinite(lr.headDensity)) sp.headDensity = lr.headDensity;
-        }
-        this._configureSpaceNodes(chain, sp);
-        ln._out = chain.input;
-        ln._vibratoEvents = note._vibratoEvents; // coherent FM across layers
-        dispatch(ln);
-      }
+    // fingerprint into its own spatial chain, inheriting the base space and
+    // the listener's head (owner 07-07: the head is a patch/space-level
+    // choice now, never per-layer). Solo: when any layer is soloed, only
+    // the soloed layers sound — the base and the rest go quiet.
+    const lrs = (Array.isArray(note.layerRenders) && this._dryGain) ? note.layerRenders : [];
+    const soloed = lrs.filter(lr => lr.solo);
+    if (!soloed.length) dispatch(note); // the base plays unless something is soloed
+    for (const lr of (soloed.length ? soloed : lrs)) {
+      const ln = {
+        ...note,
+        ...lr.note,
+        velocity: note.velocity * this._clamp(lr.gain ?? 1, 0, 2),
+        layerRenders: null,
+      };
+      const chain = this._layerChain(lr.id);
+      const sp = { ...(this._spaceP || {}) };
+      if (lr.space) { sp.spaceAzimuth = lr.space.angle; sp.spaceDistance = lr.space.dist; }
+      this._configureSpaceNodes(chain, sp);
+      ln._out = chain.input;
+      ln._vibratoEvents = note._vibratoEvents; // coherent FM across layers
+      dispatch(ln);
     }
   }
 

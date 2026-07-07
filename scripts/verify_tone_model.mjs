@@ -754,6 +754,11 @@ console.log("P3: note connection — glide vs ring on overlap");
     JSON.stringify(nOn.harmonicPartials.map(p => +p.amp.toFixed(5))));
   check("Q7: no layers → no layerRenders (untouched path)",
     firstNote(BASE).layerRenders === undefined);
+  // Owner 07-07: per-layer solo travels with the render; the renderer
+  // silences the base + unsoloed layers whenever any solo is set.
+  const nSolo = firstNote({ ...BASE, layers: [{ ...LAYER, solo: true }, { ...LAYER, id: "L2", solo: false }] });
+  check("Q7 solo: the flag rides each layerRender",
+    nSolo.layerRenders[0].solo === true && nSolo.layerRenders[1].solo === false);
 }
 
 // ── Q6: global space designer interpolator ──
