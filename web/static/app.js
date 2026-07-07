@@ -36,6 +36,8 @@ import {
   transferCoupling,
   excitationSpectrum,
   spaceAirCutoff,
+  patchBadges,
+  splitsBucketOf,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -145,6 +147,58 @@ function extractInstrumentParams(params) {
     if (!SESSION_CONTEXT_PARAMS.has(k)) out[k] = val;
   }
   return out;
+}
+
+// ── Q1: patch transparency badges + module halves ───────────
+// Badge row summarising what a patch will do in the arrangement —
+// derivation lives in synth.js (patchBadges) so it is asserted headlessly.
+function patchBadgesHTML(params, originTempo = null, compact = false) {
+  const b = patchBadges(params);
+  const tempo = originTempo ?? b.tempo;
+  const chips = [
+    `<span class="pb-chip" title="Scale this patch plays in">${esc(b.scaleLabel)}</span>`,
+    `<span class="pb-chip" title="Number of splits — scale degrees per octave">${b.splits} splits</span>`,
+    `<span class="pb-chip" title="Duration grid — subdivisions per beat">grid ${b.grid}</span>`,
+    tempo ? `<span class="pb-chip" title="The tempo this patch was designed at">${tempo} bpm</span>` : "",
+    `<span class="pb-chip" title="Overlap behaviour: glide (mono legato) or ring (multiphonic)">${esc(b.connection)}</span>`,
+    b.surpriseOn
+      ? `<span class="pb-chip pb-surprise" title="Surprise is ON — dimensions: ${b.dims.join(", ")} (P itch, T uning, R hythm, F ormant, D ynamics)">✦ ${b.dims.join("·")}</span>`
+      : `<span class="pb-chip pb-off" title="Surprise is off">no ✦</span>`,
+  ].filter(Boolean);
+  return `<span class="pb-row${compact ? " pb-compact" : ""}">${chips.join("")}</span>`;
+}
+
+// The two halves of a patch: MACRO ENGINE (how it behaves — melody, rhythm,
+// dynamics, surprise) and SUBNOTE MODULE (how it sounds). Loading a preset
+// with a half selected replaces only that half's keys; percussion and space
+// ride along only on full (BOTH) loads.
+const _MACRO_SECTIONS = new Set(["melody", "rhythm", "dynamics", "surprise"]);
+function loadPresetIntoPatch(pl, item, half) {
+  const incoming = voiceParamsFor(item);
+  if (half === "macro" || half === "subnote") {
+    const wanted = half === "macro"
+      ? (k) => _MACRO_SECTIONS.has(sectionForParam(k))
+      : (k) => sectionForParam(k) === "sound";
+    for (const [k, val] of Object.entries(incoming)) {
+      if (wanted(k)) pl.params[k] = val;
+    }
+  } else {
+    pl.params = incoming;
+    pl.name = item.name;
+    pl.kindLabel = item.kindLabel;
+    pl.sourceId = item.id;
+  }
+  // The design tempo + scale travel with macro/full loads only — a sound
+  // has neither.
+  if (half !== "subnote" && item.params) {
+    if (item.params.tempo != null) pl.originTempo = item.params.tempo;
+    if (item.params.scalePreset || item.params.customDegrees) {
+      pl.originScale = {
+        scaleMode: item.params.scaleMode, scalePreset: item.params.scalePreset,
+        customDegrees: item.params.customDegrees, edoDivisions: item.params.edoDivisions,
+      };
+    }
+  }
 }
 
 function loadInstruments() {
@@ -627,6 +681,8 @@ let lastSurpriseCount = 0;
 let lastPlayStartedAt = null; // Date.now() of most recent play start this visit
 let _visResizeObserver = null; // hero display fit observer
 let libraryFilter = "all";    // section filter shared across library tabs
+let splitsFilter = "all";     // Q1: filter presets by scale splits (degrees/octave)
+let _palHalfSel = {};         // Q1: paletteId → "macro"|"both"|"subnote" load target
 // In-context preset preview (Tonalic cue): audition a preset merged into the
 // current state without committing it. Non-destructive: exploreParams is
 // untouched; ending the preview restores exactly what was playing.
@@ -1208,6 +1264,15 @@ function addToPalette(item) {
     kindLabel: item.kindLabel,
     sourceId: item.id,
     params: voiceParamsFor(item),
+    // Voices deliberately drop tempo (session context) — remember the design
+    // tempo here so "adopt tempo" can offer it to the session (Q1).
+    originTempo: (item.params && item.params.tempo) ?? null,
+    // Scale is session context too — voices drop it, but the badge row
+    // must still tell the truth about what the patch was designed in.
+    originScale: item.params ? {
+      scaleMode: item.params.scaleMode, scalePreset: item.params.scalePreset,
+      customDegrees: item.params.customDegrees, edoDivisions: item.params.edoDivisions,
+    } : null,
   });
   saveArrangement();
 }
@@ -1272,6 +1337,7 @@ function renderBrowserCards(v) {
   const q = browserSearch.trim().toLowerCase();
   const items = browserItems().filter(item =>
     (browserFilter === "all" || item.cat === browserFilter) &&
+    (splitsFilter === "all" || splitsBucketOf(item.params) === splitsFilter) &&
     (!q || item.name.toLowerCase().includes(q) || (item.description || "").toLowerCase().includes(q)));
   container.innerHTML = items.length ? items.map(item => `
     <div class="browser-card" data-browser-item="${esc(item.id)}">
@@ -1334,6 +1400,34 @@ function wireBrowserPalette(v) {
       v.querySelectorAll("[data-browser-filter]").forEach(c =>
         c.classList.toggle("active", c === chip));
       renderBrowserCards(v);
+    };
+  });
+  const splitsSel = v.querySelector("[data-splits-filter]");
+  if (splitsSel) splitsSel.onchange = () => {
+    splitsFilter = splitsSel.value;
+    renderBrowserCards(v);
+  };
+  // Q1: which half of a patch presets load into
+  v.querySelectorAll("[data-pal-half]").forEach(btn => {
+    btn.onclick = () => {
+      const [palId, half] = btn.dataset.palHalf.split(":");
+      _palHalfSel[palId] = half;
+      renderProduce();
+    };
+  });
+  // Q1: adopt a patch's design tempo as the session tempo
+  v.querySelectorAll("[data-adopt-tempo]").forEach(btn => {
+    btn.onclick = () => {
+      const pl = (arrangement.palette || []).find(x => x.id === btn.dataset.adoptTempo);
+      if (!pl || !pl.originTempo) return;
+      arrangement.context.tempo = pl.originTempo;
+      saveArrangement("adopt tempo");
+      if (synth.isPlaying && selectedRegion) {
+        const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+        const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+        if (track && region) synth.updateGenerationParams(regionPlayParams(track, region));
+      }
+      renderProduce();
     };
   });
   v.querySelectorAll("[data-palette-edit]").forEach(btn => {
@@ -1775,6 +1869,11 @@ function produceTimelineHTML() {
       const baked = r.type === "baked" ? " baked" : "";
       const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
       const label = pal ? pal.name : t.name;
+      let badgeHover = "";
+      if (pal) {
+        const b = patchBadges(pal.params);
+        badgeHover = ` [${b.scaleLabel} · ${b.splits} splits · grid ${b.grid} · ${b.connection}${b.surpriseOn ? ` · ✦ ${b.dims.join("·")}` : ""}]`;
+      }
       let loopTicks = "";
       if (r.type === "baked" && r.loopSourceBeats && regionLen(r) > r.loopSourceBeats) {
         for (let lb = r.loopSourceBeats; lb < regionLen(r); lb += r.loopSourceBeats) {
@@ -1784,9 +1883,10 @@ function produceTimelineHTML() {
       const gainDb = 20 * Math.log10(Math.max(0.02, r.gain ?? 1));
       return `<div class="tl2-region${sel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
         style="left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
-        title="${esc(label)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
+        title="${esc(label)}${esc(badgeHover)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
         ${loopTicks}<span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
         ${r.type !== "baked" ? `<span class="tl2-seed" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">s·${r.seed}</span>` : ""}
+        ${sel && pal ? `<span class="tl2-badges">${patchBadgesHTML({ ...pal.params, ...(pal.originScale || {}) }, pal.originTempo, true)}</span>` : ""}
         ${sel ? `<span class="tl2-gain-tag" data-gain-tag="${r.id}" title="Region level — drag vertically">${gainDb >= 0 ? "+" : ""}${gainDb.toFixed(1)}dB</span>` : ""}
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
       </div>`;
@@ -2252,6 +2352,11 @@ function paletteZoneAtPoint(x, y) {
     .map(el => (el.closest ? el.closest("#dawPalette") : null))
     .find(Boolean) || null;
 }
+function paletteItemAtPoint(x, y) {
+  return document.elementsFromPoint(x, y)
+    .map(el => (el.closest ? el.closest("[data-palette-item]") : null))
+    .find(Boolean) || null;
+}
 function beatAtClientX(lane, clientX) {
   const rect = lane.getBoundingClientRect();
   const raw = (clientX - rect.left) / pxPerBeat;
@@ -2545,8 +2650,12 @@ function pointerDragMove(e) {
   const lane = laneAtPoint(e.clientX, e.clientY);
   if (lane) lane.classList.add("drop-target");
   else if (pointerDrag.kind === "browser") {
-    const zone = paletteZoneAtPoint(e.clientX, e.clientY);
-    if (zone) zone.classList.add("drop-target");
+    const itemEl = paletteItemAtPoint(e.clientX, e.clientY);
+    if (itemEl) itemEl.classList.add("drop-target");
+    else {
+      const zone = paletteZoneAtPoint(e.clientX, e.clientY);
+      if (zone) zone.classList.add("drop-target");
+    }
   }
   e.preventDefault();
 }
@@ -2581,6 +2690,17 @@ function pointerDragUp(e) {
       addToPalette(item);
       const palId = arrangement.palette[arrangement.palette.length - 1].id;
       dropPaletteOnLane(lane.dataset.lane, palId, beatAtClientX(lane, e.clientX));
+      return;
+    }
+    // Q1: dropping ON an existing patch loads the preset into it — the
+    // patch's MACRO/BOTH/SUB-NOTE selector decides which half is replaced.
+    const palEl = paletteItemAtPoint(e.clientX, e.clientY);
+    const pl = palEl && (arrangement.palette || []).find(x => x.id === palEl.dataset.paletteItem);
+    if (pl) {
+      const half = _palHalfSel[pl.id] || "both";
+      loadPresetIntoPatch(pl, item, half);
+      saveArrangement(`load ${item.name} → ${pl.name} (${half})`);
+      renderProduce();
     } else if (paletteZoneAtPoint(e.clientX, e.clientY)) {
       addToPalette(item);
       renderProduce();
@@ -2658,22 +2778,35 @@ function renderProduce() {
               <div class="browser-filters">
                 ${[["all", "All"], ["starter", "Starters"], ["instrument", "Instruments"], ["mine", "Mine"], ["section", "Sections"]].map(([k, label]) =>
                   `<button class="filter-chip${browserFilter === k ? " active" : ""}" data-browser-filter="${k}">${label}</button>`).join("")}
+                <select class="splits-filter" data-splits-filter title="Filter presets by number of splits (scale degrees per octave)">
+                  ${[["all", "Any splits"], ["5", "5 splits"], ["6", "6 splits"], ["7", "7 splits"], ["8+", "8+ splits"], ["12", "12 splits"], ["other", "Other"]].map(([k, label]) =>
+                    `<option value="${k}"${splitsFilter === k ? " selected" : ""}>${label}</option>`).join("")}
+                </select>
               </div>
               <div class="browser-cards" id="browserCards"></div>
             </div>
             <div class="daw-palette" id="dawPalette">
               <div class="section-label">Palette</div>
               <div class="palette-rack" id="paletteRack">
-                ${(arrangement.palette || []).length ? (arrangement.palette || []).map(pl => `
-                  <div class="palette-item" data-palette-item="${pl.id}" title="Your working instrument — drag onto a track (P3) or add a track with +">
+                ${(arrangement.palette || []).length ? (arrangement.palette || []).map(pl => {
+                  const half = _palHalfSel[pl.id] || "both";
+                  return `
+                  <div class="palette-item${half !== "both" ? " half-armed" : ""}" data-palette-item="${pl.id}" title="Your working instrument — drag onto a track (P3) or add a track with +. Drop a browser preset ON this card to load it into the selected half.">
                     <span class="pal-name">${esc(pl.name)}</span>
                     <span class="pal-kind">${esc(pl.kindLabel || "")}</span>
                     <span class="pal-actions">
+                      ${pl.originTempo ? `<button class="pal-btn" data-adopt-tempo="${pl.id}" title="Adopt this patch's design tempo (${pl.originTempo} bpm) as the session tempo">⏱</button>` : ""}
                       <button class="pal-btn" data-palette-edit="${pl.id}" title="Open this instrument in the Sound Studio editor — save it back and every region using it follows">✎</button>
                       <button class="pal-btn" data-add-track="pal:${pl.id}" title="Add a track playing this instrument">+</button>
                       <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
                     </span>
-                  </div>`).join("") : '<div class="empty-state">Drag presets here from the browser above — this is your instrument rack for the arrangement.</div>'}
+                    ${patchBadgesHTML({ ...pl.params, ...(pl.originScale || {}) }, pl.originTempo)}
+                    <span class="pal-half" role="group" title="Which half of this patch browser presets load into: MACRO = behaviour (melody, rhythm, dynamics, surprise), SUB-NOTE = the sound itself, BOTH = the whole patch">
+                      ${[["macro", "MACRO"], ["both", "BOTH"], ["subnote", "SUB-NOTE"]].map(([h, label]) =>
+                        `<button class="pal-half-btn${half === h ? " active" : ""}" data-pal-half="${pl.id}:${h}">${label}</button>`).join("")}
+                    </span>
+                  </div>`;
+                }).join("") : '<div class="empty-state">Drag presets here from the browser above — this is your instrument rack for the arrangement.</div>'}
               </div>
             </div>
           </div>
@@ -3770,6 +3903,10 @@ function renderExplore() {
         <button class="filter-chip${libraryFilter === "full" ? " active" : ""}" data-filter="full">Full rigs</button>
         ${[["percussive", "Percussive"], ["bass", "Bass"], ["atmos", "Atmos"], ["melody", "Melody"]].map(([k, label]) =>
           `<button class="filter-chip family-chip${libraryFilter === `family:${k}` ? " active" : ""}" data-filter="family:${k}">${label}</button>`).join("")}
+        <select class="splits-filter" data-splits-filter title="Filter presets by number of splits (scale degrees per octave)">
+          ${[["all", "Any splits"], ["5", "5 splits"], ["6", "6 splits"], ["7", "7 splits"], ["8+", "8+ splits"], ["12", "12 splits"], ["other", "Other"]].map(([k, label]) =>
+            `<option value="${k}"${splitsFilter === k ? " selected" : ""}>${label}</option>`).join("")}
+        </select>
         ${Object.entries(PRESET_SECTIONS).map(([k, s]) =>
           `<button class="filter-chip${libraryFilter === k ? " active" : ""}" data-filter="${k}">${s.label}</button>`).join("")}
       </div>
@@ -4603,6 +4740,13 @@ function renderExplore() {
       libraryFilter = chip.dataset.filter;
       libraryFilters.querySelectorAll(".filter-chip").forEach(c =>
         c.classList.toggle("active", c === chip));
+      renderPresetList(starterList, FACTORY_PRESETS, "starter");
+      renderPresetList(myList, loadPresets(), "my");
+      if (!globalList.classList.contains("hidden")) loadGlobalPresets(globalList);
+    };
+    const librarySplits = libraryFilters.querySelector("[data-splits-filter]");
+    if (librarySplits) librarySplits.onchange = () => {
+      splitsFilter = librarySplits.value;
       renderPresetList(starterList, FACTORY_PRESETS, "starter");
       renderPresetList(myList, loadPresets(), "my");
       if (!globalList.classList.contains("hidden")) loadGlobalPresets(globalList);
@@ -8826,6 +8970,9 @@ function renderPresetList(container, presets, source) {
     presets = presets.filter(p => p.family === libraryFilter.slice(7));
   } else if (libraryFilter !== "all" && source !== "instrument") {
     presets = presets.filter(p => (p.section && p.section !== "full" ? p.section : "full") === libraryFilter);
+  }
+  if (splitsFilter !== "all" && source !== "instrument") {
+    presets = presets.filter(p => splitsBucketOf(p.parameters) === splitsFilter);
   }
   if (!presets.length) {
     container.innerHTML = '<div class="empty-state">No presets yet. Save one to get started.</div>';

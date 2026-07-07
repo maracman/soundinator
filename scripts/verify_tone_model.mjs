@@ -592,5 +592,40 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q1: patch transparency badges (pure derivation, no persistence) ──
+{
+  const { patchBadges, splitsBucketOf } = await import("../web/static/synth.js");
+  const fixture = {
+    scaleMode: "12tone", scalePreset: "pent_minor", customDegrees: null,
+    beatDivisions: 3, noteConnection: "ring", surpriseProb: 0.2,
+    surprisePitchEnabled: true, surprisePitchWeight: 1,
+    surpriseRhythmEnabled: true, surpriseRhythmWeight: 0.5,
+    surpriseDynamicsEnabled: true, surpriseDynamicsWeight: 0, // weight 0 → not a dim
+    surpriseRestEnabled: false, surpriseRestWeight: 0.2,
+  };
+  const b = patchBadges(fixture);
+  check("Q1 badges: scale label from preset", b.scaleLabel === "Pentatonic minor");
+  check("Q1 badges: splits = preset degree count", b.splits === 5);
+  check("Q1 badges: grid = beatDivisions", b.grid === 3);
+  check("Q1 badges: connection passes through", b.connection === "ring");
+  check("Q1 badges: surprise on with enabled+weighted dims", b.surpriseOn === true);
+  check("Q1 badges: dims filtered by enabled AND weight>0",
+    JSON.stringify(b.dims) === JSON.stringify(["P", "R"]), JSON.stringify(b.dims));
+  const bOff = patchBadges({ ...fixture, surpriseProb: 0 });
+  check("Q1 badges: surpriseProb 0 → surprise off", bOff.surpriseOn === false);
+  const bEdo = patchBadges({ scaleMode: "edo", edoDivisions: 19,
+    customDegrees: [0, 3, 6, 8, 11, 14, 17] });
+  check("Q1 badges: EDO label is 'N-EDO n'", bEdo.scaleLabel === "19-EDO 7", bEdo.scaleLabel);
+  check("Q1 badges: EDO splits from customDegrees", bEdo.splits === 7);
+  check("Q1 badges: defaults are sane on an empty params object",
+    (() => { const d = patchBadges({}); return d.scaleLabel === "Major" && d.splits === 7 && d.grid === 1 && d.connection === "glide"; })());
+  check("Q1 splits bucket: customDegrees length wins",
+    splitsBucketOf({ customDegrees: [0, 1, 2, 3, 4, 5], scalePreset: "major" }) === "6");
+  check("Q1 splits bucket: scalePreset fallback", splitsBucketOf({ scalePreset: "chromatic" }) === "12");
+  check("Q1 splits bucket: 8-11 → '8+'", splitsBucketOf({ customDegrees: [0,1,2,3,4,5,6,7,8] }) === "8+");
+  check("Q1 splits bucket: <5 → 'other'", splitsBucketOf({ customDegrees: [0, 4, 7] }) === "other");
+  check("Q1 splits bucket: silent presets get no bucket", splitsBucketOf({ tempo: 120 }) === null);
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
 console.log("\nAll tone-model v2 assertions passed (T1-T6 + space).");

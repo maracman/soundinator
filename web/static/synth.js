@@ -937,6 +937,63 @@ export const SCALE_PRESETS = {
 
 const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// ─── Patch transparency (Q1) ────────────────────────────────
+// What a patch will do inside an arrangement, derived from its parameters
+// alone — nothing is persisted for this. Pure so it can be asserted
+// headlessly; the UI renders whatever comes back.
+
+const _SURPRISE_DIM_BADGES = [
+  { letter: "P",    enabled: "surprisePitchEnabled",    weight: "surprisePitchWeight" },
+  { letter: "T",    enabled: "surpriseTuningEnabled",   weight: "surpriseTuningWeight" },
+  { letter: "R",    enabled: "surpriseRhythmEnabled",   weight: "surpriseRhythmWeight" },
+  { letter: "F",    enabled: "surpriseFormantEnabled",  weight: "surpriseFormantWeight" },
+  { letter: "D",    enabled: "surpriseDynamicsEnabled", weight: "surpriseDynamicsWeight" },
+  { letter: "rest", enabled: "surpriseRestEnabled",     weight: "surpriseRestWeight" },
+];
+
+// Degrees the patch actually plays: explicit customDegrees win, otherwise
+// the named 12-tone preset.
+export function patchDegrees(params) {
+  if (Array.isArray(params.customDegrees) && params.customDegrees.length) {
+    return params.customDegrees;
+  }
+  return (SCALE_PRESETS[params.scalePreset] || SCALE_PRESETS.major).degrees;
+}
+
+export function patchBadges(params) {
+  const p = params || {};
+  const degrees = patchDegrees(p);
+  const scaleLabel = p.scaleMode === "edo"
+    ? `${p.edoDivisions || 12}-EDO ${degrees.length}`
+    : (SCALE_PRESETS[p.scalePreset]?.label || p.scalePreset || "Major");
+  return {
+    surpriseOn: (p.surpriseProb ?? 0) > 0 &&
+      _SURPRISE_DIM_BADGES.some(d => p[d.enabled] && (p[d.weight] ?? 0) > 0),
+    dims: _SURPRISE_DIM_BADGES
+      .filter(d => p[d.enabled] && (p[d.weight] ?? 0) > 0)
+      .map(d => d.letter),
+    scaleLabel,
+    splits: degrees.length,
+    grid: p.beatDivisions ?? 1,
+    tempo: p.tempo ?? null, // palette voices drop tempo (session context); callers pass originTempo
+    connection: p.noteConnection || "glide",
+  };
+}
+
+// Browser filter bucket for "number of splits" — only presets that say
+// something about scale get a bucket; the rest only show under "all".
+export function splitsBucketOf(parameters) {
+  const p = parameters || {};
+  let n = null;
+  if (Array.isArray(p.customDegrees) && p.customDegrees.length) n = p.customDegrees.length;
+  else if (p.scalePreset && SCALE_PRESETS[p.scalePreset]) n = SCALE_PRESETS[p.scalePreset].degrees.length;
+  if (n == null) return null;
+  if (n === 12) return "12";
+  if (n >= 8) return "8+";
+  if (n >= 5) return String(n);
+  return "other";
+}
+
 // ─── Scale ──────────────────────────────────────────────────
 
 export class Scale {

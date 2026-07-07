@@ -5146,6 +5146,59 @@ body.explore-mode #app {
 .pal-kind { font-size: 0.6rem; color: var(--text3); white-space: nowrap; }
 .pal-actions { display: flex; gap: 0.25rem; }
 
+/* ── Q1: patch transparency badges + module halves ───────── */
+.palette-item { flex-wrap: wrap; }
+.palette-item.half-armed { border-color: rgba(245,166,35,0.55); box-shadow: 0 0 0 1px rgba(245,166,35,0.25); }
+.palette-item.drop-target { outline: 1px dashed var(--accent); outline-offset: 2px; }
+.pb-row { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.15rem; }
+.pb-chip {
+  font-size: 0.58rem;
+  color: var(--text3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.02rem 0.4rem;
+  white-space: nowrap;
+}
+.pb-chip.pb-surprise { color: var(--surp); border-color: rgba(56,189,248,0.45); }
+.pb-chip.pb-off { opacity: 0.55; }
+.pal-half { flex-basis: 100%; display: flex; gap: 0; margin-top: 0.25rem; }
+.pal-half-btn {
+  flex: 1;
+  background: var(--surface);
+  color: var(--text3);
+  border: 1px solid var(--border);
+  padding: 0.08rem 0.3rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.pal-half-btn:first-child { border-radius: 5px 0 0 5px; }
+.pal-half-btn:last-child { border-radius: 0 5px 5px 0; }
+.pal-half-btn.active {
+  color: var(--accent2);
+  border-color: rgba(245,166,35,0.5);
+  background: rgba(245,166,35,0.1);
+}
+.splits-filter {
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.tl2-badges {
+  position: absolute;
+  left: 4px;
+  bottom: 2px;
+  right: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tl2-badges .pb-row { flex-wrap: nowrap; margin-top: 0; }
+.tl2-badges .pb-chip { background: rgba(10,14,20,0.65); }
+
 /* ── Producer v2 P3: beat-based timeline ─────────────────── */
 
 .tl2 { overflow-x: auto; padding-bottom: 4px; }

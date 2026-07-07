@@ -121,6 +121,7 @@ Read this before touching anything.
 | CH-B2: draggable ADSR + vibrato + onset noise in EXCITOR; liftable `envelopeProbBlockHTML`/`vibratoBlockHTML` | audit | `fb76fbb` v148 |
 | P2 family starters (percussive/bass/atmos/melody) + library family filter chips | 07-07 | `b17a63a` v149 |
 | P3 note connection: `noteConnection` glide\|ring | 07-07 | `da5111b` v150 |
+| Q1 patch transparency: badge row (scale/splits/grid/tempo/connection/✦dims), adopt-tempo, splits filter, MACRO\|BOTH\|SUB-NOTE half-loads via drop-on-card | 07-07 brief | v151 |
 
 ### Queued — build order
 
