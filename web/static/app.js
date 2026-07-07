@@ -9521,8 +9521,16 @@ function _soundHalf(params) {
 
 function enterLayerEdit(layer) {
   if (_chLayerEdit) exitLayerEdit(false);
-  _chLayerEdit = { layerId: layer.id, baseStash: _soundHalf(exploreParams) };
+  // Owner 07-07: location in space is SEPARATE per layer — editing a layer
+  // also swaps its position in, so the SPACE stage pad moves THIS layer.
+  _chLayerEdit = {
+    layerId: layer.id,
+    baseStash: _soundHalf(exploreParams),
+    baseSpace: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 },
+  };
   Object.assign(exploreParams, layer.subnote || {});
+  exploreParams.spaceAzimuth = layer.space?.angle ?? _chLayerEdit.baseSpace.angle;
+  exploreParams.spaceDistance = layer.space?.dist ?? _chLayerEdit.baseSpace.dist;
   _chLayerSel = layer.id;
   synth.updateGenerationParams({ ...exploreParams });
   renderExplore();
@@ -9531,8 +9539,16 @@ function enterLayerEdit(layer) {
 function exitLayerEdit(rerender = true) {
   if (!_chLayerEdit) return;
   const layer = (exploreParams.layers || []).find(l => l.id === _chLayerEdit.layerId);
-  if (layer) layer.subnote = _soundHalf(exploreParams); // save the edit back
+  if (layer) {
+    layer.subnote = _soundHalf(exploreParams); // save the edit back
+    layer.space = { // ...including where the SPACE pad put this layer
+      angle: exploreParams.spaceAzimuth ?? 0,
+      dist: exploreParams.spaceDistance ?? 2.5,
+    };
+  }
   Object.assign(exploreParams, _chLayerEdit.baseStash);  // restore the base
+  exploreParams.spaceAzimuth = _chLayerEdit.baseSpace.angle;
+  exploreParams.spaceDistance = _chLayerEdit.baseSpace.dist;
   _chLayerEdit = null;
   _chLayerSel = null;
   synth.updateGenerationParams({ ...exploreParams });
@@ -9556,9 +9572,10 @@ function wireLayerStrip(v) {
       id: crypto.randomUUID(),
       hue: (36 + exploreParams.layers.length * 70) % 360,
       subnote,
-      space: null, // inherits the patch position until positioned
+      // owner 07-07: every layer's location is its OWN from birth — a copy
+      // of the current position, so moving the base never drags layers
+      space: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 },
       gain: 0.8,
-      independentHead: false,
     };
     exploreParams.layers.push(layer);
     _chLayerSel = layer.id;
@@ -9582,8 +9599,23 @@ function wireLayerStrip(v) {
     };
   });
   bindSlider("data-layer-gain", (l, val) => { l.gain = val; });
-  bindSlider("data-layer-angle", (l, val) => { l.space = { angle: val, dist: l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5) }; });
-  bindSlider("data-layer-dist", (l, val) => { l.space = { angle: l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0), dist: val }; });
+  const syncEditedSpace = (l) => {
+    // if this layer is loaded in the editor, the SPACE pad mirrors the move
+    if (_chLayerEdit?.layerId === l.id) {
+      exploreParams.spaceAzimuth = l.space.angle;
+      exploreParams.spaceDistance = l.space.dist;
+      drawSpacePad();
+      synth.updateReverb({ ...exploreParams });
+    }
+  };
+  bindSlider("data-layer-angle", (l, val) => {
+    l.space = { angle: val, dist: l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5) };
+    syncEditedSpace(l);
+  });
+  bindSlider("data-layer-dist", (l, val) => {
+    l.space = { angle: l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0), dist: val };
+    syncEditedSpace(l);
+  });
   // Owner 07-07: solo a layer to hear it alone (base + unsoloed layers
   // silent); multiple solos combine like track solos
   v.querySelectorAll("[data-layer-solo]").forEach(el => {
