@@ -4955,6 +4955,9 @@ function resetSpectralPartialParams(p) {
   for (const [key, value] of Object.entries(profile.performance || {})) {
     if (key !== "attackNoise" && key in DEFAULTS) p[key] = value;
   }
+  // An instrument without its own measured inharmonicity starts harmonic —
+  // otherwise the previous instrument's B leaks across the switch
+  if (!Number.isFinite(profile.performance?.partialB)) p.partialB = null;
   // Tone v2 (T2): the instrument's natural excitation is part of its
   // character — selecting a profile re-seats type/position/hardness.
   const exc = profile.performance?.excitation;

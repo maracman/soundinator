@@ -108,12 +108,16 @@ console.log("64-partial profile tables");
   check("8 instrument profiles present", profiles.length >= 8);
   check("every profile carries 64 partials", profiles.every(([, p]) => p.partials.length === 64));
   const cl = SPECTRAL_PROFILES.clarinet.partials;
-  // Clarinet's odd-dominant parity must survive into the extrapolated tail
-  const oddTail = [cl[40], cl[42], cl[44]].map(p => p.amp);
-  const evenTail = [cl[41], cl[43], cl[45]].map(p => p.amp);
-  check("clarinet parity survives past partial 40",
-    oddTail.every((o, i) => o > evenTail[i]),
-    `odd ${oddTail.join(",")} vs even ${evenTail.join(",")}`);
+  // Clarinet's odd-dominant parity must hold across the band the
+  // measurement resolves (the measured tail is honestly ~0 above ~10 kHz,
+  // so parity is tested where there is signal, and the tail must fade)
+  const odd = [cl[2], cl[4], cl[6], cl[8]].map(p => p.amp);   // harmonics 3,5,7,9
+  const even = [cl[1], cl[3], cl[5], cl[7]].map(p => p.amp);  // harmonics 2,4,6,8
+  const oddSum = odd.reduce((a, b) => a + b, 0), evenSum = even.reduce((a, b) => a + b, 0);
+  check("clarinet parity holds across the measured band",
+    oddSum > evenSum * 3, `odd ${oddSum.toFixed(3)} vs even ${evenSum.toFixed(3)}`);
+  check("clarinet measured tail fades to silence, not garbage",
+    cl.slice(44).every(p => p.amp <= 0.02));
   const vn = SPECTRAL_PROFILES.violin.partials;
   check("violin tail keeps decaying", vn[63].amp < vn[31].amp && vn[31].amp < vn[7].amp);
 }
@@ -441,6 +445,30 @@ console.log("CH-B1 rev 2: articulation manipulates the SELECTED body");
   const legacyVocal = new GenerationEngine({ ...GEN6, bodyArticulation: undefined, bodyType: "vocal" });
   check("legacy bodyType 'vocal' still articulates (depth defaults to 1)",
     legacyVocal._articulationDepth() === 1);
+}
+
+console.log("CH-B3: measured instrument fits folded into presets");
+{
+  for (const key of ["flute", "clarinet", "violin", "cello", "trumpet", "trombone", "piano"]) {
+    const prof = SPECTRAL_PROFILES[key];
+    check(`${key}: 64 measured partials, all sane, dyn curve extended`,
+      prof.partials.length === 64 &&
+      prof.partials.every(p => Number.isFinite(p.amp) && p.amp >= 0 && p.amp <= 1 &&
+        Number.isFinite(p.spread) && Number.isFinite(p.dyn)) &&
+      prof.measured && typeof prof.measured.source === "string");
+  }
+  const piano = SPECTRAL_PROFILES.piano.performance;
+  check("piano: measured inharmonicity seeds partialB (~3.6e-4, was 1.2e-4)",
+    piano.partialB > 2e-4 && piano.partialB < 6e-4);
+  check("piano: measured material (real piano out-rings the old default)",
+    piano.partialMaterial <= 0.1);
+  const violin = SPECTRAL_PROFILES.violin.performance;
+  check("violin: measured vibrato rate, blended depth, hand envelope kept",
+    Math.abs(violin.vibratoRate - 5.739) < 0.01 &&
+    violin.vibratoDepth > 16 && violin.vibratoDepth < 25.3 &&
+    violin.envelopeAttack === 0.085);
+  check("vocal profile untouched (no solo-voice source measured)",
+    !SPECTRAL_PROFILES.vocal.measured);
 }
 
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }

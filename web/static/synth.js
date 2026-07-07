@@ -37,6 +37,8 @@ export class SeededRNG {
 // with formant number. F4/F5 carry the "presence"/singer's-formant region
 // that makes voices read as natural rather than filtered.
 
+import { MEASURED_PROFILES } from "./measured_profiles.js";
+
 export const FORMANT_PRESETS = {
   ah: { f1: 730, f2: 1090, f3: 2440, f4: 3300, f5: 3750, bw: [90, 110, 170, 250, 300], label: "ah" },
   ee: { f1: 270, f2: 2290, f3: 3010, f4: 3500, f5: 3950, bw: [60, 100, 150, 200, 260], label: "ee" },
@@ -640,6 +642,50 @@ const SPECTRAL_PERFORMANCE = {
 
 for (const [profileKey, performance] of Object.entries(SPECTRAL_PERFORMANCE)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].performance = performance;
+}
+
+// ── CH-B3: fold measured instrument fits into the presets ──
+// scripts/fit_profiles_from_samples.py measured real recordings (U. Iowa
+// anechoic + Philharmonia; docs/MEASURED_PROFILES.md). Curation rules:
+//  - partials: measured 64 amps/spreads REPLACE the hand-tuned 20; the
+//    hand dyn curve (velocity swell per partial) is kept and extended
+//    linearly — the samples were single-dynamic (mf), so they can't say
+//    how partials swell.
+//  - material & partialB: measured (the fit inverts the engine's own T60
+//    law, so ring times land on the recordings; real piano B is ~3x the
+//    old default).
+//  - attackNoise: measured transient fits (freq/Q/level/decay).
+//  - vibrato rate/SDs: measured; depth: blended 50/50 with hand values —
+//    the vibrato sources are molto-vibrato takes, an upper bound on the
+//    default. vibratoProb and the envelope stay hand-tuned: sample
+//    players bloom slowly into long held notes, which measures recording
+//    style, not the instrument's speaking speed.
+for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
+  const prof = SPECTRAL_PROFILES[profileKey];
+  if (!prof || !Array.isArray(m.partials) || !m.partials.length) continue;
+  const hand = prof.partials;
+  const last = hand.length - 1;
+  const dynSlope = last > 0 ? ((hand[last].dyn ?? 0) - (hand[0].dyn ?? 0)) / last : 0;
+  prof.partials = m.partials.map((mp, i) => ({
+    amp: mp.amp,
+    spread: mp.spread,
+    dyn: hand[i]?.dyn ?? +((hand[last]?.dyn ?? 0) + dynSlope * (i - last)).toFixed(2),
+    ...(hand[i]?.reg !== undefined ? { reg: hand[i].reg } : {}),
+  }));
+  const perf = prof.performance || (prof.performance = {});
+  if (Number.isFinite(m.material)) perf.partialMaterial = m.material;
+  if (Number.isFinite(m.partialB)) perf.partialB = m.partialB;
+  if (m.attackNoise && Number.isFinite(m.attackNoise.level)) {
+    perf.attackNoise = { level: m.attackNoise.level, freq: m.attackNoise.freq, q: m.attackNoise.q, decay: m.attackNoise.decay };
+  }
+  const mp = m.performance || {};
+  for (const key of ["vibratoRate", "vibratoRateSd", "vibratoDepthSd"]) {
+    if (Number.isFinite(mp[key])) perf[key] = mp[key];
+  }
+  if (Number.isFinite(mp.vibratoDepth) && Number.isFinite(perf.vibratoDepth)) {
+    perf.vibratoDepth = +((perf.vibratoDepth + mp.vibratoDepth) / 2).toFixed(1);
+  }
+  prof.measured = { source: m.source || "" };
 }
 
 // ── Tone model v2: resonator core (docs/TONE_MODEL_V2_DESIGN.md §3.2) ──
