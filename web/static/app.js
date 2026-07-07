@@ -5025,22 +5025,13 @@ function macroPanelHTML(p) {
 }
 
 function productionPanelHTML(p) {
+  // Q2: the standalone reverb card is gone from the macro production tab.
+  // Owner-clarified model: reverb/space TYPE lives with the global space
+  // (producer, Q6); each patch keeps its own space in the SPACE stage
+  // inspector. The reverb params stay in the params object — patches and
+  // saved presets still carry and use them.
   return `
-    <div class="perf-panel production-panel production-panel-split">
-      <div class="perf-section space-section">
-        <div class="perf-section-title">Reverb</div>
-        ${panelPresetBarHTML("space")}
-        <select data-param-select="reverbType" class="param-select">
-          ${reverbTypeOptions(p.reverbType)}
-        </select>
-        <div class="controls-grid">
-          ${controlRow("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01)}
-          ${controlRow("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1)}
-          ${controlRow("reverbTone", "Tone", p.reverbTone, 0, 1, 0.01)}
-          ${controlRow("reverbPreDelay", "Pre-delay", p.reverbPreDelay, 0, 0.25, 0.005)}
-        </div>
-        <canvas class="mini-canvas" id="cvReverb" width="360" height="54"></canvas>
-      </div>
+    <div class="perf-panel production-panel">
       <div class="perf-section percussion-section">
         <div class="perf-section-title">Percussion</div>
         ${panelPresetBarHTML("percussion")}
