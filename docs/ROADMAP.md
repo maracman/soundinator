@@ -135,7 +135,8 @@ never blindly reset. Claim an item by committing early and often.
 | Q4 binaural head: `itdSeconds`/`ildDb`/`headShadowCutoff`/`pinnaParams`/`spaceDistanceGain` laws, explicit per-ear graph replaces the HRTF panner, `earDistance`+`headDensity` knobs, full-circle pad (±180°, behind shaded). APP_VERSION → 0.4.0 | 07-07 brief | `6a75198` v155 |
 | Q5 global scale strip: `arrangement.globalScale` markers + `globalScaleAt` law, per-track G opt-in, merge after voice in `regionPlayParams`, collapsible strip + mini-roll operator cycling (off→scale→sub→root) | 07-07 brief | `5b343a5` v156 |
 | Q6 global space designer: `trackSpaceAt` interpolator, `arrangement.space` (mode override/offset, head owns reverb type per Q2), cross-section editor (drag/snap-back/dblclick-anchor, first anchor seeds start+end), rocking cylinder with roll-spring + anchor→playhead jump, smart-arrange activation modal, per-beat walker retarget | 07-07 brief | `1eeb308` v157 |
-| Q7 layered subnotes: `params.layers` + `layerEnvOverride`, per-note `layerRenders` (one seed, independent-or-synced env draws, cross-layer coupling over the union), per-layer Q4 spatial chains, block strip UI with env-override block. APP_VERSION → 0.5.0 | 07-07 batch 2 | v158 |
+| Q7 layered subnotes: `params.layers` + `layerEnvOverride`, per-note `layerRenders` (one seed, independent-or-synced env draws, cross-layer coupling over the union), per-layer Q4 spatial chains, block strip UI with env-override block. APP_VERSION → 0.5.0 | 07-07 batch 2 | `92fc47e` v158 |
+| Q8 imperfections: `onsetScoopCents`/`partialOnsetDelay`/`releaseRingSeconds`/`f0WanderTrace` laws wired into the render path (scoop+wander via _setFrequency, stagger via partial amp ramps, ring via _adsr tail + extended osc stops); generator passes `lowToHighStaggerMs` through for future fits. APP_VERSION → 0.6.0 | 07-07 brief | v159 |
 
 ### Queued — build order
 

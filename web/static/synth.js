@@ -993,6 +993,54 @@ export const SCALE_PRESETS = {
 
 const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// ─── Imperfections (Q8) ─────────────────────────────────────
+// Four small physical truths of played notes, each a pure law asserted
+// headlessly, each scaled by the Human dial so machine-precise settings
+// stay machine-precise.
+
+// 1 · Onset pitch scoop: f0 approaches from below over the attack —
+// sustained excitation (bow/blow) hunts for pitch far more than a struck
+// or plucked string, and only humans hunt at all.
+const _SCOOP_BASE_CENTS = { bow: 35, blow: 45, pluck: 10, strike: 6 };
+export function onsetScoopCents(excitationType, human = 0) {
+  const base = _SCOOP_BASE_CENTS[excitationType] ?? 12;
+  return -base * Math.max(0, Math.min(1, human ?? 0));
+}
+
+// 2 · Attack stagger: low partials speak first for bow/blow. Measured
+// lowToHighStaggerMs wins when a profile carries it; hand values apply
+// until the sample fitter is re-run.
+const _STAGGER_DEFAULT_MS = { bow: 38, blow: 45 };
+export function partialOnsetDelay(harmonic, excitationType, staggerMs = null) {
+  const ms = staggerMs ?? _STAGGER_DEFAULT_MS[excitationType];
+  if (!ms) return 0; // strike/pluck: everything speaks at once
+  return ((Math.max(1, harmonic) - 1) / 63) * Math.max(0, Math.min(120, ms)) / 1000;
+}
+
+// 3 · Release ring: after note-off the resonator keeps ringing at the
+// material's own T60 instead of being cut by the envelope (capped for CPU).
+export function releaseRingSeconds(material, freqHz) {
+  const m = Math.max(0, Math.min(1, material ?? 0));
+  if (m <= 0) return 0;
+  return Math.min(1.8, materialT60(Math.max(60, freqHz || 261.63), m) * 0.5);
+}
+
+// 4 · f0 wander: a very slow seeded random walk (< ±4¢ at Human 1)
+// during the sustain — nobody holds a pitch perfectly still.
+export function f0WanderTrace(rand, durSec, human = 0) {
+  const h = Math.max(0, Math.min(1, human ?? 0));
+  if (h <= 0 || !(durSec > 0.5)) return [];
+  const cap = 4 * h;
+  const events = [];
+  let c = 0;
+  let guard = 0;
+  for (let t = 0.25; t < durSec - 0.05 && guard++ < 200; t += 0.35) {
+    c = Math.max(-cap, Math.min(cap, c + (rand() * 2 - 1) * cap * 0.5));
+    events.push({ time: t, cents: c });
+  }
+  return events;
+}
+
 // ─── Global space designer (Q6) ─────────────────────────────
 // A track's position over time is a list of anchors {beat, angle, dist,
 // smooth 0..1}. Between anchors we interpolate linearly, eased toward
@@ -1919,6 +1967,9 @@ export class GenerationEngine {
         const lvl = this._clamp(this.p.attackNoiseLevel ?? 1, 0, 2);
         return lvl === 1 ? an : { ...an, level: an.level * lvl };
       })(),
+      // Q8 attack stagger: measured low→high onset spread when the profile
+      // carries one (hand defaults per excitation type apply otherwise)
+      attackStaggerMs: profile.performance?.lowToHighStaggerMs ?? null,
       partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
       spectralMix: this.p.spectralMix ?? 0,
       excitationType: excType,
@@ -3523,6 +3574,10 @@ export class SynthEngine {
     if (t0 < this.ctx.currentTime - 0.02) return;
     if (note.isRest || note.velocity <= 0) return; // silence for rest surprises
     note._vibratoEvents = this._buildVibratoEvents(note, t0, t0 + note.duration);
+    // Q8 imperfections: pitch scoops in from below on fresh onsets (never on
+    // legato joins) and wanders slowly during the sustain — both Human-scaled.
+    note._scoopCents = note.legatoFromPrevious ? 0 : onsetScoopCents(note.excitationType, note.excitationHuman);
+    note._wanderEvents = f0WanderTrace(() => this._nextRandom(), note.duration, note.excitationHuman);
     const dispatch = (n) => {
       if (this._voiceMode === "formant" || this._voiceMode === "fourier") {
         this._renderFourier(n, t0);
@@ -3611,7 +3666,7 @@ export class SynthEngine {
     env.connect(note._out || this.master);
 
     osc.start(t0);
-    osc.stop(t1 + 0.08);
+    osc.stop(t1 + 0.08 + (note._ringSec || 0));
     this._track(osc);
   }
 
@@ -3631,7 +3686,7 @@ export class SynthEngine {
     this._renderBreath(note, t0, t1, env);
     env.connect(note._out || this.master);
     osc.start(t0);
-    osc.stop(t1 + 0.06);
+    osc.stop(t1 + 0.06 + (note._ringSec || 0));
     this._track(osc);
   }
 
@@ -3655,7 +3710,29 @@ export class SynthEngine {
       ? Math.max(1, note.slideFromFrequency * multiplier)
       : target;
     const slide = Math.max(0, Math.min(note.slideDuration || 0, note.duration * 0.8));
-    const events = note._vibratoEvents || [];
+    // Q8: onset scoop rises over the attack; f0 wander steps slowly through
+    // the sustain. Both are cent offsets shared by every partial (coherent).
+    const scoopCents = note._scoopCents || 0;
+    const atk = Math.min((note.duration || 0.2) * 0.4, Math.max(0.015, note.envelopeAttack ?? 0.02));
+    const scoopAt = (time) => scoopCents
+      ? scoopCents * Math.max(0, 1 - (time - t0) / atk)
+      : 0;
+    const wander = note._wanderEvents || [];
+    const wanderAt = (time) => {
+      let c = 0;
+      for (const p of wander) { if (p.time <= time - t0) c = p.cents; else break; }
+      return c;
+    };
+    let events = note._vibratoEvents || [];
+    if (!events.length && (scoopCents || wander.length)) {
+      // no vibrato timeline to ride — synthesize ramp points for the
+      // imperfections themselves
+      const pts = [t0];
+      if (scoopCents) for (const f of [0.25, 0.5, 0.75, 1]) pts.push(t0 + atk * f);
+      for (const p of wander) pts.push(t0 + p.time);
+      pts.push(t0 + (note.duration || 0.2));
+      events = [...new Set(pts)].sort((a, b) => a - b).map(time => ({ time, cents: 0 }));
+    }
     const baseAt = (time) => {
       if (slide > 0.001 && time < t0 + slide && Math.abs(from - target) > 0.01) {
         const progress = this._clamp((time - t0) / slide, 0, 1);
@@ -3663,7 +3740,8 @@ export class SynthEngine {
       }
       return target;
     };
-    const valueAt = (time, cents = 0) => baseAt(time) * Math.pow(2, cents / 1200);
+    const valueAt = (time, cents = 0) =>
+      baseAt(time) * Math.pow(2, (cents + scoopAt(time) + wanderAt(time)) / 1200);
 
     if (events.length > 0) {
       param.setValueAtTime(valueAt(t0, events[0].cents), t0);
@@ -3761,7 +3839,12 @@ export class SynthEngine {
       // shows is exactly what renders; spectral shaping lives only in the
       // model (excitation × macros × material × body).
       const gainScale = mix / norm;
-      scheduled.push({ param: g.gain, part, gainScale });
+      // Q8 attack stagger: low partials speak first on bow/blow onsets
+      // (never on legato joins — the column of air / string is already going)
+      const onsetDelay = note.legatoFromPrevious
+        ? 0
+        : partialOnsetDelay(harmonic, note.excitationType, note.attackStaggerMs);
+      scheduled.push({ param: g.gain, part, gainScale, onsetDelay });
       osc.connect(g);
       let tail = g;
       // FM→AM through the body (T5): the SAME vibrato events that bend the
@@ -3807,7 +3890,7 @@ export class SynthEngine {
       }
       if (tail) tail.connect(env);
       osc.start(t0);
-      osc.stop(t1 + 0.04);
+      osc.stop(t1 + 0.04 + (note._ringSec || 0)); // Q8: let the ring sound
       this._track(osc);
     });
     this._schedulePartialAmplitudes(scheduled, note, t0, t1);
@@ -3821,7 +3904,16 @@ export class SynthEngine {
   // over the sustain. Both share one merged automation timeline.
   _schedulePartialAmplitudes(partials, note, t0, t1) {
     if (partials.length === 0) return;
-    partials.forEach(item => item.param.setValueAtTime(item.gainScale * Math.max(0, item.part.amp), t0));
+    partials.forEach(item => {
+      const target = item.gainScale * Math.max(0, item.part.amp);
+      // Q8 attack stagger: delayed partials fade in over their delay
+      if ((item.onsetDelay || 0) > 0.001) {
+        item.param.setValueAtTime(0.0001, t0);
+        item.param.linearRampToValueAtTime(target, t0 + item.onsetDelay);
+      } else {
+        item.param.setValueAtTime(target, t0);
+      }
+    });
     const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
     const trace = humanFluctuationTrace(() => this._nextRandom(), t1 - t0, note.excitationType || "bow", human);
     const transfer = this._clamp(note.partialTransfer ?? 0, 0, 1);
@@ -3946,19 +4038,31 @@ export class SynthEngine {
     const dec = Math.min(noteDur * 0.45, note.envelopeDecay ?? 0.04);
     const sus = vel * Math.max(0.05, Math.min(1, note.envelopeSustain ?? 0.6));
     const rel = Math.min(note.envelopeRelease ?? 0.08, noteDur * 0.55);
+    // Q8 release ring: material keeps the resonator ringing past note-off
+    // at its own T60 instead of the envelope's hard cut (renderers extend
+    // their oscillator stop times by note._ringSec to let the tail sound).
+    const ring = releaseRingSeconds(note.partialMaterial, note.frequency);
+    note._ringSec = ring;
+    const release = (fromT) => {
+      if (ring > 0.05) {
+        g.gain.setTargetAtTime(0.0001, fromT, ring / 6.91); // -60 dB at ~6.91τ
+      } else {
+        g.gain.linearRampToValueAtTime(0.0001, t1);
+      }
+    };
     if (note.legatoFromPrevious) {
       const joinFade = Math.min(0.006, noteDur * 0.12);
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.linearRampToValueAtTime(Math.max(0.0001, sus), t0 + joinFade);
       g.gain.setValueAtTime(Math.max(0.0001, sus), Math.max(t0 + joinFade, t1 - rel));
-      g.gain.linearRampToValueAtTime(0.0001, t1);
+      release(Math.max(t0 + joinFade, t1 - rel));
       return g;
     }
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(vel, t0 + atk);
     g.gain.linearRampToValueAtTime(sus, t0 + atk + dec);
     g.gain.setValueAtTime(sus, Math.max(t0 + atk + dec, t1 - rel));
-    g.gain.linearRampToValueAtTime(0.0001, t1);
+    release(Math.max(t0 + atk + dec, t1 - rel));
     return g;
   }
 

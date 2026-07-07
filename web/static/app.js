@@ -52,7 +52,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.5.0"; // Q7: layered subnotes change what a params object renders as
+const APP_VERSION = "sound-studio-0.6.0"; // Q8: imperfection laws (scoop/stagger/ring/wander) alter rendering at Human > 0
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.

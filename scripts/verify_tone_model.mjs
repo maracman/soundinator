@@ -592,6 +592,44 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q8: imperfections — four small physical truths ──
+{
+  const { onsetScoopCents, partialOnsetDelay, releaseRingSeconds, f0WanderTrace, materialT60 } =
+    await import("../web/static/synth.js");
+  // 1 · onset scoop
+  check("Q8 scoop: from below (negative cents)", onsetScoopCents("bow", 1) < 0);
+  check("Q8 scoop: sustained excitation hunts more than struck",
+    Math.abs(onsetScoopCents("bow", 1)) > Math.abs(onsetScoopCents("strike", 1)) &&
+    Math.abs(onsetScoopCents("blow", 1)) > Math.abs(onsetScoopCents("pluck", 1)));
+  check("Q8 scoop: machines don't hunt (human 0 → 0)", onsetScoopCents("bow", 0) === 0);
+  check("Q8 scoop: scales with human", Math.abs(onsetScoopCents("bow", 0.5)) === Math.abs(onsetScoopCents("bow", 1)) / 2);
+  // 2 · attack stagger
+  check("Q8 stagger: fundamental speaks first", partialOnsetDelay(1, "bow") === 0);
+  check("Q8 stagger: higher partials wait longer",
+    partialOnsetDelay(32, "bow") > partialOnsetDelay(8, "bow") && partialOnsetDelay(8, "bow") > 0);
+  check("Q8 stagger: strike/pluck speak at once",
+    partialOnsetDelay(32, "strike") === 0 && partialOnsetDelay(32, "pluck") === 0);
+  check("Q8 stagger: measured value wins over the hand default",
+    Math.abs(partialOnsetDelay(64, "bow", 100) - 0.1) < 1e-9);
+  check("Q8 stagger: capped at 120 ms", partialOnsetDelay(64, "bow", 500) <= 0.12);
+  // 3 · release ring
+  check("Q8 ring: no material → no ring", releaseRingSeconds(0, 440) === 0);
+  check("Q8 ring: follows the material T60 law",
+    Math.abs(releaseRingSeconds(0.6, 440) - Math.min(1.8, materialT60(440, 0.6) * 0.5)) < 1e-9);
+  check("Q8 ring: lows ring longer than highs (same material)",
+    releaseRingSeconds(0.6, 220) >= releaseRingSeconds(0.6, 3520));
+  check("Q8 ring: CPU cap at 1.8 s", releaseRingSeconds(1, 60) <= 1.8);
+  // 4 · f0 wander
+  const mkRand = (seed) => () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const w = f0WanderTrace(mkRand(7), 4, 1);
+  check("Q8 wander: bounded to ±4¢ at Human 1", w.length > 4 && w.every(p => Math.abs(p.cents) <= 4));
+  check("Q8 wander: slow (steps ≥ 0.3 s apart)", w.every((p, i) => i === 0 || p.time - w[i - 1].time > 0.3));
+  check("Q8 wander: machines hold still (human 0 → empty)", f0WanderTrace(mkRand(7), 4, 0).length === 0);
+  check("Q8 wander: short notes don't wander", f0WanderTrace(mkRand(7), 0.3, 1).length === 0);
+  check("Q8 wander: deterministic per seed",
+    JSON.stringify(f0WanderTrace(mkRand(7), 4, 1)) === JSON.stringify(f0WanderTrace(mkRand(7), 4, 1)));
+}
+
 // ── Q7: layered subnote modules ──
 {
   const { GenerationEngine } = await import("../web/static/synth.js");

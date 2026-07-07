@@ -17,6 +17,11 @@ PERF_KEYS = [
     "envelopeAttack", "envelopeAttackSd", "envelopeDecay", "envelopeSustain",
     "envelopeRelease", "vibratoProb", "vibratoRate", "vibratoRateSd",
     "vibratoDepth", "vibratoDepthSd",
+    # Q8 attack stagger: measured low-to-high partial onset spread; flows to
+    # the renderer when a future fit run provides it (hand defaults apply
+    # until then — the current measured_profiles.json predates the fitter's
+    # stagger support).
+    "lowToHighStaggerMs",
 ]
 
 
