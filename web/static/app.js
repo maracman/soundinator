@@ -5604,6 +5604,7 @@ function renderExplore() {
 
   wireTonePrint(v);
   wireSpacePad(v);
+  wireSpaceField(v);
   wireLayerStrip(v);
   wireStudioPanels(v);
   // Owner 07-07: one-click octave shifts widen a patch's range of uses —
@@ -6656,6 +6657,13 @@ function subnoteWorkspaceHTML(p) {
               <div class="ch-inspector ch-${_chStage}" id="chInspector" style="width:${_studioPanels.chW}px">${chInspectorHTML(p)}</div>
               <div class="ch-vsplit" id="chVSplit" title="Drag to resize the inspector"></div>
               <div class="ch-field-wrap">
+                ${_chStage === "space" ? `
+                <!-- Owner 07-07: space has no bearing on the partial print —
+                     the field serves the stage instead: a full-size room. -->
+                <div class="ch-focus-row"><span class="ch-focus-label">ROOM</span><span class="ch-focus-sum">where the instrument stands — the tone print returns on stages that shape it</span></div>
+                <div class="ch-field-pos">
+                  <canvas id="cvSpaceField" width="1200" height="364" style="width:100%;height:364px" title="Drag anywhere to place the instrument around your head — behind you is shaded. The lower strip shows how air soaks up the highs at this distance."></canvas>
+                </div>` : `
                 <div class="ch-focus-row" id="chFocus">
                   <span class="ch-focus-label">FOCUS</span>
                   ${[["all", "All"], ["odd", "Odd"], ["even", "Even"], ["coupled", "Coupled"], ["longring", "Long ring"], ["wobbly", "Wobbly"]].map(([c, label]) =>
@@ -6667,10 +6675,12 @@ function subnoteWorkspaceHTML(p) {
                   <div class="ch-pin" id="chPin" hidden></div>
                 </div>
                 <div class="ch-lens-row"><span class="ch-lens-label">LENS</span><canvas id="cvLens" width="1200" height="34"></canvas></div>
-                <div class="ch-strip" id="chStrip"></div>
+                <div class="ch-strip" id="chStrip"></div>`}
               </div>
             </div>
-            <div class="ch-status"><span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span></div>
+            <div class="ch-status">${_chStage === "space"
+              ? `<span><b>drag</b> the room = position · the mini pad in the inspector mirrors it</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
+              : `<span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span>`}</div>
             ${layerStripHTML(p)}
           </div>
         `}
@@ -9207,6 +9217,16 @@ function chPinHide() {
 }
 
 function wireTonePrint(v) {
+  // stage rail: select a stage -> its inspector expands. Wired before the
+  // print guard — on the SPACE stage the print canvas is absent (room view
+  // instead) but the rail must still switch stages.
+  v.querySelectorAll("[data-ch-stage]").forEach(card => {
+    card.onclick = () => {
+      if (_chStage === card.dataset.chStage) return;
+      _chStage = card.dataset.chStage;
+      renderExplore();
+    };
+  });
   const cv = v.querySelector("#cvTonePrint");
   if (!cv) return;
   const hitNeedle = (e) => {
@@ -9315,14 +9335,6 @@ function wireTonePrint(v) {
     };
   }
 
-  // stage rail: select a stage -> its inspector expands
-  v.querySelectorAll("[data-ch-stage]").forEach(card => {
-    card.onclick = () => {
-      if (_chStage === card.dataset.chStage) return;
-      _chStage = card.dataset.chStage;
-      renderExplore();
-    };
-  });
 }
 
 
@@ -9656,6 +9668,119 @@ function wireLayerStrip(v) {
   drawLayerMiniPads();
 }
 
+// Owner 07-07: the SPACE stage's full-size field — the same room as the
+// mini pad, at working size, with an air-absorption strip underneath
+// (the one space fact that also touched the old print overlay).
+const SPACE_FIELD_AIR_H = 74;
+function drawSpaceField() {
+  const cv = document.getElementById("cvSpaceField");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+  const padH = h - SPACE_FIELD_AIR_H;
+  const cx = w / 2, cy = padH / 2;
+  const rMax = Math.min(padH / 2 - 14, w / 2 - 14);
+  // behind half + rings
+  ctx.fillStyle = "rgba(60,72,88,0.16)";
+  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(90,110,130,0.28)";
+  ctx.fillStyle = "rgba(120,135,150,0.6)";
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.textAlign = "left";
+  for (const dm of [1, 3, 10, 30]) {
+    const r = _spaceDistToR(dm, rMax);
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillText(`${dm}m`, cx + 4, cy - r + 12);
+  }
+  ctx.strokeStyle = "rgba(90,110,130,0.14)";
+  for (const a of [-135, -90, -45, 0, 45, 90, 135, 180]) {
+    const rad = (a - 90) * Math.PI / 180;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax); ctx.stroke();
+  }
+  ctx.textAlign = "center";
+  ctx.fillText("front", cx, cy - rMax - 3);
+  ctx.fillText("behind", cx, cy + rMax + 11);
+  // the head — skull, ears, nose forward
+  const hr = 11;
+  ctx.fillStyle = "rgba(200,215,230,0.85)";
+  ctx.beginPath(); ctx.arc(cx, cy, hr, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx - hr, cy, 3.4, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + hr, cy, 3.4, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - 3.6, cy - hr + 1); ctx.lineTo(cx, cy - hr - 5.5); ctx.lineTo(cx + 3.6, cy - hr + 1);
+  ctx.closePath(); ctx.fill();
+  // the instrument
+  const d = clamp(exploreParams.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
+  const az = clamp(exploreParams.spaceAzimuth ?? 0, -180, 180);
+  const rad = (az - 90) * Math.PI / 180;
+  const r = _spaceDistToR(d, rMax);
+  const ix = cx + Math.cos(rad) * r, iy = cy + Math.sin(rad) * r;
+  ctx.strokeStyle = "rgba(88,214,169,0.4)";
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ix, iy); ctx.stroke();
+  ctx.fillStyle = "#58d6a9";
+  ctx.shadowColor = "#58d6a9"; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(ix, iy, 8, 0, 2 * Math.PI); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(200,215,230,0.85)";
+  ctx.font = "11px ui-monospace, monospace";
+  ctx.fillText(`${d.toFixed(1)} m · ${Math.round(az)}°`, ix, iy - 14);
+  // air-absorption strip: how this distance soaks up the highs
+  const ay0 = padH + 8, ah = SPACE_FIELD_AIR_H - 20;
+  const FMIN = 100, FMAX = 18000;
+  ctx.strokeStyle = "rgba(90,110,130,0.25)";
+  ctx.strokeRect(0.5, ay0 + 0.5, w - 1, ah);
+  const cut = spaceAirCutoff(d);
+  ctx.beginPath();
+  for (let px = 0; px <= w; px += 3) {
+    const f = FMIN * Math.pow(FMAX / FMIN, px / w);
+    const dropDb = f > cut ? Math.min(30, 12 * Math.log2(f / cut)) : 0;
+    const y = ay0 + 3 + (dropDb / 30) * (ah - 6);
+    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+  }
+  ctx.strokeStyle = "rgba(148,196,255,0.8)";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "rgba(120,135,150,0.65)";
+  ctx.font = "9px ui-monospace, monospace";
+  ctx.textAlign = "left";
+  ctx.fillText(`air @ ${d.toFixed(1)} m — highs above ${(cut / 1000).toFixed(1)} kHz fade with distance`, 6, ay0 + ah + 11);
+}
+
+function wireSpaceField(v) {
+  const cv = v.querySelector("#cvSpaceField");
+  if (!cv) return;
+  const apply = (e) => {
+    const rect = cv.getBoundingClientRect();
+    const w = cv.width, h = cv.height;
+    const sx = w / Math.max(1, rect.width), sy = h / Math.max(1, rect.height);
+    const padH = h - SPACE_FIELD_AIR_H;
+    const cx = w / 2, cy = padH / 2;
+    const rMax = Math.min(padH / 2 - 14, w / 2 - 14);
+    const x = (e.clientX - rect.left) * sx - cx;
+    const y = (e.clientY - rect.top) * sy - cy;
+    exploreParams.spaceAzimuth = Math.round(clamp(Math.atan2(x, -y) * 180 / Math.PI, -180, 180));
+    exploreParams.spaceDistance = Number(_spaceRToDist(Math.hypot(x, y), rMax).toFixed(2));
+    const readout = v.querySelector("#spaceReadout");
+    if (readout) readout.textContent = `${exploreParams.spaceDistance.toFixed(1)} m · ${exploreParams.spaceAzimuth}°`;
+    drawSpaceField();
+    drawSpacePad();
+    drawChThumbs();
+    synth.updateReverb({ ...exploreParams });
+  };
+  cv.onmousedown = (e) => {
+    e.preventDefault();
+    apply(e);
+    const move = (ev) => apply(ev);
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  drawSpaceField();
+}
+
 function wireSpacePad(v) {
   const cv = v.querySelector("#cvSpacePad");
   if (!cv) return;
@@ -9672,6 +9797,7 @@ function wireSpacePad(v) {
     const readout = v.querySelector("#spaceReadout");
     if (readout) readout.textContent = `${exploreParams.spaceDistance.toFixed(1)} m · ${exploreParams.spaceAzimuth}°`;
     drawSpacePad();
+    drawSpaceField();
     drawChThumbs();
     synth.updateReverb({ ...exploreParams });
   };
