@@ -1657,7 +1657,13 @@ export class GenerationEngine {
     });
     return {
       harmonicPartials: partials,
-      attackNoise: profile.performance?.attackNoise || null,
+      attackNoise: (() => {
+        const an = profile.performance?.attackNoise;
+        if (!an) return null;
+        // CH-B2: user-scalable onset transient (1 = the instrument's own)
+        const lvl = this._clamp(this.p.attackNoiseLevel ?? 1, 0, 2);
+        return lvl === 1 ? an : { ...an, level: an.level * lvl };
+      })(),
       partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
       spectralMix: this.p.spectralMix ?? 0,
       excitationType: excType,

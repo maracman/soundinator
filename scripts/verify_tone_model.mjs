@@ -547,5 +547,20 @@ console.log("Surprise gates: all-off is OFF; arps are deterministic (owner 2026-
     arp.map(nn => nn.degree).join(",") === arpClean.map(nn => nn.degree).join(","));
 }
 
+console.log("CH-B2: onset-noise level scaling");
+{
+  const GEN8 = {
+    seed: 3, tempo: 120, beatDivisions: 2, motifCount: 1, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    spectralProfile: "violin", excitationHuman: 0,
+  };
+  const fpAt = (lvl) => new GenerationEngine({ ...GEN8, attackNoiseLevel: lvl })._spectralFingerprint(0.62, 261.63, 0);
+  const base = fpAt(1), off = fpAt(0), loud = fpAt(2);
+  check("onset noise at 1 = the instrument's own transient",
+    base.attackNoise && Math.abs(base.attackNoise.level - fpAt(undefined ?? 1).attackNoise.level) < 1e-9);
+  check("onset noise at 0 = silent transient, at 2 = doubled",
+    off.attackNoise.level === 0 && Math.abs(loud.attackNoise.level - base.attackNoise.level * 2) < 1e-9);
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
 console.log("\nAll tone-model v2 assertions passed (T1-T6 + space).");

@@ -5470,3 +5470,11 @@ body.dragging { cursor: grabbing; user-select: none; }
 .pattern-row .seg-btn { flex: 1; }
 
 .arp-surprise-note { font-size: 11.5px; color: var(--ch-dim, #8b9aa8); line-height: 1.5; padding: 4px 2px 6px; }
+
+/* CH-B2: EXCITOR performance drawer + liftable envelope/vibrato blocks */
+.ch-perf { margin: 8px 0 2px; border: 1px solid rgba(140, 160, 180, 0.14); border-radius: 8px; padding: 2px 8px 8px; }
+.ch-perf summary { cursor: pointer; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ch-dim, #8b9aa8); padding: 6px 0; }
+.ch-perf .perf-envelope-block, .ch-perf .perf-vibrato-block { margin-top: 6px; }
+.ch-perf .envelope-canvas.adsr-edit { cursor: grab; width: 100%; }
+.ch-perf .envelope-canvas.adsr-edit:active { cursor: grabbing; }
+.ch-perf .vibrato-canvas { width: 100%; }

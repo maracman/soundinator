@@ -167,6 +167,7 @@ const DEFAULTS = {
   tonicHz: 261.63,
   intervalPeakedness: 2.0,
   melodyPattern: "walk",
+  attackNoiseLevel: 1,
   arpStep: 2,
   arpOctaves: 1,
   intervalRange: 7,
@@ -334,6 +335,7 @@ const DEFAULTS = {
 
 const PARAM_DESC = {
   tempo: "Playback speed in beats per minute",
+  attackNoiseLevel: "Scales the instrument's onset transient (bow scratch, breath chiff, hammer thump): 0 = removed, 1 = as measured/designed, 2 = exaggerated",
   melodyPattern: "How the melody chooses notes: Walk = the probabilistic interval walk shaped by the dials below; Arp = a deterministic cycle over a fixed set of in-scale notes (up, down, or up-and-down) — rhythm, rests, dynamics and surprise still apply on top",
   arpStep: "Arp stride in scale steps: 2 = every other scale note (thirds, triad-like), 3 = wider voicings, 1 = a scale run",
   arpOctaves: "How many octaves the arp cycle spans before it wraps",
@@ -4019,7 +4021,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType","partialB",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType","partialB","attackNoiseLevel",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF1Level","formantF2Level","formantF3Level","formantF4Level","formantF5Level","formantBandwidth","bodyArticulation",
@@ -4212,6 +4214,62 @@ function renderExplore() {
     drawBodyRidge();
   };
   if (bandSlider) bandSlider.onchange = () => renderExplore(); // drag done: refresh chips + ↺ preset affordance
+  // CH-B2: draggable ADSR — grab the attack peak, the decay→sustain
+  // corner (vertical = sustain level) or the release foot. Scale is
+  // frozen at drag start so the mapping stays stable under the cursor.
+  v.querySelectorAll(".adsr-edit").forEach(cv => {
+    cv.style.touchAction = "none";
+    cv.onmousedown = (e) => {
+      const rect = cv.getBoundingClientRect();
+      const w = rect.width, h = rect.height, pad = w > 220 ? 12 : 5;
+      const P = () => ({
+        a: exploreParams.envelopeAttack || 0.008,
+        d: exploreParams.envelopeDecay || 0.04,
+        s: clamp(exploreParams.envelopeSustain ?? 0.6, 0.05, 1),
+        r: exploreParams.envelopeRelease || 0.08,
+      });
+      const start = P();
+      const pts = envelopePoints(w, h, pad, start.a, start.d, start.s, start.r);
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const hit = [
+        { key: "attack", x: pts[1][0], y: pts[1][1] },
+        { key: "decay", x: pts[2][0], y: pts[2][1] },
+        { key: "release", x: pts[3][0], y: pts[3][1] },
+      ].map(o => ({ ...o, dist: Math.hypot(o.x - mx, o.y - my) }))
+        .sort((q, z) => q.dist - z.dist)[0];
+      if (!hit || hit.dist > 22) return;
+      e.preventDefault();
+      const total0 = Math.max(0.08, start.a + start.d + start.r + 0.24);
+      const usableW = w - pad * 2;
+      const perPx = total0 / usableW;      // seconds per pixel at drag start
+      const move = (ev) => {
+        const dx = (ev.clientX - e.clientX) * perPx;
+        const dy = (ev.clientY - e.clientY) / Math.max(20, h - pad * 2 - 4);
+        const upd = {};
+        if (hit.key === "attack") upd.envelopeAttack = clamp(start.a + dx, 0.001, 0.6);
+        if (hit.key === "decay") {
+          upd.envelopeDecay = clamp(start.d + dx, 0.005, 0.8);
+          upd.envelopeSustain = clamp(start.s - dy, 0.05, 1);
+        }
+        if (hit.key === "release") upd.envelopeRelease = clamp(start.r - dx, 0.005, 1.2);
+        for (const [key, val] of Object.entries(upd)) {
+          exploreParams[key] = +val.toFixed(3);
+          const out = v.querySelector(`#out_${key}`);
+          if (out) out.textContent = fmtOutput(key, exploreParams[key]);
+          const sl = v.querySelector(`input[data-param="${key}"]`);
+          if (sl) { sl.value = exploreParams[key]; updateSliderFill(sl); }
+        }
+        drawEnvelopeDist();
+        synth.updateGenerationParams({ ...exploreParams });
+      };
+      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+  });
+  const perfDetails = v.querySelector("#chPerfDetails");
+  if (perfDetails) perfDetails.ontoggle = () => { _chPerfOpen = perfDetails.open; };
+
   const bandReset = v.querySelector("[data-body-reset]");
   if (bandReset) bandReset.onclick = () => {
     noteParamChange("bodyBands", "edited", "preset");
@@ -4948,26 +5006,6 @@ function subnoteWorkspaceHTML(p) {
             </details>
           </div>
 
-          <div class="subnote-side-section">
-            <div class="section-label">Vibrato Distribution</div>
-            <div class="controls-grid">
-              ${controlRow("vibratoProb", "Chance", p.vibratoProb, 0, 1, 0.01)}
-              ${controlRow("vibratoDepth", "Depth", p.vibratoDepth, 0, 80, 1)}
-              ${controlRow("vibratoDepthSd", "Depth SD", p.vibratoDepthSd, 0, 40, 1)}
-              ${controlRow("vibratoRate", "Rate", p.vibratoRate, 0.5, 12, 0.1)}
-              ${controlRow("vibratoRateSd", "Rate SD", p.vibratoRateSd, 0, 4, 0.1)}
-            </div>
-            <canvas class="vibrato-canvas js-vibrato-canvas" width="260" height="54"></canvas>
-          </div>
-
-          <div class="subnote-side-section">
-            <div class="section-label">Envelope Distribution</div>
-            <div class="controls-grid">
-              ${controlRow("envelopeProb", "Chance", p.envelopeProb, 0, 1, 0.01)}
-            </div>
-            ${envelopeDistributionControlsHTML(p)}
-            <canvas class="envelope-canvas js-envelope-canvas" width="260" height="104"></canvas>
-          </div>
         </div>
 
       </div>
@@ -5042,6 +5080,28 @@ function profilePartial(partial) {
   return (typeof partial === "number")
     ? { amp: partial, spread: 0.25, dyn: 0, reg: null }
     : partial;
+}
+
+// ── CH-B2 liftable performance blocks ──
+// One param-scoped component per concern so the CH-B5 layer strip's
+// "override envelope probabilities" can reuse them verbatim.
+function envelopeProbBlockHTML(p) {
+  return `
+    <div class="perf-envelope-block">
+      ${controlRow("envelopeProb", "Envelope chance", p.envelopeProb, 0, 1, 0.01)}
+      ${envelopeDistributionControlsHTML(p)}
+      <canvas class="envelope-canvas js-envelope-canvas adsr-edit" width="300" height="110" title="Drag the corners: attack peak, decay→sustain corner (vertical = sustain level), release foot"></canvas>
+    </div>`;
+}
+
+function vibratoBlockHTML(p) {
+  return `
+    <div class="perf-vibrato-block">
+      ${controlRow("vibratoProb", "Vibrato chance", p.vibratoProb, 0, 1, 0.01)}
+      ${controlRow("vibratoDepth", "Depth", p.vibratoDepth, 0, 80, 1)}
+      ${controlRow("vibratoRate", "Rate", p.vibratoRate, 0.5, 12, 0.1)}
+      <canvas class="vibrato-canvas js-vibrato-canvas" width="260" height="54"></canvas>
+    </div>`;
 }
 
 function envelopeDistributionControlsHTML(p) {
@@ -6859,7 +6919,8 @@ function chRailCardHTML(p, stage, num, name) {
 // copies it onto the instrument (p.bodyBands) so later preset browsing never
 // silently discards the user's shaping. Articulation formants F1-F5 appear
 // as chips of their own when depth > 0.
-let _chBodySel = null; // { kind: "base" | "artic", i } — chip → highlighted EQ curve in the field
+let _chBodySel = null;
+let _chPerfOpen = false; // EXCITOR performance drawer state across re-renders // { kind: "base" | "artic", i } — chip → highlighted EQ curve in the field
 
 function currentBaseBodyBands(p) {
   if (Array.isArray(p.bodyBands) && p.bodyBands.length) return p.bodyBands;
@@ -6924,6 +6985,14 @@ function chInspectorHTML(p) {
         ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
       </div>
       <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
+      <details class="ch-perf" ${_chPerfOpen ? "open" : ""} id="chPerfDetails">
+        <summary>Performance — envelope · vibrato · onset noise</summary>
+        ${envelopeProbBlockHTML(p)}
+        ${vibratoBlockHTML(p)}
+        <div class="knob-row">
+          ${knobHTML("attackNoiseLevel", "Onset noise", p.attackNoiseLevel ?? 1, 0, 2, 0.01, { def: 1 })}
+        </div>
+      </details>
       <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field</div>`;
   }
   if (_chStage === "resonator") {
