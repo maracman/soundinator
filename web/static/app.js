@@ -1678,6 +1678,7 @@ function newSeed() { return Math.floor(Math.random() * 999999) + 1; }
 // (4 beats per slot), starting each track's region at its slot with its
 // seed and silencing tracks with empty cells.
 const producerVoices = new Map(); // trackId -> SynthEngine voice
+window._prodVoicesQA = producerVoices; // QA hook (matches _synthQA): assert ring-out in tests
 let producerBus = null;
 let arrPlay = null; // { slot, timer, lastSlot }
 let playheadBeat = 0;  // where Play starts; set by clicking the ruler
@@ -1734,10 +1735,22 @@ function pauseArrangement() {
   stopArrangement();
 }
 
-function stopArrangement() {
+function stopArrangement(ringOut = false) {
   if (arrPlay) { clearTimeout(arrPlay.timer); arrPlay = null; }
-  producerVoices.forEach(v => v.stop());
+  // ringOut (natural end of the arrangement): stop triggering but let the
+  // last notes' releases and the reverb tail play out. Explicit stops cut.
+  producerVoices.forEach(v => ringOut ? v.finish() : v.stop());
   updatePlayhead(playheadBeat);
+}
+
+// The beat under the playhead RIGHT NOW — fractional during playback
+// (interpolated between beat steps) so the space visualisers move smoothly
+// instead of jumping once per beat.
+function curPlayBeat() {
+  if (!arrPlay) return playheadBeat;
+  const base = arrPlay.playingBeat ?? arrPlay.beat;
+  if (arrPlay.stepAt == null) return base;
+  return base + Math.min(1, (performance.now() - arrPlay.stepAt) / (arrPlay.beatMs || 1));
 }
 
 function playArrangement(fromBeat = 0) {
@@ -1761,11 +1774,15 @@ function playArrangement(fromBeat = 0) {
       arrPlay.startAt = b;
     }
     if (!lr && b > arrPlay.lastBeat) {
-      stopArrangement();
+      stopArrangement(true); // natural end: the last notes ring out
       const btn = document.querySelector("#arrPlayBtn");
       if (btn) btn.textContent = "▶";
       return;
     }
+    // smooth-beat bookkeeping for the space visualisers (curPlayBeat)
+    arrPlay.playingBeat = b;
+    arrPlay.stepAt = performance.now();
+    arrPlay.beatMs = beatMs;
     for (const track of arrangement.tracks) {
       const region = regionAtBeat(track, b);
       const voice = producerVoice(track);
@@ -1785,8 +1802,13 @@ function playArrangement(fromBeat = 0) {
         } else {
           voice.play(regionPlayParams(track, region));
         }
-      } else if (!region || region.muted) {
-        voice.stop();
+      } else if (region && region.muted) {
+        voice.stop(); // an explicit mute silences immediately
+      } else if (!region) {
+        // Region end is NOT a mute (owner 07-07): stop triggering new
+        // events and let what's already in the air play out — envelope
+        // releases, material ring, reverb tail.
+        voice.finish();
       }
       // mid-region beats: leave the voice playing through its span
     }
@@ -2072,6 +2094,19 @@ let _spOpen = false;
 let _spSelTrack = null;
 let _spRock = { roll: 0, dragging: false, drag: null };
 let _spRaf = null;
+// Sound-glow mapping: which beat sat under the playhead at which ctx time.
+// Frozen when playback ends so ring-out glows keep fading IN PLACE.
+let _spGlowMap = null;
+
+// A voice's real output level right now (0..~1) from its analyser tap —
+// measured post-reverb, so tails read truthfully in the visualiser.
+function _voiceRms(voice) {
+  const d = voice?.getWaveform?.();
+  if (!d) return 0;
+  let s = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) { const x = (d[i] - 128) / 128; s += x * x; n++; }
+  return n ? Math.sqrt(s / n) : 0;
+}
 
 function ensureGlobalSpace() {
   if (!arrangement.space) {
@@ -2188,15 +2223,28 @@ function drawSpSection() {
   ctx.beginPath();
   ctx.moveTo(cx - 2, cy - headR + 0.5); ctx.lineTo(cx, cy - headR - 3); ctx.lineTo(cx + 2, cy - headR + 0.5);
   ctx.closePath(); ctx.fill();
-  // track dots at the playhead
+  // track dots at the playhead — live during playback (curPlayBeat), and
+  // pulsing with each voice's real output level
+  const phBeat = curPlayBeat();
   arrangement.tracks.forEach((t, i) => {
     const drag = _spRock.drag;
-    const pos = (drag && drag.trackId === t.id) ? drag.pos : _spTrackPos(t, playheadBeat);
+    const pos = (drag && drag.trackId === t.id) ? drag.pos : _spTrackPos(t, phBeat);
     const rad = (pos.angle - 90) * Math.PI / 180;
     const r = _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist)), rMax);
     const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
     const seld = t.id === _spSelTrack;
-    ctx.fillStyle = `hsla(${_spHue(i)}, 70%, ${seld ? 68 : 55}%, ${seld ? 1 : 0.8})`;
+    const hue = _spHue(i);
+    const rms = _voiceRms(producerVoices.get(t.id));
+    if (rms > 0.012) {
+      const level = Math.min(1, rms * 2.6);
+      const rGlow = 6 + 12 * level;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rGlow);
+      g.addColorStop(0, `hsla(${hue}, 85%, 65%, ${0.4 * level})`);
+      g.addColorStop(1, `hsla(${hue}, 85%, 65%, 0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, rGlow, 0, 2 * Math.PI); ctx.fill();
+    }
+    ctx.fillStyle = `hsla(${hue}, 70%, ${seld ? 68 : 55}%, ${seld ? 1 : 0.8})`;
     if (seld) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; }
     ctx.beginPath(); ctx.arc(x, y, seld ? 5.5 : 4, 0, 2 * Math.PI); ctx.fill();
     ctx.shadowBlur = 0;
@@ -2222,9 +2270,10 @@ function drawSpCylinder(rockRad) {
   ctx.strokeStyle = "rgba(200,215,230,0.14)";
   ctx.beginPath(); ctx.moveTo(0, cy - headR); ctx.lineTo(w, cy - headR); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(0, cy + headR); ctx.lineTo(w, cy + headR); ctx.stroke();
-  // playhead line
+  // playhead line — live during playback
+  const phBeat = curPlayBeat();
   ctx.strokeStyle = "rgba(56,189,248,0.55)";
-  ctx.beginPath(); ctx.moveTo(xFor(playheadBeat), 0); ctx.lineTo(xFor(playheadBeat), h); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xFor(phBeat), 0); ctx.lineTo(xFor(phBeat), h); ctx.stroke();
   const yFor = (t, beat) => {
     const pos = _spTrackPos(t, beat);
     const a = pos.angle * Math.PI / 180 + rockRad + roll;
@@ -2270,6 +2319,64 @@ function drawSpCylinder(rockRad) {
       }
     }
   });
+
+  // ── Sound glow (owner 07-07): each note onset glows on its thread at
+  // the beat where it HAPPENED and fades with the note's own envelope +
+  // the room's decay (modelled — the past can't be measured), while a
+  // "now" glow at the playhead pulses with the voice's actual analyser
+  // level (measured — so the real reverb tail is what you see). The
+  // beat↔time map freezes when playback ends, so ring-out fades in place.
+  if (arrPlay && synth.ctx) _spGlowMap = { beat: phBeat, t: synth.ctx.currentTime };
+  const map = _spGlowMap;
+  if (map && synth.ctx) {
+    const beatSec = 60 / Math.max(30, arrangement.context.tempo || 104);
+    const nowT = synth.ctx.currentTime;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    arrangement.tracks.forEach((t, i) => {
+      const voice = producerVoices.get(t.id);
+      if (!voice) return;
+      const hue = t.hue ?? _spHue(i);
+      // decay constant from the sounding region's actual envelope + room
+      const region = regionAtBeat(t, Math.floor(Math.max(0, map.beat)));
+      const rp = region ? regionPlayParams(t, region, map.beat) : {};
+      const tau = Math.max(0.15, (rp.envelopeRelease ?? 0.2) + (rp.reverbDecay ?? 1.4) * 0.45);
+      const events = voice.getNoteTimeline?.()?.events || [];
+      for (const ev of events) {
+        if (ev.isRest) continue;
+        const age = nowT - ev.when;
+        if (age < 0 || age > ev.dur + tau * 3) continue; // not yet sounded / fully faded
+        const att = Math.min(1, age / 0.03);
+        const level = (ev.velocity ?? 0.8) * att *
+          (age <= ev.dur ? 1 : Math.exp(-(age - ev.dur) / tau));
+        if (level < 0.02) continue;
+        const evBeat = map.beat - (map.t - ev.when) / beatSec;
+        const x = xFor(evBeat);
+        if (evBeat < 0 || x < -20 || x > w + 20) continue;
+        const p = yFor(t, evBeat);
+        const rGlow = 4 + 9 * level;
+        const g = ctx.createRadialGradient(x, p.y, 0, x, p.y, rGlow);
+        g.addColorStop(0, `hsla(${hue}, 85%, 65%, ${(p.back ? 0.22 : 0.38) * level})`);
+        g.addColorStop(1, `hsla(${hue}, 85%, 65%, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, p.y, rGlow, 0, 2 * Math.PI); ctx.fill();
+      }
+      // "now" glow: the voice's real output level at the playhead
+      const rms = _voiceRms(voice);
+      if (rms > 0.012) {
+        const level = Math.min(1, rms * 2.6);
+        const x = xFor(map.beat);
+        const p = yFor(t, map.beat);
+        const rGlow = 5 + 13 * level;
+        const g = ctx.createRadialGradient(x, p.y, 0, x, p.y, rGlow);
+        g.addColorStop(0, `hsla(${hue}, 90%, 70%, ${0.5 * level})`);
+        g.addColorStop(1, `hsla(${hue}, 90%, 70%, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, p.y, rGlow, 0, 2 * Math.PI); ctx.fill();
+      }
+    });
+    ctx.restore();
+  }
 }
 
 function _spAnimate() {
@@ -2358,7 +2465,7 @@ function wireGlobalSpace(v) {
     const trackAtXY = (g) => {
       let best = null;
       arrangement.tracks.forEach((t) => {
-        const pos = _spTrackPos(t, playheadBeat);
+        const pos = _spTrackPos(t, curPlayBeat());
         const rad = (pos.angle - 90) * Math.PI / 180;
         const r = _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist)), g.rMax);
         const d = Math.hypot(g.cx + Math.cos(rad) * r - g.x, g.cy + Math.sin(rad) * r - g.y);
@@ -2372,7 +2479,7 @@ function wireGlobalSpace(v) {
       const t = trackAtXY(g);
       if (!t) return;
       _spSelTrack = t.id; // clicking a dot selects that track (owner 07-07)
-      _spRock.drag = { trackId: t.id, pos: _spTrackPos(t, playheadBeat), moved: false };
+      _spRock.drag = { trackId: t.id, pos: _spTrackPos(t, curPlayBeat()), moved: false };
       const move = (ev) => {
         _spRock.drag.moved = true;
         _spRock.drag.pos = posFromXY(xy(ev));
@@ -2388,7 +2495,7 @@ function wireGlobalSpace(v) {
         if (!drag?.moved) return;
         const sp = ensureGlobalSpace();
         const anchors = sp.tracks[t.id];
-        const a = anchors?.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
+        const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < 0.26);
         if (a) {
           // an anchor lives at the playhead: commit the drag to it
           a.angle = drag.pos.angle;
@@ -2420,11 +2527,11 @@ function wireGlobalSpace(v) {
       if (!anchors.length) {
         // the very first anchor also creates start + end anchors, seeded
         // from wherever the track currently sits (incl. a static drag)
-        const cur = _spTrackPos(t, playheadBeat);
+        const cur = _spTrackPos(t, curPlayBeat());
         anchors.push({ beat: 0, ...cur, smooth: 0.5 }, { beat: totalBeats(), ...cur, smooth: 0.5 });
         if (sp.static) delete sp.static[t.id]; // anchors supersede the static spot
       }
-      const atBeat = Math.round(playheadBeat * 4) / 4;
+      const atBeat = Math.round(curPlayBeat() * 4) / 4;
       const existing = anchors.find(a => Math.abs(a.beat - atBeat) < 0.26);
       if (existing) { existing.angle = pos.angle; existing.dist = pos.dist; }
       else anchors.push({ beat: atBeat, angle: pos.angle, dist: pos.dist, smooth: 0.5 });

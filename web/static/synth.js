@@ -3326,6 +3326,19 @@ export class SynthEngine {
         }
         this._render(note, t);
         this._schedulePerc(note, t, divSec);
+        // Event record for the visualisers. Baked spans schedule upfront,
+        // so unlike _schedule() the timeline fills with FUTURE events —
+        // keep them all (within reason) rather than trimming the oldest,
+        // which here would drop the notes that play first.
+        if (this._timeline.length < 2400) {
+          this._timeline.push({
+            when: t,
+            dur: note.duration || note.durationDivs * divSec,
+            frequency: note.frequency,
+            velocity: note.velocity,
+            isRest: !(note.velocity > 0),
+          });
+        }
       }
     }
   }
@@ -3570,6 +3583,19 @@ export class SynthEngine {
     }
   }
 
+  /**
+   * Stop TRIGGERING new notes but let everything already sounding play
+   * out — envelope releases, material ring, and the reverb tail all run
+   * to their natural end. Contrast stop(), which fades the master and
+   * kills the nodes ~40ms later. Used at producer region ends (owner
+   * 07-07: a region boundary is not a mute).
+   */
+  finish() {
+    this.playing = false;
+    clearTimeout(this._timer);
+    this._timer = null;
+  }
+
   get isPlaying() { return this.playing; }
 
   /** Current generation state for UI feedback. */
@@ -3671,7 +3697,7 @@ export class SynthEngine {
 
     while (this._nextTime < now + AHEAD) {
       const note = this._engine.nextNote();
-      if (!note) { this.stop(); return; }
+      if (!note) { this.finish(); return; } // exhausted: ring out, don't cut the tail
       if (note.isSurprise) {
         this._surpriseCount += 1;
         this._lastSurpriseAt = Date.now();

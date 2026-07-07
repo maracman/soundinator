@@ -939,6 +939,21 @@ console.log("P3: note connection — glide vs ring on overlap");
     (() => { const p = notePerformance({}); return p.vibrato === null && p.glideFrom === null && p.tuningCents === 0; })());
 }
 
+// ── Region ring-out (owner 07-07): finish() stops triggering, not sound ──
+{
+  const { SynthEngine } = await import("../web/static/synth.js");
+  const eng = new SynthEngine();
+  check("ring-out: SynthEngine exposes finish()", typeof eng.finish === "function");
+  eng.playing = true;
+  eng._timer = setTimeout(() => {}, 60000);
+  eng._nodes = [{ stop() { eng._nodeKilled = true; } }];
+  eng.finish();
+  check("ring-out: finish() stops the generator", eng.playing === false && eng._timer === null);
+  check("ring-out: finish() leaves sounding nodes alive (no stop call)",
+    !eng._nodeKilled && eng._nodes.length === 1);
+  eng._nodes = []; // don't leak the fake node into later checks
+}
+
 // ── Q1: patch transparency badges (pure derivation, no persistence) ──
 {
   const { patchBadges, splitsBucketOf } = await import("../web/static/synth.js");
