@@ -2074,14 +2074,49 @@ export class GenerationEngine {
     return result;
   }
 
+  /**
+   * Deterministic arp note set (owner brief P1): scale degrees at a fixed
+   * stride from the root nearest the register centre, spanning arpOctaves.
+   * "Doesn't need to change chord, just go up and down over the same
+   * interval notes" — the set is stable; rhythm/rests/dynamics/surprise
+   * machinery run unchanged on top.
+   */
+  _arpSequence() {
+    const p = this.p;
+    const stride = Math.max(1, Math.round(p.arpStep ?? 2));
+    const octaves = Math.max(1, Math.min(3, Math.round(p.arpOctaves ?? 1)));
+    const div = this.scale.div;
+    const roots = (Array.isArray(p.rootNotes) && p.rootNotes.length) ? p.rootNotes : [0];
+    const center = Math.round(p.registerCenter ?? 0);
+    const anchor = this.scale.nearest(roots[0] + Math.round((center - roots[0]) / div) * div);
+    const up = [anchor];
+    let d = anchor;
+    for (let guard = 0; guard < 64; guard++) {
+      d = this.scale.stepFrom(d, stride);
+      if (d - anchor > octaves * div + 0.001) break;
+      up.push(d);
+    }
+    if (up.length < 2) up.push(this.scale.stepFrom(anchor, stride));
+    const pattern = p.melodyPattern || "walk";
+    if (pattern === "arpDown") return up.slice().reverse();
+    if (pattern === "arpUpDown") return up.concat(up.slice(1, -1).reverse());
+    return up;
+  }
+
   _generateMotif() {
     const beatDiv = this.p.beatDivisions || 1;
     const motifBeats = this.p.motifLengthBeats || this.p.motifLength || 4;
     const totalDivs = motifBeats * beatDiv;
     const rhythm = this._generateMotifRhythm(totalDivs);
 
+    const pattern = this.p.melodyPattern || "walk";
+    const arpSeq = pattern !== "walk" ? this._arpSequence() : null;
+    if (arpSeq && !Number.isFinite(this._arpPos)) this._arpPos = 0;
+
     const notes = [];
-    let deg = this._currentDegree || this.scale.pickNote(this.rng);
+    let deg = arpSeq ? arpSeq[this._arpPos % arpSeq.length]
+      : (this._currentDegree || this.scale.pickNote(this.rng));
+    if (arpSeq) this._arpPos++;
     let fmt = this._pickFormant();
     // Momentum state: direction of the most recent completed move, carried
     // across notes (and across motifs via this._lastDir).
@@ -2089,7 +2124,13 @@ export class GenerationEngine {
 
     for (let i = 0; i < rhythm.length; i++) {
       const phrasePos = rhythm.length > 1 ? i / (rhythm.length - 1) : 0;
-      if (i > 0) {
+      if (i > 0 && arpSeq) {
+        // Arp: the cycle is the melody — deterministic, seeded phase.
+        const before = deg;
+        deg = arpSeq[this._arpPos % arpSeq.length];
+        this._arpPos++;
+        if (deg !== before) prevDir = Math.sign(deg - before);
+      } else if (i > 0) {
         // The previous note's duration sets how recently the prior shift
         // happened (in tempo-agnostic divisions); shorter = stronger pull.
         const prevDur = rhythm[i - 1].durationDivs;

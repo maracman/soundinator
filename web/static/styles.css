@@ -5464,3 +5464,7 @@ body.dragging { cursor: grabbing; user-select: none; }
 .body-band-edit .body-band-name { font-size: 10.5px; color: var(--ch-dim, #8b9aa8); white-space: nowrap; }
 .body-band-edit input[type=range] { flex: 1; min-width: 80px; }
 .body-band-edit .body-band-out { font-size: 11px; font-variant-numeric: tabular-nums; color: rgba(255, 214, 140, 0.9); min-width: 44px; text-align: right; }
+
+/* Melody pattern segmented control (walk / arp) */
+.pattern-row { display: flex; gap: 4px; margin: 2px 0 8px; }
+.pattern-row .seg-btn { flex: 1; }

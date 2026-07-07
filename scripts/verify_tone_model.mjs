@@ -471,5 +471,49 @@ console.log("CH-B3: measured instrument fits folded into presets");
     !SPECTRAL_PROFILES.vocal.measured);
 }
 
+console.log("P1: arp pattern mode (owner brief 2026-07-07)");
+{
+  const GEN7 = {
+    seed: 5, tempo: 120, beatDivisions: 2, motifCount: 1, motifLengthBeats: 8,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    registerCenter: 0, gapProb: 0, restMotifStartRatio: 0, surpriseProb: 0,
+    melodyPattern: "arpUp", arpStep: 2, arpOctaves: 1, excitationHuman: 0,
+  };
+  const degreesOf = (params, count = 12) => {
+    const e = new GenerationEngine(params); e.initialise();
+    const out = [];
+    for (let i = 0; i < 200 && out.length < count; i++) {
+      const nn = e.nextNote();
+      if (nn && nn.velocity > 0) out.push(nn.degree);
+    }
+    return out;
+  };
+  const up = degreesOf(GEN7);
+  // major triad-ish cycle from the root: 0,4,7,11(maj7 skip)… stride 2 over
+  // major degrees [0,2,4,5,7,9,11] from 0 → 0,4,7,11,12? (wraps at octave)
+  const uniq = [...new Set(up)].sort((a, b) => a - b);
+  check("arpUp: deterministic cycle over a fixed in-scale set",
+    uniq.length >= 3 && uniq.length <= 6 && up.slice(0, uniq.length).join(",") === up.slice(uniq.length, 2 * uniq.length).join(","),
+    `degrees ${up.join(",")}`);
+  check("arpUp: strictly ascending within each cycle",
+    up.slice(0, uniq.length - 1).every((d, i) => up[i + 1] > d));
+  check("arp set stays in scale",
+    uniq.every(d => [0, 2, 4, 5, 7, 9, 11].includes(((d % 12) + 12) % 12)));
+  const down = degreesOf({ ...GEN7, melodyPattern: "arpDown" });
+  check("arpDown: same set, descending",
+    down.slice(0, uniq.length - 1).every((d, i) => down[i + 1] < d));
+  const ud = degreesOf({ ...GEN7, melodyPattern: "arpUpDown", motifLengthBeats: 8 }, 2 * uniq.length - 2);
+  const half = uniq.length;
+  check("arpUpDown: palindrome without repeated endpoints",
+    ud.length >= 2 * half - 2 &&
+    ud.slice(0, half - 1).every((d, i) => ud[i + 1] > d) &&
+    ud.slice(half - 1, 2 * half - 2).every((d, i) => ud[half + i] < d || half + i >= ud.length));
+  const walk = degreesOf({ ...GEN7, melodyPattern: "walk" });
+  check("walk mode untouched (probabilistic, not the arp cycle)",
+    walk.join(",") !== up.join(","));
+  const det1 = degreesOf(GEN7), det2 = degreesOf(GEN7);
+  check("arp is deterministic under the same seed", det1.join(",") === det2.join(","));
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
 console.log("\nAll tone-model v2 assertions passed (T1-T6 + space).");

@@ -166,6 +166,9 @@ const DEFAULTS = {
   subScaleWeight: 0.7,
   tonicHz: 261.63,
   intervalPeakedness: 2.0,
+  melodyPattern: "walk",
+  arpStep: 2,
+  arpOctaves: 1,
   intervalRange: 7,
   momentum: 0,
   motifHitProb: 0.92,
@@ -331,6 +334,9 @@ const DEFAULTS = {
 
 const PARAM_DESC = {
   tempo: "Playback speed in beats per minute",
+  melodyPattern: "How the melody chooses notes: Walk = the probabilistic interval walk shaped by the dials below; Arp = a deterministic cycle over a fixed set of in-scale notes (up, down, or up-and-down) — rhythm, rests, dynamics and surprise still apply on top",
+  arpStep: "Arp stride in scale steps: 2 = every other scale note (thirds, triad-like), 3 = wider voicings, 1 = a scale run",
+  arpOctaves: "How many octaves the arp cycle spans before it wraps",
   intervalPeakedness: "Shape of the interval distribution. At the bottom of the dial every interval size within the range is equally likely (flat/uniform); raising it forms a bell that narrows to a sharp point at the top (stepwise/repeat). The range sets how far the flat/uniform spread reaches",
   intervalRange: "Maximum interval size in scale degrees — the hard limit of the interval distribution. Widening it stretches the whole shape: at the flat/uniform end it sets how far equal-probability intervals reach; with the bell it widens the spread",
   momentum: "Tendency to keep moving in the same direction as the previous step. Stronger after short notes, fades near register edges (max 80% continuation)",
@@ -4000,6 +4006,7 @@ function renderExplore() {
     // instead of restarting from the top. Use "Restart seq" to hear the full
     // from-scratch effect.
     "intervalPeakedness","intervalRange","momentum","registerCenter","registerWidth","registerSkew",
+    "melodyPattern","arpStep","arpOctaves",
     "rootPullStrength","rootPullShape",
     "surpriseProb","incorporationRate","surpriseMaxBaked","motifSurpriseProb",
     "surprisePitchWeight","surpriseTuningWeight","surpriseRhythmWeight","surpriseFormantWeight",
@@ -4213,6 +4220,18 @@ function renderExplore() {
     synth.updateGenerationParams({ ...exploreParams });
     renderExplore();
   };
+
+  // Melody pattern segmented control (walk vs deterministic arp cycles)
+  v.querySelectorAll("[data-melody-pattern]").forEach(btn => {
+    btn.onclick = () => {
+      const val = btn.dataset.melodyPattern;
+      if ((exploreParams.melodyPattern || "walk") === val) return;
+      noteParamChange("melodyPattern", exploreParams.melodyPattern, val);
+      exploreParams.melodyPattern = val;
+      synth.updateGenerationParams({ ...exploreParams });
+      renderExplore(); // walk dials ↔ arp dials swap
+    };
+  });
 
   // Excite segmented control (the four physical drive types)
   v.querySelectorAll("[data-exc-type]").forEach(btn => {
@@ -4737,9 +4756,16 @@ function macroPanelHTML(p) {
       <div class="macro-controls">
         <div class="macro-subsection${melSub === "generation" ? " active" : ""}" data-section="generation">
           <div class="subsection-label">Generation</div>
+          <div class="pattern-row" role="group" title="${esc(PARAM_DESC.melodyPattern)}">
+            ${[["walk", "Walk"], ["arpUp", "Arp ↑"], ["arpDown", "Arp ↓"], ["arpUpDown", "Arp ↕"]].map(([v, label]) =>
+              `<button class="seg-btn${(p.melodyPattern || "walk") === v ? " active" : ""}" data-melody-pattern="${v}">${label}</button>`).join("")}
+          </div>
+          ${(p.melodyPattern || "walk") === "walk" ? `
           ${controlRow("intervalPeakedness", "Interval shape", p.intervalPeakedness, 0, 4, 0.05)}
           ${controlRow("intervalRange", "Interval range", p.intervalRange, 1, 24, 1)}
-          ${controlRow("momentum", "Momentum", p.momentum, 0, 1, 0.01)}
+          ${controlRow("momentum", "Momentum", p.momentum, 0, 1, 0.01)}` : `
+          ${controlRow("arpStep", "Arp stride", p.arpStep, 1, 4, 1)}
+          ${controlRow("arpOctaves", "Arp octaves", p.arpOctaves, 1, 3, 1)}`}
         </div>
 
         <div class="macro-subsection${melSub === "accuracy" ? " active" : ""}" data-section="accuracy">
