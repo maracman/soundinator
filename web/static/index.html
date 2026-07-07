@@ -4,12 +4,12 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Sound Studio</title>
-<link rel="stylesheet" href="/styles.css?v=200"/>
+<link rel="stylesheet" href="/styles.css?v=202"/>
 </head>
 <body>
 <div id="app" role="main"></div>
 <script type="module">
-  import("/app.js?v=200").catch((err) => {
+  import("/app.js?v=202").catch((err) => {
     const app = document.getElementById("app");
     if (app) app.textContent = err && err.stack ? err.stack : String(err);
     console.error(err);

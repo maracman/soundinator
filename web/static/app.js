@@ -63,7 +63,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.10.0"; // room designer (parametric RIR: size/damping/diffusion) + ear models (pinnaScale)
+const APP_VERSION = "sound-studio-0.11.0"; // measured KEMAR HRIR convolution ear model (route 2) alongside the parametric fit
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -1415,6 +1415,7 @@ function regionPlayParams(track, region, atBeat = null) {
       if (Number.isFinite(sp.head.earDistance)) params.earDistance = sp.head.earDistance;
       if (Number.isFinite(sp.head.headDensity)) params.headDensity = sp.head.headDensity;
       if (Number.isFinite(sp.head.pinnaScale)) params.pinnaScale = sp.head.pinnaScale;
+      if (sp.head.earModel) params.earModel = sp.head.earModel;
       if (sp.head.reverbType) {
         params.reverbType = sp.head.reverbType;
         // the shared room's design rides with its type: unset designer
@@ -9022,11 +9023,14 @@ function chInspectorHTML(p) {
 // Which EAR_MODELS preset the current head params correspond to (within
 // knob resolution), or "custom" when the knobs have wandered off-preset.
 function _earModelOf(p) {
-  for (const [k, m] of Object.entries(EAR_MODELS)) {
-    if (Math.abs((p.earDistance ?? 0.175) - m.earDistance) < 0.0026 &&
-        Math.abs((p.headDensity ?? 0.5) - m.headDensity) < 0.006 &&
-        Math.abs((p.pinnaScale ?? 1) - m.pinnaScale) < 0.006) return k;
-  }
+  const matches = (m) =>
+    Math.abs((p.earDistance ?? 0.175) - m.earDistance) < 0.0026 &&
+    Math.abs((p.headDensity ?? 0.5) - m.headDensity) < 0.006 &&
+    Math.abs((p.pinnaScale ?? 1) - m.pinnaScale) < 0.006;
+  // the stored choice wins when it still fits — disambiguates models that
+  // share parameters (measured KEMAR vs its fitted replica)
+  if (p.earModel && EAR_MODELS[p.earModel] && matches(EAR_MODELS[p.earModel])) return p.earModel;
+  for (const [k, m] of Object.entries(EAR_MODELS)) if (matches(m)) return k;
   return "custom";
 }
 
@@ -10246,7 +10250,15 @@ function drawSpaceField() {
     pinna.conchaDb < -0.1 ? `behind: concha ${pinna.conchaDb.toFixed(1)} dB` : null,
   ].filter(Boolean);
   ctx.fillText(bits.join(" · "), R.x, h - 8);
-  const earLbl = EAR_MODELS[_earModelOf(p)]?.label ?? "custom ears";
+  const emKey = _earModelOf(p);
+  const measuredMode = !!EAR_MODELS[emKey]?.measured;
+  const earLbl = EAR_MODELS[emKey]?.label ?? "custom ears";
+  if (measuredMode) {
+    ctx.fillStyle = "rgba(88,214,169,0.9)";
+    ctx.textAlign = "right";
+    ctx.fillText("● convolving measured HRIR — curves show the fitted model", w - 14, 16);
+    ctx.textAlign = "left";
+  }
   ctx.fillText(`${d.toFixed(1)} m · ${Math.round(clamp(p.spaceAzimuth ?? 0, -180, 180))}° · ${prof.label.toLowerCase()} ${decay.toFixed(1)}s · size ${size.toFixed(2)} · damp ${damping.toFixed(2)} · diffuse ${diffusion.toFixed(2)} · ${earLbl.toLowerCase()}`, L.x, h - 8);
 }
 

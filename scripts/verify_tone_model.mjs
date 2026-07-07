@@ -983,6 +983,24 @@ console.log("P3: note connection — glide vs ring on overlap");
     EAR_MODELS.kemarLarge.pinnaScale > EAR_MODELS.kemar.pinnaScale);
   check("KEMAR fits: provenance in the blurbs",
     /Gardner & Martin/.test(EAR_MODELS.kemar.blurb) && /DB-065/.test(EAR_MODELS.kemarLarge.blurb));
+  // measured convolution model (route 2) — the real HRIRs, bundled
+  const { KEMAR_HRIR } = await import("../web/static/kemar-hrir.js");
+  check("KEMAR measured: model present + flagged", EAR_MODELS.kemarMeasured?.measured === true);
+  check("KEMAR HRIR: 72 azimuths, both ears, 256 taps",
+    KEMAR_HRIR.count === 72 && KEMAR_HRIR.taps === 256 && KEMAR_HRIR.step === 5);
+  // decode + physics sanity: ITD peaks near the side, zero front/back
+  const bin = Buffer.from(KEMAR_HRIR._b64, "base64");
+  const s = new Int16Array(bin.buffer, bin.byteOffset, bin.length / 2);
+  const T = KEMAR_HRIR.taps;
+  const onset = (off) => { let pk = 0; for (let i = 0; i < T; i++) pk = Math.max(pk, Math.abs(s[off + i])); const th = pk * 0.15; for (let i = 0; i < T; i++) if (Math.abs(s[off + i]) >= th) return i; return 0; };
+  const itd = (azDeg) => { const idx = ((Math.round(azDeg / 5) * 5) % 360 + 360) % 360 / 5; const b = idx * 2 * T; return (onset(b) - onset(b + T)) / KEMAR_HRIR.sampleRate; };
+  check("KEMAR HRIR: decodes to the declared size", s.length === 72 * 2 * T);
+  check("KEMAR HRIR: front ITD ~0", Math.abs(itd(0)) < 5e-5);
+  check("KEMAR HRIR: right-side ITD is large + correct sign (right ear first)",
+    itd(90) > 5e-4 && itd(90) < 8e-4);
+  check("KEMAR HRIR: behind ITD ~0 (front/back symmetric timing)", Math.abs(itd(180)) < 5e-5);
+  check("KEMAR HRIR: normGain level-matches the parametric path (near unity)",
+    Math.abs(KEMAR_HRIR.normGain - 1) < 0.15);
 }
 
 // ── Region ring-out (owner 07-07): finish() stops triggering, not sound ──

@@ -13,6 +13,8 @@
 
 // ─── Seeded PRNG (xorshift32) ───────────────────────────────
 
+import { KEMAR_HRIR, kemarBuffers } from "./kemar-hrir.js";
+
 export class SeededRNG {
   constructor(seed = 42) { this.s = (seed >>> 0) || 1; }
   next()  { let x=this.s; x^=x<<13; x^=x>>>17; x^=x<<5; this.s=x>>>0; return this.s/4294967296; }
@@ -330,6 +332,14 @@ export const EAR_MODELS = {
     blurb: "fitted to measured MIT KEMAR HRTFs (Gardner & Martin 1994, DB-061 pinna)" },
   kemarLarge: { label: "KEMAR large pinna (fitted)", earDistance: 0.17, headDensity: 0.27, pinnaScale: 0.93,
     blurb: "fitted to measured MIT KEMAR HRTFs (Gardner & Martin 1994, DB-065 pinna)" },
+  // The MEASURED reference (owner 07-07 route 2): not a parametric filter
+  // at all — the actual KEMAR impulse responses convolved per ear. The
+  // nominal numbers below are the fitted values, used only for the field
+  // drawing and as a fallback; `measured` flips the audio to convolution.
+  // A/B this against `kemar` to hear whether the replica is good enough.
+  kemarMeasured: { label: "KEMAR (measured HRIR)", earDistance: 0.17, headDensity: 0.27, pinnaScale: 0.49,
+    measured: true,
+    blurb: "the real thing: measured MIT KEMAR impulse responses, convolved per ear" },
 };
 
 // ─── Approximate harmonic fingerprints for common instruments ─────
@@ -3203,6 +3213,24 @@ export class SynthEngine {
     this._pinnaNotch.gain.value = 0;
     this._spaceDistGain = this.ctx.createGain();
     this._spaceDistGain.gain.value = spaceDistanceGain(2.5);
+    // Measured-HRIR binaural path (owner 07-07 route 2): a parallel to the
+    // parametric ear filters, gated in when a `measured` ear model is
+    // picked. Two mono convolvers (KEMAR left/right IR for the current
+    // azimuth) drive the two output channels; distance colour (proximity,
+    // air) still happens BEFORE, distance gain AFTER, exactly as the
+    // parametric path — only the DIRECTION cue swaps from model to
+    // measurement, so an A/B compares like with like.
+    this._hrirConvL = this.ctx.createConvolver();
+    this._hrirConvL.normalize = false;
+    this._hrirConvR = this.ctx.createConvolver();
+    this._hrirConvR.normalize = false;
+    this._hrirMerger = this.ctx.createChannelMerger(2);
+    this._paramBinGain = this.ctx.createGain(); // parametric path gate (default on)
+    this._paramBinGain.gain.value = 1;
+    this._hrirGain = this.ctx.createGain();      // measured path gate (default off)
+    this._hrirGain.gain.value = 0;
+    this._hrirAz = null;   // last azimuth bucket loaded into the convolvers
+    this._hrirReady = false;
 
     this.master.connect(this._spaceProximity);
     this._spaceProximity.connect(this._spaceAir);
@@ -3217,7 +3245,15 @@ export class SynthEngine {
     this._earFilterR.connect(this._earMerger, 0, 1);
     this._earMerger.connect(this._pinnaShelf);
     this._pinnaShelf.connect(this._pinnaNotch);
-    this._pinnaNotch.connect(this._spaceDistGain);
+    this._pinnaNotch.connect(this._paramBinGain);
+    this._paramBinGain.connect(this._spaceDistGain);
+    // measured branch taps the same post-distance-colour signal
+    this._spaceAir.connect(this._hrirConvL);
+    this._spaceAir.connect(this._hrirConvR);
+    this._hrirConvL.connect(this._hrirMerger, 0, 0);
+    this._hrirConvR.connect(this._hrirMerger, 0, 1);
+    this._hrirMerger.connect(this._hrirGain);
+    this._hrirGain.connect(this._spaceDistGain);
     this._spaceDistGain.connect(this._dryGain);
     this._dryGain.connect(this.analyser);
     this.master.connect(this._preDelay);
@@ -3495,6 +3531,35 @@ export class SynthEngine {
       pinnaShelf: this._pinnaShelf, pinnaNotch: this._pinnaNotch,
       distGain: this._spaceDistGain,
     }, p);
+    this._configureMeasuredEar(p);
+  }
+
+  // Owner 07-07 route 2: swap the DIRECTION cue between the parametric ear
+  // filters and the measured KEMAR convolution. The measured model loads
+  // the left/right IR for the current azimuth (only on bucket change, so a
+  // fixed A/B toggle never reloads) and crossfades the two path gates.
+  _configureMeasuredEar(p = {}) {
+    if (!this._hrirGain) return;
+    const measured = !!(EAR_MODELS[p.earModel] && EAR_MODELS[p.earModel].measured);
+    const now = this.ctx.currentTime;
+    if (measured) {
+      const azBucket = Math.round((Number(p.spaceAzimuth) || 0) / KEMAR_HRIR.step);
+      if (azBucket !== this._hrirAz || !this._hrirReady) {
+        try {
+          const { left, right } = kemarBuffers(this.ctx, (Number(p.spaceAzimuth) || 0));
+          this._hrirConvL.buffer = left;
+          this._hrirConvR.buffer = right;
+          this._hrirAz = azBucket;
+          this._hrirReady = true;
+        } catch (e) {
+          // decode/convolver failure → stay parametric rather than go silent
+          this._hrirReady = false;
+        }
+      }
+    }
+    const useHrir = measured && this._hrirReady;
+    this._hrirGain.gain.setTargetAtTime(useHrir ? 1 : 0, now, 0.02);
+    this._paramBinGain.gain.setTargetAtTime(useHrir ? 0 : 1, now, 0.02);
   }
 
   // One spatial chain's configuration — shared by the base chain and every
