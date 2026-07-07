@@ -5590,6 +5590,48 @@ body.explore-mode #app {
 }
 .layer-strip { flex-wrap: wrap; }
 
+/* Owner 07-07: the scale is a circle — one octave per turn, degree 0 at
+   12 o'clock; tuned nodes slide around the ring by their cents. */
+.note-circle {
+  position: relative;
+  margin: 0.4rem auto;
+}
+.note-circle-ring {
+  position: absolute;
+  border: 1px solid rgba(90,110,130,0.3);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.note-circle .note-cell {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 0.62rem;
+  flex-direction: column;
+  line-height: 1;
+  gap: 1px;
+}
+.note-circle .note-cell.tuned { border-style: dashed; }
+.note-cents {
+  font-size: 0.48rem;
+  color: var(--accent2);
+  font-variant-numeric: tabular-nums;
+}
+.oct-btns { float: right; display: inline-flex; gap: 0.25rem; }
+
+/* Owner 07-07: the strips are their own panel — pinned above the
+   timeline (vertical scrolling never moves them), horizontally mirrored
+   to the timeline's scrollLeft by wireStripsPanel. */
+.strips-panel {
+  flex: none;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  padding-bottom: 2px;
+}
+.strips-tl2 { overflow-x: hidden; padding-bottom: 0; }
+
 /* ── Q6: global space designer ───────────────────────────── */
 .tl2-sp-row { min-height: 20px; }
 /* Owner 07-07 layout: cross-section + params live in the track-parameter

@@ -592,6 +592,42 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── World tunings: per-degree pitch centres (owner 07-07) ──
+{
+  const { Scale, CULTURAL_SCALES, GenerationEngine } = await import("../web/static/synth.js");
+  const cents = (hzA, hzB) => 1200 * Math.log2(hzB / hzA);
+  // Pythagorean: the fifth is exactly 3:2 (701.955¢)
+  const py = CULTURAL_SCALES.pythagorean;
+  const sPy = new Scale(12, py.degrees, py.sub, 0.7, 261.63, py.tuning);
+  check("Tuning: Pythagorean fifth is a pure 3:2 (702¢ within rounding)",
+    Math.abs(cents(sPy.degreeToHz(0), sPy.degreeToHz(7)) - 701.955) < 1.1);
+  // Just: the major third is exactly 5:4 (386.31¢)
+  const ju = CULTURAL_SCALES.just;
+  const sJu = new Scale(12, ju.degrees, ju.sub, 0.7, 261.63, ju.tuning);
+  check("Tuning: just major third is a pure 5:4 (386¢ within rounding)",
+    Math.abs(cents(sJu.degreeToHz(0), sJu.degreeToHz(4)) - 386.31) < 1.1);
+  check("Tuning: offsets repeat at the octave (pitch-class based)",
+    Math.abs(cents(sJu.degreeToHz(4), sJu.degreeToHz(16)) - 1200) < 1e-6);
+  check("Tuning: no tuning → exact EDO grid (untouched path)",
+    new Scale(12, [0, 7], [0], 0.7, 261.63).degreeToHz(7) === 261.63 * Math.pow(2, 7 / 12));
+  // Maqam Rast on the 24-EDO grid: the third sits at 350¢ (E half-flat)
+  const ra = CULTURAL_SCALES.rast;
+  const sRa = new Scale(24, ra.degrees, ra.sub, 0.7, 261.63, ra.tuning);
+  check("Tuning: Rast's third is the quarter-tone 350¢",
+    Math.abs(cents(sRa.degreeToHz(0), sRa.degreeToHz(7)) - 350) < 1e-6);
+  check("Tuning: every cultural preset is internally consistent",
+    Object.values(CULTURAL_SCALES).every(s =>
+      s.degrees.every(d => d >= 0 && d < s.edo) &&
+      (s.sub || []).every(d => s.degrees.includes(d)) &&
+      (s.roots || []).every(d => s.degrees.includes(d)) &&
+      (!s.tuning || Object.keys(s.tuning).every(k => Math.abs(s.tuning[k]) < 1200 / s.edo))));
+  // the engine carries degreeTuning end to end
+  const eng = new GenerationEngine({ scaleMode: "12tone", scalePreset: "major",
+    customDegrees: ju.degrees, subScaleWeight: 0.7, tonicHz: 261.63, degreeTuning: ju.tuning });
+  check("Tuning: GenerationEngine's scale applies degreeTuning",
+    Math.abs(cents(eng._buildScale().degreeToHz(0), eng._buildScale().degreeToHz(4)) - 386.31) < 1.1);
+}
+
 // ── Q10: MIDI mapping — the full 2×3×2 option grid ──
 {
   const { midiMapDegree, GenerationEngine } = await import("../web/static/synth.js");

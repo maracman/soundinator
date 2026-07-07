@@ -42,6 +42,7 @@ import {
   globalScaleAt,
   trackSpaceAt,
   midiMapDegree,
+  CULTURAL_SCALES,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -97,6 +98,7 @@ const PRESET_SECTIONS = {
 
 const _MELODY_PARAMS = new Set([
   "scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz",
+  "degreeTuning",
   "subScaleNotes", "subScaleWeight", "rootNotes", "rootPullStrength",
   "rootPullShape", "intervalPeakedness", "intervalRange", "momentum",
   "registerCenter", "registerWidth", "registerSkew", "precision",
@@ -223,6 +225,7 @@ const DEFAULTS = {
   scalePreset: "major",
   edoDivisions: 12,
   customDegrees: null,
+  degreeTuning: null, // per-degree cent offsets from the EDO grid (world tunings / hand-tuned)
   subScaleNotes: [0, 4, 7],
   subScaleWeight: 0.7,
   tonicHz: 261.63,
@@ -507,6 +510,7 @@ const PARAM_DESC = {
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences AND head shadowing from lower frequencies (the shadow corner is c/2πa)",
   headDensity: "How strongly your head shadows the far ear (0–1). 0.5 = the published spherical-head model (Brown & Duda 1998: lows diffract around, highs shadow up to -20 dB); 0 = transparent, 1 = doubled",
   spaceOwnHead: "Keep this patch's own ear span and head density even when the producer's global space is active (normally the global listener overrides them)",
+  degreeTuning: "Each degree's true pitch centre, in cents off the equal grid — how just intonation, maqamat and other tuning traditions place their notes. Drag a node around the scale circle to set it by hand",
   layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
   layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
   layerEnvProb: "How often the shared variation trigger fires (per note) when synchronisation is on",
@@ -2371,28 +2375,34 @@ function wireGlobalSpace(v) {
       const t = trackAtXY(g);
       if (!t) return;
       _spSelTrack = t.id; // clicking a dot selects that track (owner 07-07)
-      _spRock.drag = { trackId: t.id, pos: _spTrackPos(t, playheadBeat) };
-      const move = (ev) => { _spRock.drag.pos = posFromXY(xy(ev)); };
+      _spRock.drag = { trackId: t.id, pos: _spTrackPos(t, playheadBeat), moved: false };
+      const move = (ev) => {
+        _spRock.drag.moved = true;
+        _spRock.drag.pos = posFromXY(xy(ev));
+      };
       const up = () => {
         window.removeEventListener("mousemove", move);
         window.removeEventListener("mouseup", up);
+        const drag = _spRock.drag;
+        _spRock.drag = null;
+        // A plain click commits NOTHING and never re-renders — re-rendering
+        // here replaced the canvas between the two clicks of a double-click,
+        // which is why anchoring never fired (owner bug report 07-07).
+        if (!drag?.moved) return;
         const sp = ensureGlobalSpace();
         const anchors = sp.tracks[t.id];
         const a = anchors?.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
         if (a) {
           // an anchor lives at the playhead: commit the drag to it
-          a.angle = _spRock.drag.pos.angle;
-          a.dist = _spRock.drag.pos.dist;
+          a.angle = drag.pos.angle;
+          a.dist = drag.pos.dist;
           saveArrangement("move space anchor");
         } else if (!anchors || !anchors.length) {
-          // owner 07-07: an UNANCHORED track just moves — it stays where
-          // you drop it (a static designer position, no snap back)
+          // an UNANCHORED track just moves — it stays where you drop it
           sp.static = sp.static || {};
-          sp.static[t.id] = { ..._spRock.drag.pos };
+          sp.static[t.id] = { ...drag.pos };
           saveArrangement("move track in space");
-        } // anchored without an anchor here: snaps back
-        _spRock.drag = null;
-        renderProduce();
+        } // anchored without an anchor here: snaps back (the rAF redraw handles it)
       };
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
@@ -2675,8 +2685,6 @@ function produceTimelineHTML() {
   }).join("");
   return `
     <div class="tl2">
-      ${globalScaleStripHTML(laneW)}
-      ${globalSpaceStripHTML(laneW)}
       <div class="tl2-row tl2-ruler-row">
         <div class="tl2-head tl2-corner"></div>
         <div class="tl2-ruler" id="tlRuler" style="width:${laneW}px">${rulerMarks}
@@ -3804,6 +3812,10 @@ function renderProduce() {
         </div>
         <div class="daw-vsplit" id="dawVSplit" title="Drag to resize the library panel"></div>
         <div class="daw-center">
+          <!-- Owner 07-07: the global strips are a SEPARATE panel — vertical
+               timeline scrolling never moves them; horizontal position stays
+               beat-aligned via scrollLeft sync (wireStripsPanel). -->
+          <div class="strips-panel" id="stripsPanel"><div class="tl2 strips-tl2" id="stripsScroll">${globalScaleStripHTML(totalBeats() * pxPerBeat)}${globalSpaceStripHTML(totalBeats() * pxPerBeat)}</div></div>
           <div class="timeline-grid" id="timelineGrid">${produceTimelineHTML()}</div>
           <div class="region-toolbar" id="regionToolbar">${produceToolbarHTML()}</div>
         </div>
@@ -3929,6 +3941,18 @@ function wireGlobalScale(v) {
   }
 }
 
+function wireStripsPanel(v) {
+  // beat-alignment: the strips mirror the timeline's horizontal scroll
+  const strips = v.querySelector("#stripsScroll");
+  const grid = v.querySelector("#timelineGrid");
+  const tl2 = grid?.querySelector(".tl2");
+  if (!strips || !tl2) return;
+  const sync = () => { strips.scrollLeft = tl2.scrollLeft; };
+  tl2.addEventListener("scroll", sync);
+  grid.addEventListener("scroll", () => { strips.scrollLeft = grid.scrollLeft; });
+  sync();
+}
+
 function wireProduce(v) {
   const sources = produceSources();
 
@@ -3937,6 +3961,7 @@ function wireProduce(v) {
   wireGlobalScale(v);
   wireGlobalSpace(v);
   wireMidi(v);
+  wireStripsPanel(v);
 
   v.querySelectorAll("[data-add-track]").forEach(btn => {
     btn.onclick = () => {
@@ -5584,6 +5609,18 @@ function renderExplore() {
   wireSpacePad(v);
   wireLayerStrip(v);
   wireStudioPanels(v);
+  // Owner 07-07: one-click octave shifts widen a patch's range of uses —
+  // an octave is one full turn of the scale (div degrees in degree space)
+  const octShift = (dir) => {
+    const div = exploreParams.scaleMode === "edo" ? (exploreParams.edoDivisions || 12) : 12;
+    exploreParams.registerCenter = Math.max(-48, Math.min(48, (exploreParams.registerCenter || 0) + dir * div));
+    synth.updateGenerationParams({ ...exploreParams });
+    renderExplore();
+  };
+  const octDown = v.querySelector("#octDown");
+  if (octDown) octDown.onclick = () => octShift(-1);
+  const octUp = v.querySelector("#octUp");
+  if (octUp) octUp.onclick = () => octShift(1);
 
   // Rotary knobs (tone chain): vertical drag, shift = fine, double-click
   // resets to the stage default. Every change lights up the overlay it
@@ -5824,6 +5861,7 @@ function renderExplore() {
       const preset = SCALE_PRESETS[presetSel.value] || SCALE_PRESETS.major;
       exploreParams.customDegrees = [...preset.degrees];
       exploreParams.subScaleNotes = exploreParams.subScaleNotes.filter(d => preset.degrees.includes(d));
+      exploreParams.degreeTuning = null; // plain presets are equal-tempered — stale world tuning must not linger
       rerenderNoteGrid(v);
       syncRootNotesWithScale(v);
       debouncedReplay();
@@ -5845,13 +5883,82 @@ function renderExplore() {
     };
   }
 
-  // Note grid clicks
+  // Scale circle: click cycles a degree's role; dragging a node around the
+  // ring adjusts its pitch centre (per-degree cents); double-click resets it.
   const noteGridContainer = v.querySelector("#noteGridContainer");
-  if (noteGridContainer) noteGridContainer.onclick = (e) => {
-    const cell = e.target.closest(".note-cell");
-    if (!cell) return;
-    handleNoteGridClick(cell);
-    syncRootNotesWithScale(v);
+  if (noteGridContainer) {
+    noteGridContainer.onmousedown = (e) => {
+      const cell = e.target.closest(".note-cell");
+      if (!cell) return;
+      e.preventDefault();
+      const d = parseInt(cell.dataset.degree);
+      const circle = cell.closest(".note-circle");
+      const rect = circle.getBoundingClientRect();
+      const divisions = exploreParams.scaleMode === "edo" ? (exploreParams.edoDivisions || 12) : 12;
+      const maxCents = Math.max(5, Math.floor(1200 / divisions / 2) - 1); // never cross a neighbour
+      let moved = false;
+      const centsAt = (ev) => {
+        const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+        let angle = Math.atan2(ev.clientY - cy, ev.clientX - cx) + Math.PI / 2; // 0 at 12 o'clock
+        let frac = angle / (2 * Math.PI);
+        frac = ((frac % 1) + 1) % 1;
+        let cents = (frac - d / divisions) * 1200;
+        if (cents > 600) cents -= 1200;
+        if (cents < -600) cents += 1200;
+        return Math.max(-maxCents, Math.min(maxCents, Math.round(cents)));
+      };
+      const move = (ev) => {
+        if (Math.abs(ev.clientX - e.clientX) + Math.abs(ev.clientY - e.clientY) < 4 && !moved) return;
+        moved = true;
+        const cents = centsAt(ev);
+        exploreParams.degreeTuning = { ...(exploreParams.degreeTuning || {}) };
+        if (cents) exploreParams.degreeTuning[d] = cents;
+        else delete exploreParams.degreeTuning[d];
+        if (!Object.keys(exploreParams.degreeTuning).length) exploreParams.degreeTuning = null;
+        rerenderNoteGrid(v);
+        synth.updateGenerationParams({ ...exploreParams });
+      };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        if (!moved) {
+          // plain click: cycle the role exactly as before
+          handleNoteGridClick(cell);
+          syncRootNotesWithScale(v);
+        } else {
+          debouncedReplay();
+        }
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+    noteGridContainer.ondblclick = (e) => {
+      const cell = e.target.closest(".note-cell");
+      if (!cell || !exploreParams.degreeTuning) return;
+      const d = parseInt(cell.dataset.degree);
+      delete exploreParams.degreeTuning[d];
+      if (!Object.keys(exploreParams.degreeTuning).length) exploreParams.degreeTuning = null;
+      rerenderNoteGrid(v);
+      synth.updateGenerationParams({ ...exploreParams });
+      debouncedReplay();
+    };
+  }
+
+  // World tuning systems: divisions + degrees + (where the tradition isn't
+  // equal-tempered) the per-degree pitch centres, in one pick.
+  const worldSel = v.querySelector("#worldScaleSelect");
+  if (worldSel) worldSel.onchange = () => {
+    const s = CULTURAL_SCALES[worldSel.value];
+    if (!s) return;
+    exploreParams.scaleMode = s.edo === 12 ? "12tone" : "edo";
+    exploreParams.edoDivisions = s.edo;
+    exploreParams.customDegrees = [...s.degrees];
+    exploreParams.subScaleNotes = [...(s.sub || [])];
+    exploreParams.rootNotes = [...(s.roots || [0])];
+    exploreParams.degreeTuning = s.tuning ? { ...s.tuning } : null;
+    synth.updateGenerationParams({ ...exploreParams });
+    renderExplore();
+    debouncedReplay();
   };
 
   // Formant chips
@@ -6095,6 +6202,15 @@ function macroWorkspaceHTML(p) {
                    min="3" max="48" value="${p.edoDivisions}"/>
           </div>
         `}
+        <div class="scale-preset-row">
+          <label class="text-sm">World tunings
+            <select id="worldScaleSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem" title="Tuning systems from different traditions — each sets the divisions, the scale, and (where the tradition isn't equal-tempered) the real pitch centre of every degree">
+              <option value="">—</option>
+              ${Object.entries(CULTURAL_SCALES).map(([k, s]) =>
+                `<option value="${k}">${s.label}</option>`).join("")}
+            </select>
+          </label>
+        </div>
       </div>
       <div id="noteGridContainer">${buildNoteGridHTML(p)}</div>
       <div class="note-grid-legend">
@@ -6314,7 +6430,12 @@ function macroPanelHTML(p) {
         </div>
 
         <div class="register-mini-section">
-          <div class="subsection-label">Register</div>
+          <div class="subsection-label">Register
+            <span class="oct-btns">
+              <button class="pal-btn" id="octDown" title="Drop the whole melody an octave (register centre −1 octave)">8va −</button>
+              <button class="pal-btn" id="octUp" title="Lift the whole melody an octave (register centre +1 octave)">8va ＋</button>
+            </span>
+          </div>
           ${controlRow("registerCenter", "Centre", p.registerCenter, -24, 24, 1)}
           ${controlRow("registerWidth", "Width", p.registerWidth, 2, 36, 1)}
           ${controlRow("registerSkew", "Skew", p.registerSkew, -1, 1, 0.05)}
@@ -6807,26 +6928,44 @@ function applySubnoteModeState(root = document) {
 
 // ─── Explore: Note Grid ─────────────────────────────────────
 
+// Owner 07-07: the scale is a CIRCLE — one octave around the ring, degree
+// 0 at 12 o'clock. Click a node to cycle its role (off → scale → sub →
+// root, as before); when a tuning system offsets a degree from the equal
+// grid, the node slides around the ring by its cents and shows them —
+// drag a node around the ring to adjust its pitch centre by hand,
+// double-click to snap it back to the grid.
+const NOTE_CIRCLE_R = 96;
 function buildNoteGridHTML(p) {
   const isEDO = p.scaleMode === "edo";
   const divisions = isEDO ? (p.edoDivisions || 12) : 12;
   const customDeg = p.customDegrees || [];
   const subNotes = p.subScaleNotes || [];
   const rootNotes = p.rootNotes || [];
-
-  let html = '<div class="note-grid">';
+  const tuning = p.degreeTuning || {};
+  const size = NOTE_CIRCLE_R * 2 + 36;
+  const c = size / 2;
+  let html = `<div class="note-circle" style="width:${size}px;height:${size}px">`;
+  html += `<div class="note-circle-ring" style="inset:${18 - 1}px"></div>`;
   for (let d = 0; d < divisions; d++) {
     const name = (divisions === 12) ? NOTE_NAMES_12[d] : String(d);
     const inScale = customDeg.includes(d);
     const inSub = subNotes.includes(d) && inScale;
     const isRoot = rootNotes.includes(d) && inScale;
+    const cents = Math.round(tuning[d] || 0);
     let cls = "note-cell";
     if (isRoot) cls += " is-root";
     else if (inSub) cls += " in-sub";
     else if (inScale) cls += " in-scale";
-    html += `<div class="${cls}" data-degree="${d}">${name}</div>`;
+    if (cents) cls += " tuned";
+    // the node's TRUE position: grid angle + its cent offset (one octave
+    // = a full turn, so angle = 2π · sounding-pitch / octave)
+    const angle = 2 * Math.PI * (d / divisions + cents / 1200) - Math.PI / 2;
+    const x = c + Math.cos(angle) * NOTE_CIRCLE_R;
+    const y = c + Math.sin(angle) * NOTE_CIRCLE_R;
+    html += `<div class="${cls}" data-degree="${d}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"
+      title="${name}: click cycles off → in scale → sub-scale → root · drag around the ring to move its pitch centre${cents ? ` (now ${cents > 0 ? "+" : ""}${cents}¢)` : ""} · double-click resets the tuning">${name}${cents ? `<span class="note-cents">${cents > 0 ? "+" : ""}${cents}</span>` : ""}</div>`;
   }
-  html += '</div>';
+  html += "</div>";
   return html;
 }
 

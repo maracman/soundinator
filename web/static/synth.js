@@ -1037,6 +1037,59 @@ export const SCALE_PRESETS = {
 
 const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// ─── World tuning systems (owner 07-07, per the Leimma reference) ───
+// Each preset is an EDO grid + per-degree cent OFFSETS from that grid, so
+// the whole degree-space machinery (walks, markers, bakes) keeps working
+// while the sounding pitch centres are the tradition's own. Offsets are
+// from standard references: Pythagorean/just from exact ratio maths;
+// maqamat on the 24-EDO theoretical grid (AEU); slendro/pelog as their
+// customary equal-step approximations (real gamelans vary per instrument
+// set — these are the documented averages).
+export const CULTURAL_SCALES = {
+  pythagorean: {
+    label: "Pythagorean (3-limit)",
+    edo: 12, degrees: [0, 2, 4, 5, 7, 9, 11], sub: [0, 4, 7], roots: [0],
+    tuning: { 2: 4, 4: 8, 5: -2, 7: 2, 9: 6, 11: 10 }, // exact 3^n/2^m cents − 12ET
+    description: "Major scale from pure fifths (3:2) — bright thirds, the tuning of medieval Europe and many modal traditions",
+  },
+  just: {
+    label: "Just intonation (5-limit)",
+    edo: 12, degrees: [0, 2, 4, 5, 7, 9, 11], sub: [0, 4, 7], roots: [0],
+    tuning: { 2: 4, 4: -14, 5: -2, 7: 2, 9: -16, 11: -12 }, // exact 5-limit ratios − 12ET
+    description: "Major scale from pure ratios (5:4 thirds, 3:2 fifths) — beatless chords at the cost of free modulation",
+  },
+  rast: {
+    label: "Maqam Rast (Arabic)",
+    edo: 24, degrees: [0, 4, 7, 10, 14, 18, 21], sub: [0, 7, 14], roots: [0],
+    tuning: null, // the 24-EDO theoretical grid IS the notation standard
+    description: "The mother maqam — its third and seventh sit a quarter-tone flat, between major and minor",
+  },
+  bayati: {
+    label: "Maqam Bayati (Arabic)",
+    edo: 24, degrees: [0, 3, 6, 10, 14, 17, 20], sub: [0, 6, 14], roots: [0],
+    tuning: null,
+    description: "The most sung maqam of the Levant — a three-quarter-tone second gives its plaintive colour",
+  },
+  hijaz: {
+    label: "Maqam Hijaz (Arabic)",
+    edo: 24, degrees: [0, 2, 8, 10, 14, 16, 20], sub: [0, 8, 14], roots: [0],
+    tuning: null,
+    description: "The augmented-second leap between its lowered second and raised third — the desert sound",
+  },
+  slendro: {
+    label: "Slendro (Java)",
+    edo: 5, degrees: [0, 1, 2, 3, 4], sub: [0, 2], roots: [0],
+    tuning: null, // customary near-equal 240¢ steps; real gamelans detune per set
+    description: "Five near-equal steps of ~240¢ — no fifths, no thirds, a different consonance entirely (each gamelan tunes its own)",
+  },
+  pelog: {
+    label: "Pelog bem (Java)",
+    edo: 9, degrees: [0, 1, 3, 5, 6], sub: [0, 3], roots: [0],
+    tuning: null, // the documented 9-EDO-subset approximation
+    description: "Five uneven steps from the seven-tone pelog — small seconds against wide thirds (9-EDO subset approximation)",
+  },
+};
+
 // ─── MIDI mapping (Q10) ─────────────────────────────────────
 // How a MIDI keyboard reaches an N-division scale. Three owner-specified
 // choices multiply out: which physical keys participate (white-only or
@@ -1272,17 +1325,26 @@ export class Scale {
    * @param {number[]} subScale     Weighted sub-scale (user-selected notes)
    * @param {number}   weight       0.5 = equal weighting, 1.0 = only sub-scale
    * @param {number}   tonicHz      Reference pitch
+   * @param {Object?}  degreeTuning Per-pitch-class cent offsets layered on
+   *                                the EDO grid ({pc: cents}) — how scales
+   *                                from tuning traditions that aren't equal-
+   *                                tempered (just, Pythagorean, maqamat…)
+   *                                get their real pitch centres.
    */
-  constructor(divisions, allDegrees, subScale, weight, tonicHz = 261.63) {
+  constructor(divisions, allDegrees, subScale, weight, tonicHz = 261.63, degreeTuning = null) {
     this.div = divisions;
     this.all = allDegrees;
     this.sub = subScale.length > 0 ? subScale : allDegrees;
     this.weight = weight;
     this.tonicHz = tonicHz;
+    this.tuning = degreeTuning && typeof degreeTuning === "object" ? degreeTuning : null;
   }
 
   degreeToHz(degree) {
-    return this.tonicHz * Math.pow(2, degree / this.div);
+    const base = this.tonicHz * Math.pow(2, degree / this.div);
+    if (!this.tuning) return base;
+    const cents = this.tuning[this.norm(degree)] || 0;
+    return cents ? base * Math.pow(2, cents / 1200) : base;
   }
 
   norm(degree) {
@@ -1875,7 +1937,8 @@ export class GenerationEngine {
       subDeg = (this.p.subScaleNotes || allDeg).filter(d => allDeg.includes(d));
       if (subDeg.length === 0) subDeg = allDeg;
     }
-    return new Scale(div, allDeg, subDeg, this.p.subScaleWeight, this.p.tonicHz || 261.63);
+    return new Scale(div, allDeg, subDeg, this.p.subScaleWeight, this.p.tonicHz || 261.63,
+      this.p.degreeTuning || null);
   }
 
   _subNoteVariation(velocity = 0.6, fundamentalHz = 261.63, degree = 0, formantPos = null) {
