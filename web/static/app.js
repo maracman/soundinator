@@ -329,6 +329,7 @@ const DEFAULTS = {
   gapDistanceSlope: 0,
   gapTimingRange: 0,
   slideSpeed: 0.65,
+  noteConnection: "glide",
   phraseGap: 0.15,
 };
 
@@ -448,6 +449,7 @@ const PARAM_DESC = {
   gapMax: "Upper edge of the articulation distribution. Positive values leave silence before the next note",
   gapDistanceSlope: "How strongly larger melodic intervals move toward the upper break value",
   gapTimingRange: "Random articulation variation around the chosen break or legato value",
+  noteConnection: "What happens when notes overlap (negative gap): Glide slides the new note's pitch from the previous one (single voice, legato); Ring lets both keep sounding at their own pitches (multiphonic)",
   slideSpeed: "How quickly connected notes glide into the next pitch when the sampled value is zero or below",
   phraseGap: "Minimum break at motif/phrase boundaries",
 };
@@ -4018,7 +4020,7 @@ function renderExplore() {
     "surpriseDynamicsWeight","surpriseRestWeight",
     "surprisePitchDistance","surpriseTuningDistance","surpriseRhythmDistance",
     "surpriseFormantDistance","surpriseDynamicsDistance",
-    "gapProb","gapMin","gapMax","gapDistanceSlope","gapTimingRange","slideSpeed","phraseGap",
+    "gapProb","gapMin","gapMax","gapDistanceSlope","gapTimingRange","slideSpeed","phraseGap","noteConnection",
     "restMotifStartRatio","restOnMeterRatio","restOffMeterRatio",
     "dynamicsLevel","loudnessRange","dynamicsPrecision","dynamicsRange","formantChangeProb",
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
@@ -4291,6 +4293,18 @@ function renderExplore() {
       exploreParams.melodyPattern = val;
       synth.updateGenerationParams({ ...exploreParams });
       renderExplore(); // walk dials ↔ arp dials swap
+    };
+  });
+
+  // Note connection segmented control (glide vs ring on overlap)
+  v.querySelectorAll("[data-note-connection]").forEach(btn => {
+    btn.onclick = () => {
+      const val = btn.dataset.noteConnection;
+      if ((exploreParams.noteConnection || "glide") === val) return;
+      noteParamChange("noteConnection", exploreParams.noteConnection, val);
+      exploreParams.noteConnection = val;
+      synth.updateGenerationParams({ ...exploreParams });
+      renderExplore(); // slide-speed dial appears only for glide
     };
   });
 
@@ -4766,8 +4780,15 @@ function macroPanelHTML(p) {
               ${controlRow("gapMax", "Max", p.gapMax, -0.8, 0.8, 0.01)}
               ${controlRow("gapDistanceSlope", "Distance slope", p.gapDistanceSlope, 0, 1, 0.01)}
               ${controlRow("gapTimingRange", "Timing range", p.gapTimingRange, 0, 0.4, 0.01)}
-              ${controlRow("slideSpeed", "Slide speed", p.slideSpeed, 0, 1, 0.01)}
               ${controlRow("phraseGap", "Phrase gap", p.phraseGap, 0, 0.8, 0.01)}
+            </div>
+            <div class="connection-row" role="group" title="${esc(PARAM_DESC.noteConnection)}">
+              <span class="connection-label">When notes overlap</span>
+              ${[["glide", "Glide (mono)"], ["ring", "Ring (multiphonic)"]].map(([v, label]) =>
+                `<button class="seg-btn${(p.noteConnection || "glide") === v ? " active" : ""}" data-note-connection="${v}">${label}</button>`).join("")}
+            </div>
+            <div class="breaks-grid">
+              ${(p.noteConnection || "glide") === "glide" ? controlRow("slideSpeed", "Slide speed", p.slideSpeed, 0, 1, 0.01) : ""}
             </div>
             <canvas class="mini-canvas" id="cvGap" width="620" height="76"></canvas>
           </div>

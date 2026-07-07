@@ -1387,7 +1387,12 @@ export class GenerationEngine {
     const gridDuration = durationDivs * divSec;
     const fittedFrequency = this._fitFrequency(hz);
     const previousFrequency = this._lastOutputFrequency;
-    const legatoFromPrevious = velocity > 0 && previousFrequency != null && this._lastGapFraction <= 0;
+    // P3 note connection (owner): when notes overlap, either GLIDE the new
+    // note from the previous pitch (mono legato, the old behaviour) or let
+    // both RING (multiphonic) — the tail extension stays either way.
+    const connection = this.p.noteConnection || "glide";
+    const legatoFromPrevious = connection === "glide" &&
+      velocity > 0 && previousFrequency != null && this._lastGapFraction <= 0;
     const slideDuration = legatoFromPrevious ? this._slideDuration(divSec, this._lastGapFraction) : 0;
     const gapFraction = this._gapFraction(intervalFromPrev, isMotifEnd);
     const legatoTail = gapFraction <= 0 ? this._slideDuration(divSec, gapFraction) : 0;
@@ -2781,7 +2786,7 @@ export class SynthEngine {
         const note = { ...stored };
         if (Number.isFinite(note.degree) && scale) {
           note.frequency = scale.degreeToHz(note.degree) * Math.pow(2, (note.intonationCents || 0) / 1200);
-          note.slideFromFrequency = note.legatoFromPrevious ? prevFreq : null;
+          note.slideFromFrequency = ((params.noteConnection || "glide") === "glide" && note.legatoFromPrevious) ? prevFreq : null;
         }
         if (note.velocity > 0) prevFreq = note.frequency;
         // Micro-timing deviations (owner spec): fractional div offsets edited

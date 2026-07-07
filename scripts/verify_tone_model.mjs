@@ -562,5 +562,35 @@ console.log("CH-B2: onset-noise level scaling");
     off.attackNoise.level === 0 && Math.abs(loud.attackNoise.level - base.attackNoise.level * 2) < 1e-9);
 }
 
+console.log("P3: note connection — glide vs ring on overlap");
+{
+  const GEN9 = {
+    seed: 4, tempo: 120, beatDivisions: 2, motifCount: 1, motifLengthBeats: 8,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    registerCenter: 0, restMotifStartRatio: 0, surpriseProb: 0, excitationHuman: 0,
+    gapProb: 1, gapMin: -0.5, gapMax: -0.2, // every gap negative = forced overlap
+  };
+  const run = (params) => {
+    const e = new GenerationEngine(params); e.initialise();
+    const out = [];
+    for (let i = 0; i < 100 && out.length < 16; i++) {
+      const nn = e.nextNote();
+      if (nn && nn.velocity > 0) out.push(nn);
+    }
+    return out;
+  };
+  const glide = run({ ...GEN9, noteConnection: "glide" });
+  const ring = run({ ...GEN9, noteConnection: "ring" });
+  check("glide: overlapped notes slide from the previous pitch (mono legato)",
+    glide.slice(1).some(nn => nn.legatoFromPrevious && nn.slideFromFrequency != null));
+  check("ring: overlapped notes start at their own pitch — no slide, multiphonic",
+    ring.slice(1).every(nn => !nn.legatoFromPrevious && nn.slideFromFrequency == null));
+  const divSec = 60 / 120 / 2;
+  check("ring keeps the overlap: tails still extend past the grid slot",
+    ring.some(nn => nn.gapFraction <= 0 && nn.duration > nn.durationDivs * divSec + 1e-6));
+  check("default is glide (unchanged behaviour for existing patches)",
+    run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
 console.log("\nAll tone-model v2 assertions passed (T1-T6 + space).");

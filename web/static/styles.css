@@ -5481,3 +5481,8 @@ body.dragging { cursor: grabbing; user-select: none; }
 
 /* P2: family starter tags + filter chips */
 .family-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 6px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(245, 190, 100, 0.9); white-space: nowrap; }
+
+/* P3: note-connection control */
+.connection-row { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; }
+.connection-row .connection-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ch-dim, #8b9aa8); margin-right: 2px; }
+.connection-row .seg-btn { flex: 0 0 auto; }
