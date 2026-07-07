@@ -43,6 +43,13 @@ import {
   trackSpaceAt,
   midiMapDegree,
   CULTURAL_SCALES,
+  itdSeconds,
+  headShadowDb,
+  headShadowFreq,
+  pinnaParams,
+  spaceProximityDb,
+  spaceDistanceGain,
+  spaceArrivalDelay,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -5711,7 +5718,7 @@ function renderExplore() {
 
   wireTonePrint(v);
   wireSpacePad(v);
-  wireSpaceField(v);
+  drawSpaceField(); // SPACE stage ear-response view (display only)
   wireLayerStrip(v);
   wireStudioPanels(v);
   // Owner 07-07: one-click octave shifts widen a patch's range of uses —
@@ -5751,7 +5758,11 @@ function renderExplore() {
         drawTonePrint();
         return;
       }
-      if (liveReverbParams.has(key)) { synth.updateReverb({ ...exploreParams }); return; }
+      if (liveReverbParams.has(key)) {
+        synth.updateReverb({ ...exploreParams });
+        drawSpaceField(); // the SPACE ear-response view rides these live
+        return;
+      }
       if (liveSubnoteParams.has(key)) { synth.updateGenerationParams({ ...exploreParams }); return; }
       debouncedReplay();
     };
@@ -6765,11 +6776,13 @@ function subnoteWorkspaceHTML(p) {
               <div class="ch-vsplit" id="chVSplit" title="Drag to resize the inspector"></div>
               <div class="ch-field-wrap">
                 ${_chStage === "space" ? `
-                <!-- Owner 07-07: space has no bearing on the partial print —
-                     the field serves the stage instead: a full-size room. -->
-                <div class="ch-focus-row"><span class="ch-focus-label">ROOM</span><span class="ch-focus-sum">where the instrument stands — the tone print returns on stages that shape it</span></div>
+                <!-- Owner 07-07: space has no bearing on the partial print,
+                     and a big room duplicated the mini pad. The field shows
+                     what the space DOES instead: the binaural response —
+                     what each ear receives, from the published head models. -->
+                <div class="ch-focus-row"><span class="ch-focus-label">EARS</span><span class="ch-focus-sum">what this position hands to each ear — move the instrument on the pad, left</span></div>
                 <div class="ch-field-pos">
-                  <canvas id="cvSpaceField" width="1200" height="364" style="width:100%;height:364px" title="Drag anywhere to place the instrument around your head — behind you is shaded. The lower strip shows how air soaks up the highs at this distance."></canvas>
+                  <canvas id="cvSpaceField" width="1200" height="364" style="width:100%;height:364px" title="Left: when the sound arrives — the direct hit, then the room's tail (the inset zooms the sub-millisecond gap between your ears). Right: how it's coloured — each ear's frequency response from head shadow, pinna, air and proximity."></canvas>
                 </div>` : `
                 <div class="ch-focus-row" id="chFocus">
                   <span class="ch-focus-label">FOCUS</span>
@@ -6786,7 +6799,7 @@ function subnoteWorkspaceHTML(p) {
               </div>
             </div>
             <div class="ch-status">${_chStage === "space"
-              ? `<span><b>drag</b> the room = position · the mini pad in the inspector mirrors it</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
+              ? `<span>curves follow the pad and knobs live · <b>L</b> ear blue · <b>R</b> ear amber</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
               : `<span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span>`}</div>
             ${layerStripHTML(p)}
           </div>
@@ -9775,117 +9788,196 @@ function wireLayerStrip(v) {
   drawLayerMiniPads();
 }
 
-// Owner 07-07: the SPACE stage's full-size field — the same room as the
-// mini pad, at working size, with an air-absorption strip underneath
-// (the one space fact that also touched the old print overlay).
-const SPACE_FIELD_AIR_H = 74;
+// Owner 07-07 round 2: the SPACE stage's field is the BINAURAL RESPONSE —
+// what this position hands to each ear, computed from the same published
+// models the audio uses (Woodworth ITD, Brown-Duda shadow, Shaw pinna,
+// air absorption, proximity). The old full-size room duplicated the mini
+// pad ("ugly and redundant"); position editing lives on the pad + knobs,
+// and this view follows them live. Pure display — no interaction.
 function drawSpaceField() {
   const cv = document.getElementById("cvSpaceField");
   if (!cv) return;
   const ctx = cv.getContext("2d");
   const w = cv.width, h = cv.height;
   ctx.clearRect(0, 0, w, h);
-  const padH = h - SPACE_FIELD_AIR_H;
-  const cx = w / 2, cy = padH / 2;
-  const rMax = Math.min(padH / 2 - 14, w / 2 - 14);
-  // behind half + rings
-  ctx.fillStyle = "rgba(60,72,88,0.16)";
-  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = "rgba(90,110,130,0.28)";
-  ctx.fillStyle = "rgba(120,135,150,0.6)";
-  ctx.font = "10px ui-monospace, monospace";
-  ctx.textAlign = "left";
-  for (const dm of [1, 3, 10, 30]) {
-    const r = _spaceDistToR(dm, rMax);
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
-    ctx.fillText(`${dm}m`, cx + 4, cy - r + 12);
-  }
-  ctx.strokeStyle = "rgba(90,110,130,0.14)";
-  for (const a of [-135, -90, -45, 0, 45, 90, 135, 180]) {
-    const rad = (a - 90) * Math.PI / 180;
-    ctx.beginPath(); ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax); ctx.stroke();
-  }
-  ctx.textAlign = "center";
-  ctx.fillText("front", cx, cy - rMax - 3);
-  ctx.fillText("behind", cx, cy + rMax + 11);
-  // the head — skull, ears, nose forward
-  const hr = 11;
-  ctx.fillStyle = "rgba(200,215,230,0.85)";
-  ctx.beginPath(); ctx.arc(cx, cy, hr, 0, 2 * Math.PI); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx - hr, cy, 3.4, 0, 2 * Math.PI); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx + hr, cy, 3.4, 0, 2 * Math.PI); ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - 3.6, cy - hr + 1); ctx.lineTo(cx, cy - hr - 5.5); ctx.lineTo(cx + 3.6, cy - hr + 1);
-  ctx.closePath(); ctx.fill();
-  // the instrument
-  const d = clamp(exploreParams.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
-  const az = clamp(exploreParams.spaceAzimuth ?? 0, -180, 180);
-  const rad = (az - 90) * Math.PI / 180;
-  const r = _spaceDistToR(d, rMax);
-  const ix = cx + Math.cos(rad) * r, iy = cy + Math.sin(rad) * r;
-  ctx.strokeStyle = "rgba(88,214,169,0.4)";
-  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ix, iy); ctx.stroke();
-  ctx.fillStyle = "#58d6a9";
-  ctx.shadowColor = "#58d6a9"; ctx.shadowBlur = 12;
-  ctx.beginPath(); ctx.arc(ix, iy, 8, 0, 2 * Math.PI); ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(200,215,230,0.85)";
-  ctx.font = "11px ui-monospace, monospace";
-  ctx.fillText(`${d.toFixed(1)} m · ${Math.round(az)}°`, ix, iy - 14);
-  // air-absorption strip: how this distance soaks up the highs
-  const ay0 = padH + 8, ah = SPACE_FIELD_AIR_H - 20;
-  const FMIN = 100, FMAX = 18000;
-  ctx.strokeStyle = "rgba(90,110,130,0.25)";
-  ctx.strokeRect(0.5, ay0 + 0.5, w - 1, ah);
-  const cut = spaceAirCutoff(d);
-  ctx.beginPath();
-  for (let px = 0; px <= w; px += 3) {
-    const f = FMIN * Math.pow(FMAX / FMIN, px / w);
-    const dropDb = f > cut ? Math.min(30, 12 * Math.log2(f / cut)) : 0;
-    const y = ay0 + 3 + (dropDb / 30) * (ah - 6);
-    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
-  }
-  ctx.strokeStyle = "rgba(148,196,255,0.8)";
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
-  ctx.lineWidth = 1;
-  ctx.fillStyle = "rgba(120,135,150,0.65)";
-  ctx.font = "9px ui-monospace, monospace";
-  ctx.textAlign = "left";
-  ctx.fillText(`air @ ${d.toFixed(1)} m — highs above ${(cut / 1000).toFixed(1)} kHz fade with distance`, 6, ay0 + ah + 11);
-}
 
-function wireSpaceField(v) {
-  const cv = v.querySelector("#cvSpaceField");
-  if (!cv) return;
-  const apply = (e) => {
-    const rect = cv.getBoundingClientRect();
-    const w = cv.width, h = cv.height;
-    const sx = w / Math.max(1, rect.width), sy = h / Math.max(1, rect.height);
-    const padH = h - SPACE_FIELD_AIR_H;
-    const cx = w / 2, cy = padH / 2;
-    const rMax = Math.min(padH / 2 - 14, w / 2 - 14);
-    const x = (e.clientX - rect.left) * sx - cx;
-    const y = (e.clientY - rect.top) * sy - cy;
-    exploreParams.spaceAzimuth = Math.round(clamp(Math.atan2(x, -y) * 180 / Math.PI, -180, 180));
-    exploreParams.spaceDistance = Number(_spaceRToDist(Math.hypot(x, y), rMax).toFixed(2));
-    const readout = v.querySelector("#spaceReadout");
-    if (readout) readout.textContent = `${exploreParams.spaceDistance.toFixed(1)} m · ${exploreParams.spaceAzimuth}°`;
-    drawSpaceField();
-    drawSpacePad();
-    drawChThumbs();
-    synth.updateReverb({ ...exploreParams });
+  const p = exploreParams;
+  const d = clamp(p.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
+  const azRad = clamp(p.spaceAzimuth ?? 0, -180, 180) * Math.PI / 180;
+  const earDist = p.earDistance ?? 0.175;
+  const density = p.headDensity ?? 0.5;
+  const wet = clamp(p.reverbWet ?? 0.16, 0, 0.95);
+  const decay = clamp(p.reverbDecay ?? 1.4, 0.2, 8);
+  const preDelay = clamp(p.reverbPreDelay ?? 0.015, 0, 0.25);
+
+  const itd = itdSeconds(azRad, earDist);          // +ve: LEFT ear later
+  const t0 = spaceArrivalDelay(d);
+  const distDb = 20 * Math.log10(spaceDistanceGain(d));
+  const shadowL = headShadowDb(azRad, "L", density);
+  const shadowR = headShadowDb(azRad, "R", density);
+  const f0 = headShadowFreq(earDist);
+  const airFc = spaceAirCutoff(d);
+  const proxDb = spaceProximityDb(d);
+  const pinna = pinnaParams(azRad);
+
+  const COL_L = "rgba(124,196,255,0.95)", COL_R = "rgba(255,180,84,0.95)";
+  const GRID = "rgba(90,110,130,0.22)", TXT = "rgba(120,135,150,0.75)";
+  ctx.font = "10px ui-monospace, monospace";
+
+  // ── left panel: WHEN it arrives (direct hit + room tail) ──────────
+  const L = { x: 14, y: 30, w: 610, h: h - 78 };
+  ctx.fillStyle = TXT; ctx.textAlign = "left";
+  ctx.fillText("WHEN IT ARRIVES", L.x, 16);
+  ctx.strokeStyle = GRID;
+  ctx.strokeRect(L.x + 0.5, L.y + 0.5, L.w, L.h);
+  // sqrt-compressed time axis: the first milliseconds matter as much as
+  // the seconds-long tail
+  const tMax = Math.max(0.4, t0 + preDelay + decay * 1.15);
+  const xT = (t) => L.x + Math.sqrt(Math.max(0, t) / tMax) * L.w;
+  ctx.textAlign = "center";
+  for (const t of [0.01, 0.05, 0.2, 0.5, 1, 2, 5]) {
+    if (t > tMax) break;
+    const x = xT(t);
+    ctx.strokeStyle = GRID;
+    ctx.beginPath(); ctx.moveTo(x, L.y); ctx.lineTo(x, L.y + L.h); ctx.stroke();
+    ctx.fillStyle = TXT;
+    ctx.fillText(t < 1 ? `${Math.round(t * 1000)}ms` : `${t}s`, x, L.y + L.h + 12);
+  }
+  const base = L.y + L.h - 4;
+  // room tail: wet energy decaying after the direct hit + pre-delay
+  const tail0 = t0 + preDelay;
+  if (wet > 0.001) {
+    ctx.beginPath();
+    ctx.moveTo(xT(tail0), base);
+    for (let px = 0; px <= 220; px++) {
+      const t = tail0 + (px / 220) * (tMax - tail0);
+      const amp = wet * Math.exp(-3 * (t - tail0) / decay); // ~-26 dB at "decay"
+      ctx.lineTo(xT(t), base - amp * (L.h - 26));
+    }
+    ctx.lineTo(xT(tMax), base);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(xT(tail0), 0, xT(tMax), 0);
+    grad.addColorStop(0, "rgba(148,196,255,0.30)");
+    grad.addColorStop(1, "rgba(148,196,255,0.03)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+  // direct hit: one spike at t0 (the ITD gap is sub-millisecond — the
+  // inset shows it honestly instead of pretending it's visible here)
+  const directAmp = clamp((distDb + 46) / 46, 0.05, 1);
+  ctx.strokeStyle = "rgba(200,215,230,0.9)";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(xT(t0), base); ctx.lineTo(xT(t0), base - directAmp * (L.h - 14)); ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = TXT; ctx.textAlign = "left";
+  ctx.fillText(`direct ${(t0 * 1000).toFixed(1)}ms · ${distDb.toFixed(1)}dB`, xT(t0) + 6, L.y + 14);
+  if (wet > 0.001) ctx.fillText(`room tail · ${decay.toFixed(1)}s`, xT(tail0 + decay * 0.12), base - wet * (L.h - 26) * 0.5);
+
+  // inset: the sub-millisecond gap between the ears (Woodworth ITD)
+  const I = { x: L.x + L.w - 218, y: L.y + 10, w: 206, h: 92 };
+  ctx.fillStyle = "rgba(10,14,20,0.88)";
+  ctx.fillRect(I.x, I.y, I.w, I.h);
+  ctx.strokeStyle = "rgba(90,110,130,0.45)";
+  ctx.strokeRect(I.x + 0.5, I.y + 0.5, I.w, I.h);
+  ctx.fillStyle = TXT;
+  ctx.fillText("between your ears", I.x + 8, I.y + 14);
+  const itdMs = itd * 1000;
+  const span = Math.max(0.9, Math.abs(itdMs) * 1.6); // ±span ms window
+  const xI = (ms) => I.x + I.w / 2 + (ms / span) * (I.w / 2 - 14);
+  const iBase = I.y + I.h - 18;
+  // near ear at 0, far ear offset by |ITD|; heights show the level gap
+  const ampFor = (db) => clamp((db + 24) / 30, 0.12, 1) * (I.h - 44);
+  const ears = [
+    { ms: Math.max(0, itdMs), col: COL_L, db: shadowL, lbl: "L" },
+    { ms: Math.max(0, -itdMs), col: COL_R, db: shadowR, lbl: "R" },
+  ];
+  for (const e of ears) {
+    ctx.strokeStyle = e.col;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(xI(e.ms), iBase); ctx.lineTo(xI(e.ms), iBase - ampFor(e.db)); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.fillStyle = e.col;
+    ctx.textAlign = "center";
+    ctx.fillText(e.lbl, xI(e.ms), iBase - ampFor(e.db) - 5);
+  }
+  ctx.fillStyle = TXT;
+  ctx.fillText(
+    Math.abs(itdMs) < 0.005 ? "dead centre — no gap"
+      : `${itdMs > 0 ? "left" : "right"} ear ${Math.abs(itdMs).toFixed(2)}ms later`,
+    I.x + I.w / 2, I.y + I.h - 5);
+
+  // ── right panel: HOW it's coloured (per-ear frequency response) ───
+  const R = { x: 660, y: 30, w: w - 660 - 14, h: h - 78 };
+  ctx.textAlign = "left";
+  ctx.fillStyle = TXT;
+  ctx.fillText("HOW IT'S COLOURED", R.x, 16);
+  ctx.strokeStyle = GRID;
+  ctx.strokeRect(R.x + 0.5, R.y + 0.5, R.w, R.h);
+  const FMIN = 60, FMAX = 20000, DB_TOP = 12, DB_BOT = -36;
+  const xF = (f) => R.x + Math.log(f / FMIN) / Math.log(FMAX / FMIN) * R.w;
+  const yDb = (db) => R.y + (DB_TOP - clamp(db, DB_BOT, DB_TOP)) / (DB_TOP - DB_BOT) * R.h;
+  ctx.textAlign = "center";
+  for (const f of [100, 1000, 10000]) {
+    ctx.strokeStyle = GRID;
+    ctx.beginPath(); ctx.moveTo(xF(f), R.y); ctx.lineTo(xF(f), R.y + R.h); ctx.stroke();
+    ctx.fillStyle = TXT;
+    ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, xF(f), R.y + R.h + 12);
+  }
+  ctx.textAlign = "left";
+  for (const db of [0, -12, -24]) {
+    ctx.strokeStyle = db === 0 ? "rgba(120,140,160,0.35)" : GRID;
+    ctx.beginPath(); ctx.moveTo(R.x, yDb(db)); ctx.lineTo(R.x + R.w, yDb(db)); ctx.stroke();
+    ctx.fillStyle = TXT;
+    ctx.fillText(`${db}dB`, R.x + 4, yDb(db) - 3);
+  }
+  // one ear's response: air lowpass + head-shadow shelf (f0) + proximity
+  // low shelf + pinna concha dip and high shelf (behind only)
+  const earDb = (f, shadowShelfDb) => {
+    const air = -10 * Math.log10(1 + (f / airFc) ** 2);
+    const hs = shadowShelfDb * (f * f / (f * f + f0 * f0));
+    const prox = proxDb * (1 - f * f / (f * f + 250 * 250));
+    const lg = Math.log2(f / pinna.conchaHz);
+    const concha = pinna.conchaDb / (1 + (lg / 0.55) ** 2);
+    const flange = pinna.shelfDb * (f * f / (f * f + pinna.shelfHz * pinna.shelfHz));
+    return air + hs + prox + concha + flange;
   };
-  cv.onmousedown = (e) => {
-    e.preventDefault();
-    apply(e);
-    const move = (ev) => apply(ev);
-    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
+  const curve = (shadowShelfDb) => {
+    const pts = [];
+    for (let px = 0; px <= R.w; px += 3) {
+      const f = FMIN * Math.pow(FMAX / FMIN, px / R.w);
+      pts.push([R.x + px, yDb(earDb(f, shadowShelfDb))]);
+    }
+    return pts;
   };
-  drawSpaceField();
+  const ptsL = curve(shadowL), ptsR = curve(shadowR);
+  // faint fill between the ears = the interaural level difference
+  ctx.beginPath();
+  ptsL.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  for (let i = ptsR.length - 1; i >= 0; i--) ctx.lineTo(ptsR[i][0], ptsR[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(200,215,230,0.07)";
+  ctx.fill();
+  for (const [pts, col, lbl] of [[ptsL, COL_L, "L"], [ptsR, COL_R, "R"]]) {
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.fillStyle = col;
+    ctx.fillText(lbl, pts[pts.length - 1][0] - 12, pts[pts.length - 1][1] - 6);
+  }
+  // readout line: the numbers behind the curves
+  ctx.fillStyle = TXT;
+  ctx.textAlign = "left";
+  const bits = [
+    `shadow from ${Math.round(f0)} Hz`,
+    `air to ${(airFc / 1000).toFixed(1)} kHz`,
+    proxDb > 0.05 ? `proximity +${proxDb.toFixed(1)} dB` : null,
+    pinna.conchaDb < -0.1 ? `behind: concha ${pinna.conchaDb.toFixed(1)} dB` : null,
+  ].filter(Boolean);
+  ctx.fillText(bits.join(" · "), R.x, h - 8);
+  ctx.fillText(`${d.toFixed(1)} m · ${Math.round(clamp(p.spaceAzimuth ?? 0, -180, 180))}° · room ${decay.toFixed(1)}s`, L.x, h - 8);
 }
 
 function wireSpacePad(v) {
