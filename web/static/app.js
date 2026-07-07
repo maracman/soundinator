@@ -1950,35 +1950,100 @@ function ensureGlobalScale() {
   return arrangement.globalScale;
 }
 
+// The scale in force at a beat: latest marker at/before it, else the
+// session context's own scale.
+function _gsDivCount() {
+  return arrangement.context.scaleMode === "edo" ? (arrangement.context.edoDivisions || 12) : 12;
+}
+function _gsScaleAt(beat) {
+  const m = globalScaleAt({ ...(arrangement.globalScale || {}), enabled: true }, beat);
+  if (m) return m;
+  const ctx = arrangement.context;
+  return {
+    degrees: ctx.customDegrees || SCALE_PRESETS[ctx.scalePreset]?.degrees || SCALE_PRESETS.major.degrees,
+    subScaleNotes: ctx.subScaleNotes || [],
+    rootNotes: ctx.rootNotes || [0],
+  };
+}
+
+// Owner rework 07-07: the strip IS a tiny piano roll — every division is a
+// row, coloured by its role under the scale in force at that beat, with a
+// vertical line at every change point. Double-click at a bar line adds a
+// change point; clicking a line opens the cell editor; clicking anywhere
+// else closes it, leaving the line + the highlight difference visible.
+const GS_STRIP_H = 42;
+function drawGsStrip() {
+  const cv = document.getElementById("gsCanvas");
+  if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+  const gs = arrangement.globalScale || { markers: [] };
+  const div = _gsDivCount();
+  const rowH = h / div;
+  const beats = totalBeats();
+  // segments between change points
+  const cuts = [0, ...(gs.markers || []).map(m => m.atBeat).filter(b => b > 0), beats]
+    .sort((a, b) => a - b);
+  for (let s = 0; s < cuts.length - 1; s++) {
+    const b0 = cuts[s], b1 = cuts[s + 1];
+    if (b1 <= b0) continue;
+    const sc = _gsScaleAt(b0 + 1e-4);
+    const x = b0 * pxPerBeat, ww = (b1 - b0) * pxPerBeat;
+    for (let d = 0; d < div; d++) {
+      const role = sc.rootNotes?.includes(d) ? "root"
+        : sc.subScaleNotes?.includes(d) ? "sub"
+        : sc.degrees?.includes(d) ? "scale" : "off";
+      ctx.fillStyle = role === "root" ? "rgba(139,124,246,0.5)"
+        : role === "sub" ? "rgba(245,166,35,0.42)"
+        : role === "scale" ? "rgba(148,196,255,0.3)"
+        : "rgba(0,0,0,0.35)";
+      const y = h - (d + 1) * rowH;
+      ctx.fillRect(x, y, ww, Math.max(1, rowH - 0.5));
+    }
+  }
+  // bar ticks (double-click targets)
+  ctx.strokeStyle = "rgba(154,160,171,0.12)";
+  for (let b = 0; b <= beats; b += BEATS_PER_BAR) {
+    const x = b * pxPerBeat;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  // change-point lines
+  (gs.markers || []).forEach((m, i) => {
+    const x = m.atBeat * pxPerBeat;
+    ctx.strokeStyle = i === _gsSelMarker ? "#ffd28a" : "rgba(245,166,35,0.8)";
+    ctx.lineWidth = i === _gsSelMarker ? 2 : 1.2;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    ctx.lineWidth = 1;
+  });
+}
+
 function globalScaleStripHTML(laneW) {
   const gs = arrangement.globalScale || { enabled: false, markers: [] };
-  const flags = (gs.markers || []).map((m, i) =>
-    `<div class="gs-flag${i === _gsSelMarker ? " sel" : ""}" data-gs-marker="${i}" style="left:${m.atBeat * pxPerBeat}px" title="Scale marker at beat ${m.atBeat} (${(m.degrees || []).length} degrees) — click to edit">⚑<span class="gs-flag-label">${(m.degrees || []).length}</span></div>`).join("");
   const sel = gs.markers?.[_gsSelMarker];
-  const div = arrangement.context.scaleMode === "edo" ? (arrangement.context.edoDivisions || 12) : 12;
+  const div = _gsDivCount();
   const editorRow = (_gsOpen && sel) ? `
       <div class="tl2-row">
         <div class="tl2-head tl2-corner"></div>
         <div class="gs-editor">
-          <span class="gs-editor-title">marker @ beat ${sel.atBeat}</span>
-          <div class="gs-roll" role="group" title="Click a note division to cycle its role: off → in scale → sub-scale → root (same operators as the patch scale card)">
+          <span class="gs-editor-title">change point @ beat ${sel.atBeat}</span>
+          <div class="gs-roll" role="group" title="Click a note division to cycle its role: off → in scale → sub-scale → root (same operators as the patch scale card). Click anywhere off this editor to close it.">
             ${Array.from({ length: div }, (_, d) => {
               const st = sel.rootNotes?.includes(d) ? "root" : sel.subScaleNotes?.includes(d) ? "sub" : sel.degrees?.includes(d) ? "scale" : "off";
               return `<button class="gs-cell gs-${st}" data-gs-cell="${d}" title="division ${d}: ${st}">${d}</button>`;
             }).join("")}
           </div>
-          <button class="pal-btn" id="gsDeleteMarker" title="Remove this marker">×</button>
+          <button class="pal-btn" id="gsDeleteMarker" title="Remove this change point">×</button>
         </div>
       </div>` : "";
   return `
       <div class="tl2-row tl2-gs-row${_gsOpen ? " open" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron" id="gsToggle" title="Global scale — markers along the timeline; tracks opt in with the G button in their header">${_gsOpen ? "▾" : "▸"} Global scale</button>
+          <button class="gs-chevron" id="gsToggle" title="Global scale — a tiny piano roll of the scale over time; double-click at a bar line to add a change point; tracks opt in with the G button in their header">${_gsOpen ? "▾" : "▸"} Global scale</button>
           ${_gsOpen ? `<input type="checkbox" id="gsEnabled"${gs.enabled ? " checked" : ""} title="Apply the global scale to opted-in tracks"/>` : ""}
         </div>
-        <div class="gs-strip${gs.enabled ? "" : " off"}" id="gsStrip" style="width:${laneW}px">
-          ${_gsOpen ? flags : ""}
-          ${_gsOpen ? `<button class="gs-add" id="gsAddMarker" style="left:${playheadBeat * pxPerBeat}px" title="Add a scale marker at the playhead (beat ${Math.round(playheadBeat * 4) / 4}), seeded from the session scale">＋</button>` : ""}
+        <div class="gs-strip${gs.enabled ? "" : " off"}${_gsOpen ? " open" : ""}" id="gsStrip" style="width:${laneW}px">
+          ${_gsOpen ? `<canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The scale over time — rows are note divisions, colours are roles (lit = in scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas>` : ""}
         </div>
       </div>${editorRow}`;
 }
@@ -3692,35 +3757,52 @@ function wireGlobalScale(v) {
     saveArrangement("global scale on/off");
     renderProduce();
   };
-  const gsAdd = v.querySelector("#gsAddMarker");
-  if (gsAdd) gsAdd.onclick = () => {
-    const gs = ensureGlobalScale();
-    const ctx = arrangement.context;
-    const atBeat = Math.round(playheadBeat * 4) / 4;
-    if (gs.markers.some(m => m.atBeat === atBeat)) {
+  // Owner rework: the strip canvas is the surface. Double-click at a bar
+  // line adds a change point (seeded from the scale in force there);
+  // clicking a change-point line opens the editor; clicking anywhere else
+  // on the canvas closes it, leaving the line + highlight diff visible.
+  const gsCanvas = v.querySelector("#gsCanvas");
+  if (gsCanvas) {
+    drawGsStrip();
+    const beatAt = (e) => {
+      const rect = gsCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (gsCanvas.width / Math.max(1, rect.width));
+      return x / pxPerBeat;
+    };
+    gsCanvas.onclick = (e) => {
+      const beat = beatAt(e);
+      const gs = arrangement.globalScale || { markers: [] };
+      const tol = 5 / pxPerBeat; // ±5 px around a change-point line
+      const hit = (gs.markers || []).findIndex(m => Math.abs(m.atBeat - beat) <= tol);
+      const next = hit >= 0 ? (hit === _gsSelMarker ? -1 : hit) : -1;
+      if (next !== _gsSelMarker) {
+        _gsSelMarker = next;
+        renderProduce();
+      }
+    };
+    gsCanvas.ondblclick = (e) => {
+      const gs = ensureGlobalScale();
+      const atBeat = Math.max(0, Math.round(beatAt(e) / BEATS_PER_BAR) * BEATS_PER_BAR);
+      const existing = gs.markers.findIndex(m => m.atBeat === atBeat);
+      if (existing >= 0) {
+        _gsSelMarker = existing;
+        renderProduce();
+        return;
+      }
+      const seed = _gsScaleAt(atBeat); // continue the scale in force here
+      gs.markers.push({
+        atBeat,
+        degrees: [...(seed.degrees || [])],
+        subScaleNotes: [...(seed.subScaleNotes || [])],
+        rootNotes: [...(seed.rootNotes || [0])],
+      });
+      gs.markers.sort((a, b) => a.atBeat - b.atBeat);
       _gsSelMarker = gs.markers.findIndex(m => m.atBeat === atBeat);
-      renderProduce();
-      return;
-    }
-    gs.markers.push({
-      atBeat,
-      degrees: [...(ctx.customDegrees || SCALE_PRESETS[ctx.scalePreset]?.degrees || SCALE_PRESETS.major.degrees)],
-      subScaleNotes: [...(ctx.subScaleNotes || [])],
-      rootNotes: [...(ctx.rootNotes || [0])],
-    });
-    gs.markers.sort((a, b) => a.atBeat - b.atBeat);
-    _gsSelMarker = gs.markers.findIndex(m => m.atBeat === atBeat);
-    gs.enabled = true; // adding the first marker is an unambiguous opt-in
-    saveArrangement("global scale marker");
-    renderProduce();
-  };
-  v.querySelectorAll("[data-gs-marker]").forEach(f => {
-    f.onclick = () => {
-      const i = Number(f.dataset.gsMarker);
-      _gsSelMarker = _gsSelMarker === i ? -1 : i;
+      gs.enabled = true; // adding the first change point is an unambiguous opt-in
+      saveArrangement("global scale change point");
       renderProduce();
     };
-  });
+  }
   v.querySelectorAll("[data-gs-cell]").forEach(btn => {
     btn.onclick = () => {
       const m = ensureGlobalScale().markers[_gsSelMarker];
@@ -3759,6 +3841,18 @@ function wireGlobalScale(v) {
       renderProduce();
     };
   });
+  // Clicking anywhere off the editor closes it (bubble phase, so the
+  // click's own action runs first), leaving the change-point line and the
+  // highlight difference visible in the strip.
+  if (!window._gsClickOffInstalled) {
+    window._gsClickOffInstalled = true;
+    document.addEventListener("click", (e) => {
+      if (_gsSelMarker < 0 || !location.hash.includes("produce")) return;
+      if (e.target.closest?.(".gs-editor") || e.target.closest?.("#gsCanvas")) return;
+      _gsSelMarker = -1;
+      renderProduce();
+    });
+  }
 }
 
 function wireProduce(v) {

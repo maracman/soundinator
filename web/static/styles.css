@@ -5275,6 +5275,8 @@ body.explore-mode #app {
   border-radius: 4px;
 }
 .gs-strip.off { opacity: 0.45; }
+.gs-strip.open { min-height: 42px; }
+#gsCanvas { display: block; cursor: pointer; border-radius: 4px; }
 .gs-flag {
   position: absolute;
   top: 0;
