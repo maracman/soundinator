@@ -479,8 +479,8 @@ const PARAM_DESC = {
   vibratoRate: "Mean vibrato rate in cycles per second",
   vibratoRateSd: "Standard deviation of vibrato rate, sampled once per vibrato cycle",
   spectralProb: "Chance that each new note samples every harmonic amplitude from its mean/SD distribution. Otherwise it uses the means; Hold drift handles changes during a held note",
-  spectralMix: "How strongly the harmonic fingerprint is mixed into the tone",
-  spectralPartials: "Number of harmonic partials in the Fourier fingerprint",
+  spectralMix: "How strongly the harmonic tone print is mixed into the tone",
+  spectralPartials: "Number of harmonic partials in the tone print",
   spectralSpread: "Global scale for each harmonic's amplitude distribution",
   spectralDynamicAmount: "How strongly note dynamics reshape each harmonic amplitude",
   spectralRegisterAmount: "How strongly note range reshapes each harmonic amplitude",
@@ -556,7 +556,7 @@ const UI_DESC = {
   cvFormantAccuracy: "Formant accuracy and surprise display around a circular vowel sequence. The selected formant is the centre row.",
   cvGap: "Articulation distribution. Values above zero create rests; values at or below zero connect or slide notes.",
   cvReverb: "Convolution impulse preview. Orange shows the decay envelope, blue suggests early reflections.",
-  cvHarmonicSignature: "Harmonic fingerprint display. Orange is mean, blue is SD, grey/green show low/high register response.",
+  cvHarmonicSignature: "Tone print display. Orange is mean, blue is SD, grey/green show low/high register response.",
   libraryCard: "Saved local presets and shared community presets.",
 };
 
@@ -578,8 +578,8 @@ const SECTION_DESC = {
   Breaks: "Shape gaps between notes and phrase-boundary separations.",
   Percussion: "Add beat, motif, and downbeat accent layers.",
   Space: "Add generated convolution reverbs after the synthesiser.",
-  "Harmonic Decomposition": "Inspect every harmonic partial and the combined waveform produced by the current fingerprint. Disabled while Formant mode is selected.",
-  "Instrument Fourier Print": "Choose and shape the instrument-like harmonic fingerprint used by Fourier mode.",
+  "Harmonic Decomposition": "Inspect every harmonic partial and the combined waveform produced by the current tone print. Disabled while Formant mode is selected.",
+  "Instrument Fourier Print": "Choose and shape the instrument-like harmonic tone print used by Fourier mode.",
   "Colour Distribution": "Shape sub-note formant, resonance, and breath variation used by Formant mode.",
   "Vibrato Distribution": "Shape pitch vibrato whose depth and rate are resampled every vibration cycle.",
   "Envelope Distribution": "Shape attack, decay, sustain, and release distributions for each note.",
@@ -595,8 +595,8 @@ const DIMENSION_DESC = {
 };
 
 const WORKSPACE_DESC = {
-  explore: "Show the main macro-level synthesiser controls.",
-  subnote: "Open the detailed harmonic, tone-colour, and envelope workspace.",
+  explore: "The behaviour half: melody, rhythm, dynamics, sequence & surprise — how the instrument plays.",
+  subnote: "The instrument designer: excitor, resonator, body and space — what one note sounds like.",
 };
 
 const PERFORMANCE_DESC = {
@@ -4903,8 +4903,8 @@ function renderExplore() {
         <div class="studio-subtitle">Probabilistic Synthesiser</div>
       </div>
       <div class="workspace-tabs" id="workspaceTabs">
-        <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore">Macro</button>
-        <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote">Sub-note</button>
+        <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore" title="The behaviour half: melody, rhythm, dynamics, sequence & surprise — how the instrument plays">Macro</button>
+        <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
         <a class="workspace-tab workspace-link" href="#produce" title="Producer: arrange your instruments on a timeline (early preview)">Producer</a>
       </div>
     </div>
