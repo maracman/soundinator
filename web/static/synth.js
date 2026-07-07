@@ -1766,6 +1766,15 @@ export class GenerationEngine {
         sharedEnv = {
           vary: this.rng.next() < prob,
           z: { a: this._gaussian(), d: this._gaussian(), s: this._gaussian(), r: this._gaussian() },
+          // owner 07-07: the variation MAGNITUDE is shared too — one SD per
+          // envelope parameter for the base and every layer (each stream
+          // still varies around its own mean)
+          sd: {
+            a: this.p.layerEnvAttackSd ?? this.p.envelopeAttackSd ?? 0.006,
+            d: this.p.layerEnvDecaySd ?? this.p.envelopeDecaySd ?? 0.018,
+            s: this.p.layerEnvSustainSd ?? this.p.envelopeSustainSd ?? 0.08,
+            r: this.p.layerEnvReleaseSd ?? this.p.envelopeReleaseSd ?? 0.035,
+          },
         };
         // the base joins the sync: replace its independent draw with the
         // shared trigger applied around the base's own means
@@ -1834,8 +1843,11 @@ export class GenerationEngine {
     };
   }
 
-  // One shared trigger + z-scores, applied around a param set's OWN
-  // envelope baselines — the synced-variation law for layerEnvOverride.
+  // One shared trigger + z-scores + SDs, applied around a param set's OWN
+  // envelope MEANS — the synced-variation law for layerEnvOverride. The
+  // magnitude of the variation (SD) is shared across base + layers (owner
+  // 07-07: "it will have to be the same SDs for all of them"); only the
+  // baseline means stay per-stream.
   _envelopeShared(shared, p) {
     const sample = (mean, sd, lo, hi, z) => {
       const base = this._clamp(mean, lo, hi);
@@ -1843,10 +1855,10 @@ export class GenerationEngine {
       return this._clamp(base + z * sd, lo, hi);
     };
     return {
-      envelopeAttack: sample(p.envelopeAttack ?? 0.008, p.envelopeAttackSd ?? 0.006, 0.001, 0.18, shared.z.a),
-      envelopeDecay: sample(p.envelopeDecay ?? 0.04, p.envelopeDecaySd ?? 0.018, 0.001, 0.5, shared.z.d),
-      envelopeSustain: sample(p.envelopeSustain ?? 0.6, p.envelopeSustainSd ?? 0.08, 0.05, 1, shared.z.s),
-      envelopeRelease: sample(p.envelopeRelease ?? 0.08, p.envelopeReleaseSd ?? 0.035, 0.004, 0.6, shared.z.r),
+      envelopeAttack: sample(p.envelopeAttack ?? 0.008, shared.sd.a, 0.001, 0.18, shared.z.a),
+      envelopeDecay: sample(p.envelopeDecay ?? 0.04, shared.sd.d, 0.001, 0.5, shared.z.d),
+      envelopeSustain: sample(p.envelopeSustain ?? 0.6, shared.sd.s, 0.05, 1, shared.z.s),
+      envelopeRelease: sample(p.envelopeRelease ?? 0.08, shared.sd.r, 0.004, 0.6, shared.z.r),
     };
   }
 

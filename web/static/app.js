@@ -53,7 +53,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.7.0"; // layerEnvOverride resemantics: shared TRIGGER around per-layer baselines
+const APP_VERSION = "sound-studio-0.8.0"; // synced layer variation now also shares the SDs (magnitude) per parameter
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -342,8 +342,12 @@ const DEFAULTS = {
   earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
   headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
   layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
-  layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own baselines kept)
+  layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own means kept)
   layerEnvProb: 0.5,       // Q7: the shared variation chance when layerEnvOverride is on
+  layerEnvAttackSd: 0.015,  // shared variation SDs — one magnitude per envelope
+  layerEnvDecaySd: 0.04,    // parameter for the base and every layer while
+  layerEnvSustainSd: 0.08,  // synchronisation is on (owner 07-07)
+  layerEnvReleaseSd: 0.05,
   midiMapKeys: "white",       // Q10: which keys play — "white" | "all"
   midiMapCoverage: "packed",  // Q10: "all" divisions | "muted" out-of-scale | "packed" in-scale only
   midiMapAnchor: "octave",    // Q10: degree 0 repeats at each C ("octave") or right after the last degree ("consecutive")
@@ -502,8 +506,12 @@ const PARAM_DESC = {
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences = a wider, more localised stereo image",
   headDensity: "How opaque your head is to sound (0–1). Denser = the far ear loses more level and more treble when a source sits to one side",
   layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
-  layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE — each keeps its own envelope baseline, only the trigger is shared",
-  layerEnvProb: "How often the shared variation trigger fires (per note) when the envelope override is on",
+  layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
+  layerEnvProb: "How often the shared variation trigger fires (per note) when synchronisation is on",
+  layerEnvAttackSd: "The shared attack variation magnitude — applied to the base and every layer while synchronised",
+  layerEnvDecaySd: "The shared decay variation magnitude — applied to the base and every layer while synchronised",
+  layerEnvSustainSd: "The shared sustain variation magnitude — applied to the base and every layer while synchronised",
+  layerEnvReleaseSd: "The shared release variation magnitude — applied to the base and every layer while synchronised",
   midiMapKeys: "Which keys of a MIDI keyboard play this patch: only the white keys, or every key",
   midiMapCoverage: "What the keys cover: every scale subdivision, every subdivision with out-of-scale keys silent, or only in-scale degrees packed onto consecutive keys",
   midiMapAnchor: "Where the mapping repeats: degree 0 sits at C and restarts at every C, or the scale restarts on the very next key after its last degree",
@@ -5446,7 +5454,7 @@ function renderExplore() {
     "surprisePitchDistance","surpriseTuningDistance","surpriseRhythmDistance",
     "surpriseFormantDistance","surpriseDynamicsDistance",
     "gapProb","gapMin","gapMax","gapDistanceSlope","gapTimingRange","slideSpeed","phraseGap","noteConnection",
-    "layerEnvProb",
+    "layerEnvProb","layerEnvAttackSd","layerEnvDecaySd","layerEnvSustainSd","layerEnvReleaseSd",
     "restMotifStartRatio","restOnMeterRatio","restOffMeterRatio",
     "dynamicsLevel","loudnessRange","dynamicsPrecision","dynamicsRange","formantChangeProb",
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
@@ -5491,6 +5499,7 @@ function renderExplore() {
       }
       if (liveSubnoteParams.has(key)) {
         synth.updateGenerationParams({ ...exploreParams });
+        if (key.startsWith("layerEnv")) refreshLayerEnvLines(); // rows mirror the shared panel live
         return;
       }
       debouncedReplay();
@@ -6360,6 +6369,36 @@ function productionPanelHTML(p) {
 // an independent-head toggle; the strip header can sync envelope draws.
 let _chLayerSel = null; // selected layer id (opens its mini panel)
 
+// One layer's envelope-baseline line. While synchronised, the chance and
+// the ± magnitudes come from the shared panel (identical on every row);
+// the means stay the layer's own.
+function layerEnvLineText(l, p) {
+  const sn = l.subnote || {};
+  const syncActive = !!p.layerEnvOverride;
+  const prof = SPECTRAL_PROFILES[sn.spectralProfile]?.label || sn.spectralProfile || "custom";
+  const v = (k, fb) => sn[k] ?? p[k] ?? fb;
+  const ms = (x) => Math.round(x * 1000);
+  const prob = syncActive ? (p.layerEnvProb ?? 0.5) : v("envelopeProb", 0);
+  const sd = (ownKey, sharedKey, fb) => syncActive ? (p[sharedKey] ?? fb) : v(ownKey, fb);
+  return [
+    prof,
+    `var ${Math.round(prob * 100)}%${syncActive ? " (synced)" : ""}`,
+    `A ${ms(v("envelopeAttack", 0.008))}±${ms(sd("envelopeAttackSd", "layerEnvAttackSd", 0.006))}ms`,
+    `D ${ms(v("envelopeDecay", 0.04))}±${ms(sd("envelopeDecaySd", "layerEnvDecaySd", 0.018))}ms`,
+    `S ${Math.round(v("envelopeSustain", 0.6) * 100)}±${Math.round(sd("envelopeSustainSd", "layerEnvSustainSd", 0.08) * 100)}%`,
+    `R ${ms(v("envelopeRelease", 0.08))}±${ms(sd("envelopeReleaseSd", "layerEnvReleaseSd", 0.035))}ms`,
+  ].join(" · ");
+}
+
+// Refresh every row's baseline line in place (no re-render — the shared
+// SD sliders live-update mid-drag).
+function refreshLayerEnvLines() {
+  (exploreParams.layers || []).forEach(l => {
+    const row = document.querySelector(`[data-layer-row="${l.id}"] .layer-env`);
+    if (row) row.textContent = layerEnvLineText(l, exploreParams);
+  });
+}
+
 function layerStripHTML(p) {
   const layers = Array.isArray(p.layers) ? p.layers : [];
   // Owner refinement 07-07: each row = mini head diagram + two lines —
@@ -6370,16 +6409,7 @@ function layerStripHTML(p) {
   // greyed out unless synchronisation is on.
   const rows = layers.map((l, i) => {
     const sn = l.subnote || {};
-    const prof = SPECTRAL_PROFILES[sn.spectralProfile]?.label || sn.spectralProfile || "custom";
-    const v = (k, fb) => sn[k] ?? p[k] ?? fb;
-    const ms = (x) => Math.round(x * 1000);
-    const envStr = [
-      `var ${Math.round(v("envelopeProb", 0) * 100)}%`,
-      `A ${ms(v("envelopeAttack", 0.008))}±${ms(v("envelopeAttackSd", 0.006))}ms`,
-      `D ${ms(v("envelopeDecay", 0.04))}±${ms(v("envelopeDecaySd", 0.018))}ms`,
-      `S ${Math.round(v("envelopeSustain", 0.6) * 100)}±${Math.round(v("envelopeSustainSd", 0.08) * 100)}%`,
-      `R ${ms(v("envelopeRelease", 0.08))}±${ms(v("envelopeReleaseSd", 0.035))}ms`,
-    ].join(" · ");
+    const envStr = layerEnvLineText(l, p);
     return `
     <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}">
       <span class="layer-row-tag">${i + 1}</span>
@@ -6396,7 +6426,7 @@ function layerStripHTML(p) {
           <button class="pal-btn" data-layer-recapture="${l.id}" title="Re-capture the CURRENT sound half into this layer (a layer is a snapshot — reshape the sound above, then update the layer)">⟳</button>
           <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
         </div>
-        <div class="layer-env" title="This layer's own envelope baseline: variation chance and each parameter's mean ± standard deviation. Synchronisation shares only WHEN variations fire — these values stay the layer's own.">${esc(prof)} · ${envStr}</div>
+        <div class="layer-env" title="This layer's envelope baseline: variation chance and each parameter's mean ± magnitude. While synchronised, the chance and the ± magnitudes come from the shared panel (same for every layer); the means stay the layer's own.">${esc(envStr)}</div>
       </div>
     </div>`;
   }).join("");
@@ -6416,7 +6446,11 @@ function layerStripHTML(p) {
         </label>
         <div class="layer-sync-body${syncOn ? "" : " off"}">
           ${controlRow("layerEnvProb", "Chance", p.layerEnvProb ?? 0.5, 0, 1, 0.01)}
-          <div class="ch-caption">one roll per note triggers the envelope variation on the base sound and every layer AT ONCE — each still varies around its own baseline (shown on its row)</div>
+          ${controlRow("layerEnvAttackSd", "Attack SD", p.layerEnvAttackSd ?? 0.015, 0, 0.12, 0.001)}
+          ${controlRow("layerEnvDecaySd", "Decay SD", p.layerEnvDecaySd ?? 0.04, 0, 0.25, 0.001)}
+          ${controlRow("layerEnvSustainSd", "Sustain SD", p.layerEnvSustainSd ?? 0.08, 0, 0.45, 0.01)}
+          ${controlRow("layerEnvReleaseSd", "Release SD", p.layerEnvReleaseSd ?? 0.05, 0, 0.3, 0.001)}
+          <div class="ch-caption">one roll per note triggers the envelope variation on the base sound and every layer AT ONCE, at these shared magnitudes — each still varies around its own means (shown on its row)</div>
         </div>
       </div>
     </div>` : ""}`;
@@ -9348,9 +9382,8 @@ function wireLayerStrip(v) {
   if (add) add.onclick = () => {
     if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
     const subnote = extractSectionParams(exploreParams, "sound");
-    delete subnote.layers;          // a layer never nests layers
-    delete subnote.layerEnvOverride;
-    delete subnote.layerEnvProb;
+    // a layer never nests layers or carries the shared-sync settings
+    for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k];
     const layer = {
       id: crypto.randomUUID(),
       hue: (36 + exploreParams.layers.length * 70) % 360,
@@ -9400,9 +9433,7 @@ function wireLayerStrip(v) {
       const l = layerOf(el.dataset.layerRecapture);
       if (!l) return;
       const subnote = extractSectionParams(exploreParams, "sound");
-      delete subnote.layers;
-      delete subnote.layerEnvOverride;
-      delete subnote.layerEnvProb;
+      for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k];
       l.subnote = subnote;
       applyLive();
       renderExplore();
