@@ -481,7 +481,7 @@ export function migrateToneParams(p) {
   // CH-B1: the Formant sound-source mode retires — old formant presets
   // become vocal-bodied chain patches (articulation params carry over).
   if (out.voiceMode === "formant") {
-    out.bodyType = out.bodyType && out.bodyType !== "auto" ? out.bodyType : "vocal";
+    if (!Number.isFinite(out.bodyArticulation)) out.bodyArticulation = 1;
     if (!out.spectralProfile || out.spectralProfile === "violin") out.spectralProfile = "vocal";
     out.spectralMix = Math.max(0.6, Number(out.spectralMix) || 0);
     out.voiceMode = "fourier";
@@ -1500,22 +1500,31 @@ export class GenerationEngine {
     };
   }
 
-  // CH-B1 articulated bodies: when the body is "vocal", its bands FOLLOW
-  // the engine's per-note vowel walk (change probability, surprise, and
-  // accuracy misses included) — a voice is a body that moves, not a
-  // different synthesiser. F3-F5 level and bandwidth shaping apply here.
+  // CH-B1 rev 2 (owner): articulation MANIPULATES the selected body — the
+  // vowel walk's five formant bands are layered ON TOP of the base body's
+  // bands, scaled by bodyArticulation depth (0 = still, 1 = full vowel EQ).
+  // A violin body with articulation is a wah violin; the base is never
+  // discarded. Log-gain summation makes this composition physically clean.
+  _articulationDepth() {
+    if (Number.isFinite(this.p.bodyArticulation)) return this._clamp(this.p.bodyArticulation, 0, 1);
+    return (this.p.bodyType === "vocal") ? 1 : 0; // legacy vocal-type presets
+  }
+
   _articulatedBands(formantPos) {
-    if ((this.p.bodyType || "auto") !== "vocal" || !formantPos) return null;
+    const depth = this._articulationDepth();
+    if (depth <= 0 || !formantPos) return null;
     const f = formantFreqsAtPoint(formantPos);
     const gains = [2.0, 1.7, 1.2, 0.9, 0.7];
-    const lvl = [1, 1,
+    const lvl = [
+      this._clamp(this.p.formantF1Level ?? 1, 0, 2),
+      this._clamp(this.p.formantF2Level ?? 1, 0, 2),
       this._clamp(this.p.formantF3Level ?? 1, 0, 2),
       this._clamp(this.p.formantF4Level ?? 1, 0, 2),
       this._clamp(this.p.formantF5Level ?? 1, 0, 2)];
     const bwScale = this._clamp(this.p.formantBandwidth ?? 1, 0.4, 2.5);
     return [f.f1, f.f2, f.f3, f.f4, f.f5].map((freq, i) => ({
       freq,
-      gain: gains[i] * lvl[i],
+      gain: gains[i] * lvl[i] * depth,
       width: Math.max(0.1, ((f.bw && f.bw[i]) || 90) / Math.max(60, freq) * 1.9 * bwScale),
     }));
   }
@@ -1533,7 +1542,11 @@ export class GenerationEngine {
     // is the ONLY register-dependent shaping now: the per-partial reg
     // grids are retired (audit A7 — register timbre emerges from where
     // the partials fall against fixed-Hz bands, not hand-set exponents).
-    const bodyBands = this._articulatedBands(formantPos) || bodyBandsFor(this.p, profile);
+    const baseBands = (Array.isArray(this.p.bodyBands) && this.p.bodyBands.length)
+      ? this.p.bodyBands                       // preset used as a starting point, then band-edited
+      : bodyBandsFor(this.p, profile);
+    const artic = this._articulatedBands(formantPos);
+    const bodyBands = artic ? baseBands.concat(artic) : baseBands;
     // Tone v2 (T2): resolve the excitation once per note. Current settings
     // are applied as a transform NORMALISED against the profile's own
     // excitation defaults — the measured amplitude tables already embody

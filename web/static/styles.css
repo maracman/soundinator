@@ -5452,3 +5452,15 @@ body.dragging { cursor: grabbing; user-select: none; }
 .roll-dyncheck { font-size: 0.62rem; color: var(--text3); display: flex; gap: 4px; align-items: center; text-transform: uppercase; letter-spacing: 0.08em; }
 
 .roll-panel.dyn canvas { height: 300px; }
+
+/* BODY bands: chip strip + per-band EQ editor (preset-then-editable) */
+.body-band-strip { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 2px; }
+.body-band-strip .band-chip { font-size: 10.5px; letter-spacing: 0.02em; }
+.body-band-strip .band-chip.artic { border-color: rgba(236, 142, 200, 0.45); color: rgba(236, 168, 210, 0.9); }
+.body-band-strip .band-chip.artic.active { background: rgba(236, 142, 200, 0.18); }
+.body-band-strip .band-chip.active { border-color: rgba(255, 214, 140, 0.7); color: rgba(255, 222, 160, 0.95); }
+.body-band-strip .band-reset { opacity: 0.75; }
+.body-band-edit { display: flex; align-items: center; gap: 8px; margin: 4px 0 6px; }
+.body-band-edit .body-band-name { font-size: 10.5px; color: var(--ch-dim, #8b9aa8); white-space: nowrap; }
+.body-band-edit input[type=range] { flex: 1; min-width: 80px; }
+.body-band-edit .body-band-out { font-size: 11px; font-variant-numeric: tabular-nums; color: rgba(255, 214, 140, 0.9); min-width: 44px; text-align: right; }

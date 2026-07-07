@@ -23,6 +23,7 @@ import {
   SPECTRAL_PROFILES,
   spectralDefaultRegisterSensitivity,
   VOWEL_POINTS,
+  formantFreqsAtPoint,
   partialFrequency,
   legacyStretchToB,
   BODY_PRESETS,
@@ -4014,7 +4015,7 @@ function renderExplore() {
     "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType","partialB",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
-    "formantF3Level","formantF4Level","formantF5Level","formantBandwidth",
+    "formantF1Level","formantF2Level","formantF3Level","formantF4Level","formantF5Level","formantBandwidth","bodyArticulation",
     "spectralRegisterAmount","spectralResonanceAmount","spectralLoudnessNorm",
     "spectralDriftProb","spectralDriftDepth","spectralDriftRate","spectralStretchCents",
     "envelopeProb","envelopeAttack","envelopeAttackSd","envelopeDecay","envelopeDecaySd",
@@ -4086,6 +4087,12 @@ function renderExplore() {
         return;
       }
       if (key === "spectralProfile" || key === "bodyType") {
+        // preset semantics: choosing a body (or, on auto, an instrument)
+        // re-seeds the editable band list; edits made after that persist
+        if (key === "bodyType" || (exploreParams.bodyType || "auto") === "auto") {
+          delete exploreParams.bodyBands;
+          _chBodySel = null;
+        }
         synth.updateGenerationParams({ ...exploreParams });
         // Profile changes re-seat performance defaults; bodyType swaps the
         // BODY inspector between static and articulated layouts.
@@ -4140,6 +4147,13 @@ function renderExplore() {
       if (out) out.textContent = fmtOutput(key, val);
       printEmphasis(key);
       drawDistributions();
+      if (key === "bodyArticulation") {
+        synth.updateGenerationParams({ ...exploreParams });
+        const block = v.querySelector(".ch-artic");
+        if ((val > 0) !== !!block) { renderExplore(); return; } // vowel controls appear/disappear at 0
+        drawTonePrint();
+        return;
+      }
       if (liveReverbParams.has(key)) { synth.updateReverb({ ...exploreParams }); return; }
       if (liveSubnoteParams.has(key)) { synth.updateGenerationParams({ ...exploreParams }); return; }
       debouncedReplay();
@@ -4156,6 +4170,49 @@ function renderExplore() {
     };
     cell.ondblclick = () => applyKnob(Number(cell.dataset.def));
   });
+
+  // BODY band chips: click a band to see its EQ curve alone in the field;
+  // the slider makes that band more or less extreme. Base-band edits copy
+  // the preset's bands onto the instrument first (preset stays a preset).
+  v.querySelectorAll("[data-body-band]").forEach(btn => {
+    btn.onclick = () => {
+      const [kind, iStr] = btn.dataset.bodyBand.split(":");
+      const i = Number(iStr);
+      _chBodySel = (_chBodySel && _chBodySel.kind === kind && _chBodySel.i === i) ? null : { kind, i };
+      renderExplore();
+    };
+  });
+  const bandSlider = v.querySelector("[data-body-gain]");
+  if (bandSlider) bandSlider.oninput = () => {
+    if (!_chBodySel) return;
+    const val = Number(bandSlider.value);
+    if (_chBodySel.kind === "artic") {
+      const key = `formantF${_chBodySel.i + 1}Level`;
+      noteParamChange(key, exploreParams[key], val);
+      exploreParams[key] = val;
+    } else {
+      if (!Array.isArray(exploreParams.bodyBands) || !exploreParams.bodyBands.length) {
+        exploreParams.bodyBands = currentBaseBodyBands(exploreParams).map(b => ({ ...b }));
+      }
+      const band = exploreParams.bodyBands[_chBodySel.i];
+      if (band) band.gain = val;
+    }
+    const out = v.querySelector("#bodyBandOut");
+    if (out) out.textContent = _chBodySel.kind === "artic" ? `×${val.toFixed(2)}` : `${val >= 0 ? "+" : ""}${val.toFixed(2)}`;
+    printEmphasis("spectralResonanceAmount");
+    synth.updateGenerationParams({ ...exploreParams });
+    drawTonePrint();
+    drawBodyRidge();
+  };
+  if (bandSlider) bandSlider.onchange = () => renderExplore(); // drag done: refresh chips + ↺ preset affordance
+  const bandReset = v.querySelector("[data-body-reset]");
+  if (bandReset) bandReset.onclick = () => {
+    noteParamChange("bodyBands", "edited", "preset");
+    delete exploreParams.bodyBands;
+    _chBodySel = null;
+    synth.updateGenerationParams({ ...exploreParams });
+    renderExplore();
+  };
 
   // Excite segmented control (the four physical drive types)
   v.querySelectorAll("[data-exc-type]").forEach(btn => {
@@ -4840,25 +4897,6 @@ function subnoteWorkspaceHTML(p) {
           <div class="subnote-side-section sound-source-section">
             <div class="section-label">Sound Source</div>
             ${panelPresetBarHTML("sound")}
-
-          </div>
-
-            <div class="controls-grid">
-              ${controlRow("formantChangeProb", "Formant change", p.formantChangeProb, 0, 1, 0.01)}
-            </div>
-            ${featureSurpriseBlock("formant", "Formant", "surpriseFormantEnabled", null, p.surpriseFormantEnabled, p.surpriseFormantDistance)}
-            ${formantWeightControlsHTML(p)}
-            <details class="formant-detail">
-              <summary title="Higher formants (F3-F5) and bandwidths — the presence and 'singer's formant' region. The vowel pad above stays the simple face.">Formant detail</summary>
-              <div class="controls-grid">
-                ${controlRow("formantF3Level", "F3 level", p.formantF3Level, 0, 2, 0.01)}
-                ${controlRow("formantF4Level", "F4 level", p.formantF4Level, 0, 2, 0.01)}
-                ${controlRow("formantF5Level", "F5 level", p.formantF5Level, 0, 2, 0.01)}
-                ${controlRow("formantBandwidth", "Bandwidth", p.formantBandwidth, 0.4, 2.5, 0.01)}
-              </div>
-            </details>
-          </div>
-
           </div>
 
           <div class="subnote-side-section${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
@@ -6693,7 +6731,8 @@ const KNOB_EMPHASIS = {
   excitationHuman: "needles", spectralDynamicAmount: "needles",
   partialMaterial: "glow", partialB: "shift", partialTransfer: "arcs",
   partialTilt: "needles", spectralPartials: "needles",
-  bodyType: "ridge", spectralResonanceAmount: "ridge",
+  bodyType: "ridge", spectralResonanceAmount: "ridge", bodyArticulation: "ridge",
+  formantF1Level: "ridge", formantF2Level: "ridge", formantF3Level: "ridge", formantF4Level: "ridge", formantF5Level: "ridge",
 };
 let _printEmphasis = null; // { kind, until } — the overlay a fresh change lights up
 let _printGhosts = null; // pre-change needle dots, shown while emphasis is fresh
@@ -6783,6 +6822,59 @@ function chRailCardHTML(p, stage, num, name) {
     </button>`;
 }
 
+// ── BODY bands as first-class objects (owner: "use the body settings as a
+// preset and then still be able to change the eq of each") ──
+// The selected body preset seeds an editable band list; the first gain edit
+// copies it onto the instrument (p.bodyBands) so later preset browsing never
+// silently discards the user's shaping. Articulation formants F1-F5 appear
+// as chips of their own when depth > 0.
+let _chBodySel = null; // { kind: "base" | "artic", i } — chip → highlighted EQ curve in the field
+
+function currentBaseBodyBands(p) {
+  if (Array.isArray(p.bodyBands) && p.bodyBands.length) return p.bodyBands;
+  const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
+  return bodyBandsFor(p, profile);
+}
+
+function articChipBands(p) {
+  if ((p.bodyArticulation ?? 0) <= 0) return [];
+  const focus = (p.formantFocus && VOWEL_POINTS[p.formantFocus]) ? p.formantFocus
+    : (p.activeFormants || []).find(k => VOWEL_POINTS[k]) || "ah";
+  const f = formantFreqsAtPoint(VOWEL_POINTS[focus]);
+  return [f.f1, f.f2, f.f3, f.f4, f.f5].map(freq => ({ freq }));
+}
+
+function bodyBandChipsHTML(p) {
+  const fmtF = (f) => f >= 1000 ? `${(f / 1000).toFixed(1).replace(/\.0$/, "")}k` : `${Math.round(f)}`;
+  const base = currentBaseBodyBands(p);
+  const artic = articChipBands(p);
+  if (_chBodySel && !(_chBodySel.kind === "artic" ? artic : base)[_chBodySel.i]) _chBodySel = null;
+  const chip = (kind, i, label) => {
+    const on = _chBodySel && _chBodySel.kind === kind && _chBodySel.i === i;
+    return `<button class="ch-chip band-chip${kind === "artic" ? " artic" : ""}${on ? " active" : ""}" data-body-band="${kind}:${i}">${label}</button>`;
+  };
+  let editor = "";
+  if (_chBodySel) {
+    const { kind, i } = _chBodySel;
+    const isArt = kind === "artic";
+    const val = isArt ? (p[`formantF${i + 1}Level`] ?? 1) : (base[i]?.gain ?? 1);
+    const min = isArt ? 0 : -2, max = isArt ? 2 : 3.5;
+    const name = isArt ? `formant F${i + 1}` : `band B${i + 1}`;
+    editor = `
+      <div class="body-band-edit">
+        <span class="body-band-name">${name} · ${fmtF((isArt ? artic : base)[i].freq)} Hz</span>
+        <input type="range" data-body-gain min="${min}" max="${max}" step="0.05" value="${val}">
+        <span class="body-band-out" id="bodyBandOut">${isArt ? `×${val.toFixed(2)}` : `${val >= 0 ? "+" : ""}${val.toFixed(2)}`}</span>
+      </div>`;
+  }
+  return `
+    <div class="body-band-strip">
+      ${base.map((b, i) => chip("base", i, `B${i + 1} ${fmtF(b.freq)}`)).join("")}
+      ${artic.map((b, i) => chip("artic", i, `F${i + 1} ${fmtF(b.freq)}`)).join("")}
+      ${Array.isArray(p.bodyBands) && p.bodyBands.length ? `<button class="ch-chip band-reset" data-body-reset title="Discard band edits and reload the preset's bands">↺ preset</button>` : ""}
+    </div>${editor}`;
+}
+
 function chInspectorHTML(p) {
   if (_chStage === "excitor") {
     return `
@@ -6824,26 +6916,28 @@ function chInspectorHTML(p) {
       <div class="ch-ins-head"><span class="ch-card-n">03 · BODY</span><span class="ch-ins-d">the box around it</span></div>
       <select data-param-select="bodyType" id="sel_bodyType" class="param-select body-select">
         <option value="auto"${(p.bodyType || "auto") === "auto" ? " selected" : ""}>Auto (instrument)</option>
-        <option value="vocal"${p.bodyType === "vocal" ? " selected" : ""}>Vocal (articulated)</option>
         ${Object.entries(BODY_PRESETS).map(([k, b]) =>
           `<option value="${k}"${p.bodyType === k ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
       </select>
+      ${bodyBandChipsHTML(p)}
       <div class="knob-row">
         ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 0.35, cool: true })}
-        ${p.bodyType === "vocal" ? knobHTML("formantChangeProb", "Vowel walk", p.formantChangeProb, 0, 1, 0.01, { def: 0.25, cool: true }) : ""}
+        ${knobHTML("bodyArticulation", "Articulate", p.bodyArticulation ?? (p.bodyType === "vocal" ? 1 : 0), 0, 1, 0.01, { def: 0, cool: true })}
+        ${(p.bodyArticulation ?? 0) > 0 ? knobHTML("formantChangeProb", "Vowel walk", p.formantChangeProb, 0, 1, 0.01, { def: 0.25, cool: true }) : ""}
       </div>
-      ${p.bodyType === "vocal" ? `
+      ${(p.bodyArticulation ?? 0) > 0 ? `
         <div class="ch-artic">
           ${formantWeightControlsHTML(p)}
           ${featureSurpriseBlock("formant", "Vowel", "surpriseFormantEnabled", null, p.surpriseFormantEnabled, p.surpriseFormantDistance)}
           <div class="knob-row">
             ${knobHTML("toneFormantDrift", "Drift", p.toneFormantDrift, 0, 0.5, 0.01, { def: 0.08, cool: true })}
             ${knobHTML("toneResonanceDrift", "Width drift", p.toneResonanceDrift, 0, 0.8, 0.01, { def: 0.12, cool: true })}
+            ${knobHTML("formantBandwidth", "Band width", p.formantBandwidth, 0.4, 2.5, 0.01, { def: 1, cool: true })}
           </div>
         </div>` : `<canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>`}
-      <div class="ch-caption">${p.bodyType === "vocal"
-        ? "an ARTICULATED body: the vowel walks per note (weights, change probability, surprise) — the chain keeps its excitor, resonator and stage"
-        : "fixed-Hz resonance bands — vowels are bodies too; with vibrato, partials on the curve's slopes shimmer (FM→AM)"}</div>`;
+      <div class="ch-caption">${(p.bodyArticulation ?? 0) > 0
+        ? "ARTICULATION rides on the selected body: the vowel EQ layers over its bands at the chosen depth — a violin body can sing. Click a band chip to see and reshape its EQ in the field"
+        : "the body is a PRESET you can edit: click a band chip to see its EQ curve in the field and drag the Band gain knob to make it more or less extreme"}</div>`;
   }
   return `
     <div class="ch-ins-head"><span class="ch-card-n">04 · SPACE</span><span class="ch-ins-d">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")}</span></div>
@@ -6961,6 +7055,12 @@ function tonePrintModel() {
   ensureSpectralPartialParams(exploreParams);
   const engine = new GenerationEngine({ ...exploreParams, excitationHuman: 0 });
   const fp = engine._spectralFingerprint(0.62, exploreParams.tonicHz || 261.63, 0);
+  // fingerprint above ran with formantPos null → fp.bodyBands is the BASE
+  // body only; compute the vowel layer at the focus vowel for the overlay
+  fp.baseBands = fp.bodyBands || [];
+  const focus = (exploreParams.formantFocus && VOWEL_POINTS[exploreParams.formantFocus]) ? exploreParams.formantFocus
+    : (exploreParams.activeFormants || []).find(k => VOWEL_POINTS[k]) || "ah";
+  fp.articBands = engine._articulatedBands(VOWEL_POINTS[focus]) || [];
   return fp;
 }
 
@@ -7015,24 +7115,61 @@ function drawTonePrint() {
   ctx.fillStyle = "rgba(120,135,150,0.5)";
   ctx.fillText("coupling", 36, base + 12);
 
-  // body overlay (stage 3): its own dB curve, centred on the −30 line
-  const bands = fp.bodyBands || [];
+  // body overlay (stage 3): its own dB curve, centred on the −30 line.
+  // Articulation layers over the base body — the dashed curve is the vowel
+  // EQ riding on top; a selected band chip draws that band's own curve hot.
+  const baseBands = fp.baseBands || fp.bodyBands || [];
+  const articBands = fp.articBands || [];
+  const bands = articBands.length ? baseBands.concat(articBands) : baseBands;
   const amount = fp.bodyAmount || 0;
   if (bands.length && amount > 0) {
     const ridgeHot = _emph("ridge");
+    const bandY = (arr, f) => top + ((30 - 20 * Math.log10(bodyResponse(arr, f, amount))) / 60) * (base - top);
     ctx.beginPath();
     for (let px = 36; px <= w; px += 3) {
       const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
-      const bdb = 20 * Math.log10(bodyResponse(bands, f, amount));
-      const y = top + ((30 - bdb) / 60) * (base - top);
-      px === 36 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+      px === 36 ? ctx.moveTo(px, bandY(bands, f)) : ctx.lineTo(px, bandY(bands, f));
     }
     ctx.strokeStyle = ridgeHot ? "rgba(200,160,240,0.95)" : "rgba(180,142,222,0.45)";
     ctx.lineWidth = ridgeHot ? 2.2 : 1.4;
     ctx.stroke();
+    if (articBands.length) {
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      for (let px = 36; px <= w; px += 3) {
+        const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
+        px === 36 ? ctx.moveTo(px, bandY(articBands, f)) : ctx.lineTo(px, bandY(articBands, f));
+      }
+      ctx.strokeStyle = "rgba(236,142,200,0.55)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(236,142,200,0.65)";
+      ctx.fillText("articulation", w - 78, bandY(articBands, PRINT_FMAX * 0.45) - 6);
+    }
+    if (_chBodySel) {
+      const b = (_chBodySel.kind === "artic" ? articBands : baseBands)[_chBodySel.i];
+      if (b) {
+        ctx.beginPath();
+        for (let px = 36; px <= w; px += 2) {
+          const f = PRINT_FMIN * Math.pow(PRINT_FMAX / PRINT_FMIN, px / w);
+          px === 36 ? ctx.moveTo(px, bandY([b], f)) : ctx.lineTo(px, bandY([b], f));
+        }
+        ctx.strokeStyle = "rgba(255,214,140,0.95)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        const bx = X(b.freq);
+        ctx.strokeStyle = "rgba(255,214,140,0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, base); ctx.stroke();
+        const peakDb = 20 * Math.log10(bodyResponse([b], b.freq, amount));
+        ctx.fillStyle = "rgba(255,214,140,0.95)";
+        ctx.fillText(`${_chBodySel.kind === "artic" ? "F" : "B"}${_chBodySel.i + 1} ${peakDb >= 0 ? "+" : ""}${peakDb.toFixed(1)} dB`, Math.min(bx + 5, w - 78), top + 12);
+      }
+    }
     ctx.lineWidth = 1;
     ctx.fillStyle = ridgeHot ? "rgba(200,160,240,0.95)" : "rgba(180,142,222,0.5)";
-    ctx.fillText("body ±dB", w - 64, top + ((30 - 20 * Math.log10(bodyResponse(bands, PRINT_FMAX * 0.7, amount))) / 60) * (base - top) - 6);
+    ctx.fillText("body ±dB", w - 64, bandY(bands, PRINT_FMAX * 0.7) - 6);
   }
   // air absorption at the current distance (stage 4)
   const airCut = spaceAirCutoff(exploreParams.spaceDistance ?? 2.5);

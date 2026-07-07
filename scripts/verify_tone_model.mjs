@@ -383,31 +383,64 @@ console.log("SPACE positioning laws");
     spaceArrivalDelay(1000) === 30 / 343 && spaceProximityDb(-5) === spaceProximityDb(0.3));
 }
 
-console.log("CH-B1: articulated bodies, formant mode retired");
+console.log("CH-B1 rev 2: articulation manipulates the SELECTED body");
 {
   const GEN6 = {
     seed: 9, tempo: 104, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
     scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
-    spectralPartials: 24, spectralProfile: "vocal", bodyType: "vocal",
-    activeFormants: ["ah", "ee"], excitationHuman: 0, formantChangeProb: 1,
+    spectralPartials: 24, spectralProfile: "vocal", bodyType: "violin",
+    bodyArticulation: 1, activeFormants: ["ah", "ee"], excitationHuman: 0, formantChangeProb: 1,
   };
+  const nBase = BODY_PRESETS.violin.bands.length;
   const e = new GenerationEngine(GEN6); e.initialise();
-  const bandsSeen = [];
+  const seen = [];
   for (let i = 0; i < 30; i++) {
     const nn = e.nextNote();
-    if (nn && nn.velocity > 0 && nn.bodyBands) bandsSeen.push(nn.bodyBands.map(b => Math.round(b.freq)).join(","));
+    if (nn && nn.velocity > 0 && nn.bodyBands) seen.push(nn.bodyBands);
   }
-  check("vocal body: per-note bands exist (5 formants)", bandsSeen.length > 4 &&
-    bandsSeen.every(s => s.split(",").length === 5));
-  check("the body MOVES: bands differ across notes (vowel walk)",
-    new Set(bandsSeen).size > 1, `distinct=${new Set(bandsSeen).size}`);
-  const stat = new GenerationEngine({ ...GEN6, bodyType: "violin" }); stat.initialise();
+  check("articulation COMPOSES: base bands + 5 formants, base never discarded",
+    seen.length > 4 && seen.every(b => b.length === nBase + 5 &&
+      JSON.stringify(b.slice(0, nBase)) === JSON.stringify(BODY_PRESETS.violin.bands)));
+  const articSig = seen.map(b => b.slice(nBase).map(x => Math.round(x.freq)).join(","));
+  check("the vowel layer MOVES across notes while the base stays still",
+    new Set(articSig).size > 1, `distinct=${new Set(articSig).size}`);
+
+  // depth scales the vowel layer's gains, half depth = half gain
+  const full = new GenerationEngine({ ...GEN6 });
+  const half = new GenerationEngine({ ...GEN6, bodyArticulation: 0.5 });
+  const pos = { x: Math.log(700), y: Math.log(1100) };
+  const gF = full._articulatedBands(pos).map(b => b.gain);
+  const gH = half._articulatedBands(pos).map(b => b.gain);
+  check("articulation depth scales the vowel EQ (more/less extreme)",
+    gF.every((g, i) => Math.abs(gH[i] - g / 2) < 1e-9));
+  check("depth 0 = still body: no vowel layer at all",
+    new GenerationEngine({ ...GEN6, bodyArticulation: 0 })._articulatedBands(pos) === null);
+
+  // per-formant extremity: F1 level doubles the F1 band only
+  const boosted = new GenerationEngine({ ...GEN6, formantF1Level: 2 })._articulatedBands(pos);
+  check("formantF1Level makes that band's EQ more extreme, others untouched",
+    Math.abs(boosted[0].gain - gF[0] * 2) < 1e-9 && Math.abs(boosted[1].gain - gF[1]) < 1e-9);
+
+  // preset-then-editable: a custom band list overrides the preset's bands
+  const custom = [{ freq: 500, gain: 2.2, width: 0.3 }, { freq: 3100, gain: -1, width: 0.5 }];
+  const ec = new GenerationEngine({ ...GEN6, bodyArticulation: 0, bodyBands: custom }); ec.initialise();
+  let cNote = null;
+  for (let i = 0; i < 20 && !cNote; i++) { const nn = ec.nextNote(); if (nn && nn.velocity > 0) cNote = nn; }
+  check("edited bands override the preset (body settings are a starting point)",
+    cNote && JSON.stringify(cNote.bodyBands) === JSON.stringify(custom));
+
+  const stat = new GenerationEngine({ ...GEN6, bodyArticulation: undefined, activeFormants: undefined }); stat.initialise();
   let sNote = null;
   for (let i = 0; i < 20 && !sNote; i++) { const nn = stat.nextNote(); if (nn && nn.velocity > 0) sNote = nn; }
-  check("static bodies stay still", sNote && JSON.stringify(sNote.bodyBands) === JSON.stringify(BODY_PRESETS.violin.bands));
+  check("no articulation param, non-vocal body: static preset bands, unchanged",
+    sNote && JSON.stringify(sNote.bodyBands) === JSON.stringify(BODY_PRESETS.violin.bands));
+
   const m = migrateToneParams({ voiceMode: "formant", spectralMix: 0.1, spectralProfile: "violin" });
-  check("formant-mode presets migrate to vocal-bodied chain patches",
-    m.voiceMode === "fourier" && m.bodyType === "vocal" && m.spectralProfile === "vocal" && m.spectralMix >= 0.6);
+  check("formant-mode presets migrate to full articulation depth",
+    m.voiceMode === "fourier" && m.bodyArticulation === 1 && m.spectralProfile === "vocal" && m.spectralMix >= 0.6);
+  const legacyVocal = new GenerationEngine({ ...GEN6, bodyArticulation: undefined, bodyType: "vocal" });
+  check("legacy bodyType 'vocal' still articulates (depth defaults to 1)",
+    legacyVocal._articulationDepth() === 1);
 }
 
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
