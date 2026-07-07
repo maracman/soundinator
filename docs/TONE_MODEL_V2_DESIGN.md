@@ -519,6 +519,17 @@ options and a third:
   vibrato FM→AM already works. = **CH-B1** (engine + BODY inspector UI +
   formant-mode retirement with preset migration).
 
+  **CH-B1 rev 2 (owner, 2026-07-07, DONE aaf2914):** articulation is not
+  a body *type* — it *manipulates whichever body is selected*.
+  `bodyArticulation` (0–1) layers the vowel walk's five formant bands on
+  top of the base body's bands, gains scaled by depth; the base is never
+  discarded. Bodies behave as presets whose bands stay individually
+  editable: `p.bodyBands` overrides (copy-on-write on first edit, ↺
+  restores, re-seeded on body/instrument change), band chips B1..Bn +
+  F1..F5 in the BODY inspector, click = that band's EQ curve drawn hot
+  in the tone print with peak-dB readout, slider = more/less extreme
+  (formantF1..F5Level per formant). Legacy bodyType "vocal" ⇒ depth 1.
+
 **2. P1/P2 strips hidden** — FIXED now (v137): the field column is its
 own scroller, print 150 px, strips land in view; duplicate CSS height
 rule removed.
