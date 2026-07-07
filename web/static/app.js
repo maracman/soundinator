@@ -6362,39 +6362,64 @@ let _chLayerSel = null; // selected layer id (opens its mini panel)
 
 function layerStripHTML(p) {
   const layers = Array.isArray(p.layers) ? p.layers : [];
-  // Owner rework 07-07: each layer is a thicker horizontal ROW underneath —
-  // inline level/angle/distance, a mini diagram of where it sits around the
-  // head, and its envelope baseline in slim form. The override checkbox
-  // brings up ONLY the shared-probability slider: variations then fire at
-  // once across base + layers, each around its own baseline.
+  // Owner refinement 07-07: each row = mini head diagram + two lines —
+  // space parameters (level/angle/distance + the layer's OWN head when
+  // enabled) on top, the layer's full envelope baseline (variation chance
+  // and every parameter's mean ± SD) underneath. The synchronised-
+  // variation controls live in their own panel to the RIGHT of the rows,
+  // greyed out unless synchronisation is on.
   const rows = layers.map((l, i) => {
     const sn = l.subnote || {};
     const prof = SPECTRAL_PROFILES[sn.spectralProfile]?.label || sn.spectralProfile || "custom";
-    const envMs = (v, fb) => `${Math.round(((sn[v] ?? p[v] ?? fb)) * 1000)}ms`;
-    const envStr = `A ${envMs("envelopeAttack", 0.008)} · D ${envMs("envelopeDecay", 0.04)} · S ${Math.round((sn.envelopeSustain ?? p.envelopeSustain ?? 0.6) * 100)}% · R ${envMs("envelopeRelease", 0.08)}`;
+    const v = (k, fb) => sn[k] ?? p[k] ?? fb;
+    const ms = (x) => Math.round(x * 1000);
+    const envStr = [
+      `var ${Math.round(v("envelopeProb", 0) * 100)}%`,
+      `A ${ms(v("envelopeAttack", 0.008))}±${ms(v("envelopeAttackSd", 0.006))}ms`,
+      `D ${ms(v("envelopeDecay", 0.04))}±${ms(v("envelopeDecaySd", 0.018))}ms`,
+      `S ${Math.round(v("envelopeSustain", 0.6) * 100)}±${Math.round(v("envelopeSustainSd", 0.08) * 100)}%`,
+      `R ${ms(v("envelopeRelease", 0.08))}±${ms(v("envelopeReleaseSd", 0.035))}ms`,
+    ].join(" · ");
     return `
     <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}">
       <span class="layer-row-tag">${i + 1}</span>
       <canvas class="layer-minipad" data-layer-pad="${l.id}" width="40" height="40" title="Where this layer sits around your head — set it with the Angle and Dist sliders (shaded half = behind you)"></canvas>
-      <label class="sp-ctl">Vol <input type="range" data-layer-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}" title="This layer's level relative to the base sound"/></label>
-      <label class="sp-ctl">Angle <input type="range" data-layer-angle="${l.id}" min="-180" max="180" step="1" value="${l.space?.angle ?? (p.spaceAzimuth ?? 0)}" title="Where this layer sits around you"/></label>
-      <label class="sp-ctl">Dist <input type="range" data-layer-dist="${l.id}" min="0.3" max="30" step="0.1" value="${l.space?.dist ?? (p.spaceDistance ?? 2.5)}" title="How far away this layer stands"/></label>
-      <span class="layer-env" title="This layer's own envelope baseline — the sync override shares only the variation trigger, never these values">${esc(prof)} · ${envStr}</span>
-      <label class="sp-ctl layer-ownhead" title="Give this layer its own ear span / head density (from its captured params) instead of inheriting the listener's"><input type="checkbox" data-layer-head="${l.id}"${l.independentHead ? " checked" : ""}/> own head</label>
-      <button class="pal-btn" data-layer-recapture="${l.id}" title="Re-capture the CURRENT sound half into this layer (a layer is a snapshot — reshape the sound above, then update the layer)">⟳</button>
-      <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
+      <div class="layer-row-lines">
+        <div class="layer-row-space">
+          <label class="sp-ctl">Vol <input type="range" data-layer-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}" title="This layer's level relative to the base sound"/></label>
+          <label class="sp-ctl">Angle <input type="range" data-layer-angle="${l.id}" min="-180" max="180" step="1" value="${l.space?.angle ?? (p.spaceAzimuth ?? 0)}" title="Where this layer sits around you"/></label>
+          <label class="sp-ctl">Dist <input type="range" data-layer-dist="${l.id}" min="0.3" max="30" step="0.1" value="${l.space?.dist ?? (p.spaceDistance ?? 2.5)}" title="How far away this layer stands"/></label>
+          <label class="sp-ctl layer-ownhead" title="Give this layer its own head (ear span + density) instead of inheriting the listener's"><input type="checkbox" data-layer-head="${l.id}"${l.independentHead ? " checked" : ""}/> own head</label>
+          ${l.independentHead ? `
+            <label class="sp-ctl">Ears <input type="range" data-layer-ear="${l.id}" min="0.12" max="0.25" step="0.005" value="${sn.earDistance ?? p.earDistance ?? 0.175}" title="${esc(PARAM_DESC.earDistance)}"/></label>
+            <label class="sp-ctl">Density <input type="range" data-layer-density="${l.id}" min="0" max="1" step="0.01" value="${sn.headDensity ?? p.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>` : ""}
+          <button class="pal-btn" data-layer-recapture="${l.id}" title="Re-capture the CURRENT sound half into this layer (a layer is a snapshot — reshape the sound above, then update the layer)">⟳</button>
+          <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
+        </div>
+        <div class="layer-env" title="This layer's own envelope baseline: variation chance and each parameter's mean ± standard deviation. Synchronisation shares only WHEN variations fire — these values stay the layer's own.">${esc(prof)} · ${envStr}</div>
+      </div>
     </div>`;
   }).join("");
+  const syncOn = !!p.layerEnvOverride;
   return `
     <div class="layer-strip" id="layerStrip">
       <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
       <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer underneath">＋</button>
-      <label class="layer-env-sync" title="${esc(PARAM_DESC.layerEnvOverride)}">
-        <input type="checkbox" id="layerEnvSync"${p.layerEnvOverride ? " checked" : ""}/> override envelope probabilities
-      </label>
-      ${p.layerEnvOverride && layers.length ? `<div class="layer-env-prob">${controlRow("layerEnvProb", "Shared chance", p.layerEnvProb ?? 0.5, 0, 1, 0.01)}</div>` : ""}
     </div>
-    ${rows ? `<div class="layer-rows">${rows}</div>` : ""}`;
+    ${layers.length ? `
+    <div class="layer-area">
+      <div class="layer-rows">${rows}</div>
+      <div class="layer-sync">
+        <div class="subsection-label">Synchronised variation</div>
+        <label class="layer-env-sync" title="${esc(PARAM_DESC.layerEnvOverride)}">
+          <input type="checkbox" id="layerEnvSync"${syncOn ? " checked" : ""}/> variations fire together
+        </label>
+        <div class="layer-sync-body${syncOn ? "" : " off"}">
+          ${controlRow("layerEnvProb", "Chance", p.layerEnvProb ?? 0.5, 0, 1, 0.01)}
+          <div class="ch-caption">one roll per note triggers the envelope variation on the base sound and every layer AT ONCE — each still varies around its own baseline (shown on its row)</div>
+        </div>
+      </div>
+    </div>` : ""}`;
 }
 
 // The tiny head-relation diagram on each layer row.
@@ -9357,10 +9382,17 @@ function wireLayerStrip(v) {
   bindSlider("data-layer-gain", (l, val) => { l.gain = val; });
   bindSlider("data-layer-angle", (l, val) => { l.space = { angle: val, dist: l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5) }; });
   bindSlider("data-layer-dist", (l, val) => { l.space = { angle: l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0), dist: val }; });
+  // the layer's own head (engine reads these from layer.subnote)
+  bindSlider("data-layer-ear", (l, val) => { l.subnote = { ...(l.subnote || {}), earDistance: val }; });
+  bindSlider("data-layer-density", (l, val) => { l.subnote = { ...(l.subnote || {}), headDensity: val }; });
   v.querySelectorAll("[data-layer-head]").forEach(el => {
     el.onchange = () => {
       const l = layerOf(el.dataset.layerHead);
-      if (l) { l.independentHead = el.checked; applyLive(); }
+      if (l) {
+        l.independentHead = el.checked;
+        applyLive();
+        renderExplore(); // the ear/density sliders appear with the toggle
+      }
     };
   });
   v.querySelectorAll("[data-layer-recapture]").forEach(el => {
