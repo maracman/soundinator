@@ -5406,20 +5406,41 @@ body.explore-mode #app {
   margin-top: 0.4rem;
 }
 .layer-strip-label { font-size: 0.58rem; letter-spacing: 0.08em; color: var(--text3); }
-.layer-block {
-  width: 26px;
-  height: 20px;
-  border-radius: 4px;
-  border: 1px solid hsla(var(--layer-hue), 70%, 55%, 0.6);
-  background: hsla(var(--layer-hue), 70%, 55%, 0.18);
-  color: hsl(var(--layer-hue), 70%, 70%);
-  font-size: 0.62rem;
+.layer-rows { display: flex; flex-direction: column; gap: 4px; padding: 0.2rem 0.5rem 0.4rem; }
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 48px;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid hsl(var(--layer-hue), 70%, 55%);
+  border-radius: 6px;
   cursor: pointer;
 }
-.layer-block.sel {
-  background: hsla(var(--layer-hue), 70%, 55%, 0.4);
-  box-shadow: 0 0 6px hsla(var(--layer-hue), 70%, 55%, 0.5);
+.layer-row.sel {
+  border-color: hsla(var(--layer-hue), 70%, 55%, 0.7);
+  box-shadow: 0 0 8px hsla(var(--layer-hue), 70%, 55%, 0.25);
 }
+.layer-row-tag {
+  width: 18px;
+  text-align: center;
+  font-size: 0.7rem;
+  color: hsl(var(--layer-hue), 70%, 68%);
+  font-weight: 700;
+}
+.layer-minipad { width: 40px; height: 40px; flex: none; border-radius: 50%; }
+.layer-row .sp-ctl input[type=range] { width: 76px; }
+.layer-env {
+  font-size: 0.6rem;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.layer-ownhead { white-space: nowrap; }
+.layer-env-prob { flex-basis: 100%; max-width: 340px; }
 .layer-add {
   width: 26px;
   height: 20px;
@@ -5439,19 +5460,7 @@ body.explore-mode #app {
   gap: 0.3rem;
   cursor: pointer;
 }
-.layer-panel {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  padding: 0.3rem 0.5rem;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  margin: 0.2rem 0.5rem;
-  flex-wrap: wrap;
-}
-.layer-panel .sp-ctl input[type=range] { max-width: 90px; }
-.layer-env-block { padding: 0.3rem 0.5rem; }
+.layer-strip { flex-wrap: wrap; }
 
 /* ── Q6: global space designer ───────────────────────────── */
 .tl2-sp-row { min-height: 20px; }

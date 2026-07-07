@@ -720,10 +720,22 @@ console.log("P3: note connection — glide vs ring on overlap");
     lr.gain === 0.6 && lr.space.angle === 90 && lr.space.dist === 4);
   check("Q7: independent envelope draws by default",
     lr.note.envelopeAttack !== n.envelopeAttack);
-  const nSync = firstNote({ ...BASE, layers: [LAYER], layerEnvOverride: true });
-  check("Q7: layerEnvOverride shares ONE draw across base + layers",
-    nSync.layerRenders[0].note.envelopeAttack === nSync.envelopeAttack &&
-    nSync.layerRenders[0].note.envelopeSustain === nSync.envelopeSustain);
+  // Owner rework: the override shares the variation TRIGGER + z-scores,
+  // but every stream keeps its OWN envelope baseline.
+  const SYNC = {
+    ...BASE,
+    envelopeAttack: 0.05, envelopeAttackSd: 0.01,
+    layers: [{ ...LAYER, subnote: { ...LAYER.subnote, envelopeAttack: 0.09, envelopeAttackSd: 0.02 } }],
+    layerEnvOverride: true,
+  };
+  const nOn2 = firstNote({ ...SYNC, layerEnvProb: 1 });
+  const zBase = (nOn2.envelopeAttack - 0.05) / 0.01;
+  const zLayer = (nOn2.layerRenders[0].note.envelopeAttack - 0.09) / 0.02;
+  check("Q7 sync: variation fires AT ONCE with the same z, around each stream's own baseline",
+    Math.abs(zBase) > 1e-6 && Math.abs(zBase - zLayer) < 1e-9, `zBase ${zBase} zLayer ${zLayer}`);
+  const nOff2 = firstNote({ ...SYNC, layerEnvProb: 0 });
+  check("Q7 sync: trigger chance 0 → base and layer sit exactly on their own baselines",
+    nOff2.envelopeAttack === 0.05 && nOff2.layerRenders[0].note.envelopeAttack === 0.09);
   const nA = firstNote({ ...BASE, layers: [LAYER] });
   const nB = firstNote({ ...BASE, layers: [LAYER] });
   check("Q7: one seed drives all layers deterministically",

@@ -53,7 +53,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.6.0"; // Q8: imperfection laws (scoop/stagger/ring/wander) alter rendering at Human > 0
+const APP_VERSION = "sound-studio-0.7.0"; // layerEnvOverride resemantics: shared TRIGGER around per-layer baselines
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -339,7 +339,8 @@ const DEFAULTS = {
   earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
   headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
   layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
-  layerEnvOverride: false, // Q7: true = one envelope draw shared by base + all layers
+  layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own baselines kept)
+  layerEnvProb: 0.5,       // Q7: the shared variation chance when layerEnvOverride is on
   midiMapKeys: "white",       // Q10: which keys play — "white" | "all"
   midiMapCoverage: "packed",  // Q10: "all" divisions | "muted" out-of-scale | "packed" in-scale only
   midiMapAnchor: "octave",    // Q10: degree 0 repeats at each C ("octave") or right after the last degree ("consecutive")
@@ -498,7 +499,8 @@ const PARAM_DESC = {
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences = a wider, more localised stereo image",
   headDensity: "How opaque your head is to sound (0–1). Denser = the far ear loses more level and more treble when a source sits to one side",
   layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
-  layerEnvOverride: "Sync the envelope variation: one draw per note shared by the base sound and every layer, instead of each layer varying independently",
+  layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE — each keeps its own envelope baseline, only the trigger is shared",
+  layerEnvProb: "How often the shared variation trigger fires (per note) when the envelope override is on",
   midiMapKeys: "Which keys of a MIDI keyboard play this patch: only the white keys, or every key",
   midiMapCoverage: "What the keys cover: every scale subdivision, every subdivision with out-of-scale keys silent, or only in-scale degrees packed onto consecutive keys",
   midiMapAnchor: "Where the mapping repeats: degree 0 sits at C and restarts at every C, or the scale restarts on the very next key after its last degree",
@@ -5353,6 +5355,7 @@ function renderExplore() {
     "surprisePitchDistance","surpriseTuningDistance","surpriseRhythmDistance",
     "surpriseFormantDistance","surpriseDynamicsDistance",
     "gapProb","gapMin","gapMax","gapDistanceSlope","gapTimingRange","slideSpeed","phraseGap","noteConnection",
+    "layerEnvProb",
     "restMotifStartRatio","restOnMeterRatio","restOffMeterRatio",
     "dynamicsLevel","loudnessRange","dynamicsPrecision","dynamicsRange","formantChangeProb",
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
@@ -6268,40 +6271,63 @@ let _chLayerSel = null; // selected layer id (opens its mini panel)
 
 function layerStripHTML(p) {
   const layers = Array.isArray(p.layers) ? p.layers : [];
-  const sel = layers.find(l => l.id === _chLayerSel);
-  const blocks = layers.map((l, i) => `
-    <button class="layer-block${l.id === _chLayerSel ? " sel" : ""}" data-layer-block="${l.id}"
-      style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}"
-      title="Layer ${i + 1} (${esc(SPECTRAL_PROFILES[l.subnote?.spectralProfile]?.label || l.subnote?.spectralProfile || "custom")}) — click to edit">
-      ${i + 1}
-    </button>`).join("");
-  const panel = sel ? `
-    <div class="layer-panel">
-      <label class="sp-ctl">Level
-        <input type="range" data-layer-gain="${sel.id}" min="0" max="1.5" step="0.01" value="${sel.gain ?? 1}" title="This layer's level relative to the base sound"/>
-      </label>
-      <label class="sp-ctl">Angle
-        <input type="range" data-layer-angle="${sel.id}" min="-180" max="180" step="1" value="${sel.space?.angle ?? 0}" title="Where this layer sits around you (inherits the patch position when untouched)"/>
-      </label>
-      <label class="sp-ctl">Distance
-        <input type="range" data-layer-dist="${sel.id}" min="0.3" max="30" step="0.1" value="${sel.space?.dist ?? 2.5}" title="How far away this layer stands"/>
-      </label>
-      <label class="sp-ctl"><span title="Give this layer its own ear span / head density (from its captured subnote params) instead of inheriting the listener's">independent head</span>
-        <input type="checkbox" data-layer-head="${sel.id}"${sel.independentHead ? " checked" : ""}/>
-      </label>
-      <button class="pal-btn" data-layer-remove="${sel.id}" title="Remove this layer">×</button>
-    </div>` : "";
+  // Owner rework 07-07: each layer is a thicker horizontal ROW underneath —
+  // inline level/angle/distance, a mini diagram of where it sits around the
+  // head, and its envelope baseline in slim form. The override checkbox
+  // brings up ONLY the shared-probability slider: variations then fire at
+  // once across base + layers, each around its own baseline.
+  const rows = layers.map((l, i) => {
+    const sn = l.subnote || {};
+    const prof = SPECTRAL_PROFILES[sn.spectralProfile]?.label || sn.spectralProfile || "custom";
+    const envMs = (v, fb) => `${Math.round(((sn[v] ?? p[v] ?? fb)) * 1000)}ms`;
+    const envStr = `A ${envMs("envelopeAttack", 0.008)} · D ${envMs("envelopeDecay", 0.04)} · S ${Math.round((sn.envelopeSustain ?? p.envelopeSustain ?? 0.6) * 100)}% · R ${envMs("envelopeRelease", 0.08)}`;
+    return `
+    <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}">
+      <span class="layer-row-tag">${i + 1}</span>
+      <canvas class="layer-minipad" data-layer-pad="${l.id}" width="40" height="40" title="Where this layer sits around your head — set it with the Angle and Dist sliders (shaded half = behind you)"></canvas>
+      <label class="sp-ctl">Vol <input type="range" data-layer-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}" title="This layer's level relative to the base sound"/></label>
+      <label class="sp-ctl">Angle <input type="range" data-layer-angle="${l.id}" min="-180" max="180" step="1" value="${l.space?.angle ?? (p.spaceAzimuth ?? 0)}" title="Where this layer sits around you"/></label>
+      <label class="sp-ctl">Dist <input type="range" data-layer-dist="${l.id}" min="0.3" max="30" step="0.1" value="${l.space?.dist ?? (p.spaceDistance ?? 2.5)}" title="How far away this layer stands"/></label>
+      <span class="layer-env" title="This layer's own envelope baseline — the sync override shares only the variation trigger, never these values">${esc(prof)} · ${envStr}</span>
+      <label class="sp-ctl layer-ownhead" title="Give this layer its own ear span / head density (from its captured params) instead of inheriting the listener's"><input type="checkbox" data-layer-head="${l.id}"${l.independentHead ? " checked" : ""}/> own head</label>
+      <button class="pal-btn" data-layer-recapture="${l.id}" title="Re-capture the CURRENT sound half into this layer (a layer is a snapshot — reshape the sound above, then update the layer)">⟳</button>
+      <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
+    </div>`;
+  }).join("");
   return `
     <div class="layer-strip" id="layerStrip">
       <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
-      ${blocks}
-      <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer">＋</button>
+      <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer underneath">＋</button>
       <label class="layer-env-sync" title="${esc(PARAM_DESC.layerEnvOverride)}">
         <input type="checkbox" id="layerEnvSync"${p.layerEnvOverride ? " checked" : ""}/> override envelope probabilities
       </label>
+      ${p.layerEnvOverride && layers.length ? `<div class="layer-env-prob">${controlRow("layerEnvProb", "Shared chance", p.layerEnvProb ?? 0.5, 0, 1, 0.01)}</div>` : ""}
     </div>
-    ${panel}
-    ${p.layerEnvOverride && layers.length ? `<div class="layer-env-block">${envelopeProbBlockHTML(p)}</div>` : ""}`;
+    ${rows ? `<div class="layer-rows">${rows}</div>` : ""}`;
+}
+
+// The tiny head-relation diagram on each layer row.
+function drawLayerMiniPads() {
+  (exploreParams.layers || []).forEach(l => {
+    const cv = document.querySelector(`[data-layer-pad="${l.id}"]`);
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    const w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 3;
+    ctx.fillStyle = "rgba(60,72,88,0.22)";
+    ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(90,110,130,0.4)";
+    ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillStyle = "rgba(200,215,230,0.9)";
+    ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, 2 * Math.PI); ctx.fill();
+    const angle = l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0);
+    const dist = l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5);
+    const r = _spaceDistToR(clamp(dist, SPACE_DMIN, SPACE_DMAX), rMax);
+    const rad = (angle - 90) * Math.PI / 180;
+    ctx.fillStyle = `hsl(${l.hue ?? 36}, 70%, 62%)`;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(rad) * r, cy + Math.sin(rad) * r, 3, 0, 2 * Math.PI); ctx.fill();
+  });
 }
 
 function subnoteWorkspaceHTML(p) {
@@ -9179,6 +9205,7 @@ function wireLayerStrip(v) {
     const subnote = extractSectionParams(exploreParams, "sound");
     delete subnote.layers;          // a layer never nests layers
     delete subnote.layerEnvOverride;
+    delete subnote.layerEnvProb;
     const layer = {
       id: crypto.randomUUID(),
       hue: (36 + exploreParams.layers.length * 70) % 360,
@@ -9192,26 +9219,41 @@ function wireLayerStrip(v) {
     applyLive();
     renderExplore();
   };
-  v.querySelectorAll("[data-layer-block]").forEach(b => {
-    b.onclick = () => {
-      _chLayerSel = _chLayerSel === b.dataset.layerBlock ? null : b.dataset.layerBlock;
-      renderExplore();
+  v.querySelectorAll("[data-layer-row]").forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest("input, button, canvas")) return; // controls stay controls
+      _chLayerSel = _chLayerSel === row.dataset.layerRow ? null : row.dataset.layerRow;
+      v.querySelectorAll("[data-layer-row]").forEach(r =>
+        r.classList.toggle("sel", r.dataset.layerRow === _chLayerSel));
     };
   });
   const layerOf = (id) => (exploreParams.layers || []).find(l => l.id === id);
   const bindSlider = (attr, apply) => v.querySelectorAll(`[${attr}]`).forEach(el => {
     el.oninput = () => {
       const l = layerOf(el.getAttribute(attr));
-      if (l) { apply(l, Number(el.value)); applyLive(); }
+      if (l) { apply(l, Number(el.value)); applyLive(); drawLayerMiniPads(); }
     };
   });
   bindSlider("data-layer-gain", (l, val) => { l.gain = val; });
-  bindSlider("data-layer-angle", (l, val) => { l.space = { angle: val, dist: l.space?.dist ?? 2.5 }; });
-  bindSlider("data-layer-dist", (l, val) => { l.space = { angle: l.space?.angle ?? 0, dist: val }; });
+  bindSlider("data-layer-angle", (l, val) => { l.space = { angle: val, dist: l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5) }; });
+  bindSlider("data-layer-dist", (l, val) => { l.space = { angle: l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0), dist: val }; });
   v.querySelectorAll("[data-layer-head]").forEach(el => {
     el.onchange = () => {
       const l = layerOf(el.dataset.layerHead);
       if (l) { l.independentHead = el.checked; applyLive(); }
+    };
+  });
+  v.querySelectorAll("[data-layer-recapture]").forEach(el => {
+    el.onclick = () => {
+      const l = layerOf(el.dataset.layerRecapture);
+      if (!l) return;
+      const subnote = extractSectionParams(exploreParams, "sound");
+      delete subnote.layers;
+      delete subnote.layerEnvOverride;
+      delete subnote.layerEnvProb;
+      l.subnote = subnote;
+      applyLive();
+      renderExplore();
     };
   });
   v.querySelectorAll("[data-layer-remove]").forEach(el => {
@@ -9229,6 +9271,7 @@ function wireLayerStrip(v) {
     applyLive();
     renderExplore();
   };
+  drawLayerMiniPads();
 }
 
 function wireSpacePad(v) {

@@ -1754,11 +1754,25 @@ export class GenerationEngine {
     // Q7 layered subnotes: each layer renders its own fingerprint under its
     // own subnote params — ONE seed drives everything (sequential rng draws
     // decorrelate the layers deterministically). Envelope draws are
-    // independent per layer unless layerEnvOverride syncs them to the base
-    // draw. Cross-layer sympathetic coupling runs over the union set.
+    // independent per layer unless layerEnvOverride SYNCS THE TRIGGER
+    // (owner rework 07-07): one probability roll + one set of z-scores per
+    // note, applied around every stream's OWN envelope baselines — the
+    // variations fire at once across base + layers, but each keeps the
+    // envelope it was set to. Cross-layer coupling runs over the union.
     if (Array.isArray(this.p.layers) && this.p.layers.length) {
+      let sharedEnv = null;
+      if (this.p.layerEnvOverride) {
+        const prob = this._clamp(this.p.layerEnvProb ?? this.p.envelopeProb ?? 0, 0, 1);
+        sharedEnv = {
+          vary: this.rng.next() < prob,
+          z: { a: this._gaussian(), d: this._gaussian(), s: this._gaussian(), r: this._gaussian() },
+        };
+        // the base joins the sync: replace its independent draw with the
+        // shared trigger applied around the base's own means
+        Object.assign(out, this._envelopeShared(sharedEnv, this.p));
+      }
       out.layerRenders = this.p.layers.map((layer, i) =>
-        this._layerRender(layer, i, velocity, fittedFrequency, note.degree, note.formantPos, out));
+        this._layerRender(layer, i, velocity, fittedFrequency, note.degree, note.formantPos, out, sharedEnv));
       this._applyCrossLayerCoupling(out, out.layerRenders);
     }
     this._recordNoteMetrics(out, {
@@ -1820,9 +1834,25 @@ export class GenerationEngine {
     };
   }
 
+  // One shared trigger + z-scores, applied around a param set's OWN
+  // envelope baselines — the synced-variation law for layerEnvOverride.
+  _envelopeShared(shared, p) {
+    const sample = (mean, sd, lo, hi, z) => {
+      const base = this._clamp(mean, lo, hi);
+      if (!shared.vary || sd <= 0) return base;
+      return this._clamp(base + z * sd, lo, hi);
+    };
+    return {
+      envelopeAttack: sample(p.envelopeAttack ?? 0.008, p.envelopeAttackSd ?? 0.006, 0.001, 0.18, shared.z.a),
+      envelopeDecay: sample(p.envelopeDecay ?? 0.04, p.envelopeDecaySd ?? 0.018, 0.001, 0.5, shared.z.d),
+      envelopeSustain: sample(p.envelopeSustain ?? 0.6, p.envelopeSustainSd ?? 0.08, 0.05, 1, shared.z.s),
+      envelopeRelease: sample(p.envelopeRelease ?? 0.08, p.envelopeReleaseSd ?? 0.035, 0.004, 0.6, shared.z.r),
+    };
+  }
+
   // Q7: one layer's render data for this note. The layer's subnote params
   // temporarily overlay the engine params so the SAME fingerprint code runs.
-  _layerRender(layer, index, velocity, fundamentalHz, degree, formantPos, baseNote) {
+  _layerRender(layer, index, velocity, fundamentalHz, degree, formantPos, baseNote, sharedEnv = null) {
     const saved = this.p;
     this.p = { ...saved, ...(layer.subnote || {}) };
     let fields;
@@ -1830,14 +1860,9 @@ export class GenerationEngine {
       fields = {
         ...this._vibratoParams(),
         ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
-        ...(saved.layerEnvOverride
-          ? {
-              envelopeAttack: baseNote.envelopeAttack,
-              envelopeDecay: baseNote.envelopeDecay,
-              envelopeSustain: baseNote.envelopeSustain,
-              envelopeRelease: baseNote.envelopeRelease,
-            }
-          : this._envelopeVariation()),
+        // synced: the shared trigger around THIS layer's own baselines;
+        // otherwise an independent draw
+        ...(sharedEnv ? this._envelopeShared(sharedEnv, this.p) : this._envelopeVariation()),
       };
     } finally {
       this.p = saved;
