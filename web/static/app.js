@@ -2059,9 +2059,7 @@ function globalScaleStripHTML(laneW) {
           <button class="gs-chevron" id="gsToggle" title="Global scale — a tiny piano roll of the scale over time; double-click at a bar line to add a change point; tracks opt in with the G button in their header">${_gsOpen ? "▾" : "▸"} Global scale</button>
           ${_gsOpen ? `<input type="checkbox" id="gsEnabled"${gs.enabled ? " checked" : ""} title="Apply the global scale to opted-in tracks"/>` : ""}
         </div>
-        <div class="gs-strip${gs.enabled ? "" : " off"}${_gsOpen ? " open" : ""}" id="gsStrip" style="width:${laneW}px">
-          ${_gsOpen ? `<canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The scale over time — rows are note divisions, colours are roles (lit = in scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas>` : ""}
-        </div>
+        ${_gsOpen ? `<div class="gs-strip${gs.enabled ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The scale over time — rows are note divisions, colours are roles (lit = in scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
       </div>${editorRow}`;
 }
 
@@ -2163,7 +2161,6 @@ function globalSpaceStripHTML(laneW) {
           <button class="gs-chevron" id="spToggle" title="Global space — position every instrument around the listener along the timeline">${_spOpen ? "▾" : "▸"} Global space</button>
           ${_spOpen ? `<input type="checkbox" id="spEnabled"${sp.enabled ? " checked" : ""} title="Apply the global space to playback (asks how to initialise on first use)"/>` : ""}
         </div>
-        <div class="gs-strip${sp.enabled ? "" : " off"}" style="width:${laneW}px"></div>
       </div>${panel}`;
 }
 
@@ -6270,8 +6267,8 @@ function macroWorkspaceHTML(p) {
     <div class="card production-card">
       <div class="production-head">
         <div>
-          <div class="section-label">Production Context</div>
-          <div class="micro-note">Playback dressing only: percussion and space do not change motif generation.</div>
+          <div class="section-label">Percussion</div>
+          <div class="micro-note">Playback dressing only — accents never change motif generation.</div>
         </div>
       </div>
       ${productionPanelHTML(p)}
@@ -6458,7 +6455,6 @@ function productionPanelHTML(p) {
   return `
     <div class="perf-panel production-panel">
       <div class="perf-section percussion-section">
-        <div class="perf-section-title">Percussion</div>
         ${panelPresetBarHTML("percussion")}
         <div class="perc-layers">
           <div class="perc-layer">
@@ -6535,7 +6531,7 @@ function layerStripHTML(p) {
   const rows = layers.map((l, i) => {
     const envStr = layerEnvLineText(l, p);
     return `
-    <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}">
+    <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}" title="Click to load this layer's sound into the editor above (click again, or Done, to return to the base)">
       <span class="layer-row-tag">${i + 1}</span>
       <canvas class="layer-minipad" data-layer-pad="${l.id}" width="40" height="40" title="Where this layer sits around your head — set it with the Angle and Dist sliders (shaded half = behind you)"></canvas>
       <div class="layer-row-lines">
@@ -6632,9 +6628,10 @@ function subnoteWorkspaceHTML(p) {
                  is the shared display everything indexes into. -->
             <div class="ch-head">
               <div>
-                <div class="section-label">Tone Designer</div>
+                <div class="section-label">Tone Designer${_chLayerEdit ? ` — <span class="layer-edit-tag">editing layer ${(p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 1 || ""}</span>` : ""}</div>
                 <h2>${esc(profile.label)}</h2>
               </div>
+              ${_chLayerEdit ? `<button class="btn btn-primary btn-sm" id="layerEditDone" title="Save this sound back into the layer and return to the base sound">Done — back to base</button>` : ""}
               <div class="ch-head-mid">
                 <select data-param-select="spectralProfile" class="param-select" title="Starting points — carefully shaped instruments to depart from; tweak anything, then save the result as your own instrument">
                   ${spectralProfileOptions(p.spectralProfile)}
@@ -8304,6 +8301,13 @@ function drawLoudnessRegisterDist() {
   ctx.fillText("loud", w - 2, h - 2);
 }
 
+// Owner 07-07: the diagram ILLUSTRATES the parameters — a row of literal
+// notes whose endings show what the settings do. Positive gap = the bar
+// stops early and silence shows; negative gap = the bar reaches into the
+// next note (overlap) and either a glide arc (mono) or a stacked ring bar
+// (multiphonic) shows the connection. Gaps grow across the row by the
+// distance slope; whiskers at each boundary show the timing range; the
+// marker opacity follows the chance.
 function drawGapDist() {
   const cv = document.getElementById("cvGap");
   if (!cv) return;
@@ -8312,103 +8316,92 @@ function drawGapDist() {
 
   const minGap = Math.min(exploreParams.gapMin ?? 0, exploreParams.gapMax ?? 0);
   const maxGap = Math.max(exploreParams.gapMin ?? 0, exploreParams.gapMax ?? 0);
-  const slope = exploreParams.gapDistanceSlope ?? 0;
-  const range = exploreParams.gapTimingRange ?? 0;
-  const chance = exploreParams.gapProb ?? 1;
-  const midY = h / 2;
-  const amp = h / 2 - 6;
-  const valueToY = (value) => midY - clamp(value, -0.92, 0.92) / 0.92 * amp;
-
-  const gapAt = (x) => {
-    const interval = x / w;
-    const even = (minGap + maxGap) / 2;
-    const sloped = minGap + (maxGap - minGap) * interval;
-    return clamp(even * (1 - slope) + sloped * slope, -0.92, 0.92);
-  };
-
-  const bandPath = () => {
-    ctx.beginPath();
-    ctx.moveTo(0, valueToY(gapAt(0) + range));
-    for (let x = 0; x <= w; x++) {
-      ctx.lineTo(x, valueToY(gapAt(x) + range));
-    }
-    for (let x = w; x >= 0; x--) {
-      ctx.lineTo(x, valueToY(gapAt(x) - range));
-    }
-    ctx.closePath();
-  };
-
-  ctx.fillStyle = "rgba(59,130,246,0.055)";
-  ctx.fillRect(0, midY, w, h - midY);
-  ctx.fillStyle = "rgba(245,158,11,0.045)";
-  ctx.fillRect(0, 0, w, midY);
-
-  ctx.strokeStyle = "rgba(136,153,170,0.13)";
-  ctx.lineWidth = 1;
-  [-0.5, 0.5].forEach(v => {
-    const y = valueToY(v);
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
-    ctx.stroke();
-  });
-
-  ctx.strokeStyle = "rgba(226,232,240,0.62)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, midY);
-  ctx.lineTo(w, midY);
-  ctx.stroke();
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, w, midY);
-  ctx.clip();
-  ctx.fillStyle = `rgba(245,158,11,${0.08 + chance * 0.14})`;
-  bandPath();
-  ctx.fill();
-  ctx.restore();
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, midY, w, h - midY);
-  ctx.clip();
-  ctx.fillStyle = `rgba(59,130,246,${0.08 + chance * 0.14})`;
-  bandPath();
-  ctx.fill();
-  ctx.restore();
-
-  for (let x = 0; x < w; x += 2) {
-    const v1 = gapAt(x);
-    const v2 = gapAt(Math.min(w, x + 2));
-    ctx.strokeStyle = ((v1 + v2) / 2) >= 0 ? "rgba(245,158,11,0.90)" : "rgba(96,165,250,0.92)";
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(x, valueToY(v1));
-    ctx.lineTo(Math.min(w, x + 2), valueToY(v2));
-    ctx.stroke();
-  }
-
+  const slope = clamp(exploreParams.gapDistanceSlope ?? 0, 0, 1);
+  const range = clamp(exploreParams.gapTimingRange ?? 0, 0, 0.4);
+  const chance = clamp(exploreParams.gapProb ?? 1, 0, 1);
+  const ring = (exploreParams.noteConnection || "glide") === "ring";
   const speed = clamp(exploreParams.slideSpeed ?? 0.65, 0, 1);
-  const slideY = h - 12;
-  ctx.strokeStyle = `rgba(96,165,250,${0.28 + speed * 0.5})`;
-  ctx.lineWidth = 1.2;
-  for (let x = 24; x < w - 24; x += 44) {
-    const len = 10 + speed * 18;
-    ctx.beginPath();
-    ctx.moveTo(x, slideY);
-    ctx.lineTo(x + len, slideY - 6);
-    ctx.stroke();
+
+  const n = 6;                       // six notes tell the story
+  const padX = 8, labelH = 11;
+  const slotW = (w - padX * 2) / n;
+  const barH = Math.max(8, h * 0.3);
+  const yHi = labelH + 4;            // two alternating pitch rows so glides
+  const yLo = yHi + barH * 0.85;     // have somewhere to go
+  const alpha = 0.25 + chance * 0.7; // the CHANCE any pair gets a gap at all
+
+  const gapAt = (t) => {             // min→max blend, straightened by slope
+    const even = (minGap + maxGap) / 2;
+    const sloped = minGap + (maxGap - minGap) * t;
+    return clamp(even * (1 - slope) + sloped * slope, -0.9, 0.9);
+  };
+
+  for (let i = 0; i < n; i++) {
+    const x0 = padX + i * slotW;
+    const hiRow = i % 2 === 0;
+    const y = hiRow ? yHi : yLo;
+    const g = i < n - 1 ? gapAt(i / (n - 2)) : 0;
+    const soundW = slotW * (1 - Math.max(0, g)); // positive gap stops early
+    const overlapW = Math.max(0, -g) * slotW;    // negative gap reaches on
+
+    // the note body (+ its reach into the next slot when overlapping)
+    ctx.fillStyle = "rgba(245,166,35,0.8)";
+    ctx.fillRect(x0, y, Math.max(3, soundW - 1.5), barH * 0.5);
+    if (i < n - 1 && overlapW > 1) {
+      ctx.fillStyle = `rgba(245,166,35,${0.35 * alpha})`;
+      ctx.fillRect(x0 + slotW, y, overlapW, barH * 0.5);
+    }
+
+    if (i < n - 1) {
+      const nextY = hiRow ? yLo : yHi;
+      const bx = x0 + slotW; // the next note's onset
+      if (g > 0.02) {
+        // GAP: visible silence before the next onset
+        ctx.strokeStyle = `rgba(136,153,170,${0.5 * alpha})`;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x0 + soundW, y + barH * 0.25);
+        ctx.lineTo(bx, y + barH * 0.25);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (g < -0.02) {
+        if (ring) {
+          // RING: both keep sounding at their own pitch — nothing bends
+          ctx.strokeStyle = `rgba(96,165,250,${0.9 * alpha})`;
+          ctx.strokeRect(bx + 0.5, nextY - 2.5, overlapW, 2);
+        } else {
+          // GLIDE: pitch slides from this note into the next over the
+          // overlap — arc length/steepness follows the slide speed
+          const reach = overlapW * (0.35 + speed * 0.65);
+          ctx.strokeStyle = `rgba(96,165,250,${0.9 * alpha})`;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(bx, y + barH * 0.25);
+          ctx.quadraticCurveTo(bx + reach * 0.5, (y + nextY) / 2 + barH * 0.25, bx + reach, nextY + barH * 0.25);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+        }
+      }
+      // TIMING RANGE: the onset can wander this far around the boundary
+      if (range > 0.005) {
+        const rw = range * slotW;
+        ctx.strokeStyle = "rgba(136,153,170,0.5)";
+        ctx.beginPath();
+        ctx.moveTo(bx - rw, nextY + barH * 0.62);
+        ctx.lineTo(bx + rw, nextY + barH * 0.62);
+        ctx.stroke();
+      }
+    }
   }
 
-  ctx.fillStyle = "rgba(136,153,170,0.7)";
+  ctx.fillStyle = "rgba(136,153,170,0.75)";
   ctx.font = "8px system-ui";
   ctx.textAlign = "left";
-  ctx.fillText("connect / slide", 4, h - 4);
-  ctx.fillText("gap / silence", 4, 8);
+  ctx.fillText(`${ring ? "ring: overlaps stack" : `glide: overlaps slide (speed ${speed.toFixed(2)})`} · chance ${Math.round(chance * 100)}%`, padX, h - 2);
   ctx.textAlign = "right";
-  ctx.fillText("near -> far", w - 4, 8);
-  ctx.fillText("0", w - 2, midY - 3);
+  ctx.fillText("near intervals → far", w - padX, labelH - 3);
+  ctx.textAlign = "left";
+  ctx.fillText(`gap ${minGap.toFixed(2)} … ${maxGap.toFixed(2)}${range > 0.005 ? ` · timing ±${range.toFixed(2)}` : ""}`, padX, labelH - 3);
 }
 
 function drawReverbDist() {
@@ -9464,8 +9457,11 @@ function fitStudioScale() {
   // a zero-size viewport (headless capture, minimised window) must never
   // collapse the studio to scale(0)
   if (!window.innerWidth || !window.innerHeight) return;
-  const s = Math.min(window.innerWidth / 1446, window.innerHeight / 796, 1);
-  dash.style.transform = s < 1 ? `scale(${s})` : "";
+  // Owner 07-07: adaptive both ways — small viewports scale the plugin
+  // down, LARGE viewports scale it up to fill (no black band below);
+  // capped at 1.6x so text stays crisp.
+  const s = Math.min(window.innerWidth / 1446, window.innerHeight / 796, 1.6);
+  dash.style.transform = Math.abs(s - 1) > 0.01 ? `scale(${s})` : "";
   dash.style.transformOrigin = "top left";
 }
 if (!window._studioFitInstalled) {
@@ -9511,12 +9507,47 @@ function wireStudioPanels(v) {
   }, saveStudioPanels);
 }
 
+// Owner 07-07: clicking a layer row LOADS that layer's sound into the
+// editor above. The base sound half is stashed; every editor control then
+// shapes (and auditions) the layer; Done — or clicking another row, or the
+// row again — writes the sound back into the layer and restores the base.
+let _chLayerEdit = null; // { layerId, baseStash }
+
+function _soundHalf(params) {
+  const half = extractSectionParams(params, "sound");
+  for (const k of Object.keys(half)) if (k.startsWith("layer")) delete half[k];
+  return half;
+}
+
+function enterLayerEdit(layer) {
+  if (_chLayerEdit) exitLayerEdit(false);
+  _chLayerEdit = { layerId: layer.id, baseStash: _soundHalf(exploreParams) };
+  Object.assign(exploreParams, layer.subnote || {});
+  _chLayerSel = layer.id;
+  synth.updateGenerationParams({ ...exploreParams });
+  renderExplore();
+}
+
+function exitLayerEdit(rerender = true) {
+  if (!_chLayerEdit) return;
+  const layer = (exploreParams.layers || []).find(l => l.id === _chLayerEdit.layerId);
+  if (layer) layer.subnote = _soundHalf(exploreParams); // save the edit back
+  Object.assign(exploreParams, _chLayerEdit.baseStash);  // restore the base
+  _chLayerEdit = null;
+  _chLayerSel = null;
+  synth.updateGenerationParams({ ...exploreParams });
+  if (rerender) renderExplore();
+}
+
 // Q7: layer strip interactions. Layer edits apply live through
 // updateGenerationParams — the next generated note carries them.
 function wireLayerStrip(v) {
   const applyLive = () => synth.updateGenerationParams({ ...exploreParams });
+  const doneBtn = v.querySelector("#layerEditDone");
+  if (doneBtn) doneBtn.onclick = () => exitLayerEdit();
   const add = v.querySelector("#layerAdd");
   if (add) add.onclick = () => {
+    exitLayerEdit(false); // a new layer captures the BASE sound, not an edit in progress
     if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
     const subnote = extractSectionParams(exploreParams, "sound");
     // a layer never nests layers or carries the shared-sync settings
@@ -9537,9 +9568,10 @@ function wireLayerStrip(v) {
   v.querySelectorAll("[data-layer-row]").forEach(row => {
     row.onclick = (e) => {
       if (e.target.closest("input, button, canvas")) return; // controls stay controls
-      _chLayerSel = _chLayerSel === row.dataset.layerRow ? null : row.dataset.layerRow;
-      v.querySelectorAll("[data-layer-row]").forEach(r =>
-        r.classList.toggle("sel", r.dataset.layerRow === _chLayerSel));
+      const id = row.dataset.layerRow;
+      if (_chLayerEdit?.layerId === id) { exitLayerEdit(); return; } // same row = done
+      const layer = (exploreParams.layers || []).find(l => l.id === id);
+      if (layer) enterLayerEdit(layer); // exits any other edit first
     };
   });
   const layerOf = (id) => (exploreParams.layers || []).find(l => l.id === id);
@@ -9565,17 +9597,17 @@ function wireLayerStrip(v) {
   });
   v.querySelectorAll("[data-layer-recapture]").forEach(el => {
     el.onclick = () => {
+      exitLayerEdit(false); // recapture always means "from the BASE sound"
       const l = layerOf(el.dataset.layerRecapture);
       if (!l) return;
-      const subnote = extractSectionParams(exploreParams, "sound");
-      for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k];
-      l.subnote = subnote;
+      l.subnote = _soundHalf(exploreParams);
       applyLive();
       renderExplore();
     };
   });
   v.querySelectorAll("[data-layer-remove]").forEach(el => {
     el.onclick = () => {
+      exitLayerEdit(false); // restore the base before the layer disappears
       exploreParams.layers = (exploreParams.layers || []).filter(l => l.id !== el.dataset.layerRemove);
       if (!exploreParams.layers.length) exploreParams.layers = null;
       _chLayerSel = null;

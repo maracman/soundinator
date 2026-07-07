@@ -2177,6 +2177,10 @@ body.explore-mode {
   grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
   gap: 0.65rem;
 }
+/* Owner 07-07: the preset bar was silently eating the first grid cell in
+   the duration/dynamics panels, shunting the controls right and the
+   distribution display to the wrong side. It spans the full row. */
+.macro-panel > .panel-presets { grid-column: 1 / -1; }
 
 .macro-controls {
   min-width: 0;
@@ -3077,10 +3081,13 @@ body.explore-mode #app {
 
 /* Frequency-response view-mode switcher */
 .vis-mode-switch {
+  /* Owner 07-07: these stack vertically */
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  align-items: stretch;
   gap: 2px;
   margin-top: 3px;
+  width: max-content;
 }
 .vis-mode-btn {
   flex: 1 1 0;
@@ -3956,11 +3963,21 @@ body.explore-mode #app {
   font-weight: 700;
   letter-spacing: 0.04em;
   min-height: 22px;
-  padding: 0 5px;
+  height: 22px;
+  padding: 0 6px;
   transition: all 0.15s;
   border-radius: 3px;
   white-space: nowrap;
+  /* buttons and the Producer LINK share identical metrics — the link used
+     to float above its siblings (owner: "ugly and misaligned") */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-decoration: none;
+  vertical-align: middle;
 }
+.workspace-tabs { align-items: center; }
 
 .workspace-tab:hover:not(.active) {
   color: #b8c4d0;
@@ -5511,6 +5528,7 @@ body.explore-mode #app {
   border-color: rgba(245,166,35,0.6);
   background: rgba(245,166,35,0.15);
 }
+.layer-edit-tag { color: var(--accent2); text-transform: none; letter-spacing: 0; }
 .layer-row {
   display: flex;
   align-items: center;
