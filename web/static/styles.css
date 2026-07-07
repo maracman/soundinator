@@ -6095,3 +6095,89 @@ body.dragging { cursor: grabbing; user-select: none; }
 .connection-row { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; }
 .connection-row .connection-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ch-dim, #8b9aa8); margin-right: 2px; }
 .connection-row .seg-btn { flex: 0 0 auto; }
+
+/* ── Room designer + ear models (owner 07-07 round 3) ─────────── */
+.ear-model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+.ear-model-row select {
+  flex: 1;
+  min-width: 0;
+  background: rgba(16, 20, 26, 0.9);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.room-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 5px;
+}
+.room-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 2px 3px;
+  background: rgba(16, 20, 26, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.room-tile:hover { border-color: rgba(148, 196, 255, 0.5); color: var(--text); }
+.room-tile.sel {
+  border-color: #58d6a9;
+  box-shadow: 0 0 6px rgba(88, 214, 169, 0.35);
+  color: var(--text);
+}
+.room-tile canvas { display: block; }
+.room-tile span {
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+}
+/* producer: the uncollapsible room-designer row under the space panel */
+.sp-designer {
+  display: flex;
+  flex-wrap: wrap; /* narrow producer: controls drop below the tiles */
+  align-items: flex-start;
+  gap: 10px 14px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: rgba(10, 13, 17, 0.55);
+}
+.sp-designer .room-tiles {
+  grid-template-columns: repeat(5, 56px);
+  flex: none;
+}
+.sp-designer-ctls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 4px 14px;
+  flex: 1;
+  min-width: 150px;
+}
+.sp-designer-ctls input[type="range"] { width: 90px; }
+.sp-designer-ctls .sp-ctl { white-space: nowrap; }
+.sp-room-btn {
+  background: rgba(16, 20, 26, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 10px;
+  padding: 3px 7px;
+  cursor: pointer;
+  text-align: left;
+}
+.sp-room-btn:hover { border-color: rgba(88, 214, 169, 0.6); }
+.sp-room-blurb { color: var(--text-dim); font-style: italic; white-space: normal !important; }

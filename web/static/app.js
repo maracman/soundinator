@@ -50,6 +50,8 @@ import {
   spaceProximityDb,
   spaceDistanceGain,
   spaceArrivalDelay,
+  EAR_MODELS,
+  earlyReflectionPattern,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -61,7 +63,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.9.0"; // binaural physics grounded: Brown-Duda head shadow + Shaw/Blauert pinna cue
+const APP_VERSION = "sound-studio-0.10.0"; // room designer (parametric RIR: size/damping/diffusion) + ear models (pinnaScale)
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -126,6 +128,7 @@ const _SURPRISE_EXTRAS = new Set([
 function sectionForParam(key) {
   if (key === "seed") return null;
   if (key.startsWith("reverb") || key.startsWith("space")) return "space";
+  if (key === "pinnaScale" || key === "earModel") return "space";
   if (key.startsWith("perc")) return "percussion";
   if (key.startsWith("surprise") || _SURPRISE_EXTRAS.has(key)) return "surprise";
   if (key.startsWith("dynamics") || key === "loudnessRange") return "dynamics";
@@ -352,6 +355,11 @@ const DEFAULTS = {
   earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
   headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
   spaceOwnHead: false, // owner 07-07: keep THIS patch's head even when the global space is on
+  earModel: "average",  // owner 07-07 round 3: which EAR_MODELS preset the head params came from
+  pinnaScale: 1,        // Shaw pinna cue scale (ear models; 0 = bare sphere)
+  reverbSize: null,     // room designer — null = the picked room's own character
+  reverbDamping: null,
+  reverbDiffusion: null,
   layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
   layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own means kept)
   layerEnvProb: 0.5,       // Q7: the shared variation chance when layerEnvOverride is on
@@ -515,6 +523,11 @@ const PARAM_DESC = {
   spaceDistance: "How far the instrument stands from you (0.3–30 m). Distance delays the sound's arrival (~3 ms/m), rolls off the highs (air absorption), lowers the direct level against the room, and inside ~1 m adds the proximity bass lift",
   spaceAzimuth: "The instrument's bearing, all the way around you (−180°…180°): per-ear arrival times, far-ear head shadow, and a pinna cue that makes sounds behind you duller than in front — real binaural physics, not simple panning",
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences AND head shadowing from lower frequencies (the shadow corner is c/2πa)",
+  earModel: "A listener preset on the published physics — head width (Woodworth/Brown-Duda geometry) and outer-ear strength (Shaw pinna). Pick one, then fine-tune with the knobs",
+  pinnaScale: "How strong the outer-ear (pinna) cue is: 0 = bare sphere (behind sounds like front), 1 = Shaw's measured average, 2 = exaggerated front/behind difference",
+  reverbSize: "Room size: how far the walls are. Bigger rooms answer later (first bounce up to ~34 ms) and ring longer for the same decay",
+  reverbDamping: "Surface absorption: soft rooms eat the highs as the tail rings, hard tiled rooms stay bright to the end",
+  reverbDiffusion: "How scattered the walls are: low = sparse distinct echoes (cave, canyon), high = a smooth dense wash (plate)",
   headDensity: "How strongly your head shadows the far ear (0–1). 0.5 = the published spherical-head model (Brown & Duda 1998: lows diffract around, highs shadow up to -20 dB); 0 = transparent, 1 = doubled",
   spaceOwnHead: "Keep this patch's own ear span and head density even when the producer's global space is active (normally the global listener overrides them)",
   degreeTuning: "Each degree's true pitch centre, in cents off the equal grid — how just intonation, maqamat and other tuning traditions place their notes. Drag a node around the scale circle to set it by hand",
@@ -1401,8 +1414,17 @@ function regionPlayParams(track, region, atBeat = null) {
       // SPACE section opted out (owner 07-07)
       if (Number.isFinite(sp.head.earDistance)) params.earDistance = sp.head.earDistance;
       if (Number.isFinite(sp.head.headDensity)) params.headDensity = sp.head.headDensity;
-      if (sp.head.reverbType) params.reverbType = sp.head.reverbType;
+      if (Number.isFinite(sp.head.pinnaScale)) params.pinnaScale = sp.head.pinnaScale;
+      if (sp.head.reverbType) {
+        params.reverbType = sp.head.reverbType;
+        // the shared room's design rides with its type: unset designer
+        // values fall back to THAT room's character, not the patch's
+        params.reverbSize = sp.head.reverbSize ?? null;
+        params.reverbDamping = sp.head.reverbDamping ?? null;
+        params.reverbDiffusion = sp.head.reverbDiffusion ?? null;
+      }
       if (Number.isFinite(sp.head.reverbWet)) params.reverbWet = sp.head.reverbWet;
+      if (Number.isFinite(sp.head.reverbDecay)) params.reverbDecay = sp.head.reverbDecay;
     }
   }
   return params;
@@ -2098,6 +2120,7 @@ function globalScaleStripHTML(laneW) {
 // trackSpaceAt (synth.js); the head panel owns the listener (ear span,
 // head density, room type — re-homed here from Q2).
 let _spOpen = false;
+let _spRoomOpen = false; // owner 07-07 round 3: the room-designer drawer
 let _spSelTrack = null;
 let _spRock = { roll: 0, dragging: false, drag: null };
 let _spRaf = null;
@@ -2184,9 +2207,7 @@ function globalSpaceStripHTML(laneW) {
                 <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset</option>
               </select>
             </label>
-            <label class="sp-ctl">Room
-              <select id="spReverbType" title="The shared room every track sits in when the global space is on">${reverbTypeOptions(head.reverbType || arrangement.context.reverbType || "room")}</select>
-            </label>
+            <button class="sp-ctl sp-room-btn" id="spRoomToggle" title="The shared room every track sits in — open the designer to pick a room and bend its character">${_spRoomOpen ? "▾" : "▸"} Room · ${esc((REVERB_PROFILES[head.reverbType || arrangement.context.reverbType] || REVERB_PROFILES.room).label)}</button>
             <label class="sp-ctl">Amount <input type="range" id="spWet" min="0" max="0.95" step="0.01" value="${head.reverbWet ?? arrangement.context.reverbWet ?? 0.16}" title="How much of the shared room you hear (only applies while the global space is on)"/></label>
             <label class="sp-ctl">Ear span <input type="range" id="spEar" min="0.12" max="0.25" step="0.005" value="${head.earDistance ?? 0.175}" title="${esc(PARAM_DESC.earDistance)}"/></label>
             <label class="sp-ctl">Density <input type="range" id="spDensity" min="0" max="1" step="0.01" value="${head.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>
@@ -2196,7 +2217,7 @@ function globalSpaceStripHTML(laneW) {
         <div class="sp-cyl-wrap" style="width:${laneW}px">
           <canvas id="spCylinder" width="${laneW}" height="150" style="width:${laneW}px;height:150px" title="The arrangement's space over time, beat-aligned with the timeline below — one thread per instrument (nearer = thicker; the bright spans are that track's regions; the translucent core is your head). Drag up/down to roll the view; click an anchor dot to jump the playhead."></canvas>
         </div>
-      </div>` : "";
+      </div>${_spRoomOpen ? spRoomDesignerHTML(head) : ""}` : "";
   return `
       <div class="tl2-row tl2-sp-row">
         <div class="tl2-head tl2-corner gs-head">
@@ -2204,6 +2225,44 @@ function globalSpaceStripHTML(laneW) {
           ${_spOpen ? `<input type="checkbox" id="spEnabled"${sp.enabled ? " checked" : ""} title="Apply the global space to playback (asks how to initialise on first use)"/>` : ""}
         </div>
       </div>${panel}`;
+}
+
+// The producer's room designer (owner 07-07 round 3): the same editor as
+// the sub-note SPACE stage, writing to the arrangement's shared listener
+// (space.head) instead of the patch.
+function spRoomDesignerHTML(head) {
+  const ctxP = arrangement.context || {};
+  const roomKey = REVERB_PROFILES[head.reverbType || ctxP.reverbType] ? (head.reverbType || ctxP.reverbType) : "room";
+  const prof = REVERB_PROFILES[roomKey];
+  const earSel = _earModelOf({
+    earDistance: head.earDistance ?? 0.175,
+    headDensity: head.headDensity ?? 0.5,
+    pinnaScale: head.pinnaScale ?? 1,
+  });
+  return `
+      <div class="sp-designer">
+        <div class="room-tiles">
+          ${Object.entries(REVERB_PROFILES).map(([k, r]) => `
+            <button class="room-tile${k === roomKey ? " sel" : ""}" data-room-tile="${k}" title="${esc(r.label)} — ${esc(r.blurb)}">
+              <canvas data-room-art="${k}" width="44" height="30"></canvas>
+              <span>${esc(r.label)}</span>
+            </button>`).join("")}
+        </div>
+        <div class="sp-designer-ctls">
+          <label class="sp-ctl" title="${esc(PARAM_DESC.earModel)}">Ears
+            <select id="spEarModel">
+              ${Object.entries(EAR_MODELS).map(([k, m]) =>
+                `<option value="${k}"${earSel === k ? " selected" : ""} title="${esc(m.blurb)}">${esc(m.label)}</option>`).join("")}
+              ${earSel === "custom" ? `<option value="custom" selected>Custom</option>` : ""}
+            </select>
+          </label>
+          <label class="sp-ctl" title="How long the shared room rings">Decay <input type="range" id="spDecay" min="0.2" max="8" step="0.1" value="${head.reverbDecay ?? ctxP.reverbDecay ?? 1.4}"/></label>
+          <label class="sp-ctl" title="${esc(PARAM_DESC.reverbSize)}">Size <input type="range" id="spSize" min="0" max="1" step="0.01" value="${head.reverbSize ?? prof.size}"/></label>
+          <label class="sp-ctl" title="${esc(PARAM_DESC.reverbDamping)}">Damping <input type="range" id="spDamp" min="0" max="1" step="0.01" value="${head.reverbDamping ?? prof.damping}"/></label>
+          <label class="sp-ctl" title="${esc(PARAM_DESC.reverbDiffusion)}">Diffusion <input type="range" id="spDiff" min="0" max="1" step="0.01" value="${head.reverbDiffusion ?? prof.diffusion}"/></label>
+          <span class="sp-ctl sp-room-blurb">${esc(prof.blurb)}</span>
+        </div>
+      </div>`;
 }
 
 function drawSpSection() {
@@ -2436,7 +2495,42 @@ function wireGlobalSpace(v) {
   bindHead("#spEar", "earDistance");
   bindHead("#spDensity", "headDensity");
   bindHead("#spWet", "reverbWet");
-  bindHead("#spReverbType", "reverbType", false);
+  // room designer drawer (owner 07-07 round 3)
+  const spRoomToggle = v.querySelector("#spRoomToggle");
+  if (spRoomToggle) spRoomToggle.onclick = () => { _spRoomOpen = !_spRoomOpen; renderProduce(); };
+  bindHead("#spDecay", "reverbDecay");
+  bindHead("#spSize", "reverbSize");
+  bindHead("#spDamp", "reverbDamping");
+  bindHead("#spDiff", "reverbDiffusion");
+  const spEarModel = v.querySelector("#spEarModel");
+  if (spEarModel) spEarModel.onchange = () => {
+    const m = EAR_MODELS[spEarModel.value];
+    if (!m) return;
+    const sp = ensureGlobalSpace();
+    sp.head.earModel = spEarModel.value;
+    sp.head.earDistance = m.earDistance;
+    sp.head.headDensity = m.headDensity;
+    sp.head.pinnaScale = m.pinnaScale;
+    saveArrangement("global space ears");
+    liveApply();
+    renderProduce(); // the ear-span/density sliders show the new values
+  };
+  v.querySelectorAll(".sp-designer [data-room-tile]").forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.roomTile;
+      if (!REVERB_PROFILES[k]) return;
+      const sp = ensureGlobalSpace();
+      sp.head.reverbType = k;
+      // a fresh pick adopts the room's own character
+      delete sp.head.reverbSize;
+      delete sp.head.reverbDamping;
+      delete sp.head.reverbDiffusion;
+      saveArrangement("global space room");
+      liveApply();
+      renderProduce();
+    };
+  });
+  if (_spRoomOpen) drawRoomTiles();
   const spMode = v.querySelector("#spMode");
   if (spMode) spMode.onchange = () => {
     ensureGlobalSpace().mode = spMode.value;
@@ -5579,6 +5673,8 @@ function renderExplore() {
     // Q4 binaural head — listener properties apply live through the same
     // space configure as position (the pad already routes updateReverb)
     "earDistance","headDensity",
+    // owner 07-07 round 3: room designer + ear model — all convolver/space live
+    "reverbSize","reverbDamping","reverbDiffusion","pinnaScale",
   ]);
   const liveSubnoteParams = new Set([
     // Melody-generation shaping: changing these continues the current Markov
@@ -5718,6 +5814,7 @@ function renderExplore() {
 
   wireTonePrint(v);
   wireSpacePad(v);
+  wireEarRoom(v);
   drawSpaceField(); // SPACE stage ear-response view (display only)
   wireLayerStrip(v);
   wireStudioPanels(v);
@@ -8885,18 +8982,168 @@ function chInspectorHTML(p) {
         ? "ARTICULATION rides on the selected body: the vowel EQ layers over its bands at the chosen depth — a violin body can sing. Click a band chip to see and reshape its EQ in the field"
         : "the body is a PRESET you can edit: click a band chip to see its EQ curve in the field and drag the Band gain knob to make it more or less extreme"}</div>`;
   }
+  const prof = REVERB_PROFILES[p.reverbType] || REVERB_PROFILES.room;
+  const roomKey = REVERB_PROFILES[p.reverbType] ? p.reverbType : "room";
+  const earSel = _earModelOf(p);
   return `
-    <div class="ch-ins-head"><span class="ch-card-n">04 · SPACE</span><span class="ch-ins-d">${esc(REVERB_PROFILES[p.reverbType]?.label || p.reverbType || "room")}</span></div>
+    <div class="ch-ins-head"><span class="ch-card-n">04 · SPACE</span><span class="ch-ins-d">${esc(prof.label)}</span></div>
     <canvas class="space-pad" id="cvSpacePad" width="280" height="170"></canvas>
     <div class="ts-space-link" id="spaceReadout">${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}°</div>
+    <label class="ear-model-row" title="${esc(PARAM_DESC.earModel)}">EARS
+      <select id="earModelSel">
+        ${Object.entries(EAR_MODELS).map(([k, m]) =>
+          `<option value="${k}"${earSel === k ? " selected" : ""} title="${esc(m.blurb)}">${esc(m.label)}</option>`).join("")}
+        ${earSel === "custom" ? `<option value="custom" selected>Custom (knobs)</option>` : ""}
+      </select>
+    </label>
     <div class="knob-row">
       ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
       ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
       ${knobHTML("earDistance", "Ear span", p.earDistance ?? 0.175, 0.12, 0.25, 0.005, { def: 0.175, cool: true })}
       ${knobHTML("headDensity", "Head density", p.headDensity ?? 0.5, 0, 1, 0.01, { def: 0.5, cool: true })}
     </div>
+    <div class="subsection-label" title="Each room is a parametric impulse-response model — a recipe, not a recording. Pick one, then bend it with the knobs below.">ROOM · ${esc(prof.blurb)}</div>
+    <div class="room-tiles" id="roomTiles">
+      ${Object.entries(REVERB_PROFILES).map(([k, r]) => `
+        <button class="room-tile${k === roomKey ? " sel" : ""}" data-room-tile="${k}" title="${esc(r.label)} — ${esc(r.blurb)}">
+          <canvas data-room-art="${k}" width="44" height="30"></canvas>
+          <span>${esc(r.label)}</span>
+        </button>`).join("")}
+    </div>
+    <div class="knob-row">
+      ${knobHTML("reverbSize", "Size", p.reverbSize ?? prof.size, 0, 1, 0.01, { def: prof.size, cool: true })}
+      ${knobHTML("reverbDamping", "Damping", p.reverbDamping ?? prof.damping, 0, 1, 0.01, { def: prof.damping, cool: true })}
+      ${knobHTML("reverbDiffusion", "Diffusion", p.reverbDiffusion ?? prof.diffusion, 0, 1, 0.01, { def: prof.diffusion, cool: true })}
+    </div>
     ${checkboxControl("spaceOwnHead", "Own head — ignore the global listener", p.spaceOwnHead)}
-    <div class="ch-caption">the full circle: drag anywhere around your head — behind you (shaded half) sounds duller via the pinna law. Distance delays arrival (~3 ms/m), softens highs, trades direct for room; ear span and head density shape the interaural cues</div>`;
+    <div class="ch-caption">the full circle: drag anywhere around your head — behind you (shaded half) sounds duller via the pinna law. Distance delays arrival (~3 ms/m), softens highs, trades direct for room; the ear model and knobs shape the interaural cues</div>`;
+}
+
+// Which EAR_MODELS preset the current head params correspond to (within
+// knob resolution), or "custom" when the knobs have wandered off-preset.
+function _earModelOf(p) {
+  for (const [k, m] of Object.entries(EAR_MODELS)) {
+    if (Math.abs((p.earDistance ?? 0.175) - m.earDistance) < 0.0026 &&
+        Math.abs((p.headDensity ?? 0.5) - m.headDensity) < 0.006 &&
+        Math.abs((p.pinnaScale ?? 1) - m.pinnaScale) < 0.006) return k;
+  }
+  return "custom";
+}
+
+// Little line-art portraits of the rooms — drawn, not loaded (no images
+// in the repo; a room is a recipe here, so its picture is too).
+function drawRoomTiles() {
+  document.querySelectorAll("[data-room-art]").forEach(cv => {
+    const ctx = cv.getContext("2d");
+    const w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = "rgba(180,200,220,0.8)";
+    ctx.fillStyle = "rgba(180,200,220,0.25)";
+    ctx.lineWidth = 1.2;
+    const line = (pts) => {
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      ctx.stroke();
+    };
+    switch (cv.dataset.roomArt) {
+      case "studio": { // mic on a stand in a treated corner
+        for (let x = 4; x < w - 18; x += 5) line([[x, 3], [x + 3, 3], [x + 3, 12], [x, 12], [x, 3]]);
+        ctx.beginPath(); ctx.arc(w - 12, 12, 4, 0, 2 * Math.PI); ctx.stroke();
+        line([[w - 12, 16], [w - 12, h - 4]]); line([[w - 17, h - 4], [w - 7, h - 4]]);
+        break;
+      }
+      case "room": { // sofa + lamp
+        line([[5, h - 5], [5, 14], [10, 14], [10, 19], [26, 19], [26, 14], [31, 14], [31, h - 5], [5, h - 5]]);
+        line([[w - 8, h - 5], [w - 8, 8]]);
+        ctx.beginPath(); ctx.arc(w - 8, 7, 3.5, Math.PI, 2 * Math.PI); ctx.stroke();
+        break;
+      }
+      case "bathroom": { // tub under tiles
+        for (let x = 3; x < w - 2; x += 7) line([[x, 3], [x, 9]]);
+        line([[2, 3], [w - 2, 3]]); line([[2, 9], [w - 2, 9]]);
+        line([[8, 17], [w - 12, 17], [w - 13, h - 4], [10, h - 4], [8, 17]]);
+        break;
+      }
+      case "chamber": { // wood panelling + a chair
+        for (let x = 5; x < w - 2; x += 8) line([[x, 3], [x, h - 12]]);
+        line([[3, h - 12], [w - 3, h - 12]]);
+        line([[w - 16, h - 4], [w - 16, h - 9], [w - 10, h - 9], [w - 10, h - 4]]);
+        break;
+      }
+      case "plate": { // hatched steel sheet with the drive spot
+        line([[4, 6], [w - 4, 6], [w - 4, h - 6], [4, h - 6], [4, 6]]);
+        for (let x = 8; x < w - 6; x += 6) line([[x, 6], [x - 4, h - 6]]);
+        ctx.beginPath(); ctx.arc(w / 2, h / 2, 2.2, 0, 2 * Math.PI); ctx.fill();
+        break;
+      }
+      case "hall": { // stage arc + rows of seats
+        ctx.beginPath(); ctx.arc(w / 2, 4, 13, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+        for (let r = 0; r < 3; r++) {
+          ctx.beginPath(); ctx.arc(w / 2, 2, 18 + r * 5, 0.25 * Math.PI, 0.75 * Math.PI); ctx.stroke();
+        }
+        break;
+      }
+      case "cathedral": { // pointed arches + spire
+        line([[6, h - 3], [6, 14]]); line([[18, h - 3], [18, 14]]);
+        ctx.beginPath(); ctx.moveTo(6, 14); ctx.quadraticCurveTo(12, 4, 18, 14); ctx.stroke();
+        line([[24, h - 3], [24, 14]]); line([[36, h - 3], [36, 14]]);
+        ctx.beginPath(); ctx.moveTo(24, 14); ctx.quadraticCurveTo(30, 4, 36, 14); ctx.stroke();
+        line([[w - 4, h - 3], [w - 4, 8], [w - 2, 8]]);
+        break;
+      }
+      case "cave": { // stalactites over a floor
+        line([[3, 4], [8, 4], [10, 12], [12, 4], [18, 4], [20, 16], [23, 4], [30, 4], [32, 10], [34, 4], [w - 3, 4]]);
+        line([[3, h - 4], [w - 3, h - 4]]);
+        break;
+      }
+      case "forest": { // three pines
+        const tree = (x, s) => { line([[x - s, h - 4], [x, h - 4 - s * 2.6], [x + s, h - 4]]); line([[x, h - 4], [x, h - 2]]); };
+        tree(10, 5); tree(23, 7); tree(36, 4);
+        break;
+      }
+      case "spring": { // the coil
+        ctx.beginPath();
+        for (let x = 4; x <= w - 4; x++) {
+          const y = h / 2 + Math.sin((x - 4) * 0.9) * 6;
+          x === 4 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        line([[2, h / 2], [4, h / 2]]); line([[w - 4, h / 2], [w - 2, h / 2]]);
+        break;
+      }
+    }
+  });
+}
+
+// Ear-model select + room tiles (sub-note SPACE inspector).
+function wireEarRoom(v) {
+  const sel = v.querySelector("#earModelSel");
+  if (sel) sel.onchange = () => {
+    const m = EAR_MODELS[sel.value];
+    if (!m) return; // "custom" — nothing to apply
+    noteParamChange("earModel", exploreParams.earModel, sel.value);
+    exploreParams.earModel = sel.value;
+    exploreParams.earDistance = m.earDistance;
+    exploreParams.headDensity = m.headDensity;
+    exploreParams.pinnaScale = m.pinnaScale;
+    synth.updateReverb({ ...exploreParams });
+    renderExplore();
+  };
+  v.querySelectorAll("[data-room-tile]").forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.roomTile;
+      if (!REVERB_PROFILES[k]) return;
+      noteParamChange("reverbType", exploreParams.reverbType, k);
+      exploreParams.reverbType = k;
+      // picking a room adopts ITS character; the knobs bend it from there
+      exploreParams.reverbSize = null;
+      exploreParams.reverbDamping = null;
+      exploreParams.reverbDiffusion = null;
+      synth.updateReverb({ ...exploreParams });
+      renderExplore();
+    };
+  });
+  drawRoomTiles();
 }
 
 // Stage thumbnails: each card's live mini-visualisation, computed from the
@@ -9810,6 +10057,12 @@ function drawSpaceField() {
   const decay = clamp(p.reverbDecay ?? 1.4, 0.2, 8);
   const preDelay = clamp(p.reverbPreDelay ?? 0.015, 0, 0.25);
 
+  const roomKey = REVERB_PROFILES[p.reverbType] ? p.reverbType : "room";
+  const prof = REVERB_PROFILES[roomKey];
+  const size = clamp(p.reverbSize ?? prof.size ?? 0.5, 0, 1);
+  const damping = clamp(p.reverbDamping ?? prof.damping ?? 0.4, 0, 1);
+  const diffusion = clamp(p.reverbDiffusion ?? prof.diffusion ?? 0.5, 0, 1);
+
   const itd = itdSeconds(azRad, earDist);          // +ve: LEFT ear later
   const t0 = spaceArrivalDelay(d);
   const distDb = 20 * Math.log10(spaceDistanceGain(d));
@@ -9818,7 +10071,7 @@ function drawSpaceField() {
   const f0 = headShadowFreq(earDist);
   const airFc = spaceAirCutoff(d);
   const proxDb = spaceProximityDb(d);
-  const pinna = pinnaParams(azRad);
+  const pinna = pinnaParams(azRad, p.pinnaScale ?? 1);
 
   const COL_L = "rgba(124,196,255,0.95)", COL_R = "rgba(255,180,84,0.95)";
   const GRID = "rgba(90,110,130,0.22)", TXT = "rgba(120,135,150,0.75)";
@@ -9861,6 +10114,22 @@ function drawSpaceField() {
     grad.addColorStop(1, "rgba(148,196,255,0.03)");
     ctx.fillStyle = grad;
     ctx.fill();
+  }
+  // the room's first bounces — the SAME deterministic pattern the
+  // convolver is built from, so this is the impulse response you hear.
+  // Left/right wall bounces take each ear's colour.
+  if (wet > 0.001) {
+    for (const refl of earlyReflectionPattern(roomKey, size, diffusion)) {
+      const t = tail0 + refl.t;
+      if (t > tMax) break;
+      const x = xT(t);
+      const amp = Math.min(1, Math.abs(refl.gain) * wet * 2.4);
+      if (amp < 0.01) continue;
+      ctx.strokeStyle = refl.side > 0 ? "rgba(255,180,84,0.75)" : "rgba(124,196,255,0.75)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, base - amp * (L.h - 30)); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
   }
   // direct hit: one spike at t0 (the ITD gap is sub-millisecond — the
   // inset shows it honestly instead of pretending it's visible here)
@@ -9977,7 +10246,8 @@ function drawSpaceField() {
     pinna.conchaDb < -0.1 ? `behind: concha ${pinna.conchaDb.toFixed(1)} dB` : null,
   ].filter(Boolean);
   ctx.fillText(bits.join(" · "), R.x, h - 8);
-  ctx.fillText(`${d.toFixed(1)} m · ${Math.round(clamp(p.spaceAzimuth ?? 0, -180, 180))}° · room ${decay.toFixed(1)}s`, L.x, h - 8);
+  const earLbl = EAR_MODELS[_earModelOf(p)]?.label ?? "custom ears";
+  ctx.fillText(`${d.toFixed(1)} m · ${Math.round(clamp(p.spaceAzimuth ?? 0, -180, 180))}° · ${prof.label.toLowerCase()} ${decay.toFixed(1)}s · size ${size.toFixed(2)} · damp ${damping.toFixed(2)} · diffuse ${diffusion.toFixed(2)} · ${earLbl.toLowerCase()}`, L.x, h - 8);
 }
 
 function wireSpacePad(v) {
@@ -10401,12 +10671,6 @@ function percSoundOptions(selected) {
 
 function spectralProfileOptions(selected) {
   return Object.entries(SPECTRAL_PROFILES).map(([k, v]) =>
-    `<option value="${k}" ${selected === k ? 'selected' : ''}>${v.label}</option>`
-  ).join('');
-}
-
-function reverbTypeOptions(selected) {
-  return Object.entries(REVERB_PROFILES).map(([k, v]) =>
     `<option value="${k}" ${selected === k ? 'selected' : ''}>${v.label}</option>`
   ).join('');
 }

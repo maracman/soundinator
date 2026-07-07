@@ -237,12 +237,86 @@ export const PERC_SOUNDS = {
   bell:   { type: "sine",  freq: 1200, freqEnd: 600, decay: 0.15, amp: 0.3,  label: "Bell" },
 };
 
+// Owner 07-07 round 3: each room is a PARAMETRIC impulse-response model
+// (no audio files enter the repo — a room is a recipe, not a recording).
+// duration/shape/early/shimmer are the legacy tail controls; size, damping
+// and diffusion are the room-designer starting points, with RT60s and
+// character grounded in room-acoustics ranges (Sabine-order magnitudes:
+// booth ~0.2 s, living room ~0.5 s, chamber ~1 s, hall ~2 s, cathedral
+// 5-8 s; plate/spring model the classic electromechanical units).
 export const REVERB_PROFILES = {
-  room: { label: "Room", duration: 0.9, shape: 2.2, early: 0.55, shimmer: 0.10 },
-  plate: { label: "Plate", duration: 1.8, shape: 1.25, early: 0.28, shimmer: 0.30 },
-  hall: { label: "Hall", duration: 2.9, shape: 1.7, early: 0.42, shimmer: 0.16 },
-  cathedral: { label: "Cathedral", duration: 5.2, shape: 1.1, early: 0.35, shimmer: 0.12 },
-  spring: { label: "Spring", duration: 1.5, shape: 1.55, early: 0.22, shimmer: 0.45 },
+  studio: { label: "Studio booth", duration: 0.35, shape: 2.6, early: 0.6, shimmer: 0.06,
+    size: 0.15, damping: 0.75, diffusion: 0.6,
+    blurb: "treated recording booth — the room barely answers back" },
+  room: { label: "Room", duration: 0.9, shape: 2.2, early: 0.55, shimmer: 0.10,
+    size: 0.35, damping: 0.5, diffusion: 0.5,
+    blurb: "a lived-in living room: soft furniture eats the highs" },
+  bathroom: { label: "Bathroom", duration: 1.1, shape: 1.9, early: 0.75, shimmer: 0.35,
+    size: 0.12, damping: 0.05, diffusion: 0.3,
+    blurb: "small and tiled — bright, fluttery, a touch comic" },
+  chamber: { label: "Chamber", duration: 1.6, shape: 1.9, early: 0.5, shimmer: 0.14,
+    size: 0.45, damping: 0.35, diffusion: 0.65,
+    blurb: "wood-panelled chamber: intimate, warm, quick to bloom" },
+  plate: { label: "Plate", duration: 1.8, shape: 1.25, early: 0.28, shimmer: 0.30,
+    size: 0.5, damping: 0.15, diffusion: 0.95,
+    blurb: "EMT-style steel plate — instantly dense, no walls at all" },
+  hall: { label: "Hall", duration: 2.9, shape: 1.7, early: 0.42, shimmer: 0.16,
+    size: 0.7, damping: 0.3, diffusion: 0.7,
+    blurb: "concert hall: clear early bounces, then a long bloom" },
+  cathedral: { label: "Cathedral", duration: 5.2, shape: 1.1, early: 0.35, shimmer: 0.12,
+    size: 0.95, damping: 0.25, diffusion: 0.8,
+    blurb: "stone vaults — seconds of tail, syllables melt together" },
+  cave: { label: "Cave", duration: 4.2, shape: 1.3, early: 0.3, shimmer: 0.2,
+    size: 0.85, damping: 0.55, diffusion: 0.25,
+    blurb: "irregular rock: sparse distinct echoes, a dark long tail" },
+  forest: { label: "Forest", duration: 1.4, shape: 2.8, early: 0.25, shimmer: 0.08,
+    size: 0.8, damping: 0.85, diffusion: 0.15,
+    blurb: "outdoors — almost no tail, a few soft echoes off the trees" },
+  spring: { label: "Spring", duration: 1.5, shape: 1.55, early: 0.22, shimmer: 0.45,
+    size: 0.3, damping: 0.2, diffusion: 0.4,
+    blurb: "guitar-amp spring tank: boingy, dispersive, proudly fake" },
+};
+
+// The room's first bounces — one deterministic pattern shared by the
+// convolver builder AND the UI drawings, so what you see is what plays.
+// size moves the first reflection later (bigger room = longer path);
+// diffusion adds density (sparse distinct echoes -> smooth wash).
+export function earlyReflectionPattern(type, size = 0.5, diffusion = 0.5) {
+  const profile = REVERB_PROFILES[type] || REVERB_PROFILES.room;
+  const seed = Array.from(String(type)).reduce((s, c) => s + c.charCodeAt(0), 17);
+  const count = Math.max(3, Math.round(4 + profile.early * 8 + diffusion * 14));
+  const base = 0.004 + size * 0.03; // first bounce 4..34 ms
+  const refl = [];
+  let t = base;
+  for (let r = 0; r < count; r++) {
+    const h = Math.sin((r + 1) * 12.9898 + seed) * 43758.5453;
+    const jitter = h - Math.floor(h);
+    refl.push({
+      t,
+      gain: (profile.early * 0.9) / (1 + r * (1.4 - diffusion * 0.7)) * (r % 2 ? -0.75 : 1),
+      side: r % 2 ? 1 : -1,
+    });
+    t += base * (0.35 + 0.65 * jitter) * (0.5 + diffusion * 0.9) / (1 + r * 0.08);
+  }
+  return refl;
+}
+
+// Ear models: parametric listeners on the same published physics.
+// earDistance sets the Woodworth/Brown-Duda geometry (head widths span
+// published adult anthropometry, ~14-20 cm bitragion), headDensity scales
+// the shadow around Brown-Duda's values, pinnaScale scales the Shaw
+// concha/flange cues (0 = no outer ear at all).
+export const EAR_MODELS = {
+  average: { label: "Average head", earDistance: 0.175, headDensity: 0.5, pinnaScale: 1,
+    blurb: "the published baseline: Brown-Duda sphere, Shaw pinna" },
+  small: { label: "Small head", earDistance: 0.145, headDensity: 0.45, pinnaScale: 0.85,
+    blurb: "narrower head: smaller time gaps, shadow starts higher" },
+  large: { label: "Large head", earDistance: 0.2, headDensity: 0.6, pinnaScale: 1.1,
+    blurb: "wider head: bigger time gaps, heavier shadow" },
+  batEars: { label: "Prominent pinna", earDistance: 0.175, headDensity: 0.5, pinnaScale: 1.6,
+    blurb: "exaggerated outer ear: front/behind is unmistakable" },
+  sphere: { label: "Bare sphere", earDistance: 0.175, headDensity: 0.5, pinnaScale: 0,
+    blurb: "no outer ear: ITD + shadow only — behind sounds like front" },
 };
 
 // ─── Approximate harmonic fingerprints for common instruments ─────
@@ -607,15 +681,16 @@ export function headShadowFreq(earDistance = 0.175) {
 //    sources (≈7 dB dead-behind).
 // Exactly zero anywhere in the front half-plane, scaling smoothly
 // (smoothstep) from ±90° to 180°.
-export function pinnaParams(angleRad) {
+export function pinnaParams(angleRad, pinnaScale = 1) {
   const a = Math.abs(foldAngle(angleRad));
   const t = Math.max(0, Math.min(1, (a - Math.PI / 2) / (Math.PI / 2)));
   const behind = t * t * (3 - 2 * t); // smooth, like measured HRTF transitions
+  const s = Math.max(0, Math.min(2, pinnaScale ?? 1)); // ear models scale the cue
   return {
     conchaHz: 4300,
-    conchaDb: -8 * behind,
+    conchaDb: -8 * behind * s,
     shelfHz: 8000,
-    shelfDb: -7 * behind,
+    shelfDb: -7 * behind * s,
   };
 }
 
@@ -3365,6 +3440,12 @@ export class SynthEngine {
     const tone = this._clamp(params.reverbTone ?? 0.6, 0, 1);
     const preDelay = this._clamp(params.reverbPreDelay ?? 0.015, 0, 0.25);
     const type = REVERB_PROFILES[params.reverbType] ? params.reverbType : "room";
+    const profile = REVERB_PROFILES[type];
+    // Room-designer params (owner 07-07 round 3) default to the room's own
+    // character so a plain room pick sounds like that room.
+    const size = this._clamp(params.reverbSize ?? profile.size ?? 0.5, 0, 1);
+    const damping = this._clamp(params.reverbDamping ?? profile.damping ?? 0.4, 0, 1);
+    const diffusion = this._clamp(params.reverbDiffusion ?? profile.diffusion ?? 0.5, 0, 1);
     const now = this.ctx.currentTime;
 
     const dry = Math.cos(wet * Math.PI * 0.5);
@@ -3375,9 +3456,9 @@ export class SynthEngine {
     this._reverbTone.frequency.setTargetAtTime(1200 * Math.pow(2, tone * 3.8), now, 0.02);
     this._reverbTone.Q.setTargetAtTime(0.45 + tone * 0.9, now, 0.02);
 
-    const key = `${type}:${decay.toFixed(2)}:${tone.toFixed(2)}`;
+    const key = `${type}:${decay.toFixed(2)}:${tone.toFixed(2)}:${size.toFixed(2)}:${damping.toFixed(2)}:${diffusion.toFixed(2)}`;
     if (key !== this._reverbKey) {
-      this._convolver.buffer = this._buildImpulseResponse(type, decay, tone);
+      this._convolver.buffer = this._buildImpulseResponse(type, decay, tone, { size, damping, diffusion });
       this._reverbKey = key;
     }
   }
@@ -3438,7 +3519,7 @@ export class SynthEngine {
       smooth(n.earShadowR.gain, 1);
       // Shaw/Blauert pinna cue: behind loses the ~4.3 kHz concha gain and
       // the highs above ~8 kHz; the front half-plane is untouched.
-      const pin = pinnaParams(az);
+      const pin = pinnaParams(az, p.pinnaScale);
       n.pinnaNotch.frequency.value = pin.conchaHz;
       smooth(n.pinnaNotch.gain, pin.conchaDb);
       n.pinnaShelf.frequency.value = pin.shelfHz;
@@ -3518,10 +3599,14 @@ export class SynthEngine {
     return true;
   }
 
-  _buildImpulseResponse(type, decay, tone) {
+  _buildImpulseResponse(type, decay, tone, opts = {}) {
     const profile = REVERB_PROFILES[type] || REVERB_PROFILES.room;
+    const size = this._clamp(opts.size ?? profile.size ?? 0.5, 0, 1);
+    const damping = this._clamp(opts.damping ?? profile.damping ?? 0.4, 0, 1);
+    const diffusion = this._clamp(opts.diffusion ?? profile.diffusion ?? 0.5, 0, 1);
     const sr = this.ctx.sampleRate;
-    const duration = this._clamp(profile.duration * decay, 0.15, 10);
+    // a bigger room rings longer for the same decay setting
+    const duration = this._clamp(profile.duration * decay * (0.7 + size * 0.6), 0.15, 10);
     const length = Math.max(1, Math.floor(sr * duration));
     const buffer = this.ctx.createBuffer(2, length, sr);
     const seed = Array.from(type).reduce((sum, ch) => sum + ch.charCodeAt(0), 17);
@@ -3535,7 +3620,14 @@ export class SynthEngine {
         const env = Math.pow(1 - t, profile.shape) * Math.exp(-t * (1.2 + (1 - tone) * 2.2));
         const noise = this._impulseNoise(i, ch, seed);
         low += (noise - low) * (0.015 + brightness * 0.14);
-        let sample = (low * 0.65 + noise * brightness * 0.35) * env;
+        // damping: absorbent surfaces darken the tail progressively —
+        // the bright component dies faster than the body of the sound
+        const bright = brightness * Math.exp(-t * damping * 5);
+        let sample = (low * 0.65 + noise * bright * 0.35) * env;
+        // low diffusion: the wash breaks into audible flutter/grain
+        if (diffusion < 0.5) {
+          sample *= 1 - (0.5 - diffusion) * 0.9 * (0.5 + 0.5 * Math.sin(i * 0.013 + ch * 1.7));
+        }
 
         if (type === "spring") {
           sample *= 0.72 + 0.28 * Math.sin(i * 0.047 + Math.sin(i * 0.003) * 2.5);
@@ -3544,11 +3636,10 @@ export class SynthEngine {
         data[i] = sample;
       }
 
-      const earlyCount = Math.max(4, Math.round(8 + profile.early * 16));
-      for (let r = 0; r < earlyCount; r++) {
-        const pos = Math.min(length - 1, Math.floor(sr * (0.006 + r * (0.006 + profile.early * 0.006) + ch * 0.002)));
-        const amp = (profile.early / (r + 1)) * (r % 2 === 0 ? 1 : -0.7);
-        data[pos] += amp;
+      // first bounces from the shared pattern — the same one the UI draws
+      for (const refl of earlyReflectionPattern(type, size, diffusion)) {
+        const pos = Math.min(length - 1, Math.floor(sr * (refl.t + (refl.side > 0 ? ch : 1 - ch) * 0.0011)));
+        data[pos] += refl.gain * ((refl.side > 0) === (ch === 1) ? 1 : 0.55);
       }
     }
     return buffer;

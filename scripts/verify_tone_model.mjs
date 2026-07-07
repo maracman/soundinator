@@ -939,6 +939,41 @@ console.log("P3: note connection — glide vs ring on overlap");
     (() => { const p = notePerformance({}); return p.vibrato === null && p.glideFrom === null && p.tuningCents === 0; })());
 }
 
+// ── Room designer + ear models (owner 07-07 round 3) ─────────────────
+{
+  const { REVERB_PROFILES, earlyReflectionPattern, EAR_MODELS, pinnaParams } =
+    await import("../web/static/synth.js");
+  check("rooms: catalogue has 10 parametric models", Object.keys(REVERB_PROFILES).length === 10);
+  check("rooms: every model carries designer defaults + a blurb",
+    Object.values(REVERB_PROFILES).every(r =>
+      r.size >= 0 && r.size <= 1 && r.damping >= 0 && r.damping <= 1 &&
+      r.diffusion >= 0 && r.diffusion <= 1 && typeof r.blurb === "string" && r.label));
+  check("rooms: RT ordering is physical (booth < room < hall < cathedral)",
+    REVERB_PROFILES.studio.duration < REVERB_PROFILES.room.duration &&
+    REVERB_PROFILES.room.duration < REVERB_PROFILES.hall.duration &&
+    REVERB_PROFILES.hall.duration < REVERB_PROFILES.cathedral.duration);
+  const e1 = earlyReflectionPattern("hall", 0.2, 0.5);
+  const e2 = earlyReflectionPattern("hall", 0.9, 0.5);
+  check("early pattern: deterministic",
+    JSON.stringify(earlyReflectionPattern("hall", 0.2, 0.5)) === JSON.stringify(e1));
+  check("early pattern: bigger room → first bounce arrives later", e2[0].t > e1[0].t);
+  check("early pattern: diffusion adds density",
+    earlyReflectionPattern("hall", 0.5, 0.9).length > earlyReflectionPattern("hall", 0.5, 0.1).length);
+  check("early pattern: gains alternate sides and decay",
+    e1[0].side !== e1[1].side && Math.abs(e1[0].gain) > Math.abs(e1[2].gain));
+  check("ear models: average IS the published baseline",
+    EAR_MODELS.average.earDistance === 0.175 && EAR_MODELS.average.headDensity === 0.5 &&
+    EAR_MODELS.average.pinnaScale === 1);
+  check("ear models: head widths span published anthropometry",
+    EAR_MODELS.small.earDistance < EAR_MODELS.average.earDistance &&
+    EAR_MODELS.average.earDistance < EAR_MODELS.large.earDistance);
+  const pinBase = pinnaParams(Math.PI, 1), pinBig = pinnaParams(Math.PI, 1.6), pinOff = pinnaParams(Math.PI, 0);
+  check("pinna scale: scales the Shaw cue linearly",
+    Math.abs(pinBig.conchaDb - pinBase.conchaDb * 1.6) < 1e-9 && pinOff.conchaDb === 0 && pinOff.shelfDb === 0);
+  check("pinna scale: default arg keeps the published values",
+    JSON.stringify(pinnaParams(Math.PI)) === JSON.stringify(pinBase));
+}
+
 // ── Region ring-out (owner 07-07): finish() stops triggering, not sound ──
 {
   const { SynthEngine } = await import("../web/static/synth.js");
