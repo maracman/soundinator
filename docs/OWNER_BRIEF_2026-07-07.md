@@ -15,8 +15,11 @@ peaked intervals) but cannot produce a strict deterministic cycle.
 Build: `melodyPattern` = `walk` (default, current) | `arpUp` | `arpDown`
 | `arpUpDown`. Arp note set = scale degrees within `intervalRange` above
 the root (in-scale, existing operators apply), plus `arpOctaves` (1–3).
-Deterministic ordering, seeded phase; duration/rest/dynamics/surprise
-machinery unchanged on top. Macro UI: segmented control in MELODY.
+Deterministic ordering, seeded phase; duration/rest/dynamics machinery
+unchanged on top. AMENDED (owner): surprise does NOT apply to arp
+patterns — arps are deterministic by contract; surprise is walk-only
+(engine-gated, DONE with the all-dimensions-off fix). Macro UI:
+segmented control in MELODY.
 
 ## P2 — Factory patch families (need P1 first)
 
@@ -46,12 +49,15 @@ scale (+ splits count), grid divisions, original tempo with
 "set session tempo to this", poly/mono badge.
 Patch browser: filter by number of scale-split separations.
 
-## P5 — Remove global space/reverb
+## P5 — Remove global space/reverb (scope clarified by owner)
 
-Per-patch space owns spatialisation. Global spatial control returns
-properly as the Global Space Designer (P8). Remove the production-tab
-global reverb/space section; migrate any saved global values into
-per-patch defaults on load.
+Each patch owns its own space. The reverb space TYPE (room, cathedral,
+etc.) lives ONLY in the producer section, as part of Global Space —
+i.e. the room character is a property of the shared performance space
+when Global Space is active, not a per-patch or standalone-global knob.
+Remove the standalone global reverb section from the macro production
+tab; migrate saved global values into per-patch defaults on load; the
+type selector reappears inside the Global Space Designer (P8).
 
 ## P6 — Baked-note drill-down
 

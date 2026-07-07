@@ -2157,7 +2157,26 @@ export class GenerationEngine {
     return new Motif(notes);
   }
 
+  // The dimensions surprise may draw from — empty means surprise is OFF.
+  // No rng: safe as a pure gate.
+  _surpriseCandidates() {
+    return [
+      { key: "pitch", enabled: this.p.surprisePitchEnabled ?? (this.p.surpriseDimensions || ["pitch"]).includes("pitch"), weight: this.p.surprisePitchWeight ?? 1 },
+      { key: "tuning", enabled: this.p.surpriseTuningEnabled ?? (this.p.surpriseDimensions || []).includes("tuning"), weight: this.p.surpriseTuningWeight ?? 0.45 },
+      { key: "rhythm", enabled: this.p.surpriseRhythmEnabled ?? (this.p.surpriseDimensions || []).includes("rhythm"), weight: this.p.surpriseRhythmWeight ?? 0.45 },
+      { key: "formant", enabled: this.p.surpriseFormantEnabled ?? (this.p.surpriseDimensions || []).includes("formant"), weight: this.p.surpriseFormantWeight ?? 0.45 },
+      { key: "dynamics", enabled: this.p.surpriseDynamicsEnabled ?? (this.p.surpriseDimensions || []).includes("dynamics"), weight: this.p.surpriseDynamicsWeight ?? 0.35 },
+      { key: "rest", enabled: this.p.surpriseRestEnabled ?? (this.p.surpriseDimensions || []).includes("rest"), weight: this.p.surpriseRestWeight ?? 0.2 },
+    ].filter(item => item.enabled && item.weight > 0);
+  }
+
+  _surpriseDimsActive() {
+    return this._surpriseCandidates().length > 0;
+  }
+
   _endOfMotif() {
+    if ((this.p.melodyPattern || "walk") !== "walk") return; // arp: no surprises
+    if (!this._surpriseDimsActive()) return;
     // Motif-level surprise: create a variant motif and incorporate it
     if (this.rng.next() < this.p.motifSurpriseProb && this._canBakeSurprise()) {
       const srcIdx = this.rng.int(0, Math.min(this.repertoire.size, this.repertoire.baseLen));
@@ -2177,6 +2196,10 @@ export class GenerationEngine {
     this._seenMotifs.add(this._motifIdx);
     this._motifSurprisePlan = null;
     this._activeSurpriseProjection = null;
+    // Arp patterns are deterministic by contract (owner 2026-07-07):
+    // surprise applies only to the walk melody.
+    if ((this.p.melodyPattern || "walk") !== "walk") return;
+    if (!this._surpriseDimsActive()) return;
     const probability = this._clamp01(this.p.surpriseProb ?? 0);
     if (!this._motif || this._motif.notes.length === 0) return;
     if (this.rng.next() < probability) {
@@ -2380,15 +2403,8 @@ export class GenerationEngine {
   }
 
   _chooseSurpriseFeatures() {
-    const candidates = [
-      { key: "pitch", enabled: this.p.surprisePitchEnabled ?? (this.p.surpriseDimensions || ["pitch"]).includes("pitch"), weight: this.p.surprisePitchWeight ?? 1 },
-      { key: "tuning", enabled: this.p.surpriseTuningEnabled ?? (this.p.surpriseDimensions || []).includes("tuning"), weight: this.p.surpriseTuningWeight ?? 0.45 },
-      { key: "rhythm", enabled: this.p.surpriseRhythmEnabled ?? (this.p.surpriseDimensions || []).includes("rhythm"), weight: this.p.surpriseRhythmWeight ?? 0.45 },
-      { key: "formant", enabled: this.p.surpriseFormantEnabled ?? (this.p.surpriseDimensions || []).includes("formant"), weight: this.p.surpriseFormantWeight ?? 0.45 },
-      { key: "dynamics", enabled: this.p.surpriseDynamicsEnabled ?? (this.p.surpriseDimensions || []).includes("dynamics"), weight: this.p.surpriseDynamicsWeight ?? 0.35 },
-      { key: "rest", enabled: this.p.surpriseRestEnabled ?? (this.p.surpriseDimensions || []).includes("rest"), weight: this.p.surpriseRestWeight ?? 0.2 },
-    ].filter(item => item.enabled && item.weight > 0);
-    if (candidates.length === 0) return ["pitch"];
+    const candidates = this._surpriseCandidates();
+    if (candidates.length === 0) return []; // every dimension off = surprise off
 
     const pickOne = (pool) => {
       const total = pool.reduce((sum, item) => sum + Math.max(0.001, item.weight), 0);

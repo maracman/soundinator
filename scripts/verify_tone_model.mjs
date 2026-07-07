@@ -515,5 +515,37 @@ console.log("P1: arp pattern mode (owner brief 2026-07-07)");
   check("arp is deterministic under the same seed", det1.join(",") === det2.join(","));
 }
 
+console.log("Surprise gates: all-off is OFF; arps are deterministic (owner 2026-07-07)");
+{
+  const BASE = {
+    seed: 11, tempo: 130, beatDivisions: 2, motifCount: 1, motifLengthBeats: 8,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    registerCenter: 0, gapProb: 0, restMotifStartRatio: 0, excitationHuman: 0,
+    surpriseProb: 1, motifSurpriseProb: 1, incorporationRate: 1,
+  };
+  const run = (params, count = 24) => {
+    const e = new GenerationEngine(params); e.initialise();
+    const out = [];
+    for (let i = 0; i < 300 && out.length < count; i++) {
+      const nn = e.nextNote();
+      if (nn && nn.velocity > 0) out.push(nn);
+    }
+    return out;
+  };
+  const allOff = run({ ...BASE,
+    surprisePitchEnabled: false, surpriseTuningEnabled: false, surpriseRhythmEnabled: false,
+    surpriseFormantEnabled: false, surpriseDynamicsEnabled: false, surpriseRestEnabled: false });
+  check("every surprise dimension off = zero surprises even at prob 1",
+    allOff.length > 12 && allOff.every(nn => !nn.isSurprise));
+  const on = run({ ...BASE, surprisePitchEnabled: true });
+  check("pitch surprise alone still fires (the off-switch is a gate, not a break)",
+    on.some(nn => nn.isSurprise));
+  const arp = run({ ...BASE, melodyPattern: "arpUp", arpStep: 2, arpOctaves: 1, surprisePitchEnabled: true });
+  const arpClean = run({ ...BASE, melodyPattern: "arpUp", arpStep: 2, arpOctaves: 1, surpriseProb: 0, motifSurpriseProb: 0, surprisePitchEnabled: true });
+  check("arp ignores surprise entirely: same degrees with surprise at prob 1 and 0",
+    arp.length > 8 && !arp.some(nn => nn.isSurprise) &&
+    arp.map(nn => nn.degree).join(",") === arpClean.map(nn => nn.degree).join(","));
+}
+
 if (failures) { console.error(`\n${failures} assertion(s) FAILED`); process.exit(1); }
 console.log("\nAll tone-model v2 assertions passed (T1-T6 + space).");

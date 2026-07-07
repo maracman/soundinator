@@ -727,9 +727,9 @@ function syncSurpriseFeatureParams(p) {
     p.surpriseDynamicsEnabled = dims.includes("dynamics");
     p.surpriseRestEnabled = dims.includes("rest");
   }
-  if (![p.surprisePitchEnabled, p.surpriseTuningEnabled, p.surpriseRhythmEnabled, p.surpriseFormantEnabled, p.surpriseDynamicsEnabled, p.surpriseRestEnabled].some(Boolean)) {
-    p.surprisePitchEnabled = true;
-  }
+  // All dimensions off is a legitimate state: surprise is OFF. (This used
+  // to force pitch back on, which made melody surprise impossible to
+  // disable — owner bug report 2026-07-07.)
   p.surpriseDimensions = [
     p.surprisePitchEnabled ? "pitch" : null,
     p.surpriseTuningEnabled ? "tuning" : null,
@@ -4776,9 +4776,11 @@ function macroPanelHTML(p) {
 
         <div class="macro-subsection${!p.surprisePitchEnabled ? " surprise-disabled" : ""}${melSub === "surprise" ? " active" : ""}" data-section="surprise">
           <div class="subsection-label">Surprise</div>
-          ${checkboxControl("surprisePitchEnabled", "Enable surprise", p.surprisePitchEnabled)}
+          ${(p.melodyPattern || "walk") !== "walk"
+            ? `<div class="arp-surprise-note">Arp patterns are deterministic — surprise applies to Walk melodies only. Switch the pattern to Walk to use it.</div>`
+            : `${checkboxControl("surprisePitchEnabled", "Enable surprise", p.surprisePitchEnabled)}
           ${controlRow("melSurpriseAmount", "Amount", p.melSurpriseAmount ?? 0.5, 0, 1, 0.01)}
-          ${controlRow("surprisePitchDistance", "Range", p.surprisePitchDistance, 0, 1, 0.01)}
+          ${controlRow("surprisePitchDistance", "Range", p.surprisePitchDistance, 0, 1, 0.01)}`}
         </div>
 
         <div class="register-mini-section">
