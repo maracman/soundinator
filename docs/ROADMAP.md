@@ -138,19 +138,21 @@ never blindly reset. Claim an item by committing early and often.
 | Q7 layered subnotes: `params.layers` + `layerEnvOverride`, per-note `layerRenders` (one seed, independent-or-synced env draws, cross-layer coupling over the union), per-layer Q4 spatial chains, block strip UI with env-override block. APP_VERSION → 0.5.0 | 07-07 batch 2 | `92fc47e` v158 |
 | Q8 imperfections: `onsetScoopCents`/`partialOnsetDelay`/`releaseRingSeconds`/`f0WanderTrace` laws wired into the render path (scoop+wander via _setFrequency, stagger via partial amp ramps, ring via _adsr tail + extended osc stops); generator passes `lowToHighStaggerMs` through for future fits. APP_VERSION → 0.6.0 | 07-07 brief | `97f04ea` v159 |
 | Q9 producer remainders: D2 roll parity (✏ pencil-add, ⌫/M/Q/arrows/⌥-arrows with audition), B2 multi-select (⇧click + rubber band + bulk gain/mute/duplicate/delete), C track headers (hue swatch → space mini-controls writing `track.space`, dB readout, drag reorder, delete confirm), F onboarding (3-step tour, ? shortcut overlay, "Key (root pitch)") | 07-07 brief | `9e5fc39` v160 |
-| Q10 MIDI recording: `midiMapDegree` 2×3×2 grid (20 table tests incl. 19-EDO), device picker + per-track ● arm, monitor through the patch voice, disarm bakes a beat-space region; patch `midiMapKeys/Coverage/Anchor` params | 07-07 batch 2 | v161 |
+| Q10 MIDI recording: `midiMapDegree` 2×3×2 grid (20 table tests incl. 19-EDO), device picker + per-track ● arm, monitor through the patch voice, disarm bakes a beat-space region; patch `midiMapKeys/Coverage/Anchor` params | 07-07 batch 2 | `582d719` v161 |
+| Q11 vocabulary audit: docs/TERMINOLOGY.md, "fingerprint"→"tone print" everywhere user-facing, tab explainers; Sub-note/Macro renames left as owner decisions | 07-07 brief | `d54042e` v162 |
+| Owner-decision docs: HARMONY_PATCHES_PROPOSAL.md + HOSTING_STRATEGY.md (+ committed a parallel context's HOSTING_PLAN.md runbook) | ledger §3 | `5053a18` |
+| Q12 QA + panels: FOUND & FIXED the scale-to-fit CSS was invalid since it shipped (scale() given a length — small viewports clipped instead of scaling; now JS fitStudioScale), workspace tabs no longer overlap, page-wide grid overflow at ≤1280 fixed (min-width auto), BODY inspector scrolls instead of clipping, draggable dividers for the studio left column + CHORDA inspector (scale-aware, persisted) | 07-07 brief | v168 |
 
 ### Queued — build order
 
-Q1 patch transparency + module halves → Q2 global-reverb removal →
-Q3 baked-note drill-down → Q4 binaural head → Q5 global scale strip →
-Q6 global space designer → Q7 layered subnotes → Q8 imperfections →
-Q9 producer remainders → Q10 MIDI recording → Q11 vocabulary audit →
-Q12 QA capstone + resizable panels.
-
-Rationale: engine data before the UI that reads it; Q4's head model
-before Q6's designer that edits it; Q11/Q12 last to sweep finished
-surfaces.
+**ALL SHIPPED (2026-07-07, v151–v168).** Q1→Q12 landed in order; see the
+shipped table above for commits. What remains open:
+- The two §3 owner-decision items (harmony patches, hosting) — docs
+  written, awaiting reaction.
+- Q11's tab renames (Sub-note/Macro) — recommended in
+  docs/TERMINOLOGY.md, owner's call.
+- A future sample-fitter run to supply measured `lowToHighStaggerMs`
+  (Q8 uses hand defaults until then; the pipeline passes it through).
 
 ### Requires owner decision (write docs, build nothing)
 

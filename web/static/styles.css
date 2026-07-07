@@ -924,19 +924,49 @@ body.explore-mode #app {
 body.explore-mode .view {
   min-height: calc(100dvh - 16px);
   animation: none;
+  /* Q12 QA: a flex child defaults to min-width auto, which let the grid's
+     intrinsic width push the page into hidden horizontal overflow at
+     ≤1280 px. Let the dashboard shrink to its column floors instead. */
+  min-width: 0;
 }
 
 .explore-dashboard {
   min-height: calc(100dvh - 16px);
   display: grid;
-  grid-template-columns: 230px repeat(4, minmax(230px, 1fr));
+  /* Q12: first column is user-resizable (drag the divider); floors keep
+     every column readable */
+  grid-template-columns: var(--dash-c1, 230px) repeat(4, minmax(210px, 1fr));
   grid-template-rows: 62px 210px minmax(360px, auto) minmax(250px, auto) minmax(190px, auto);
   gap: 8px;
   overflow: visible;
+  position: relative;
 }
+
+/* Q12: panel dividers */
+.dash-vsplit {
+  position: absolute;
+  top: 44px; /* below the transport row */
+  bottom: 6px;
+  left: calc(var(--dash-c1, 260px) - 2px);
+  width: 7px;
+  cursor: col-resize;
+  z-index: 5;
+  border-radius: 3px;
+}
+.dash-vsplit:hover { background: rgba(245,166,35,0.18); }
+.ch-vsplit {
+  flex: none;
+  width: 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  border-radius: 3px;
+  z-index: 3;
+}
+.ch-vsplit:hover { background: rgba(245,166,35,0.18); }
 
 .explore-dashboard .card {
   min-height: 0;
+  min-width: 0; /* Q12 QA: grid items default min-width auto → page-wide overflow */
   padding: 0.58rem;
   overflow: auto;
   scrollbar-color: rgba(245,166,35,0.42) rgba(10,14,20,0.55);
@@ -944,6 +974,7 @@ body.explore-mode .view {
 
 .explore-dashboard .visual-card {
   min-height: 0;
+  min-width: 0; /* Q12 QA: the full-row hero card was forcing 1440 px at a 1280 viewport */
   padding: 0.58rem;
   overflow: hidden;
 }
@@ -985,12 +1016,23 @@ body.explore-mode .view {
 
 .workspace-tabs {
   display: flex;
+  /* Q12 QA: one row at full label width — the strip may overflow its grid
+     cell into the free space before the transport buttons, which beats
+     either overlapping labels (min-width 0) or clipped wrapping (the
+     transport row is only 38 px tall) */
+  flex-wrap: nowrap;
+  width: max-content;
+  position: relative;
+  z-index: 4;
   gap: 0.25rem;
   margin-top: 0.25rem;
 }
 
 .workspace-tab {
-  min-width: 0;
+  /* Q12 QA: never shrink below the label — squished tabs overlapped their
+     neighbours at narrow transport widths */
+  min-width: max-content;
+  white-space: nowrap;
   border: 1px solid var(--border2);
   border-radius: var(--radius-sm);
   background: var(--bg);
@@ -2290,6 +2332,8 @@ body.explore-mode {
   .explore-dashboard {
     grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(245px, 270px);
   }
+  /* Q12: the resizable-column divider only matches the wide layout */
+  .dash-vsplit { display: none; }
   .transport-card {
     grid-template-columns: minmax(160px, 0.8fr) minmax(170px, 1fr) minmax(150px, 0.8fr);
   }
@@ -2350,7 +2394,10 @@ body.explore-mode #app {
   height: 790px;
   min-height: 790px;
   max-height: 790px;
-  grid-template-columns: 260px 1fr 320px;
+  /* Q12: left column adjustable via the drag divider — the plugin canvas
+     stays 1440 (scaled to the viewport), so widening the left column
+     narrows the middle one */
+  grid-template-columns: var(--dash-c1, 260px) 1fr 320px;
   grid-template-rows: 38px 148px 1fr 155px;
   gap: 3px;
   padding: 3px;
@@ -2518,6 +2565,10 @@ body.explore-mode #app {
   flex-direction: column;
   gap: 7px;
   overflow-y: auto;
+  /* Q12: never clip — the inspector scrolls itself when short on height
+     (the BODY inspector used to clip at 271 px) */
+  min-height: 0;
+  max-height: none;
 }
 .ch-inspector.ch-excitor { border-color: #4a3517; }
 .ch-inspector.ch-resonator { border-color: #223f63; }
@@ -4523,7 +4574,11 @@ body.explore-mode #app {
   }
   .explore-dashboard {
     transform-origin: top left;
-    transform: scale(min(calc(100vw / 1446), calc(100dvh / 796)));
+    /* Q12 QA: the original `transform: scale(min(calc(100vw / 1446), …))`
+       was INVALID CSS — scale() takes a number, calc(100vw/1446) is a
+       length — so the scale-to-fit design silently never applied and
+       small viewports just clipped the right of the plugin. The scale is
+       now computed in JS (fitStudioScale in app.js). */
   }
 }
 

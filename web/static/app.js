@@ -702,6 +702,13 @@ let _visResizeObserver = null; // hero display fit observer
 let libraryFilter = "all";    // section filter shared across library tabs
 let splitsFilter = "all";     // Q1: filter presets by scale splits (degrees/octave)
 let _palHalfSel = {};         // Q1: paletteId → "macro"|"both"|"subnote" load target
+// Q12: adjustable studio panels (persisted like the producer's dawLayout)
+const STUDIO_PANELS_KEY = "phase0.studioPanels.v1";
+let _studioPanels = (() => {
+  try { return { chW: 218, dashC1: 260, ...(JSON.parse(localStorage.getItem(STUDIO_PANELS_KEY) || "{}")) }; }
+  catch { return { chW: 218, dashC1: 260 }; }
+})();
+function saveStudioPanels() { localStorage.setItem(STUDIO_PANELS_KEY, JSON.stringify(_studioPanels)); }
 // In-context preset preview (Tonalic cue): audition a preset merged into the
 // current state without committing it. Non-destructive: exploreParams is
 // untouched; ending the preview restores exactly what was playing.
@@ -4896,7 +4903,8 @@ function renderExplore() {
   ensureSpectralPartialParams(p);
 
   const v = mount(`
-    <div class="explore-dashboard${workspaceTab === 'subnote' ? ' subnote-workspace-mode' : ''}">
+    <div class="explore-dashboard${workspaceTab === 'subnote' ? ' subnote-workspace-mode' : ''}" style="--dash-c1:${_studioPanels.dashC1}px">
+      <div class="dash-vsplit" id="dashVSplit" title="Drag to resize the left column"></div>
     <div class="explore-top">
       <div>
         <h1>Sound Studio <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></h1>
@@ -5363,6 +5371,7 @@ function renderExplore() {
   wireTonePrint(v);
   wireSpacePad(v);
   wireLayerStrip(v);
+  wireStudioPanels(v);
 
   // Rotary knobs (tone chain): vertical drag, shift = fine, double-click
   // resets to the stage default. Every change lights up the overlay it
@@ -6245,7 +6254,8 @@ function subnoteWorkspaceHTML(p) {
               ${chRailCardHTML(p, "space", "04", "SPACE")}
             </div>
             <div class="ch-main">
-              <div class="ch-inspector ch-${_chStage}" id="chInspector">${chInspectorHTML(p)}</div>
+              <div class="ch-inspector ch-${_chStage}" id="chInspector" style="width:${_studioPanels.chW}px">${chInspectorHTML(p)}</div>
+              <div class="ch-vsplit" id="chVSplit" title="Drag to resize the inspector"></div>
               <div class="ch-field-wrap">
                 <div class="ch-focus-row" id="chFocus">
                   <span class="ch-focus-label">FOCUS</span>
@@ -8998,6 +9008,60 @@ function drawSpacePad() {
   ctx.shadowColor = "#58d6a9"; ctx.shadowBlur = 8;
   ctx.beginPath(); ctx.arc(ix, iy, 5, 0, 2 * Math.PI); ctx.fill();
   ctx.shadowBlur = 0;
+}
+
+// Q12 QA: scale the fixed 1440×790 plugin canvas to fit the viewport.
+// The stylesheet tried transform: scale(min(calc(100vw/1446), …)) which is
+// invalid CSS (scale() takes a number, not a length) and silently never
+// applied — small windows just clipped the right edge. JS owns it now.
+function fitStudioScale() {
+  const dash = document.querySelector(".explore-dashboard");
+  if (!dash) return;
+  const s = Math.min(window.innerWidth / 1446, window.innerHeight / 796, 1);
+  dash.style.transform = s < 1 ? `scale(${s})` : "";
+  dash.style.transformOrigin = "top left";
+}
+if (!window._studioFitInstalled) {
+  window._studioFitInstalled = true;
+  window.addEventListener("resize", fitStudioScale);
+}
+
+// Q12: draggable studio panel dividers — same pattern as the producer's
+// dawLayout splits, persisted across sessions. Live style updates only;
+// no re-render mid-drag (the mid-drag re-render gotcha).
+function wireStudioPanels(v) {
+  fitStudioScale();
+  const dragX = (el, apply, commit) => {
+    if (!el) return;
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      const move = (ev) => apply(ev);
+      const up = () => {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        commit();
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
+    };
+  };
+  // The studio is a fixed 1440 px plugin canvas scaled to the viewport —
+  // divide drag distances by the scale to work in layout pixels.
+  const dash = v.querySelector(".explore-dashboard");
+  const scaleOf = () => dash ? dash.getBoundingClientRect().width / Math.max(1, dash.offsetWidth) : 1;
+  dragX(v.querySelector("#dashVSplit"), (ev) => {
+    if (!dash) return;
+    const rect = dash.getBoundingClientRect();
+    _studioPanels.dashC1 = Math.max(200, Math.min(380, (ev.clientX - rect.left) / scaleOf()));
+    dash.style.setProperty("--dash-c1", `${Math.round(_studioPanels.dashC1)}px`);
+  }, saveStudioPanels);
+  const inspector = v.querySelector("#chInspector");
+  dragX(v.querySelector("#chVSplit"), (ev) => {
+    if (!inspector) return;
+    const rect = inspector.getBoundingClientRect();
+    _studioPanels.chW = Math.max(190, Math.min(420, (ev.clientX - rect.left) / scaleOf()));
+    inspector.style.width = `${Math.round(_studioPanels.chW)}px`;
+  }, saveStudioPanels);
 }
 
 // Q7: layer strip interactions. Layer edits apply live through
