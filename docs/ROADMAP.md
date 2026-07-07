@@ -22,8 +22,8 @@ Read this before touching anything.
 | `web/static/factory-presets.js` | `FACTORY_PRESETS` array: `{id, name, section: "full"\|<sectionKey>, family?, description, parameters}`. Parameter keys MUST exist in `DEFAULTS` (validate before committing). |
 | `web/static/measured_profiles.js` | GENERATED — regenerate via `python3 scripts/gen_measured_profiles_module.py` from `measured_profiles.json`. Never hand-edit. |
 | `web/static/styles.css` | Single stylesheet. CHORDA tokens `.ch-*`, producer `.tl2-*`, roll `.roll-*`. |
-| `web/static/index.html` | Cache-buster `?v=NNN` on script tags (currently **v150**). **Bump on EVERY change** or the browser serves the stale build — this has burned hours. |
-| `scripts/verify_tone_model.mjs` | Headless assertion suite (**126 passing**). Pattern: `check(name, condition, detail?)`; add new blocks immediately before the final `if (failures)` line. Run: `node scripts/verify_tone_model.mjs`. |
+| `web/static/index.html` | Cache-buster `?v=NNN` on script tags (currently **v152**). **Bump on EVERY change** or the browser serves the stale build — this has burned hours. |
+| `scripts/verify_tone_model.mjs` | Headless assertion suite (**140 passing**, incl. the Q1 badge/bucket block). Pattern: `check(name, condition, detail?)`; add new blocks immediately before the final `if (failures)` line. Run: `node scripts/verify_tone_model.mjs`. |
 | `src/synthesiser/…` + `tests/` | Python stdlib HTTP server + 20 pytest tests. Run: `.venv/bin/python -m pytest -q`. |
 
 ### Key data structures
@@ -67,7 +67,8 @@ Read this before touching anything.
    reasoning in the message.
 2. Bump the `?v=NNN` cache-buster in index.html with every change.
 3. Live-verify in the browser before claiming done: preview server
-   `sound-studio` from `.claude/launch.json` (autoPort, recently :3000).
+   `sound-studio` from `.claude/launch.json` (autoPort — :3000 when free,
+   otherwise auto-assigned; a recent run landed on :49898).
    The page may be sitting on `#produce` — set `location.hash = ""` and
    wait ~250 ms before querying studio DOM.
 4. Install a probe BEFORE interacting: `window.__errs = [];
@@ -79,6 +80,13 @@ Read this before touching anything.
    `APP_VERSION` (app.js) so `stimulus_id` provenance stays honest.
 7. Durable owner-facing servers: :8765 (current), :8766 (old-engine
    A/B) — leave them alone; use the preview server for verification.
+
+### Coordination between contexts
+
+More than one context works this plan. Before starting a Q item run
+`git status` — UNCOMMITTED work in the tree probably IS that item,
+half-done by another context. Review the diff, continue or leave it;
+never blindly reset. Claim an item by committing early and often.
 
 ### Gotchas that have already burned time
 
@@ -152,6 +160,33 @@ surfaces.
 ## 2 · Execution plan (handoff-grade)
 
 ### Q1 — Patch transparency + module halves (producer)
+
+**STATUS 2026-07-07 ~15:30 — IMPLEMENTED, UNCOMMITTED, one verification
+gap.** All of Q1 exists in the working tree (built by a parallel
+context): `patchBadges`/`splitsBucketOf` pure in synth.js (+14
+assertions, suite at 140), `patchBadgesHTML` + `loadPresetIntoPatch` +
+`_palHalfSel`/`splitsFilter` + adopt-tempo wiring in app.js, `.pb-*`
+CSS, cache at v152. Layered on top (same tree): the ORIGIN-SCALE FIX —
+palette voices strip session context (scale/tempo), so badges lied
+("Major · 7 splits" for a pent-minor patch); `addToPalette` now
+captures `pl.originScale` {scaleMode, scalePreset, customDegrees,
+edoDivisions}, both `patchBadgesHTML` call sites merge it back, and
+macro/BOTH loads refresh it alongside `originTempo`.
+
+Verified live (port 49898): badges truthful after re-add
+("Pentatonic minor · 5 splits · grid 4 · 112 bpm · glide · ✦ R·D"),
+half selector arms (`.half-armed`), adopt button renders, zero console
+errors; pytest + verify green. REMAINING: (1) live-verify the
+drop-preset-on-patch half-load — synthetic drags must use MOUSE events
+(`mousedown` on the card via `card.onmousedown` → `document`
+`mousemove` ≥5 px to pass the drag threshold → `document` `mouseup`
+over the palette item; the earlier PointerEvent attempt silently
+no-ops). Assert via localStorage `phase0.arrangements.v1` (map of
+id→arrangement; current id in `phase0.arrangement.current`): SUBNOTE
+load of Slow Sky onto Wood Talk ⇒ `excitationType` "strike"→"blow",
+`bodyArticulation` 0→0.55, while `onBeatProb` 0.92 / `registerWidth` 0
+survive. (2) Also verify old palette items (pre-originScale) degrade
+gracefully. (3) Commit the whole Q1 chunk.
 
 **Owner intent.** "Patches should have certain settings that are
 transparent in producer mode… surprise, which dimensions… their scale.
