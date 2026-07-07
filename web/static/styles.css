@@ -5114,7 +5114,13 @@ body.explore-mode #app {
   border-radius: var(--radius);
   padding: 0.7rem;
   overflow: auto;
+  /* owner 07-07: the region toolbar pins to the bottom instead of
+     floating mid-workspace over an empty gap */
+  display: flex;
+  flex-direction: column;
 }
+.daw-center .timeline-grid { flex: 1 1 auto; }
+.daw-center .region-toolbar { flex: none; margin-top: auto; }
 
 .daw-hsplit {
   height: 6px;
@@ -5149,7 +5155,35 @@ body.explore-mode #app {
   margin: 0.35rem 0 0.45rem;
 }
 .browser-filters { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
-.browser-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; padding-right: 2px; }
+.browser-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
+
+/* Owner 07-07: compact browser rows — many patches visible at once */
+.browser-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.14rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: grab;
+}
+.browser-row:hover { background: var(--surface2); border-color: var(--border); }
+.br-name { flex: 1; font-size: 0.72rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.br-kind { font-size: 0.55rem; color: var(--text3); white-space: nowrap; letter-spacing: 0.03em; }
+.br-btn {
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  background: none;
+  color: var(--text3);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  cursor: pointer;
+  flex: none;
+}
+.br-btn:hover { color: var(--text); border-color: var(--border2); }
+.br-btn.on { color: var(--surp); }
 
 .browser-card {
   background: var(--surface2);
@@ -5396,6 +5430,20 @@ body.explore-mode #app {
 .tour-card p { font-size: 0.78rem; color: var(--text2); line-height: 1.5; margin: 0.6rem 0; }
 .tour-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 
+/* The inspector is a flex column with overflow-y auto: children must not
+   flex-shrink into nothing when content exceeds the panel height (the
+   Bow/Pluck/Strike/Blow segment was crushed to 2 px). */
+.ch-inspector > * { flex-shrink: 0; }
+
+/* Owner 07-07: envelope beside the excitor knobs (it matters) — two
+   columns that fit the 320px default inspector side by side */
+.ch-exc-cols { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.ch-exc-main { flex: 1 1 135px; min-width: 130px; display: flex; flex-direction: column; gap: 7px; }
+.ch-exc-env { flex: 1 1 140px; min-width: 135px; }
+.ch-exc-env .envelope-canvas { max-width: 100%; height: auto; }
+.ch-exc-env .envelope-dist-controls { font-size: 0.58rem; }
+.ch-exc-main .ch-string { max-width: 100%; }
+
 /* ── Q7: layered subnote modules ─────────────────────────── */
 .layer-strip {
   display: flex;
@@ -5464,31 +5512,31 @@ body.explore-mode #app {
 
 /* ── Q6: global space designer ───────────────────────────── */
 .tl2-sp-row { min-height: 20px; }
-.sp-panel {
-  display: flex;
-  flex-wrap: wrap; /* head panel drops under the canvases instead of clipping */
-  gap: 0.6rem;
+/* Owner 07-07 layout: cross-section + params live in the track-parameter
+   column (left, sticky); the cylinder fills the lane column beat-aligned */
+.sp-left {
+  flex-direction: column;
   align-items: stretch;
-  max-width: 980px;
-  padding: 0.4rem;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  margin-bottom: 4px;
+  gap: 0.3rem;
+  width: 190px;
+  overflow: visible;
 }
+.sp-params { display: flex; flex-direction: column; gap: 0.25rem; }
+.sp-cyl-wrap { position: relative; }
 #spSection, #spCylinder {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
   cursor: crosshair;
 }
-/* Fixed CSS sizes are LOAD-BEARING: crisp2d sizes the backing store from
-   clientWidth×dpr every draw, and these canvases redraw per animation
-   frame — without a CSS size the attribute growth feeds back into
-   clientWidth and the canvas doubles forever (the "global space is
-   completely broken" bug: it reached 634,882 px wide). */
-#spSection { width: 150px; height: 150px; flex: none; }
-#spCylinder { width: 620px; height: 150px; flex: none; cursor: ns-resize; }
+/* Fixed CSS sizes are LOAD-BEARING: these canvases redraw per animation
+   frame — without a CSS size matching the attribute size, backing-store
+   resizing feeds back into clientWidth and the canvas doubles forever
+   (the "global space is completely broken" bug: it reached 634,882 px
+   wide). Both now draw with plain contexts at their attribute size; the
+   cylinder's width is set inline per render (beat-aligned to the lanes). */
+#spSection { width: 170px; height: 150px; flex: none; }
+#spCylinder { cursor: ns-resize; }
 .sp-head-panel { display: flex; flex-direction: column; gap: 0.3rem; min-width: 170px; }
 .sp-ctl {
   display: flex;
@@ -5538,7 +5586,7 @@ body.explore-mode #app {
   left: 0;
   z-index: 3;
   flex: none;
-  width: 150px;
+  width: 190px;
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -5548,9 +5596,49 @@ body.explore-mode #app {
   border-radius: 6px;
   margin-right: 6px;
   font-size: 0.72rem;
+  overflow: hidden; /* owner 07-07: controls must never spill onto the lanes */
 }
+/* two-row track head: identity on top, mix controls underneath */
+.tl2-track-head { flex-direction: column; align-items: stretch; gap: 0.15rem; }
+.tl2-track-head.sp-sel { border-color: rgba(56,189,248,0.55); }
+.tl2-head-top { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
+.tl2-head-ctl { display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
+.tl2-head-ctl .tl-gain { flex: 1 1 40px; min-width: 24px; }
+.tl2-head-ctl .tl-pan { flex: 1 1 30px; min-width: 20px; }
 .tl2-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-.tl2-corner { background: transparent; border: none; }
+.tl2-corner { background: transparent; border: none; overflow: visible; }
+.tl2-addbars {
+  position: absolute;
+  top: -1px;
+  height: 22px;
+  padding: 0 0.6rem;
+  white-space: nowrap;
+  background: var(--surface2);
+  color: var(--text3);
+  border: 1px dashed var(--border2);
+  border-radius: 5px;
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+.tl2-addbars:hover { color: var(--accent2); border-color: rgba(245,166,35,0.5); }
+.tl2-ph-handle {
+  position: absolute;
+  top: 0;
+  width: 11px;
+  height: 100%;
+  margin-left: -5px;
+  cursor: ew-resize;
+  z-index: 4;
+}
+.tl2-ph-handle::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 7px solid var(--surp);
+}
 
 .tl2-ruler {
   position: relative;

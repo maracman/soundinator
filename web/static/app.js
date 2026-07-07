@@ -142,7 +142,10 @@ function extractSectionParams(params, section) {
 const SESSION_CONTEXT_PARAMS = new Set([
   "seed", "tempo", "scaleMode", "scalePreset", "customDegrees",
   "edoDivisions", "tonicHz", "rootNotes", "dynamicsLevel",
-  "reverbType", "reverbWet", "reverbDecay", "reverbTone", "reverbPreDelay",
+  // Owner 07-07: reverb/space keys are no longer session context — each
+  // patch owns its space (SPACE inspector) and the GLOBAL space overrides
+  // it only when activated. Instruments saved before this change simply
+  // lack the keys and inherit the arrangement context defaults as before.
 ]);
 
 function extractInstrumentParams(params) {
@@ -707,8 +710,10 @@ let _palHalfSel = {};         // Q1: paletteId → "macro"|"both"|"subnote" load
 // Q12: adjustable studio panels (persisted like the producer's dawLayout)
 const STUDIO_PANELS_KEY = "phase0.studioPanels.v1";
 let _studioPanels = (() => {
-  try { return { chW: 218, dashC1: 260, ...(JSON.parse(localStorage.getItem(STUDIO_PANELS_KEY) || "{}")) }; }
-  catch { return { chW: 218, dashC1: 260 }; }
+  // chW default 320 (owner 07-07: the left panel should be wider — the
+  // envelope now sits beside the excitor knobs and needs the room)
+  try { return { chW: 320, dashC1: 260, ...(JSON.parse(localStorage.getItem(STUDIO_PANELS_KEY) || "{}")) }; }
+  catch { return { chW: 320, dashC1: 260 }; }
 })();
 function saveStudioPanels() { localStorage.setItem(STUDIO_PANELS_KEY, JSON.stringify(_studioPanels)); }
 // In-context preset preview (Tonalic cue): audition a preset merged into the
@@ -1357,7 +1362,10 @@ function regionPlayParams(track, region, atBeat = null) {
   // The designer's head (listener) properties apply to every track.
   const sp = arrangement?.space;
   if (sp?.enabled && track) {
-    const pos = trackSpaceAt(sp.tracks?.[track.id], atBeat ?? region.startBeat ?? 0);
+    // anchors interpolate over time; an unanchored track that was dragged
+    // freely sits at its static designer position
+    const pos = trackSpaceAt(sp.tracks?.[track.id], atBeat ?? region.startBeat ?? 0)
+      || sp.static?.[track.id] || null;
     if (pos) {
       if (sp.mode === "offset") {
         params.spaceAzimuth = Math.max(-180, Math.min(180, (params.spaceAzimuth ?? 0) + pos.angle));
@@ -1371,6 +1379,7 @@ function regionPlayParams(track, region, atBeat = null) {
       if (Number.isFinite(sp.head.earDistance)) params.earDistance = sp.head.earDistance;
       if (Number.isFinite(sp.head.headDensity)) params.headDensity = sp.head.headDensity;
       if (sp.head.reverbType) params.reverbType = sp.head.reverbType;
+      if (Number.isFinite(sp.head.reverbWet)) params.reverbWet = sp.head.reverbWet;
     }
   }
   return params;
@@ -1379,6 +1388,9 @@ function regionPlayParams(track, region, atBeat = null) {
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 function sessionBarControlsHTML() {
+  // Owner cleanup 07-07: the scale select is gone (the global scale strip
+  // is the producer's scale surface) and the Space control moved into the
+  // global-space listener panel where it only applies when that's on.
   const ctx = arrangement.context;
   const root = ctx.keyRoot ?? (Array.isArray(ctx.rootNotes) && ctx.rootNotes.length ? ctx.rootNotes[0] : 0);
   return `
@@ -1390,17 +1402,6 @@ function sessionBarControlsHTML() {
       <select data-ctx="root">
         ${NOTE_NAMES.map((n, i) => `<option value="${i}"${i === root ? " selected" : ""}>${n}</option>`).join("")}
       </select>
-      <select data-ctx="scalePreset">
-        ${Object.entries(SCALE_PRESETS).map(([k, sc]) =>
-          `<option value="${k}"${k === ctx.scalePreset ? " selected" : ""}>${sc.label}</option>`).join("")}
-      </select>
-    </label>
-    <label class="daw-ctx">Space
-      <select data-ctx="reverbType">
-        ${Object.entries(REVERB_PROFILES).map(([k, r]) =>
-          `<option value="${k}"${k === ctx.reverbType ? " selected" : ""}>${r.label}</option>`).join("")}
-      </select>
-      <input type="range" data-ctx="reverbWet" min="0" max="0.95" step="0.01" value="${ctx.reverbWet}" title="Reverb amount"/>
     </label>`;
 }
 
@@ -1412,17 +1413,15 @@ function renderBrowserCards(v) {
     (browserFilter === "all" || item.cat === browserFilter) &&
     (splitsFilter === "all" || splitsBucketOf(item.params) === splitsFilter) &&
     (!q || item.name.toLowerCase().includes(q) || (item.description || "").toLowerCase().includes(q)));
+  // Owner 07-07: compact rows, many patches visible at once. Name +
+  // kind chip + two small actions per line; the description rides the
+  // hover title; drag anywhere on the row to place it.
   container.innerHTML = items.length ? items.map(item => `
-    <div class="browser-card" data-browser-item="${esc(item.id)}">
-      <div class="bc-head">
-        <span class="bc-name">${esc(item.name)}</span>
-        <span class="bc-kind">${esc(item.kindLabel)}</span>
-      </div>
-      ${item.description ? `<div class="bc-desc">${esc(item.description)}</div>` : ""}
-      <div class="bc-actions">
-        <button class="pal-btn" data-browser-preview="${esc(item.id)}" title="Hear it in the session context">${browserPreviewId === item.id ? "■" : "▶"}</button>
-        <button class="pal-btn" data-browser-add="${esc(item.id)}" title="Add to your palette">＋ Palette</button>
-      </div>
+    <div class="browser-row" data-browser-item="${esc(item.id)}" title="${esc(item.description || item.name)} — drag onto a track, or ＋ to add to the palette">
+      <span class="br-name">${esc(item.name)}</span>
+      <span class="br-kind">${esc(item.kindLabel)}</span>
+      <button class="br-btn${browserPreviewId === item.id ? " on" : ""}" data-browser-preview="${esc(item.id)}" title="Hear it in the session context">${browserPreviewId === item.id ? "■" : "▶"}</button>
+      <button class="br-btn" data-browser-add="${esc(item.id)}" title="Add to your palette">＋</button>
     </div>`).join("") : '<div class="empty-state">No presets match.</div>';
 
   const findItem = (id) => browserItems().find(i => i.id === id);
@@ -1453,7 +1452,7 @@ function renderBrowserCards(v) {
   container.querySelectorAll("[data-browser-item]").forEach(card => {
     card.setAttribute("draggable", "false");
     card.onmousedown = (e) => {
-      if (e.target.closest(".pal-btn")) return; // buttons stay clickable
+      if (e.target.closest(".br-btn, .pal-btn")) return; // buttons stay clickable
       const item = browserItems().find(i => i.id === card.dataset.browserItem);
       if (item) beginPointerDrag("browser", item.id, item.name, e);
     };
@@ -2076,11 +2075,12 @@ function ensureGlobalSpace() {
 const _SP_HUES = [36, 152, 205, 280, 0, 60, 320, 100];
 function _spHue(i) { return _SP_HUES[i % _SP_HUES.length]; }
 
-// Where a track sits at a beat: designer anchors (override), anchors as
-// deltas on the patch space (offset), or the patch space alone.
+// Where a track sits at a beat: designer anchors (interpolated), else the
+// static position a free drag left it at, else the patch space. Offset
+// mode adds the designer value onto the patch position.
 function _spTrackPos(track, beat) {
   const sp = arrangement.space || {};
-  const res = trackSpaceAt(sp.tracks?.[track.id], beat);
+  const res = trackSpaceAt(sp.tracks?.[track.id], beat) || sp.static?.[track.id] || null;
   const vp = (arrangement.palette || []).find(pl => pl.id === track.regions?.[0]?.paletteId)?.params
     || track.instrumentParams || {};
   const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
@@ -2113,27 +2113,32 @@ function globalSpaceStripHTML(laneW) {
   const head = sp.head || {};
   const selAnchors = _spSelTrack ? (sp.tracks?.[_spSelTrack] || []) : [];
   const anchorAtPh = selAnchors.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
+  // Owner 07-07: the cross-section sits on the LEFT, in the same column as
+  // the track parameters, with the space controls under it; the cylinder
+  // runs in the lane column at the SAME beat scale as the timeline, so
+  // thread positions line up 1:1 with the regions below.
   const panel = _spOpen ? `
       <div class="tl2-row">
-        <div class="tl2-head tl2-corner"></div>
-        <div class="sp-panel">
-          <canvas id="spSection" width="150" height="150" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag it to move (snaps back without an anchor); double-click to anchor it at the playhead."></canvas>
-          <canvas id="spCylinder" width="620" height="150" title="The arrangement's space over time — one thread per instrument, nearer = thicker. The view rocks slowly; drag up/down to roll it (springs back). Click an anchor dot to jump the playhead there."></canvas>
-          <div class="sp-head-panel">
-            <div class="section-label">Listener</div>
+        <div class="tl2-head sp-left">
+          <canvas id="spSection" width="170" height="150" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here."></canvas>
+          <div class="sp-params">
             <label class="sp-ctl">Mode
               <select id="spMode" title="Override replaces each patch's own space; Offset adds the threads on top of it">
-                <option value="override"${sp.mode !== "offset" ? " selected" : ""}>Override patch space</option>
-                <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset patch space</option>
+                <option value="override"${sp.mode !== "offset" ? " selected" : ""}>Override</option>
+                <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset</option>
               </select>
             </label>
             <label class="sp-ctl">Room
               <select id="spReverbType" title="The shared room every track sits in when the global space is on">${reverbTypeOptions(head.reverbType || arrangement.context.reverbType || "room")}</select>
             </label>
+            <label class="sp-ctl">Amount <input type="range" id="spWet" min="0" max="0.95" step="0.01" value="${head.reverbWet ?? arrangement.context.reverbWet ?? 0.16}" title="How much of the shared room you hear (only applies while the global space is on)"/></label>
             <label class="sp-ctl">Ear span <input type="range" id="spEar" min="0.12" max="0.25" step="0.005" value="${head.earDistance ?? 0.175}" title="${esc(PARAM_DESC.earDistance)}"/></label>
-            <label class="sp-ctl">Head density <input type="range" id="spDensity" min="0" max="1" step="0.01" value="${head.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>
-            ${anchorAtPh ? `<label class="sp-ctl">Anchor smoothness <input type="range" id="spSmooth" min="0" max="1" step="0.05" value="${anchorAtPh.smooth ?? 0.5}" title="How gently the selected track's thread curves through the anchor at the playhead (0 = straight lines)"/></label>` : ""}
+            <label class="sp-ctl">Density <input type="range" id="spDensity" min="0" max="1" step="0.01" value="${head.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>
+            ${anchorAtPh ? `<label class="sp-ctl">Smooth <input type="range" id="spSmooth" min="0" max="1" step="0.05" value="${anchorAtPh.smooth ?? 0.5}" title="How gently the selected track's thread curves through the anchor at the playhead (0 = straight lines)"/></label>` : ""}
           </div>
+        </div>
+        <div class="sp-cyl-wrap" style="width:${laneW}px">
+          <canvas id="spCylinder" width="${laneW}" height="150" style="width:${laneW}px;height:150px" title="The arrangement's space over time, beat-aligned with the timeline below — one thread per instrument (nearer = thicker; the bright spans are that track's regions; the translucent core is your head). Drag up/down to roll the view; click an anchor dot to jump the playhead."></canvas>
         </div>
       </div>` : "";
   return `
@@ -2149,7 +2154,8 @@ function globalSpaceStripHTML(laneW) {
 function drawSpSection() {
   const cv = document.getElementById("spSection");
   if (!cv) return;
-  const { ctx, w, h } = crisp2d(cv);
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 8;
   const sp = arrangement.space || {};
@@ -2160,10 +2166,15 @@ function drawSpSection() {
   for (const dm of [1, 3, 10, 30]) {
     ctx.beginPath(); ctx.arc(cx, cy, _spaceDistToR(dm, rMax), 0, 2 * Math.PI); ctx.stroke();
   }
-  // the head, radius ∝ ear distance
-  const headR = 3 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 5;
+  // the head, radius ∝ ear distance — with ears and a front-pointing nose
+  const headR = 4 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 5;
   ctx.fillStyle = "rgba(200,215,230,0.85)";
   ctx.beginPath(); ctx.arc(cx, cy, headR, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx - headR, cy, 1.8, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + headR, cy, 1.8, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - 2, cy - headR + 0.5); ctx.lineTo(cx, cy - headR - 3); ctx.lineTo(cx + 2, cy - headR + 0.5);
+  ctx.closePath(); ctx.fill();
   // track dots at the playhead
   arrangement.tracks.forEach((t, i) => {
     const drag = _spRock.drag;
@@ -2182,30 +2193,58 @@ function drawSpSection() {
 function drawSpCylinder(rockRad) {
   const cv = document.getElementById("spCylinder");
   if (!cv) return;
-  const { ctx, w, h } = crisp2d(cv);
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
   ctx.clearRect(0, 0, w, h);
   const cy = h / 2, R = h / 2 - 10;
   const beats = Math.max(1, totalBeats());
-  const xFor = (beat) => (beat / beats) * w;
+  // beat-aligned with the timeline: 1 beat = pxPerBeat, same as the lanes
+  const xFor = (beat) => beat * pxPerBeat;
   const roll = _spRock.roll;
+  // translucent core = the listener's head running down the cylinder
+  const sp = arrangement.space || {};
+  const headR = 6 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 8;
+  ctx.fillStyle = "rgba(200,215,230,0.07)";
+  ctx.fillRect(0, cy - headR, w, headR * 2);
+  ctx.strokeStyle = "rgba(200,215,230,0.14)";
+  ctx.beginPath(); ctx.moveTo(0, cy - headR); ctx.lineTo(w, cy - headR); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, cy + headR); ctx.lineTo(w, cy + headR); ctx.stroke();
   // playhead line
-  ctx.strokeStyle = "rgba(245,166,35,0.4)";
+  ctx.strokeStyle = "rgba(56,189,248,0.55)";
   ctx.beginPath(); ctx.moveTo(xFor(playheadBeat), 0); ctx.lineTo(xFor(playheadBeat), h); ctx.stroke();
+  const yFor = (t, beat) => {
+    const pos = _spTrackPos(t, beat);
+    const a = pos.angle * Math.PI / 180 + rockRad + roll;
+    return { y: cy + Math.sin(a) * R * 0.85, back: Math.cos(a) > 0, dist: pos.dist };
+  };
   arrangement.tracks.forEach((t, i) => {
     const seld = t.id === _spSelTrack;
+    const hue = t.hue ?? _spHue(i);
+    // base thread: thin and dim everywhere…
     ctx.beginPath();
-    let backness = 0;
+    let back = false;
     for (let px = 0; px <= w; px += 6) {
-      const pos = _spTrackPos(t, (px / w) * beats);
-      const a = pos.angle * Math.PI / 180 + rockRad + roll;
-      const y = cy + Math.sin(a) * R * 0.85;
-      backness = Math.cos(a); // >0 = far side of the cylinder
-      px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+      const p = yFor(t, px / pxPerBeat);
+      back = p.back;
+      px === 0 ? ctx.moveTo(px, p.y) : ctx.lineTo(px, p.y);
     }
-    const midPos = _spTrackPos(t, playheadBeat);
-    ctx.lineWidth = Math.max(0.8, Math.min(5, 6 / Math.max(0.8, midPos.dist)));
-    ctx.strokeStyle = `hsla(${_spHue(i)}, 70%, ${seld ? 65 : 50}%, ${seld ? 0.95 : (backness > 0 ? 0.3 : 0.6)})`;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `hsla(${hue}, 70%, ${seld ? 60 : 48}%, ${back ? 0.25 : 0.45})`;
     ctx.stroke();
+    // …and thick and bright where the track actually has regions, so you
+    // can see the arrangement in the threads (owner 07-07)
+    for (const r of t.regions) {
+      const x0 = xFor(r.startBeat), x1 = xFor(r.startBeat + regionLen(r));
+      ctx.beginPath();
+      for (let px = x0; px <= x1; px += 4) {
+        const p = yFor(t, px / pxPerBeat);
+        px === x0 ? ctx.moveTo(px, p.y) : ctx.lineTo(px, p.y);
+      }
+      const mid = yFor(t, (r.startBeat + regionLen(r) / 2));
+      ctx.lineWidth = Math.max(1.6, Math.min(6, 7 / Math.max(0.8, mid.dist)));
+      ctx.strokeStyle = `hsla(${hue}, 72%, ${seld ? 68 : 56}%, ${mid.back ? 0.55 : 0.92})`;
+      ctx.stroke();
+    }
     ctx.lineWidth = 1;
     // anchor dots on the selected thread
     if (seld) {
@@ -2269,6 +2308,7 @@ function wireGlobalSpace(v) {
   };
   bindHead("#spEar", "earDistance");
   bindHead("#spDensity", "headDensity");
+  bindHead("#spWet", "reverbWet");
   bindHead("#spReverbType", "reverbType", false);
   const spMode = v.querySelector("#spMode");
   if (spMode) spMode.onchange = () => {
@@ -2318,7 +2358,7 @@ function wireGlobalSpace(v) {
       const g = xy(e);
       const t = trackAtXY(g);
       if (!t) return;
-      _spSelTrack = t.id;
+      _spSelTrack = t.id; // clicking a dot selects that track (owner 07-07)
       _spRock.drag = { trackId: t.id, pos: _spTrackPos(t, playheadBeat) };
       const move = (ev) => { _spRock.drag.pos = posFromXY(xy(ev)); };
       const up = () => {
@@ -2332,7 +2372,13 @@ function wireGlobalSpace(v) {
           a.angle = _spRock.drag.pos.angle;
           a.dist = _spRock.drag.pos.dist;
           saveArrangement("move space anchor");
-        } // otherwise the dot snaps back (drag preview only, owner spec)
+        } else if (!anchors || !anchors.length) {
+          // owner 07-07: an UNANCHORED track just moves — it stays where
+          // you drop it (a static designer position, no snap back)
+          sp.static = sp.static || {};
+          sp.static[t.id] = { ..._spRock.drag.pos };
+          saveArrangement("move track in space");
+        } // anchored without an anchor here: snaps back
         _spRock.drag = null;
         renderProduce();
       };
@@ -2345,12 +2391,19 @@ function wireGlobalSpace(v) {
       if (!t) return;
       _spSelTrack = t.id;
       const sp = ensureGlobalSpace();
+      // owner 07-07: the very FIRST anchoring asks once, then never again
+      if (!sp.anchorAsked) {
+        if (!confirm("Anchor this track in space?\n\nAnchors pin a track's position at a point in time — the thread then moves between its anchors, and drags snap back unless an anchor sits at the playhead. (This is asked only once.)")) return;
+        sp.anchorAsked = true;
+      }
       const pos = posFromXY(g);
       const anchors = (sp.tracks[t.id] = sp.tracks[t.id] || []);
       if (!anchors.length) {
-        // the very first anchor also creates start + end anchors
+        // the very first anchor also creates start + end anchors, seeded
+        // from wherever the track currently sits (incl. a static drag)
         const cur = _spTrackPos(t, playheadBeat);
         anchors.push({ beat: 0, ...cur, smooth: 0.5 }, { beat: totalBeats(), ...cur, smooth: 0.5 });
+        if (sp.static) delete sp.static[t.id]; // anchors supersede the static spot
       }
       const atBeat = Math.round(playheadBeat * 4) / 4;
       const existing = anchors.find(a => Math.abs(a.beat - atBeat) < 0.26);
@@ -2585,18 +2638,24 @@ function produceTimelineHTML() {
         <label class="sp-ctl">Distance <input type="range" data-track-space-dist="${t.id}" min="0.3" max="30" step="0.1" value="${t.space?.dist ?? 2.5}"/></label>
         <button class="pal-btn" data-track-space-clear="${t.id}" title="Back to the patch's own position">reset</button>
       </div>` : "";
+    // Owner 07-07: the head is TWO rows so its controls never spill onto
+    // the lanes — identity on top, mix controls underneath.
     return `<div class="tl2-row">
-      <div class="tl2-head${trackAudible(t) ? "" : " inaudible"}" data-track-head="${t.id}">
-        <span class="tl2-hue" data-track-space="${t.id}" style="background:hsl(${hue},70%,55%)" title="This track's colour (matches its global-space thread). Click for the track's own space position — drag the header to reorder tracks."></span>
-        <span class="tl2-name" title="${esc(t.name)} — drag to reorder">${esc(t.name)}</span>
-        <span class="tl2-db" title="Track level">${gainDbTrack >= 0 ? "+" : ""}${gainDbTrack.toFixed(1)}dB</span>
-        <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
-        <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
-        <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the global scale strip: this track's takes regenerate under the marker in force (baked notes stay put)">G</button>
-        ${_midi.access ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
-        <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
-        <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
-        <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
+      <div class="tl2-head tl2-track-head${trackAudible(t) ? "" : " inaudible"}${_spOpen && _spSelTrack === t.id ? " sp-sel" : ""}" data-track-head="${t.id}">
+        <div class="tl2-head-top">
+          <span class="tl2-hue" data-track-space="${t.id}" style="background:hsl(${hue},70%,55%)" title="This track's colour (matches its global-space thread). Click for the track's own space position — drag the header to reorder tracks."></span>
+          <span class="tl2-name" title="${esc(t.name)} — click to select for the global space; drag to reorder">${esc(t.name)}</span>
+          <span class="tl2-db" title="Track level">${gainDbTrack >= 0 ? "+" : ""}${gainDbTrack.toFixed(1)}dB</span>
+          <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
+        </div>
+        <div class="tl2-head-ctl">
+          <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
+          <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
+          <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the global scale strip: this track's takes regenerate under the marker in force (baked notes stay put)">G</button>
+          ${_midi.access ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
+          <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
+          <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
+        </div>
         ${spacePop}
       </div>
       <div class="tl2-lane" data-lane="${t.id}" style="width:${laneW}px">${regions}</div>
@@ -2611,6 +2670,8 @@ function produceTimelineHTML() {
         <div class="tl2-ruler" id="tlRuler" style="width:${laneW}px">${rulerMarks}
           <div class="tl2-loop-range${arrangement.loopRange ? (arrangement.loopOn ? "" : " dim") : " hidden"}" id="tlLoopRange" style="left:${(arrangement.loopRange?.a || 0) * pxPerBeat}px;width:${((arrangement.loopRange?.b || 0) - (arrangement.loopRange?.a || 0)) * pxPerBeat}px"></div>
           <div class="tl2-playhead hidden" id="tlPlayhead"></div>
+          <div class="tl2-ph-handle" id="tlPhHandle" style="left:${playheadBeat * pxPerBeat}px" title="Playhead — drag to move it"></div>
+          <button class="tl2-addbars" id="addBars" style="left:${laneW + 8}px" title="Lengthen the arrangement by 8 bars">＋8 bars</button>
         </div>
       </div>
       ${trackRows || ""}
@@ -3677,7 +3738,6 @@ function renderProduce() {
           <option value="0"${snapBeats === 0 ? " selected" : ""}>Off</option>
         </select>
         <input type="range" id="zoomSlider" min="6" max="32" step="1" value="${pxPerBeat}" title="Zoom (Z = fit arrangement, ⇧Z = fit selection)" class="zoom-slider"/>
-        <button class="btn btn-ghost btn-sm" id="addBars" title="Lengthen the arrangement by 8 bars">＋8 bars</button>
         <span class="daw-sep"></span>
         <button class="btn btn-secondary btn-sm" id="arrMixdown" title="Render the arrangement offline and download it as a WAV">⬇ WAV</button>
         <button class="btn btn-ghost btn-sm" id="arrExport" title="Download this arrangement as a self-contained JSON file (instruments included)">Export</button>
@@ -3958,7 +4018,15 @@ function wireProduce(v) {
       const up = () => {
         document.removeEventListener("mousemove", move);
         document.removeEventListener("mouseup", up);
-        if (moved) saveArrangement("reorder tracks");
+        if (moved) {
+          saveArrangement("reorder tracks");
+        } else if (_spOpen) {
+          // plain click on a track head selects it for the global space —
+          // its dot lights up in the cross-section and its thread in the
+          // cylinder (owner 07-07)
+          _spSelTrack = id;
+          renderProduce();
+        }
       };
       document.addEventListener("mousemove", move);
       document.addEventListener("mouseup", up);
@@ -4066,6 +4134,29 @@ function wireProduce(v) {
       document.addEventListener("mouseup", up);
     };
   });
+
+  // Owner 07-07: the playhead is directly draggable via its ruler handle
+  const phHandle = v.querySelector("#tlPhHandle");
+  if (phHandle) phHandle.onmousedown = (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // the ruler's own locate/loop drags stay untouched
+    const rulerEl = v.querySelector("#tlRuler");
+    const move = (ev) => {
+      const rect = rulerEl.getBoundingClientRect();
+      playheadBeat = Math.max(0, Math.min(totalBeats() - 0.25,
+        Math.round(((ev.clientX - rect.left) / pxPerBeat) * 4) / 4));
+      updatePlayhead(playheadBeat);
+      phHandle.style.left = `${playheadBeat * pxPerBeat}px`;
+      // the cross-section follows live through the designer's rAF loop
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      renderProduce(); // refresh playhead-dependent controls (anchor smoothness…)
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
 
   // Click the ruler to set the playhead
   const ruler = v.querySelector("#tlRuler");
@@ -8397,25 +8488,34 @@ function bodyBandChipsHTML(p) {
 
 function chInspectorHTML(p) {
   if (_chStage === "excitor") {
+    // Owner 07-07: the envelope is important — it sits beside the other
+    // excitor settings instead of buried in the performance drawer.
     return `
       <div class="ch-ins-head"><span class="ch-card-n">01 · EXCITOR</span><span class="ch-ins-d">how energy enters</span></div>
       <div class="seg-control" role="group">
         ${["bow", "pluck", "strike", "blow"].map(t =>
           `<button class="seg-btn${p.excitationType === t ? " active" : ""}" data-exc-type="${t}">${t[0].toUpperCase()}${t.slice(1)}</button>`).join("")}
       </div>
-      <div class="knob-row">
-        ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
-        ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
+      <div class="ch-exc-cols">
+        <div class="ch-exc-main">
+          <div class="knob-row">
+            ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
+            ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
+          </div>
+          <div class="knob-row">
+            ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
+            ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
+            ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
+          </div>
+          <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
+        </div>
+        <div class="ch-exc-env">
+          <div class="subsection-label">Envelope</div>
+          ${envelopeProbBlockHTML(p)}
+        </div>
       </div>
-      <div class="knob-row">
-        ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
-        ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
-        ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
-      </div>
-      <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
       <details class="ch-perf" ${_chPerfOpen ? "open" : ""} id="chPerfDetails">
-        <summary>Performance — envelope · vibrato · onset noise</summary>
-        ${envelopeProbBlockHTML(p)}
+        <summary>Performance — vibrato · onset noise</summary>
         ${vibratoBlockHTML(p)}
         <div class="knob-row">
           ${knobHTML("attackNoiseLevel", "Onset noise", p.attackNoiseLevel ?? 1, 0, 2, 0.01, { def: 1 })}
@@ -8539,12 +8639,15 @@ function drawChThumbs() {
     g.ctx.lineWidth = 1.6;
     g.ctx.stroke();
   }
-  // 04 space: mini room plan (Q4: full circle, listener centred)
+  // 04 space: mini room plan (Q4 full circle; owner 07-07: the graphic
+  // fills the card — larger rings, a real head at the centre)
   g = th("chThumb_space");
   if (g) {
-    const cx = g.w / 2, cy = g.h / 2, rMax = Math.min(g.h / 2 - 4, g.w / 2 - 6);
-    g.ctx.strokeStyle = "rgba(88,214,169,0.3)";
-    for (const dm of [1, 10]) {
+    const cx = g.w / 2, cy = g.h / 2, rMax = Math.min(g.h / 2 - 2, g.w / 2 - 2);
+    g.ctx.fillStyle = "rgba(60,72,88,0.18)";
+    g.ctx.beginPath(); g.ctx.arc(cx, cy, rMax, 0, Math.PI); g.ctx.closePath(); g.ctx.fill();
+    g.ctx.strokeStyle = "rgba(88,214,169,0.35)";
+    for (const dm of [1, 3, 10]) {
       const r = _spaceDistToR(dm, rMax);
       g.ctx.beginPath(); g.ctx.arc(cx, cy, r, 0, 2 * Math.PI); g.ctx.stroke();
     }
@@ -8553,10 +8656,16 @@ function drawChThumbs() {
     const r = _spaceDistToR(d, rMax);
     g.ctx.fillStyle = "#58d6a9";
     g.ctx.beginPath();
-    g.ctx.arc(cx + Math.cos(az) * r, cy + Math.sin(az) * r, 3, 0, 2 * Math.PI);
+    g.ctx.arc(cx + Math.cos(az) * r, cy + Math.sin(az) * r, 3.5, 0, 2 * Math.PI);
     g.ctx.fill();
-    g.ctx.fillStyle = "rgba(200,215,230,0.8)";
-    g.ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
+    // the head, with ears and a front-pointing nose
+    g.ctx.fillStyle = "rgba(200,215,230,0.85)";
+    g.ctx.beginPath(); g.ctx.arc(cx, cy, 4.5, 0, 2 * Math.PI); g.ctx.fill();
+    g.ctx.beginPath(); g.ctx.arc(cx - 4.5, cy, 1.5, 0, 2 * Math.PI); g.ctx.fill();
+    g.ctx.beginPath(); g.ctx.arc(cx + 4.5, cy, 1.5, 0, 2 * Math.PI); g.ctx.fill();
+    g.ctx.beginPath();
+    g.ctx.moveTo(cx - 1.6, cy - 4.2); g.ctx.lineTo(cx, cy - 6.8); g.ctx.lineTo(cx + 1.6, cy - 4.2);
+    g.ctx.closePath(); g.ctx.fill();
   }
   drawStringDiag();
   // rail summaries track live values
@@ -9124,10 +9233,18 @@ function drawSpacePad() {
   ctx.textAlign = "center";
   ctx.fillText("front", cx, cy - rMax + 8);
   ctx.fillText("behind", cx, cy + rMax - 3);
+  // your head (owner 07-07): a real little head — skull, two ears, a nose
+  // pointing front — instead of an anonymous dot
+  const hr = 7;
   ctx.fillStyle = "rgba(200,215,230,0.85)";
-  ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, 2 * Math.PI); ctx.fill();
-  ctx.fillStyle = "rgba(120,135,150,0.6)";
-  ctx.fillText("you", cx, cy + 12);
+  ctx.beginPath(); ctx.arc(cx, cy, hr, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx - hr, cy, 2.2, 0, 2 * Math.PI); ctx.fill(); // left ear
+  ctx.beginPath(); ctx.arc(cx + hr, cy, 2.2, 0, 2 * Math.PI); ctx.fill(); // right ear
+  ctx.beginPath(); // nose points to the front
+  ctx.moveTo(cx - 2.4, cy - hr + 0.5);
+  ctx.lineTo(cx, cy - hr - 3.5);
+  ctx.lineTo(cx + 2.4, cy - hr + 0.5);
+  ctx.closePath(); ctx.fill();
   const d = clamp(exploreParams.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
   const az = clamp(exploreParams.spaceAzimuth ?? 0, -180, 180);
   const rad = (az - 90) * Math.PI / 180;
@@ -9148,6 +9265,9 @@ function drawSpacePad() {
 function fitStudioScale() {
   const dash = document.querySelector(".explore-dashboard");
   if (!dash) return;
+  // a zero-size viewport (headless capture, minimised window) must never
+  // collapse the studio to scale(0)
+  if (!window.innerWidth || !window.innerHeight) return;
   const s = Math.min(window.innerWidth / 1446, window.innerHeight / 796, 1);
   dash.style.transform = s < 1 ? `scale(${s})` : "";
   dash.style.transformOrigin = "top left";
