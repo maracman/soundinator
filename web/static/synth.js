@@ -525,13 +525,32 @@ export function spaceProximityDb(distM) {
   return d < 1.2 ? 10 * (1.2 - d) / 1.2 : 0;
 }
 
-// ── Q4: binaural head model (owner request 2026-07-07) ─────
-// The listener has a real head: per-ear arrival times (Woodworth ITD),
-// far-ear head shadow (level + lowpass, scaled by head density), and a
-// pinna law that makes behind sound different from front. "Head size" IS
-// ear distance (owner agreed one of the two was redundant), so geometry
-// has exactly one knob (earDistance) and material one (headDensity); the
-// pinna cue is a law, not a knob. All pure, asserted headlessly.
+// ── Q4: binaural head model (owner request 2026-07-07; physics
+// grounded in published models per owner request 07-07 round 4) ─────
+// The listener has a real head. Each cue uses a real model:
+//   ITD    — Woodworth (1938) frontal-arc formula, the standard
+//            geometric-acoustics ITD for a spherical head.
+//   Shadow — Brown & Duda (1998, IEEE Trans. Speech Audio Proc.,
+//            "A structural model for binaural sound synthesis"):
+//            a spherical-head shadow is FREQUENCY-DEPENDENT — lows
+//            diffract around the head almost unattenuated, highs shadow
+//            up to ~-20 dB at the deepest-shadow angle (150° from the
+//            ear axis), and the near ear gets a ~+6 dB high-frequency
+//            "bright spot". Their one-pole/one-zero filter is realised
+//            here as a high shelf at f0 = c/(2πa) with gain 20·log10 α(θ).
+//   Pinna  — Shaw (1974, JASA 56, free-field-to-eardrum transformation)
+//            + Blauert's directional bands: the concha resonance
+//            (~4.3 kHz) amplifies FRONTAL sound; sources behind lose
+//            that gain (≈8 dB dead-behind) and the pinna flange shadows
+//            the highs above ~8 kHz (≈7 dB). Both scale smoothly from
+//            zero at ±90° to full at 180° — the front half-plane is
+//            untouched, exactly as measured HRTFs show.
+// "Head size" IS ear distance (a = earDistance/2), so geometry has one
+// knob; headDensity scales the shadow dB around the published values
+// (0.5 = exactly Brown-Duda, 0 = acoustically transparent, 1 = doubled).
+// All pure, asserted headlessly.
+
+const SPEED_OF_SOUND = 343;
 
 export function foldAngle(angleRad) {
   let a = angleRad % (2 * Math.PI);
@@ -551,28 +570,53 @@ export function itdSeconds(angleRad, earDistance = 0.175) {
   return Math.sign(lat) * r * (Math.abs(lat) + Math.sin(Math.abs(lat))) / 343;
 }
 
-// Far-ear level shadow in dB: 0 at centre, up to 12 dB at full laterality
-// with a maximally dense head.
-export function ildDb(angleRad, headDensity = 0.5) {
-  const lat = Math.abs(Math.sin(foldAngle(angleRad)));
-  return lat * Math.max(0, Math.min(1, headDensity ?? 0.5)) * 12;
+// Brown-Duda head-shadow coefficient α for one ear. θ_inc is the angle
+// between the source direction and that ear's axis: α runs from 2.0
+// (source at the ear → +6 dB bright spot) through 1.05 (≈ unity, source
+// ahead) down to 0.1 (-20 dB) at the deepest shadow, 150° off-axis —
+// their published α_min = 0.1, θ_min = 150°.
+export function headShadowAlpha(angleRad, ear /* "L" | "R" */) {
+  const az = foldAngle(angleRad);
+  // ear axes sit at ±90°: cos(angle from axis) = ±sin(azimuth)
+  const cosInc = (ear === "R" ? 1 : -1) * Math.sin(az);
+  const thetaInc = Math.acos(Math.max(-1, Math.min(1, cosInc))); // 0..π
+  const ALPHA_MIN = 0.1, THETA_MIN = 150; // published fit constants
+  return (1 + ALPHA_MIN / 2)
+    + (1 - ALPHA_MIN / 2) * Math.cos((thetaInc * 180 / Math.PI) * (180 / THETA_MIN) * Math.PI / 180);
 }
 
-// The shadowed ear also loses highs: its lowpass falls from open (8 kHz
-// scaled up to full band at zero shade) toward 1.2 kHz.
-export function headShadowCutoff(angleRad, headDensity = 0.5) {
-  const lat = Math.abs(Math.sin(foldAngle(angleRad)));
-  const shade = lat * Math.max(0, Math.min(1, headDensity ?? 0.5));
-  return shade <= 0 ? 20000 : 8000 - shade * (8000 - 1200);
+// The shadow's shelf gain in dB for one ear, headDensity-scaled around
+// the published model (0.5 = exactly Brown-Duda).
+export function headShadowDb(angleRad, ear, headDensity = 0.5) {
+  const scale = Math.max(0, Math.min(1, headDensity ?? 0.5)) / 0.5;
+  return 20 * Math.log10(Math.max(0.05, headShadowAlpha(angleRad, ear))) * scale;
 }
 
-// Pinna cue: ears face forward, so sources behind lose presence — a broad
-// high-shelf cut plus a ~8 kHz notch. Exactly zero anywhere in the front
-// half-plane, scaling smoothly to full at dead-behind.
+// The shadow filter's corner: Brown-Duda ω0 = c/a → f0 = c/(2πa).
+// Default ears (0.175 m span, a = 0.0875 m) → ≈ 624 Hz; wider heads
+// shadow from lower frequencies, exactly as the physics says.
+export function headShadowFreq(earDistance = 0.175) {
+  const a = Math.max(0.06, Math.min(0.125, (earDistance ?? 0.175) / 2));
+  return SPEED_OF_SOUND / (2 * Math.PI * a);
+}
+
+// Pinna front/behind cue, grounded in measured average HRTFs:
+//  - conchaDb: loss of Shaw's ~4.3 kHz concha-resonance gain for rear
+//    sources (front-back difference reaches ≈8 dB dead-behind);
+//  - shelfDb: pinna-flange shadowing of the highs above ~8 kHz for rear
+//    sources (≈7 dB dead-behind).
+// Exactly zero anywhere in the front half-plane, scaling smoothly
+// (smoothstep) from ±90° to 180°.
 export function pinnaParams(angleRad) {
   const a = Math.abs(foldAngle(angleRad));
-  const behind = Math.max(0, Math.min(1, (a - Math.PI / 2) / (Math.PI / 2)));
-  return { shelfDb: -4.5 * behind, notchHz: 8000, notchDepthDb: -9 * behind };
+  const t = Math.max(0, Math.min(1, (a - Math.PI / 2) / (Math.PI / 2)));
+  const behind = t * t * (3 - 2 * t); // smooth, like measured HRTF transitions
+  return {
+    conchaHz: 4300,
+    conchaDb: -8 * behind,
+    shelfHz: 8000,
+    shelfDb: -7 * behind,
+  };
 }
 
 // Direct-path distance attenuation — the inverse model the HRTF panner
@@ -2986,23 +3030,27 @@ export class SynthEngine {
     this._earDelayR = this.ctx.createDelay(0.005);
     this._earShadowL = this.ctx.createGain();
     this._earShadowR = this.ctx.createGain();
+    // Brown-Duda head shadow: a high shelf per ear at f0 = c/(2πa) —
+    // lows diffract (unity), highs shadow/boost by 20·log10 α(θ)
     this._earFilterL = this.ctx.createBiquadFilter();
-    this._earFilterL.type = "lowpass";
-    this._earFilterL.frequency.value = 20000;
-    this._earFilterL.Q.value = 0.5;
+    this._earFilterL.type = "highshelf";
+    this._earFilterL.frequency.value = headShadowFreq(0.175);
+    this._earFilterL.gain.value = 0;
     this._earFilterR = this.ctx.createBiquadFilter();
-    this._earFilterR.type = "lowpass";
-    this._earFilterR.frequency.value = 20000;
-    this._earFilterR.Q.value = 0.5;
+    this._earFilterR.type = "highshelf";
+    this._earFilterR.frequency.value = headShadowFreq(0.175);
+    this._earFilterR.gain.value = 0;
     this._earMerger = this.ctx.createChannelMerger(2);
+    // Shaw/Blauert pinna cue: flange shadowing of the highs (shelf ≥8 kHz)
+    // + loss of the ~4.3 kHz concha gain for sources behind
     this._pinnaShelf = this.ctx.createBiquadFilter();
     this._pinnaShelf.type = "highshelf";
-    this._pinnaShelf.frequency.value = 4500;
+    this._pinnaShelf.frequency.value = 8000;
     this._pinnaShelf.gain.value = 0;
     this._pinnaNotch = this.ctx.createBiquadFilter();
     this._pinnaNotch.type = "peaking";
-    this._pinnaNotch.frequency.value = 8000;
-    this._pinnaNotch.Q.value = 4;
+    this._pinnaNotch.frequency.value = 4300;
+    this._pinnaNotch.Q.value = 2;
     this._pinnaNotch.gain.value = 0;
     this._spaceDistGain = this.ctx.createGain();
     this._spaceDistGain.gain.value = spaceDistanceGain(2.5);
@@ -3295,23 +3343,32 @@ export class SynthEngine {
     smooth(n.air.frequency, spaceAirCutoff(d));
     smooth(n.proximity.gain, spaceProximityDb(d));
     if (n.earDelayL) {
-      // Q4 binaural head: listener properties ride the same params object
+      // Q4 binaural head: listener properties ride the same params object.
+      // Physics per published models (owner 07-07 round 4):
       const earDist = Number(p.earDistance ?? 0.175);
       const density = Number(p.headDensity ?? 0.5);
+      // Woodworth ITD per ear
       const itd = itdSeconds(az, earDist);
       smooth(n.earDelayL.delayTime, Math.max(0, itd));
       smooth(n.earDelayR.delayTime, Math.max(0, -itd));
-      const shadow = Math.pow(10, -ildDb(az, density) / 20);
-      const cut = headShadowCutoff(az, density);
-      const farLeft = az >= 0; // source right of centre shadows the left ear
-      smooth(n.earShadowL.gain, farLeft ? shadow : 1);
-      smooth(n.earShadowR.gain, farLeft ? 1 : shadow);
-      smooth(n.earFilterL.frequency, farLeft ? cut : 20000);
-      smooth(n.earFilterR.frequency, farLeft ? 20000 : cut);
+      // Brown-Duda head shadow: a frequency-dependent SHELF per ear —
+      // lows diffract around the head (unity), highs shadow/boost by
+      // α(θ) at the corner f0 = c/(2πa). No broadband ILD gain: that was
+      // the old guess; real interaural level difference is HF-weighted.
+      const f0 = headShadowFreq(earDist);
+      smooth(n.earFilterL.frequency, f0);
+      smooth(n.earFilterR.frequency, f0);
+      smooth(n.earFilterL.gain, headShadowDb(az, "L", density));
+      smooth(n.earFilterR.gain, headShadowDb(az, "R", density));
+      smooth(n.earShadowL.gain, 1);
+      smooth(n.earShadowR.gain, 1);
+      // Shaw/Blauert pinna cue: behind loses the ~4.3 kHz concha gain and
+      // the highs above ~8 kHz; the front half-plane is untouched.
       const pin = pinnaParams(az);
+      n.pinnaNotch.frequency.value = pin.conchaHz;
+      smooth(n.pinnaNotch.gain, pin.conchaDb);
+      n.pinnaShelf.frequency.value = pin.shelfHz;
       smooth(n.pinnaShelf.gain, pin.shelfDb);
-      n.pinnaNotch.frequency.value = pin.notchHz;
-      smooth(n.pinnaNotch.gain, pin.notchDepthDb);
       smooth(n.distGain.gain, spaceDistanceGain(d));
     }
   }
@@ -3337,11 +3394,11 @@ export class SynthEngine {
       earDelayR: this.ctx.createDelay(0.005),
       earShadowL: this.ctx.createGain(),
       earShadowR: this.ctx.createGain(),
-      earFilterL: bi("lowpass", 20000, 0.5),
-      earFilterR: bi("lowpass", 20000, 0.5),
+      earFilterL: bi("highshelf", headShadowFreq(0.175)),
+      earFilterR: bi("highshelf", headShadowFreq(0.175)),
       merger: this.ctx.createChannelMerger(2),
-      pinnaShelf: bi("highshelf", 4500),
-      pinnaNotch: bi("peaking", 8000, 4),
+      pinnaShelf: bi("highshelf", 8000),
+      pinnaNotch: bi("peaking", 4300, 2),
       distGain: this.ctx.createGain(),
     };
     c.input.connect(c.proximity);

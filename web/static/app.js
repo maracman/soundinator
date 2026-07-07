@@ -53,7 +53,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.8.0"; // synced layer variation now also shares the SDs (magnitude) per parameter
+const APP_VERSION = "sound-studio-0.9.0"; // binaural physics grounded: Brown-Duda head shadow + Shaw/Blauert pinna cue
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -503,8 +503,8 @@ const PARAM_DESC = {
   partialB: "Stiff-string inharmonicity: partials sharpen as f·n·√(1+Bn²). Piano bass ≈ 1e-4, treble ≈ 1e-3; 0 = perfectly harmonic. Rising B detunes partial pairs out of sympathetic resonance, weakening Transfer",
   spaceDistance: "How far the instrument stands from you (0.3–30 m). Distance delays the sound's arrival (~3 ms/m), rolls off the highs (air absorption), lowers the direct level against the room, and inside ~1 m adds the proximity bass lift",
   spaceAzimuth: "The instrument's bearing, all the way around you (−180°…180°): per-ear arrival times, far-ear head shadow, and a pinna cue that makes sounds behind you duller than in front — real binaural physics, not simple panning",
-  earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences = a wider, more localised stereo image",
-  headDensity: "How opaque your head is to sound (0–1). Denser = the far ear loses more level and more treble when a source sits to one side",
+  earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences AND head shadowing from lower frequencies (the shadow corner is c/2πa)",
+  headDensity: "How strongly your head shadows the far ear (0–1). 0.5 = the published spherical-head model (Brown & Duda 1998: lows diffract around, highs shadow up to -20 dB); 0 = transparent, 1 = doubled",
   layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
   layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
   layerEnvProb: "How often the shared variation trigger fires (per note) when synchronisation is on",

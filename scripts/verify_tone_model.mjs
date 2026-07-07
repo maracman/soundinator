@@ -816,7 +816,7 @@ console.log("P3: note connection — glide vs ring on overlap");
 
 // ── Q4: binaural head model laws ──
 {
-  const { itdSeconds, ildDb, headShadowCutoff, pinnaParams, spaceDistanceGain, foldAngle } =
+  const { itdSeconds, pinnaParams, spaceDistanceGain, foldAngle } =
     await import("../web/static/synth.js");
   const deg = (x) => x * Math.PI / 180;
   check("Q4 ITD: zero dead ahead", Math.abs(itdSeconds(0)) < 1e-9);
@@ -830,17 +830,35 @@ console.log("P3: note connection — glide vs ring on overlap");
   check("Q4 ITD: signed — left source leads the left ear", itdSeconds(deg(-90)) < 0);
   check("Q4 ITD: front/behind mirror-pairs share laterality",
     Math.abs(itdSeconds(deg(45)) - itdSeconds(deg(135))) < 1e-9);
-  check("Q4 ILD: zero at centre", ildDb(0) === 0);
-  check("Q4 ILD: grows with angle", ildDb(deg(90)) > ildDb(deg(45)) && ildDb(deg(45)) > 0);
-  check("Q4 ILD: grows with density, 12 dB ceiling",
-    ildDb(deg(90), 1) === 12 && ildDb(deg(90), 0.25) < ildDb(deg(90), 0.75));
-  check("Q4 ILD: transparent head shadows nothing", ildDb(deg(90), 0) === 0);
-  check("Q4 shadow cutoff: open at centre, falls to 1.2 kHz fully shaded",
-    headShadowCutoff(0) === 20000 && headShadowCutoff(deg(90), 1) === 1200);
+  // Head shadow — Brown & Duda (1998) structural model
+  const { headShadowAlpha, headShadowDb, headShadowFreq } = await import("../web/static/synth.js");
+  check("Q4 BD shadow: α = 2.0 (+6 dB bright spot) with the source AT the ear",
+    Math.abs(headShadowAlpha(deg(90), "R") - 2.0) < 1e-9 &&
+    Math.abs(headShadowAlpha(deg(-90), "L") - 2.0) < 1e-9);
+  check("Q4 BD shadow: α = 0.1 (-20 dB) at the published deepest-shadow angle (150° off-axis)",
+    Math.abs(headShadowAlpha(deg(-60), "R") - 0.1) < 1e-9); // source 150° from the right-ear axis
+  check("Q4 BD shadow: a frontal source shadows both ears identically (zero ILD) at the published α(90°)",
+    Math.abs(headShadowAlpha(0, "R") - headShadowAlpha(0, "L")) < 1e-12 &&
+    Math.abs(headShadowAlpha(0, "R") - (1.05 + 0.95 * Math.cos(Math.PI * 108 / 180))) < 1e-9);
+  check("Q4 BD shadow: left/right symmetric",
+    Math.abs(headShadowDb(deg(40), "L") - headShadowDb(deg(-40), "R")) < 1e-9);
+  check("Q4 BD shadow: density scales around the published model (0.5 = exact, 0 = transparent, 1 = doubled)",
+    headShadowDb(deg(90), "L", 0) === 0 &&
+    Math.abs(headShadowDb(deg(90), "L", 1) - 2 * headShadowDb(deg(90), "L", 0.5)) < 1e-9);
+  check("Q4 BD shadow: corner f0 = c/(2πa) ≈ 624 Hz for default ears, lower for wider heads",
+    Math.abs(headShadowFreq(0.175) - 343 / (2 * Math.PI * 0.0875)) < 0.5 &&
+    headShadowFreq(0.25) < headShadowFreq(0.175));
+  // Pinna — Shaw (1974) concha resonance + Blauert directional bands
   check("Q4 pinna: silent anywhere in the front half-plane",
-    pinnaParams(0).notchDepthDb === 0 && pinnaParams(deg(90)).notchDepthDb === 0 && pinnaParams(deg(-90)).shelfDb === 0);
-  check("Q4 pinna: engaged behind only, deepest dead-behind",
-    pinnaParams(deg(135)).notchDepthDb < 0 && pinnaParams(deg(180)).notchDepthDb < pinnaParams(deg(135)).notchDepthDb);
+    pinnaParams(0).conchaDb === 0 && pinnaParams(deg(90)).conchaDb === 0 && pinnaParams(deg(-90)).shelfDb === 0);
+  check("Q4 pinna: behind loses the ~4.3 kHz concha gain, to -8 dB dead-behind (Shaw)",
+    pinnaParams(deg(135)).conchaDb < 0 &&
+    Math.abs(pinnaParams(deg(180)).conchaDb - (-8)) < 1e-9 &&
+    pinnaParams(deg(180)).conchaHz === 4300);
+  check("Q4 pinna: flange shadows highs ≥8 kHz to -7 dB dead-behind",
+    Math.abs(pinnaParams(deg(180)).shelfDb - (-7)) < 1e-9 && pinnaParams(deg(180)).shelfHz === 8000);
+  check("Q4 pinna: front-back transition is smooth (135° between 0 and dead-behind)",
+    pinnaParams(deg(135)).conchaDb < 0 && pinnaParams(deg(135)).conchaDb > pinnaParams(deg(180)).conchaDb);
   check("Q4 distance gain: unity inside 1 m, inverse beyond",
     spaceDistanceGain(0.5) === 1 && Math.abs(spaceDistanceGain(4) - 0.25) < 1e-9);
   check("Q4 foldAngle: wraps 270° to -90°", Math.abs(foldAngle(deg(270)) - deg(-90)) < 1e-9);
