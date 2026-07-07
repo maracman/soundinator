@@ -40,6 +40,7 @@ import {
   splitsBucketOf,
   nearestVowel,
   globalScaleAt,
+  trackSpaceAt,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -1303,7 +1304,7 @@ function regionVoiceParams(track, region) {
   return pal ? pal.params : (track.instrumentParams || {});
 }
 
-function regionPlayParams(track, region) {
+function regionPlayParams(track, region, atBeat = null) {
   // Tier 1 session context (owned by the arrangement, inherited live) +
   // Tier 2 instrument (from the palette) + Tier 3 take
   const context = arrangement?.context || defaultArrangementContext();
@@ -1318,6 +1319,29 @@ function regionPlayParams(track, region) {
       params.customDegrees = [...marker.degrees];
       params.subScaleNotes = [...(marker.subScaleNotes || [])];
       params.rootNotes = [...(marker.rootNotes || [0])];
+    }
+  }
+  // Q6 global space: designer threads position each track over time —
+  // resolved at atBeat (the walker passes the playing beat so positions
+  // evolve mid-region). Override replaces the patch's space; offset adds
+  // the anchors as deltas (angle adds, distance shifts around 2.5 m).
+  // The designer's head (listener) properties apply to every track.
+  const sp = arrangement?.space;
+  if (sp?.enabled && track) {
+    const pos = trackSpaceAt(sp.tracks?.[track.id], atBeat ?? region.startBeat ?? 0);
+    if (pos) {
+      if (sp.mode === "offset") {
+        params.spaceAzimuth = Math.max(-180, Math.min(180, (params.spaceAzimuth ?? 0) + pos.angle));
+        params.spaceDistance = Math.max(0.3, Math.min(30, (params.spaceDistance ?? 2.5) + (pos.dist - 2.5)));
+      } else {
+        params.spaceAzimuth = pos.angle;
+        params.spaceDistance = pos.dist;
+      }
+    }
+    if (sp.head) {
+      if (Number.isFinite(sp.head.earDistance)) params.earDistance = sp.head.earDistance;
+      if (Number.isFinite(sp.head.headDensity)) params.headDensity = sp.head.headDensity;
+      if (sp.head.reverbType) params.reverbType = sp.head.reverbType;
     }
   }
   return params;
@@ -1722,6 +1746,17 @@ function playArrangement(fromBeat = 0) {
       }
       // mid-region beats: leave the voice playing through its span
     }
+    // Q6: global-space threads evolve DURING playback — retarget each
+    // sounding voice's spatial chain at the current beat (cheap: the IR
+    // is key-cached, everything else is smoothed AudioParams).
+    if (arrangement.space?.enabled) {
+      for (const track of arrangement.tracks) {
+        const region = regionAtBeat(track, b);
+        if (!region || region.muted || !trackAudible(track)) continue;
+        const voice = producerVoices.get(track.id);
+        if (voice && voice.playing) voice.updateReverb(regionPlayParams(track, region, b));
+      }
+    }
     updatePlayhead(b);
     arrPlay.beat = b + 1;
     arrPlay.timer = setTimeout(step, beatMs);
@@ -1921,6 +1956,352 @@ function globalScaleStripHTML(laneW) {
       </div>${editorRow}`;
 }
 
+// ── Q6: global space designer ───────────────────────────────
+// A cylinder of instrument threads along the timeline + a cross-section
+// at the playhead. Threads come from per-track anchors interpolated by
+// trackSpaceAt (synth.js); the head panel owns the listener (ear span,
+// head density, room type — re-homed here from Q2).
+let _spOpen = false;
+let _spSelTrack = null;
+let _spRock = { roll: 0, dragging: false, drag: null };
+let _spRaf = null;
+
+function ensureGlobalSpace() {
+  if (!arrangement.space) {
+    arrangement.space = {
+      enabled: false,
+      mode: "override",
+      head: { earDistance: 0.175, headDensity: 0.5, reverbType: arrangement.context.reverbType || "room" },
+      tracks: {},
+    };
+  }
+  if (!arrangement.space.tracks) arrangement.space.tracks = {};
+  return arrangement.space;
+}
+
+const _SP_HUES = [36, 152, 205, 280, 0, 60, 320, 100];
+function _spHue(i) { return _SP_HUES[i % _SP_HUES.length]; }
+
+// Where a track sits at a beat: designer anchors (override), anchors as
+// deltas on the patch space (offset), or the patch space alone.
+function _spTrackPos(track, beat) {
+  const sp = arrangement.space || {};
+  const res = trackSpaceAt(sp.tracks?.[track.id], beat);
+  const vp = (arrangement.palette || []).find(pl => pl.id === track.regions?.[0]?.paletteId)?.params
+    || track.instrumentParams || {};
+  const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
+  if (!res) return base;
+  if (sp.mode === "offset") {
+    return {
+      angle: Math.max(-180, Math.min(180, base.angle + res.angle)),
+      dist: Math.max(0.3, Math.min(30, base.dist + res.dist - 2.5)),
+    };
+  }
+  return res;
+}
+
+function spSmartArrange() {
+  const sp = ensureGlobalSpace();
+  const n = Math.max(1, arrangement.tracks.length);
+  arrangement.tracks.forEach((t, i) => {
+    const angle = n === 1 ? 0 : Math.round(-135 + i * (270 / (n - 1)));
+    const dist = 2 + (i % 3) * 0.8;
+    sp.tracks[t.id] = [
+      { beat: 0, angle, dist, smooth: 0.5 },
+      { beat: totalBeats(), angle, dist, smooth: 0.5 },
+    ];
+  });
+  sp.mode = "override";
+}
+
+function globalSpaceStripHTML(laneW) {
+  const sp = arrangement.space || { enabled: false, mode: "override", head: {}, tracks: {} };
+  const head = sp.head || {};
+  const selAnchors = _spSelTrack ? (sp.tracks?.[_spSelTrack] || []) : [];
+  const anchorAtPh = selAnchors.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
+  const panel = _spOpen ? `
+      <div class="tl2-row">
+        <div class="tl2-head tl2-corner"></div>
+        <div class="sp-panel">
+          <canvas id="spSection" width="150" height="150" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag it to move (snaps back without an anchor); double-click to anchor it at the playhead."></canvas>
+          <canvas id="spCylinder" width="620" height="150" title="The arrangement's space over time — one thread per instrument, nearer = thicker. The view rocks slowly; drag up/down to roll it (springs back). Click an anchor dot to jump the playhead there."></canvas>
+          <div class="sp-head-panel">
+            <div class="section-label">Listener</div>
+            <label class="sp-ctl">Mode
+              <select id="spMode" title="Override replaces each patch's own space; Offset adds the threads on top of it">
+                <option value="override"${sp.mode !== "offset" ? " selected" : ""}>Override patch space</option>
+                <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset patch space</option>
+              </select>
+            </label>
+            <label class="sp-ctl">Room
+              <select id="spReverbType" title="The shared room every track sits in when the global space is on">${reverbTypeOptions(head.reverbType || arrangement.context.reverbType || "room")}</select>
+            </label>
+            <label class="sp-ctl">Ear span <input type="range" id="spEar" min="0.12" max="0.25" step="0.005" value="${head.earDistance ?? 0.175}" title="${esc(PARAM_DESC.earDistance)}"/></label>
+            <label class="sp-ctl">Head density <input type="range" id="spDensity" min="0" max="1" step="0.01" value="${head.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>
+            ${anchorAtPh ? `<label class="sp-ctl">Anchor smoothness <input type="range" id="spSmooth" min="0" max="1" step="0.05" value="${anchorAtPh.smooth ?? 0.5}" title="How gently the selected track's thread curves through the anchor at the playhead (0 = straight lines)"/></label>` : ""}
+          </div>
+        </div>
+      </div>` : "";
+  return `
+      <div class="tl2-row tl2-sp-row">
+        <div class="tl2-head tl2-corner gs-head">
+          <button class="gs-chevron" id="spToggle" title="Global space — position every instrument around the listener along the timeline">${_spOpen ? "▾" : "▸"} Global space</button>
+          ${_spOpen ? `<input type="checkbox" id="spEnabled"${sp.enabled ? " checked" : ""} title="Apply the global space to playback (asks how to initialise on first use)"/>` : ""}
+        </div>
+        <div class="gs-strip${sp.enabled ? "" : " off"}" style="width:${laneW}px"></div>
+      </div>${panel}`;
+}
+
+function drawSpSection() {
+  const cv = document.getElementById("spSection");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 8;
+  const sp = arrangement.space || {};
+  // rings + behind shading (same language as the patch space pad)
+  ctx.fillStyle = "rgba(60,72,88,0.16)";
+  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(90,110,130,0.25)";
+  for (const dm of [1, 3, 10, 30]) {
+    ctx.beginPath(); ctx.arc(cx, cy, _spaceDistToR(dm, rMax), 0, 2 * Math.PI); ctx.stroke();
+  }
+  // the head, radius ∝ ear distance
+  const headR = 3 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 5;
+  ctx.fillStyle = "rgba(200,215,230,0.85)";
+  ctx.beginPath(); ctx.arc(cx, cy, headR, 0, 2 * Math.PI); ctx.fill();
+  // track dots at the playhead
+  arrangement.tracks.forEach((t, i) => {
+    const drag = _spRock.drag;
+    const pos = (drag && drag.trackId === t.id) ? drag.pos : _spTrackPos(t, playheadBeat);
+    const rad = (pos.angle - 90) * Math.PI / 180;
+    const r = _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist)), rMax);
+    const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+    const seld = t.id === _spSelTrack;
+    ctx.fillStyle = `hsla(${_spHue(i)}, 70%, ${seld ? 68 : 55}%, ${seld ? 1 : 0.8})`;
+    if (seld) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; }
+    ctx.beginPath(); ctx.arc(x, y, seld ? 5.5 : 4, 0, 2 * Math.PI); ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+}
+
+function drawSpCylinder(rockRad) {
+  const cv = document.getElementById("spCylinder");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const cy = h / 2, R = h / 2 - 10;
+  const beats = Math.max(1, totalBeats());
+  const xFor = (beat) => (beat / beats) * w;
+  const roll = _spRock.roll;
+  // playhead line
+  ctx.strokeStyle = "rgba(245,166,35,0.4)";
+  ctx.beginPath(); ctx.moveTo(xFor(playheadBeat), 0); ctx.lineTo(xFor(playheadBeat), h); ctx.stroke();
+  arrangement.tracks.forEach((t, i) => {
+    const seld = t.id === _spSelTrack;
+    ctx.beginPath();
+    let backness = 0;
+    for (let px = 0; px <= w; px += 6) {
+      const pos = _spTrackPos(t, (px / w) * beats);
+      const a = pos.angle * Math.PI / 180 + rockRad + roll;
+      const y = cy + Math.sin(a) * R * 0.85;
+      backness = Math.cos(a); // >0 = far side of the cylinder
+      px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+    }
+    const midPos = _spTrackPos(t, playheadBeat);
+    ctx.lineWidth = Math.max(0.8, Math.min(5, 6 / Math.max(0.8, midPos.dist)));
+    ctx.strokeStyle = `hsla(${_spHue(i)}, 70%, ${seld ? 65 : 50}%, ${seld ? 0.95 : (backness > 0 ? 0.3 : 0.6)})`;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    // anchor dots on the selected thread
+    if (seld) {
+      const anchors = arrangement.space?.tracks?.[t.id] || [];
+      for (const a of anchors) {
+        const aa = a.angle * Math.PI / 180 + rockRad + roll;
+        const x = xFor(a.beat), y = cy + Math.sin(aa) * R * 0.85;
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI); ctx.fill();
+      }
+    }
+  });
+}
+
+function _spAnimate() {
+  if (!_spOpen || !document.getElementById("spCylinder")) { _spRaf = null; return; }
+  const rock = Math.sin(performance.now() / 2400) * (10 * Math.PI / 180); // slow ±10° rocking
+  if (!_spRock.dragging) _spRock.roll *= 0.88; // spring back
+  drawSpCylinder(rock);
+  drawSpSection();
+  _spRaf = requestAnimationFrame(_spAnimate);
+}
+
+function wireGlobalSpace(v) {
+  const spToggle = v.querySelector("#spToggle");
+  if (spToggle) spToggle.onclick = () => { _spOpen = !_spOpen; renderProduce(); };
+  const spEnabled = v.querySelector("#spEnabled");
+  if (spEnabled) spEnabled.onchange = () => {
+    const sp = ensureGlobalSpace();
+    if (spEnabled.checked && !sp.initialised) {
+      // Activation flow (owner spec): first use asks how to start.
+      if (confirm("Smartly arrange the instruments in space?\n\nOK — spread the tracks around you (override patch positions)\nCancel — keep each patch's own position (threads become offsets)")) {
+        spSmartArrange();
+      } else {
+        sp.mode = "offset";
+      }
+      sp.initialised = true;
+    }
+    sp.enabled = spEnabled.checked;
+    saveArrangement("global space on/off");
+    renderProduce();
+  };
+  const liveApply = () => {
+    if (!arrPlay) return;
+    const b = arrPlay.beat;
+    for (const track of arrangement.tracks) {
+      const region = regionAtBeat(track, b);
+      const voice = producerVoices.get(track.id);
+      if (region && voice && voice.playing) voice.updateReverb(regionPlayParams(track, region, b));
+    }
+  };
+  const bindHead = (id, key, isNum = true) => {
+    const el = v.querySelector(id);
+    if (!el) return;
+    el.onchange = () => {
+      const sp = ensureGlobalSpace();
+      sp.head[key] = isNum ? Number(el.value) : el.value;
+      saveArrangement("global space head");
+      liveApply();
+    };
+  };
+  bindHead("#spEar", "earDistance");
+  bindHead("#spDensity", "headDensity");
+  bindHead("#spReverbType", "reverbType", false);
+  const spMode = v.querySelector("#spMode");
+  if (spMode) spMode.onchange = () => {
+    ensureGlobalSpace().mode = spMode.value;
+    saveArrangement("global space mode");
+    liveApply();
+  };
+  const spSmooth = v.querySelector("#spSmooth");
+  if (spSmooth) spSmooth.onchange = () => {
+    const anchors = ensureGlobalSpace().tracks[_spSelTrack] || [];
+    const a = anchors.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
+    if (a) { a.smooth = Number(spSmooth.value); saveArrangement("anchor smoothness"); }
+  };
+
+  // Cross-section: select / drag / double-click-anchor
+  const section = v.querySelector("#spSection");
+  if (section) {
+    const xy = (e) => {
+      const rect = section.getBoundingClientRect();
+      const w = section._cssW || section.width, h = section._cssH || section.height;
+      return {
+        x: (e.clientX - rect.left) * (w / Math.max(1, rect.width)),
+        y: (e.clientY - rect.top) * (h / Math.max(1, rect.height)),
+        cx: w / 2, cy: h / 2, rMax: Math.min(w, h) / 2 - 8,
+      };
+    };
+    const posFromXY = (g) => {
+      const dx = g.x - g.cx, dy = g.y - g.cy;
+      return {
+        angle: Math.max(-180, Math.min(180, Math.atan2(dx, -dy) * 180 / Math.PI)),
+        dist: _spaceRToDist(Math.hypot(dx, dy), g.rMax),
+      };
+    };
+    const trackAtXY = (g) => {
+      let best = null;
+      arrangement.tracks.forEach((t) => {
+        const pos = _spTrackPos(t, playheadBeat);
+        const rad = (pos.angle - 90) * Math.PI / 180;
+        const r = _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist)), g.rMax);
+        const d = Math.hypot(g.cx + Math.cos(rad) * r - g.x, g.cy + Math.sin(rad) * r - g.y);
+        if (d < 10 && (!best || d < best.d)) best = { t, d };
+      });
+      return best?.t || null;
+    };
+    section.onmousedown = (e) => {
+      e.preventDefault();
+      const g = xy(e);
+      const t = trackAtXY(g);
+      if (!t) return;
+      _spSelTrack = t.id;
+      _spRock.drag = { trackId: t.id, pos: _spTrackPos(t, playheadBeat) };
+      const move = (ev) => { _spRock.drag.pos = posFromXY(xy(ev)); };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        const sp = ensureGlobalSpace();
+        const anchors = sp.tracks[t.id];
+        const a = anchors?.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
+        if (a) {
+          // an anchor lives at the playhead: commit the drag to it
+          a.angle = _spRock.drag.pos.angle;
+          a.dist = _spRock.drag.pos.dist;
+          saveArrangement("move space anchor");
+        } // otherwise the dot snaps back (drag preview only, owner spec)
+        _spRock.drag = null;
+        renderProduce();
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+    section.ondblclick = (e) => {
+      const g = xy(e);
+      const t = trackAtXY(g) || arrangement.tracks.find(t => t.id === _spSelTrack);
+      if (!t) return;
+      _spSelTrack = t.id;
+      const sp = ensureGlobalSpace();
+      const pos = posFromXY(g);
+      const anchors = (sp.tracks[t.id] = sp.tracks[t.id] || []);
+      if (!anchors.length) {
+        // the very first anchor also creates start + end anchors
+        const cur = _spTrackPos(t, playheadBeat);
+        anchors.push({ beat: 0, ...cur, smooth: 0.5 }, { beat: totalBeats(), ...cur, smooth: 0.5 });
+      }
+      const atBeat = Math.round(playheadBeat * 4) / 4;
+      const existing = anchors.find(a => Math.abs(a.beat - atBeat) < 0.26);
+      if (existing) { existing.angle = pos.angle; existing.dist = pos.dist; }
+      else anchors.push({ beat: atBeat, angle: pos.angle, dist: pos.dist, smooth: 0.5 });
+      anchors.sort((a, b) => a.beat - b.beat);
+      saveArrangement("space anchor");
+      renderProduce();
+    };
+  }
+
+  // Cylinder: roll drag (springs back) + anchor click → playhead jump
+  const cyl = v.querySelector("#spCylinder");
+  if (cyl) {
+    cyl.onmousedown = (e) => {
+      e.preventDefault();
+      const rect = cyl.getBoundingClientRect();
+      const w = cyl._cssW || cyl.width;
+      const x = (e.clientX - rect.left) * (w / Math.max(1, rect.width));
+      // anchor hit? jump the playhead there
+      const anchors = arrangement.space?.tracks?.[_spSelTrack] || [];
+      const beats = Math.max(1, totalBeats());
+      const hit = anchors.find(a => Math.abs((a.beat / beats) * w - x) < 6);
+      if (hit) {
+        playheadBeat = hit.beat;
+        updatePlayhead(playheadBeat);
+        renderProduce();
+        return;
+      }
+      _spRock.dragging = true;
+      const y0 = e.clientY, roll0 = _spRock.roll;
+      const move = (ev) => { _spRock.roll = roll0 + (ev.clientY - y0) * 0.01; };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        _spRock.dragging = false; // spring-back happens in the rAF loop
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+  }
+
+  if (_spOpen && !_spRaf) _spRaf = requestAnimationFrame(_spAnimate);
+}
+
 function produceTimelineHTML() {
   const laneW = totalBeats() * pxPerBeat;
   // Ruler: bar numbers every BEATS_PER_BAR
@@ -1972,6 +2353,7 @@ function produceTimelineHTML() {
   return `
     <div class="tl2">
       ${globalScaleStripHTML(laneW)}
+      ${globalSpaceStripHTML(laneW)}
       <div class="tl2-row tl2-ruler-row">
         <div class="tl2-head tl2-corner"></div>
         <div class="tl2-ruler" id="tlRuler" style="width:${laneW}px">${rulerMarks}
@@ -3010,6 +3392,7 @@ function wireProduce(v) {
   wireSessionBar(v);
   wireBrowserPalette(v);
   wireGlobalScale(v);
+  wireGlobalSpace(v);
 
   v.querySelectorAll("[data-add-track]").forEach(btn => {
     btn.onclick = () => {

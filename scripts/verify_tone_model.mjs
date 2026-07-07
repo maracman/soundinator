@@ -592,6 +592,31 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q6: global space designer interpolator ──
+{
+  const { trackSpaceAt } = await import("../web/static/synth.js");
+  const A = [
+    { beat: 0, angle: -90, dist: 2, smooth: 0 },
+    { beat: 8, angle: 90, dist: 6, smooth: 0 },
+    { beat: 16, angle: 0, dist: 2, smooth: 1 },
+  ];
+  check("Q6: exact hit at an anchor", trackSpaceAt(A, 8).angle === 90 && trackSpaceAt(A, 8).dist === 6);
+  check("Q6: linear midpoint at smooth 0",
+    trackSpaceAt(A, 4).angle === 0 && trackSpaceAt(A, 4).dist === 4);
+  check("Q6: linear quarter-point at smooth 0", trackSpaceAt(A, 2).angle === -45);
+  const q = trackSpaceAt(A, 10); // smooth-blended segment (mean 0.5), t=0.25
+  const tLin = 0.25, tSm = tLin * tLin * (3 - 2 * tLin);
+  const expected = 90 + (0 - 90) * (0.5 * tSm + 0.5 * tLin);
+  check("Q6: smoothness eases toward smoothstep", Math.abs(q.angle - expected) < 1e-9, `${q.angle} vs ${expected}`);
+  check("Q6: clamps before the first anchor", trackSpaceAt(A, -5).angle === -90);
+  check("Q6: clamps after the last anchor", trackSpaceAt(A, 99).dist === 2);
+  check("Q6: unsorted anchors are sorted first",
+    trackSpaceAt([A[2], A[0], A[1]], 4).angle === 0);
+  check("Q6: empty/missing anchors resolve to nothing",
+    trackSpaceAt([], 0) === null && trackSpaceAt(null, 0) === null);
+  check("Q6: single anchor is a constant", trackSpaceAt([{ beat: 4, angle: 30, dist: 3 }], 99).angle === 30);
+}
+
 // ── Q5: global scale strip resolution law ──
 {
   const { globalScaleAt, GenerationEngine } = await import("../web/static/synth.js");

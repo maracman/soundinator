@@ -5274,6 +5274,36 @@ body.explore-mode #app {
 .gs-cell.gs-root { background: rgba(180,142,222,0.3); color: #d9c2f0; border-color: rgba(180,142,222,0.55); }
 .tl2-gsbtn.on { color: #b8d8ff; border-color: rgba(148,196,255,0.5); }
 
+/* ── Q6: global space designer ───────────────────────────── */
+.tl2-sp-row { min-height: 20px; }
+.sp-panel {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+  padding: 0.4rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+#spSection, #spCylinder {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: crosshair;
+}
+#spCylinder { cursor: ns-resize; }
+.sp-head-panel { display: flex; flex-direction: column; gap: 0.3rem; min-width: 170px; }
+.sp-ctl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.62rem;
+  color: var(--text3);
+}
+.sp-ctl select, .sp-ctl input[type=range] { max-width: 110px; }
+
 /* ── Q3: baked-note performance drill-down (roll drawer) ─── */
 .roll-perf {
   display: flex;

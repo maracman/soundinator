@@ -993,6 +993,32 @@ export const SCALE_PRESETS = {
 
 const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// ─── Global space designer (Q6) ─────────────────────────────
+// A track's position over time is a list of anchors {beat, angle, dist,
+// smooth 0..1}. Between anchors we interpolate linearly, eased toward
+// smoothstep by the mean smoothness of the two anchors (smooth 0 = pure
+// linear, exact hits at anchors). Pure, asserted headlessly.
+export function trackSpaceAt(anchors, beat) {
+  if (!Array.isArray(anchors) || anchors.length === 0) return null;
+  const pts = anchors.filter(a => a && Number.isFinite(a.beat)).sort((a, b) => a.beat - b.beat);
+  if (!pts.length) return null;
+  const val = (a) => ({ angle: a.angle ?? 0, dist: a.dist ?? 2.5 });
+  if (beat <= pts[0].beat) return val(pts[0]);
+  if (beat >= pts[pts.length - 1].beat) return val(pts[pts.length - 1]);
+  let i = 0;
+  while (i < pts.length - 2 && pts[i + 1].beat <= beat) i++;
+  const a0 = pts[i], a1 = pts[i + 1];
+  const span = Math.max(1e-9, a1.beat - a0.beat);
+  const t = Math.max(0, Math.min(1, (beat - a0.beat) / span));
+  const s = Math.max(0, Math.min(1, ((a0.smooth ?? 0) + (a1.smooth ?? 0)) / 2));
+  const te = s * (t * t * (3 - 2 * t)) + (1 - s) * t;
+  const v0 = val(a0), v1 = val(a1);
+  return {
+    angle: v0.angle + (v1.angle - v0.angle) * te,
+    dist: v0.dist + (v1.dist - v0.dist) * te,
+  };
+}
+
 // ─── Global scale strip (Q5) ────────────────────────────────
 // The arrangement can carry scale MARKERS along the timeline; opted-in
 // tracks regenerate their takes under the marker in force at the region's
