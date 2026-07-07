@@ -1094,6 +1094,9 @@ let arrangement = null;
 let selectedRegion = null; // { trackId, regionId }
 let rollOpen = false;      // piano-roll panel visible for a baked region
 let rollNoteSel = -1;      // selected note index in the roll
+let _rollAddMode = false;  // Q9 D2: pencil mode — click an empty cell adds a note
+let selectedRegions = new Set(); // Q9 B2: multi-selected region ids (⇧click / rubber band)
+let _spTrackPopover = null; // Q9 C: trackId whose space mini-controls are open
 let _rollHits = [];        // hit rects from the last roll draw
 let _rollGeom = null;      // geometry from the last roll draw
 
@@ -1325,6 +1328,12 @@ function regionPlayParams(track, region, atBeat = null) {
       params.rootNotes = [...(marker.rootNotes || [0])];
     }
   }
+  // Q9 C: a track's own space (mini-pad in the track head) overrides the
+  // voice; the Q6 global space below supersedes it when enabled.
+  if (track?.space) {
+    if (Number.isFinite(track.space.angle)) params.spaceAzimuth = track.space.angle;
+    if (Number.isFinite(track.space.dist)) params.spaceDistance = track.space.dist;
+  }
   // Q6 global space: designer threads position each track over time —
   // resolved at atBeat (the walker passes the playing beat so positions
   // evolve mid-region). Override replaces the patch's space; offset adds
@@ -1361,7 +1370,7 @@ function sessionBarControlsHTML() {
       <input type="range" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/>
       <output id="ctxTempoOut">${ctx.tempo}</output>
     </label>
-    <label class="daw-ctx">Key
+    <label class="daw-ctx" title="Root pitch: the whole lattice transposes so degree 0 lands on this pitch class">Key (root pitch)
       <select data-ctx="root">
         ${NOTE_NAMES.map((n, i) => `<option value="${i}"${i === root ? " selected" : ""}>${n}</option>`).join("")}
       </select>
@@ -1562,7 +1571,7 @@ function sessionBarHTML() {
           <input type="range" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/>
           <output id="ctxTempoOut">${ctx.tempo}</output>
         </label>
-        <label>Key
+        <label title="Root pitch: the whole lattice transposes so degree 0 lands on this pitch class">Key (root pitch)
           <select data-ctx="root">
             ${NOTE_NAMES.map((n, i) => `<option value="${i}"${i === root ? " selected" : ""}>${n}</option>`).join("")}
           </select>
@@ -2312,9 +2321,9 @@ function produceTimelineHTML() {
   const barCount = totalBeats() / BEATS_PER_BAR;
   const rulerMarks = Array.from({ length: barCount }, (_, i) =>
     `<span class="tl2-bar" style="left:${i * BEATS_PER_BAR * pxPerBeat}px">${i + 1}</span>`).join("");
-  const trackRows = arrangement.tracks.map(t => {
+  const trackRows = arrangement.tracks.map((t, ti) => {
     const regions = t.regions.map(r => {
-      const sel = selectedRegion?.regionId === r.id ? " selected" : "";
+      const sel = (selectedRegion?.regionId === r.id || selectedRegions.has(r.id)) ? " selected" : "";
       const baked = r.type === "baked" ? " baked" : "";
       const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
       const label = pal ? pal.name : t.name;
@@ -2341,15 +2350,26 @@ function produceTimelineHTML() {
       </div>`;
     }).join("");
     const gain = t.gain ?? 1;
+    const gainDbTrack = 20 * Math.log10(Math.max(0.02, gain));
+    const hue = t.hue ?? _spHue(ti);
+    const spacePop = _spTrackPopover === t.id ? `
+      <div class="tl2-space-pop">
+        <label class="sp-ctl">Angle <input type="range" data-track-space-angle="${t.id}" min="-180" max="180" step="1" value="${t.space?.angle ?? 0}"/></label>
+        <label class="sp-ctl">Distance <input type="range" data-track-space-dist="${t.id}" min="0.3" max="30" step="0.1" value="${t.space?.dist ?? 2.5}"/></label>
+        <button class="pal-btn" data-track-space-clear="${t.id}" title="Back to the patch's own position">reset</button>
+      </div>` : "";
     return `<div class="tl2-row">
-      <div class="tl2-head${trackAudible(t) ? "" : " inaudible"}">
-        <span class="tl2-name" title="${esc(t.name)}">${esc(t.name)}</span>
+      <div class="tl2-head${trackAudible(t) ? "" : " inaudible"}" data-track-head="${t.id}">
+        <span class="tl2-hue" data-track-space="${t.id}" style="background:hsl(${hue},70%,55%)" title="This track's colour (matches its global-space thread). Click for the track's own space position — drag the header to reorder tracks."></span>
+        <span class="tl2-name" title="${esc(t.name)} — drag to reorder">${esc(t.name)}</span>
+        <span class="tl2-db" title="Track level">${gainDbTrack >= 0 ? "+" : ""}${gainDbTrack.toFixed(1)}dB</span>
         <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
         <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
         <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the global scale strip: this track's takes regenerate under the marker in force (baked notes stay put)">G</button>
         <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
         <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
         <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
+        ${spacePop}
       </div>
       <div class="tl2-lane" data-lane="${t.id}" style="width:${laneW}px">${regions}</div>
     </div>`;
@@ -2396,6 +2416,8 @@ function rollPanelHTML() {
     <div class="roll-panel${rollDynLane ? " dyn" : ""}">
       <div class="roll-head">
         <span class="roll-meta">grid <b>${beatDiv}/beat</b> · scale <b>${esc(scaleLabel)}</b> · key <b>${esc(keyName)}</b></span>
+        <button class="btn btn-ghost btn-sm${_rollAddMode ? " roll-add-on" : ""}" id="rollAddMode" title="Pencil mode: click an empty cell to add a note there">✏ add</button>
+        <span class="roll-keys" title="Keyboard, with a note selected: ⌫ delete · M mute · Q quantize · ←→ nudge division · ↑↓ scale step · ⌥↑↓ cents">⌫ M Q ←→ ↑↓</span>
         <label class="roll-dyncheck"><input type="checkbox" id="rollDynToggle"${rollDynLane ? " checked" : ""}/> dynamics</label>
       </div>
       <canvas id="rollCanvas" width="960" height="${rollDynLane ? 300 : 240}"></canvas>
@@ -2602,6 +2624,11 @@ function wireRoll(v) {
     rollDynLane = dynToggle.checked;
     renderProduce();
   };
+  const addToggle = v.querySelector("#rollAddMode");
+  if (addToggle) addToggle.onclick = () => {
+    _rollAddMode = !_rollAddMode;
+    renderProduce();
+  };
   const readout = v.querySelector("#rollReadout");
   const setReadout = (text) => { if (readout) readout.textContent = text; };
   // Q3: a selected note shows its one-line summary plus the performance
@@ -2652,9 +2679,36 @@ function wireRoll(v) {
     }
     const hit = _rollHits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y - 2 && y <= h.y + h.h + 2);
     if (!hit) {
+      // Q9 D2: pencil mode — an empty in-scale cell becomes a note
+      if (_rollAddMode && _rollGeom && y < _rollGeom.laneTop) {
+        const g = _rollGeom;
+        const deg = g.maxDeg - Math.floor((y - g.padT) / g.rowH);
+        const divIdx = Math.max(0, Math.min(g.totalDivs - 1, Math.floor((x - g.padL) / g.plotW * g.totalDivs)));
+        if (deg >= g.minDeg && deg <= g.maxDeg && g.rowInfo[deg]?.inScale) {
+          const proto = region.notes[0] || {};
+          const beatDivAdd = proto.beatDivisions || arrangement.context.beatDivisions || 1;
+          const divSec = 60 / (Math.max(30, arrangement.context.tempo || 104) * beatDivAdd);
+          const note = {
+            degree: deg, offsetDivs: divIdx, durationDivs: 1,
+            velocity: 0.62, intonationCents: 0, beatDivisions: beatDivAdd,
+            gapFraction: 0.1, legatoFromPrevious: false, isSurprise: false,
+            noteRole: "added", edited: true,
+            frequency: freqFor(deg, 0), duration: divSec * 0.9,
+          };
+          region.notes.push(note);
+          region.notes.sort((a, b) => (a.offsetDivs || 0) - (b.offsetDivs || 0));
+          rollNoteSel = region.notes.indexOf(note);
+          saveArrangement("add note");
+          drawRoll(region);
+          showNote(note);
+          if (!arrPlay && !synth.isPlaying) synth.playNotes(regionPlayParams(track, region), [{ ...note, offsetDivs: 0 }]);
+          e.preventDefault();
+          return;
+        }
+      }
       rollNoteSel = -1;
       drawRoll(region);
-      setReadout("Drag a note to move it (cents ride along; out-of-scale rows are locked); drag its EDGES to trim duration; ⇧ snaps clean; ⌥ fine-tunes cents.");
+      setReadout("Drag a note to move it (cents ride along; out-of-scale rows are locked); drag its EDGES to trim duration; ⇧ snaps clean; ⌥ fine-tunes cents. ✏ add-mode: click an empty cell to write a note.");
       return;
     }
     rollNoteSel = hit.i;
@@ -2789,8 +2843,19 @@ function wireRoll(v) {
 }
 
 function produceToolbarHTML() {
+  // Q9 B2: multi-selection gets bulk actions instead of the single-region kit
+  if (selectedRegions.size > 1) {
+    return `
+      <span class="toolbar-hint"><b>${selectedRegions.size}</b> regions selected</span>
+      <label class="region-gain-label" title="Set every selected region's level">Lvl
+        <input type="range" id="bulkGain" min="0" max="1.5" step="0.05" value="1"/>
+      </label>
+      <button class="btn btn-ghost btn-sm" id="bulkMute" title="Mute/unmute all selected regions">Mute</button>
+      <button class="btn btn-ghost btn-sm" id="bulkDuplicate" title="Duplicate each selected region after itself (same seed)">Duplicate</button>
+      <button class="btn btn-ghost btn-sm" id="bulkDelete" title="Delete all selected regions (⌫)">Delete</button>`;
+  }
   if (!selectedRegion) {
-    return '<span class="toolbar-hint">Select a region to play it as a loop, reroll its take, or delete it.</span>';
+    return '<span class="toolbar-hint">Select a region to play it as a loop, reroll its take, or delete it. Press ? for shortcuts.</span>';
   }
   const sel = (() => {
     for (const t of arrangement.tracks) {
@@ -3000,6 +3065,77 @@ function pasteRegionAtPlayhead() {
   renderProduce();
 }
 
+// ── Q9 F: onboarding — shortcut overlay + first-visit tour ──
+function toggleShortcutOverlay() {
+  const existing = document.getElementById("shortcutOverlay");
+  if (existing) { existing.remove(); return; }
+  const el = document.createElement("div");
+  el.id = "shortcutOverlay";
+  el.className = "shortcut-overlay";
+  el.innerHTML = `
+    <div class="shortcut-card">
+      <div class="section-label">Producer shortcuts <span class="shortcut-close">esc / ? closes</span></div>
+      <div class="shortcut-cols">
+        <dl>
+          <dt>Space</dt><dd>play / stop</dd>
+          <dt>Enter</dt><dd>return to zero</dd>
+          <dt>Z · ⇧Z</dt><dd>zoom to fit · to selection</dd>
+          <dt>⌘Z · ⇧⌘Z</dt><dd>undo · redo</dd>
+          <dt>R · ⇧R</dt><dd>reroll take · previous seed</dd>
+          <dt>⌘D · ⇧⌘D</dt><dd>duplicate · with new seed</dd>
+          <dt>⌘T</dt><dd>split at playhead</dd>
+          <dt>⌘C · ⌘V</dt><dd>copy · paste region</dd>
+          <dt>⌫</dt><dd>delete selection</dd>
+          <dt>⇧click · drag</dt><dd>multi-select regions</dd>
+        </dl>
+        <dl>
+          <dt colspan="2"><b>Piano roll (note selected)</b></dt><dd></dd>
+          <dt>⌫</dt><dd>delete note</dd>
+          <dt>M</dt><dd>mute note (keeps its level)</dd>
+          <dt>Q</dt><dd>quantize (clear micro-timing)</dd>
+          <dt>← →</dt><dd>nudge a grid division</dd>
+          <dt>↑ ↓</dt><dd>move a scale step</dd>
+          <dt>⌥↑ ⌥↓</dt><dd>fine-tune ±5¢</dd>
+          <dt>✏ add</dt><dd>click empty cells to write notes</dd>
+        </dl>
+      </div>
+    </div>`;
+  el.onclick = () => el.remove();
+  document.body.appendChild(el);
+}
+
+const PRODUCER_TOUR_KEY = "phase0.producerTour.v1";
+function maybeShowProducerTour() {
+  if (localStorage.getItem(PRODUCER_TOUR_KEY)) return;
+  const steps = [
+    ["Welcome to the Producer", "Drag presets from the BROWSER (left) into your PALETTE — that rack holds the instruments of this arrangement. Drop one on a track lane to place a region."],
+    ["Regions are takes", "Every region plays a deterministic take of its seed — R rerolls it, ◆ Bake freezes it into editable notes, double-click opens the piano roll."],
+    ["Global strips & shortcuts", "The strips above the ruler drive a GLOBAL SCALE and a GLOBAL SPACE for opted-in tracks. Press ? any time for the full shortcut list."],
+  ];
+  let i = 0;
+  const el = document.createElement("div");
+  el.className = "shortcut-overlay";
+  const draw = () => {
+    el.innerHTML = `
+      <div class="shortcut-card tour-card">
+        <div class="section-label">${esc(steps[i][0])} <span class="shortcut-close">${i + 1}/${steps.length}</span></div>
+        <p>${esc(steps[i][1])}</p>
+        <div class="tour-actions">
+          <button class="btn btn-ghost btn-sm" id="tourSkip">Skip</button>
+          <button class="btn btn-primary btn-sm" id="tourNext">${i === steps.length - 1 ? "Done" : "Next"}</button>
+        </div>
+      </div>`;
+    el.querySelector("#tourSkip").onclick = done;
+    el.querySelector("#tourNext").onclick = () => { if (++i >= steps.length) done(); else draw(); };
+  };
+  const done = () => {
+    localStorage.setItem(PRODUCER_TOUR_KEY, "seen");
+    el.remove();
+  };
+  draw();
+  document.body.appendChild(el);
+}
+
 // U4: DAW keyboard transport, active only in the producer view
 if (!window._dawKeysInstalled) {
   window._dawKeysInstalled = true;
@@ -3007,6 +3143,66 @@ if (!window._dawKeysInstalled) {
     if (!location.hash.includes("produce") || !arrangement) return;
     const t = e.target;
     if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    // Q9 F: ? toggles the shortcut overlay
+    if (e.key === "?") {
+      e.preventDefault();
+      toggleShortcutOverlay();
+      return;
+    }
+    // Q9 D2: roll-note keyboard when a note is selected in the open roll
+    if (rollOpen && rollNoteSel >= 0 && selectedBakedRegion()
+        && ["Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "m", "M", "q", "Q"].includes(e.key)) {
+      e.preventDefault();
+      const region = selectedBakedRegion();
+      const track = arrangement.tracks.find(tr => tr.id === selectedRegion.trackId);
+      const note = region.notes[rollNoteSel];
+      if (!note || !track) return;
+      let gone = false;
+      if (e.key === "Backspace" || e.key === "Delete") {
+        region.notes.splice(rollNoteSel, 1);
+        rollNoteSel = -1;
+        gone = true;
+        saveArrangement("delete note");
+      } else if (e.key.toLowerCase() === "m") {
+        // mute = velocity-0 flag, not removal (restores the old level)
+        if (note.muted) { note.velocity = note.premuteVelocity ?? 0.62; note.muted = false; }
+        else { note.premuteVelocity = note.velocity; note.velocity = 0; note.muted = true; }
+        saveArrangement("mute note");
+      } else if (e.key.toLowerCase() === "q") {
+        note.onsetDevDivs = 0;
+        note.durationDevDivs = 0;
+        note.edited = true;
+        saveArrangement("quantize note");
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        note.offsetDivs = Math.max(0, (note.offsetDivs || 0) + (e.key === "ArrowRight" ? 1 : -1));
+        note.edited = true;
+        saveArrangement("nudge note");
+      } else {
+        const dir = e.key === "ArrowUp" ? 1 : -1;
+        const scale = new GenerationEngine(regionPlayParams(track, region)).scale;
+        if (e.altKey) {
+          note.intonationCents = (note.intonationCents || 0) + dir * 5;
+        } else {
+          note.degree = scale.stepFrom(note.degree, dir);
+          note.intonationCents = note.intonationCents || 0;
+        }
+        note.frequency = scale.degreeToHz(note.degree) * Math.pow(2, (note.intonationCents || 0) / 1200);
+        note.edited = true;
+        saveArrangement("nudge pitch");
+      }
+      drawRoll(region);
+      // audition the edit (short, only when nothing else is sounding)
+      if (!gone && !arrPlay && !synth.isPlaying && note.velocity > 0) {
+        synth.playNotes(regionPlayParams(track, region), [{ ...note, offsetDivs: 0 }]);
+      }
+      return;
+    }
+    // Q9 B2: ⌫ clears the whole multi-selection
+    if ((e.key === "Delete" || e.key === "Backspace") && selectedRegions.size > 1) {
+      e.preventDefault();
+      document.querySelector("#bulkDelete")?.click();
+      return;
+    }
     if (e.code === "Space") {
       e.preventDefault();
       document.querySelector("#arrPlayBtn")?.click();
@@ -3309,6 +3505,7 @@ function renderProduce() {
   document.title = "Sound Studio — Producer";
   wireDawLayout(v);
   wireProduce(v);
+  maybeShowProducerTour(); // Q9 F: three-step first-visit tour
   return v;
 }
 
@@ -3429,12 +3626,71 @@ function wireProduce(v) {
 
   v.querySelectorAll("[data-remove-track]").forEach(btn => {
     btn.onclick = () => {
+      const track = arrangement.tracks.find(t => t.id === btn.dataset.removeTrack);
+      // Q9 C: deleting a track with regions is destructive — confirm first
+      if (track && track.regions.length && !confirm(`Remove track "${track.name}" and its ${track.regions.length} region${track.regions.length > 1 ? "s" : ""}?`)) return;
       arrangement.tracks = arrangement.tracks.filter(t => t.id !== btn.dataset.removeTrack);
       if (selectedRegion && !arrangement.tracks.some(t => t.id === selectedRegion.trackId)) {
         selectedRegion = null;
       }
-      saveArrangement();
+      saveArrangement("remove track");
       renderProduce();
+    };
+  });
+
+  // Q9 C: track-head extras — hue swatch opens the track's own space
+  // mini-controls; dragging the header vertically reorders tracks.
+  v.querySelectorAll("[data-track-space]").forEach(sw => {
+    sw.onclick = (e) => {
+      e.stopPropagation();
+      _spTrackPopover = _spTrackPopover === sw.dataset.trackSpace ? null : sw.dataset.trackSpace;
+      renderProduce();
+    };
+  });
+  const bindTrackSpace = (attr, key) => v.querySelectorAll(`[${attr}]`).forEach(sl => {
+    sl.oninput = () => {
+      const t = arrangement.tracks.find(t => t.id === sl.getAttribute(attr));
+      if (!t) return;
+      t.space = { angle: t.space?.angle ?? 0, dist: t.space?.dist ?? 2.5, [key]: Number(sl.value) };
+    };
+    sl.onchange = () => { saveArrangement("track space"); };
+  });
+  bindTrackSpace("data-track-space-angle", "angle");
+  bindTrackSpace("data-track-space-dist", "dist");
+  v.querySelectorAll("[data-track-space-clear]").forEach(btn => {
+    btn.onclick = () => {
+      const t = arrangement.tracks.find(t => t.id === btn.dataset.trackSpaceClear);
+      if (t) { delete t.space; _spTrackPopover = null; saveArrangement("track space reset"); renderProduce(); }
+    };
+  });
+  v.querySelectorAll("[data-track-head]").forEach(head => {
+    head.onmousedown = (e) => {
+      if (e.target.closest("button, input, .tl2-hue, .tl2-space-pop")) return;
+      e.preventDefault();
+      const id = head.dataset.trackHead;
+      let baseY = e.clientY;
+      const rowH = head.closest(".tl2-row")?.getBoundingClientRect().height || 40;
+      let moved = false;
+      const move = (ev) => {
+        const delta = Math.round((ev.clientY - baseY) / rowH);
+        if (!delta) return;
+        const from = arrangement.tracks.findIndex(t => t.id === id);
+        const to = Math.max(0, Math.min(arrangement.tracks.length - 1, from + delta));
+        if (to !== from) {
+          const [t] = arrangement.tracks.splice(from, 1);
+          arrangement.tracks.splice(to, 0, t);
+          moved = true;
+          baseY = ev.clientY; // each step re-baselines so moves don't compound
+          renderProduce(); // document-level listeners keep the drag alive across the re-render
+        }
+      };
+      const up = () => {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        if (moved) saveArrangement("reorder tracks");
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
     };
   });
 
@@ -3469,7 +3725,17 @@ function wireProduce(v) {
   });
 
   v.querySelectorAll("[data-region]").forEach(el => {
-    el.onclick = () => {
+    el.onclick = (e) => {
+      // Q9 B2: ⇧click extends the multi-selection
+      if (e.shiftKey) {
+        if (selectedRegion?.regionId && !selectedRegions.size) selectedRegions.add(selectedRegion.regionId);
+        if (selectedRegions.has(el.dataset.region)) selectedRegions.delete(el.dataset.region);
+        else selectedRegions.add(el.dataset.region);
+        selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
+        renderProduce();
+        return;
+      }
+      selectedRegions.clear();
       if (selectedRegion?.regionId !== el.dataset.region) rollNoteSel = -1;
       selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
       renderProduce();
@@ -3480,6 +3746,53 @@ function wireProduce(v) {
         rollOpen = true;
         renderProduce();
       }
+    };
+  });
+
+  // Q9 B2: rubber-band selection — drag on empty lane space sweeps regions
+  // across lanes into the multi-selection.
+  v.querySelectorAll(".tl2-lane").forEach(lane => {
+    lane.onmousedown = (e) => {
+      if (e.target.closest("[data-region]")) return; // region drags win
+      if (lane.dataset.lane === "__new__") return;
+      e.preventDefault();
+      const x0 = e.clientX, y0 = e.clientY;
+      const band = document.createElement("div");
+      band.className = "tl2-band";
+      document.body.appendChild(band);
+      let swept = false;
+      const move = (ev) => {
+        swept = true;
+        const l = Math.min(x0, ev.clientX), t = Math.min(y0, ev.clientY);
+        const w = Math.abs(ev.clientX - x0), h = Math.abs(ev.clientY - y0);
+        Object.assign(band.style, { left: `${l}px`, top: `${t}px`, width: `${w}px`, height: `${h}px`, display: "block" });
+      };
+      const up = (ev) => {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        const rect = { l: Math.min(x0, ev.clientX), t: Math.min(y0, ev.clientY), r: Math.max(x0, ev.clientX), b: Math.max(y0, ev.clientY) };
+        band.remove();
+        if (!swept || (rect.r - rect.l < 4 && rect.b - rect.t < 4)) {
+          // plain click on empty lane: clear selection but don't re-render
+          // needlessly — a re-render here would swallow double-click-create
+          if (selectedRegions.size) {
+            selectedRegions.clear();
+            renderProduce();
+          }
+          return;
+        }
+        selectedRegions.clear();
+        document.querySelectorAll("[data-region]").forEach(rEl => {
+          const rr = rEl.getBoundingClientRect();
+          if (rr.right > rect.l && rr.left < rect.r && rr.bottom > rect.t && rr.top < rect.b) {
+            selectedRegions.add(rEl.dataset.region);
+            selectedRegion = { trackId: rEl.dataset.track, regionId: rEl.dataset.region };
+          }
+        });
+        renderProduce();
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
     };
   });
 
@@ -3638,6 +3951,53 @@ function wireProduce(v) {
       window.addEventListener("mouseup", up);
     };
   });
+
+  // Q9 B2: bulk actions over the multi-selection
+  const eachSelected = (fn) => {
+    for (const t of arrangement.tracks) {
+      for (const r of [...t.regions]) if (selectedRegions.has(r.id)) fn(t, r);
+    }
+  };
+  const bulkGain = v.querySelector("#bulkGain");
+  if (bulkGain) bulkGain.onchange = () => {
+    eachSelected((t, r) => { r.gain = Number(bulkGain.value); });
+    saveArrangement("bulk gain");
+    renderProduce();
+  };
+  const bulkMute = v.querySelector("#bulkMute");
+  if (bulkMute) bulkMute.onclick = () => {
+    let anyOn = false;
+    eachSelected((t, r) => { if (!r.muted) anyOn = true; });
+    eachSelected((t, r) => { r.muted = anyOn; });
+    saveArrangement("bulk mute");
+    renderProduce();
+  };
+  const bulkDup = v.querySelector("#bulkDuplicate");
+  if (bulkDup) bulkDup.onclick = () => {
+    const fresh = [];
+    eachSelected((t, r) => {
+      const len = regionLen(r);
+      let start = r.startBeat + len;
+      while (start + len <= totalBeats() && !spanFree(t, start, len)) start++;
+      if (start + len > totalBeats()) return;
+      const copy = JSON.parse(JSON.stringify(r));
+      copy.id = crypto.randomUUID();
+      copy.startBeat = start;
+      t.regions.push(copy);
+      fresh.push(copy.id);
+    });
+    selectedRegions = new Set(fresh);
+    saveArrangement("bulk duplicate");
+    renderProduce();
+  };
+  const bulkDel = v.querySelector("#bulkDelete");
+  if (bulkDel) bulkDel.onclick = () => {
+    for (const t of arrangement.tracks) t.regions = t.regions.filter(r => !selectedRegions.has(r.id));
+    selectedRegions.clear();
+    selectedRegion = null;
+    saveArrangement("bulk delete");
+    renderProduce();
+  };
 
   const bakeBtn = v.querySelector("#regionBake");
   if (bakeBtn) bakeBtn.onclick = () => {

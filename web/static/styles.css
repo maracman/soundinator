@@ -5274,6 +5274,65 @@ body.explore-mode #app {
 .gs-cell.gs-root { background: rgba(180,142,222,0.3); color: #d9c2f0; border-color: rgba(180,142,222,0.55); }
 .tl2-gsbtn.on { color: #b8d8ff; border-color: rgba(148,196,255,0.5); }
 
+/* ── Q9: producer remainders ─────────────────────────────── */
+.tl2-hue {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+  cursor: pointer;
+}
+.tl2-db { font-size: 0.55rem; color: var(--text3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tl2-space-pop {
+  position: absolute;
+  left: 4px;
+  top: 100%;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.35rem 0.45rem;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+}
+.tl2-head { position: relative; }
+.tl2-band {
+  position: fixed;
+  z-index: 40;
+  display: none;
+  background: rgba(245,166,35,0.08);
+  border: 1px dashed rgba(245,166,35,0.55);
+  pointer-events: none;
+}
+.roll-add-on { color: var(--accent2); border-color: rgba(245,166,35,0.5); }
+.roll-keys { font-size: 0.55rem; color: var(--text3); letter-spacing: 0.08em; margin-left: 0.5rem; }
+.shortcut-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6,8,12,0.6);
+}
+.shortcut-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  max-width: 560px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.shortcut-close { float: right; font-size: 0.6rem; color: var(--text3); text-transform: none; letter-spacing: 0; }
+.shortcut-cols { display: flex; gap: 1.5rem; }
+.shortcut-cols dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.7rem; margin: 0.6rem 0 0; }
+.shortcut-cols dt { font-size: 0.68rem; color: var(--accent2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.shortcut-cols dd { font-size: 0.68rem; color: var(--text2); margin: 0; }
+.tour-card p { font-size: 0.78rem; color: var(--text2); line-height: 1.5; margin: 0.6rem 0; }
+.tour-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
 /* ── Q7: layered subnote modules ─────────────────────────── */
 .layer-strip {
   display: flex;
