@@ -52,7 +52,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.4.0"; // Q4: binaural head replaces HRTF panner (same params → different audio)
+const APP_VERSION = "sound-studio-0.5.0"; // Q7: layered subnotes change what a params object renders as
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -337,6 +337,8 @@ const DEFAULTS = {
   spaceAzimuth: 0,
   earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
   headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
+  layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
+  layerEnvOverride: false, // Q7: true = one envelope draw shared by base + all layers
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -491,6 +493,8 @@ const PARAM_DESC = {
   spaceAzimuth: "The instrument's bearing, all the way around you (−180°…180°): per-ear arrival times, far-ear head shadow, and a pinna cue that makes sounds behind you duller than in front — real binaural physics, not simple panning",
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences = a wider, more localised stereo image",
   headDensity: "How opaque your head is to sound (0–1). Denser = the far ear loses more level and more treble when a source sits to one side",
+  layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
+  layerEnvOverride: "Sync the envelope variation: one draw per note shared by the base sound and every layer, instead of each layer varying independently",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -4841,6 +4845,7 @@ function renderExplore() {
 
   wireTonePrint(v);
   wireSpacePad(v);
+  wireLayerStrip(v);
 
   // Rotary knobs (tone chain): vertical drag, shift = fine, double-click
   // resets to the stage default. Every change lights up the overlay it
@@ -5624,6 +5629,50 @@ function productionPanelHTML(p) {
     </div>`;
 }
 
+// ── Q7: layered subnote modules ─────────────────────────────
+// Coloured blocks along the bottom of the sub-note view: ＋ captures the
+// CURRENT subnote half as a new layer; each block gets level, position and
+// an independent-head toggle; the strip header can sync envelope draws.
+let _chLayerSel = null; // selected layer id (opens its mini panel)
+
+function layerStripHTML(p) {
+  const layers = Array.isArray(p.layers) ? p.layers : [];
+  const sel = layers.find(l => l.id === _chLayerSel);
+  const blocks = layers.map((l, i) => `
+    <button class="layer-block${l.id === _chLayerSel ? " sel" : ""}" data-layer-block="${l.id}"
+      style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}"
+      title="Layer ${i + 1} (${esc(SPECTRAL_PROFILES[l.subnote?.spectralProfile]?.label || l.subnote?.spectralProfile || "custom")}) — click to edit">
+      ${i + 1}
+    </button>`).join("");
+  const panel = sel ? `
+    <div class="layer-panel">
+      <label class="sp-ctl">Level
+        <input type="range" data-layer-gain="${sel.id}" min="0" max="1.5" step="0.01" value="${sel.gain ?? 1}" title="This layer's level relative to the base sound"/>
+      </label>
+      <label class="sp-ctl">Angle
+        <input type="range" data-layer-angle="${sel.id}" min="-180" max="180" step="1" value="${sel.space?.angle ?? 0}" title="Where this layer sits around you (inherits the patch position when untouched)"/>
+      </label>
+      <label class="sp-ctl">Distance
+        <input type="range" data-layer-dist="${sel.id}" min="0.3" max="30" step="0.1" value="${sel.space?.dist ?? 2.5}" title="How far away this layer stands"/>
+      </label>
+      <label class="sp-ctl"><span title="Give this layer its own ear span / head density (from its captured subnote params) instead of inheriting the listener's">independent head</span>
+        <input type="checkbox" data-layer-head="${sel.id}"${sel.independentHead ? " checked" : ""}/>
+      </label>
+      <button class="pal-btn" data-layer-remove="${sel.id}" title="Remove this layer">×</button>
+    </div>` : "";
+  return `
+    <div class="layer-strip" id="layerStrip">
+      <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
+      ${blocks}
+      <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer">＋</button>
+      <label class="layer-env-sync" title="${esc(PARAM_DESC.layerEnvOverride)}">
+        <input type="checkbox" id="layerEnvSync"${p.layerEnvOverride ? " checked" : ""}/> override envelope probabilities
+      </label>
+    </div>
+    ${panel}
+    ${p.layerEnvOverride && layers.length ? `<div class="layer-env-block">${envelopeProbBlockHTML(p)}</div>` : ""}`;
+}
+
 function subnoteWorkspaceHTML(p) {
   const formantMode = isFormantMode(p);
   const fourierDisabled = formantMode ? " mode-disabled" : "";
@@ -5696,6 +5745,7 @@ function subnoteWorkspaceHTML(p) {
               </div>
             </div>
             <div class="ch-status"><span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span></div>
+            ${layerStripHTML(p)}
           </div>
         `}
 
@@ -8431,6 +8481,68 @@ function drawSpacePad() {
   ctx.shadowColor = "#58d6a9"; ctx.shadowBlur = 8;
   ctx.beginPath(); ctx.arc(ix, iy, 5, 0, 2 * Math.PI); ctx.fill();
   ctx.shadowBlur = 0;
+}
+
+// Q7: layer strip interactions. Layer edits apply live through
+// updateGenerationParams — the next generated note carries them.
+function wireLayerStrip(v) {
+  const applyLive = () => synth.updateGenerationParams({ ...exploreParams });
+  const add = v.querySelector("#layerAdd");
+  if (add) add.onclick = () => {
+    if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
+    const subnote = extractSectionParams(exploreParams, "sound");
+    delete subnote.layers;          // a layer never nests layers
+    delete subnote.layerEnvOverride;
+    const layer = {
+      id: crypto.randomUUID(),
+      hue: (36 + exploreParams.layers.length * 70) % 360,
+      subnote,
+      space: null, // inherits the patch position until positioned
+      gain: 0.8,
+      independentHead: false,
+    };
+    exploreParams.layers.push(layer);
+    _chLayerSel = layer.id;
+    applyLive();
+    renderExplore();
+  };
+  v.querySelectorAll("[data-layer-block]").forEach(b => {
+    b.onclick = () => {
+      _chLayerSel = _chLayerSel === b.dataset.layerBlock ? null : b.dataset.layerBlock;
+      renderExplore();
+    };
+  });
+  const layerOf = (id) => (exploreParams.layers || []).find(l => l.id === id);
+  const bindSlider = (attr, apply) => v.querySelectorAll(`[${attr}]`).forEach(el => {
+    el.oninput = () => {
+      const l = layerOf(el.getAttribute(attr));
+      if (l) { apply(l, Number(el.value)); applyLive(); }
+    };
+  });
+  bindSlider("data-layer-gain", (l, val) => { l.gain = val; });
+  bindSlider("data-layer-angle", (l, val) => { l.space = { angle: val, dist: l.space?.dist ?? 2.5 }; });
+  bindSlider("data-layer-dist", (l, val) => { l.space = { angle: l.space?.angle ?? 0, dist: val }; });
+  v.querySelectorAll("[data-layer-head]").forEach(el => {
+    el.onchange = () => {
+      const l = layerOf(el.dataset.layerHead);
+      if (l) { l.independentHead = el.checked; applyLive(); }
+    };
+  });
+  v.querySelectorAll("[data-layer-remove]").forEach(el => {
+    el.onclick = () => {
+      exploreParams.layers = (exploreParams.layers || []).filter(l => l.id !== el.dataset.layerRemove);
+      if (!exploreParams.layers.length) exploreParams.layers = null;
+      _chLayerSel = null;
+      applyLive();
+      renderExplore();
+    };
+  });
+  const sync = v.querySelector("#layerEnvSync");
+  if (sync) sync.onchange = () => {
+    exploreParams.layerEnvOverride = sync.checked;
+    applyLive();
+    renderExplore();
+  };
 }
 
 function wireSpacePad(v) {

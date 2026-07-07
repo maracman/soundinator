@@ -1649,6 +1649,16 @@ export class GenerationEngine {
       pitchBits,
       ...subNote,
     };
+    // Q7 layered subnotes: each layer renders its own fingerprint under its
+    // own subnote params — ONE seed drives everything (sequential rng draws
+    // decorrelate the layers deterministically). Envelope draws are
+    // independent per layer unless layerEnvOverride syncs them to the base
+    // draw. Cross-layer sympathetic coupling runs over the union set.
+    if (Array.isArray(this.p.layers) && this.p.layers.length) {
+      out.layerRenders = this.p.layers.map((layer, i) =>
+        this._layerRender(layer, i, velocity, fittedFrequency, note.degree, note.formantPos, out));
+      this._applyCrossLayerCoupling(out, out.layerRenders);
+    }
     this._recordNoteMetrics(out, {
       isSurpriseStart,
       gridDuration,
@@ -1706,6 +1716,66 @@ export class GenerationEngine {
       ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
       ...this._envelopeVariation(),
     };
+  }
+
+  // Q7: one layer's render data for this note. The layer's subnote params
+  // temporarily overlay the engine params so the SAME fingerprint code runs.
+  _layerRender(layer, index, velocity, fundamentalHz, degree, formantPos, baseNote) {
+    const saved = this.p;
+    this.p = { ...saved, ...(layer.subnote || {}) };
+    let fields;
+    try {
+      fields = {
+        ...this._vibratoParams(),
+        ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
+        ...(saved.layerEnvOverride
+          ? {
+              envelopeAttack: baseNote.envelopeAttack,
+              envelopeDecay: baseNote.envelopeDecay,
+              envelopeSustain: baseNote.envelopeSustain,
+              envelopeRelease: baseNote.envelopeRelease,
+            }
+          : this._envelopeVariation()),
+      };
+    } finally {
+      this.p = saved;
+    }
+    return {
+      id: layer.id || `layer${index}`,
+      gain: layer.gain ?? 1,
+      space: layer.space || null,
+      independentHead: !!layer.independentHead,
+      earDistance: layer.subnote?.earDistance,
+      headDensity: layer.subnote?.headDensity,
+      note: fields,
+    };
+  }
+
+  // Q7: sympathetic transfer across the union of base + layer partials —
+  // cross-stream pairs only (each stream's internal bloom stays with the
+  // renderer). Energy flows from stronger to weaker coupled partials, baked
+  // into the starting amplitudes as the steady-state exchange.
+  _applyCrossLayerCoupling(baseNote, layerRenders) {
+    const transfer = this._clamp(this.p.partialTransfer ?? 0.15, 0, 1);
+    if (transfer <= 0) return;
+    const streams = [baseNote, ...layerRenders.map(lr => lr.note)];
+    const union = [];
+    streams.forEach((s, si) =>
+      (s.harmonicPartials || []).forEach((part) => union.push({ si, part })));
+    if (union.length < 2) return;
+    const deltas = new Array(union.length).fill(0);
+    for (let i = 0; i < union.length; i++) {
+      for (let j = i + 1; j < union.length; j++) {
+        if (union[i].si === union[j].si) continue;
+        const C = transferCoupling(
+          union[i].part.harmonicFrequency, union[j].part.harmonicFrequency);
+        if (C < 0.01) continue;
+        const flow = transfer * C * (union[j].part.amp - union[i].part.amp) * 0.35;
+        deltas[i] += flow;
+        deltas[j] -= flow;
+      }
+    }
+    union.forEach((u, i) => { u.part.amp = Math.max(0, u.part.amp + deltas[i]); });
   }
 
   _vibratoParams() {
@@ -3058,6 +3128,20 @@ export class SynthEngine {
   // deterministic (no randomness).
   _configureSpace(p = {}) {
     if (!this.ctx || !this._spaceDelay) return;
+    this._spaceP = p; // remembered so layer chains (Q7) inherit the base space
+    this._configureSpaceNodes({
+      proximity: this._spaceProximity, air: this._spaceAir, delay: this._spaceDelay,
+      earDelayL: this._earDelayL, earDelayR: this._earDelayR,
+      earShadowL: this._earShadowL, earShadowR: this._earShadowR,
+      earFilterL: this._earFilterL, earFilterR: this._earFilterR,
+      pinnaShelf: this._pinnaShelf, pinnaNotch: this._pinnaNotch,
+      distGain: this._spaceDistGain,
+    }, p);
+  }
+
+  // One spatial chain's configuration — shared by the base chain and every
+  // layer chain (Q7), so layers get the full Q4 head physics.
+  _configureSpaceNodes(n, p = {}) {
     const d = Math.max(0.3, Math.min(30, Number(p.spaceDistance ?? 2.5)));
     const azDeg = Math.max(-180, Math.min(180, Number(p.spaceAzimuth ?? 0)));
     const az = azDeg * Math.PI / 180;
@@ -3065,29 +3149,77 @@ export class SynthEngine {
     const smooth = (param, v) => {
       try { param.setTargetAtTime(v, now, 0.05); } catch { param.value = v; }
     };
-    smooth(this._spaceDelay.delayTime, spaceArrivalDelay(d));
-    smooth(this._spaceAir.frequency, spaceAirCutoff(d));
-    smooth(this._spaceProximity.gain, spaceProximityDb(d));
-    if (this._earDelayL) {
+    smooth(n.delay.delayTime, spaceArrivalDelay(d));
+    smooth(n.air.frequency, spaceAirCutoff(d));
+    smooth(n.proximity.gain, spaceProximityDb(d));
+    if (n.earDelayL) {
       // Q4 binaural head: listener properties ride the same params object
       const earDist = Number(p.earDistance ?? 0.175);
       const density = Number(p.headDensity ?? 0.5);
       const itd = itdSeconds(az, earDist);
-      smooth(this._earDelayL.delayTime, Math.max(0, itd));
-      smooth(this._earDelayR.delayTime, Math.max(0, -itd));
+      smooth(n.earDelayL.delayTime, Math.max(0, itd));
+      smooth(n.earDelayR.delayTime, Math.max(0, -itd));
       const shadow = Math.pow(10, -ildDb(az, density) / 20);
       const cut = headShadowCutoff(az, density);
       const farLeft = az >= 0; // source right of centre shadows the left ear
-      smooth(this._earShadowL.gain, farLeft ? shadow : 1);
-      smooth(this._earShadowR.gain, farLeft ? 1 : shadow);
-      smooth(this._earFilterL.frequency, farLeft ? cut : 20000);
-      smooth(this._earFilterR.frequency, farLeft ? 20000 : cut);
+      smooth(n.earShadowL.gain, farLeft ? shadow : 1);
+      smooth(n.earShadowR.gain, farLeft ? 1 : shadow);
+      smooth(n.earFilterL.frequency, farLeft ? cut : 20000);
+      smooth(n.earFilterR.frequency, farLeft ? 20000 : cut);
       const pin = pinnaParams(az);
-      smooth(this._pinnaShelf.gain, pin.shelfDb);
-      this._pinnaNotch.frequency.value = pin.notchHz;
-      smooth(this._pinnaNotch.gain, pin.notchDepthDb);
-      smooth(this._spaceDistGain.gain, spaceDistanceGain(d));
+      smooth(n.pinnaShelf.gain, pin.shelfDb);
+      n.pinnaNotch.frequency.value = pin.notchHz;
+      smooth(n.pinnaNotch.gain, pin.notchDepthDb);
+      smooth(n.distGain.gain, spaceDistanceGain(d));
     }
+  }
+
+  // Q7: a layer's own spatial chain — same topology as the base one,
+  // feeding the shared dry bus and reverb send. Built lazily per layer id.
+  _layerChain(id) {
+    if (!this._layerChains) this._layerChains = new Map();
+    let c = this._layerChains.get(id);
+    if (c) return c;
+    const bi = (type, freq, q) => {
+      const f = this.ctx.createBiquadFilter();
+      f.type = type; f.frequency.value = freq;
+      if (q != null) f.Q.value = q;
+      return f;
+    };
+    c = {
+      input: this.ctx.createGain(),
+      proximity: bi("lowshelf", 180),
+      air: bi("lowpass", 20000, 0.5),
+      delay: this.ctx.createDelay(0.12),
+      earDelayL: this.ctx.createDelay(0.005),
+      earDelayR: this.ctx.createDelay(0.005),
+      earShadowL: this.ctx.createGain(),
+      earShadowR: this.ctx.createGain(),
+      earFilterL: bi("lowpass", 20000, 0.5),
+      earFilterR: bi("lowpass", 20000, 0.5),
+      merger: this.ctx.createChannelMerger(2),
+      pinnaShelf: bi("highshelf", 4500),
+      pinnaNotch: bi("peaking", 8000, 4),
+      distGain: this.ctx.createGain(),
+    };
+    c.input.connect(c.proximity);
+    c.proximity.connect(c.air);
+    c.air.connect(c.delay);
+    c.delay.connect(c.earDelayL);
+    c.delay.connect(c.earDelayR);
+    c.earDelayL.connect(c.earShadowL);
+    c.earDelayR.connect(c.earShadowR);
+    c.earShadowL.connect(c.earFilterL);
+    c.earShadowR.connect(c.earFilterR);
+    c.earFilterL.connect(c.merger, 0, 0);
+    c.earFilterR.connect(c.merger, 0, 1);
+    c.merger.connect(c.pinnaShelf);
+    c.pinnaShelf.connect(c.pinnaNotch);
+    c.pinnaNotch.connect(c.distGain);
+    c.distGain.connect(this._dryGain);
+    c.input.connect(this._preDelay); // shared diffuse reverb send
+    this._layerChains.set(id, c);
+    return c;
   }
 
   updateGenerationParams(params = {}) {
@@ -3391,10 +3523,37 @@ export class SynthEngine {
     if (t0 < this.ctx.currentTime - 0.02) return;
     if (note.isRest || note.velocity <= 0) return; // silence for rest surprises
     note._vibratoEvents = this._buildVibratoEvents(note, t0, t0 + note.duration);
-    if (this._voiceMode === "formant" || this._voiceMode === "fourier") {
-      this._renderFourier(note, t0);
-    } else {
-      this._renderOsc(note, t0);
+    const dispatch = (n) => {
+      if (this._voiceMode === "formant" || this._voiceMode === "fourier") {
+        this._renderFourier(n, t0);
+      } else {
+        this._renderOsc(n, t0);
+      }
+    };
+    dispatch(note);
+    // Q7 layered subnotes: every layer renders the SAME note through its own
+    // fingerprint into its own spatial chain (inheriting the base space and
+    // head unless the layer positions itself / declares an independent head).
+    if (Array.isArray(note.layerRenders) && note.layerRenders.length && this._dryGain) {
+      for (const lr of note.layerRenders) {
+        const ln = {
+          ...note,
+          ...lr.note,
+          velocity: note.velocity * this._clamp(lr.gain ?? 1, 0, 2),
+          layerRenders: null,
+        };
+        const chain = this._layerChain(lr.id);
+        const sp = { ...(this._spaceP || {}) };
+        if (lr.space) { sp.spaceAzimuth = lr.space.angle; sp.spaceDistance = lr.space.dist; }
+        if (lr.independentHead) {
+          if (Number.isFinite(lr.earDistance)) sp.earDistance = lr.earDistance;
+          if (Number.isFinite(lr.headDensity)) sp.headDensity = lr.headDensity;
+        }
+        this._configureSpaceNodes(chain, sp);
+        ln._out = chain.input;
+        ln._vibratoEvents = note._vibratoEvents; // coherent FM across layers
+        dispatch(ln);
+      }
     }
   }
 
@@ -3449,7 +3608,7 @@ export class SynthEngine {
     }
     this._renderSpectralPartials(note, t0, t1, env);
     this._renderBreath(note, t0, t1, env);
-    env.connect(this.master);
+    env.connect(note._out || this.master);
 
     osc.start(t0);
     osc.stop(t1 + 0.08);
@@ -3470,7 +3629,7 @@ export class SynthEngine {
     base.connect(env);
     this._renderSpectralPartials(note, t0, t1, env);
     this._renderBreath(note, t0, t1, env);
-    env.connect(this.master);
+    env.connect(note._out || this.master);
     osc.start(t0);
     osc.stop(t1 + 0.06);
     this._track(osc);
@@ -3483,7 +3642,7 @@ export class SynthEngine {
     this._renderSpectralPartials(note, t0, t1, env);
     this._renderAttackNoise(note, t0, env);
     this._renderBreath(note, t0, t1, env);
-    env.connect(this.master);
+    env.connect(note._out || this.master);
   }
 
   _spectralMix(note) {

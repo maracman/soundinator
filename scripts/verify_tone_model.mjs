@@ -592,6 +592,56 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q7: layered subnote modules ──
+{
+  const { GenerationEngine } = await import("../web/static/synth.js");
+  const LAYER = {
+    id: "L1",
+    gain: 0.6,
+    space: { angle: 90, dist: 4 },
+    independentHead: false,
+    subnote: { spectralProfile: "flute", envelopeAttack: 0.09 },
+  };
+  const BASE = {
+    seed: 21, tempo: 120, scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63,
+    rootNotes: [0], surpriseProb: 0, motifCount: 1, motifLengthBeats: 4,
+    spectralProfile: "violin", spectralMix: 1, partialTransfer: 0.5,
+    envelopeProb: 1, envelopeAttackSd: 0.03, envelopeDecaySd: 0.05,
+  };
+  const firstNote = (params) => {
+    const e = new GenerationEngine(params); e.initialise();
+    for (let i = 0; i < 30; i++) { const n = e.nextNote(); if (n && n.velocity > 0) return n; }
+    return null;
+  };
+  const n = firstNote({ ...BASE, layers: [LAYER] });
+  check("Q7: notes carry one render per layer", n.layerRenders?.length === 1);
+  const lr = n.layerRenders[0];
+  check("Q7: layer renders its own fingerprint (different profile → different partials)",
+    Array.isArray(lr.note.harmonicPartials) && lr.note.harmonicPartials.length > 0 &&
+    JSON.stringify(lr.note.harmonicPartials.map(p => +p.amp.toFixed(4))) !==
+    JSON.stringify(n.harmonicPartials.map(p => +p.amp.toFixed(4))));
+  check("Q7: layer gain and space travel with the render",
+    lr.gain === 0.6 && lr.space.angle === 90 && lr.space.dist === 4);
+  check("Q7: independent envelope draws by default",
+    lr.note.envelopeAttack !== n.envelopeAttack);
+  const nSync = firstNote({ ...BASE, layers: [LAYER], layerEnvOverride: true });
+  check("Q7: layerEnvOverride shares ONE draw across base + layers",
+    nSync.layerRenders[0].note.envelopeAttack === nSync.envelopeAttack &&
+    nSync.layerRenders[0].note.envelopeSustain === nSync.envelopeSustain);
+  const nA = firstNote({ ...BASE, layers: [LAYER] });
+  const nB = firstNote({ ...BASE, layers: [LAYER] });
+  check("Q7: one seed drives all layers deterministically",
+    JSON.stringify(nA.layerRenders[0].note.harmonicPartials) === JSON.stringify(nB.layerRenders[0].note.harmonicPartials) &&
+    nA.layerRenders[0].note.envelopeAttack === nB.layerRenders[0].note.envelopeAttack);
+  const nOff = firstNote({ ...BASE, partialTransfer: 0, layers: [LAYER] });
+  const nOn = firstNote({ ...BASE, partialTransfer: 1, layers: [LAYER] });
+  check("Q7: cross-layer coupling moves union amplitudes (transfer 0 vs 1 differ)",
+    JSON.stringify(nOff.harmonicPartials.map(p => +p.amp.toFixed(5))) !==
+    JSON.stringify(nOn.harmonicPartials.map(p => +p.amp.toFixed(5))));
+  check("Q7: no layers → no layerRenders (untouched path)",
+    firstNote(BASE).layerRenders === undefined);
+}
+
 // ── Q6: global space designer interpolator ──
 {
   const { trackSpaceAt } = await import("../web/static/synth.js");

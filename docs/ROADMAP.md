@@ -134,7 +134,8 @@ never blindly reset. Claim an item by committing early and often.
 | Q3 baked-note drill-down: `performance` persisted per note at bake (`notePerformance` law), read-only card in the roll drawer, legacy bakes degrade with a re-bake hint | 07-07 brief | `c15ddbd` v154 |
 | Q4 binaural head: `itdSeconds`/`ildDb`/`headShadowCutoff`/`pinnaParams`/`spaceDistanceGain` laws, explicit per-ear graph replaces the HRTF panner, `earDistance`+`headDensity` knobs, full-circle pad (±180°, behind shaded). APP_VERSION → 0.4.0 | 07-07 brief | `6a75198` v155 |
 | Q5 global scale strip: `arrangement.globalScale` markers + `globalScaleAt` law, per-track G opt-in, merge after voice in `regionPlayParams`, collapsible strip + mini-roll operator cycling (off→scale→sub→root) | 07-07 brief | `5b343a5` v156 |
-| Q6 global space designer: `trackSpaceAt` interpolator, `arrangement.space` (mode override/offset, head owns reverb type per Q2), cross-section editor (drag/snap-back/dblclick-anchor, first anchor seeds start+end), rocking cylinder with roll-spring + anchor→playhead jump, smart-arrange activation modal, per-beat walker retarget | 07-07 brief | v157 |
+| Q6 global space designer: `trackSpaceAt` interpolator, `arrangement.space` (mode override/offset, head owns reverb type per Q2), cross-section editor (drag/snap-back/dblclick-anchor, first anchor seeds start+end), rocking cylinder with roll-spring + anchor→playhead jump, smart-arrange activation modal, per-beat walker retarget | 07-07 brief | `1eeb308` v157 |
+| Q7 layered subnotes: `params.layers` + `layerEnvOverride`, per-note `layerRenders` (one seed, independent-or-synced env draws, cross-layer coupling over the union), per-layer Q4 spatial chains, block strip UI with env-override block. APP_VERSION → 0.5.0 | 07-07 batch 2 | v158 |
 
 ### Queued — build order
 
