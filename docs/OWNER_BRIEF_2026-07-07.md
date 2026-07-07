@@ -119,6 +119,43 @@ Full browser QA sweep with screenshots at several window sizes; fix
 quirks/inconsistencies; adjustable/resizable panels so a resized window
 never hides sections.
 
+## P10 — MIDI recording (owner notes, second batch)
+
+- MIDI controller input records into the producer, overriding most of
+  the patch's duration/dynamics/melody; the patch still supplies glides,
+  homophonic-vs-poly behaviour, and all probabilistic synth settings
+  (e.g. envelope probability draws).
+- N-EDO keyboard mapping options:
+  1. white keys only vs white+black;
+  2. all subdivisions mapped (out-of-scale playable) vs all mapped but
+     out-of-scale MUTED vs in-scale-only packed consecutively;
+  3. degree 0 anchored to C repeating at the next C vs repeating
+     immediately at the next key after the scale wraps.
+- Needs Web MIDI API; record-arm per track; captured notes become baked
+  notes (drill-down P6 applies).
+
+## P11 — Modules: macro engine × subnote module (second batch)
+
+Each instrument patch = a MACRO ENGINE + a SUBNOTE MODULE. Presets load
+into either half independently while the other stays put. Navigation and
+visibility of which half you're editing/loading must be intuitive —
+merges with P4's palette composition ('tone × behaviour' labels).
+
+## CH-B5 amendment — layered subnote modules (second batch)
+
+- In the sub-note view, a ＋ adds the current subnote module as a LAYER;
+  layers build a strip of coloured blocks along the bottom.
+- Per-block controls: distance + position (space) and volume.
+- Head model: every new layer inherits the same head size/density;
+  a per-layer 'independent head' toggle detaches it so edits stop
+  affecting all layers at once.
+- Block strip also offers 'override envelope probabilities': removes the
+  per-layer envelope variation draws and drives envelope probability for
+  ALL layers from one place so they vary in sync.
+- Implication for CH-B2: envelope-probability controls must be built as
+  a liftable unit (one component, param-scoped) so the layer override
+  can reuse it.
+
 ## Requires thought (no build yet — owner to react)
 
 - **Harmony instrument patches**: distinct from overlap-multiphonic
