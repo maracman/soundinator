@@ -317,6 +317,19 @@ export const EAR_MODELS = {
     blurb: "exaggerated outer ear: front/behind is unmistakable" },
   sphere: { label: "Bare sphere", earDistance: 0.175, headDensity: 0.5, pinnaScale: 0,
     blurb: "no outer ear: ITD + shadow only — behind sounds like front" },
+  // Fitted from MEASURED data (owner 07-07: real models, not guesses) by
+  // scripts/fit_ear_models.mjs against the MIT KEMAR set — Gardner &
+  // Martin 1994, MIT Media Lab TR #280, free with attribution. Only the
+  // fitted parameters live here; the dataset never enters the repo.
+  // KEMAR wears two different pinnae (normal DB-061 left, large DB-065
+  // right), so one mannequin yields two models on the same head:
+  // earDistance from Woodworth ITD (RMSE 16 µs), headDensity from the
+  // Brown-Duda shadow (the two ears agree independently: 0.274/0.272),
+  // pinnaScale per pinna from the Shaw front/behind bands (~3 dB RMSE).
+  kemar: { label: "KEMAR (fitted)", earDistance: 0.17, headDensity: 0.27, pinnaScale: 0.49,
+    blurb: "fitted to measured MIT KEMAR HRTFs (Gardner & Martin 1994, DB-061 pinna)" },
+  kemarLarge: { label: "KEMAR large pinna (fitted)", earDistance: 0.17, headDensity: 0.27, pinnaScale: 0.93,
+    blurb: "fitted to measured MIT KEMAR HRTFs (Gardner & Martin 1994, DB-065 pinna)" },
 };
 
 // ─── Approximate harmonic fingerprints for common instruments ─────

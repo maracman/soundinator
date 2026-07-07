@@ -972,6 +972,17 @@ console.log("P3: note connection — glide vs ring on overlap");
     Math.abs(pinBig.conchaDb - pinBase.conchaDb * 1.6) < 1e-9 && pinOff.conchaDb === 0 && pinOff.shelfDb === 0);
   check("pinna scale: default arg keeps the published values",
     JSON.stringify(pinnaParams(Math.PI)) === JSON.stringify(pinBase));
+  // measured-fit models (scripts/fit_ear_models.mjs, MIT KEMAR):
+  check("KEMAR fits: both pinnae present, sharing one head geometry",
+    EAR_MODELS.kemar && EAR_MODELS.kemarLarge &&
+    EAR_MODELS.kemar.earDistance === EAR_MODELS.kemarLarge.earDistance &&
+    EAR_MODELS.kemar.headDensity === EAR_MODELS.kemarLarge.headDensity);
+  check("KEMAR fits: head width is physically plausible (0.15-0.19 m)",
+    EAR_MODELS.kemar.earDistance > 0.15 && EAR_MODELS.kemar.earDistance < 0.19);
+  check("KEMAR fits: the large pinna measured a stronger front/behind cue",
+    EAR_MODELS.kemarLarge.pinnaScale > EAR_MODELS.kemar.pinnaScale);
+  check("KEMAR fits: provenance in the blurbs",
+    /Gardner & Martin/.test(EAR_MODELS.kemar.blurb) && /DB-065/.test(EAR_MODELS.kemarLarge.blurb));
 }
 
 // ── Region ring-out (owner 07-07): finish() stops triggering, not sound ──
