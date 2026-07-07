@@ -993,6 +993,22 @@ export const SCALE_PRESETS = {
 
 const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// ─── Global scale strip (Q5) ────────────────────────────────
+// The arrangement can carry scale MARKERS along the timeline; opted-in
+// tracks regenerate their takes under the marker in force at the region's
+// position. Baked regions are untouched by construction — their pitches
+// derive from degree + division count, not from the allowed-degrees list.
+// Pure resolution law, asserted headlessly.
+export function globalScaleAt(globalScale, beat) {
+  if (!globalScale || !globalScale.enabled || !Array.isArray(globalScale.markers)) return null;
+  let best = null;
+  for (const m of globalScale.markers) {
+    if (!m || !Number.isFinite(m.atBeat) || m.atBeat > beat + 1e-6) continue;
+    if (!best || m.atBeat > best.atBeat) best = m;
+  }
+  return best;
+}
+
 // ─── Baked-note performance capture (Q3) ────────────────────
 // The things that vary per note but aren't visible as duration/velocity:
 // the envelope draw, vibrato parameterisation, glide, onset noise, tuning

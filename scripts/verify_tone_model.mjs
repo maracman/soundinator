@@ -592,6 +592,39 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q5: global scale strip resolution law ──
+{
+  const { globalScaleAt, GenerationEngine } = await import("../web/static/synth.js");
+  const gs = {
+    enabled: true,
+    markers: [
+      { atBeat: 0, degrees: [0, 2, 4, 5, 7, 9, 11], subScaleNotes: [0, 4, 7], rootNotes: [0] },
+      { atBeat: 16, degrees: [0, 3, 5, 7, 10], subScaleNotes: [0, 7], rootNotes: [0] },
+    ],
+  };
+  check("Q5: marker at/before the beat wins", globalScaleAt(gs, 8).atBeat === 0);
+  check("Q5: exact-beat marker applies", globalScaleAt(gs, 16).atBeat === 16);
+  check("Q5: latest prior marker wins", globalScaleAt(gs, 40).atBeat === 16);
+  check("Q5: disabled strip resolves to nothing", globalScaleAt({ ...gs, enabled: false }, 8) === null);
+  check("Q5: before the first marker resolves to nothing",
+    globalScaleAt({ enabled: true, markers: [{ atBeat: 8, degrees: [0] }] }, 4) === null);
+  check("Q5: missing/empty strip is safe", globalScaleAt(null, 0) === null && globalScaleAt({ enabled: true }, 0) === null);
+  // Opted-in generation actually follows the marker's degrees
+  const base = { seed: 11, tempo: 120, scaleMode: "12tone", scalePreset: "major",
+    tonicHz: 261.63, rootNotes: [0], surpriseProb: 0, motifCount: 1, motifLengthBeats: 4 };
+  const m = globalScaleAt(gs, 40);
+  const merged = { ...base, customDegrees: [...m.degrees], subScaleNotes: [...m.subScaleNotes], rootNotes: [...m.rootNotes] };
+  const eng = new GenerationEngine(merged); eng.initialise();
+  const degreesSeen = new Set();
+  for (let i = 0; i < 60; i++) { const n = eng.nextNote(); if (n && n.velocity > 0) degreesSeen.add(((n.degree % 12) + 12) % 12); }
+  check("Q5: opted-in take draws only marker degrees",
+    [...degreesSeen].every(d => m.degrees.includes(d)), [...degreesSeen].join(","));
+  // Baked notes untouched by construction: degree→Hz ignores the degree list
+  const hzUnder = (degrees) => new GenerationEngine({ ...base, customDegrees: degrees }).scale.degreeToHz(7);
+  check("Q5: baked pitch (degree→Hz) is independent of the degree list",
+    Math.abs(hzUnder([0, 2, 4, 5, 7, 9, 11]) - hzUnder([0, 3, 5, 7, 10])) < 1e-9);
+}
+
 // ── Q4: binaural head model laws ──
 {
   const { itdSeconds, ildDb, headShadowCutoff, pinnaParams, spaceDistanceGain, foldAngle } =

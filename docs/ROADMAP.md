@@ -132,7 +132,8 @@ never blindly reset. Claim an item by committing early and often.
 | Q1 patch transparency: badge row (scale/splits/grid/tempo/connection/✦dims), adopt-tempo, splits filter, MACRO\|BOTH\|SUB-NOTE half-loads via drop-on-card | 07-07 brief | `7b75e76` v151 |
 | Q2 standalone reverb card removed from macro production tab (type parks until Q6's designer; patch SPACE inspector untouched) | 07-07 brief | `b67537b` v153 |
 | Q3 baked-note drill-down: `performance` persisted per note at bake (`notePerformance` law), read-only card in the roll drawer, legacy bakes degrade with a re-bake hint | 07-07 brief | `c15ddbd` v154 |
-| Q4 binaural head: `itdSeconds`/`ildDb`/`headShadowCutoff`/`pinnaParams`/`spaceDistanceGain` laws, explicit per-ear graph replaces the HRTF panner, `earDistance`+`headDensity` knobs, full-circle pad (±180°, behind shaded). APP_VERSION → 0.4.0 | 07-07 brief | v155 |
+| Q4 binaural head: `itdSeconds`/`ildDb`/`headShadowCutoff`/`pinnaParams`/`spaceDistanceGain` laws, explicit per-ear graph replaces the HRTF panner, `earDistance`+`headDensity` knobs, full-circle pad (±180°, behind shaded). APP_VERSION → 0.4.0 | 07-07 brief | `6a75198` v155 |
+| Q5 global scale strip: `arrangement.globalScale` markers + `globalScaleAt` law, per-track G opt-in, merge after voice in `regionPlayParams`, collapsible strip + mini-roll operator cycling (off→scale→sub→root) | 07-07 brief | v156 |
 
 ### Queued — build order
 

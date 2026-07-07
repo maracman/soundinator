@@ -39,6 +39,7 @@ import {
   patchBadges,
   splitsBucketOf,
   nearestVowel,
+  globalScaleAt,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -1306,7 +1307,20 @@ function regionPlayParams(track, region) {
   // Tier 1 session context (owned by the arrangement, inherited live) +
   // Tier 2 instrument (from the palette) + Tier 3 take
   const context = arrangement?.context || defaultArrangementContext();
-  return { ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed };
+  const params = { ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed };
+  // Q5 global scale: an opted-in track regenerates under the marker in
+  // force at the region's position. Applied AFTER the voice so the marker
+  // wins; baked regions replay stored degrees and are untouched by
+  // construction (pitch derives from degree + division, not this list).
+  if (track?.useGlobalScale) {
+    const marker = globalScaleAt(arrangement?.globalScale, region.startBeat ?? 0);
+    if (marker) {
+      params.customDegrees = [...marker.degrees];
+      params.subScaleNotes = [...(marker.subScaleNotes || [])];
+      params.rootNotes = [...(marker.rootNotes || [0])];
+    }
+  }
+  return params;
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -1599,6 +1613,8 @@ const producerVoices = new Map(); // trackId -> SynthEngine voice
 let producerBus = null;
 let arrPlay = null; // { slot, timer, lastSlot }
 let playheadBeat = 0;  // where Play starts; set by clicking the ruler
+let _gsOpen = false;      // Q5: global scale strip expanded
+let _gsSelMarker = -1;    // Q5: which marker's mini-roll is open
 
 function producerVoice(track) {
   synth.init();
@@ -1863,6 +1879,48 @@ function maxRegionLength(track, region) {
   return limit;
 }
 
+// ── Q5: global scale strip ──────────────────────────────────
+// Collapsible strip above the ruler carrying scale MARKERS. Opted-in
+// tracks (G in the track head) regenerate their takes under the marker in
+// force at each region's position; baked notes never move.
+function ensureGlobalScale() {
+  if (!arrangement.globalScale) arrangement.globalScale = { enabled: false, markers: [] };
+  return arrangement.globalScale;
+}
+
+function globalScaleStripHTML(laneW) {
+  const gs = arrangement.globalScale || { enabled: false, markers: [] };
+  const flags = (gs.markers || []).map((m, i) =>
+    `<div class="gs-flag${i === _gsSelMarker ? " sel" : ""}" data-gs-marker="${i}" style="left:${m.atBeat * pxPerBeat}px" title="Scale marker at beat ${m.atBeat} (${(m.degrees || []).length} degrees) — click to edit">⚑<span class="gs-flag-label">${(m.degrees || []).length}</span></div>`).join("");
+  const sel = gs.markers?.[_gsSelMarker];
+  const div = arrangement.context.scaleMode === "edo" ? (arrangement.context.edoDivisions || 12) : 12;
+  const editorRow = (_gsOpen && sel) ? `
+      <div class="tl2-row">
+        <div class="tl2-head tl2-corner"></div>
+        <div class="gs-editor">
+          <span class="gs-editor-title">marker @ beat ${sel.atBeat}</span>
+          <div class="gs-roll" role="group" title="Click a note division to cycle its role: off → in scale → sub-scale → root (same operators as the patch scale card)">
+            ${Array.from({ length: div }, (_, d) => {
+              const st = sel.rootNotes?.includes(d) ? "root" : sel.subScaleNotes?.includes(d) ? "sub" : sel.degrees?.includes(d) ? "scale" : "off";
+              return `<button class="gs-cell gs-${st}" data-gs-cell="${d}" title="division ${d}: ${st}">${d}</button>`;
+            }).join("")}
+          </div>
+          <button class="pal-btn" id="gsDeleteMarker" title="Remove this marker">×</button>
+        </div>
+      </div>` : "";
+  return `
+      <div class="tl2-row tl2-gs-row${_gsOpen ? " open" : ""}">
+        <div class="tl2-head tl2-corner gs-head">
+          <button class="gs-chevron" id="gsToggle" title="Global scale — markers along the timeline; tracks opt in with the G button in their header">${_gsOpen ? "▾" : "▸"} Global scale</button>
+          ${_gsOpen ? `<input type="checkbox" id="gsEnabled"${gs.enabled ? " checked" : ""} title="Apply the global scale to opted-in tracks"/>` : ""}
+        </div>
+        <div class="gs-strip${gs.enabled ? "" : " off"}" id="gsStrip" style="width:${laneW}px">
+          ${_gsOpen ? flags : ""}
+          ${_gsOpen ? `<button class="gs-add" id="gsAddMarker" style="left:${playheadBeat * pxPerBeat}px" title="Add a scale marker at the playhead (beat ${Math.round(playheadBeat * 4) / 4}), seeded from the session scale">＋</button>` : ""}
+        </div>
+      </div>${editorRow}`;
+}
+
 function produceTimelineHTML() {
   const laneW = totalBeats() * pxPerBeat;
   // Ruler: bar numbers every BEATS_PER_BAR
@@ -1903,6 +1961,7 @@ function produceTimelineHTML() {
         <span class="tl2-name" title="${esc(t.name)}">${esc(t.name)}</span>
         <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
         <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
+        <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the global scale strip: this track's takes regenerate under the marker in force (baked notes stay put)">G</button>
         <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
         <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
         <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
@@ -1912,6 +1971,7 @@ function produceTimelineHTML() {
   }).join("");
   return `
     <div class="tl2">
+      ${globalScaleStripHTML(laneW)}
       <div class="tl2-row tl2-ruler-row">
         <div class="tl2-head tl2-corner"></div>
         <div class="tl2-ruler" id="tlRuler" style="width:${laneW}px">${rulerMarks}
@@ -2866,11 +2926,90 @@ function renderProduce() {
   return v;
 }
 
+function wireGlobalScale(v) {
+  const gsToggle = v.querySelector("#gsToggle");
+  if (gsToggle) gsToggle.onclick = () => { _gsOpen = !_gsOpen; renderProduce(); };
+  const gsEnabled = v.querySelector("#gsEnabled");
+  if (gsEnabled) gsEnabled.onchange = () => {
+    ensureGlobalScale().enabled = gsEnabled.checked;
+    saveArrangement("global scale on/off");
+    renderProduce();
+  };
+  const gsAdd = v.querySelector("#gsAddMarker");
+  if (gsAdd) gsAdd.onclick = () => {
+    const gs = ensureGlobalScale();
+    const ctx = arrangement.context;
+    const atBeat = Math.round(playheadBeat * 4) / 4;
+    if (gs.markers.some(m => m.atBeat === atBeat)) {
+      _gsSelMarker = gs.markers.findIndex(m => m.atBeat === atBeat);
+      renderProduce();
+      return;
+    }
+    gs.markers.push({
+      atBeat,
+      degrees: [...(ctx.customDegrees || SCALE_PRESETS[ctx.scalePreset]?.degrees || SCALE_PRESETS.major.degrees)],
+      subScaleNotes: [...(ctx.subScaleNotes || [])],
+      rootNotes: [...(ctx.rootNotes || [0])],
+    });
+    gs.markers.sort((a, b) => a.atBeat - b.atBeat);
+    _gsSelMarker = gs.markers.findIndex(m => m.atBeat === atBeat);
+    gs.enabled = true; // adding the first marker is an unambiguous opt-in
+    saveArrangement("global scale marker");
+    renderProduce();
+  };
+  v.querySelectorAll("[data-gs-marker]").forEach(f => {
+    f.onclick = () => {
+      const i = Number(f.dataset.gsMarker);
+      _gsSelMarker = _gsSelMarker === i ? -1 : i;
+      renderProduce();
+    };
+  });
+  v.querySelectorAll("[data-gs-cell]").forEach(btn => {
+    btn.onclick = () => {
+      const m = ensureGlobalScale().markers[_gsSelMarker];
+      if (!m) return;
+      const d = Number(btn.dataset.gsCell);
+      const has = (arr) => Array.isArray(arr) && arr.includes(d);
+      const rm = (arr) => (arr || []).filter(x => x !== d);
+      const add = (arr) => [...(arr || []), d].sort((a, b) => a - b);
+      // off → scale → sub-scale → root → off (root implies sub implies scale)
+      if (has(m.rootNotes)) {
+        m.rootNotes = rm(m.rootNotes); m.subScaleNotes = rm(m.subScaleNotes); m.degrees = rm(m.degrees);
+      } else if (has(m.subScaleNotes)) {
+        m.rootNotes = add(m.rootNotes);
+      } else if (has(m.degrees)) {
+        m.subScaleNotes = add(m.subScaleNotes);
+      } else {
+        m.degrees = add(m.degrees);
+      }
+      saveArrangement("global scale edit");
+      renderProduce();
+    };
+  });
+  const gsDel = v.querySelector("#gsDeleteMarker");
+  if (gsDel) gsDel.onclick = () => {
+    ensureGlobalScale().markers.splice(_gsSelMarker, 1);
+    _gsSelMarker = -1;
+    saveArrangement("global scale marker removed");
+    renderProduce();
+  };
+  v.querySelectorAll("[data-track-gscale]").forEach(btn => {
+    btn.onclick = () => {
+      const t = arrangement.tracks.find(t => t.id === btn.dataset.trackGscale);
+      if (!t) return;
+      t.useGlobalScale = !t.useGlobalScale;
+      saveArrangement("track follows global scale");
+      renderProduce();
+    };
+  });
+}
+
 function wireProduce(v) {
   const sources = produceSources();
 
   wireSessionBar(v);
   wireBrowserPalette(v);
+  wireGlobalScale(v);
 
   v.querySelectorAll("[data-add-track]").forEach(btn => {
     btn.onclick = () => {
