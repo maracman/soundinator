@@ -50,7 +50,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.3.0"; // tone model v2 T1: resonator core
+const APP_VERSION = "sound-studio-0.4.0"; // Q4: binaural head replaces HRTF panner (same params → different audio)
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -333,6 +333,8 @@ const DEFAULTS = {
   // SPACE positioning: where the instrument stands relative to the listener
   spaceDistance: 2.5,
   spaceAzimuth: 0,
+  earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
+  headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -484,7 +486,9 @@ const PARAM_DESC = {
   bodyType: "The box around the resonator: a set of fixed-Hz resonance bands. Auto keeps the instrument's own measured body; vowels are bodies too (F1–F5 bands). With vibrato, partials on body slopes shimmer in amplitude — real FM→AM",
   partialB: "Stiff-string inharmonicity: partials sharpen as f·n·√(1+Bn²). Piano bass ≈ 1e-4, treble ≈ 1e-3; 0 = perfectly harmonic. Rising B detunes partial pairs out of sympathetic resonance, weakening Transfer",
   spaceDistance: "How far the instrument stands from you (0.3–30 m). Distance delays the sound's arrival (~3 ms/m), rolls off the highs (air absorption), lowers the direct level against the room, and inside ~1 m adds the proximity bass lift",
-  spaceAzimuth: "The instrument's bearing (−90° left … +90° right): true interaural timing/level differences and head-shadow filtering via HRTF, not simple panning",
+  spaceAzimuth: "The instrument's bearing, all the way around you (−180°…180°): per-ear arrival times, far-ear head shadow, and a pinna cue that makes sounds behind you duller than in front — real binaural physics, not simple panning",
+  earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences = a wider, more localised stereo image",
+  headDensity: "How opaque your head is to sound (0–1). Denser = the far ear loses more level and more treble when a source sits to one side",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -642,6 +646,7 @@ const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 // ─── State ──────────────────────────────────────────────────
 
 const synth = new SynthEngine();
+window._synthQA = synth; // QA hook (matches _rollHitsQA): inspect the audio graph in tests
 let el;
 let animFrame = null;
 let canvas, canvasCtx;
@@ -4173,7 +4178,10 @@ function renderExplore() {
     "spectralResonanceAmount","spectralLoudnessNorm","spectralStretchCents",
   ]);
   const liveReverbParams = new Set([
-    "reverbWet","reverbDecay","reverbTone","reverbPreDelay"
+    "reverbWet","reverbDecay","reverbTone","reverbPreDelay",
+    // Q4 binaural head — listener properties apply live through the same
+    // space configure as position (the pad already routes updateReverb)
+    "earDistance","headDensity",
   ]);
   const liveSubnoteParams = new Set([
     // Melody-generation shaping: changing these continues the current Markov
@@ -7236,8 +7244,10 @@ function chInspectorHTML(p) {
     <div class="knob-row">
       ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
       ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
+      ${knobHTML("earDistance", "Ear span", p.earDistance ?? 0.175, 0.12, 0.25, 0.005, { def: 0.175, cool: true })}
+      ${knobHTML("headDensity", "Head density", p.headDensity ?? 0.5, 0, 1, 0.01, { def: 0.5, cool: true })}
     </div>
-    <div class="ch-caption">distance delays arrival (~3 ms/m), softens highs, trades direct for room, and lifts bass inside 1 m; bearing is true interaural (HRTF)</div>`;
+    <div class="ch-caption">the full circle: drag anywhere around your head — behind you (shaded half) sounds duller via the pinna law. Distance delays arrival (~3 ms/m), softens highs, trades direct for room; ear span and head density shape the interaural cues</div>`;
 }
 
 // Stage thumbnails: each card's live mini-visualisation, computed from the
@@ -7299,17 +7309,17 @@ function drawChThumbs() {
     g.ctx.lineWidth = 1.6;
     g.ctx.stroke();
   }
-  // 04 space: mini room plan
+  // 04 space: mini room plan (Q4: full circle, listener centred)
   g = th("chThumb_space");
   if (g) {
-    const cx = g.w / 2, cy = g.h - 6, rMax = Math.min(g.h - 12, g.w / 2 - 6);
+    const cx = g.w / 2, cy = g.h / 2, rMax = Math.min(g.h / 2 - 4, g.w / 2 - 6);
     g.ctx.strokeStyle = "rgba(88,214,169,0.3)";
     for (const dm of [1, 10]) {
       const r = _spaceDistToR(dm, rMax);
-      g.ctx.beginPath(); g.ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI); g.ctx.stroke();
+      g.ctx.beginPath(); g.ctx.arc(cx, cy, r, 0, 2 * Math.PI); g.ctx.stroke();
     }
     const d = clamp(p.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
-    const az = (clamp(p.spaceAzimuth ?? 0, -90, 90) - 90) * Math.PI / 180;
+    const az = (clamp(p.spaceAzimuth ?? 0, -180, 180) - 90) * Math.PI / 180;
     const r = _spaceDistToR(d, rMax);
     g.ctx.fillStyle = "#58d6a9";
     g.ctx.beginPath();
@@ -7793,7 +7803,9 @@ function wireTonePrint(v) {
 // log scale (0.3–30 m). Dragging repositions live.
 const SPACE_DMIN = 0.3, SPACE_DMAX = 30;
 function _spacePadGeom(w, h) {
-  return { cx: w / 2, cy: h - 12, rMax: Math.min(h - 22, w / 2 - 8) };
+  // Q4: full circle — the listener sits at the centre and sources can be
+  // anywhere around them, including behind (screen-down = behind).
+  return { cx: w / 2, cy: h / 2, rMax: Math.min(h / 2 - 10, w / 2 - 8) };
 }
 function _spaceDistToR(d, rMax) {
   return (Math.log(d / SPACE_DMIN) / Math.log(SPACE_DMAX / SPACE_DMIN)) * rMax;
@@ -7852,6 +7864,12 @@ function drawSpacePad() {
   const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
   const { cx, cy, rMax } = _spacePadGeom(w, h);
+  // Behind half-plane (Q4): subtly shaded — sources there get the pinna cue
+  ctx.fillStyle = "rgba(60,72,88,0.16)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, rMax, 0, Math.PI); // screen-down = behind the listener
+  ctx.closePath();
+  ctx.fill();
   ctx.strokeStyle = "rgba(90,110,130,0.25)";
   ctx.fillStyle = "rgba(120,135,150,0.55)";
   ctx.font = "8px ui-monospace, monospace";
@@ -7860,25 +7878,28 @@ function drawSpacePad() {
   for (const dm of [1, 3, 10, 30]) {
     const r = _spaceDistToR(dm, rMax);
     ctx.beginPath();
-    ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI);
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
     ctx.stroke();
-    ctx.fillText(`${dm}m`, cx + r * 0.06 + 2, cy - r + 8);
+    ctx.fillText(`${dm}m`, cx + 2, cy - r + 8);
   }
   ctx.strokeStyle = "rgba(90,110,130,0.15)";
-  for (const a of [-90, -45, 0, 45, 90]) {
+  for (const a of [-135, -90, -45, 0, 45, 90, 135, 180]) {
     const rad = (a - 90) * Math.PI / 180;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax);
     ctx.stroke();
   }
+  ctx.fillStyle = "rgba(120,135,150,0.6)";
+  ctx.textAlign = "center";
+  ctx.fillText("front", cx, cy - rMax + 8);
+  ctx.fillText("behind", cx, cy + rMax - 3);
   ctx.fillStyle = "rgba(200,215,230,0.85)";
   ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, 2 * Math.PI); ctx.fill();
   ctx.fillStyle = "rgba(120,135,150,0.6)";
-  ctx.textAlign = "center";
-  ctx.fillText("you", cx, cy + 9);
+  ctx.fillText("you", cx, cy + 12);
   const d = clamp(exploreParams.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
-  const az = clamp(exploreParams.spaceAzimuth ?? 0, -90, 90);
+  const az = clamp(exploreParams.spaceAzimuth ?? 0, -180, 180);
   const rad = (az - 90) * Math.PI / 180;
   const r = _spaceDistToR(d, rMax);
   const ix = cx + Math.cos(rad) * r, iy = cy + Math.sin(rad) * r;
@@ -7899,7 +7920,7 @@ function wireSpacePad(v) {
     const { cx, cy, rMax } = _spacePadGeom(w, h);
     const x = (e.clientX - rect.left) * (w / rect.width) - cx;
     const y = (e.clientY - rect.top) * (h / rect.height) - cy;
-    const az = clamp(Math.atan2(x, -y) * 180 / Math.PI, -90, 90);
+    const az = clamp(Math.atan2(x, -y) * 180 / Math.PI, -180, 180); // Q4: full circle
     const dist = _spaceRToDist(Math.hypot(x, y), rMax);
     exploreParams.spaceAzimuth = Math.round(az);
     exploreParams.spaceDistance = Number(dist.toFixed(2));

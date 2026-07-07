@@ -592,6 +592,38 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q4: binaural head model laws ──
+{
+  const { itdSeconds, ildDb, headShadowCutoff, pinnaParams, spaceDistanceGain, foldAngle } =
+    await import("../web/static/synth.js");
+  const deg = (x) => x * Math.PI / 180;
+  check("Q4 ITD: zero dead ahead", Math.abs(itdSeconds(0)) < 1e-9);
+  check("Q4 ITD: zero dead behind", Math.abs(itdSeconds(deg(180))) < 1e-9);
+  check("Q4 ITD: maximal at ±90°",
+    itdSeconds(deg(90)) > itdSeconds(deg(60)) && itdSeconds(deg(60)) > itdSeconds(deg(30)));
+  check("Q4 ITD: Woodworth magnitude at 90° (~0.65 ms for 0.175 m)",
+    Math.abs(itdSeconds(deg(90), 0.175) - (0.0875 * (Math.PI / 2 + 1) / 343)) < 1e-6);
+  check("Q4 ITD: proportional to ear distance",
+    Math.abs(itdSeconds(deg(90), 0.25) / itdSeconds(deg(90), 0.125) - 2) < 1e-6);
+  check("Q4 ITD: signed — left source leads the left ear", itdSeconds(deg(-90)) < 0);
+  check("Q4 ITD: front/behind mirror-pairs share laterality",
+    Math.abs(itdSeconds(deg(45)) - itdSeconds(deg(135))) < 1e-9);
+  check("Q4 ILD: zero at centre", ildDb(0) === 0);
+  check("Q4 ILD: grows with angle", ildDb(deg(90)) > ildDb(deg(45)) && ildDb(deg(45)) > 0);
+  check("Q4 ILD: grows with density, 12 dB ceiling",
+    ildDb(deg(90), 1) === 12 && ildDb(deg(90), 0.25) < ildDb(deg(90), 0.75));
+  check("Q4 ILD: transparent head shadows nothing", ildDb(deg(90), 0) === 0);
+  check("Q4 shadow cutoff: open at centre, falls to 1.2 kHz fully shaded",
+    headShadowCutoff(0) === 20000 && headShadowCutoff(deg(90), 1) === 1200);
+  check("Q4 pinna: silent anywhere in the front half-plane",
+    pinnaParams(0).notchDepthDb === 0 && pinnaParams(deg(90)).notchDepthDb === 0 && pinnaParams(deg(-90)).shelfDb === 0);
+  check("Q4 pinna: engaged behind only, deepest dead-behind",
+    pinnaParams(deg(135)).notchDepthDb < 0 && pinnaParams(deg(180)).notchDepthDb < pinnaParams(deg(135)).notchDepthDb);
+  check("Q4 distance gain: unity inside 1 m, inverse beyond",
+    spaceDistanceGain(0.5) === 1 && Math.abs(spaceDistanceGain(4) - 0.25) < 1e-9);
+  check("Q4 foldAngle: wraps 270° to -90°", Math.abs(foldAngle(deg(270)) - deg(-90)) < 1e-9);
+}
+
 // ── Q3: baked notes persist their per-note performance draw ──
 {
   const { SynthEngine, notePerformance } = await import("../web/static/synth.js");

@@ -525,6 +525,62 @@ export function spaceProximityDb(distM) {
   return d < 1.2 ? 10 * (1.2 - d) / 1.2 : 0;
 }
 
+// ── Q4: binaural head model (owner request 2026-07-07) ─────
+// The listener has a real head: per-ear arrival times (Woodworth ITD),
+// far-ear head shadow (level + lowpass, scaled by head density), and a
+// pinna law that makes behind sound different from front. "Head size" IS
+// ear distance (owner agreed one of the two was redundant), so geometry
+// has exactly one knob (earDistance) and material one (headDensity); the
+// pinna cue is a law, not a knob. All pure, asserted headlessly.
+
+export function foldAngle(angleRad) {
+  let a = angleRad % (2 * Math.PI);
+  if (a > Math.PI) a -= 2 * Math.PI;
+  if (a <= -Math.PI) a += 2 * Math.PI;
+  return a;
+}
+
+// Signed interaural time difference — Woodworth (d/2)(θ+sinθ)/c with the
+// angle folded to pure laterality, so front/behind mirror-pairs share the
+// same ITD (the pinna law is what tells them apart). Positive = source
+// right of centre → the LEFT ear is far and receives the wave this much
+// later.
+export function itdSeconds(angleRad, earDistance = 0.175) {
+  const lat = Math.asin(Math.max(-1, Math.min(1, Math.sin(foldAngle(angleRad)))));
+  const r = Math.max(0.06, Math.min(0.125, (earDistance ?? 0.175) / 2));
+  return Math.sign(lat) * r * (Math.abs(lat) + Math.sin(Math.abs(lat))) / 343;
+}
+
+// Far-ear level shadow in dB: 0 at centre, up to 12 dB at full laterality
+// with a maximally dense head.
+export function ildDb(angleRad, headDensity = 0.5) {
+  const lat = Math.abs(Math.sin(foldAngle(angleRad)));
+  return lat * Math.max(0, Math.min(1, headDensity ?? 0.5)) * 12;
+}
+
+// The shadowed ear also loses highs: its lowpass falls from open (8 kHz
+// scaled up to full band at zero shade) toward 1.2 kHz.
+export function headShadowCutoff(angleRad, headDensity = 0.5) {
+  const lat = Math.abs(Math.sin(foldAngle(angleRad)));
+  const shade = lat * Math.max(0, Math.min(1, headDensity ?? 0.5));
+  return shade <= 0 ? 20000 : 8000 - shade * (8000 - 1200);
+}
+
+// Pinna cue: ears face forward, so sources behind lose presence — a broad
+// high-shelf cut plus a ~8 kHz notch. Exactly zero anywhere in the front
+// half-plane, scaling smoothly to full at dead-behind.
+export function pinnaParams(angleRad) {
+  const a = Math.abs(foldAngle(angleRad));
+  const behind = Math.max(0, Math.min(1, (a - Math.PI / 2) / (Math.PI / 2)));
+  return { shelfDb: -4.5 * behind, notchHz: 8000, notchDepthDb: -9 * behind };
+}
+
+// Direct-path distance attenuation — the inverse model the HRTF panner
+// used to provide (refDistance 1), now explicit.
+export function spaceDistanceGain(distM) {
+  return 1 / Math.max(1, Math.max(0.3, Math.min(30, distM ?? 2.5)));
+}
+
 // Body gain at one frequency: Gaussian bands in log-frequency space,
 // summed in log gain. Pure so T-B6 asserts it headlessly, and so the
 // renderer can evaluate it against a partial's MODULATED frequency
@@ -2658,8 +2714,11 @@ export class SynthEngine {
 
     // SPACE positioning (direct path only — the reverb stays diffuse, so
     // walking away naturally trades direct sound for room): proximity
-    // bass shelf → air-absorption lowpass → arrival delay → HRTF panner
-    // (interaural time/level + head shadow + 1/r attenuation).
+    // bass shelf → air-absorption lowpass → arrival delay → explicit
+    // binaural head (Q4): per-ear delay + far-ear shadow (gain + lowpass)
+    // → pinna shelf/notch (behind cue) → 1/r distance gain. The opaque
+    // HRTF PannerNode is gone so ear distance and head density can be
+    // real, testable knobs and the field extends behind the listener.
     this._spaceProximity = this.ctx.createBiquadFilter();
     this._spaceProximity.type = "lowshelf";
     this._spaceProximity.frequency.value = 180;
@@ -2669,24 +2728,46 @@ export class SynthEngine {
     this._spaceAir.frequency.value = 20000;
     this._spaceAir.Q.value = 0.5;
     this._spaceDelay = this.ctx.createDelay(0.12);
-    this._spacePanner = this.ctx.createPanner ? this.ctx.createPanner() : null;
-    if (this._spacePanner) {
-      this._spacePanner.panningModel = "HRTF";
-      this._spacePanner.distanceModel = "inverse";
-      this._spacePanner.refDistance = 1;
-      this._spacePanner.rolloffFactor = 1;
-      this._spacePanner.positionZ ? this._spacePanner.positionZ.value = -2.5 : this._spacePanner.setPosition(0, 0, -2.5);
-    }
+    this._earDelayL = this.ctx.createDelay(0.005);
+    this._earDelayR = this.ctx.createDelay(0.005);
+    this._earShadowL = this.ctx.createGain();
+    this._earShadowR = this.ctx.createGain();
+    this._earFilterL = this.ctx.createBiquadFilter();
+    this._earFilterL.type = "lowpass";
+    this._earFilterL.frequency.value = 20000;
+    this._earFilterL.Q.value = 0.5;
+    this._earFilterR = this.ctx.createBiquadFilter();
+    this._earFilterR.type = "lowpass";
+    this._earFilterR.frequency.value = 20000;
+    this._earFilterR.Q.value = 0.5;
+    this._earMerger = this.ctx.createChannelMerger(2);
+    this._pinnaShelf = this.ctx.createBiquadFilter();
+    this._pinnaShelf.type = "highshelf";
+    this._pinnaShelf.frequency.value = 4500;
+    this._pinnaShelf.gain.value = 0;
+    this._pinnaNotch = this.ctx.createBiquadFilter();
+    this._pinnaNotch.type = "peaking";
+    this._pinnaNotch.frequency.value = 8000;
+    this._pinnaNotch.Q.value = 4;
+    this._pinnaNotch.gain.value = 0;
+    this._spaceDistGain = this.ctx.createGain();
+    this._spaceDistGain.gain.value = spaceDistanceGain(2.5);
 
     this.master.connect(this._spaceProximity);
     this._spaceProximity.connect(this._spaceAir);
     this._spaceAir.connect(this._spaceDelay);
-    if (this._spacePanner) {
-      this._spaceDelay.connect(this._spacePanner);
-      this._spacePanner.connect(this._dryGain);
-    } else {
-      this._spaceDelay.connect(this._dryGain);
-    }
+    this._spaceDelay.connect(this._earDelayL);
+    this._spaceDelay.connect(this._earDelayR);
+    this._earDelayL.connect(this._earShadowL);
+    this._earDelayR.connect(this._earShadowR);
+    this._earShadowL.connect(this._earFilterL);
+    this._earShadowR.connect(this._earFilterR);
+    this._earFilterL.connect(this._earMerger, 0, 0);
+    this._earFilterR.connect(this._earMerger, 0, 1);
+    this._earMerger.connect(this._pinnaShelf);
+    this._pinnaShelf.connect(this._pinnaNotch);
+    this._pinnaNotch.connect(this._spaceDistGain);
+    this._spaceDistGain.connect(this._dryGain);
     this._dryGain.connect(this.analyser);
     this.master.connect(this._preDelay);
     this._preDelay.connect(this._convolver);
@@ -2936,7 +3017,7 @@ export class SynthEngine {
   _configureSpace(p = {}) {
     if (!this.ctx || !this._spaceDelay) return;
     const d = Math.max(0.3, Math.min(30, Number(p.spaceDistance ?? 2.5)));
-    const azDeg = Math.max(-90, Math.min(90, Number(p.spaceAzimuth ?? 0)));
+    const azDeg = Math.max(-180, Math.min(180, Number(p.spaceAzimuth ?? 0)));
     const az = azDeg * Math.PI / 180;
     const now = this.ctx.currentTime;
     const smooth = (param, v) => {
@@ -2945,14 +3026,25 @@ export class SynthEngine {
     smooth(this._spaceDelay.delayTime, spaceArrivalDelay(d));
     smooth(this._spaceAir.frequency, spaceAirCutoff(d));
     smooth(this._spaceProximity.gain, spaceProximityDb(d));
-    if (this._spacePanner) {
-      const x = Math.sin(az) * d, z = -Math.cos(az) * d;
-      if (this._spacePanner.positionX) {
-        smooth(this._spacePanner.positionX, x);
-        smooth(this._spacePanner.positionZ, z);
-      } else {
-        this._spacePanner.setPosition(x, 0, z);
-      }
+    if (this._earDelayL) {
+      // Q4 binaural head: listener properties ride the same params object
+      const earDist = Number(p.earDistance ?? 0.175);
+      const density = Number(p.headDensity ?? 0.5);
+      const itd = itdSeconds(az, earDist);
+      smooth(this._earDelayL.delayTime, Math.max(0, itd));
+      smooth(this._earDelayR.delayTime, Math.max(0, -itd));
+      const shadow = Math.pow(10, -ildDb(az, density) / 20);
+      const cut = headShadowCutoff(az, density);
+      const farLeft = az >= 0; // source right of centre shadows the left ear
+      smooth(this._earShadowL.gain, farLeft ? shadow : 1);
+      smooth(this._earShadowR.gain, farLeft ? 1 : shadow);
+      smooth(this._earFilterL.frequency, farLeft ? cut : 20000);
+      smooth(this._earFilterR.frequency, farLeft ? 20000 : cut);
+      const pin = pinnaParams(az);
+      smooth(this._pinnaShelf.gain, pin.shelfDb);
+      this._pinnaNotch.frequency.value = pin.notchHz;
+      smooth(this._pinnaNotch.gain, pin.notchDepthDb);
+      smooth(this._spaceDistGain.gain, spaceDistanceGain(d));
     }
   }
 
