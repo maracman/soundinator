@@ -38,6 +38,7 @@ import {
   spaceAirCutoff,
   patchBadges,
   splitsBucketOf,
+  nearestVowel,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 
@@ -2116,6 +2117,30 @@ function rollReadoutText(n) {
   return `deg ${n.degree}  ·  ${cents >= 0 ? "+" : ""}${cents}¢${Math.abs(cents) > 1 ? "" : " (on pitch)"}  ·  vel ${(n.velocity || 0).toFixed(2)}  ·  ${n.durationDivs || 1} div${(n.durationDivs || 1) > 1 ? "s" : ""}${timing}${n.isSurprise ? "  ·  surprise" : ""}`;
 }
 
+// Q3: drill-down into the per-note performance draw persisted at bake
+// time — the things duration/velocity don't show. Read-only v1.
+function rollPerfHTML(n) {
+  const perf = n.performance;
+  if (!perf) {
+    return `<div class="roll-perf roll-perf-missing">This region was baked before performance capture — re-bake it to see glide, envelope and vibrato detail per note.</div>`;
+  }
+  const ms = (s) => s == null ? "—" : `${Math.round(s * 1000)} ms`;
+  const rows = [];
+  const e = perf.envelope || {};
+  rows.push(["envelope", `A ${ms(e.a)} · D ${ms(e.d)} · S ${e.s == null ? "—" : Math.round(e.s * 100) + "%"} · R ${ms(e.r)}`]);
+  rows.push(["vibrato", perf.vibrato
+    ? `${Math.round(perf.vibrato.prob * 100)}% chance · ±${(+perf.vibrato.depth).toFixed(0)}¢ @ ${(+perf.vibrato.rate).toFixed(1)} Hz`
+    : "—"]);
+  rows.push(["glide", perf.glideFrom
+    ? `from ${(+perf.glideFrom).toFixed(1)} Hz over ${perf.glideMs} ms`
+    : "—"]);
+  rows.push(["onset noise", perf.attackNoiseLevel == null ? "—" : (+perf.attackNoiseLevel).toFixed(2)]);
+  rows.push(["tuning", `${perf.tuningCents >= 0 ? "+" : ""}${Math.round(perf.tuningCents)}¢`]);
+  if (perf.formantPos) rows.push(["vowel", `~“${nearestVowel(perf.formantPos)}”`]);
+  return `<div class="roll-perf">${rows.map(([k, val]) =>
+    `<span class="roll-perf-row"><span class="roll-perf-key">${k}</span><span class="roll-perf-val">${esc(String(val))}</span></span>`).join("")}</div>`;
+}
+
 function wireRoll(v) {
   const cv = v.querySelector("#rollCanvas");
   const region = selectedBakedRegion();
@@ -2128,6 +2153,12 @@ function wireRoll(v) {
   };
   const readout = v.querySelector("#rollReadout");
   const setReadout = (text) => { if (readout) readout.textContent = text; };
+  // Q3: a selected note shows its one-line summary plus the performance
+  // drill-down persisted at bake time.
+  const showNote = (note) => {
+    if (!readout) return;
+    readout.innerHTML = `<div class="roll-line">${esc(rollReadoutText(note))}</div>${rollPerfHTML(note)}`;
+  };
   const canvasXY = (e) => {
     const rect = cv.getBoundingClientRect();
     return {
@@ -2163,7 +2194,7 @@ function wireRoll(v) {
         const note = region.notes[best.i];
         drag = { i: best.i, note, mode: "velocity", startY: y, orig: { velocity: note.velocity || 0 }, moved: false };
         drawRoll(region);
-        setReadout(rollReadoutText(note));
+        showNote(note);
         e.preventDefault();
         return;
       }
@@ -2192,7 +2223,7 @@ function wireRoll(v) {
       moved: false,
     };
     drawRoll(region);
-    setReadout(rollReadoutText(note));
+    showNote(note);
     e.preventDefault();
   };
 
@@ -2215,7 +2246,7 @@ function wireRoll(v) {
     if (drag.mode === "velocity") {
       note.velocity = Math.max(0.05, Math.min(1, drag.orig.velocity + (drag.startY - y) / Math.max(20, g.laneH - 8)));
       drawRoll(region);
-      setReadout(rollReadoutText(note));
+      showNote(note);
       return;
     }
     const pxPerDivW = g.plotW / g.totalDivs;
@@ -2228,7 +2259,7 @@ function wireRoll(v) {
         note.onsetDevDivs = Math.max(-0.9, Math.min(0.9, drag.orig.onsetDevDivs + dx / pxPerDivW));
       }
       drawRoll(region);
-      setReadout(rollReadoutText(note));
+      showNote(note);
       return;
     }
     const divDelta = Math.round(dx / (g.plotW / g.totalDivs));
@@ -2268,7 +2299,7 @@ function wireRoll(v) {
       note.offsetDivs = Math.max(0, Math.min(maxOffset, drag.orig.offsetDivs + divDelta));
     }
     drawRoll(region);
-    setReadout(rollReadoutText(note));
+    showNote(note);
   };
 
   const finishDrag = (commit) => {
@@ -2299,7 +2330,7 @@ function wireRoll(v) {
     }
     drag = null;
     drawRoll(region);
-    setReadout(rollReadoutText(note));
+    showNote(note);
   };
 
   cv.onmouseup = () => finishDrag(true);

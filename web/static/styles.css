@@ -5199,6 +5199,25 @@ body.explore-mode #app {
 .tl2-badges .pb-row { flex-wrap: nowrap; margin-top: 0; }
 .tl2-badges .pb-chip { background: rgba(10,14,20,0.65); }
 
+/* ── Q3: baked-note performance drill-down (roll drawer) ─── */
+.roll-perf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border);
+}
+.roll-perf-row { display: inline-flex; gap: 0.35rem; align-items: baseline; }
+.roll-perf-key {
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.roll-perf-val { font-size: 0.68rem; color: var(--text2); font-variant-numeric: tabular-nums; }
+.roll-perf-missing { font-size: 0.66rem; color: var(--text3); font-style: italic; margin-top: 0.3rem; }
+
 /* ── Producer v2 P3: beat-based timeline ─────────────────── */
 
 .tl2 { overflow-x: auto; padding-bottom: 4px; }

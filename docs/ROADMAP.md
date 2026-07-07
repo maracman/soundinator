@@ -129,7 +129,9 @@ never blindly reset. Claim an item by committing early and often.
 | CH-B2: draggable ADSR + vibrato + onset noise in EXCITOR; liftable `envelopeProbBlockHTML`/`vibratoBlockHTML` | audit | `fb76fbb` v148 |
 | P2 family starters (percussive/bass/atmos/melody) + library family filter chips | 07-07 | `b17a63a` v149 |
 | P3 note connection: `noteConnection` glide\|ring | 07-07 | `da5111b` v150 |
-| Q1 patch transparency: badge row (scale/splits/grid/tempo/connection/✦dims), adopt-tempo, splits filter, MACRO\|BOTH\|SUB-NOTE half-loads via drop-on-card | 07-07 brief | v151 |
+| Q1 patch transparency: badge row (scale/splits/grid/tempo/connection/✦dims), adopt-tempo, splits filter, MACRO\|BOTH\|SUB-NOTE half-loads via drop-on-card | 07-07 brief | `7b75e76` v151 |
+| Q2 standalone reverb card removed from macro production tab (type parks until Q6's designer; patch SPACE inspector untouched) | 07-07 brief | `b67537b` v153 |
+| Q3 baked-note drill-down: `performance` persisted per note at bake (`notePerformance` law), read-only card in the roll drawer, legacy bakes degrade with a re-bake hint | 07-07 brief | v154 |
 
 ### Queued — build order
 

@@ -937,6 +937,31 @@ export const SCALE_PRESETS = {
 
 const NOTE_NAMES_12 = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
+// ─── Baked-note performance capture (Q3) ────────────────────
+// The things that vary per note but aren't visible as duration/velocity:
+// the envelope draw, vibrato parameterisation, glide, onset noise, tuning
+// and vowel position. Every field mirrors EXACTLY what the render path
+// reads off the note object, so a drill-down card can never disagree with
+// the audio. Pure — asserted headlessly.
+export function notePerformance(note) {
+  return {
+    envelope: {
+      a: note.envelopeAttack ?? null,
+      d: note.envelopeDecay ?? null,
+      s: note.envelopeSustain ?? null,
+      r: note.envelopeRelease ?? null,
+    },
+    vibrato: ((note.vibratoProb ?? 0) > 0 && ((note.vibratoDepth ?? 0) > 0 || (note.vibratoDepthSd ?? 0) > 0))
+      ? { prob: note.vibratoProb, depth: note.vibratoDepth, rate: note.vibratoRate ?? 5.5 }
+      : null,
+    glideFrom: note.slideFromFrequency ?? null,
+    glideMs: note.slideFromFrequency ? Math.round((note.slideDuration || 0) * 1000) : 0,
+    attackNoiseLevel: note.attackNoise?.level ?? null,
+    tuningCents: note.intonationCents || 0,
+    formantPos: note.formantPos ?? null,
+  };
+}
+
 // ─── Patch transparency (Q1) ────────────────────────────────
 // What a patch will do inside an arrangement, derived from its parameters
 // alone — nothing is persisted for this. Pure so it can be asserted
@@ -2792,7 +2817,10 @@ export class SynthEngine {
       if (!note) break;
       const noteDur = note.durationDivs * divSec;
       if (offsetDivs * divSec + noteDur > spanSec + 1e-6) break;
-      notes.push({ ...note, offsetDivs });
+      // Q3: the per-note performance draw travels with the bake so the
+      // roll can drill into it later (regions baked before this change
+      // simply lack the field and degrade gracefully).
+      notes.push({ ...note, offsetDivs, performance: notePerformance(note) });
       offsetDivs += note.durationDivs;
     }
     return notes;

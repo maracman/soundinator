@@ -592,6 +592,40 @@ console.log("P3: note connection — glide vs ring on overlap");
     run(GEN9).slice(1).some(nn => nn.legatoFromPrevious));
 }
 
+// ── Q3: baked notes persist their per-note performance draw ──
+{
+  const { SynthEngine, notePerformance } = await import("../web/static/synth.js");
+  const BAKE = {
+    seed: 7, tempo: 120, beatDivisions: 2, motifCount: 1, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    surpriseProb: 0, restMotifStartRatio: 0,
+    envelopeProb: 1, envelopeAttack: 0.05, envelopeAttackSd: 0.02,
+    vibratoProb: 0.8, vibratoDepth: 12, vibratoRate: 5.2,
+    spectralProfile: "violin", spectralMix: 1,
+  };
+  const eng = new SynthEngine();
+  const notes = eng.captureSpan(BAKE, 4);
+  check("Q3: bake produces notes", notes.length > 0, `${notes.length} notes`);
+  check("Q3: every baked note carries performance", notes.every(n => n.performance));
+  const p0 = notes[0].performance;
+  check("Q3: envelope draw persisted and mirrors the audible fields",
+    p0.envelope.a === notes[0].envelopeAttack && p0.envelope.s === notes[0].envelopeSustain);
+  check("Q3: vibrato parameterisation persisted when active",
+    p0.vibrato && p0.vibrato.depth === 12 && p0.vibrato.rate === 5.2);
+  check("Q3: tuning mirrors intonationCents",
+    notes.every(n => n.performance.tuningCents === (n.intonationCents || 0)));
+  check("Q3: onset noise level from the fingerprint",
+    p0.attackNoiseLevel == null || Number.isFinite(p0.attackNoiseLevel));
+  const glideNotes = eng.captureSpan({ ...BAKE, gapProb: 1, gapMin: -0.5, gapMax: -0.2, noteConnection: "glide" }, 4);
+  check("Q3: glide capture — overlapped notes record glideFrom + ms",
+    glideNotes.some(n => n.performance.glideFrom != null && n.performance.glideMs >= 0));
+  check("Q3: envelope determinism — same seed bakes the same draws",
+    JSON.stringify(eng.captureSpan(BAKE, 4).map(n => n.performance.envelope)) ===
+    JSON.stringify(notes.map(n => n.performance.envelope)));
+  check("Q3: notePerformance on a bare legacy note degrades to nulls",
+    (() => { const p = notePerformance({}); return p.vibrato === null && p.glideFrom === null && p.tuningCents === 0; })());
+}
+
 // ── Q1: patch transparency badges (pure derivation, no persistence) ──
 {
   const { patchBadges, splitsBucketOf } = await import("../web/static/synth.js");
