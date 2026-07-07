@@ -5478,3 +5478,6 @@ body.dragging { cursor: grabbing; user-select: none; }
 .ch-perf .envelope-canvas.adsr-edit { cursor: grab; width: 100%; }
 .ch-perf .envelope-canvas.adsr-edit:active { cursor: grabbing; }
 .ch-perf .vibrato-canvas { width: 100%; }
+
+/* P2: family starter tags + filter chips */
+.family-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 6px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(245, 190, 100, 0.9); white-space: nowrap; }

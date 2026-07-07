@@ -272,6 +272,7 @@ const DEFAULTS = {
   excitationHuman: 0.4,
   partialTransfer: 0.15,
   bodyType: "auto",
+  bodyArticulation: 0,
   // null = derive from legacy spectralStretchCents; a finite value wins
   partialB: null,
   // SPACE positioning: where the instrument stands relative to the listener
@@ -3765,6 +3766,8 @@ function renderExplore() {
       <div class="library-filters" id="libraryFilters">
         <button class="filter-chip${libraryFilter === "all" ? " active" : ""}" data-filter="all">All</button>
         <button class="filter-chip${libraryFilter === "full" ? " active" : ""}" data-filter="full">Full rigs</button>
+        ${[["percussive", "Percussive"], ["bass", "Bass"], ["atmos", "Atmos"], ["melody", "Melody"]].map(([k, label]) =>
+          `<button class="filter-chip family-chip${libraryFilter === `family:${k}` ? " active" : ""}" data-filter="family:${k}">${label}</button>`).join("")}
         ${Object.entries(PRESET_SECTIONS).map(([k, s]) =>
           `<button class="filter-chip${libraryFilter === k ? " active" : ""}" data-filter="${k}">${s.label}</button>`).join("")}
       </div>
@@ -8798,7 +8801,9 @@ function renderInstrumentTab(root) {
 }
 
 function renderPresetList(container, presets, source) {
-  if (libraryFilter !== "all" && source !== "instrument") {
+  if (libraryFilter.startsWith("family:") && source !== "instrument") {
+    presets = presets.filter(p => p.family === libraryFilter.slice(7));
+  } else if (libraryFilter !== "all" && source !== "instrument") {
     presets = presets.filter(p => (p.section && p.section !== "full" ? p.section : "full") === libraryFilter);
   }
   if (!presets.length) {
@@ -8815,6 +8820,7 @@ function renderPresetList(container, presets, source) {
     <div class="preset-item">
       <span class="name">${esc(p.name || p.preset_name || "Untitled")}</span>
       <span class="section-chip${sectionKey ? "" : " chip-full"}">${sectionLabel || "Full"}</span>
+      ${p.family ? `<span class="family-tag">${esc(p.family)}</span>` : ""}
       <span class="meta">${p.description ? esc(p.description) : (sectionLabel ? `${Object.keys(p.parameters || {}).length} settings` : presetSummary(p.parameters))}</span>
       <span class="score">${(p.rating || p.favourite_rating) ? `${p.rating || p.favourite_rating}/7` : ""}</span>
       <div class="actions">
