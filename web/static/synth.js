@@ -1937,6 +1937,9 @@ export class GenerationEngine {
       velocity,
       isRest: !!note.isRest || isRatioRest,
       isSurprise,
+      // Which dimensions this surprise touched (pitch/tuning/rhythm/
+      // dynamics/formant/rest) — the lanes display tags events with them.
+      surpriseFeatures: isSurprise ? (this._activeSurpriseProjection?.features || []).slice() : [],
       motifIndex: this._motifIdx,
       baseIndex: this.repertoire ? this.repertoire.baseIndexFor(this._motifIdx) : this._motifIdx,
       isVariant: this.repertoire ? this._motifIdx >= this.repertoire.baseLen : false,
@@ -1953,6 +1956,8 @@ export class GenerationEngine {
       beatDivisions: beatDiv,
       motifLengthDivs: motifBeats * beatDiv,
       pitchBits,
+      dynBits,
+      restBits,
       ...subNote,
     };
     // Q7 layered subnotes: each layer renders its own fingerprint under its
@@ -3903,6 +3908,11 @@ export class SynthEngine {
         intonationCents: note.intonationCents || 0,
         pitchDev: dev.pitch,
         rhythmDev: dev.rhythm,
+        // information + surprise dimensions for the behaviour lanes
+        pitchBits: note.pitchBits ?? null,
+        dynBits: note.dynBits ?? null,
+        restBits: note.restBits ?? null,
+        surpriseFeatures: note.surpriseFeatures || [],
       });
       if (this._timeline.length > 320) this._timeline.splice(0, this._timeline.length - 320);
 

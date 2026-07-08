@@ -16,6 +16,7 @@ import {
   SynthEngine,
   GenerationEngine,
   HeadphoneCheck,
+  Scale,
   SCALE_PRESETS,
   FORMANT_PRESETS,
   PERC_SOUNDS,
@@ -583,7 +584,7 @@ const UI_DESC = {
   contribBtn: "Share the current preset with the community sound library.",
   scalePresetSelect: "Choose a 12-tone scale preset and update the active scale degrees.",
   edoDivisionsInput: "Set the number of equal octave divisions for N-EDO mode.",
-  vis: "Live analyser display of the current audio output.",
+  vis: "",
   cvInterval: "Probability distribution over melodic interval sizes.",
   cvMelodyAccuracy: "Melody accuracy and surprise display. The centre is the expected motif note; the bracket marks the finite display range around infinite probability tails.",
   cvTuningAccuracy: "Tuning accuracy display in cents. Cents are hundredths of a 12-tone semitone, independent of the selected scale or EDO.",
@@ -706,8 +707,9 @@ let _lastMarkerTick = 0;     // throttle for live note-trace redraws
 let _markersActive = false;  // whether the note trace was drawn last frame
 
 // Frequency-response area view mode: "spectrum" | "motifs" | "pianoroll"
-let visMode = "spectrum";
+let visMode = "lanes";
 const VIS_MODE_LABEL = {
+  lanes: "Behaviour Timeline",
   spectrum: "Frequency Response",
   motifs: "Motif Timeline",
   pianoroll: "Piano Roll",
@@ -1467,7 +1469,7 @@ function renderBrowserCards(v) {
       <span class="br-name">${esc(item.name)}</span>
       <span class="br-kind">${esc(item.kindLabel)}</span>
       <button class="br-btn${browserPreviewId === item.id ? " on" : ""}" data-browser-preview="${esc(item.id)}" title="Hear it in the session context">${browserPreviewId === item.id ? "■" : "▶"}</button>
-      <button class="br-btn" data-browser-add="${esc(item.id)}" title="Add to your palette">＋</button>
+      <button class="br-btn br-add" data-browser-add="${esc(item.id)}" title="Add to your palette — the instrument rack for this arrangement">＋ Add</button>
     </div>`).join("") : '<div class="empty-state">No presets match.</div>';
 
   const findItem = (id) => browserItems().find(i => i.id === id);
@@ -2850,8 +2852,7 @@ function produceTimelineHTML() {
       return `<div class="tl2-region${sel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
         style="left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
         title="${esc(label)}${esc(badgeHover)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
-        ${loopTicks}<span class="tl2-region-label">${r.type === "baked" ? "◆ " : ""}${esc(label)}</span>
-        ${r.type !== "baked" ? `<span class="tl2-seed" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">s·${r.seed}</span>` : ""}
+        ${loopTicks}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span><span class="tl2-region-label">${esc(label)}${r.type === "baked" ? `<b class="tl2-baked-tag" title="Baked: the take is frozen into editable notes — double-click to open the note editor">— BAKED</b>` : ""}</span>
         ${sel && pal ? `<span class="tl2-badges">${patchBadgesHTML({ ...pal.params, ...(pal.originScale || {}) }, pal.originTempo, true)}</span>` : ""}
         ${sel ? `<span class="tl2-gain-tag" data-gain-tag="${r.id}" title="Region level — drag vertically">${gainDb >= 0 ? "+" : ""}${gainDb.toFixed(1)}dB</span>` : ""}
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
@@ -2905,6 +2906,23 @@ function produceTimelineHTML() {
         <div class="tl2-head tl2-corner"></div>
         <div class="tl2-newtrack" data-lane="__new__" style="width:${laneW}px">${arrangement.tracks.length ? "Drop a palette instrument here to add a track" : "Drag an instrument from your palette here to create the first track"}</div>
       </div>
+      ${arrangement.tracks.length ? "" : `
+      <!-- Audit P0: the first-creation path stays visible until the first
+           track exists — and a demo teaches structure faster than a blank
+           DAW. -->
+      <div class="tl2-row">
+        <div class="tl2-head tl2-corner"></div>
+        <div class="tl2-empty-guide" style="width:${laneW}px">
+          <div class="tl2-guide-steps">
+            <span class="tl2-guide-step"><b>1</b> Pick a sound in the Browser</span>
+            <span class="tl2-guide-arrow">→</span>
+            <span class="tl2-guide-step"><b>2</b> ＋ Add it to your Palette</span>
+            <span class="tl2-guide-arrow">→</span>
+            <span class="tl2-guide-step"><b>3</b> ＋ Track, or drag it onto the lane above</span>
+          </div>
+          <button class="btn btn-primary" id="loadDemo" title="Build a small three-instrument arrangement so you can see how tracks, regions and seeds fit together — then reroll, bake and edit it">▶ Load demo arrangement</button>
+        </div>
+      </div>`}
     </div>`;
 }
 function selectedBakedRegion() {
@@ -2927,16 +2945,25 @@ function rollPanelHTML() {
     ? `${ctxP.edoDivisions}-EDO`
     : (SCALE_PRESETS[ctxP.scalePreset]?.label || ctxP.scalePreset || "major");
   const keyName = NOTE_NAMES[((ctxP.keyRoot ?? 0) % 12 + 12) % 12] || "C";
+  const regionName = (arrangement.palette || []).find(pl => pl.id === region.paletteId)?.name || "Region";
   return `
     <div class="roll-panel${rollDynLane ? " dyn" : ""}">
       <div class="roll-head">
+        <span class="roll-title">Baked Note Editor</span>
+        <span class="roll-region" title="The region under edit">${esc(String(regionName))} — Seed ${region.seed ?? "—"}</span>
+        <span class="roll-chip roll-chip-baked" title="The take is frozen into editable notes — Unbake returns it to the seed">Baked</span>
+        <span class="roll-chip roll-chip-det" title="Baked notes replay exactly — no probability draws remain">Deterministic</span>
         <span class="roll-meta">grid <b>${beatDiv}/beat</b> · scale <b>${esc(scaleLabel)}</b> · key <b>${esc(keyName)}</b></span>
-        <button class="btn btn-ghost btn-sm${_rollAddMode ? " roll-add-on" : ""}" id="rollAddMode" title="Pencil mode: click an empty cell to add a note there">✏ add</button>
+        <button class="btn btn-ghost btn-sm${_rollAddMode ? " roll-add-on" : ""}" id="rollAddMode" title="Draw mode: click an empty cell to add a note there">✏ Draw</button>
         <span class="roll-keys" title="Keyboard, with a note selected: ⌫ delete · M mute · Q quantize · ←→ nudge division · ↑↓ scale step · ⌥↑↓ cents">⌫ M Q ←→ ↑↓</span>
-        <label class="roll-dyncheck"><input type="checkbox" id="rollDynToggle"${rollDynLane ? " checked" : ""}/> dynamics</label>
+        <label class="roll-dyncheck"><input type="checkbox" id="rollDynToggle"${rollDynLane ? " checked" : ""}/> velocity lane</label>
+        <span class="roll-legend">
+          <i class="roll-leg-intended"></i> Intended (scale degree)
+          <i class="roll-leg-realised"></i> Realised (played)
+        </span>
       </div>
       <canvas id="rollCanvas" width="960" height="${rollDynLane ? 300 : 240}"></canvas>
-      <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies show the realised pitch AND timing; ghost outlines mark the intended scale note and grid slot. ⇧-drag = micro-timing off the grid.</div>
+      <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies show the realised pitch AND timing; dashed outlines mark the intended scale note and grid slot. ⇧-drag = micro-timing off the grid.</div>
     </div>`;
 }
 
@@ -3046,11 +3073,12 @@ function drawRoll(region) {
     const cents = n.intonationCents || 0;
     const timingDeviates = Math.abs(n.onsetDevDivs || 0) > 0.01
       || Math.abs(n.durationDevDivs || 0) > 0.01 || (n.gapFraction || 0) > 0.05;
-    // Ghost: intended pitch row and/or intended grid slot
+    // Ghost: intended pitch row and/or intended grid slot — teal dashed,
+    // matching the editor legend (Intended vs Realised)
     if (Math.abs(cents) > 1 || timingDeviates) {
       const gy = yForPitch(n.degree, 0) + rowH / 2 - bodyH / 2;
-      ctx.strokeStyle = "rgba(154,160,171,0.35)";
-      ctx.setLineDash([2, 2]);
+      ctx.strokeStyle = "rgba(95,212,200,0.55)";
+      ctx.setLineDash([3, 2]);
       ctx.lineWidth = 1;
       ctx.strokeRect(gx, gy, gw, bodyH);
       ctx.setLineDash([]);
@@ -4002,7 +4030,7 @@ function renderProduce() {
                     <span class="pal-actions">
                       ${pl.originTempo ? `<button class="pal-btn" data-adopt-tempo="${pl.id}" title="Adopt this patch's design tempo (${pl.originTempo} bpm) as the session tempo">⏱</button>` : ""}
                       <button class="pal-btn" data-palette-edit="${pl.id}" title="Open this instrument in the Sound Studio editor — save it back and every region using it follows">✎</button>
-                      <button class="pal-btn" data-add-track="pal:${pl.id}" title="Add a track playing this instrument">+</button>
+                      <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="Add a track playing this instrument, with a first region at bar 1">＋ Track</button>
                       <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
                     </span>
                     ${patchBadgesHTML({ ...pl.params, ...(pl.originScale || {}) }, pl.originTempo)}
@@ -4197,6 +4225,44 @@ function wireProduce(v) {
       renderProduce();
     };
   });
+
+  // Audit P0: demo arrangement — three starter rigs in overlapping
+  // regions, built through the SAME path as by hand (palette → track →
+  // region), so undo/inspect/reroll all behave normally afterwards.
+  const demoBtn = v.querySelector("#loadDemo");
+  if (demoBtn) demoBtn.onclick = () => {
+    const wanted = ["Wood Talk", "Deep Walker", "Slow Sky"];
+    const picks = wanted
+      .map(n => produceSources().find(s => s.kind === "factory" && s.name === n))
+      .filter(Boolean);
+    if (!picks.length) return;
+    const layout = [
+      { start: 0, len: 8 * BEATS_PER_BAR },
+      { start: 2 * BEATS_PER_BAR, len: 6 * BEATS_PER_BAR },
+      { start: 4 * BEATS_PER_BAR, len: 4 * BEATS_PER_BAR },
+    ];
+    picks.forEach((src, i) => {
+      addToPalette({ id: src.id, name: src.name, kindLabel: "starter", params: src.parameters, parameters: src.parameters });
+      const pl = arrangement.palette[arrangement.palette.length - 1];
+      arrangement.tracks.push({
+        id: crypto.randomUUID(),
+        name: src.name,
+        sourceKind: src.kind,
+        instrumentParams: { ...src.parameters },
+        gain: 1,
+        regions: [{
+          id: crypto.randomUUID(), paletteId: pl.id,
+          startBeat: layout[i]?.start ?? 0,
+          lengthBeats: layout[i]?.len ?? 4 * BEATS_PER_BAR,
+          seed: newSeed(),
+        }],
+      });
+    });
+    const t0 = arrangement.tracks[arrangement.tracks.length - picks.length];
+    if (t0?.regions[0]) selectedRegion = { trackId: t0.id, regionId: t0.regions[0].id };
+    saveArrangement("demo arrangement");
+    renderProduce();
+  };
 
   v.querySelectorAll("[data-remove-track]").forEach(btn => {
     btn.onclick = () => {
@@ -5344,7 +5410,7 @@ function renderExplore() {
   ensureSpectralPartialParams(p);
 
   const v = mount(`
-    <div class="explore-dashboard${workspaceTab === 'subnote' ? ' subnote-workspace-mode' : ''}" style="--dash-c1:${_studioPanels.dashC1}px">
+    <div class="explore-dashboard${workspaceTab === 'subnote' ? ' subnote-workspace-mode' : ''}${workspaceTab === 'scalelab' ? ' scalelab-workspace-mode' : ''}${workspaceTab === 'explore' ? ' macro2-workspace-mode' : ''}" style="--dash-c1:${_studioPanels.dashC1}px">
       <div class="dash-vsplit" id="dashVSplit" title="Drag to resize the left column"></div>
     <div class="explore-top">
       <div>
@@ -5354,7 +5420,7 @@ function renderExplore() {
       <div class="workspace-tabs" id="workspaceTabs">
         <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore" title="The behaviour half: melody, rhythm, dynamics, sequence & surprise — how the instrument plays">Macro</button>
         <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
-        <a class="workspace-tab workspace-link" href="#produce" title="Producer: arrange your instruments on a timeline (early preview)">Producer</a>
+        <button class="workspace-tab${workspaceTab === 'scalelab' ? ' active' : ''}" data-workspace-tab="scalelab" title="The tuning workshop: the scale wheel, N-EDO systems, world tunings, per-degree cents and Scala import/export">Scale Lab</button>
       </div>
     </div>
 
@@ -5364,6 +5430,7 @@ function renderExplore() {
     <!-- Transport -->
     <div class="card transport-card">
       <div class="transport">
+        <a class="producer-pill" href="#produce" title="Producer: arrange your instruments on a timeline">▦ Producer</a>
         <button class="transport-round transport-play${synth.isPlaying ? ' is-playing' : ''}" id="playBtn">${synth.isPlaying ? "❚❚" : "▶"}</button>
         <button class="transport-round transport-stop" id="stopBtn">■</button>
         <button class="btn btn-secondary rand-btn" id="randBtn">Randomise</button>
@@ -5373,6 +5440,7 @@ function renderExplore() {
           <button class="btn btn-ghost btn-sm" id="seedBtn">${p.seed}</button>
         </div>
       </div>
+      ${workspaceTab === 'explore' ? '' : `
       <div class="top-save-bar">
         <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
         <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
@@ -5380,7 +5448,7 @@ function renderExplore() {
           ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
         </select>
         <button class="btn btn-primary btn-sm" id="saveBtn">Save</button>
-      </div>
+      </div>`}
       <div class="top-rating-row">
         <span class="label">Rating</span>
         <input type="range" id="ratingSlider" min="1" max="7" step="1" value="${exploreRating}"/>
@@ -5389,34 +5457,14 @@ function renderExplore() {
       <div class="controls-grid tempo-grid">
         ${controlRow("tempo", "Tempo", p.tempo, 50, 180, 1)}
       </div>
-      <div class="top-library-actions">
-        <button class="top-action-btn" id="topMyPresets">My Presets</button>
-        <button class="top-action-btn" id="topLibrary">Library</button>
-      </div>
+      <!-- V2.2 (owner): presets no longer open from the top bar — the
+           browser strip at the bottom of the macro workspace is the one
+           preset surface (expandable for the full library). -->
     </div>
 
-    <!-- Frequency response dash -->
-    <div class="visual-card" id="visualCard">
-      <div class="visual-status">
-        <div><span class="status-dot"></span>${VIS_MODE_LABEL[visMode] || "Frequency Response"}</div>
-        <div class="surprise-status">Surprise Event</div>
-        <div class="vis-mode-switch" id="visModeSwitch">
-          <button class="vis-mode-btn${visMode === "spectrum" ? " active" : ""}" data-vismode="spectrum">Spec</button>
-          <button class="vis-mode-btn${visMode === "motifs" ? " active" : ""}" data-vismode="motifs">Motif</button>
-          <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll">Roll</button>
-        </div>
-      </div>
-      <div class="visualiser-wrap vis-mode-${visMode}">
-        <canvas id="vis" width="980" height="210"></canvas>
-      </div>
-      <div class="engine-state" id="engineState">
-        <div class="stat">Motifs <span class="stat-val" id="statMotifs">&ndash;</span></div>
-        <div class="stat">Sequence <span class="stat-val" id="statSeq">&ndash;</span></div>
-        <div class="stat">Notes <span class="stat-val" id="statNotes">&ndash;</span></div>
-      </div>
-    </div>
-
-    ${workspaceTab === 'subnote' ? subnoteWorkspaceHTML(p) : macroWorkspaceHTML(p)}
+    <!-- V2: the hero visualiser lives INSIDE the macro workspace now (its
+         centre display); the other workspaces never showed it anyway. -->
+    ${workspaceTab === 'subnote' ? subnoteWorkspaceHTML(p) : workspaceTab === 'scalelab' ? scaleLabWorkspaceHTML(p) : macroWorkspaceHTML(p)}
 
     <!-- Library -->
     <div class="card library-card" id="libraryCard">
@@ -5482,11 +5530,11 @@ function renderExplore() {
   // ── Wire up ──
 
   canvas = v.querySelector("#vis");
-  canvasCtx = canvas.getContext("2d");
+  canvasCtx = canvas ? canvas.getContext("2d") : null;
 
   // Responsive, high-DPI hero display: match the backing store to the CSS
   // size (capped at 2x DPR) and redraw whenever the layout changes.
-  if (window.ResizeObserver) {
+  if (canvas && window.ResizeObserver) {
     if (_visResizeObserver) _visResizeObserver.disconnect();
     const fitVis = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -5495,6 +5543,7 @@ function renderExplore() {
       if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
         canvas.width = w;
         canvas.height = h;
+        layoutLaneHeads(); // lane header overlay tracks the canvas box
         if (!synth.isPlaying) drawStaticVis();
       }
     };
@@ -5815,6 +5864,8 @@ function renderExplore() {
 
   wireTonePrint(v);
   wireSpacePad(v);
+  wireStageBig(v); // V2 spatial stage — sources around the shared head
+  wireScaleLab(v); // V2 scale lab — the tuning workshop tab
   wireEarRoom(v);
   drawSpaceField(); // SPACE stage ear-response view (display only)
   wireLayerStrip(v);
@@ -6013,6 +6064,84 @@ function renderExplore() {
       synth.updateGenerationParams({ ...exploreParams });
     };
   });
+
+  // V2: Envelope / Modulation tab switch (right column)
+  const tdTabs = v.querySelector("#tdTabs");
+  if (tdTabs) tdTabs.onclick = (e) => {
+    const btn = e.target.closest("[data-td-tab]");
+    if (!btn || btn.dataset.tdTab === _tdSideTab) return;
+    _tdSideTab = btn.dataset.tdTab;
+    renderExplore();
+  };
+
+  // V2: stage power toggles (BODY / SPACE bypass — a stored mix amount)
+  v.querySelectorAll("[data-ch-power]").forEach(el => {
+    const fire = (e) => {
+      e.stopPropagation(); // the card underneath selects the stage
+      const stage = el.dataset.chPower;
+      const key = stage === "body" ? "spectralResonanceAmount" : "reverbWet";
+      const before = exploreParams[key];
+      toggleStagePower(exploreParams, stage);
+      noteParamChange(key, before, exploreParams[key]);
+      if (stage === "space") synth.updateReverb({ ...exploreParams });
+      else synth.updateGenerationParams({ ...exploreParams });
+      renderExplore();
+    };
+    el.onclick = fire;
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") fire(e); };
+  });
+
+  // V2 macro explorer: task rail → one mechanism in the inspector
+  v.querySelectorAll("[data-m2-mode]").forEach(btn => {
+    btn.onclick = () => {
+      const mode = btn.dataset.m2Mode;
+      if (mode === _macroMode) return;
+      _macroMode = mode;
+      if (["melody", "tuning", "duration", "dynamics"].includes(mode)) macroTab = mode;
+      const wasPlaying = synth.isPlaying;
+      renderExplore();
+      if (wasPlaying) startVisualiser();
+    };
+  });
+  const openLab = v.querySelector("#m2OpenScaleLab");
+  if (openLab) openLab.onclick = () => {
+    workspaceTab = "scalelab";
+    const wasPlaying = synth.isPlaying;
+    renderExplore();
+    if (wasPlaying) startVisualiser();
+  };
+  // V2 macro explorer: bottom preset strip (factory full rigs)
+  v.querySelectorAll("[data-m2-preset]").forEach(btn => {
+    btn.onclick = () => {
+      const f = FACTORY_PRESETS.find(x => x.id === btn.dataset.m2Preset);
+      if (!f) return;
+      const wasPlaying = synth.isPlaying;
+      exploreParams = mergedPresetParams({ parameters: { ...f.parameters }, section: "full" });
+      renderExplore();
+      if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+    };
+  });
+  drawM2PresetArt();
+  wireM2Lib(v); // V2.2 bottom browser (collapsed strip / expanded library)
+  wireLaneHeads(v); // lane-key popovers (lanes display only)
+
+  // V2: instrument recipe cards (bottom row)
+  v.querySelectorAll("[data-inst-card]").forEach(btn => {
+    btn.onclick = () => {
+      const key = btn.dataset.instCard;
+      if (exploreParams.spectralProfile === key) return;
+      noteParamChange("spectralProfile", exploreParams.spectralProfile, key);
+      exploreParams.spectralProfile = key;
+      resetSpectralPartialParams(exploreParams);
+      if ((exploreParams.bodyType || "auto") === "auto") {
+        delete exploreParams.bodyBands;
+        _chBodySel = null;
+      }
+      synth.updateGenerationParams({ ...exploreParams });
+      renderExplore();
+    };
+  });
+  drawInstCards();
 
   // Checkbox param → section mapping for auto-switch
   const _checkToSection = {
@@ -6389,106 +6518,381 @@ function renderExplore() {
   drawDistributions();
 }
 
-function macroWorkspaceHTML(p) {
+// ═══ V2 MACRO EXPLORER (render phase-02, 2026-07-08 redesign) ═══════
+// Display-led: a task rail on the left picks ONE mechanism, the centre
+// is the live behaviour display (lanes/spectrum/motifs/roll — engine
+// truth), the right inspector holds that mechanism's controls, and a
+// preset strip runs along the bottom. Same params, same wiring hooks.
+let _macroMode = "melody";
+
+function m2RailHTML() {
+  const item = (mode, label, cls = "") => `
+    <button class="m2-rail-btn ${cls}${_macroMode === mode ? " active" : ""}" data-m2-mode="${mode}">${label}</button>`;
   return `
-    <div class="card scale-card">
-      <div class="section-label">Scale & Root</div>
-      ${panelPresetBarHTML("melody")}
-      <div class="mode-btns" id="scaleModeGroup">
-        <button class="mode-btn${p.scaleMode !== 'edo' ? ' active' : ''}" data-smode="12tone">12-tone</button>
-        <button class="mode-btn${p.scaleMode === 'edo' ? ' active' : ''}" data-smode="edo">N-EDO</button>
+    <div class="m2-rail">
+      ${item("scale", "Scale &amp; Root", "m2-rail-top")}
+      <div class="m2-rail-group">
+        <div class="m2-rail-head">Macro Probability</div>
+        ${item("melody", `<i class="m2-dot" style="background:var(--gen)"></i>Melody`)}
+        ${item("tuning", `<i class="m2-dot" style="background:var(--surp)"></i>Tuning`)}
+        ${item("duration", `<i class="m2-dot" style="background:var(--blue)"></i>Duration`)}
+        ${item("dynamics", `<i class="m2-dot" style="background:var(--green)"></i>Dynamics`)}
       </div>
-      <div id="scaleOptions">
-        ${p.scaleMode !== 'edo' ? `
-          <div class="scale-preset-row">
-            <label class="text-sm">Preset
-              <select id="scalePresetSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem">
-                ${Object.entries(SCALE_PRESETS).map(([k, v]) =>
-                  `<option value="${k}" ${p.scalePreset === k ? 'selected' : ''}>${v.label}</option>`
-                ).join('')}
-              </select>
-            </label>
-          </div>
-        ` : `
-          <div class="edo-row">
-            <span class="text-sm" style="color:var(--text2)">Divisions:</span>
-            <input type="number" id="edoDivisionsInput" class="edo-input"
-                   min="3" max="48" value="${p.edoDivisions}"/>
-          </div>
-        `}
+      ${item("sequence", "Markov Sequence<br/>&amp; Surprise", "m2-rail-top")}
+      ${item("percussion", "Percussion", "m2-rail-top")}
+    </div>`;
+}
+
+function m2ScaleInspectorHTML(p) {
+  return `
+    <div class="section-label">Scale & Root</div>
+    ${panelPresetBarHTML("melody")}
+    <div class="mode-btns" id="scaleModeGroup">
+      <button class="mode-btn${p.scaleMode !== 'edo' ? ' active' : ''}" data-smode="12tone">12-tone</button>
+      <button class="mode-btn${p.scaleMode === 'edo' ? ' active' : ''}" data-smode="edo">N-EDO</button>
+    </div>
+    <div id="scaleOptions">
+      ${p.scaleMode !== 'edo' ? `
         <div class="scale-preset-row">
-          <label class="text-sm">World tunings
-            <select id="worldScaleSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem" title="Tuning systems from different traditions — each sets the divisions, the scale, and (where the tradition isn't equal-tempered) the real pitch centre of every degree">
-              <option value="">—</option>
-              ${Object.entries(CULTURAL_SCALES).map(([k, s]) =>
-                `<option value="${k}">${s.label}</option>`).join("")}
+          <label class="text-sm">Preset
+            <select id="scalePresetSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem">
+              ${Object.entries(SCALE_PRESETS).map(([k, v]) =>
+                `<option value="${k}" ${p.scalePreset === k ? 'selected' : ''}>${v.label}</option>`
+              ).join('')}
             </select>
           </label>
         </div>
-      </div>
-      <div id="noteGridContainer">${buildNoteGridHTML(p)}</div>
-      <div class="note-grid-legend">
-        <div class="legend-item"><div class="legend-dot off"></div> Off</div>
-        <div class="legend-item"><div class="legend-dot scale"></div> In scale</div>
-        <div class="legend-item"><div class="legend-dot sub"></div> Sub-scale</div>
-        <div class="legend-item"><div class="legend-dot root"></div> Root</div>
-      </div>
-      <div class="section-subhead">Root Pull</div>
-      <div class="controls-grid root-controls">
-        ${controlRow("subScaleWeight", "Sub-scale weight", p.subScaleWeight, 0.5, 1.0, 0.01)}
-        ${controlRow("rootPullStrength", "Root pull", p.rootPullStrength, 0, 1, 0.01)}
-        ${controlRow("rootPullShape", "Pull shape", p.rootPullShape, 0, 1, 0.01)}
-      </div>
-      <div class="dist-display" id="distRoot">
-        <canvas class="dist-canvas" id="cvRoot" width="240" height="72"></canvas>
-        <span class="dist-label">Root pull</span>
+      ` : `
+        <div class="edo-row">
+          <span class="text-sm" style="color:var(--text2)">Divisions:</span>
+          <input type="number" id="edoDivisionsInput" class="edo-input"
+                 min="3" max="48" value="${p.edoDivisions}"/>
+        </div>
+      `}
+      <div class="scale-preset-row">
+        <label class="text-sm">World tunings
+          <select id="worldScaleSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem" title="Tuning systems from different traditions — each sets the divisions, the scale, and (where the tradition isn't equal-tempered) the real pitch centre of every degree">
+            <option value="">—</option>
+            ${Object.entries(CULTURAL_SCALES).map(([k, s]) =>
+              `<option value="${k}">${s.label}</option>`).join("")}
+          </select>
+        </label>
       </div>
     </div>
-
-    <div class="card macro-card">
-      <div class="macro-card-head">
-        <div>
-          <div class="section-label">Macro Probability</div>
-        </div>
-        <div class="macro-tabs" id="macroTabs">
-          ${macroTabButton("melody", "Melody")}
-          ${macroTabButton("tuning", "Tuning")}
-          ${macroTabButton("duration", "Duration")}
-          ${macroTabButton("dynamics", "Dynamics")}
-        </div>
-      </div>
-      ${macroPanelHTML(p)}
+    <div id="noteGridContainer">${buildNoteGridHTML(p)}</div>
+    <div class="note-grid-legend">
+      <div class="legend-item"><div class="legend-dot off"></div> Off</div>
+      <div class="legend-item"><div class="legend-dot scale"></div> In scale</div>
+      <div class="legend-item"><div class="legend-dot sub"></div> Sub-scale</div>
+      <div class="legend-item"><div class="legend-dot root"></div> Root</div>
     </div>
-
-    <div class="card structure-card">
-      <div class="section-label">Markov Sequence &amp; Surprise</div>
-      ${panelPresetBarHTML("surprise")}
-      <div class="section-subhead">Sequence</div>
-      <div class="controls-grid">
-        ${controlRow("motifCount", "Motif states", p.motifCount, 1, 8, 1)}
-        ${controlRow("motifLengthBeats", "Loop length (beats)", p.motifLengthBeats, 1, 16, 1)}
-        ${controlRow("sequenceProb", "Order bias", p.sequenceProb, 0, 1, 0.01)}
-        ${controlRow("motifSurpriseProb", "Motif mutation", p.motifSurpriseProb, 0, 1, 0.01)}
-      </div>
-      <div class="sequence-divider"></div>
-      <div class="section-subhead">Surprise</div>
-      <div class="controls-grid">
-        ${controlRow("surpriseProb", "Surprise chance (per note)", p.surpriseProb, 0, 1, 0.01)}
-        ${controlRow("incorporationRate", "Incorporation chance", p.incorporationRate, 0, 1, 0.01)}
-        ${selectControlRow("surpriseMaxBaked", "Max incorporated surprises", p.surpriseMaxBaked, bakedSurpriseOptions(p.surpriseMaxBaked))}
-      </div>
-      ${checkboxControl("surpriseAllowMultiple", "Multiple features / note", p.surpriseAllowMultiple)}
-      ${surpriseWeightControlsHTML(p)}
+    <div class="section-subhead">Root Pull</div>
+    <div class="controls-grid root-controls">
+      ${controlRow("subScaleWeight", "Sub-scale weight", p.subScaleWeight, 0.5, 1.0, 0.01)}
+      ${controlRow("rootPullStrength", "Root pull", p.rootPullStrength, 0, 1, 0.01)}
+      ${controlRow("rootPullShape", "Pull shape", p.rootPullShape, 0, 1, 0.01)}
     </div>
+    <div class="dist-display" id="distRoot">
+      <canvas class="dist-canvas" id="cvRoot" width="240" height="72"></canvas>
+      <span class="dist-label">Root pull</span>
+    </div>`;
+}
 
-    <div class="card production-card">
-      <div class="production-head">
-        <div>
-          <div class="section-label">Percussion</div>
-          <div class="micro-note">Playback dressing only — accents never change motif generation.</div>
-        </div>
+function m2SequenceInspectorHTML(p) {
+  return `
+    <div class="section-label">Markov Sequence &amp; Surprise</div>
+    ${panelPresetBarHTML("surprise")}
+    <div class="section-subhead">Sequence</div>
+    <div class="controls-grid">
+      ${controlRow("motifCount", "Motif states", p.motifCount, 1, 8, 1)}
+      ${controlRow("motifLengthBeats", "Loop length (beats)", p.motifLengthBeats, 1, 16, 1)}
+      ${controlRow("sequenceProb", "Order bias", p.sequenceProb, 0, 1, 0.01)}
+      ${controlRow("motifSurpriseProb", "Motif mutation", p.motifSurpriseProb, 0, 1, 0.01)}
+    </div>
+    <div class="sequence-divider"></div>
+    <div class="section-subhead">Surprise</div>
+    <div class="controls-grid">
+      ${controlRow("surpriseProb", "Surprise chance (per note)", p.surpriseProb, 0, 1, 0.01)}
+      ${controlRow("incorporationRate", "Incorporation chance", p.incorporationRate, 0, 1, 0.01)}
+      ${selectControlRow("surpriseMaxBaked", "Max incorporated surprises", p.surpriseMaxBaked, bakedSurpriseOptions(p.surpriseMaxBaked))}
+    </div>
+    ${checkboxControl("surpriseAllowMultiple", "Multiple features / note", p.surpriseAllowMultiple)}
+    ${surpriseWeightControlsHTML(p)}`;
+}
+
+function m2InspectorHTML(p) {
+  if (_macroMode === "scale") return m2ScaleInspectorHTML(p);
+  if (_macroMode === "sequence") return m2SequenceInspectorHTML(p);
+  if (_macroMode === "percussion") {
+    return `
+      <div class="section-label">Percussion</div>
+      <div class="micro-note">Playback dressing only — accents never change motif generation.</div>
+      ${productionPanelHTML(p)}`;
+  }
+  // the four probability mechanisms share one anatomy (LAYOUT proposal §3)
+  const label = { melody: "Melody", tuning: "Tuning", duration: "Duration", dynamics: "Dynamics" }[macroTab] || "Melody";
+  return `
+    <div class="macro-card-head">
+      <div class="section-label">Macro Probability — ${label}</div>
+    </div>
+    ${macroPanelHTML(p)}`;
+}
+
+function m2ChipsHTML(p) {
+  const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
+  const scaleName = p.scaleMode === "edo"
+    ? `${(p.customDegrees || []).length}/${div} degrees`
+    : (SCALE_PRESETS[p.scalePreset]?.label || "Custom");
+  const root = (p.rootNotes || [0])[0] ?? 0;
+  const rootName = div === 12 ? NOTE_NAMES_12[root] : `°${root}`;
+  return `
+    <div class="m2-chips">
+      <span class="m2-chip">Scale: <b>${esc(scaleName)}</b></span>
+      <span class="m2-chip">Root: <b>${esc(String(rootName))}</b></span>
+      <span class="m2-chip">${div}-EDO</span>
+      <button class="m2-chip m2-chip-link" id="m2OpenScaleLab" title="Open the tuning workshop">Open Scale Lab ↗</button>
+      <div class="vis-mode-switch" id="visModeSwitch">
+        <button class="vis-mode-btn${visMode === "lanes" ? " active" : ""}" data-vismode="lanes">Lanes</button>
+        <button class="vis-mode-btn${visMode === "spectrum" ? " active" : ""}" data-vismode="spectrum">Spec</button>
+        <button class="vis-mode-btn${visMode === "motifs" ? " active" : ""}" data-vismode="motifs">Motif</button>
+        <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll">Roll</button>
       </div>
-      ${productionPanelHTML(p)}
+    </div>`;
+}
+
+// ═══ V2.2 macro BROWSER (owner 2026-07-08): one preset surface ═══
+// Collapsed: a strip of behaviour-signature cards with shortcut filters.
+// Expanded: an overlay over the lower workspace with the granular
+// library — factory / mine / community tabs, hearts, ratings, tags —
+// and the save controls live in the strip header in BOTH states.
+let _m2Lib = { open: false, tab: "factory", search: "", fam: "all", favOnly: false };
+let _m2LibCommunity = null; // fetched on first Community open
+
+function loadFavs() {
+  try { return new Set(JSON.parse(localStorage.getItem("phase0.favs.v1") || "[]")); } catch { return new Set(); }
+}
+function saveFavs(s) { localStorage.setItem("phase0.favs.v1", JSON.stringify([...s])); }
+
+function m2LibEntries() {
+  if (_m2Lib.tab === "mine") {
+    return loadPresets().map(e => ({
+      id: `m:${e.id}`, name: e.name, section: e.section || "full",
+      family: null, rating: e.rating ?? null, parameters: e.parameters, desc: "",
+    }));
+  }
+  if (_m2Lib.tab === "community") {
+    return (_m2LibCommunity || []).map((e, i) => ({
+      id: `g:${e.id ?? i}`, name: e.name || "Shared preset", section: e.section || "full",
+      family: e.family || null, rating: e.rating ?? null, parameters: e.parameters, desc: e.description || "",
+    }));
+  }
+  return FACTORY_PRESETS.map(f => ({
+    id: `f:${f.id}`, name: f.name, section: f.section || "full",
+    family: f.family || null, rating: null, parameters: f.parameters, desc: f.description || "",
+  }));
+}
+
+function m2LibFiltered() {
+  const favs = loadFavs();
+  const q = _m2Lib.search.trim().toLowerCase();
+  return m2LibEntries().filter(e =>
+    (_m2Lib.fam === "all" || e.family === _m2Lib.fam || e.section === _m2Lib.fam) &&
+    (!_m2Lib.favOnly || favs.has(e.id)) &&
+    (!q || e.name.toLowerCase().includes(q) || (e.desc || "").toLowerCase().includes(q)));
+}
+
+function m2LibRowsHTML() {
+  const favs = loadFavs();
+  const rows = m2LibFiltered();
+  if (_m2Lib.tab === "community" && _m2LibCommunity === null) {
+    return '<div class="empty-state">Loading the shared library…</div>';
+  }
+  if (!rows.length) return '<div class="empty-state">Nothing matches — clear the search or filters.</div>';
+  return rows.map(e => {
+    const splits = e.parameters ? splitsBucketOf(e.parameters) : null;
+    return `
+    <div class="m2-lib-row" title="${esc(e.desc || e.name)}">
+      <span class="m2-lib-name">${esc(e.name)}</span>
+      <span class="m2-lib-tags">
+        <i class="m2-tag">${esc(PRESET_SECTIONS[e.section]?.label || (e.section === "full" ? "Full rig" : e.section))}</i>
+        ${e.family ? `<i class="m2-tag">${esc(e.family)}</i>` : ""}
+        ${splits && splits !== "all" ? `<i class="m2-tag">${esc(splits)} splits</i>` : ""}
+      </span>
+      <span class="m2-lib-stars" title="${e.rating ? `rated ${e.rating}/7 when saved` : "no rating yet"}">${e.rating ? `★ ${e.rating}/7` : "☆ –"}</span>
+      <button class="m2-lib-heart${favs.has(e.id) ? " on" : ""}" data-m2-fav="${esc(e.id)}" title="Favourite — pin it to the ♥ filter">♥</button>
+      <button class="btn btn-secondary btn-sm" data-m2-load="${esc(e.id)}" title="${e.section === "full" ? "Load the whole rig" : "Apply just this section, keeping everything else"}">Load</button>
+    </div>`;
+  }).join("");
+}
+
+function m2PresetStripHTML() {
+  const favs = loadFavs();
+  const famChip = (k, label) => `<button class="m2-lib-chip${_m2Lib.fam === k ? " active" : ""}" data-m2-fam="${k}">${label}</button>`;
+  const fulls = FACTORY_PRESETS.filter(f => f.section === "full" &&
+    (_m2Lib.fam === "all" || f.family === _m2Lib.fam) &&
+    (!_m2Lib.favOnly || favs.has(`f:${f.id}`)));
+  return `
+    <div class="m2-lib${_m2Lib.open ? " open" : ""}" id="m2Lib">
+      <div class="m2-lib-head">
+        <span class="m2-lib-title">BROWSER</span>
+        <button class="m2-lib-chip m2-lib-expand" id="m2LibToggle" title="${_m2Lib.open ? "Back to the compact strip" : "Open the full library — factory, your saves, and the shared community"}">${_m2Lib.open ? "▾ Collapse" : "▴ Browse all"}</button>
+        ${_m2Lib.open ? `
+        <span class="m2-lib-tabs">
+          ${[["factory", "Factory"], ["mine", "Mine"], ["community", "Community"]].map(([k, label]) =>
+            `<button class="m2-lib-chip m2-lib-tab${_m2Lib.tab === k ? " active" : ""}" data-m2-tab="${k}">${label}</button>`).join("")}
+        </span>
+        <input type="search" id="m2LibSearch" class="m2-lib-search" placeholder="Search…" value="${esc(_m2Lib.search)}"/>` : ""}
+        ${famChip("all", "All")}${famChip("percussive", "Percussive")}${famChip("bass", "Bass")}${famChip("atmos", "Atmos")}${famChip("melody", "Melody")}
+        <button class="m2-lib-chip m2-lib-fav${_m2Lib.favOnly ? " active" : ""}" id="m2LibFavOnly" title="Only favourites">♥</button>
+        <span class="m2-lib-save">
+          <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
+          <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
+            <option value="full">Everything</option>
+            ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
+          </select>
+          <button class="btn btn-primary btn-sm" id="saveBtn">Save</button>
+        </span>
+      </div>
+      ${_m2Lib.open
+        ? `<div class="m2-lib-list" id="m2LibList">${m2LibRowsHTML()}</div>`
+        : `<div class="m2-presets" id="m2Presets">
+            ${fulls.map(f => `
+              <button class="m2-preset" data-m2-preset="${esc(f.id)}" title="${esc(f.description || f.name)} — click to load the full rig">
+                <span class="m2-preset-name">${esc(f.name)}</span>
+                <canvas data-m2-art="${esc(f.id)}" width="180" height="40"></canvas>
+                <span class="m2-preset-fam">${esc(f.family || "")}</span>
+              </button>`).join("") || '<div class="empty-state">No favourites yet — open ▴ Browse all and ♥ some presets.</div>'}
+          </div>`}
+    </div>`;
+}
+
+function wireM2Lib(v) {
+  const lib = v.querySelector("#m2Lib");
+  if (!lib) return;
+  const toggle = v.querySelector("#m2LibToggle");
+  if (toggle) toggle.onclick = () => { _m2Lib.open = !_m2Lib.open; renderExplore(); };
+  v.querySelectorAll("[data-m2-tab]").forEach(btn => {
+    btn.onclick = async () => {
+      _m2Lib.tab = btn.dataset.m2Tab;
+      if (_m2Lib.tab === "community" && _m2LibCommunity === null) {
+        renderExplore(); // shows the loading row
+        try { _m2LibCommunity = await api("/api/presets/global"); }
+        catch { _m2LibCommunity = []; }
+      }
+      renderExplore();
+    };
+  });
+  v.querySelectorAll("[data-m2-fam]").forEach(btn => {
+    btn.onclick = () => { _m2Lib.fam = btn.dataset.m2Fam; renderExplore(); };
+  });
+  const favOnly = v.querySelector("#m2LibFavOnly");
+  if (favOnly) favOnly.onclick = () => { _m2Lib.favOnly = !_m2Lib.favOnly; renderExplore(); };
+  const search = v.querySelector("#m2LibSearch");
+  if (search) search.oninput = () => {
+    _m2Lib.search = search.value;
+    const list = v.querySelector("#m2LibList");
+    if (list) { list.innerHTML = m2LibRowsHTML(); wireM2LibList(v); }
+  };
+  wireM2LibList(v);
+}
+
+function wireM2LibList(v) {
+  v.querySelectorAll("[data-m2-fav]").forEach(btn => {
+    btn.onclick = () => {
+      const favs = loadFavs();
+      const id = btn.dataset.m2Fav;
+      favs.has(id) ? favs.delete(id) : favs.add(id);
+      saveFavs(favs);
+      btn.classList.toggle("on", favs.has(id));
+    };
+  });
+  v.querySelectorAll("[data-m2-load]").forEach(btn => {
+    btn.onclick = () => {
+      const entry = m2LibEntries().find(e => e.id === btn.dataset.m2Load);
+      if (!entry || !entry.parameters) return;
+      const wasPlaying = synth.isPlaying;
+      exploreParams = mergedPresetParams({ parameters: { ...entry.parameters }, section: entry.section || "full" });
+      renderExplore();
+      if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+    };
+  });
+}
+
+// Behaviour signature sparkline: the preset's melody interval shape
+// (peakedness × range) with its rhythm grid ticked underneath — drawn
+// from the preset's actual parameters, not decoration.
+function drawM2PresetArt() {
+  const fulls = FACTORY_PRESETS.filter(f => f.section === "full");
+  for (const f of fulls) {
+    const cv = document.querySelector(`[data-m2-art="${f.id}"]`);
+    if (!cv) continue;
+    const ctx = cv.getContext("2d");
+    const w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    const P = f.parameters || {};
+    const k = Math.max(0.2, P.intervalPeakedness ?? 2);
+    const R = Math.max(1, P.intervalRange ?? 7);
+    ctx.beginPath();
+    for (let px = 0; px <= w; px += 2) {
+      const x = (px / w) * 2 - 1;                    // -1..1 across the range
+      const y = Math.exp(-Math.pow(Math.abs(x) * R / 3, k));
+      const yy = h - 12 - y * (h - 18);
+      px === 0 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
+    }
+    ctx.strokeStyle = "rgba(245,166,35,0.8)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    const divs = Math.max(1, Math.round(P.beatDivisions ?? 2));
+    const gap = clamp(P.gapProb ?? 0.2, 0, 1);
+    const ticks = 4 * divs;
+    ctx.fillStyle = "rgba(96,165,250,0.75)";
+    for (let i = 0; i < ticks; i++) {
+      if ((i * 7 + 3) % 11 / 11 < gap) continue;     // deterministic rest pattern
+      const x = (i + 0.5) * (w / ticks);
+      ctx.fillRect(x, h - 8, 2, 6);
+    }
+  }
+}
+
+function macroWorkspaceHTML(p) {
+  return `
+    <div class="card macro2-card">
+      <div class="m2-main">
+        ${m2RailHTML()}
+        <div class="m2-center">
+          ${m2ChipsHTML(p)}
+          <div class="visualiser-wrap vis-mode-${visMode} m2-visual">
+            <canvas id="vis" width="980" height="210"></canvas>
+            ${visMode === "lanes" ? `
+            <div class="m2-lane-heads" id="m2LaneHeads">
+              ${LANE_DEFS.map(d => `
+                <div class="m2-lane-head" data-lane-head="${d.key}">
+                  <span class="m2-lane-n" style="color:${d.col}">${d.n}</span>
+                  <div class="m2-lane-tt">
+                    <span class="m2-lane-title" style="color:${d.col}">${d.title}</span>
+                    <span class="m2-lane-sub">${d.sub}</span>
+                  </div>
+                  <button class="m2-lane-info" data-lane-key="${d.key}" title="Show this lane's key" aria-label="${d.title} key">i</button>
+                </div>`).join("")}
+            </div>
+            <div class="m2-lane-key" id="m2LaneKey" hidden></div>` : ""}
+          </div>
+          <div class="m2-bottom">
+            <span class="m2-status-chip" id="m2StatusChip">■ stopped · settings field ready</span>
+            <div class="engine-state m2-tiles" id="engineState">
+              <div class="stat">Motifs <span class="stat-val" id="statMotifs">&ndash;</span></div>
+              <div class="stat">Variants <span class="stat-val" id="statVariants">&ndash;</span></div>
+              <div class="stat">Sequence <span class="stat-val" id="statSeq">&ndash;</span></div>
+              <div class="stat">Notes <span class="stat-val" id="statNotes">&ndash;</span></div>
+              <div class="stat">Rests <span class="stat-val" id="statRests">&ndash;</span></div>
+              <div class="stat">Mean info <span class="stat-val" id="statMeanInfo">&ndash;</span></div>
+              <div class="stat">Surprises <span class="stat-val" id="statSurprises">&ndash;</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="m2-inspector" id="m2Inspector">${m2InspectorHTML(p)}</div>
+      </div>
+      ${m2PresetStripHTML()}
     </div>
   `;
 }
@@ -6737,8 +7141,19 @@ function refreshLayerEnvLines() {
   });
 }
 
-function layerStripHTML(p) {
+function layerStripHTML(p, compact = false) {
   const layers = Array.isArray(p.layers) ? p.layers : [];
+  // V2: on the SPACE stage the big stage IS the layers view (chips +
+  // draggable dots; position is a layer's only space property), so the
+  // strip collapses to its header — add/remove still lives here.
+  if (compact) {
+    return `
+    <div class="layer-strip" id="layerStrip">
+      <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
+      <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer underneath">＋</button>
+      <span class="layer-strip-note">${layers.length ? `${layers.length} layer${layers.length > 1 ? "s" : ""} on the stage above — drag the dots to place them; switch to another stage to edit their sound` : "no layers yet — ＋ captures the current sound as a layer you can place on the stage"}</span>
+    </div>`;
+  }
   // Owner refinement 07-07: each row = mini head diagram + two lines —
   // space parameters (level/angle/distance + the layer's OWN head when
   // enabled) on top, the layer's full envelope baseline (variation chance
@@ -6873,14 +7288,24 @@ function subnoteWorkspaceHTML(p) {
               <div class="ch-inspector ch-${_chStage}" id="chInspector" style="width:${_studioPanels.chW}px">${chInspectorHTML(p)}</div>
               <div class="ch-vsplit" id="chVSplit" title="Drag to resize the inspector"></div>
               <div class="ch-field-wrap">
+                <div class="td-field-head">
+                  <span class="td-field-title"><span class="td-stage-word ch-${_chStage}-word">${_chStage[0].toUpperCase()}${_chStage.slice(1)}</span> — ${_chStage === "space" ? "Ear Response" : "Partial Field"}</span>
+                </div>
                 ${_chStage === "space" ? `
-                <!-- Owner 07-07: space has no bearing on the partial print,
-                     and a big room duplicated the mini pad. The field shows
-                     what the space DOES instead: the binaural response —
-                     what each ear receives, from the published head models. -->
-                <div class="ch-focus-row"><span class="ch-focus-label">EARS</span><span class="ch-focus-sum">what this position hands to each ear — move the instrument on the pad, left</span></div>
+                <!-- V2 spatial stage (renders phase-04): the field IS the
+                     stage. Sources = base sound + layers; the only per-
+                     layer space property is position (owner 07-08). The
+                     binaural analysis strip below follows the SELECTED
+                     source live. -->
+                <!-- V2.2 (owner): no chip strip above the stage — the layer
+                     rows below are the one list; dots + rows share selection -->
+                <div class="ch-field-pos stage-pos">
+                  <canvas id="cvStageBig" title="The stage around your head, seen from above — front is up, the shaded half is behind you. Drag a numbered dot to place that source; rings are metres away."></canvas>
+                </div>
+                ${stageReadoutsHTML(p)}
+                <div class="ch-focus-row"><span class="ch-focus-label">EARS</span><span class="ch-focus-sum">what the selected source hands to each ear — arrival on the left, colouring on the right</span></div>
                 <div class="ch-field-pos">
-                  <canvas id="cvSpaceField" width="1200" height="364" style="width:100%;height:364px" title="Left: when the sound arrives — the direct hit, then the room's tail (the inset zooms the sub-millisecond gap between your ears). Right: how it's coloured — each ear's frequency response from head shadow, pinna, air and proximity."></canvas>
+                  <canvas id="cvSpaceField" width="1200" height="170" style="width:100%;height:170px" title="Left: when the sound arrives — the direct hit, then the room's tail (the inset zooms the sub-millisecond gap between your ears). Right: how it's coloured — each ear's frequency response from head shadow, pinna, air and proximity."></canvas>
                 </div>` : `
                 <div class="ch-focus-row" id="chFocus">
                   <span class="ch-focus-label">FOCUS</span>
@@ -6895,50 +7320,111 @@ function subnoteWorkspaceHTML(p) {
                 <div class="ch-lens-row"><span class="ch-lens-label">LENS</span><canvas id="cvLens" width="1200" height="34"></canvas></div>
                 <div class="ch-strip" id="chStrip"></div>`}
               </div>
+              <div class="td-side${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
+                ${tdSidePanelHTML(p)}
+              </div>
             </div>
             <div class="ch-status">${_chStage === "space"
               ? `<span>curves follow the pad and knobs live · <b>L</b> ear blue · <b>R</b> ear amber</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
               : `<span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span>`}</div>
-            ${layerStripHTML(p)}
+            ${layerStripHTML(p) /* V2.2: full rows on every stage — the space rows ARE the source list */}
+            ${_chStage === "space" ? "" : instCardsHTML(p) /* the stage needs the height; recipes are tone-side */}
           </div>
         `}
-
-        <div class="subnote-side">
-          <!-- Space audit 07-07: the legacy "Sound Source" save box is gone —
-               the top bar's Preset name + section + SAVE is the one true
-               preset save. The envelope moved here from the excitor panel:
-               it matters, and this column had the room. -->
-          <div class="subnote-side-section env-side-section">
-            <div class="section-label">Envelope</div>
-            ${envelopeProbBlockHTML(p)}
-          </div>
-
-          <div class="subnote-side-section${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
-            <div class="section-label">Advanced shaping</div>
-            <details class="formant-detail">
-              <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery until the tone print's focus editing replaces them.">Advanced</summary>
-              <div class="controls-grid">
-                ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
-                ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
-                ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
-              </div>
-              <div class="subsection-label">Octave groups</div>
-              <div class="controls-grid">
-                ${controlRow("partialGroup1", "Fund (1)", p.partialGroup1, 0, 2, 0.01)}
-                ${controlRow("partialGroup2", "Oct (2)", p.partialGroup2, 0, 2, 0.01)}
-                ${controlRow("partialGroup3", "3–4", p.partialGroup3, 0, 2, 0.01)}
-                ${controlRow("partialGroup4", "5–8", p.partialGroup4, 0, 2, 0.01)}
-                ${controlRow("partialGroup5", "9–16", p.partialGroup5, 0, 2, 0.01)}
-                ${controlRow("partialGroup6", "17+", p.partialGroup6, 0, 2, 0.01)}
-              </div>
-            </details>
-          </div>
-
-        </div>
 
       </div>
     </div>
   `;
+}
+
+// ── V2 right column: Envelope / Modulation panel ────────────────────
+// One panel, two tabs. Envelope keeps the interactive ADSR canvas (the
+// .adsr-edit wiring is class-based) with big A/D/S/R readouts under it —
+// the same #out_<param> ids the canvas drag already updates. Modulation
+// gathers the per-note movement sources that used to hide inside the
+// excitor's Performance drawer, as FabFilter-style routing rows.
+function tdSidePanelHTML(p) {
+  return `
+    <div class="td-tabs" id="tdTabs">
+      <button class="td-tab${_tdSideTab === "envelope" ? " active" : ""}" data-td-tab="envelope">Envelope</button>
+      <button class="td-tab${_tdSideTab === "modulation" ? " active" : ""}" data-td-tab="modulation">Modulation</button>
+    </div>
+    ${_tdSideTab === "envelope" ? tdEnvelopeTabHTML(p) : tdModulationTabHTML(p)}`;
+}
+
+function tdEnvelopeTabHTML(p) {
+  return `
+    <canvas class="envelope-canvas js-envelope-canvas adsr-edit" width="300" height="128" title="Drag the corners: attack peak, decay→sustain corner (vertical = sustain level), release foot"></canvas>
+    <div class="adsr-readouts">
+      <div><span class="adsr-k">A</span><output id="out_envelopeAttack">${fmtOutput("envelopeAttack", p.envelopeAttack)}</output></div>
+      <div><span class="adsr-k">D</span><output id="out_envelopeDecay">${fmtOutput("envelopeDecay", p.envelopeDecay)}</output></div>
+      <div><span class="adsr-k">S</span><output id="out_envelopeSustain">${fmtOutput("envelopeSustain", p.envelopeSustain)}</output></div>
+      <div><span class="adsr-k">R</span><output id="out_envelopeRelease">${fmtOutput("envelopeRelease", p.envelopeRelease)}</output></div>
+    </div>
+    ${controlRow("envelopeProb", "Variation chance", p.envelopeProb, 0, 1, 0.01)}
+    <details class="formant-detail">
+      <summary title="Per-note variation: each parameter is a distribution — the mean is the shape above, the SD is how far a note may stray from it">Variation (SD per note)</summary>
+      <div class="controls-grid">
+        ${controlRow("envelopeAttackSd", "Attack SD", p.envelopeAttackSd, 0, 0.12, 0.001)}
+        ${controlRow("envelopeDecaySd", "Decay SD", p.envelopeDecaySd, 0, 0.25, 0.001)}
+        ${controlRow("envelopeSustainSd", "Sustain SD", p.envelopeSustainSd, 0, 0.45, 0.01)}
+        ${controlRow("envelopeReleaseSd", "Release SD", p.envelopeReleaseSd, 0, 0.3, 0.001)}
+      </div>
+    </details>`;
+}
+
+// Owner feedback 2026-07-08: the "LFO 1 / LFO 2 / Env 2 / Keytrack"
+// routing rows were confusing — and slightly dishonest, since vibrato
+// here is a per-note probability draw, not a free-running LFO. The tab
+// keeps its place in the right panel, but the CONTENT is the old
+// presentation: the vibrato block (chance/depth/rate sliders + the
+// wobble trace) and the old Dynamics control.
+function tdModulationTabHTML(p) {
+  return `
+    <div class="section-label">Vibrato</div>
+    ${vibratoBlockHTML(p)}
+    <div class="section-label">Dynamics</div>
+    <div class="controls-grid">
+      ${controlRow("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01)}
+    </div>
+    <div class="ch-caption">vibrato is a per-note draw — Chance decides whether a note gets it, Depth and Rate shape the wobble the trace shows. Dynamics is how strongly louder playing brightens the spectrum.</div>`;
+}
+
+// ── V2 bottom row: instrument cards ─────────────────────────────────
+// The spectral profiles as first-class visual cards (render phase-03):
+// each card draws its own partial recipe — honest data, no stock art.
+function instCardsHTML(p) {
+  return `
+    <div class="inst-cards" id="instCards">
+      ${Object.entries(SPECTRAL_PROFILES).map(([k, prof]) => `
+        <button class="inst-card${p.spectralProfile === k ? " sel" : ""}" data-inst-card="${k}" title="Load the ${esc(prof.label)} recipe — partial levels, envelope and performance defaults; everything stays editable">
+          <canvas data-inst-art="${k}" width="216" height="104"></canvas>
+          <span class="inst-card-name">${esc(prof.label)}</span>
+        </button>`).join("")}
+    </div>`;
+}
+
+function drawInstCards() {
+  document.querySelectorAll("[data-inst-art]").forEach(cv => {
+    const prof = SPECTRAL_PROFILES[cv.dataset.instArt];
+    if (!prof) return;
+    const ctx = cv.getContext("2d");
+    const w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    const sel = cv.closest(".inst-card")?.classList.contains("sel");
+    const n = Math.min(20, prof.partials.length);
+    const pad = 10, base = h - 8;
+    for (let i = 0; i < n; i++) {
+      const amp = prof.partials[i].amp;
+      const x = pad + (w - pad * 2) * (i / (n - 1));
+      const y = base - Math.pow(amp, 0.4) * (h - 18);
+      ctx.strokeStyle = sel ? "rgba(61,157,246,0.85)" : "rgba(120,140,165,0.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, y); ctx.stroke();
+      ctx.fillStyle = sel ? "#3d9df6" : "rgba(150,170,195,0.8)";
+      ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 2 * Math.PI); ctx.fill();
+    }
+  });
 }
 
 function resetSpectralPartialParams(p) {
@@ -7256,6 +7742,461 @@ function handleNoteGridClick(cell) {
   rerenderNoteGrid(document);
   debouncedReplay();
   drawDistributions();
+}
+
+// ═══ V2 SCALE LAB (render phase-09, 2026-07-08 redesign) ═══════════
+// A dedicated tuning workshop as a third workspace tab. It edits the
+// SAME scale state the macro wheel uses (scaleMode, edoDivisions,
+// customDegrees, subScaleNotes, rootNotes, degreeTuning) — one truth.
+
+let _slSel = 0;                            // selected degree (inspector)
+let _slView = { ratios: true, grid: true };
+let _slSearch = "";
+let _slPresetSel = null;
+
+function _slDivisions(p) { return p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12; }
+function _slCents(p, d) { return d * 1200 / _slDivisions(p) + ((p.degreeTuning || {})[d] || 0); }
+function _slFreq(p, d) { return (p.tonicHz || 261.63) * Math.pow(2, _slCents(p, d) / 1200); }
+
+// Nearest simple just ratio (within the octave) for a cents value.
+function _slRatio(cents) {
+  const gcd = (a, b) => b ? gcd(b, a % b) : a;
+  let best = null, bestErr = 30;
+  for (let q = 1; q <= 16; q++) {
+    for (let n = q; n <= q * 2; n++) {
+      if (gcd(n, q) !== 1) continue;
+      const err = Math.abs(1200 * Math.log2(n / q) - cents);
+      if (err < bestErr) { best = [n, q]; bestErr = err; }
+    }
+  }
+  return best ? { txt: `${best[0]}/${best[1]}`, err: bestErr, val: best[0] / best[1] } : null;
+}
+
+function _slDegreeStatus(p, d) {
+  if ((p.rootNotes || []).includes(d)) return "root";
+  if ((p.subScaleNotes || []).includes(d)) return "sub";
+  if ((p.customDegrees || []).includes(d)) return "scale";
+  return "off";
+}
+
+function slSetStatus(p, d, status) {
+  p.customDegrees = [...(p.customDegrees || [])];
+  p.subScaleNotes = [...(p.subScaleNotes || [])];
+  p.rootNotes = [...(p.rootNotes || [])];
+  const rm = (arr) => arr.filter(x => x !== d);
+  if (status === "off") {
+    const remaining = rm(p.customDegrees);
+    if (remaining.length) {         // never empty the scale
+      p.customDegrees = remaining;
+      p.subScaleNotes = rm(p.subScaleNotes);
+      p.rootNotes = rm(p.rootNotes);
+    }
+  } else {
+    if (!p.customDegrees.includes(d)) p.customDegrees.push(d);
+    if (status === "sub") {
+      if (!p.subScaleNotes.includes(d)) p.subScaleNotes.push(d);
+      p.rootNotes = rm(p.rootNotes);
+    } else if (status === "root") {
+      if (!p.rootNotes.includes(d)) p.rootNotes.push(d);
+      p.subScaleNotes = rm(p.subScaleNotes);
+    } else {
+      p.subScaleNotes = rm(p.subScaleNotes);
+      p.rootNotes = rm(p.rootNotes);
+    }
+  }
+  p.customDegrees.sort((a, b) => a - b);
+  if (!p.rootNotes.length) p.rootNotes = [p.customDegrees[0] ?? 0];
+}
+
+function slPresets() {
+  const all = (n) => Array.from({ length: n }, (_, i) => i);
+  const list = [];
+  const edoEntry = (n) => ({
+    id: `edo${n}`, label: `${n}-EDO Equal Temperament`, tag: `${n}-EDO`,
+    desc: `${n} equal divisions of the octave — ${(1200 / n).toFixed(1)}¢ per step`,
+    apply: (p) => {
+      p.scaleMode = n === 12 ? "12tone" : "edo";
+      p.edoDivisions = n;
+      p.customDegrees = all(n);
+      p.subScaleNotes = []; p.rootNotes = [0]; p.degreeTuning = null;
+    },
+  });
+  list.push(edoEntry(12));
+  for (const [k, s] of Object.entries(SCALE_PRESETS)) {
+    list.push({
+      id: `sp:${k}`, label: s.label || k, tag: "12-EDO",
+      desc: `12-tone ${s.label || k} scale`,
+      apply: (p) => {
+        p.scaleMode = "12tone"; p.edoDivisions = 12; p.scalePreset = k;
+        p.customDegrees = [...s.degrees];
+        p.subScaleNotes = []; p.rootNotes = [s.degrees[0] ?? 0]; p.degreeTuning = null;
+      },
+    });
+  }
+  for (const [k, s] of Object.entries(CULTURAL_SCALES)) {
+    list.push({
+      id: `cs:${k}`, label: s.label, tag: `${s.edo}-EDO`, desc: s.description,
+      apply: (p) => {
+        p.scaleMode = s.edo === 12 ? "12tone" : "edo";
+        p.edoDivisions = s.edo;
+        p.customDegrees = [...s.degrees];
+        p.subScaleNotes = [...(s.sub || [])];
+        p.rootNotes = [...(s.roots || [0])];
+        p.degreeTuning = s.tuning ? { ...s.tuning } : null;
+      },
+    });
+  }
+  for (const n of [19, 24, 31, 53]) list.push(edoEntry(n));
+  return list;
+}
+
+function slPresetListHTML(p) {
+  const q = _slSearch.trim().toLowerCase();
+  return slPresets()
+    .filter(pr => !q || pr.label.toLowerCase().includes(q) || pr.tag.toLowerCase().includes(q))
+    .map(pr => `
+      <button class="sl-preset${_slPresetSel === pr.id ? " sel" : ""}" data-sl-preset="${pr.id}" title="${esc(pr.desc || pr.label)}">
+        <span class="sl-preset-name">${esc(pr.label)}</span>
+        <span class="sl-preset-tag">${esc(pr.tag)}</span>
+      </button>`).join("");
+}
+
+// The radial wheel — degrees around the circle at their SOUNDING angle
+// (grid position + cent offset), just-ratio spokes for reference.
+const SL_R = 200, SL_C = 250;
+function slWheelSVG(p) {
+  const div = _slDivisions(p);
+  if (_slSel >= div) _slSel = 0;
+  const pol = (cents, r) => {
+    const a = 2 * Math.PI * cents / 1200 - Math.PI / 2;
+    return [SL_C + Math.cos(a) * r, SL_C + Math.sin(a) * r];
+  };
+  let s = `<svg id="slWheel" viewBox="0 0 ${SL_C * 2} ${SL_C * 2}" class="sl-wheel">`;
+  s += `<circle cx="${SL_C}" cy="${SL_C}" r="${SL_R}" class="sl-ring"/>`;
+  if (_slView.grid) {
+    for (let d = 0; d < div; d++) {
+      const [x, y] = pol(d * 1200 / div, SL_R);
+      s += `<line x1="${SL_C}" y1="${SL_C}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="sl-grid"/>`;
+    }
+  }
+  if (_slView.ratios) {
+    for (const [n, q] of [[1, 1], [9, 8], [6, 5], [5, 4], [4, 3], [7, 5], [3, 2], [8, 5], [5, 3], [16, 9], [15, 8]]) {
+      const cents = 1200 * Math.log2(n / q);
+      const [x2, y2] = pol(cents, SL_R * 0.72);
+      const [tx, ty] = pol(cents, SL_R * 0.8);
+      s += `<line x1="${SL_C}" y1="${SL_C}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" class="sl-ratio"/>`;
+      s += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" class="sl-ratio-t">${n}/${q}</text>`;
+    }
+  }
+  for (let d = 0; d < div; d++) {
+    const st = _slDegreeStatus(p, d);
+    const cents = _slCents(p, d);
+    const [x, y] = pol(cents, SL_R);
+    const name = div === 12 ? NOTE_NAMES_12[d] : String(d);
+    const rr = st === "off" ? 9 : 14;
+    s += `<g class="sl-node sl-${st}${_slSel === d ? " sl-sel" : ""}" data-sl-degree="${d}">
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr}"/>
+      <text x="${x.toFixed(1)}" y="${(y + 3.5).toFixed(1)}">${name}</text>
+    </g>`;
+  }
+  s += `</svg>`;
+  return s;
+}
+
+function slInspectorHTML(p) {
+  const d = _slSel;
+  const div = _slDivisions(p);
+  const st = _slDegreeStatus(p, d);
+  const cents = _slCents(p, d);
+  const off = (p.degreeTuning || {})[d] || 0;
+  const hz = _slFreq(p, d);
+  const ratio = _slRatio(((cents % 1200) + 1200) % 1200);
+  const seg = (key, label) => `<button class="sl-st-btn sl-st-${key}${st === key ? " active" : ""}" data-sl-status="${key}">${label}</button>`;
+  return `
+    <div class="sl-ins-head"><span class="sl-deg-dot sl-${st}"></span> DEGREE <b>${d}</b> <span class="sl-ins-sub">of ${div}</span></div>
+    <div class="sl-sec-label">Status</div>
+    <div class="sl-st-row">${seg("scale", "In scale")}${seg("sub", "Sub-scale")}${seg("root", "Root")}${seg("off", "Off")}</div>
+    <div class="sl-sec-label">Cents (offset from grid)</div>
+    <div class="sl-cents-row">
+      <input type="number" id="slCents" step="1" min="-60" max="60" value="${Math.round(off)}"/>
+      <span class="sl-cents-abs">${cents.toFixed(1)}¢ absolute</span>
+      ${off ? `<button class="sl-mini-btn" data-sl-cents-reset title="Back to the equal-tempered grid">↺</button>` : ""}
+    </div>
+    <div class="sl-sec-label">Sounding</div>
+    <div class="sl-kv"><span>Ratio</span><b>${ratio ? `${ratio.txt}` : "—"}</b><span class="sl-kv-sub">${ratio ? `${ratio.val.toFixed(3)} : 1 · ±${ratio.err.toFixed(0)}¢` : ""}</span></div>
+    <div class="sl-kv"><span>Note</span><b>${esc(noteAndCents(hz))}</b><span class="sl-kv-sub">${hz.toFixed(2)} Hz</span></div>
+    <div class="sl-sec-label">Audition</div>
+    <div class="sl-audition">
+      <button class="btn btn-secondary btn-sm" data-sl-play="degree">▶ Play degree</button>
+      <button class="btn btn-secondary btn-sm" data-sl-play="interval">Play interval to root</button>
+    </div>
+    <div class="sl-sec-label">Info</div>
+    <div class="sl-kv"><span>EDO step</span><b>${d} / ${div}</b><span class="sl-kv-sub">${(1200 / div).toFixed(2)}¢ per step</span></div>
+  `;
+}
+
+function scaleLabWorkspaceHTML(p) {
+  const div = _slDivisions(p);
+  return `
+    <div class="card scalelab-card">
+      <div class="sl-layout">
+        <div class="sl-left">
+          <div class="sl-title">Scale Lab</div>
+          <div class="sl-sec-label">Tuning presets</div>
+          <input type="search" id="slSearch" class="sl-search" placeholder="Search presets…" value="${esc(_slSearch)}"/>
+          <div class="sl-preset-list" id="slPresetList">${slPresetListHTML(p)}</div>
+          <div class="sl-sec-label">N-EDO</div>
+          <div class="sl-edo-step">
+            <button class="sl-mini-btn" data-sl-edo="-1" title="One fewer division of the octave">−</button>
+            <b>${div} divisions</b>
+            <button class="sl-mini-btn" data-sl-edo="1" title="One more division of the octave">＋</button>
+          </div>
+          <div class="sl-sec-label">Reference — degree 0</div>
+          <div class="sl-ref-row">
+            <input type="number" id="slTonic" step="0.01" min="55" max="1760" value="${(p.tonicHz || 261.63).toFixed(2)}"/> Hz
+            <span class="sl-kv-sub">${esc(noteAndCents(p.tonicHz || 261.63))}</span>
+          </div>
+          <div class="sl-sec-label">View</div>
+          <label class="sl-check"><input type="checkbox" id="slShowRatios"${_slView.ratios ? " checked" : ""}/> Show just ratios</label>
+          <label class="sl-check"><input type="checkbox" id="slShowGrid"${_slView.grid ? " checked" : ""}/> Show EDO grid</label>
+          <div class="sl-actions">
+            <button class="btn btn-secondary btn-sm" id="slImport" title="Load a Scala .scl tuning file">⬆ Import Scala</button>
+            <button class="btn btn-secondary btn-sm" id="slExport" title="Save the current scale as a Scala .scl file">⬇ Export</button>
+            <input type="file" id="slFile" accept=".scl,text/plain" hidden/>
+          </div>
+        </div>
+        <div class="sl-center">
+          <div class="sl-center-head">
+            <span class="sl-chip">${div}-EDO ${p.scaleMode === "12tone" ? "· 12-tone" : "· equal temperament"}</span>
+            <span class="sl-chip sl-chip-info">${div} EDO steps · ${(1200 / div).toFixed(3)}¢ per step</span>
+          </div>
+          ${slWheelSVG(p)}
+          <div class="sl-legend">
+            <span><i class="sl-leg sl-root"></i> Root</span>
+            <span><i class="sl-leg sl-sub"></i> Sub-scale</span>
+            <span><i class="sl-leg sl-scale"></i> In scale</span>
+            <span><i class="sl-leg sl-off"></i> Off</span>
+          </div>
+        </div>
+        <div class="sl-right" id="slInspector">${slInspectorHTML(p)}</div>
+      </div>
+      <div class="sl-keys-wrap">
+        <div class="sl-sec-label">Keyboard mapping — where the scale lands on a piano axis (C3–C6)</div>
+        <canvas id="slKeys" width="1200" height="90" style="width:100%;height:90px"></canvas>
+      </div>
+    </div>`;
+}
+
+function drawSlKeys() {
+  const cv = document.getElementById("slKeys");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const p = exploreParams;
+  const loMidi = 48, hiMidi = 84; // C3..C6
+  const keyW = w / (hiMidi - loMidi);
+  const isBlack = (m) => [1, 3, 6, 8, 10].includes(m % 12);
+  for (let m = loMidi; m < hiMidi; m++) {
+    const x = (m - loMidi) * keyW;
+    ctx.fillStyle = isBlack(m) ? "#161a21" : "#252a33";
+    ctx.fillRect(x + 0.5, 0, keyW - 1, h - 22);
+    if (m % 12 === 0) {
+      ctx.fillStyle = "rgba(120,135,150,0.7)";
+      ctx.font = "9px ui-monospace, monospace";
+      ctx.fillText(`C${m / 12 - 1}`, x + 2, h - 26);
+    }
+  }
+  const colFor = { root: "#8b7cf6", sub: "#4caf7d", scale: "#9aa0ab" };
+  for (const d of (p.customDegrees || [])) {
+    const st = _slDegreeStatus(p, d);
+    for (let oct = -2; oct <= 2; oct++) {
+      const hz = _slFreq(p, d) * Math.pow(2, oct);
+      const midi = 69 + 12 * Math.log2(hz / 440);
+      if (midi < loMidi || midi >= hiMidi) continue;
+      const x = (midi - loMidi) * keyW + keyW / 2;
+      ctx.fillStyle = colFor[st] || colFor.scale;
+      ctx.beginPath(); ctx.arc(x, h - 10, st === "root" ? 5 : 3.5, 0, 2 * Math.PI); ctx.fill();
+    }
+  }
+}
+
+let _slAudCtx = null;
+function slPlayFreqs(freqs) {
+  const ac = (synth && synth.ctx) || (_slAudCtx ||= new (window.AudioContext || window.webkitAudioContext)());
+  if (ac.state === "suspended") ac.resume();
+  const t0 = ac.currentTime + 0.03;
+  freqs.forEach((f, i) => {
+    const t = t0 + i * 0.5;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine";
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.46);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + 0.5);
+  });
+}
+
+function slExportScl(p) {
+  const div = _slDivisions(p);
+  const degs = (p.customDegrees || []).filter(d => d > 0).sort((a, b) => a - b);
+  const lines = [
+    "! sound-studio.scl", "!",
+    `Sound Studio scale — ${degs.length + 1} notes from ${div}-EDO`,
+    ` ${degs.length + 1}`, "!",
+    ...degs.map(d => ` ${_slCents(p, d).toFixed(5)}`),
+    " 2/1", "",
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "sound-studio.scl";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function slImportScl(text, p) {
+  // Scala format: comment lines start with '!'; first data line is the
+  // description, second the note count, then one pitch per line (cents
+  // if it contains '.', else a ratio).
+  const data = text.split(/\r?\n/).filter(l => !l.trim().startsWith("!"));
+  const vals = [];
+  for (let i = 2; i < data.length; i++) {
+    const tok = data[i].trim().split(/\s+/)[0];
+    if (!tok) continue;
+    let cents = null;
+    if (tok.includes(".")) cents = parseFloat(tok);
+    else if (tok.includes("/")) {
+      const [n, q] = tok.split("/").map(Number);
+      if (n > 0 && q > 0) cents = 1200 * Math.log2(n / q);
+    } else if (/^\d+$/.test(tok)) cents = 1200 * Math.log2(Number(tok));
+    if (Number.isFinite(cents)) vals.push(cents);
+  }
+  if (!vals.length) return false;
+  // Last value is the octave; the steps within it become the new grid.
+  const inOctave = vals.filter(c => c > 0 && c < 1199.5);
+  const div = inOctave.length + 1;
+  const step = 1200 / div;
+  const tuning = {};
+  inOctave.sort((a, b) => a - b).forEach((c, i) => {
+    const d = i + 1;
+    const off = c - d * step;
+    if (Math.abs(off) > 0.5) tuning[d] = Math.round(off * 10) / 10;
+  });
+  p.scaleMode = div === 12 && !Object.keys(tuning).length ? "12tone" : "edo";
+  p.edoDivisions = div;
+  p.customDegrees = Array.from({ length: div }, (_, i) => i);
+  p.subScaleNotes = [];
+  p.rootNotes = [0];
+  p.degreeTuning = Object.keys(tuning).length ? tuning : null;
+  return true;
+}
+
+function wireScaleLab(v) {
+  if (!v.querySelector("#slWheel")) return;
+  const p = exploreParams;
+  const applyScale = () => {
+    syncSurpriseFeatureParams?.(p);
+    synth.updateGenerationParams({ ...p });
+    debouncedReplay();
+    renderExplore();
+  };
+  const list = v.querySelector("#slPresetList");
+  if (list) list.onclick = (e) => {
+    const btn = e.target.closest("[data-sl-preset]");
+    if (!btn) return;
+    const pr = slPresets().find(x => x.id === btn.dataset.slPreset);
+    if (!pr) return;
+    pr.apply(p);
+    _slPresetSel = pr.id;
+    _slSel = 0;
+    noteParamChange("scalePreset", null, pr.id);
+    applyScale();
+  };
+  const search = v.querySelector("#slSearch");
+  if (search) search.oninput = () => {
+    _slSearch = search.value;
+    const l = v.querySelector("#slPresetList");
+    if (l) l.innerHTML = slPresetListHTML(p);
+  };
+  v.querySelectorAll("[data-sl-edo]").forEach(btn => {
+    btn.onclick = () => {
+      const next = clamp(_slDivisions(p) + Number(btn.dataset.slEdo), 3, 53);
+      p.scaleMode = "edo";
+      p.edoDivisions = next;
+      p.customDegrees = Array.from({ length: next }, (_, i) => i);
+      p.subScaleNotes = [];
+      p.rootNotes = [0];
+      p.degreeTuning = null;
+      _slPresetSel = null;
+      _slSel = Math.min(_slSel, next - 1);
+      applyScale();
+    };
+  });
+  const tonic = v.querySelector("#slTonic");
+  if (tonic) tonic.onchange = () => {
+    const hz = clamp(Number(tonic.value) || 261.63, 55, 1760);
+    noteParamChange("tonicHz", p.tonicHz, hz);
+    p.tonicHz = hz;
+    applyScale();
+  };
+  const ratios = v.querySelector("#slShowRatios");
+  if (ratios) ratios.onchange = () => { _slView.ratios = ratios.checked; renderExplore(); };
+  const grid = v.querySelector("#slShowGrid");
+  if (grid) grid.onchange = () => { _slView.grid = grid.checked; renderExplore(); };
+  const wheel = v.querySelector("#slWheel");
+  if (wheel) wheel.onclick = (e) => {
+    const node = e.target.closest("[data-sl-degree]");
+    if (!node) return;
+    _slSel = Number(node.dataset.slDegree);
+    renderExplore();
+  };
+  v.querySelectorAll("[data-sl-status]").forEach(btn => {
+    btn.onclick = () => {
+      slSetStatus(p, _slSel, btn.dataset.slStatus);
+      applyScale();
+    };
+  });
+  const cents = v.querySelector("#slCents");
+  if (cents) cents.onchange = () => {
+    const val = clamp(Number(cents.value) || 0, -60, 60);
+    p.degreeTuning = { ...(p.degreeTuning || {}) };
+    if (val) p.degreeTuning[_slSel] = val; else delete p.degreeTuning[_slSel];
+    if (!Object.keys(p.degreeTuning).length) p.degreeTuning = null;
+    applyScale();
+  };
+  const centsReset = v.querySelector("[data-sl-cents-reset]");
+  if (centsReset) centsReset.onclick = () => {
+    if (p.degreeTuning) {
+      p.degreeTuning = { ...p.degreeTuning };
+      delete p.degreeTuning[_slSel];
+      if (!Object.keys(p.degreeTuning).length) p.degreeTuning = null;
+    }
+    applyScale();
+  };
+  v.querySelectorAll("[data-sl-play]").forEach(btn => {
+    btn.onclick = () => {
+      const root = (p.rootNotes || [0])[0] ?? 0;
+      if (btn.dataset.slPlay === "degree") slPlayFreqs([_slFreq(p, _slSel)]);
+      else slPlayFreqs([_slFreq(p, root), _slFreq(p, _slSel)]);
+    };
+  });
+  const exp = v.querySelector("#slExport");
+  if (exp) exp.onclick = () => slExportScl(p);
+  const imp = v.querySelector("#slImport");
+  const file = v.querySelector("#slFile");
+  if (imp && file) {
+    imp.onclick = () => file.click();
+    file.onchange = () => {
+      const f = file.files && file.files[0];
+      if (!f) return;
+      f.text().then(text => {
+        if (slImportScl(text, p)) { _slPresetSel = null; _slSel = 0; applyScale(); }
+      });
+    };
+  }
+  drawSlKeys();
 }
 
 // ─── Explore: Root Note Grid ────────────────────────────────
@@ -8819,6 +9760,61 @@ function _setKnobVisual(cell, frac) {
 
 let _chStage = "excitor";
 let _chFocus = { chip: "all", lensLo: null, lensHi: null };
+// V2 redesign (2026-07-08): right-column tab + stage bypass stash.
+// BODY and SPACE can be switched off (their effect is a mix amount the
+// engine already honours at 0); EXCITOR and RESONATOR are the sound
+// itself, so their power buttons render disabled.
+let _tdSideTab = "envelope";
+const _chBypass = { body: null, space: null };
+
+function stagePowerState(p, stage) {
+  if (stage === "body") return (p.spectralResonanceAmount ?? 0.35) > 0.001;
+  if (stage === "space") return (p.reverbWet ?? 0.16) > 0.001;
+  return true; // excitor + resonator are always in the chain
+}
+
+function toggleStagePower(p, stage) {
+  if (stage === "body") {
+    if (stagePowerState(p, "body")) {
+      _chBypass.body = p.spectralResonanceAmount ?? 0.35;
+      p.spectralResonanceAmount = 0;
+    } else {
+      p.spectralResonanceAmount = _chBypass.body ?? 0.35;
+    }
+    return;
+  }
+  if (stage === "space") {
+    if (stagePowerState(p, "space")) {
+      _chBypass.space = p.reverbWet ?? 0.16;
+      p.reverbWet = 0;
+    } else {
+      p.reverbWet = _chBypass.space ?? 0.16;
+    }
+  }
+}
+
+// One-line character name per stage — the card's headline, like the
+// render's "Noise Burst / Modal Cluster / Wooden Cavity / Concert Hall".
+function chStageHeadline(p, stage) {
+  if (stage === "excitor") {
+    const t = p.excitationType || "bow";
+    const base = { bow: "Bowed", pluck: "Plucked", strike: "Struck", blow: "Blown" }[t] || t;
+    return (p.attackNoiseLevel ?? 1) > 1.4 ? `${base} · noise burst` : base;
+  }
+  if (stage === "resonator") {
+    const B = Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0);
+    return B > 0.0004 ? "Inharmonic cluster" : "Modal cluster";
+  }
+  if (stage === "body") {
+    if (!p.bodyType || p.bodyType === "auto") {
+      const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
+      return `${profile.label} body`;
+    }
+    return BODY_PRESETS[p.bodyType]?.label || p.bodyType;
+  }
+  const prof = REVERB_PROFILES[p.reverbType] || REVERB_PROFILES.room;
+  return prof.label;
+}
 
 function noteNameForHz(hz) {
   const midi = Math.round(69 + 12 * Math.log2(Math.max(20, hz) / 440));
@@ -8846,11 +9842,22 @@ function chCardSummary(p, stage) {
   return `${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}° · wet ${(p.reverbWet ?? 0).toFixed(2)}`;
 }
 
+const _POWER_SVG = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 1.5v6"/><path d="M4.2 3.6a5.5 5.5 0 1 0 7.6 0"/></svg>`;
+
 function chRailCardHTML(p, stage, num, name) {
+  const toggleable = stage === "body" || stage === "space";
+  const on = stagePowerState(p, stage);
+  const title = name[0] + name.slice(1).toLowerCase();
   return `
-    <button class="ch-card ch-${stage}${_chStage === stage ? " active" : ""}" data-ch-stage="${stage}">
-      <div class="ch-card-head"><span class="ch-card-n">${num} ${name}</span><span class="ch-dot"></span></div>
-      <canvas class="ch-thumb" id="chThumb_${stage}" width="380" height="64"></canvas>
+    <button class="ch-card ch-${stage}${_chStage === stage ? " active" : ""}${on ? "" : " stage-off"}" data-ch-stage="${stage}">
+      <div class="ch-card-head">
+        <span class="ch-card-n">${title}</span>
+        <span class="ch-power${on ? " on" : ""}${toggleable ? "" : " always"}" ${toggleable
+          ? `data-ch-power="${stage}" role="button" tabindex="0" title="Switch the ${title} stage ${on ? "off" : "on"}"`
+          : `title="${title} is the sound itself — always in the chain"`}>${_POWER_SVG}</span>
+      </div>
+      <canvas class="ch-thumb" id="chThumb_${stage}" width="380" height="90"></canvas>
+      <div class="ch-headline">${esc(chStageHeadline(p, stage))}</div>
       <div class="ch-card-sum">${esc(chCardSummary(p, stage))}</div>
     </button>`;
 }
@@ -8920,40 +9927,65 @@ function chInspectorHTML(p) {
         ${["bow", "pluck", "strike", "blow"].map(t =>
           `<button class="seg-btn${p.excitationType === t ? " active" : ""}" data-exc-type="${t}">${t[0].toUpperCase()}${t.slice(1)}</button>`).join("")}
       </div>
-      <div class="knob-row">
-        ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
-        ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
-      </div>
-      <div class="knob-row">
-        ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
-        ${knobHTML("spectralDynamicAmount", "Dynamics", p.spectralDynamicAmount, 0, 1.5, 0.01, { def: 0.8 })}
-        ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
-      </div>
-      <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
-      <details class="ch-perf" ${_chPerfOpen ? "open" : ""} id="chPerfDetails">
-        <summary>Performance — vibrato · onset noise</summary>
-        ${vibratoBlockHTML(p)}
+      <div class="ins-group">
+        <div class="ins-group-label">Contact</div>
         <div class="knob-row">
+          ${knobHTML("excitationPosition", "Position", p.excitationPosition, 0.02, 0.5, 0.01, { def: 0.13 })}
+          ${knobHTML("excitationHardness", "Hardness", p.excitationHardness, 0, 1, 0.01, { def: 0.6 })}
+        </div>
+      </div>
+      <div class="ins-group">
+        <div class="ins-group-label">Character</div>
+        <div class="knob-row">
+          ${knobHTML("excitationHuman", "Human", p.excitationHuman, 0, 1, 0.01, { def: 0.4 })}
+          ${knobHTML("toneBreath", "Breath", p.toneBreath, 0, 0.4, 0.01, { def: 0.03 })}
           ${knobHTML("attackNoiseLevel", "Onset noise", p.attackNoiseLevel ?? 1, 0, 2, 0.01, { def: 1 })}
         </div>
-      </details>
-      <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field. The envelope has its own panel on the right →</div>`;
+      </div>
+      <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
+      <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field. Envelope &amp; modulation live in the right panel →</div>`;
   }
   if (_chStage === "resonator") {
     return `
       <div class="ch-ins-head"><span class="ch-card-n">02 · RESONATOR</span><span class="ch-ins-d">what rings, how long, what couples</span></div>
-      <div class="knob-row">
-        ${knobHTML("partialMaterial", "Material", p.partialMaterial, 0, 1, 0.01, { def: 0.45 })}
-        ${knobHTML("partialB", "Inharmonic", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002, { def: 0 })}
+      <div class="ins-group">
+        <div class="ins-group-label">Material</div>
+        <div class="knob-row">
+          ${knobHTML("partialMaterial", "Loss factor", p.partialMaterial, 0, 1, 0.01, { def: 0.45 })}
+          ${knobHTML("partialTransfer", "Coupling", p.partialTransfer, 0, 1, 0.01, { def: 0.15 })}
+        </div>
       </div>
-      <div class="knob-row">
-        ${knobHTML("partialTransfer", "Transfer", p.partialTransfer, 0, 1, 0.01, { def: 0.15 })}
-        ${knobHTML("partialTilt", "Brightness", p.partialTilt, -1, 1, 0.01, { def: 0 })}
+      <div class="ins-group">
+        <div class="ins-group-label">Partials</div>
+        <div class="knob-row">
+          ${knobHTML("spectralPartials", "Density", p.spectralPartials, 1, 64, 1, { def: 20 })}
+          ${knobHTML("partialB", "Inharmonicity", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002, { def: 0 })}
+        </div>
       </div>
-      <div class="knob-row">
-        ${knobHTML("spectralPartials", "Harmonics", p.spectralPartials, 1, 64, 1, { def: 20 })}
+      <div class="ins-group">
+        <div class="ins-group-label">Damping</div>
+        <div class="knob-row">
+          ${knobHTML("partialTilt", "Frequency tilt", p.partialTilt, -1, 1, 0.01, { def: 0 })}
+        </div>
       </div>
-      <div class="ch-caption">material sets each partial's ring time from its REAL frequency; transfer lets true-ratio neighbours feed each other — inharmonicity detunes them apart</div>`;
+      <details class="ch-perf formant-detail">
+        <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery.">Advanced shaping</summary>
+        <div class="controls-grid">
+          ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
+          ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
+          ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
+        </div>
+        <div class="subsection-label">Octave groups</div>
+        <div class="controls-grid">
+          ${controlRow("partialGroup1", "Fund (1)", p.partialGroup1, 0, 2, 0.01)}
+          ${controlRow("partialGroup2", "Oct (2)", p.partialGroup2, 0, 2, 0.01)}
+          ${controlRow("partialGroup3", "3–4", p.partialGroup3, 0, 2, 0.01)}
+          ${controlRow("partialGroup4", "5–8", p.partialGroup4, 0, 2, 0.01)}
+          ${controlRow("partialGroup5", "9–16", p.partialGroup5, 0, 2, 0.01)}
+          ${controlRow("partialGroup6", "17+", p.partialGroup6, 0, 2, 0.01)}
+        </div>
+      </details>
+      <div class="ch-caption">loss factor sets each partial's ring time from its REAL frequency; coupling lets true-ratio neighbours feed each other — inharmonicity detunes them apart</div>`;
   }
   if (_chStage === "body") {
     return `
@@ -8986,38 +10018,41 @@ function chInspectorHTML(p) {
   const prof = REVERB_PROFILES[p.reverbType] || REVERB_PROFILES.room;
   const roomKey = REVERB_PROFILES[p.reverbType] ? p.reverbType : "room";
   const earSel = _earModelOf(p);
+  // V2 (owner 2026-07-08): the space is SHARED — one room, one head, one
+  // air for every layer. The only per-layer spatial property is position,
+  // edited on the big stage to the right. This panel owns the shared half.
   return `
-    <div class="ch-ins-head"><span class="ch-card-n">04 · SPACE</span><span class="ch-ins-d">${esc(prof.label)}</span></div>
-    <canvas class="space-pad" id="cvSpacePad" width="280" height="170"></canvas>
-    <div class="ts-space-link" id="spaceReadout">${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}°</div>
-    <label class="ear-model-row" title="${esc(PARAM_DESC.earModel)}">EARS
-      <select id="earModelSel">
-        ${Object.entries(EAR_MODELS).map(([k, m]) =>
-          `<option value="${k}"${earSel === k ? " selected" : ""} title="${esc(m.blurb)}">${esc(m.label)}</option>`).join("")}
-        ${earSel === "custom" ? `<option value="custom" selected>Custom (knobs)</option>` : ""}
+    <div class="ch-ins-head"><span class="ch-card-n">04 · SPACE</span><span class="ch-ins-d">one shared space — layers only differ by position</span></div>
+    <div class="ins-group">
+      <div class="ins-group-label" title="Each room is a parametric impulse-response model — a recipe, not a recording. Pick one, then bend it with the knobs below.">Room</div>
+      <select id="roomTypeSel" class="param-select ins-select" title="${esc(prof.label)} — ${esc(prof.blurb)}">
+        ${Object.entries(REVERB_PROFILES).map(([k, r]) =>
+          `<option value="${k}"${k === roomKey ? " selected" : ""}>${esc(r.label)} — ${esc(r.blurb)}</option>`).join("")}
       </select>
-    </label>
-    <div class="knob-row">
-      ${knobHTML("reverbWet", "Wet", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
-      ${knobHTML("reverbDecay", "Decay", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
-      ${knobHTML("earDistance", "Ear span", p.earDistance ?? 0.175, 0.12, 0.25, 0.005, { def: 0.175, cool: true })}
-      ${knobHTML("headDensity", "Head density", p.headDensity ?? 0.5, 0, 1, 0.01, { def: 0.5, cool: true })}
+      <div class="knob-row">
+        ${knobHTML("reverbDecay", "RT60", p.reverbDecay, 0.2, 8, 0.1, { def: 1.4, cool: true })}
+        ${knobHTML("reverbSize", "Size", p.reverbSize ?? prof.size, 0, 1, 0.01, { def: prof.size, cool: true })}
+        ${knobHTML("reverbWet", "Room level", p.reverbWet, 0, 0.95, 0.01, { def: 0.16, cool: true })}
+      </div>
+      <div class="knob-row">
+        ${knobHTML("reverbDamping", "HF damping", p.reverbDamping ?? prof.damping, 0, 1, 0.01, { def: prof.damping, cool: true })}
+        ${knobHTML("reverbDiffusion", "Diffusion", p.reverbDiffusion ?? prof.diffusion, 0, 1, 0.01, { def: prof.diffusion, cool: true })}
+      </div>
     </div>
-    <div class="subsection-label" title="Each room is a parametric impulse-response model — a recipe, not a recording. Pick one, then bend it with the knobs below.">ROOM · ${esc(prof.blurb)}</div>
-    <div class="room-tiles" id="roomTiles">
-      ${Object.entries(REVERB_PROFILES).map(([k, r]) => `
-        <button class="room-tile${k === roomKey ? " sel" : ""}" data-room-tile="${k}" title="${esc(r.label)} — ${esc(r.blurb)}">
-          <canvas data-room-art="${k}" width="44" height="30"></canvas>
-          <span>${esc(r.label)}</span>
-        </button>`).join("")}
+    <div class="ins-group">
+      <div class="ins-group-label" title="${esc(PARAM_DESC.earModel)}">Head model — one listener for all layers</div>
+      <select id="earModelSel" class="param-select ins-select">
+        ${Object.entries(EAR_MODELS).map(([k, m]) =>
+          `<option value="${k}"${earSel === k ? " selected" : ""} title="${esc(m.blurb)}">${esc(m.label)} — ${(m.earDistance * 100).toFixed(1)} cm · density ${m.headDensity.toFixed(2)}</option>`).join("")}
+        ${earSel === "custom" ? `<option value="custom" selected>Custom — shaped by the knobs below</option>` : ""}
+      </select>
+      <div class="knob-row">
+        ${knobHTML("earDistance", "Ear span", p.earDistance ?? 0.175, 0.12, 0.25, 0.005, { def: 0.175, cool: true })}
+        ${knobHTML("headDensity", "Density", p.headDensity ?? 0.5, 0, 1, 0.01, { def: 0.5, cool: true })}
+        ${knobHTML("pinnaScale", "Pinna", p.pinnaScale ?? 1, 0.6, 1.6, 0.01, { def: 1, cool: true })}
+      </div>
     </div>
-    <div class="knob-row">
-      ${knobHTML("reverbSize", "Size", p.reverbSize ?? prof.size, 0, 1, 0.01, { def: prof.size, cool: true })}
-      ${knobHTML("reverbDamping", "Damping", p.reverbDamping ?? prof.damping, 0, 1, 0.01, { def: prof.damping, cool: true })}
-      ${knobHTML("reverbDiffusion", "Diffusion", p.reverbDiffusion ?? prof.diffusion, 0, 1, 0.01, { def: prof.diffusion, cool: true })}
-    </div>
-    ${checkboxControl("spaceOwnHead", "Own head — ignore the global listener", p.spaceOwnHead)}
-    <div class="ch-caption">the full circle: drag anywhere around your head — behind you (shaded half) sounds duller via the pinna law. Distance delays arrival (~3 ms/m), softens highs, trades direct for room; the ear model and knobs shape the interaural cues</div>`;
+    <div class="ch-caption">the room, the listener's head and the air are the PATCH's space — every layer plays inside them. Drag the numbered dots on the stage to place the base sound and each layer around your head; behind you (shaded half) sounds duller via the pinna law</div>`;
 }
 
 // Which EAR_MODELS preset the current head params correspond to (within
@@ -9133,6 +10168,20 @@ function wireEarRoom(v) {
     synth.updateReverb({ ...exploreParams });
     renderExplore();
   };
+  // V2: the head-model list rows (the select's replacement)
+  v.querySelectorAll("[data-ear-model]").forEach(btn => {
+    btn.onclick = () => {
+      const m = EAR_MODELS[btn.dataset.earModel];
+      if (!m) return; // the "custom" row is a state, not a preset
+      noteParamChange("earModel", exploreParams.earModel, btn.dataset.earModel);
+      exploreParams.earModel = btn.dataset.earModel;
+      exploreParams.earDistance = m.earDistance;
+      exploreParams.headDensity = m.headDensity;
+      exploreParams.pinnaScale = m.pinnaScale;
+      synth.updateReverb({ ...exploreParams });
+      renderExplore();
+    };
+  });
   v.querySelectorAll("[data-room-tile]").forEach(btn => {
     btn.onclick = () => {
       const k = btn.dataset.roomTile;
@@ -9147,6 +10196,19 @@ function wireEarRoom(v) {
       renderExplore();
     };
   });
+  // V2.2: the sub-note room list is a dropdown now (owner: tiles ate the column)
+  const roomSel = v.querySelector("#roomTypeSel");
+  if (roomSel) roomSel.onchange = () => {
+    const k = roomSel.value;
+    if (!REVERB_PROFILES[k]) return;
+    noteParamChange("reverbType", exploreParams.reverbType, k);
+    exploreParams.reverbType = k;
+    exploreParams.reverbSize = null;
+    exploreParams.reverbDamping = null;
+    exploreParams.reverbDiffusion = null;
+    synth.updateReverb({ ...exploreParams });
+    renderExplore();
+  };
   drawRoomTiles();
 }
 
@@ -9994,10 +11056,12 @@ function wireLayerStrip(v) {
   bindSlider("data-layer-angle", (l, val) => {
     l.space = { angle: val, dist: l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5) };
     syncEditedSpace(l);
+    drawStageBig(); updateStageReadouts(); // the stage mirrors the strip live (V2.2)
   });
   bindSlider("data-layer-dist", (l, val) => {
     l.space = { angle: l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0), dist: val };
     syncEditedSpace(l);
+    drawStageBig(); updateStageReadouts();
   });
   // Owner 07-07: solo a layer to hear it alone (base + unsoloed layers
   // silent); multiple solos combine like track solos
@@ -10039,12 +11103,255 @@ function wireLayerStrip(v) {
   drawLayerMiniPads();
 }
 
+// ── V2 SPATIAL STAGE (render phase-04, owner 2026-07-08) ────────────
+// The SPACE field is a full top-down stage. Sources = the base sound
+// plus every layer; the space itself (room, head, air) is SHARED — the
+// only per-layer property is position, so the only per-source edit here
+// is dragging a dot. The binaural strip below follows the selection.
+let _stageSel = "base";
+let _stageViewPos = null; // non-base selection: {angle, dist} the ear view follows
+
+function stageSourceList(p) {
+  const list = [{
+    id: "base", num: "B", label: "Base", hue: 36,
+    angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5,
+  }];
+  (p.layers || []).forEach((l, i) => list.push({
+    id: l.id, num: String(i + 1), label: `Layer ${i + 1}`,
+    hue: l.hue ?? (36 + i * 70) % 360,
+    angle: l.space?.angle ?? (p.spaceAzimuth ?? 0),
+    dist: l.space?.dist ?? (p.spaceDistance ?? 2.5),
+    layer: l,
+  }));
+  return list;
+}
+
+function _stageSelected(p) {
+  const list = stageSourceList(p);
+  return list.find(s => s.id === _stageSel) || list[0];
+}
+
+function stageReadoutsHTML(p) {
+  // (V2.2: the chip strip above the stage is gone — the layer rows below
+  // are the one source list; selection state still lives in _stageSel)
+  if (!stageSourceList(p).some(s => s.id === _stageSel)) _stageSel = "base";
+  const s = _stageSelected(p);
+  const tof = spaceArrivalDelay(s.dist) * 1000;
+  const lvl = 20 * Math.log10(spaceDistanceGain(s.dist));
+  return `
+    <div class="stage-readouts" id="stageReadouts">
+      <div class="stage-ro"><span class="stage-ro-k" style="color:hsl(${s.hue},70%,62%)">Source</span><span class="stage-ro-v" id="stageRoSrc">${esc(s.label)}</span></div>
+      <div class="stage-ro"><span class="stage-ro-k">Distance</span><span class="stage-ro-v" id="stageRoDist">${s.dist.toFixed(2)} m</span></div>
+      <div class="stage-ro"><span class="stage-ro-k">Azimuth</span><span class="stage-ro-v" id="stageRoAz">${Math.round(s.angle)}°</span></div>
+      <div class="stage-ro"><span class="stage-ro-k">Time of flight</span><span class="stage-ro-v" id="stageRoTof">${tof.toFixed(1)} ms</span></div>
+      <div class="stage-ro"><span class="stage-ro-k">Level (dry)</span><span class="stage-ro-v" id="stageRoLvl">${lvl.toFixed(1)} dB</span></div>
+    </div>`;
+}
+
+function updateStageReadouts() {
+  const s = _stageSelected(exploreParams);
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  set("stageRoSrc", s.label);
+  set("stageRoDist", `${s.dist.toFixed(2)} m`);
+  set("stageRoAz", `${Math.round(s.angle)}°`);
+  set("stageRoTof", `${(spaceArrivalDelay(s.dist) * 1000).toFixed(1)} ms`);
+  set("stageRoLvl", `${(20 * Math.log10(spaceDistanceGain(s.dist))).toFixed(1)} dB`);
+  // stage selection ↔ layer rows: the picked dot highlights its row as the
+  // active layer (base clears it) — one selection, two views (V2.2)
+  _chLayerSel = s.id === "base" ? null : s.id;
+  document.querySelectorAll("[data-layer-row]").forEach(row =>
+    row.classList.toggle("sel", row.dataset.layerRow === _stageSel));
+  _stageViewPos = s.id === "base" ? null : { angle: s.angle, dist: s.dist };
+}
+
+function _stageGeom(w, h) {
+  const cx = w / 2, cy = h / 2 + 6;
+  const rMax = Math.min(h / 2 - 30, w / 2 - 46);
+  return { cx, cy, rMax };
+}
+
+function drawStageBig() {
+  const cv = document.getElementById("cvStageBig");
+  if (!cv) return;
+  const { ctx, w, h } = crisp2d(cv);
+  ctx.clearRect(0, 0, w, h);
+  const { cx, cy, rMax } = _stageGeom(w, h);
+  const GRID = "rgba(90,110,130,0.3)", TXT = "rgba(120,135,150,0.8)";
+  ctx.font = "10px ui-monospace, monospace";
+
+  // behind-you half (bottom) shaded — same convention as the old pad
+  ctx.fillStyle = "rgba(60,72,88,0.13)";
+  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
+
+  // distance rings (log map, like the engine's distance law)
+  ctx.strokeStyle = GRID;
+  ctx.setLineDash([3, 4]);
+  ctx.fillStyle = TXT;
+  for (const dm of [1, 2, 4, 8, 16]) {
+    const r = _spaceDistToR(dm, rMax);
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillText(`${dm} m`, cx + 5, cy - r - 3);
+  }
+  ctx.setLineDash([]);
+
+  // outer ring + azimuth ticks every 15°
+  ctx.strokeStyle = "rgba(120,140,165,0.5)";
+  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, 2 * Math.PI); ctx.stroke();
+  for (let a = -180; a < 180; a += 15) {
+    const rad = (a - 90) * Math.PI / 180;
+    const len = a % 45 === 0 ? 8 : 4;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax);
+    ctx.lineTo(cx + Math.cos(rad) * (rMax + len), cy + Math.sin(rad) * (rMax + len));
+    ctx.stroke();
+  }
+  ctx.fillStyle = TXT;
+  ctx.textAlign = "center";
+  for (const a of [-90, -60, -30, 0, 30, 60, 90]) {
+    const rad = (a - 90) * Math.PI / 180;
+    ctx.fillText(`${a}°`, cx + Math.cos(rad) * (rMax + 20), cy + Math.sin(rad) * (rMax + 20) + 3);
+  }
+  ctx.fillStyle = "rgba(120,135,150,0.45)";
+  ctx.fillText("behind", cx, cy + rMax + 22);
+  ctx.textAlign = "left";
+
+  // front axis
+  ctx.strokeStyle = "rgba(120,140,165,0.25)";
+  ctx.beginPath(); ctx.moveTo(cx, cy - rMax); ctx.lineTo(cx, cy + rMax); ctx.stroke();
+
+  // the listener's head, ears + nose forward
+  ctx.fillStyle = "rgba(200,215,230,0.9)";
+  ctx.beginPath(); ctx.arc(cx, cy, 9, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx - 9, cy, 3, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 9, cy, 3, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - 3, cy - 8.4); ctx.lineTo(cx, cy - 13.5); ctx.lineTo(cx + 3, cy - 8.4);
+  ctx.closePath(); ctx.fill();
+
+  // sources — the base sound and each layer, drag targets
+  ctx.textAlign = "center";
+  for (const s of stageSourceList(exploreParams)) {
+    const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
+    const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
+    const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+    const col = `hsl(${s.hue}, 70%, 62%)`;
+    if (s.id === _stageSel) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, 14, 0, 2 * Math.PI); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(13,16,21,0.9)";
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillStyle = col;
+    ctx.font = "600 10px ui-monospace, monospace";
+    ctx.fillText(s.num, x, y + 3.5);
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillStyle = TXT;
+    ctx.fillText(`${s.dist.toFixed(1)} m`, x, y + 24);
+  }
+  ctx.textAlign = "left";
+}
+
+function wireStageBig(v) {
+  const cv = v.querySelector("#cvStageBig");
+  if (!cv) return;
+  const srcAt = (x, y) => {
+    const w = cv._cssW || cv.getBoundingClientRect().width;
+    const h = cv._cssH || cv.getBoundingClientRect().height;
+    const { cx, cy, rMax } = _stageGeom(w, h);
+    let best = null, bestD = 18;
+    for (const s of stageSourceList(exploreParams)) {
+      const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
+      const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
+      const d = Math.hypot(cx + Math.cos(rad) * r - x, cy + Math.sin(rad) * r - y);
+      // ties go to the already-selected source, so when dots stack the
+      // chips decide which one a grab picks up
+      if (d < bestD || (best && s.id === _stageSel && d < 18)) { best = s; bestD = Math.min(d, bestD); }
+    }
+    return best;
+  };
+  // The studio scales to the viewport (fitStudioScale transform), so
+  // mouse coords must map from SCREEN px into the canvas's LAYOUT px
+  // before geometry — rect is post-transform, _cssW is the layout truth.
+  const toLocal = (e) => {
+    const rect = cv.getBoundingClientRect();
+    const w = cv._cssW || rect.width, h = cv._cssH || rect.height;
+    return {
+      x: (e.clientX - rect.left) * (w / Math.max(1, rect.width)),
+      y: (e.clientY - rect.top) * (h / Math.max(1, rect.height)),
+      w, h,
+    };
+  };
+  const applyAt = (e) => {
+    const { x, y, w, h } = toLocal(e);
+    const { cx, cy, rMax } = _stageGeom(w, h);
+    const az = Math.round(clamp(Math.atan2(x - cx, -(y - cy)) * 180 / Math.PI, -180, 180));
+    const dist = Number(_spaceRToDist(Math.hypot(x - cx, y - cy), rMax).toFixed(2));
+    const s = _stageSelected(exploreParams);
+    if (s.id === "base") {
+      exploreParams.spaceAzimuth = az;
+      exploreParams.spaceDistance = dist;
+      synth.updateReverb({ ...exploreParams });
+      drawChThumbs();
+    } else if (s.layer) {
+      s.layer.space = { angle: az, dist };
+      // mirror to the layer strip's sliders so the two stay one control
+      const aSl = document.querySelector(`[data-layer-angle="${s.id}"]`);
+      if (aSl) aSl.value = az;
+      const dSl = document.querySelector(`[data-layer-dist="${s.id}"]`);
+      if (dSl) dSl.value = dist;
+      if (_chLayerEdit?.layerId === s.id) {
+        exploreParams.spaceAzimuth = az;
+        exploreParams.spaceDistance = dist;
+        synth.updateReverb({ ...exploreParams });
+      }
+      synth.updateGenerationParams({ ...exploreParams });
+      drawLayerMiniPads();
+    }
+    updateStageReadouts();
+    drawStageBig();
+    drawSpaceField();
+  };
+  cv.onmousedown = (e) => {
+    e.preventDefault();
+    const pt = toLocal(e);
+    const hit = srcAt(pt.x, pt.y);
+    if (hit && hit.id !== _stageSel) {
+      _stageSel = hit.id;
+      updateStageReadouts();
+      drawStageBig();
+      drawSpaceField();
+    }
+    applyAt(e);
+    const move = (ev) => applyAt(ev);
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  v.querySelectorAll("[data-stage-src]").forEach(chip => {
+    chip.onclick = (e) => {
+      if (e.target.closest("button")) return; // solo stays solo
+      if (_stageSel === chip.dataset.stageSrc) return;
+      _stageSel = chip.dataset.stageSrc;
+      updateStageReadouts();
+      drawStageBig();
+      drawSpaceField();
+    };
+  });
+  updateStageReadouts();
+  drawStageBig();
+}
+
 // Owner 07-07 round 2: the SPACE stage's field is the BINAURAL RESPONSE —
 // what this position hands to each ear, computed from the same published
 // models the audio uses (Woodworth ITD, Brown-Duda shadow, Shaw pinna,
 // air absorption, proximity). The old full-size room duplicated the mini
 // pad ("ugly and redundant"); position editing lives on the pad + knobs,
 // and this view follows them live. Pure display — no interaction.
+// V2: when a layer is selected on the stage, the view follows ITS
+// position via _stageViewPos (the shared room/head stay the patch's).
 function drawSpaceField() {
   const cv = document.getElementById("cvSpaceField");
   if (!cv) return;
@@ -10053,8 +11360,8 @@ function drawSpaceField() {
   ctx.clearRect(0, 0, w, h);
 
   const p = exploreParams;
-  const d = clamp(p.spaceDistance ?? 2.5, SPACE_DMIN, SPACE_DMAX);
-  const azRad = clamp(p.spaceAzimuth ?? 0, -180, 180) * Math.PI / 180;
+  const d = clamp((_stageViewPos ? _stageViewPos.dist : p.spaceDistance) ?? 2.5, SPACE_DMIN, SPACE_DMAX);
+  const azRad = clamp((_stageViewPos ? _stageViewPos.angle : p.spaceAzimuth) ?? 0, -180, 180) * Math.PI / 180;
   const earDist = p.earDistance ?? 0.175;
   const density = p.headDensity ?? 0.5;
   const wet = clamp(p.reverbWet ?? 0.16, 0, 0.95);
@@ -11556,6 +12863,7 @@ function drawLoop() {
     drawMacroDistsAll();   // one final clean redraw to clear the trace
   }
 
+  if (visMode === "lanes") { drawBehaviorLanes(); return; }
   if (visMode === "motifs") { drawMotifTimeline(); return; }
   if (visMode === "pianoroll") { drawPianoRoll(); return; }
 
@@ -11573,6 +12881,14 @@ function drawLoop() {
 
 function drawStaticVis() {
   if (!canvas || !canvasCtx) return;
+  if (visMode === "lanes") {
+    // The future field keeps flowing while stopped (a slow audition drift),
+    // so the lanes view stays on the animation loop even without playback.
+    drawBehaviorLanes();
+    cancelAnimationFrame(animFrame);
+    animFrame = requestAnimationFrame(drawLoop);
+    return;
+  }
   if (visMode === "motifs") { drawMotifTimeline(); return; }
   if (visMode === "pianoroll") { drawPianoRoll(); return; }
   const w = canvas.width, h = canvas.height;
@@ -11645,6 +12961,1115 @@ function visGroupMotifs(events) {
 function visBackdrop(ctx, w, h) {
   ctx.fillStyle = "#0b1219";
   ctx.fillRect(0, 0, w, h);
+}
+
+// ── V2.1 behaviour timeline (MACRO_LANES_CHANGE_SPEC.md, 2026-07-08) ──
+// Playhead at ~1/3: left = RECENT HISTORY (realized, solid), right =
+// POSSIBLE FUTURE FIELD (settings-driven likelihood climate). The future
+// side intentionally avoids pretending to know the next notes; it shows
+// bounds, heat maps, onset/rest climates, surprise risk, and motif-memory
+// tendency so an experienced user can infer the patch's sound at a glance.
+const LANES_PLAYHEAD_FRAC = 0.32;
+const LANE_DEFS = [
+  { key: "melody", n: 1, title: "MELODY / PITCH", sub: "contour · hit distance", frac: 0.30, col: "#f5a623" },
+  { key: "rhythm", n: 2, title: "RHYTHM & RESTS", sub: "onsets · durations · rests", frac: 0.24, col: "#60a5fa" },
+  { key: "surprise", n: 3, title: "SURPRISE / INFORMATION", sub: "bits · distance from mean", frac: 0.20, col: "#38bdf8" },
+  { key: "motif", n: 4, title: "MOTIF MEMORY", sub: "identity · drift · incorporation", frac: 0.26, col: "#4caf7d" },
+];
+const LANES_TOP_STRIP = 20; // zone-header band (CSS px; scaled by S below)
+const LANES_GUTTER = 190;   // quiet lane-header gutter (CSS px; scaled by S)
+
+const _SURPRISE_TAG = { pitch: "P", tuning: "T", rhythm: "R", dynamics: "D", formant: "F", rest: "Rest" };
+let _macroFutureFieldCache = null;
+
+function _evBits(e) {
+  let b = 0, any = false;
+  for (const k of ["pitchBits", "restBits", "dynBits"]) {
+    if (Number.isFinite(e[k])) { b += e[k]; any = true; }
+  }
+  return any ? b : null;
+}
+
+// Enabled surprise dimensions ranked by weight — the future-field tags.
+function _surpriseRisks(p) {
+  const dims = [
+    ["pitch", p.surprisePitchEnabled, p.surprisePitchWeight ?? 1],
+    ["tuning", p.surpriseTuningEnabled, p.surpriseTuningWeight ?? 1],
+    ["rhythm", p.surpriseRhythmEnabled, p.surpriseRhythmWeight ?? 1],
+    ["dynamics", p.surpriseDynamicsEnabled, p.surpriseDynamicsWeight ?? 1],
+    ["formant", p.surpriseFormantEnabled, p.surpriseFormantWeight ?? 1],
+    ["rest", p.surpriseRestEnabled, p.surpriseRestWeight ?? 1],
+  ].filter(([, on]) => on).sort((a, b) => b[2] - a[2]);
+  return dims.map(([k]) => k);
+}
+
+// ── POSSIBLE FUTURE FIELD (audit/ui-audit-2026-07-08/MACRO_FUTURE_FIELD_BRIEF.md) ──
+// makeMacroFutureField rolls the current macro settings many times through a
+// miniature of the real generative model — scale-quantized interval walks
+// (the engine's own Scale / intervalShapeWeight / registerWindow), motif
+// repeat/variant/new choices, onset/rest sampling — and aggregates the rolls
+// into a heat climate plus one representative sampled path. It is pure in the
+// settings snapshot: the result (and its pre-rendered tile) is cached until a
+// relevant setting changes, and only the presentation offset animates.
+
+// Deterministic per-roll RNG (mulberry32) so the field never re-randomizes
+// between frames for unchanged settings.
+function _fieldRng(seedU32) {
+  let a = (Math.floor(seedU32) >>> 0) || 1;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function _macroFutureKey(p) {
+  const picked = {};
+  [
+    "seed", "scaleMode", "scalePreset", "customDegrees", "edoDivisions",
+    "subScaleNotes", "subScaleWeight", "rootNotes", "rootPullStrength",
+    "registerCenter", "registerWidth", "registerSkew",
+    "intervalPeakedness", "intervalRange", "momentum",
+    "motifHitProb", "motifHitRange",
+    "surpriseProb", "surprisePitchEnabled", "surprisePitchDistance",
+    "surpriseTuningEnabled", "surpriseRhythmEnabled", "surpriseDynamicsEnabled",
+    "surpriseFormantEnabled", "surpriseRestEnabled",
+    "beatDivisions", "onBeatProb", "offBeatProb", "sameLengthProb",
+    "restMotifStartRatio", "restOnMeterRatio", "restOffMeterRatio", "gapProb",
+    "motifCount", "motifLengthBeats", "motifLength", "sequenceProb",
+    "motifSurpriseProb", "incorporationRate",
+  ].forEach(k => { picked[k] = p[k]; });
+  return JSON.stringify(picked);
+}
+
+// The active scale model, built the same way the engine builds it, so the
+// future field quantizes to exactly the rows the patch can actually play.
+function _fieldScale(p) {
+  const div = p.scaleMode === "edo" ? Math.max(1, Math.round(p.edoDivisions || 12)) : 12;
+  let degrees = (Array.isArray(p.customDegrees) && p.customDegrees.length)
+    ? p.customDegrees
+    : p.scaleMode === "edo"
+      ? Array.from({ length: div }, (_, i) => i)
+      : (SCALE_PRESETS[p.scalePreset]?.degrees || SCALE_PRESETS.major.degrees);
+  degrees = [...new Set(degrees.map(d => ((Math.round(d) % div) + div) % div))].sort((a, b) => a - b);
+  if (!degrees.length) degrees = [0];
+  const sub = (Array.isArray(p.subScaleNotes) ? p.subScaleNotes : [])
+    .map(d => ((Math.round(d) % div) + div) % div)
+    .filter(d => degrees.includes(d));
+  return new Scale(div, degrees, sub, clamp(Number(p.subScaleWeight ?? 0.5), 0, 1), p.tonicHz || 261.63, p.degreeTuning || null);
+}
+
+function makeMacroFutureField(p) {
+  const key = _macroFutureKey(p);
+  const seed = Math.max(1, Math.round(Number(p.seed) || 1));
+  const scale = _fieldScale(p);
+  const divs = Math.max(1, Math.round(p.beatDivisions || 1));
+  const motifSteps = clamp(Math.round(Number(p.motifLengthBeats || p.motifLength || 4) * divs), 2, 48);
+  const passes = 4;
+  const steps = motifSteps * passes;
+  const samples = 160;
+
+  const range = Math.max(1, Math.round(Number(p.intervalRange ?? 7)));
+  const peaked = clamp(Number(p.intervalPeakedness ?? 2), 0, 5);
+  const momentum = clamp(Number(p.momentum ?? 0), 0, 1);
+  const regCenter = Number(p.registerCenter ?? 0);
+  const regWidth = Number(p.registerWidth ?? 12);
+  const regSkew = Number(p.registerSkew ?? 0);
+  const pull = clamp(Number(p.rootPullStrength ?? 0), 0, 1);
+  const rootPcs = (Array.isArray(p.rootNotes) && p.rootNotes.length ? p.rootNotes : [0]).map(r => scale.norm(r));
+  const hitProb = clamp(Number(p.motifHitProb ?? 1), 0, 1);
+  const hitRange = Math.max(1, Math.round(Number(p.motifHitRange ?? 2)));
+  const surprise = clamp(Number(p.surpriseProb ?? 0), 0, 1);
+  const pitchSurprise = !!p.surprisePitchEnabled;
+  const leapSteps = Math.max(1, Math.round(clamp(Number(p.surprisePitchDistance ?? 1), 0, 1) * range * 1.4));
+  const onProb = clamp(Number(p.onBeatProb ?? 0.8), 0, 1);
+  const offProb = clamp(Number(p.offBeatProb ?? 0.2), 0, 1);
+  const sameLen = clamp(Number(p.sameLengthProb ?? 0.5), 0, 1);
+  const restStart = clamp(Number(p.restMotifStartRatio ?? 0), 0, 0.95);
+  const restOn = clamp(Number(p.restOnMeterRatio ?? 0), 0, 0.95);
+  const restOff = clamp(Number(p.restOffMeterRatio ?? 0), 0, 0.95);
+  const seq = clamp(Number(p.sequenceProb ?? 0.5), 0, 1);
+  const mutation = clamp(Number(p.motifSurpriseProb ?? 0), 0, 1);
+  const incorporation = clamp(Number(p.incorporationRate ?? 0), 0, 1);
+  const motifCount = clamp(Math.round(Number(p.motifCount ?? 3)), 1, 8);
+  const spanCap = scale.div * 2.2;   // keep outliers within ~2 octaves of centre
+
+  // Interval candidates from the engine's melodic prior (interval shape ×
+  // sub-scale bonus × register window × root pull), cached per centre degree.
+  const candCache = new Map();
+  const rootDistOf = (deg) => {
+    let best = Infinity;
+    for (const pc of rootPcs) {
+      for (let oct = -2; oct <= 2; oct++) {
+        best = Math.min(best, scale.stepDistance(deg, pc + oct * scale.div));
+      }
+    }
+    return best;
+  };
+  const candidatesFor = (deg) => {
+    const center = scale.nearest(deg);
+    let entry = candCache.get(center);
+    if (entry) return entry;
+    const list = [];
+    let up = 0, down = 0;
+    const currentRootDist = pull > 0 ? rootDistOf(center) : 0;
+    for (let step = -range; step <= range; step++) {
+      const target = scale.stepFrom(center, step);
+      if (Math.abs(target - regCenter) > spanCap) continue;
+      let wgt = intervalShapeWeight(Math.abs(step), peaked, range);
+      if (!(wgt > 0)) continue;
+      wgt *= scale.sub.includes(scale.norm(target)) ? scale.weight : (1 - scale.weight);
+      if (regWidth > 0 && regWidth < 100) {
+        wgt *= Math.max(0.01, registerCurveValue(target - regCenter, regWidth, regSkew));
+      }
+      if (pull > 0) {
+        const d = rootDistOf(target);
+        if (d < currentRootDist) wgt *= 1 + pull * 2.0 * (1 - d / Math.max(1, currentRootDist));
+        else if (d > currentRootDist) wgt *= Math.max(0.05, 1 - pull * 0.7);
+      }
+      const dir = Math.sign(step);
+      if (dir > 0) up += wgt; else if (dir < 0) down += wgt;
+      list.push({ target, dir, wgt });
+    }
+    let total = 0;
+    for (const cnd of list) total += cnd.wgt;
+    entry = { list, up, down, total };
+    candCache.set(center, entry);
+    return entry;
+  };
+
+  // One melodic move: momentum pushes P(same direction) toward 0.8, exactly
+  // like the engine's `_pickBiasedNote`.
+  const pickNext = (deg, prevDir, rng) => {
+    const cands = candidatesFor(deg);
+    if (!cands.list.length || !(cands.total > 0)) return { deg, dir: 0 };
+    let fSame = 1, fOther = 1, total = cands.total;
+    if (momentum > 0 && prevDir !== 0) {
+      const same = prevDir > 0 ? cands.up : cands.down;
+      const other = cands.total - same;
+      if (same > 0 && other > 0) {
+        const basePsame = same / cands.total;
+        const targetPsame = Math.max(basePsame, basePsame + (0.8 - basePsame) * momentum);
+        fSame = targetPsame / basePsame;
+        fOther = (1 - targetPsame) / (1 - basePsame);
+        total = same * fSame + other * fOther;
+      }
+    }
+    let r = rng() * total;
+    for (const cnd of cands.list) {
+      r -= cnd.wgt * (cnd.dir === prevDir ? fSame : fOther);
+      if (r <= 0) return { deg: cnd.target, dir: cnd.dir };
+    }
+    const last = cands.list[cands.list.length - 1];
+    return { deg: last.target, dir: last.dir };
+  };
+
+  const startDeg = scale.nearest(regCenter);
+  const walkNotes = (rng, n) => {
+    let deg = startDeg, dir = 0, mv;
+    for (let i = 0; i < 6; i++) { mv = pickNext(deg, dir, rng); deg = mv.deg; dir = mv.dir; }  // burn-in
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      out.push(deg);
+      mv = pickNext(deg, dir, rng); deg = mv.deg; dir = mv.dir;
+    }
+    return out;
+  };
+  const sampleDur = (rng, prevDur) => {
+    if (prevDur != null && rng() < sameLen) return prevDur;
+    const r = rng();
+    return r < 0.55 ? 1 : r < 0.85 ? 2 : Math.max(1, Math.round(divs * (0.5 + rng())));
+  };
+  const walkRhythm = (rng, n) => {
+    const slots = [];
+    let prevDur = null;
+    for (let i = 0; i < n; i++) {
+      const onBeat = i % divs === 0;
+      const onset = rng() < (onBeat ? onProb : offProb);
+      let dur = 0;
+      if (onset) { dur = sampleDur(rng, prevDur); prevDur = dur; }
+      slots.push({ onset, dur });
+    }
+    return slots;
+  };
+
+  // A small deterministic repertoire, generated by the same walk the samples
+  // repeat from — motif structure is what makes repeats read as repeats.
+  const motifs = [];
+  for (let m = 0; m < motifCount; m++) {
+    const rng = _fieldRng((seed ^ (0x517CC1B7 + m * 0x9E3779B9)) >>> 0);
+    motifs.push({ notes: walkNotes(rng, motifSteps), rhythm: walkRhythm(rng, motifSteps) });
+  }
+
+  const stepMaps = Array.from({ length: steps }, () => new Map());
+  const onsetCount = new Float32Array(steps);
+  const restCount = new Float32Array(steps);
+  const soundCount = new Float32Array(steps);
+  const surpriseCount = new Float32Array(steps);
+  const passCounts = Array.from({ length: passes }, () => ({ repeat: 0, variant: 0, neu: 0 }));
+  const paths = [];
+
+  for (let s = 0; s < samples; s++) {
+    const rng = _fieldRng((seed ^ (0x85EBCA6B + s * 0xC2B2AE35)) >>> 0);
+    const path = new Array(steps);
+    let heldDeg = startDeg;
+    let mutated = false;      // this roll incorporated new material earlier
+    let variantShift = 0;     // persistent drift of the incorporated repertoire
+    let prevDurHeld = 0;
+    for (let k = 0; k < passes; k++) {
+      const isNew = rng() < mutation;
+      const ordered = rng() < seq;
+      const idx = ordered ? k % motifCount : Math.floor(rng() * motifCount);
+      const motif = motifs[Math.min(idx, motifs.length - 1)];
+      let freshNotes = null, freshRhythm = null;
+      if (isNew) {
+        freshNotes = walkNotes(rng, motifSteps);
+        freshRhythm = walkRhythm(rng, motifSteps);
+        if (rng() < incorporation) {
+          mutated = true;
+          variantShift = rng() < 0.5 ? -1 : 1;
+        }
+      }
+      let missedNotes = 0;
+      for (let i = 0; i < motifSteps; i++) {
+        const gi = k * motifSteps + i;
+        const slot = isNew ? freshRhythm[i] : motif.rhythm[i];
+        let onset = slot.onset;
+        // imperfect hits also wobble the rhythm slightly on repeats
+        if (!isNew && onset && rng() < (1 - hitProb) * 0.25) { onset = false; missedNotes++; }
+        if (onset) {
+          const onBeatSlot = i % divs === 0;
+          const restP = i === 0
+            ? Math.max(restStart, onBeatSlot ? restOn : restOff)
+            : (onBeatSlot ? restOn : restOff);
+          if (rng() < restP) {
+            restCount[gi]++;
+            prevDurHeld = 0;
+            path[gi] = heldDeg;
+            continue;
+          }
+          let deg = isNew ? freshNotes[i] : motif.notes[i];
+          if (!isNew && mutated && variantShift !== 0) deg = scale.stepFrom(deg, variantShift);
+          if (!isNew && rng() < 1 - hitProb) {
+            const missSteps = 1 + Math.floor(rng() * hitRange);
+            deg = scale.stepFrom(deg, rng() < 0.5 ? -missSteps : missSteps);
+            missedNotes++;
+          }
+          if (rng() < surprise) {
+            surpriseCount[gi]++;
+            if (pitchSurprise) deg = scale.stepFrom(deg, rng() < 0.5 ? -leapSteps : leapSteps);
+          }
+          if (Math.abs(deg - regCenter) > spanCap) {
+            deg = scale.nearest(regCenter + Math.sign(deg - regCenter) * spanCap);
+          }
+          heldDeg = deg;
+          onsetCount[gi]++;
+          prevDurHeld = Math.max(1, slot.dur);
+        }
+        if (prevDurHeld > 0) {
+          soundCount[gi]++;
+          stepMaps[gi].set(heldDeg, (stepMaps[gi].get(heldDeg) || 0) + 1);
+          prevDurHeld--;
+        }
+        path[gi] = heldDeg;
+      }
+      // A pass reads as a variant when its material audibly drifted: an
+      // out-of-order pick, incorporated new material, or a meaningful miss
+      // rate (a lone imperfect hit still reads as a repeat).
+      const drifted = missedNotes >= Math.max(2, Math.ceil(motifSteps * 0.25));
+      const kind = isNew ? "neu" : (!ordered || mutated || drifted) ? "variant" : "repeat";
+      passCounts[k][kind]++;
+    }
+    paths.push(path);
+  }
+
+  // Rows: every valid scale degree between the deposited extremes — a sparse
+  // scale shows visibly fewer possible rows, a dense EDO shows more.
+  let lo = Infinity, hi = -Infinity;
+  for (const m of stepMaps) for (const d of m.keys()) { if (d < lo) lo = d; if (d > hi) hi = d; }
+  if (!Number.isFinite(lo)) { lo = startDeg - 2; hi = startDeg + 2; }
+  while (hi - lo < 4) { lo -= 1; hi += 1; }
+  const rows = [];
+  const rowOfDeg = new Map();
+  for (let d = Math.floor(lo); d <= Math.ceil(hi); d++) {
+    if (scale.nearest(d) !== d) continue;   // only rows the scale can play
+    rowOfDeg.set(d, rows.length);
+    rows.push({
+      deg: d,
+      isRoot: rootPcs.includes(scale.norm(d)),
+      isSub: scale.sub.includes(scale.norm(d)),
+    });
+  }
+
+  const heat = Array.from({ length: steps }, () => new Float32Array(rows.length));
+  let maxHeat = 1;
+  stepMaps.forEach((m, i) => {
+    for (const [d, cnt] of m) {
+      const r = rowOfDeg.get(d);
+      if (r == null) continue;
+      heat[i][r] += cnt;
+      if (heat[i][r] > maxHeat) maxHeat = heat[i][r];
+    }
+  });
+
+  // Representative path: the sampled roll that best follows the aggregate —
+  // a real generated path, so every move is a valid scale interval.
+  let best = 0, bestScore = -1;
+  for (let s = 0; s < samples; s++) {
+    let score = 0;
+    for (let i = 0; i < steps; i++) {
+      const r = rowOfDeg.get(paths[s][i]);
+      if (r != null) score += heat[i][r];
+    }
+    if (score > bestScore) { bestScore = score; best = s; }
+  }
+
+  const norm = (arr) => Array.from(arr, v => v / samples);
+  return {
+    key, steps, motifSteps, passes, samples, divs,
+    rows, rowOfDeg, heat, maxHeat,
+    modePath: paths[best],
+    loDeg: rows[0].deg, hiDeg: rows[rows.length - 1].deg,
+    onsetHeat: norm(onsetCount),
+    restHeat: norm(restCount),
+    soundHeat: norm(soundCount),
+    surpriseHeat: norm(surpriseCount),
+    passStats: passCounts.map(c => ({
+      repeat: c.repeat / samples,
+      variant: c.variant / samples,
+      neu: c.neu / samples,
+    })),
+    risk: surprise,
+    dims: _surpriseRisks(p),
+    gapProb: clamp(Number(p.gapProb ?? 0.4), 0, 1),
+    scaleSize: scale.all.length,
+    scaleDiv: scale.div,
+  };
+}
+if (typeof window !== "undefined") window.makeMacroFutureField = makeMacroFutureField;  // debug/validation hook
+
+function _macroFutureField(p) {
+  const key = _macroFutureKey(p);
+  if (_macroFutureFieldCache?.key === key) return _macroFutureFieldCache.value;
+  const value = makeMacroFutureField(p);
+  _macroFutureFieldCache = { key, value };
+  _futureLayerCache = null;
+  return value;
+}
+
+// Pre-rendered tile of the future field (all four lanes). The tile holds one
+// full loop plus one extra step so the wrap seam stays continuous; the draw
+// loop only translates it, so unchanged settings render an identical, stable
+// field that merely flows past the playhead.
+let _futureLayerCache = null;
+let _fieldScrollPx = 0, _fieldScrollT = 0;
+
+function _futureFieldLayer(field, geom) {
+  const gkey = `${field.key}|${geom.stepPx.toFixed(3)}|${geom.h}|${geom.S.toFixed(3)}|${geom.lanes.map(L => `${L.top.toFixed(1)}-${L.bot.toFixed(1)}`).join(",")}`;
+  if (_futureLayerCache?.gkey === gkey) return _futureLayerCache;
+
+  const S = geom.S, px = geom.stepPx;
+  const steps = field.steps;
+  const loopW = steps * px;
+  const cvs = document.createElement("canvas");
+  cvs.width = Math.max(2, Math.ceil(loopW + px));
+  cvs.height = Math.max(2, Math.ceil(geom.h));
+  const c = cvs.getContext("2d");
+  const cw = cvs.width;
+  const F = (size, weight = "") => `${weight}${weight ? " " : ""}${Math.round(size * S)}px ui-monospace, monospace`;
+  const [L1, L2, L3, L4] = geom.lanes;
+  const at = (i) => i % steps;   // wrap for the seam column
+
+  // ── pitch: scale-degree heat rows + representative sampled path ──
+  const laneH1 = L1.bot - L1.top;
+  const span = Math.max(1, field.hiDeg - field.loDeg);
+  const padY = laneH1 * 0.06;
+  const yOfDeg = (d) => L1.bot - padY - ((d - field.loDeg) / span) * (laneH1 - 2 * padY);
+  const unitH = (laneH1 - 2 * padY) / span;
+  const bandH = clamp(unitH * 0.92, 1.4, 12 * S);
+  for (const r of field.rows) {
+    // valid-row guides: sparse scales visibly offer fewer paths; roots glow
+    const y = yOfDeg(r.deg);
+    c.fillStyle = r.isRoot ? "rgba(245,166,35,0.13)" : "rgba(160,175,195,0.05)";
+    c.fillRect(0, y - 0.5 * S, cw, Math.max(1, 0.8 * S));
+  }
+  for (let i = 0; i < steps; i++) {
+    const col = field.heat[i];
+    const x = i * px;
+    for (let r = 0; r < col.length; r++) {
+      const d = col[r] / field.maxHeat;
+      if (d < 0.02) continue;
+      const y = yOfDeg(field.rows[r].deg);
+      const a = Math.pow(d, 0.72);
+      c.fillStyle = `rgba(245,166,35,${(0.04 + a * 0.10).toFixed(3)})`;
+      c.fillRect(x, y - bandH * 1.1, px + 0.6, bandH * 2.2);   // soft halo
+      c.fillStyle = `rgba(245,166,35,${(0.06 + a * 0.30).toFixed(3)})`;
+      c.fillRect(x, y - bandH / 2, px + 0.6, bandH);           // core band
+    }
+  }
+  const pathPt = (i) => [(i + 0.5) * px, yOfDeg(field.modePath[at(i)])];
+  const drawPath = (width, style) => {
+    c.strokeStyle = style;
+    c.lineWidth = width;
+    c.lineJoin = "round";
+    c.lineCap = "round";
+    c.beginPath();
+    let [x0, y0] = pathPt(0);
+    c.moveTo(x0, y0);
+    for (let i = 1; i <= steps; i++) {
+      const [x1, y1] = pathPt(i);
+      // midpoint smoothing: musical motion, not a mechanical zig-zag
+      c.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+      x0 = x1; y0 = y1;
+    }
+    c.lineTo(x0, y0);
+    c.stroke();
+  };
+  drawPath(4.5 * S, "rgba(255,198,80,0.14)");
+  drawPath(1.7 * S, "rgba(255,198,80,0.85)");
+
+  // ── rhythm: sampled onset/rest/duration climate (density forecast) ──
+  const microH = 4 * S;
+  const bodyBot = L2.bot - microH - 3 * S;
+  const durH = 7 * S;
+  const stemTop = L2.top + 2 * S;
+  for (let i = 0; i < steps; i++) {
+    const x = i * px;
+    const onset = field.onsetHeat[i];
+    const rest = field.restHeat[i];
+    const sound = field.soundHeat[i];
+    const colW = Math.max(1.5 * S, px * 0.72);
+    const cx = x + (px - colW) / 2;
+    if (i % field.motifSteps === 0) {   // motif-pass accent keeps the meter legible
+      c.fillStyle = "rgba(96,165,250,0.09)";
+      c.fillRect(x, L2.top, Math.max(S, px * 0.28), L2.bot - L2.top);
+    }
+    if (onset > 0.01) {
+      const hgt = (0.10 + 0.90 * onset) * (bodyBot - durH - stemTop);
+      const g = c.createLinearGradient(0, bodyBot - durH - hgt, 0, bodyBot - durH);
+      g.addColorStop(0, `rgba(96,165,250,${0.02 + onset * 0.10})`);
+      g.addColorStop(1, `rgba(96,165,250,${0.10 + onset * 0.30})`);
+      c.fillStyle = g;
+      c.fillRect(cx, bodyBot - durH - hgt, colW, hgt);
+    }
+    if (sound > 0.01) {   // sustain coverage — the duration density band
+      c.fillStyle = `rgba(96,165,250,${0.05 + sound * 0.30})`;
+      c.fillRect(x, bodyBot - durH, px + 0.6, durH);
+    }
+    if (rest > 0.01) {    // silence pressure
+      c.fillStyle = `rgba(229,72,77,${0.05 + rest * 0.55})`;
+      c.fillRect(x, bodyBot + 1.5 * S, px + 0.6, durH * 0.95);
+    }
+    // articulation: continuous gap/legato band, breathing with density
+    c.fillStyle = `rgba(95,212,200,${((0.08 + field.gapProb * 0.24) * (0.6 + sound * 0.4)).toFixed(3)})`;
+    c.fillRect(x, L2.bot - microH, px + 0.6, microH);
+  }
+
+  // ── surprise: layered risk climate (one layer per enabled dimension) ──
+  if (field.risk > 0.005 && field.dims.length) {
+    const avail = L3.bot - L3.top - 14 * S;
+    let maxS = 0;
+    for (const v of field.surpriseHeat) maxS = Math.max(maxS, v);
+    const nDims = Math.min(4, field.dims.length);
+    for (let li = 0; li < nDims; li++) {
+      const frac = (li + 1) / nDims;
+      c.fillStyle = `rgba(56,189,248,${(0.05 + field.risk * 0.10).toFixed(3)})`;
+      c.beginPath();
+      c.moveTo(0, L3.bot);
+      for (let i = 0; i <= steps; i++) {
+        const rel = maxS > 0 ? field.surpriseHeat[at(i)] / maxS : 0;
+        const hgt = avail * field.risk * (0.30 + 0.70 * rel) * frac;
+        c.lineTo(i * px, L3.bot - hgt);
+      }
+      c.lineTo(cw, L3.bot);
+      c.closePath();
+      c.fill();
+    }
+  }
+
+  // ── motif: generic pass windows showing repeat / variant / new pressure ──
+  const labelH = 13 * S, stripRow = 6 * S;
+  for (let k = 0; k < field.passes; k++) {
+    const st = field.passStats[k];
+    const x0 = k * field.motifSteps * px + 2 * S;
+    const bw = field.motifSteps * px - 4 * S;
+    if (bw < 10 * S) continue;
+    const total = Math.max(0.001, st.repeat + st.variant + st.neu);
+    const wRep = bw * st.repeat / total, wVar = bw * st.variant / total;
+    const wNew = Math.max(0, bw - wRep - wVar);
+    const dominant = st.repeat >= st.variant && st.repeat >= st.neu
+      ? ["repeat", "#4caf7d"]
+      : st.variant >= st.neu ? ["variant", "#5fd4c8"] : ["new", "#e5a53a"];
+    // block fill split into the sampled green/teal/amber proportions
+    c.save();
+    roundRectPath(c, x0, L4.top, bw, labelH, 3 * S);
+    c.clip();
+    c.fillStyle = `rgba(76,175,125,${0.10 + st.repeat * 0.34})`;
+    c.fillRect(x0, L4.top, wRep, labelH);
+    c.fillStyle = `rgba(95,212,200,${0.10 + st.variant * 0.36})`;
+    c.fillRect(x0 + wRep, L4.top, wVar, labelH);
+    c.fillStyle = `rgba(229,165,58,${0.10 + st.neu * 0.42})`;
+    c.fillRect(x0 + wRep + wVar, L4.top, wNew, labelH);
+    c.restore();
+    c.strokeStyle = dominant[1];
+    c.lineWidth = 1.2 * S;
+    roundRectPath(c, x0, L4.top, bw, labelH, 3 * S);
+    c.stroke();
+    if (bw > 64 * S) {
+      c.fillStyle = dominant[1];
+      c.font = F(8.5, "700");
+      c.textAlign = "center";
+      c.fillText(`${dominant[0]} pressure`, x0 + bw / 2, L4.top + 9.5 * S);
+      c.textAlign = "left";
+    }
+    // stacked probability bar
+    const barY = L4.top + labelH + 3 * S;
+    c.fillStyle = `rgba(76,175,125,${0.18 + st.repeat * 0.6})`;
+    c.fillRect(x0, barY, wRep, stripRow);
+    c.fillStyle = `rgba(95,212,200,${0.16 + st.variant * 0.55})`;
+    c.fillRect(x0 + wRep, barY, wVar, stripRow);
+    c.fillStyle = `rgba(229,165,58,${0.14 + st.neu * 0.6})`;
+    c.fillRect(x0 + wRep + wVar, barY, wNew, stripRow);
+    // expected drift heat: hotter as variant/new pressure grows
+    c.fillStyle = heatColor(clamp(st.variant * 0.5 + st.neu, 0, 1), 0.35);
+    c.fillRect(x0, barY + stripRow + 2 * S, bw, stripRow * 1.2);
+  }
+
+  _futureLayerCache = { gkey, canvas: cvs, loopW };
+  return _futureLayerCache;
+}
+
+function drawBehaviorLanes() {
+  if (!canvas || !canvasCtx) return;
+  const ctx = canvasCtx;
+  const w = canvas.width, h = canvas.height;
+  visBackdrop(ctx, w, h);
+
+  // scale factor: draw metrics in CSS-consistent sizes on the DPR backing
+  const S = Math.max(1, w / Math.max(1, canvas.clientWidth || w));
+  const F = (px, weight = "") => `${weight}${weight ? " " : ""}${Math.round(px * S)}px ui-monospace, monospace`;
+  const gutter = Math.min(w * 0.34, LANES_GUTTER * S);
+  const plotLeft = gutter;
+  const plotW = Math.max(1, w - plotLeft);
+
+  const tl = synth.getNoteTimeline ? synth.getNoteTimeline() : null;
+  const playheadX = Math.round(plotLeft + plotW * LANES_PLAYHEAD_FRAC);
+  const now = tl ? tl.now : 0;
+  const PPS = MOTIF_PX_PER_SEC * S;
+  const X = (t) => playheadX + (t - now) * PPS;
+  const p = exploreParams;
+  const futureField = _macroFutureField(p);
+
+  // ── zone headers ──
+  const strip = LANES_TOP_STRIP * S;
+  ctx.fillStyle = "rgba(5, 10, 15, 0.58)";
+  ctx.fillRect(0, 0, plotLeft, h);
+  ctx.strokeStyle = "rgba(100, 120, 140, 0.18)";
+  ctx.beginPath(); ctx.moveTo(plotLeft + 0.5, strip); ctx.lineTo(plotLeft + 0.5, h); ctx.stroke();
+  ctx.font = F(9, "600");
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(150,163,178,0.75)";
+  ctx.fillText("RECENT HISTORY", plotLeft + (playheadX - plotLeft) / 2, strip * 0.62);
+  ctx.fillStyle = "rgba(96,165,250,0.85)";
+  ctx.fillText("POSSIBLE FUTURE FIELD", playheadX + (w - playheadX) / 2, strip * 0.62);
+  // future zone tint
+  ctx.fillStyle = "rgba(56,120,220,0.045)";
+  ctx.fillRect(playheadX, strip, w - playheadX, h - strip);
+
+  // ── lane geometry ──
+  const lanes = LANE_DEFS.map(d => ({ ...d }));
+  let y0 = strip;
+  for (const L of lanes) {
+    const lh = (h - strip) * L.frac;
+    L.top = y0 + 10 * S;
+    L.bot = y0 + lh - 6 * S;
+    y0 += lh;
+    ctx.strokeStyle = "rgba(90,110,130,0.18)";
+    ctx.beginPath(); ctx.moveTo(0, y0 + 0.5); ctx.lineTo(w, y0 + 0.5); ctx.stroke();
+  }
+  // beat gridlines (tempo grid, not wall seconds)
+  const beatSec = 60 / Math.max(30, p.tempo || 104);
+  ctx.strokeStyle = "rgba(96,165,250,0.06)";
+  const firstBeat = Math.floor((now - playheadX / PPS) / beatSec) * beatSec;
+  for (let t = firstBeat; X(t) < w; t += beatSec) {
+    const x = X(t);
+    if (x < plotLeft) continue;
+    ctx.beginPath(); ctx.moveTo(x, strip); ctx.lineTo(x, h); ctx.stroke();
+  }
+  ctx.textAlign = "left";
+
+  const hasTimeline = !!(tl && tl.events && tl.events.length);
+  if (!hasTimeline) {
+    ctx.fillStyle = "rgba(150,170,190,0.36)";
+    ctx.font = F(9, "600");
+    ctx.textAlign = "center";
+    ctx.fillText("press play for realized history", plotLeft + (playheadX - plotLeft) / 2, h * 0.5);
+    ctx.textAlign = "left";
+  }
+
+  const allEvents = hasTimeline ? tl.events : [];
+  const evs = allEvents.filter(e => X(e.when + e.dur) > -8 && X(e.when) < w + 8);
+  const notes = evs.filter(e => !e.isRest && e.velocity > 0 && e.frequency > 0);
+  const realizedEvs = evs.filter(e => e.when <= now);
+  const realizedNotes = notes.filter(e => e.when <= now);
+  const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
+  const motifUnitsAll = visGroupMotifs(allEvents);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plotLeft, strip, plotW, h - strip);
+  ctx.clip();
+
+  // ══ LANE 1 · MELODY / PITCH ══
+  const L1 = lanes[0];
+  if (realizedNotes.length) {
+    let lo = Infinity, hi = -Infinity;
+    for (const n of realizedNotes) {
+      const s = Math.log2(n.frequency);
+      if (s < lo) lo = s;
+      if (s > hi) hi = s;
+    }
+    // leave head-room for the future likelihood field
+    const hitDeg = Math.max(1, Math.round(p.motifHitRange ?? 2));
+    const bandOct = hitDeg * (1 / Math.max(5, div));
+    lo -= bandOct; hi += bandOct;
+    if (hi - lo < 0.8) { const mid = (hi + lo) / 2; lo = mid - 0.4; hi = mid + 0.4; }
+    const Y = (f) => L1.bot - (Math.log2(f) - lo) / (hi - lo) * (L1.bot - L1.top);
+
+    // rolling expectation (EMA of realized pitch) — the faint mean line
+    let ema = null;
+    const emaPts = [];
+    for (const n of realizedNotes) {
+      const s = Math.log2(n.frequency);
+      ema = ema == null ? s : ema * 0.75 + s * 0.25;
+      emaPts.push([X(n.when), L1.bot - (ema - lo) / (hi - lo) * (L1.bot - L1.top), n.when]);
+    }
+    ctx.strokeStyle = "rgba(200,210,225,0.28)";
+    ctx.lineWidth = S;
+    ctx.setLineDash([2 * S, 3 * S]);
+    ctx.beginPath();
+    emaPts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // heat backing: information distance behind each realized note
+    for (const n of realizedNotes) {
+      if (!Number.isFinite(n.pitchBits) || n.when > now) continue;
+      const t = clamp(n.pitchBits / 7, 0, 1);
+      if (t < 0.25) continue;
+      const x = X(n.when), y = Y(n.frequency);
+      const r = (7 + t * 11) * S;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, `rgba(255,${Math.round(140 - t * 90)},40,${0.34 * t})`);
+      g.addColorStop(1, "rgba(255,120,40,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+
+    // contour: solid realized history only
+    const seg = (filter, dash) => {
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = "rgba(245,166,35,0.75)";
+      ctx.lineWidth = 1.5 * S;
+      ctx.beginPath();
+      let started = false, prev = null;
+      for (const n of realizedNotes) {
+        if (!filter(n)) { started = false; continue; }
+        const x = X(n.when), y = Y(n.frequency);
+        if (!started) {
+          if (prev) ctx.moveTo(X(prev.when), Y(prev.frequency)), ctx.lineTo(x, y);
+          else ctx.moveTo(x, y);
+          started = true;
+        } else ctx.lineTo(x, y);
+        prev = n;
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    seg(n => n.when <= now, []);
+
+    // note dots: realized events only; the future side is a likelihood field.
+    for (const n of realizedNotes) {
+      const x = X(n.when), y = Y(n.frequency);
+      ctx.lineWidth = 1.4 * S;
+      ctx.fillStyle = n.isSurprise ? "#ffe07a" : "#f5a623";
+      ctx.beginPath(); ctx.arc(x, y, (n.isSurprise ? 3.2 : 2.5) * S, 0, 2 * Math.PI); ctx.fill();
+    }
+
+    // surprise tags: dimension letter + real bits ("P 5.2b")
+    ctx.font = F(8, "700");
+    ctx.textAlign = "center";
+    for (const n of realizedNotes) {
+      if (!n.isSurprise || !(n.surpriseFeatures || []).includes("pitch")) continue;
+      const x = X(n.when), y = Y(n.frequency);
+      const label = Number.isFinite(n.pitchBits) ? `P ${n.pitchBits.toFixed(1)}b` : "P";
+      const tw = ctx.measureText(label).width + 8 * S;
+      ctx.fillStyle = "rgba(58,38,10,0.92)";
+      ctx.strokeStyle = "#f5a623";
+      ctx.lineWidth = S;
+      const ty = y - 14 * S;
+      roundRectPath(ctx, x - tw / 2, ty - 8 * S, tw, 11 * S, 3 * S);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#ffd28a";
+      ctx.fillText(label, x, ty);
+    }
+    ctx.textAlign = "left";
+  }
+
+  // Settings roll-field: many deterministic draws from the current macro
+  // settings, pre-rendered as a looped tile (all four lanes) and scrolled
+  // left through the playhead like an audition of the current settings.
+  // The sampled field itself stays fixed until a relevant setting changes.
+  const fieldStart = playheadX + 5 * S;
+  const stepPx = Math.max(1.5, (beatSec / futureField.divs) * PPS);
+  const fieldLayer = _futureFieldLayer(futureField, {
+    stepPx, h, S, lanes: lanes.map(L => ({ top: L.top, bot: L.bot })),
+  });
+  const tScroll = performance.now();
+  const dtScroll = _fieldScrollT ? Math.min(0.1, Math.max(0, (tScroll - _fieldScrollT) / 1000)) : 0;
+  _fieldScrollT = tScroll;
+  // full tempo during playback; a slow drift while stopped so the field
+  // still reads as a flowing surface rather than a frozen picture
+  _fieldScrollPx = (_fieldScrollPx + dtScroll * PPS * (synth.isPlaying ? 1 : 0.3)) % fieldLayer.loopW;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(fieldStart, strip, w - fieldStart, h - strip);
+  ctx.clip();
+  for (let tileX = fieldStart - _fieldScrollPx; tileX < w; tileX += fieldLayer.loopW) {
+    if (tileX + fieldLayer.canvas.width > fieldStart) ctx.drawImage(fieldLayer.canvas, tileX, 0);
+  }
+  // dissolve into the playhead as each loop arrives at "now"
+  const fadeW = 30 * S;
+  const fadeG = ctx.createLinearGradient(fieldStart, 0, fieldStart + fadeW, 0);
+  fadeG.addColorStop(0, "rgba(11,18,25,0.92)");
+  fadeG.addColorStop(1, "rgba(11,18,25,0)");
+  ctx.fillStyle = fadeG;
+  ctx.fillRect(fieldStart, strip, fadeW, h - strip);
+  ctx.restore();
+  ctx.fillStyle = "rgba(150,163,178,0.6)";
+  ctx.font = F(8);
+  ctx.textAlign = "right";
+  ctx.fillText(
+    `settings roll field · ${futureField.samples} draws · ${futureField.scaleSize}/${futureField.scaleDiv} scale rows`,
+    w - 6 * S, L1.top + 9 * S);
+  ctx.textAlign = "left";
+
+  // ══ LANE 2 · RHYTHM & RESTS ══
+  const L2 = lanes[1];
+  const microH = 4 * S;                       // gap/legato micro-row
+  const bodyBot = L2.bot - microH - 3 * S;
+  const durH = 7 * S;
+  for (const e of realizedEvs) {
+    const x = X(e.when);
+    const bw = Math.max(2 * S, e.dur * PPS - S);
+    if (e.isRest || !(e.velocity > 0)) {
+      // rest block: muted red outline
+      ctx.strokeStyle = "rgba(229,72,77,0.7)";
+      ctx.lineWidth = S;
+      roundRectPath(ctx, x, bodyBot - durH, bw, durH, 2 * S);
+      ctx.stroke();
+      continue;
+    }
+    // duration-deviation heat behind the body
+    if (e.rhythmDev > 0.02) {
+      const t = clamp(e.rhythmDev, 0, 1);
+      const g = ctx.createLinearGradient(x, 0, x + bw, 0);
+      g.addColorStop(0, `rgba(80,150,255,${0.28 * t})`);
+      g.addColorStop(1, "rgba(80,150,255,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 2 * S, bodyBot - durH - 3 * S, bw + 4 * S, durH + 6 * S);
+    }
+    // duration body: realized past only
+    ctx.fillStyle = "rgba(96,165,250,0.5)";
+    roundRectPath(ctx, x, bodyBot - durH, bw, durH, 2 * S);
+    ctx.fill();
+    // onset stem + lollipop above the body
+    const oh = (0.35 + 0.65 * clamp(e.velocity, 0, 1)) * (bodyBot - durH - L2.top);
+    ctx.strokeStyle = "rgba(96,165,250,0.95)";
+    ctx.lineWidth = 1.6 * S;
+    ctx.beginPath(); ctx.moveTo(x + S, bodyBot - durH); ctx.lineTo(x + S, bodyBot - durH - oh); ctx.stroke();
+    ctx.fillStyle = "rgba(96,165,250,0.95)";
+    ctx.beginPath(); ctx.arc(x + S, bodyBot - durH - oh, 2.2 * S, 0, 2 * Math.PI); ctx.fill();
+  }
+  // gap/legato micro-row: teal where sound carries, dark where gapped
+  ctx.fillStyle = "rgba(95,212,200,0.55)";
+  for (const e of realizedEvs) {
+    if (e.isRest || !(e.velocity > 0)) continue;
+    const x = X(e.when);
+    const bw = Math.max(S, e.dur * PPS - S);
+    ctx.globalAlpha = 1;
+    ctx.fillRect(x, L2.bot - microH, bw, microH);
+  }
+  ctx.globalAlpha = 1;
+
+  // (Future onset/rest/duration climate is part of the scrolled field tile.)
+
+  // ══ LANE 3 · SURPRISE / INFORMATION ══
+  const L3 = lanes[2];
+  const bitsList = realizedEvs.map(e => [e, _evBits(e)]).filter(([, b]) => Number.isFinite(b));
+  const realizedBits = bitsList.map(([, b]) => b);
+  const meanBits = realizedBits.length ? realizedBits.reduce((a, b) => a + b, 0) / realizedBits.length : 0;
+  const maxBits = Math.max(8, ...bitsList.map(([, b]) => b));
+  const YB = (b) => L3.bot - clamp(b / maxBits, 0, 1) * (L3.bot - L3.top - 10 * S);
+  // mean + threshold reference lines
+  const thresholdBits = meanBits * 1.5;
+  ctx.font = F(8);
+  for (const [val, label, col] of [[meanBits, `mean (${meanBits.toFixed(1)}b)`, "rgba(150,163,178,0.5)"], [thresholdBits, `threshold (${thresholdBits.toFixed(1)}b)`, "rgba(56,189,248,0.45)"]]) {
+    if (!(val > 0)) continue;
+    ctx.strokeStyle = col;
+    ctx.setLineDash([3 * S, 4 * S]);
+    ctx.beginPath(); ctx.moveTo(plotLeft, YB(val)); ctx.lineTo(w, YB(val)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = col;
+    ctx.fillText(label, plotLeft + 5 * S, YB(val) - 2 * S);
+  }
+  // information trace: realized history only
+  ctx.strokeStyle = "rgba(95,212,200,0.8)";
+  ctx.lineWidth = 1.2 * S;
+  ctx.beginPath();
+  bitsList.forEach(([e, b], i) => {
+    const x = X(e.when), y = YB(b);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.stroke();
+  ctx.fillStyle = "rgba(150,163,178,0.55)";
+  ctx.font = F(8);
+  ctx.fillText("settings risk field", playheadX + 8 * S, L3.top + 8 * S);
+  // surprise tags: stacked feature letters at each surprise event
+  ctx.font = F(8, "700");
+  ctx.textAlign = "center";
+  for (const [e, b] of bitsList) {
+    if (!e.isSurprise) continue;
+    const x = X(e.when);
+    ctx.strokeStyle = "rgba(56,189,248,0.9)";
+    ctx.lineWidth = 1.4 * S;
+    ctx.beginPath(); ctx.moveTo(x, L3.bot); ctx.lineTo(x, YB(b)); ctx.stroke();
+    const feats = (e.surpriseFeatures && e.surpriseFeatures.length) ? e.surpriseFeatures : (e.isRest ? ["rest"] : ["pitch"]);
+    feats.slice(0, 3).forEach((f, i) => {
+      const label = _SURPRISE_TAG[f] || "?";
+      const ty = YB(b) - (6 + i * 12) * S;
+      const tw = ctx.measureText(label).width + 7 * S;
+      ctx.fillStyle = "rgba(14,24,34,0.92)";
+      ctx.strokeStyle = "rgba(56,189,248,0.85)";
+      ctx.lineWidth = S;
+      roundRectPath(ctx, x - tw / 2, ty - 9 * S, tw, 11 * S, 3 * S);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#8ee3ff";
+      ctx.fillText(label, x, ty);
+    });
+  }
+  ctx.textAlign = "left";
+  // The future risk climate lives in the scrolled field tile; here only the
+  // compact legend of enabled surprise dimensions (badges, not predicted events).
+  const risk = clamp(p.surpriseProb ?? 0, 0, 1);
+  if (risk > 0.01) {
+    const riskFeats = _surpriseRisks(p).slice(0, 4);
+    ctx.font = F(8, "700");
+    let badgeX = playheadX + 12 * S;
+    for (const f of riskFeats) {
+      const label = _SURPRISE_TAG[f] || "?";
+      const tw = ctx.measureText(label).width + 8 * S;
+      ctx.fillStyle = "rgba(14,24,34,0.88)";
+      ctx.strokeStyle = "rgba(56,189,248,0.45)";
+      roundRectPath(ctx, badgeX, L3.top + 12 * S, tw, 11 * S, 3 * S);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(142,227,255,0.72)";
+      ctx.textAlign = "center";
+      ctx.fillText(label, badgeX + tw / 2, L3.top + 20 * S);
+      badgeX += tw + 4 * S;
+    }
+    ctx.textAlign = "left";
+  }
+
+  // ══ LANE 4 · MOTIF MEMORY ══
+  const L4 = lanes[3];
+  const units = motifUnitsAll.filter(u => X(u.end) > -4 && X(u.start) < w + 4 && u.start <= now);
+  const labelH = 13 * S, stripRow = 6 * S, stateH = 11 * S;
+  const seen = new Map(); // baseIndex → appearances (for stable vs active)
+  for (const u of units) {
+    const x0 = X(u.start), x1 = Math.min(playheadX, X(u.end));
+    const bw = Math.max(6 * S, x1 - x0 - 2 * S);
+    const future = false;
+    const count = (seen.get(u.baseIndex) || 0) + 1;
+    seen.set(u.baseIndex, count);
+    const state = u.hasSurprise ? "new" : u.isVariant ? "evolving" : count > 2 ? "stable" : "active";
+    const col = state === "new" ? "#e5a53a" : state === "evolving" ? "#5fd4c8" : "#4caf7d";
+    // identity block
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = future ? 0.6 : 1;
+    ctx.lineWidth = 1.3 * S;
+    ctx.setLineDash(future ? [4 * S, 3 * S] : []);
+    roundRectPath(ctx, x0 + S, L4.top, bw, labelH, 3 * S);
+    ctx.fillStyle = future ? "rgba(14,20,28,0.6)" : "rgba(20,32,26,0.85)";
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+    if (bw > 16 * S) {
+      ctx.fillStyle = col;
+      ctx.font = F(9, "700");
+      ctx.textAlign = "center";
+      const tag = motifLabel(u.baseIndex) + (u.isVariant ? "′" : "") + (future ? "  next" : "");
+      ctx.fillText(bw > 52 * S ? tag : motifLabel(u.baseIndex) + (u.isVariant ? "′" : ""), x0 + S + bw / 2, L4.top + 10 * S);
+      ctx.textAlign = "left";
+    }
+    // drift heat strips (pitch, rhythm)
+    const sy = L4.top + labelH + 2 * S;
+    ctx.fillStyle = heatColor(clamp(u.pitchDev, 0, 1), future ? 0.4 : 0.8);
+    ctx.fillRect(x0 + S, sy, bw, stripRow);
+    ctx.fillStyle = heatColor(clamp(u.rhythmDev, 0, 1), future ? 0.4 : 0.8);
+    ctx.fillRect(x0 + S, sy + stripRow + S, bw, stripRow);
+    // incorporation row: state text + diamond
+    const iy = L4.bot - stateH;
+    if (bw > 34 * S) {
+      ctx.strokeStyle = "rgba(120,135,150,0.3)";
+      ctx.lineWidth = S;
+      roundRectPath(ctx, x0 + S, iy, bw, stateH, 2 * S);
+      ctx.stroke();
+      ctx.fillStyle = future ? "rgba(150,163,178,0.55)" : "rgba(180,195,210,0.8)";
+      ctx.font = F(7.5, "600");
+      ctx.textAlign = "center";
+      ctx.fillText(state.toUpperCase(), x0 + S + bw / 2, iy + 8.5 * S);
+      ctx.textAlign = "left";
+    }
+    if (u.hasSurprise) {
+      const dx = x0 + S + bw / 2, dy = L4.bot + 0.5;
+      ctx.save();
+      ctx.translate(dx, dy - 3 * S);
+      ctx.rotate(Math.PI / 4);
+      if (future) {
+        ctx.strokeStyle = "#ffe07a";
+        ctx.lineWidth = S;
+        ctx.strokeRect(-2.4 * S, -2.4 * S, 4.8 * S, 4.8 * S);
+      } else {
+        ctx.fillStyle = "#ffe07a";
+        ctx.fillRect(-2.4 * S, -2.4 * S, 4.8 * S, 4.8 * S);
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // (Future motif repeat/variant/new pressure windows are part of the
+  // scrolled field tile — generic pass slots, never named identities.)
+
+  ctx.restore();
+  _drawLanesNow(ctx, playheadX, h, strip, S);
+}
+
+// ── Lane header overlay + per-lane key popovers (spec: quiet headers,
+// detailed legends behind the i buttons; one key open at a time). ──
+const LANE_KEYS = {
+  melody: {
+    title: "Melody key",
+    rows: [
+      ["k-line-amber", "realized pitch contour"],
+      ["k-line-amber-dash", "representative sampled path"],
+      ["k-line-gray-dash", "rolling expectation (mean)"],
+      ["k-band", "scale-degree likelihood heat (settings rolls)"],
+      ["k-heat", "information heat (bits from expectation)"],
+      ["k-tag", "surprise tag · P 5.2b = pitch, 5.2 bits"],
+    ],
+  },
+  rhythm: {
+    title: "Rhythm key",
+    rows: [
+      ["k-onset", "onset (height = velocity)"],
+      ["k-dur", "duration"],
+      ["k-heat-blue", "duration deviation"],
+      ["k-rest", "rest"],
+      ["k-gap", "gap / legato"],
+      ["k-dur-dash", "onset / rest density forecast"],
+    ],
+  },
+  surprise: {
+    title: "Surprise key",
+    rows: [
+      ["k-line-teal", "information per note (model bits)"],
+      ["k-line-gray-dash", "mean · threshold lines"],
+      ["k-tag-cyan", "P T R D F Rest = surprise dimension"],
+      ["k-tag-cyan-dash", "future risk climate (per enabled dimension)"],
+    ],
+  },
+  motif: {
+    title: "Motif key",
+    rows: [
+      ["k-block-green", "motif block (A, B, A′ = variant)"],
+      ["k-heat", "pitch-drift · rhythm-drift strips"],
+      ["k-diamond", "incorporation (solid = realized)"],
+      ["k-block-amber-dash", "repeat / variant / new pressure window"],
+    ],
+  },
+};
+
+function layoutLaneHeads() {
+  const heads = document.getElementById("m2LaneHeads");
+  const cv = document.getElementById("vis");
+  if (!heads || !cv) return;
+  const H = cv.clientHeight || cv.getBoundingClientRect().height;
+  if (!H) return;
+  let y = LANES_TOP_STRIP;
+  heads.querySelectorAll(".m2-lane-head").forEach((el, i) => {
+    const lh = (H - LANES_TOP_STRIP) * (LANE_DEFS[i]?.frac || 0.25);
+    el.style.top = `${Math.round(y)}px`;
+    el.style.height = `${Math.round(lh)}px`;
+    y += lh;
+  });
+}
+
+function wireLaneHeads(v) {
+  const heads = v.querySelector("#m2LaneHeads");
+  const key = v.querySelector("#m2LaneKey");
+  if (!heads || !key) return;
+  layoutLaneHeads();
+  let openFor = null;
+  const close = () => { key.hidden = true; openFor = null; };
+  const open = (laneKey, btn) => {
+    const def = LANE_KEYS[laneKey];
+    if (!def) return;
+    key.innerHTML = `
+      <div class="m2-key-head"><span>${esc(def.title)}</span><button class="m2-key-close" aria-label="Close">×</button></div>
+      ${def.rows.map(([sw, label]) => `<div class="m2-key-row"><span class="k-sw ${sw}"></span><span>${esc(label)}</span></div>`).join("")}`;
+    const head = btn.closest(".m2-lane-head");
+    key.style.top = `${Math.min(head.offsetTop, (heads.parentElement.clientHeight || 400) - 170)}px`;
+    key.style.left = `${heads.offsetWidth + 10}px`;
+    key.hidden = false;
+    openFor = laneKey;
+    key.querySelector(".m2-key-close").onclick = close;
+  };
+  heads.querySelectorAll("[data-lane-key]").forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const k = btn.dataset.laneKey;
+      if (openFor === k) close(); else open(k, btn);
+    };
+  });
+  // singleton document listeners (renderExplore re-runs this wiring)
+  if (window._laneKeyDocClick) document.removeEventListener("click", window._laneKeyDocClick, true);
+  window._laneKeyDocClick = (e) => {
+    if (!key.hidden && !e.target.closest("#m2LaneKey") && !e.target.closest("[data-lane-key]")) close();
+  };
+  document.addEventListener("click", window._laneKeyDocClick, true);
+  if (window._laneKeyDocEsc) document.removeEventListener("keydown", window._laneKeyDocEsc);
+  window._laneKeyDocEsc = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", window._laneKeyDocEsc);
+}
+
+// The NOW playhead: strong amber line, top handle, label.
+function _drawLanesNow(ctx, x, h, strip, S) {
+  ctx.strokeStyle = "rgba(245,166,35,0.9)";
+  ctx.lineWidth = 1.6 * S;
+  ctx.beginPath(); ctx.moveTo(x, strip * 0.2); ctx.lineTo(x, h); ctx.stroke();
+  ctx.font = `700 ${Math.round(8.5 * S)}px ui-monospace, monospace`;
+  ctx.textAlign = "center";
+  const tw = ctx.measureText("NOW").width + 10 * S;
+  ctx.fillStyle = "#f5a623";
+  roundRectPath(ctx, x - tw / 2, 0, tw, 13 * S, 3 * S);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - 4 * S, 13 * S); ctx.lineTo(x, 18 * S); ctx.lineTo(x + 4 * S, 13 * S);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#100c04";
+  ctx.fillText("NOW", x, 9.5 * S);
+  ctx.textAlign = "left";
 }
 
 function drawMotifTimeline() {
@@ -12033,6 +14458,25 @@ function updateEngineState() {
   if (m) m.textContent = state.motifCount;
   if (s) s.textContent = state.seqLen;
   if (n) n.textContent = state.notes;
+
+  // V2.1 analysis tiles (MACRO_LANES_CHANGE_SPEC) — computed from the
+  // same event ring the lanes draw, so numbers and picture always agree.
+  const tlx = synth.getNoteTimeline ? synth.getNoteTimeline() : null;
+  if (tlx && tlx.events.length) {
+    const evsAll = tlx.events;
+    const setStat = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    setStat("statVariants", new Set(evsAll.filter(e => e.isVariant).map(e => e.motifIndex)).size);
+    setStat("statRests", evsAll.filter(e => e.isRest).length);
+    setStat("statSurprises", Number.isFinite(state.surpriseCount) ? state.surpriseCount : evsAll.filter(e => e.noteRole === "surprise").length);
+    const bits = evsAll.map(_evBits).filter(Number.isFinite);
+    setStat("statMeanInfo", bits.length ? `${(bits.reduce((a, b) => a + b, 0) / bits.length).toFixed(1)}b` : "–");
+  }
+  const chip = document.getElementById("m2StatusChip");
+  if (chip) {
+    const playing = synth.isPlaying;
+    chip.textContent = playing ? "★ Now playing · possible future field" : "■ Stopped · settings field ready";
+    chip.classList.toggle("playing", !!playing);
+  }
   if (Number.isFinite(state.surpriseCount)) {
     if (state.surpriseCount < lastSurpriseCount) lastSurpriseCount = state.surpriseCount;
     if (state.surpriseCount > lastSurpriseCount) {
