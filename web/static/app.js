@@ -708,6 +708,10 @@ let _markersActive = false;  // whether the note trace was drawn last frame
 
 // Frequency-response area view mode: "spectrum" | "motifs" | "pianoroll"
 let visMode = "lanes";
+// Owner 07-08: the spectrum is an OVERLAY toggle (faint, behind the active
+// view), not a mode — switching to it hid the behaviour information. The
+// motif view retired: the lanes' motif-memory lane carries that story.
+let _visSpecOverlay = false;
 const VIS_MODE_LABEL = {
   lanes: "Behaviour Timeline",
   spectrum: "Frequency Response",
@@ -1402,7 +1406,24 @@ function regionPlayParams(track, region, atBeat = null) {
     // freely sits at its static designer position
     const pos = trackSpaceAt(sp.tracks?.[track.id], atBeat ?? region.startBeat ?? 0)
       || sp.static?.[track.id] || null;
-    if (pos) {
+    const patchLayers = Array.isArray(params.layers) && params.layers.length ? params.layers : null;
+    if (pos && patchLayers) {
+      // Multi-layer patch: the designer value is a GROUP HANDLE — the whole
+      // constellation (base + layers) moves together, centered (rotate +
+      // distance ratio) or additive (rigid translation). Same math as the
+      // canvases (spTransformSources), so what you see is what you hear.
+      const sources = [
+        { angle: params.spaceAzimuth ?? 0, dist: params.spaceDistance ?? 2.5 },
+        ...patchLayers.map(l => ({ angle: l.space?.angle ?? 0, dist: l.space?.dist ?? 2.5 })),
+      ];
+      const out = spTransformSources(sources, pos, sp.layerMode === "additive" ? "additive" : "centered");
+      params.spaceAzimuth = out[0].angle;
+      params.spaceDistance = Math.max(0.3, out[0].dist);
+      params.layers = patchLayers.map((l, i) => ({
+        ...l,
+        space: { angle: out[i + 1].angle, dist: Math.max(0.3, out[i + 1].dist) },
+      }));
+    } else if (pos) {
       if (sp.mode === "offset") {
         params.spaceAzimuth = Math.max(-180, Math.min(180, (params.spaceAzimuth ?? 0) + pos.angle));
         params.spaceDistance = Math.max(0.3, Math.min(30, (params.spaceDistance ?? 2.5) + (pos.dist - 2.5)));
@@ -2146,25 +2167,101 @@ function ensureGlobalSpace() {
     arrangement.space = {
       enabled: false,
       mode: "override",
+      layerMode: "centered", // multi-layer handle behaviour: centered | additive
       head: { earDistance: 0.175, headDensity: 0.5, reverbType: arrangement.context.reverbType || "room" },
       tracks: {},
     };
   }
   if (!arrangement.space.tracks) arrangement.space.tracks = {};
+  if (!arrangement.space.layerMode) arrangement.space.layerMode = "centered";
   return arrangement.space;
 }
+
+// ── Multi-layer patches in the global space (owner 2026-07-08) ──
+// A patch whose sound has layers is a CONSTELLATION of sources (base +
+// layers), each with its own patch-space position. In the global space the
+// track's designer value acts as one GROUP HANDLE for the whole
+// constellation, in one of two modes:
+//   centered — the handle sits at the constellation's centre (ring at the
+//     average distance, notch at the average angle). Dragging it rotates
+//     every source together and scales every distance by the RATIO
+//     handle/centroid, so distances can never go negative.
+//   additive — the handle is a translation from the listener's centre
+//     (drawn slightly in front of the head so it can be grabbed); every
+//     source shifts by the same vector.
+
+function _spTrackVoiceParams(track) {
+  return (arrangement.palette || []).find(pl => pl.id === track.regions?.[0]?.paletteId)?.params
+    || track.instrumentParams || {};
+}
+
+// The patch's own constellation: base source first, then its layers.
+function _spTrackSources(vp) {
+  const sources = [{ angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 }];
+  for (const l of Array.isArray(vp.layers) ? vp.layers : []) {
+    sources.push({ angle: l.space?.angle ?? 0, dist: l.space?.dist ?? 2.5 });
+  }
+  return sources;
+}
+
+function _spIsMulti(vp) { return Array.isArray(vp.layers) && vp.layers.length > 0; }
+
+// Circular-mean angle + mean distance of a constellation.
+function _spCentroid(sources) {
+  let sx = 0, sy = 0, sd = 0;
+  for (const s of sources) {
+    const a = (s.angle ?? 0) * Math.PI / 180;
+    sx += Math.sin(a);
+    sy += Math.cos(a);
+    sd += s.dist ?? 2.5;
+  }
+  const angle = (Math.abs(sx) > 1e-9 || Math.abs(sy) > 1e-9) ? Math.atan2(sx, sy) * 180 / Math.PI : 0;
+  return { angle, dist: sd / Math.max(1, sources.length) };
+}
+
+// Apply the group handle to a constellation. Pure — shared by playback
+// (regionPlayParams) and both canvases, so what you see is what you hear.
+function spTransformSources(sources, handle, mode) {
+  if (mode === "additive") {
+    const ha = (handle.angle ?? 0) * Math.PI / 180;
+    const hd = Math.max(0, handle.dist ?? 0);
+    const tx = Math.sin(ha) * hd, tz = Math.cos(ha) * hd;
+    return sources.map(s => {
+      const a = (s.angle ?? 0) * Math.PI / 180;
+      const d = s.dist ?? 2.5;
+      const x = Math.sin(a) * d + tx, z = Math.cos(a) * d + tz;
+      return { angle: Math.atan2(x, z) * 180 / Math.PI, dist: Math.min(30, Math.hypot(x, z)) };
+    });
+  }
+  const cen = _spCentroid(sources);
+  const dA = (handle.angle ?? cen.angle) - cen.angle;
+  const k = Math.max(0.02, handle.dist ?? cen.dist) / Math.max(0.05, cen.dist);
+  return sources.map(s => {
+    let a = (s.angle ?? 0) + dA;
+    a = ((a + 180) % 360 + 360) % 360 - 180;
+    return { angle: a, dist: Math.max(0.05, Math.min(30, (s.dist ?? 2.5) * k)) };
+  });
+}
+if (typeof window !== "undefined") window.spTransformSources = spTransformSources;  // debug/validation hook
 
 const _SP_HUES = [36, 152, 205, 280, 0, 60, 320, 100];
 function _spHue(i) { return _SP_HUES[i % _SP_HUES.length]; }
 
-// Where a track sits at a beat: designer anchors (interpolated), else the
-// static position a free drag left it at, else the patch space. Offset
-// mode adds the designer value onto the patch position.
+// Where a track's HANDLE sits at a beat: designer anchors (interpolated),
+// else the static position a free drag left it at, else the patch space.
+// Offset mode adds the designer value onto the patch position. For a
+// multi-layer patch the handle is the group control: at rest it sits at
+// the constellation centroid (centered) or the listener centre (additive).
 function _spTrackPos(track, beat) {
   const sp = arrangement.space || {};
   const res = trackSpaceAt(sp.tracks?.[track.id], beat) || sp.static?.[track.id] || null;
-  const vp = (arrangement.palette || []).find(pl => pl.id === track.regions?.[0]?.paletteId)?.params
-    || track.instrumentParams || {};
+  const vp = _spTrackVoiceParams(track);
+  if (_spIsMulti(vp)) {
+    if (res) return res;
+    return sp.layerMode === "additive"
+      ? { angle: 0, dist: 0 }
+      : _spCentroid(_spTrackSources(vp));
+  }
   const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
   if (!res) return base;
   if (sp.mode === "offset") {
@@ -2174,6 +2271,17 @@ function _spTrackPos(track, beat) {
     };
   }
   return res;
+}
+
+// The transformed constellation a multi-layer track is ACTUALLY playing
+// from at this beat (null for single-source tracks).
+function _spTrackConstellation(track, beat, dragPos = null) {
+  const vp = _spTrackVoiceParams(track);
+  if (!_spIsMulti(vp)) return null;
+  const sp = arrangement.space || {};
+  const handle = dragPos || _spTrackPos(track, beat);
+  const mode = sp.layerMode === "additive" ? "additive" : "centered";
+  return spTransformSources(_spTrackSources(vp), handle, mode);
 }
 
 function spSmartArrange() {
@@ -2202,12 +2310,18 @@ function globalSpaceStripHTML(laneW) {
   const panel = _spOpen ? `
       <div class="tl2-row">
         <div class="tl2-head sp-left">
-          <canvas id="spSection" width="170" height="150" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here."></canvas>
+          <canvas id="spSection" width="170" height="150" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. A multi-layer patch shows its instruments as faint dots and one brighter HANDLE: in Centered mode the handle rides a ring at their average distance (drag to rotate them together or scale their distances); in Additive mode it sits just in front of your head and shifts them all by the same amount. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here."></canvas>
           <div class="sp-params">
             <label class="sp-ctl">Mode
               <select id="spMode" title="Override replaces each patch's own space; Offset adds the threads on top of it">
                 <option value="override"${sp.mode !== "offset" ? " selected" : ""}>Override</option>
                 <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset</option>
+              </select>
+            </label>
+            <label class="sp-ctl">Layers
+              <select id="spLayerMode" title="How a multi-layer patch's handle moves its instruments: Centered — the notch rides a ring at their average distance; dragging rotates them together and scales every distance by the same ratio (never negative). Additive — the handle is the patch's centre point (shown just in front of your head); dragging shifts every instrument by the same amount.">
+                <option value="centered"${sp.layerMode !== "additive" ? " selected" : ""}>Centered</option>
+                <option value="additive"${sp.layerMode === "additive" ? " selected" : ""}>Additive</option>
               </select>
             </label>
             <button class="sp-ctl sp-room-btn" id="spRoomToggle" title="The shared room every track sits in — open the designer to pick a room and bend its character">${_spRoomOpen ? "▾" : "▸"} Room · ${esc((REVERB_PROFILES[head.reverbType || arrangement.context.reverbType] || REVERB_PROFILES.room).label)}</button>
@@ -2293,31 +2407,82 @@ function drawSpSection() {
   ctx.moveTo(cx - 2, cy - headR + 0.5); ctx.lineTo(cx, cy - headR - 3); ctx.lineTo(cx + 2, cy - headR + 0.5);
   ctx.closePath(); ctx.fill();
   // track dots at the playhead — live during playback (curPlayBeat), and
-  // pulsing with each voice's real output level
+  // pulsing with each voice's real output level. Multi-layer tracks show
+  // their sources as fainter dots plus one GROUP HANDLE (ring + notch in
+  // centered mode; a head-centre handle drawn just in front in additive).
   const phBeat = curPlayBeat();
+  const xyOf = (p) => {
+    const rad = ((p.angle ?? 0) - 90) * Math.PI / 180;
+    const r = _spaceDistToR(Math.max(0.3, Math.min(30, p.dist ?? 2.5)), rMax);
+    return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r };
+  };
   arrangement.tracks.forEach((t, i) => {
     const drag = _spRock.drag;
-    const pos = (drag && drag.trackId === t.id) ? drag.pos : _spTrackPos(t, phBeat);
-    const rad = (pos.angle - 90) * Math.PI / 180;
-    const r = _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist)), rMax);
-    const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+    const dragPos = (drag && drag.trackId === t.id) ? drag.pos : null;
+    const pos = dragPos || _spTrackPos(t, phBeat);
     const seld = t.id === _spSelTrack;
     const hue = _spHue(i);
     const rms = _voiceRms(producerVoices.get(t.id));
-    if (rms > 0.012) {
-      const level = Math.min(1, rms * 2.6);
+    const constellation = _spTrackConstellation(t, phBeat, dragPos);
+    const glowAt = (x, y, strength) => {
+      if (rms <= 0.012) return;
+      const level = Math.min(1, rms * 2.6) * strength;
       const rGlow = 6 + 12 * level;
       const g = ctx.createRadialGradient(x, y, 0, x, y, rGlow);
       g.addColorStop(0, `hsla(${hue}, 85%, 65%, ${0.4 * level})`);
       g.addColorStop(1, `hsla(${hue}, 85%, 65%, 0)`);
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(x, y, rGlow, 0, 2 * Math.PI); ctx.fill();
+    };
+    if (constellation) {
+      // fainter, smaller dots = the instruments the handle represents —
+      // the sound comes from THESE, so the level glow rides them
+      for (const s of constellation) {
+        const p = xyOf(s);
+        glowAt(p.x, p.y, 0.85);
+        ctx.fillStyle = `hsla(${hue}, 70%, 62%, ${seld ? 0.55 : 0.4})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, 2 * Math.PI); ctx.fill();
+      }
+      const additive = (arrangement.space?.layerMode === "additive");
+      if (seld && !additive) {
+        // the ring the notch rides: the handle's distance around you
+        ctx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.5)`;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist ?? 2.5)), rMax), 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      const hp = _spHandleXY(pos, cx, cy, rMax, true);
+      ctx.fillStyle = `hsla(${hue}, 78%, ${seld ? 70 : 58}%, 1)`;
+      if (seld) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; }
+      ctx.beginPath(); ctx.arc(hp.x, hp.y, seld ? 5.5 : 4.5, 0, 2 * Math.PI); ctx.fill();
+      ctx.shadowBlur = 0;
+      // notch core: reads as a handle, not another instrument
+      ctx.fillStyle = "rgba(10,14,20,0.9)";
+      ctx.beginPath(); ctx.arc(hp.x, hp.y, 1.8, 0, 2 * Math.PI); ctx.fill();
+    } else {
+      const { x, y } = xyOf(pos);
+      glowAt(x, y, 1);
+      ctx.fillStyle = `hsla(${hue}, 70%, ${seld ? 68 : 55}%, ${seld ? 1 : 0.8})`;
+      if (seld) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; }
+      ctx.beginPath(); ctx.arc(x, y, seld ? 5.5 : 4, 0, 2 * Math.PI); ctx.fill();
+      ctx.shadowBlur = 0;
     }
-    ctx.fillStyle = `hsla(${hue}, 70%, ${seld ? 68 : 55}%, ${seld ? 1 : 0.8})`;
-    if (seld) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; }
-    ctx.beginPath(); ctx.arc(x, y, seld ? 5.5 : 4, 0, 2 * Math.PI); ctx.fill();
-    ctx.shadowBlur = 0;
   });
+}
+
+// Where a track's handle is DRAWN: normally its polar position; an additive
+// multi-layer handle at rest is the head centre, shown slightly in front of
+// the head so it can be seen and grabbed. Shared by drawing and hit-tests.
+function _spHandleXY(pos, cx, cy, rMax, multi) {
+  const sp = arrangement.space || {};
+  if (multi && sp.layerMode === "additive" && (pos.dist ?? 0) < 0.35) {
+    return { x: cx, y: cy - 16 };
+  }
+  const rad = ((pos.angle ?? 0) - 90) * Math.PI / 180;
+  const r = _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist ?? 2.5)), rMax);
+  return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r };
 }
 
 function drawSpCylinder(rockRad) {
@@ -2377,6 +2542,30 @@ function drawSpCylinder(rockRad) {
       ctx.stroke();
     }
     ctx.lineWidth = 1;
+    // multi-layer patches: ultra-thin threads for every source (base +
+    // layers) around the patch's main thread — the sound lives on these
+    const vp = _spTrackVoiceParams(t);
+    if (_spIsMulti(vp)) {
+      const sources0 = _spTrackSources(vp);
+      const mode = (arrangement.space?.layerMode === "additive") ? "additive" : "centered";
+      const paths = sources0.map(() => []);
+      for (let px = 0; px <= w; px += 6) {
+        const out = spTransformSources(sources0, _spTrackPos(t, px / pxPerBeat), mode);
+        out.forEach((s, si) => {
+          const a = s.angle * Math.PI / 180 + rockRad + roll;
+          paths[si].push([px, cy + Math.sin(a) * R * 0.85, Math.cos(a) > 0]);
+        });
+      }
+      for (const path of paths) {
+        ctx.beginPath();
+        path.forEach(([px, y], k) => k === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y));
+        ctx.lineWidth = 0.6;
+        const backMid = path[Math.floor(path.length / 2)]?.[2];
+        ctx.strokeStyle = `hsla(${hue}, 70%, 62%, ${backMid ? 0.18 : 0.32})`;
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+    }
     // anchor dots on the selected thread
     if (seld) {
       const anchors = arrangement.space?.tracks?.[t.id] || [];
@@ -2406,6 +2595,16 @@ function drawSpCylinder(rockRad) {
       const voice = producerVoices.get(t.id);
       if (!voice) return;
       const hue = t.hue ?? _spHue(i);
+      // The glow rides the SOURCE threads — for a multi-layer patch the
+      // sound is produced on the layer threads, not the group handle.
+      const glowPts = (beat) => {
+        const con = _spTrackConstellation(t, beat);
+        if (!con) return [yFor(t, beat)];
+        return con.map(s => {
+          const a = s.angle * Math.PI / 180 + rockRad + roll;
+          return { y: cy + Math.sin(a) * R * 0.85, back: Math.cos(a) > 0 };
+        });
+      };
       // decay constant from the sounding region's actual envelope + room
       const region = regionAtBeat(t, Math.floor(Math.max(0, map.beat)));
       const rp = region ? regionPlayParams(t, region, map.beat) : {};
@@ -2422,26 +2621,32 @@ function drawSpCylinder(rockRad) {
         const evBeat = map.beat - (map.t - ev.when) / beatSec;
         const x = xFor(evBeat);
         if (evBeat < 0 || x < -20 || x > w + 20) continue;
-        const p = yFor(t, evBeat);
-        const rGlow = 4 + 9 * level;
-        const g = ctx.createRadialGradient(x, p.y, 0, x, p.y, rGlow);
-        g.addColorStop(0, `hsla(${hue}, 85%, 65%, ${(p.back ? 0.22 : 0.38) * level})`);
-        g.addColorStop(1, `hsla(${hue}, 85%, 65%, 0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(x, p.y, rGlow, 0, 2 * Math.PI); ctx.fill();
+        const pts = glowPts(evBeat);
+        const shrink = pts.length > 1 ? 0.8 : 1;
+        for (const p of pts) {
+          const rGlow = (4 + 9 * level) * shrink;
+          const g = ctx.createRadialGradient(x, p.y, 0, x, p.y, rGlow);
+          g.addColorStop(0, `hsla(${hue}, 85%, 65%, ${(p.back ? 0.22 : 0.38) * level})`);
+          g.addColorStop(1, `hsla(${hue}, 85%, 65%, 0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, p.y, rGlow, 0, 2 * Math.PI); ctx.fill();
+        }
       }
       // "now" glow: the voice's real output level at the playhead
       const rms = _voiceRms(voice);
       if (rms > 0.012) {
         const level = Math.min(1, rms * 2.6);
         const x = xFor(map.beat);
-        const p = yFor(t, map.beat);
-        const rGlow = 5 + 13 * level;
-        const g = ctx.createRadialGradient(x, p.y, 0, x, p.y, rGlow);
-        g.addColorStop(0, `hsla(${hue}, 90%, 70%, ${0.5 * level})`);
-        g.addColorStop(1, `hsla(${hue}, 90%, 70%, 0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(x, p.y, rGlow, 0, 2 * Math.PI); ctx.fill();
+        const pts = glowPts(map.beat);
+        const shrink = pts.length > 1 ? 0.8 : 1;
+        for (const p of pts) {
+          const rGlow = (5 + 13 * level) * shrink;
+          const g = ctx.createRadialGradient(x, p.y, 0, x, p.y, rGlow);
+          g.addColorStop(0, `hsla(${hue}, 90%, 70%, ${0.5 * level})`);
+          g.addColorStop(1, `hsla(${hue}, 90%, 70%, 0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, p.y, rGlow, 0, 2 * Math.PI); ctx.fill();
+        }
       }
     });
     ctx.restore();
@@ -2540,6 +2745,12 @@ function wireGlobalSpace(v) {
     saveArrangement("global space mode");
     liveApply();
   };
+  const spLayerMode = v.querySelector("#spLayerMode");
+  if (spLayerMode) spLayerMode.onchange = () => {
+    ensureGlobalSpace().layerMode = spLayerMode.value;
+    saveArrangement("global space layer mode");
+    liveApply();
+  };
   const spSmooth = v.querySelector("#spSmooth");
   if (spSmooth) spSmooth.onchange = () => {
     const anchors = ensureGlobalSpace().tracks[_spSelTrack] || [];
@@ -2570,9 +2781,11 @@ function wireGlobalSpace(v) {
       let best = null;
       arrangement.tracks.forEach((t) => {
         const pos = _spTrackPos(t, curPlayBeat());
-        const rad = (pos.angle - 90) * Math.PI / 180;
-        const r = _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist)), g.rMax);
-        const d = Math.hypot(g.cx + Math.cos(rad) * r - g.x, g.cy + Math.sin(rad) * r - g.y);
+        // the HANDLE is the grabbable thing (for multi-layer patches the
+        // faint source dots are display-only — their sound is placed from
+        // the sub-note stage)
+        const hp = _spHandleXY(pos, g.cx, g.cy, g.rMax, _spIsMulti(_spTrackVoiceParams(t)));
+        const d = Math.hypot(hp.x - g.x, hp.y - g.y);
         if (d < 10 && (!best || d < best.d)) best = { t, d };
       });
       return best?.t || null;
@@ -2598,6 +2811,11 @@ function wireGlobalSpace(v) {
         // which is why anchoring never fired (owner bug report 07-07).
         if (!drag?.moved) return;
         const sp = ensureGlobalSpace();
+        // additive multi-layer handle: dropping near the head snaps back to
+        // rest (no translation) so the constellation returns home exactly
+        if (sp.layerMode === "additive" && _spIsMulti(_spTrackVoiceParams(t)) && drag.pos.dist <= 0.5) {
+          drag.pos = { angle: 0, dist: 0 };
+        }
         const anchors = sp.tracks[t.id];
         const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < 0.26);
         if (a) {
@@ -5555,6 +5773,14 @@ function renderExplore() {
   const visModeSwitch = v.querySelector("#visModeSwitch");
   if (visModeSwitch) {
     visModeSwitch.onclick = (e) => {
+      const tog = e.target.closest("[data-vistoggle]");
+      if (tog) {
+        // spectrum overlay: on/off, drawn faintly behind the active view
+        _visSpecOverlay = !_visSpecOverlay;
+        tog.classList.toggle("active", _visSpecOverlay);
+        if (!synth.isPlaying) drawStaticVis();
+        return;
+      }
       const btn = e.target.closest("[data-vismode]");
       if (!btn || btn.dataset.vismode === visMode) return;
       visMode = btn.dataset.vismode;
@@ -6122,26 +6348,9 @@ function renderExplore() {
     };
   });
   drawM2PresetArt();
+  drawM2SoundArt(); // sub-note browser: sound-module cards draw their partial recipes
   wireM2Lib(v); // V2.2 bottom browser (collapsed strip / expanded library)
   wireLaneHeads(v); // lane-key popovers (lanes display only)
-
-  // V2: instrument recipe cards (bottom row)
-  v.querySelectorAll("[data-inst-card]").forEach(btn => {
-    btn.onclick = () => {
-      const key = btn.dataset.instCard;
-      if (exploreParams.spectralProfile === key) return;
-      noteParamChange("spectralProfile", exploreParams.spectralProfile, key);
-      exploreParams.spectralProfile = key;
-      resetSpectralPartialParams(exploreParams);
-      if ((exploreParams.bodyType || "auto") === "auto") {
-        delete exploreParams.bodyBands;
-        _chBodySel = null;
-      }
-      synth.updateGenerationParams({ ...exploreParams });
-      renderExplore();
-    };
-  });
-  drawInstCards();
 
   // Checkbox param → section mapping for auto-switch
   const _checkToSection = {
@@ -6197,18 +6406,68 @@ function renderExplore() {
   };
 
   // Preset dropdown (12-tone mode)
-  const presetSel = v.querySelector("#scalePresetSelect");
-  if (presetSel) {
-    presetSel.onchange = () => {
-      exploreParams.scalePreset = presetSel.value;
-      const preset = SCALE_PRESETS[presetSel.value] || SCALE_PRESETS.major;
-      exploreParams.customDegrees = [...preset.degrees];
-      exploreParams.subScaleNotes = exploreParams.subScaleNotes.filter(d => preset.degrees.includes(d));
-      exploreParams.degreeTuning = null; // plain presets are equal-tempered — stale world tuning must not linger
-      rerenderNoteGrid(v);
-      syncRootNotesWithScale(v);
-      debouncedReplay();
+  // One searchable combo covers 12-tone presets AND world tunings.
+  const scaleCombo = v.querySelector("#scaleCombo");
+  if (scaleCombo) {
+    const comboBtn = scaleCombo.querySelector("#scaleComboBtn");
+    const comboPop = scaleCombo.querySelector("#scaleComboPop");
+    const comboSearch = scaleCombo.querySelector("#scaleComboSearch");
+    const comboFilter = () => {
+      const q = comboSearch.value.trim().toLowerCase();
+      scaleCombo.querySelectorAll("[data-scale-choice]").forEach(b => {
+        b.hidden = !!q && !b.textContent.toLowerCase().includes(q);
+      });
+      scaleCombo.querySelectorAll(".scale-combo-group").forEach(g => {
+        let sib = g.nextElementSibling, any = false;
+        while (sib && !sib.classList.contains("scale-combo-group")) {
+          if (!sib.hidden) any = true;
+          sib = sib.nextElementSibling;
+        }
+        g.hidden = !any;
+      });
     };
+    comboBtn.onclick = (e) => {
+      e.stopPropagation();
+      comboPop.hidden = !comboPop.hidden;
+      if (!comboPop.hidden) { comboSearch.value = ""; comboFilter(); comboSearch.focus(); }
+    };
+    comboSearch.oninput = comboFilter;
+    scaleCombo.querySelectorAll("[data-scale-choice]").forEach(b => {
+      b.onclick = () => {
+        const [kind, key] = b.dataset.scaleChoice.split(":");
+        if (kind === "p") {
+          const preset = SCALE_PRESETS[key] || SCALE_PRESETS.major;
+          exploreParams.scaleMode = "12tone";
+          exploreParams.scalePreset = key;
+          exploreParams.customDegrees = [...preset.degrees];
+          exploreParams.subScaleNotes = (exploreParams.subScaleNotes || []).filter(d => preset.degrees.includes(d));
+          exploreParams.degreeTuning = null; // plain presets are equal-tempered — stale world tuning must not linger
+          exploreParams.rootNotes = (exploreParams.rootNotes || [0]).filter(r => preset.degrees.includes(r));
+          if (!exploreParams.rootNotes.length) exploreParams.rootNotes = [preset.degrees[0] ?? 0];
+          _scaleComboWorld = null;
+        } else {
+          // world tuning: divisions + degrees + (where the tradition isn't
+          // equal-tempered) the per-degree pitch centres, in one pick
+          const s = CULTURAL_SCALES[key];
+          if (!s) return;
+          exploreParams.scaleMode = s.edo === 12 ? "12tone" : "edo";
+          exploreParams.edoDivisions = s.edo;
+          exploreParams.customDegrees = [...s.degrees];
+          exploreParams.subScaleNotes = [...(s.sub || [])];
+          exploreParams.rootNotes = [...(s.roots || [0])];
+          exploreParams.degreeTuning = s.tuning ? { ...s.tuning } : null;
+          _scaleComboWorld = key;
+        }
+        synth.updateGenerationParams({ ...exploreParams });
+        renderExplore();
+        debouncedReplay();
+      };
+    });
+    if (window._scaleComboDocClick) document.removeEventListener("click", window._scaleComboDocClick, true);
+    window._scaleComboDocClick = (e) => {
+      if (!comboPop.hidden && !e.target.closest("#scaleCombo")) comboPop.hidden = true;
+    };
+    document.addEventListener("click", window._scaleComboDocClick, true);
   }
 
   // EDO divisions input
@@ -6287,22 +6546,7 @@ function renderExplore() {
     };
   }
 
-  // World tuning systems: divisions + degrees + (where the tradition isn't
-  // equal-tempered) the per-degree pitch centres, in one pick.
-  const worldSel = v.querySelector("#worldScaleSelect");
-  if (worldSel) worldSel.onchange = () => {
-    const s = CULTURAL_SCALES[worldSel.value];
-    if (!s) return;
-    exploreParams.scaleMode = s.edo === 12 ? "12tone" : "edo";
-    exploreParams.edoDivisions = s.edo;
-    exploreParams.customDegrees = [...s.degrees];
-    exploreParams.subScaleNotes = [...(s.sub || [])];
-    exploreParams.rootNotes = [...(s.roots || [0])];
-    exploreParams.degreeTuning = s.tuning ? { ...s.tuning } : null;
-    synth.updateGenerationParams({ ...exploreParams });
-    renderExplore();
-    debouncedReplay();
-  };
+  // (World tunings live inside the scale preset combo above.)
 
   // Formant chips
   const formantChips = v.querySelector("#formantChips");
@@ -6525,22 +6769,55 @@ function renderExplore() {
 // preset strip runs along the bottom. Same params, same wiring hooks.
 let _macroMode = "melody";
 
+// Square icon cards per the phase-02 mock (audit renders): icon on top,
+// label under, accent colour per mechanism.
+const M2_RAIL_ICONS = {
+  scale: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="4" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="9.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="16.5" cy="18.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="7.5" cy="18.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="5" cy="9.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2.1"/></svg>`,
+  melody: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 15 Q7 4 11 11 T21 9"/><circle cx="3" cy="15" r="1.3" fill="currentColor" stroke="none"/><circle cx="11" cy="11" r="1.3" fill="currentColor" stroke="none"/><circle cx="21" cy="9" r="1.3" fill="currentColor" stroke="none"/></svg>`,
+  tuning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12h3.5M18 12h3.5"/></svg>`,
+  duration: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.5" y="3.5" width="7.4" height="7.4" rx="1.6"/><rect x="13.1" y="3.5" width="7.4" height="7.4" rx="1.6" fill="currentColor" stroke="none"/><rect x="3.5" y="13.1" width="7.4" height="7.4" rx="1.6" fill="currentColor" stroke="none"/><rect x="13.1" y="13.1" width="7.4" height="7.4" rx="1.6"/></svg>`,
+  dynamics: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4.5 18v-4M10 18V8M15.5 18V4.5M21 18v-7"/></svg>`,
+  sequence: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 3.5v3.6M12 16.9v3.6M3.5 12h3.6M16.9 12h3.6M6 6l2.4 2.4M18 6l-2.4 2.4M6 18l2.4-2.4M18 18l-2.4-2.4"/></svg>`,
+  percussion: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><ellipse cx="12" cy="8" rx="8" ry="3.1"/><path d="M4 8v8c0 1.7 3.6 3.1 8 3.1s8-1.4 8-3.1V8"/><path d="M12 11.1v7.9"/></svg>`,
+};
+
 function m2RailHTML() {
-  const item = (mode, label, cls = "") => `
-    <button class="m2-rail-btn ${cls}${_macroMode === mode ? " active" : ""}" data-m2-mode="${mode}">${label}</button>`;
+  const item = (mode, label, color = "", full = "") => `
+    <button class="m2-rail-btn${_macroMode === mode ? " active" : ""}" data-m2-mode="${mode}"${color ? ` style="--rail-c:${color}"` : ""}${full ? ` title="${full}"` : ""}>
+      <span class="m2-rail-icon">${M2_RAIL_ICONS[mode] || ""}</span>
+      <span class="m2-rail-label">${label}</span>
+    </button>`;
   return `
     <div class="m2-rail">
-      ${item("scale", "Scale &amp; Root", "m2-rail-top")}
+      ${item("scale", "Scale &amp; Root")}
       <div class="m2-rail-group">
         <div class="m2-rail-head">Macro Probability</div>
-        ${item("melody", `<i class="m2-dot" style="background:var(--gen)"></i>Melody`)}
-        ${item("tuning", `<i class="m2-dot" style="background:var(--surp)"></i>Tuning`)}
-        ${item("duration", `<i class="m2-dot" style="background:var(--blue)"></i>Duration`)}
-        ${item("dynamics", `<i class="m2-dot" style="background:var(--green)"></i>Dynamics`)}
+        <div class="m2-rail-grid">
+          ${item("melody", "Melody", "var(--gen)")}
+          ${item("tuning", "Tuning", "var(--surp)")}
+          ${item("duration", "Duration", "var(--blue)")}
+          ${item("dynamics", "Dynamics", "var(--green)")}
+        </div>
       </div>
-      ${item("sequence", "Markov Sequence<br/>&amp; Surprise", "m2-rail-top")}
-      ${item("percussion", "Percussion", "m2-rail-top")}
+      ${item("sequence", "Sequence &amp; Surprise", "", "Markov sequence & surprise")}
+      ${item("percussion", "Percussion")}
     </div>`;
+}
+
+// Which world tuning the combo last applied (a world pick rewrites mode/
+// divisions/degrees, so it can't be re-derived from params afterwards).
+let _scaleComboWorld = null;
+
+function _scaleComboLabel(p) {
+  if (_scaleComboWorld) {
+    // only trust the remembered world pick while the params still match it
+    const s = CULTURAL_SCALES[_scaleComboWorld];
+    const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
+    if (s && s.edo === div && JSON.stringify(s.degrees) === JSON.stringify(p.customDegrees)) return s.label;
+    _scaleComboWorld = null;
+  }
+  if (p.scaleMode === "edo") return `${p.edoDivisions || 12}-EDO custom`;
+  return SCALE_PRESETS[p.scalePreset]?.label || "Custom";
 }
 
 function m2ScaleInspectorHTML(p) {
@@ -6552,32 +6829,30 @@ function m2ScaleInspectorHTML(p) {
       <button class="mode-btn${p.scaleMode === 'edo' ? ' active' : ''}" data-smode="edo">N-EDO</button>
     </div>
     <div id="scaleOptions">
-      ${p.scaleMode !== 'edo' ? `
-        <div class="scale-preset-row">
-          <label class="text-sm">Preset
-            <select id="scalePresetSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem">
-              ${Object.entries(SCALE_PRESETS).map(([k, v]) =>
-                `<option value="${k}" ${p.scalePreset === k ? 'selected' : ''}>${v.label}</option>`
-              ).join('')}
-            </select>
-          </label>
+      <div class="scale-preset-row">
+        <span class="text-sm" style="color:var(--text2)">Preset</span>
+        <div class="scale-combo" id="scaleCombo">
+          <button type="button" class="scale-combo-btn" id="scaleComboBtn" title="Scale presets and world tunings in one list — open and type to search">${esc(_scaleComboLabel(p))}<span class="scale-combo-caret">▾</span></button>
+          <div class="scale-combo-pop" id="scaleComboPop" hidden>
+            <input type="search" class="scale-combo-search" id="scaleComboSearch" placeholder="Search scales &amp; tunings…"/>
+            <div class="scale-combo-list" id="scaleComboList">
+              <div class="scale-combo-group">12-tone presets</div>
+              ${Object.entries(SCALE_PRESETS).map(([k, s]) =>
+                `<button type="button" class="scale-combo-opt${p.scaleMode !== 'edo' && !_scaleComboWorld && p.scalePreset === k ? " sel" : ""}" data-scale-choice="p:${k}">${esc(s.label)}</button>`).join("")}
+              <div class="scale-combo-group">World tunings</div>
+              ${Object.entries(CULTURAL_SCALES).map(([k, s]) =>
+                `<button type="button" class="scale-combo-opt${_scaleComboWorld === k ? " sel" : ""}" data-scale-choice="w:${k}" title="${esc(s.description || s.label)}">${esc(s.label)}<i class="scale-combo-note">${s.edo}-EDO</i></button>`).join("")}
+            </div>
+          </div>
         </div>
-      ` : `
+      </div>
+      ${p.scaleMode === 'edo' ? `
         <div class="edo-row">
           <span class="text-sm" style="color:var(--text2)">Divisions:</span>
           <input type="number" id="edoDivisionsInput" class="edo-input"
                  min="3" max="48" value="${p.edoDivisions}"/>
         </div>
-      `}
-      <div class="scale-preset-row">
-        <label class="text-sm">World tunings
-          <select id="worldScaleSelect" class="form-select" style="width:auto;display:inline-block;margin-left:0.5rem" title="Tuning systems from different traditions — each sets the divisions, the scale, and (where the tradition isn't equal-tempered) the real pitch centre of every degree">
-            <option value="">—</option>
-            ${Object.entries(CULTURAL_SCALES).map(([k, s]) =>
-              `<option value="${k}">${s.label}</option>`).join("")}
-          </select>
-        </label>
-      </div>
+      ` : ""}
     </div>
     <div id="noteGridContainer">${buildNoteGridHTML(p)}</div>
     <div class="note-grid-legend">
@@ -6593,8 +6868,8 @@ function m2ScaleInspectorHTML(p) {
       ${controlRow("rootPullShape", "Pull shape", p.rootPullShape, 0, 1, 0.01)}
     </div>
     <div class="dist-display" id="distRoot">
-      <canvas class="dist-canvas" id="cvRoot" width="240" height="72"></canvas>
-      <span class="dist-label">Root pull</span>
+      <canvas class="dist-canvas" id="cvRoot" width="240" height="96" style="height:96px" title="${esc(UI_DESC.cvRoot || "How strongly root pull acts across the phrase.")}"></canvas>
+      <span class="dist-label">pull toward the root across each motif phrase</span>
     </div>`;
 }
 
@@ -6639,6 +6914,8 @@ function m2InspectorHTML(p) {
 }
 
 function m2ChipsHTML(p) {
+  // spectrum/motif retired as modes — normalize any stale state to lanes
+  if (visMode !== "lanes" && visMode !== "pianoroll") visMode = "lanes";
   const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
   const scaleName = p.scaleMode === "edo"
     ? `${(p.customDegrees || []).length}/${div} degrees`
@@ -6652,10 +6929,9 @@ function m2ChipsHTML(p) {
       <span class="m2-chip">${div}-EDO</span>
       <button class="m2-chip m2-chip-link" id="m2OpenScaleLab" title="Open the tuning workshop">Open Scale Lab ↗</button>
       <div class="vis-mode-switch" id="visModeSwitch">
-        <button class="vis-mode-btn${visMode === "lanes" ? " active" : ""}" data-vismode="lanes">Lanes</button>
-        <button class="vis-mode-btn${visMode === "spectrum" ? " active" : ""}" data-vismode="spectrum">Spec</button>
-        <button class="vis-mode-btn${visMode === "motifs" ? " active" : ""}" data-vismode="motifs">Motif</button>
-        <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll">Roll</button>
+        <button class="vis-mode-btn${visMode === "lanes" ? " active" : ""}" data-vismode="lanes" title="Behaviour timeline — history and the possible future field (motif structure lives here too)">Lanes</button>
+        <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll" title="Scrolling piano roll of the realized notes">Roll</button>
+        <button class="vis-mode-btn vis-spec-toggle${_visSpecOverlay ? " active" : ""}" data-vistoggle="spec" title="Overlay the live frequency response faintly behind the current view — no information lost to a separate mode">Spec</button>
       </div>
     </div>`;
 }
@@ -6695,10 +6971,26 @@ function m2LibEntries() {
 function m2LibFiltered() {
   const favs = loadFavs();
   const q = _m2Lib.search.trim().toLowerCase();
-  return m2LibEntries().filter(e =>
-    (_m2Lib.fam === "all" || e.family === _m2Lib.fam || e.section === _m2Lib.fam) &&
+  const soundMode = m2SoundMode();
+  // Sub-note mode: the factory tab leads with the instrument recipes, and
+  // sound modules sort ahead of full patches (which still load/drag in —
+  // only their sound half comes across). Behaviour-family chips are a
+  // macro concept, so the fam filter is ignored here.
+  const entries = soundMode && _m2Lib.tab === "factory"
+    ? [
+        ...Object.entries(SPECTRAL_PROFILES).map(([k, prof]) => ({
+          id: `r:${k}`, name: prof.label, section: "sound", family: null, rating: null,
+          parameters: null, desc: `${prof.label} recipe — partial levels, envelope and performance defaults`,
+        })),
+        ...m2LibEntries(),
+      ]
+    : m2LibEntries();
+  const rows = entries.filter(e =>
+    (soundMode || _m2Lib.fam === "all" || e.family === _m2Lib.fam || e.section === _m2Lib.fam) &&
     (!_m2Lib.favOnly || favs.has(e.id)) &&
     (!q || e.name.toLowerCase().includes(q) || (e.desc || "").toLowerCase().includes(q)));
+  if (soundMode) rows.sort((a, b) => (a.section === "sound" ? 0 : 1) - (b.section === "sound" ? 0 : 1));
+  return rows;
 }
 
 function m2LibRowsHTML() {
@@ -6710,29 +7002,59 @@ function m2LibRowsHTML() {
   if (!rows.length) return '<div class="empty-state">Nothing matches — clear the search or filters.</div>';
   return rows.map(e => {
     const splits = e.parameters ? splitsBucketOf(e.parameters) : null;
+    const layerCount = Array.isArray(e.parameters?.layers) ? e.parameters.layers.length : 0;
     return `
-    <div class="m2-lib-row" title="${esc(e.desc || e.name)}">
+    <div class="m2-lib-row" draggable="true" data-m2-drag="${esc(e.id)}" title="${esc(e.desc || e.name)} — drag onto the LAYERS strip to stack its sound onto this instrument">
       <span class="m2-lib-name">${esc(e.name)}</span>
       <span class="m2-lib-tags">
         <i class="m2-tag">${esc(PRESET_SECTIONS[e.section]?.label || (e.section === "full" ? "Full rig" : e.section))}</i>
         ${e.family ? `<i class="m2-tag">${esc(e.family)}</i>` : ""}
         ${splits && splits !== "all" ? `<i class="m2-tag">${esc(splits)} splits</i>` : ""}
+        ${layerCount ? `<i class="m2-tag m2-tag-layers" title="Base sound plus ${layerCount} layered sub-note source${layerCount > 1 ? "s" : ""}">+${layerCount} layer${layerCount > 1 ? "s" : ""}</i>` : ""}
       </span>
       <span class="m2-lib-stars" title="${e.rating ? `rated ${e.rating}/7 when saved` : "no rating yet"}">${e.rating ? `★ ${e.rating}/7` : "☆ –"}</span>
       <button class="m2-lib-heart${favs.has(e.id) ? " on" : ""}" data-m2-fav="${esc(e.id)}" title="Favourite — pin it to the ♥ filter">♥</button>
-      <button class="btn btn-secondary btn-sm" data-m2-load="${esc(e.id)}" title="${e.section === "full" ? "Load the whole rig" : "Apply just this section, keeping everything else"}">Load</button>
+      <button class="btn btn-secondary btn-sm" data-m2-load="${esc(e.id)}" title="${m2SoundMode()
+        ? (e.section === "full" ? "Load just this patch's sound module (its sub-note half) as the base sound" : "Load this sound module as the base sound")
+        : (e.section === "full" ? "Load the whole rig" : "Apply just this section, keeping everything else")}">Load</button>
     </div>`;
   }).join("");
 }
 
-function m2PresetStripHTML() {
+// Sub-note browser mode: in the sub-note workspace the browser IS the
+// instrument selection — its catalogue defaults to sound modules (factory
+// recipes + saved sub-note module presets), and full patches contribute
+// only their sound half when clicked or dragged in.
+function m2SoundMode() { return workspaceTab === "subnote"; }
+
+// The sub-note browser's collapsed catalogue: factory instrument recipes
+// plus the user's saved sub-note modules.
+function m2SoundModules() {
+  const recipes = Object.entries(SPECTRAL_PROFILES).map(([k, prof]) => ({
+    id: `r:${k}`, name: prof.label, kind: "instrument", profileKey: k,
+    desc: `${prof.label} recipe — partial levels, envelope and performance defaults; everything stays editable`,
+  }));
+  const mine = loadPresets().filter(e => (e.section || "full") === "sound").map(e => ({
+    id: `m:${e.id}`, name: e.name, kind: "my module",
+    profileKey: e.parameters?.spectralProfile || null,
+    desc: "Your saved sub-note module",
+  }));
+  return [...recipes, ...mine];
+}
+
+function m2PresetStripHTML(withSave = true) {
   const favs = loadFavs();
+  const soundMode = m2SoundMode();
   const famChip = (k, label) => `<button class="m2-lib-chip${_m2Lib.fam === k ? " active" : ""}" data-m2-fam="${k}">${label}</button>`;
   const fulls = FACTORY_PRESETS.filter(f => f.section === "full" &&
     (_m2Lib.fam === "all" || f.family === _m2Lib.fam) &&
     (!_m2Lib.favOnly || favs.has(`f:${f.id}`)));
+  const soundCards = soundMode
+    ? m2SoundModules().filter(m => !_m2Lib.favOnly || favs.has(m.id))
+    : [];
   return `
     <div class="m2-lib${_m2Lib.open ? " open" : ""}" id="m2Lib">
+      ${soundMode ? `<div class="m2-drop-layer" id="m2DropLayer" hidden>⊕ drop here to add as a layer — its sound comes across, your room &amp; head stay</div>` : ""}
       <div class="m2-lib-head">
         <span class="m2-lib-title">BROWSER</span>
         <button class="m2-lib-chip m2-lib-expand" id="m2LibToggle" title="${_m2Lib.open ? "Back to the compact strip" : "Open the full library — factory, your saves, and the shared community"}">${_m2Lib.open ? "▾ Collapse" : "▴ Browse all"}</button>
@@ -6742,8 +7064,9 @@ function m2PresetStripHTML() {
             `<button class="m2-lib-chip m2-lib-tab${_m2Lib.tab === k ? " active" : ""}" data-m2-tab="${k}">${label}</button>`).join("")}
         </span>
         <input type="search" id="m2LibSearch" class="m2-lib-search" placeholder="Search…" value="${esc(_m2Lib.search)}"/>` : ""}
-        ${famChip("all", "All")}${famChip("percussive", "Percussive")}${famChip("bass", "Bass")}${famChip("atmos", "Atmos")}${famChip("melody", "Melody")}
+        ${soundMode ? "" : `${famChip("all", "All")}${famChip("percussive", "Percussive")}${famChip("bass", "Bass")}${famChip("atmos", "Atmos")}${famChip("melody", "Melody")}`}
         <button class="m2-lib-chip m2-lib-fav${_m2Lib.favOnly ? " active" : ""}" id="m2LibFavOnly" title="Only favourites">♥</button>
+        ${withSave ? `
         <span class="m2-lib-save">
           <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
           <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
@@ -6751,13 +7074,22 @@ function m2PresetStripHTML() {
             ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
           </select>
           <button class="btn btn-primary btn-sm" id="saveBtn">Save</button>
-        </span>
+        </span>` : ""}
       </div>
       ${_m2Lib.open
         ? `<div class="m2-lib-list" id="m2LibList">${m2LibRowsHTML()}</div>`
-        : `<div class="m2-presets" id="m2Presets">
+        : soundMode
+          ? `<div class="m2-presets" id="m2Presets">
+              ${soundCards.map(m => `
+                <button class="m2-preset${m.profileKey === exploreParams.spectralProfile && m.kind === "instrument" ? " sel" : ""}" data-m2-sound="${esc(m.id)}" draggable="true" data-m2-drag="${esc(m.id)}" title="${esc(m.desc)} — click to make it the base sound, or drag onto the LAYERS strip to stack it">
+                  <span class="m2-preset-name">${esc(m.name)}</span>
+                  <canvas data-m2-sound-art="${esc(m.id)}" width="180" height="40"></canvas>
+                  <span class="m2-preset-fam">${esc(m.kind)}</span>
+                </button>`).join("") || '<div class="empty-state">No favourites yet — open ▴ Browse all and ♥ some sounds.</div>'}
+            </div>`
+          : `<div class="m2-presets" id="m2Presets">
             ${fulls.map(f => `
-              <button class="m2-preset" data-m2-preset="${esc(f.id)}" title="${esc(f.description || f.name)} — click to load the full rig">
+              <button class="m2-preset" data-m2-preset="${esc(f.id)}" draggable="true" data-m2-drag="f:${esc(f.id)}" title="${esc(f.description || f.name)} — click to load the full rig, or drag onto the LAYERS strip to stack its sound onto this instrument">
                 <span class="m2-preset-name">${esc(f.name)}</span>
                 <canvas data-m2-art="${esc(f.id)}" width="180" height="40"></canvas>
                 <span class="m2-preset-fam">${esc(f.family || "")}</span>
@@ -6766,9 +7098,119 @@ function m2PresetStripHTML() {
     </div>`;
 }
 
+// Resolve a browser drag id (r:/f:/m:/g: prefixed) to its preset parameters,
+// independent of which library tab is currently showing. Recipe ids (r:)
+// synthesize a clean sound module from the instrument profile.
+function m2PresetParamsById(id) {
+  if (!id) return null;
+  if (id.startsWith("r:")) {
+    const key = id.slice(2);
+    if (!SPECTRAL_PROFILES[key]) return null;
+    const params = { ...extractSectionParams(DEFAULTS, "sound"), spectralProfile: key };
+    resetSpectralPartialParams(params);
+    return params;
+  }
+  if (id.startsWith("f:")) return FACTORY_PRESETS.find(f => `f:${f.id}` === id)?.parameters || null;
+  if (id.startsWith("m:")) return loadPresets().find(e => `m:${e.id}` === id)?.parameters || null;
+  if (id.startsWith("g:")) return (_m2LibCommunity || []).find((e, i) => `g:${e.id ?? i}` === id)?.parameters || null;
+  return null;
+}
+
+// Load a browser entry as the BASE sound (sub-note mode): a recipe re-seats
+// the instrument exactly like the old instrument cards did; any preset —
+// sound module or full patch — contributes only its sound half. The shared
+// space (room, head, air) and the macro half stay untouched.
+function loadSoundModuleById(id) {
+  if (id.startsWith("r:")) {
+    const key = id.slice(2);
+    if (!SPECTRAL_PROFILES[key] || exploreParams.spectralProfile === key) return;
+    noteParamChange("spectralProfile", exploreParams.spectralProfile, key);
+    exploreParams.spectralProfile = key;
+    resetSpectralPartialParams(exploreParams);
+    if ((exploreParams.bodyType || "auto") === "auto") {
+      delete exploreParams.bodyBands;
+      _chBodySel = null;
+    }
+  } else {
+    const params = m2PresetParamsById(id);
+    if (!params) return;
+    const sound = extractSectionParams(migrateToneParams({ ...params }), "sound");
+    for (const k of Object.keys(sound)) if (k.startsWith("layer")) delete sound[k];
+    if (!Object.keys(sound).length) return;
+    Object.assign(exploreParams, sound);
+    if ((exploreParams.bodyType || "auto") === "auto") {
+      delete exploreParams.bodyBands;
+      _chBodySel = null;
+    }
+  }
+  synth.updateGenerationParams({ ...exploreParams });
+  renderExplore();
+}
+
+// Add a browser preset as layer(s): its sound half becomes a new layer, and
+// any layers the preset carries ride along. Only the sound module comes
+// across (plus per-layer position) — the shared space (room, head, air)
+// stays the instrument's own.
+function addPresetAsLayers(params) {
+  if (!params) return false;
+  exitLayerEdit(false);
+  if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
+  const pushLayer = (sourceParams, space, gain) => {
+    const subnote = { ...sourceParams };
+    for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k];
+    if (!Object.keys(subnote).length) return false;
+    exploreParams.layers.push({
+      id: crypto.randomUUID(),
+      hue: (36 + exploreParams.layers.length * 70) % 360,
+      subnote,
+      space,
+      gain,
+    });
+    return true;
+  };
+  let added = pushLayer(
+    extractSectionParams(params, "sound"),
+    // position is a layer's own space property — take the preset's if saved
+    {
+      angle: params.spaceAzimuth ?? (exploreParams.spaceAzimuth ?? 0),
+      dist: params.spaceDistance ?? (exploreParams.spaceDistance ?? 2.5),
+    },
+    0.8);
+  for (const l of Array.isArray(params.layers) ? params.layers : []) {
+    if (!l || typeof l !== "object" || !l.subnote) continue;
+    added = pushLayer(
+      { ...l.subnote },
+      { angle: l.space?.angle ?? 0, dist: l.space?.dist ?? 2.5 },
+      l.gain ?? 0.8) || added;
+  }
+  if (!added) return false;
+  _chLayerSel = exploreParams.layers[exploreParams.layers.length - 1].id;
+  synth.updateGenerationParams({ ...exploreParams });
+  renderExplore();
+  return true;
+}
+
+// Make an element accept browser-preset drops as new layers.
+function bindLayerDropTarget(target) {
+  target.ondragover = (e) => {
+    if (![...e.dataTransfer.types].includes("application/x-preset-id")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    target.classList.add("drop-ok");
+  };
+  target.ondragleave = () => target.classList.remove("drop-ok");
+  target.ondrop = (e) => {
+    e.preventDefault();
+    target.classList.remove("drop-ok");
+    addPresetAsLayers(m2PresetParamsById(e.dataTransfer.getData("application/x-preset-id")));
+  };
+}
+
 function wireM2Lib(v) {
   const lib = v.querySelector("#m2Lib");
   if (!lib) return;
+  const dropZone = v.querySelector("#m2DropLayer");
+  if (dropZone) bindLayerDropTarget(dropZone);
   const toggle = v.querySelector("#m2LibToggle");
   if (toggle) toggle.onclick = () => { _m2Lib.open = !_m2Lib.open; renderExplore(); };
   v.querySelectorAll("[data-m2-tab]").forEach(btn => {
@@ -6796,7 +7238,25 @@ function wireM2Lib(v) {
   wireM2LibList(v);
 }
 
+// Preset drag-out: cards and rows carry their library id; the LAYERS strip
+// in the sub-note view accepts the drop (sound half only — shared space
+// stays with the instrument).
+function wireM2Drag(v) {
+  const dropZone = document.getElementById("m2DropLayer");
+  v.querySelectorAll("[data-m2-drag]").forEach(el => {
+    el.ondragstart = (e) => {
+      e.dataTransfer.setData("application/x-preset-id", el.dataset.m2Drag);
+      e.dataTransfer.effectAllowed = "copy";
+      // A drop target the drag can always reach — the expanded library
+      // covers the LAYERS strip, so a floating zone appears while dragging.
+      if (dropZone) dropZone.hidden = false;
+    };
+    el.ondragend = () => { if (dropZone) dropZone.hidden = true; };
+  });
+}
+
 function wireM2LibList(v) {
+  wireM2Drag(v);
   v.querySelectorAll("[data-m2-fav]").forEach(btn => {
     btn.onclick = () => {
       const favs = loadFavs();
@@ -6808,7 +7268,9 @@ function wireM2LibList(v) {
   });
   v.querySelectorAll("[data-m2-load]").forEach(btn => {
     btn.onclick = () => {
-      const entry = m2LibEntries().find(e => e.id === btn.dataset.m2Load);
+      const id = btn.dataset.m2Load;
+      if (m2SoundMode()) { loadSoundModuleById(id); return; }
+      const entry = m2LibEntries().find(e => e.id === id);
       if (!entry || !entry.parameters) return;
       const wasPlaying = synth.isPlaying;
       exploreParams = mergedPresetParams({ parameters: { ...entry.parameters }, section: entry.section || "full" });
@@ -6816,11 +7278,18 @@ function wireM2LibList(v) {
       if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
     };
   });
+  // Sub-note mode: the collapsed strip's sound cards load on click
+  v.querySelectorAll("[data-m2-sound]").forEach(btn => {
+    btn.onclick = () => loadSoundModuleById(btn.dataset.m2Sound);
+  });
 }
 
-// Behaviour signature sparkline: the preset's melody interval shape
-// (peakedness × range) with its rhythm grid ticked underneath — drawn
-// from the preset's actual parameters, not decoration.
+// Behaviour signature (owner 07-08): one melodic contour line per preset,
+// rolled deterministically from its own parameters — amplitude from the
+// interval range, smooth curve vs zig-zag from the interval shape, arcs and
+// runs from momentum, a soft slack band from hit accuracy × SD, and the
+// line's COLOUR is the surprise heat (teal = tame → red = volatile), with a
+// warm wash behind high-surprise patches. Same params → same picture.
 function drawM2PresetArt() {
   const fulls = FACTORY_PRESETS.filter(f => f.section === "full");
   for (const f of fulls) {
@@ -6830,27 +7299,64 @@ function drawM2PresetArt() {
     const w = cv.width, h = cv.height;
     ctx.clearRect(0, 0, w, h);
     const P = f.parameters || {};
-    const k = Math.max(0.2, P.intervalPeakedness ?? 2);
-    const R = Math.max(1, P.intervalRange ?? 7);
-    ctx.beginPath();
-    for (let px = 0; px <= w; px += 2) {
-      const x = (px / w) * 2 - 1;                    // -1..1 across the range
-      const y = Math.exp(-Math.pow(Math.abs(x) * R / 3, k));
-      const yy = h - 12 - y * (h - 18);
-      px === 0 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
+    let seed = 0;
+    for (const ch of f.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    const rng = _fieldRng(seed || 1);
+    const range = clamp((Number(P.intervalRange ?? 7)) / 14, 0.15, 1);
+    const smooth = clamp((Number(P.intervalPeakedness ?? 2)) / 4, 0, 1);   // 1 = stepwise
+    const momentum = clamp(Number(P.momentum ?? 0), 0, 1);
+    const surprise = clamp(Number(P.surpriseProb ?? 0), 0, 1);
+    const slack = clamp((1 - (Number(P.motifHitProb ?? 0.9))) * (Number(P.motifHitRange ?? 2)) / 2.5, 0, 1);
+
+    // surprise wash: volatile patches sit on a warm field
+    if (surprise > 0.02) {
+      const g = ctx.createLinearGradient(0, h, w, 0);
+      g.addColorStop(0, "rgba(229,110,60,0)");
+      g.addColorStop(1, `rgba(229,96,60,${(0.04 + surprise * 0.30).toFixed(3)})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
     }
-    ctx.strokeStyle = "rgba(245,166,35,0.8)";
-    ctx.lineWidth = 1.6;
+
+    // the contour: a seeded walk shaped by the preset's own melody params
+    const n = 15;
+    const mid = h * 0.56, amp = h * 0.34 * range;
+    const pts = [];
+    let y = (rng() - 0.5) * 0.4, dir = 0;
+    for (let i = 0; i < n; i++) {
+      let step = (rng() * 2 - 1) * (0.35 + (1 - smooth) * 0.75);
+      step += dir * momentum * 0.7;                    // momentum → arcs and runs
+      y = clamp(y + step, -1, 1);
+      if (step !== 0) dir = Math.sign(step);
+      pts.push([4 + (i / (n - 1)) * (w - 8), mid - y * amp]);
+    }
+    const tracePath = () => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      if (smooth > 0.45) {
+        // stepwise patches read as a flowing arc
+        for (let i = 1; i < n; i++) {
+          const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+          ctx.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+        }
+        ctx.lineTo(pts[n - 1][0], pts[n - 1][1]);
+      } else {
+        // jumpy patches read as a zig-zag
+        for (let i = 1; i < n; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      }
+    };
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    if (slack > 0.03) {
+      // hit slack: a soft band of where the line may actually land
+      ctx.strokeStyle = heatColor(surprise, 0.16);
+      ctx.lineWidth = 3 + slack * 9;
+      tracePath();
+      ctx.stroke();
+    }
+    ctx.strokeStyle = heatColor(surprise, 0.92);      // colour IS the surprise heat
+    ctx.lineWidth = 1.7;
+    tracePath();
     ctx.stroke();
-    const divs = Math.max(1, Math.round(P.beatDivisions ?? 2));
-    const gap = clamp(P.gapProb ?? 0.2, 0, 1);
-    const ticks = 4 * divs;
-    ctx.fillStyle = "rgba(96,165,250,0.75)";
-    for (let i = 0; i < ticks; i++) {
-      if ((i * 7 + 3) % 11 / 11 < gap) continue;     // deterministic rest pattern
-      const x = (i + 0.5) * (w / ticks);
-      ctx.fillRect(x, h - 8, 2, 6);
-    }
   }
 }
 
@@ -6859,6 +7365,9 @@ function macroWorkspaceHTML(p) {
     <div class="card macro2-card">
       <div class="m2-main">
         ${m2RailHTML()}
+        <!-- Owner 07-08: the controls panel sits beside the rail (icon → its
+             controls → the display), not stranded on the far side. -->
+        <div class="m2-inspector" id="m2Inspector">${m2InspectorHTML(p)}</div>
         <div class="m2-center">
           ${m2ChipsHTML(p)}
           <div class="visualiser-wrap vis-mode-${visMode} m2-visual">
@@ -6890,7 +7399,6 @@ function macroWorkspaceHTML(p) {
             </div>
           </div>
         </div>
-        <div class="m2-inspector" id="m2Inspector">${m2InspectorHTML(p)}</div>
       </div>
       ${m2PresetStripHTML()}
     </div>
@@ -6922,7 +7430,7 @@ function macroPanelHTML(p) {
         </div>
         <div class="macro-monitor">
           <div class="monitor-title">Tuning Deviation (Cents)</div>
-          <canvas class="dist-canvas accuracy-canvas" id="cvTuningAccuracy" width="620" height="300"></canvas>
+          <canvas class="dist-canvas accuracy-canvas" id="cvTuningAccuracy" width="620" height="220"></canvas>
         </div>
       </div>`;
   }
@@ -6953,7 +7461,7 @@ function macroPanelHTML(p) {
         </div>
         <div class="macro-monitor duration-monitor">
           <div class="monitor-title">Duration Difference (Divisions)</div>
-          <canvas class="dist-canvas accuracy-canvas" id="cvDurationAccuracy" width="620" height="260"></canvas>
+          <canvas class="dist-canvas accuracy-canvas" id="cvDurationAccuracy" width="620" height="220"></canvas>
           <div class="breaks-block">
             <div class="section-label">Breaks & Slides</div>
             <div class="breaks-grid">
@@ -7010,7 +7518,7 @@ function macroPanelHTML(p) {
         </div>
         <div class="macro-monitor">
           <div class="monitor-title">Dynamic Difference (%)</div>
-          <canvas class="dist-canvas accuracy-canvas" id="cvDynamicsAccuracy" width="620" height="300"></canvas>
+          <canvas class="dist-canvas accuracy-canvas" id="cvDynamicsAccuracy" width="620" height="220"></canvas>
         </div>
       </div>`;
   }
@@ -7062,7 +7570,7 @@ function macroPanelHTML(p) {
       </div>
       <div class="macro-monitor melody-monitor">
         <div class="monitor-title">Scale Degree Difference (Steps)</div>
-        <canvas class="dist-canvas accuracy-canvas" id="cvMelodyAccuracy" width="620" height="340"></canvas>
+        <canvas class="dist-canvas accuracy-canvas" id="cvMelodyAccuracy" width="620" height="220"></canvas>
       </div>
     </div>`;
 }
@@ -7151,7 +7659,7 @@ function layerStripHTML(p, compact = false) {
     <div class="layer-strip" id="layerStrip">
       <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
       <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer underneath">＋</button>
-      <span class="layer-strip-note">${layers.length ? `${layers.length} layer${layers.length > 1 ? "s" : ""} on the stage above — drag the dots to place them; switch to another stage to edit their sound` : "no layers yet — ＋ captures the current sound as a layer you can place on the stage"}</span>
+      <span class="layer-strip-note">${layers.length ? `${layers.length} layer${layers.length > 1 ? "s" : ""} on the stage above — drag the dots to place them; switch to another stage to edit their sound` : "no layers yet — ＋ captures the current sound as a layer, or drag a preset from the browser below"}</span>
     </div>`;
   }
   // Owner refinement 07-07: each row = mini head diagram + two lines —
@@ -7184,6 +7692,7 @@ function layerStripHTML(p, compact = false) {
     <div class="layer-strip" id="layerStrip">
       <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
       <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer underneath">＋</button>
+      ${layers.length ? "" : `<span class="layer-strip-note">＋ captures the current sound as a layer — or drag a preset from the browser below (its sound comes across; the shared room and head stay yours)</span>`}
     </div>
     ${layers.length ? `
     <div class="layer-area">
@@ -7264,15 +7773,11 @@ function subnoteWorkspaceHTML(p) {
                 <h2>${esc(profile.label)}</h2>
               </div>
               ${_chLayerEdit ? `<button class="btn btn-primary btn-sm" id="layerEditDone" title="Save this sound back into the layer and return to the base sound">Done — back to base</button>` : ""}
-              <div class="ch-head-mid">
-                <select data-param-select="spectralProfile" class="param-select" title="Starting points — carefully shaped instruments to depart from; tweak anything, then save the result as your own instrument">
-                  ${spectralProfileOptions(p.spectralProfile)}
-                </select>
-                <label class="ch-mix">mix
-                  <input type="range" data-param="spectralMix" min="0" max="1" step="0.01" value="${p.spectralMix}"/>
-                  <output id="out_spectralMix">${fmtOutput("spectralMix", p.spectralMix)}</output>
-                </label>
-              </div>
+              <!-- Owner 07-08: no preset dropdown or mix slider here — the
+                   instrument cards below are the one place a recipe is
+                   chosen, and spectralMix is a legacy blend (in the fourier
+                   voice it is only a flat gain on the tone print), so it
+                   rides along in presets without a control. -->
               <div class="ch-readout">f₀ <b>${(p.tonicHz || 261.63).toFixed(1)} Hz</b> · ${esc(noteNameForHz(p.tonicHz || 261.63))} · ${Math.round(p.spectralPartials || 20)} partials</div>
             </div>
             <div class="ch-rail" id="chRail">
@@ -7328,7 +7833,7 @@ function subnoteWorkspaceHTML(p) {
               ? `<span>curves follow the pad and knobs live · <b>L</b> ear blue · <b>R</b> ear amber</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
               : `<span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span>`}</div>
             ${layerStripHTML(p) /* V2.2: full rows on every stage — the space rows ARE the source list */}
-            ${_chStage === "space" ? "" : instCardsHTML(p) /* the stage needs the height; recipes are tone-side */}
+            ${m2PresetStripHTML(false) /* owner 07-08: ONE browser is the whole selection surface — sound modules + recipes to click or drag onto LAYERS; save lives in the top bar */}
           </div>
         `}
 
@@ -7390,39 +7895,38 @@ function tdModulationTabHTML(p) {
     <div class="ch-caption">vibrato is a per-note draw — Chance decides whether a note gets it, Depth and Rate shape the wobble the trace shows. Dynamics is how strongly louder playing brightens the spectrum.</div>`;
 }
 
-// ── V2 bottom row: instrument cards ─────────────────────────────────
-// The spectral profiles as first-class visual cards (render phase-03):
-// each card draws its own partial recipe — honest data, no stock art.
-function instCardsHTML(p) {
-  return `
-    <div class="inst-cards" id="instCards">
-      ${Object.entries(SPECTRAL_PROFILES).map(([k, prof]) => `
-        <button class="inst-card${p.spectralProfile === k ? " sel" : ""}" data-inst-card="${k}" title="Load the ${esc(prof.label)} recipe — partial levels, envelope and performance defaults; everything stays editable">
-          <canvas data-inst-art="${k}" width="216" height="104"></canvas>
-          <span class="inst-card-name">${esc(prof.label)}</span>
-        </button>`).join("")}
-    </div>`;
-}
-
-function drawInstCards() {
-  document.querySelectorAll("[data-inst-art]").forEach(cv => {
-    const prof = SPECTRAL_PROFILES[cv.dataset.instArt];
-    if (!prof) return;
+// ── Sub-note browser card art ────────────────────────────────────────
+// Each sound-module card draws its own partial recipe — honest data, no
+// stock art. Recipes draw from the profile; saved modules from their own
+// captured partial means (falling back to their profile's recipe).
+function drawM2SoundArt() {
+  document.querySelectorAll("[data-m2-sound-art]").forEach(cv => {
+    const id = cv.dataset.m2SoundArt;
+    let amps = null;
+    if (id.startsWith("r:")) {
+      amps = SPECTRAL_PROFILES[id.slice(2)]?.partials.map(pt => profilePartial(pt).amp || 0);
+    } else {
+      const params = m2PresetParamsById(id);
+      amps = Array.isArray(params?.spectralPartialMeans) && params.spectralPartialMeans.length
+        ? params.spectralPartialMeans
+        : SPECTRAL_PROFILES[params?.spectralProfile]?.partials.map(pt => profilePartial(pt).amp || 0);
+    }
+    if (!amps || !amps.length) return;
     const ctx = cv.getContext("2d");
     const w = cv.width, h = cv.height;
     ctx.clearRect(0, 0, w, h);
-    const sel = cv.closest(".inst-card")?.classList.contains("sel");
-    const n = Math.min(20, prof.partials.length);
-    const pad = 10, base = h - 8;
+    const sel = cv.closest(".m2-preset")?.classList.contains("sel");
+    const n = Math.min(20, amps.length);
+    const pad = 8, base = h - 5;
     for (let i = 0; i < n; i++) {
-      const amp = prof.partials[i].amp;
-      const x = pad + (w - pad * 2) * (i / (n - 1));
-      const y = base - Math.pow(amp, 0.4) * (h - 18);
+      const amp = Math.max(0, amps[i] || 0);
+      const x = pad + (w - pad * 2) * (n > 1 ? i / (n - 1) : 0.5);
+      const y = base - Math.pow(amp, 0.4) * (h - 10);
       ctx.strokeStyle = sel ? "rgba(61,157,246,0.85)" : "rgba(120,140,165,0.55)";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, y); ctx.stroke();
       ctx.fillStyle = sel ? "#3d9df6" : "rgba(150,170,195,0.8)";
-      ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 2 * Math.PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 2 * Math.PI); ctx.fill();
     }
   });
 }
@@ -9274,46 +9778,83 @@ function formantDisplaySequence() {
 }
 
 function drawRootPullDist() {
+  // How hard the melody is pulled home across one motif phrase: the exact
+  // curve the engine samples (strength × (1−shape+shape·pos)), annotated
+  // with the start/end pull values and beat ticks so the shape dial reads
+  // as "when the pull kicks in", not an abstract wiggle.
   const cv = document.getElementById("cvRoot");
   if (!cv) return;
   const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
-  const strength = exploreParams.rootPullStrength;
-  const shape = exploreParams.rootPullShape;
+  const strength = clamp(exploreParams.rootPullStrength ?? 0, 0, 1);
+  const shape = clamp(exploreParams.rootPullShape ?? 0, 0, 1);
+  const padT = 13, padB = 13;
+  const plotH = h - padT - padB;
+  const yOf = (pull) => padT + (1 - pull) * plotH;
+  const pullAt = (pos) => strength * (1 - shape + shape * pos);
 
-  // Draw pull strength across phrase position (0 to 1)
-  ctx.fillStyle = "rgba(245,158,11,0.08)";
-  ctx.strokeStyle = "rgba(245,158,11,0.7)";
+  // beat ticks: the phrase in motif-length beats, so "end of phrase" is real
+  const beats = Math.max(1, Math.round(exploreParams.motifLengthBeats || 4));
+  ctx.strokeStyle = "rgba(96,110,130,0.16)";
+  ctx.lineWidth = 1;
+  for (let b = 1; b < beats; b++) {
+    const x = (b / beats) * w;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
+  }
+  // full-strength reference line
+  ctx.strokeStyle = "rgba(245,158,11,0.25)";
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(0, yOf(strength)); ctx.lineTo(w, yOf(strength)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (strength <= 0.001) {
+    ctx.fillStyle = "rgba(136,153,170,0.55)";
+    ctx.font = "9px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("no pull — the melody wanders freely", w / 2, h / 2 + 3);
+    ctx.textAlign = "left";
+    return;
+  }
+
+  // the engine's curve
+  ctx.fillStyle = "rgba(245,158,11,0.10)";
+  ctx.strokeStyle = "rgba(245,158,11,0.8)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(0, h);
-  for (let x = 0; x <= w; x++) {
-    const pos = x / w;
-    const pull = strength * (1 - shape + shape * pos);
-    const y = h - pull * (h - 4);
-    ctx.lineTo(x, y);
-  }
-  ctx.lineTo(w, h);
+  ctx.moveTo(0, h - padB);
+  for (let x = 0; x <= w; x++) ctx.lineTo(x, yOf(pullAt(x / w)));
+  ctx.lineTo(w, h - padB);
   ctx.closePath();
   ctx.fill();
   ctx.beginPath();
   for (let x = 0; x <= w; x++) {
-    const pos = x / w;
-    const pull = strength * (1 - shape + shape * pos);
-    const y = h - pull * (h - 4);
-    if (x === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+    const y = yOf(pullAt(x / w));
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
   ctx.stroke();
 
-  // Labels
+  // end-point values: the numbers the dial is actually setting
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  ctx.font = "600 9px system-ui";
+  ctx.fillStyle = "#f5a623";
+  ctx.textAlign = "left";
+  ctx.fillText(pct(pullAt(0)), 3, yOf(pullAt(0)) - 3);
+  ctx.textAlign = "right";
+  ctx.fillText(pct(pullAt(1)), w - 3, Math.max(9, yOf(pullAt(1)) - 3));
+
+  // axis: where in the phrase we are
   ctx.fillStyle = "rgba(136,153,170,0.7)";
   ctx.font = "9px system-ui";
   ctx.textAlign = "left";
-  ctx.fillText("start", 2, h - 2);
+  ctx.fillText("phrase start", 2, h - 2);
   ctx.textAlign = "right";
-  ctx.fillText("end", w - 2, h - 2);
+  ctx.fillText(`phrase end (${beats} beats)`, w - 2, h - 2);
+  ctx.textAlign = "center";
+  const summary = shape < 0.15 ? "pull is constant" : shape > 0.85 ? "pull arrives at the cadence" : "pull grows toward the end";
+  ctx.fillStyle = "rgba(170,185,200,0.75)";
+  ctx.fillText(summary, w / 2, 9);
+  ctx.textAlign = "left";
 }
 
 function drawRegisterDist() {
@@ -11027,6 +11568,13 @@ function wireLayerStrip(v) {
     applyLive();
     renderExplore();
   };
+
+  // Drop targets for browser presets: the strip itself, the rows area, and
+  // the floating zone that appears while dragging (so a drop target is
+  // always in view even when the expanded library covers the strip).
+  [v.querySelector("#layerStrip"), v.querySelector(".layer-area")]
+    .filter(Boolean).forEach(bindLayerDropTarget);
+
   v.querySelectorAll("[data-layer-row]").forEach(row => {
     row.onclick = (e) => {
       if (e.target.closest("input, button, canvas")) return; // controls stay controls
@@ -11988,12 +12536,6 @@ function percSoundOptions(selected) {
   ).join('');
 }
 
-function spectralProfileOptions(selected) {
-  return Object.entries(SPECTRAL_PROFILES).map(([k, v]) =>
-    `<option value="${k}" ${selected === k ? 'selected' : ''}>${v.label}</option>`
-  ).join('');
-}
-
 function bakedSurpriseOptions(selected) {
   const value = normaliseBakedSurpriseValue(selected);
   const options = [
@@ -12075,7 +12617,6 @@ function fmtOutput(param, val) {
     case "toneBreath":
     case "vibratoProb":
     case "spectralProb":
-    case "spectralMix":
     case "spectralSpread":
     case "spectralDynamicAmount":
     case "spectralRegisterAmount":
@@ -12187,7 +12728,8 @@ function randomiseParams() {
   p.vibratoRateSd = rf(0, 1.6);
   p.spectralProfile = rp(Object.keys(SPECTRAL_PROFILES));
   p.spectralProb = rf(0.45, 1.0);
-  p.spectralMix = rf(0.25, 0.85);
+  // spectralMix stays put — it has no control (legacy blend; a flat tone-print
+  // gain in the fourier voice), so randomising it would silently change level.
   p.spectralPartials = ri(8, 20);
   p.spectralSpread = rf(0.1, 0.85);
   resetSpectralPartialParams(p);
@@ -12963,6 +13505,18 @@ function visBackdrop(ctx, w, h) {
   ctx.fillRect(0, 0, w, h);
 }
 
+// Spec toggle: the live frequency response drawn faintly BEHIND the active
+// view, so turning it on never costs the behaviour information.
+function drawSpecOverlay(ctx, w, h) {
+  if (!_visSpecOverlay || !synth.isPlaying) return;
+  const data = synth.getSpectrum && synth.getSpectrum();
+  if (!data) return;
+  ctx.save();
+  ctx.globalAlpha = 0.38;   // a ghost, but a readable one
+  drawSpectrumCurve(ctx, data, w, h);
+  ctx.restore();
+}
+
 // ── V2.1 behaviour timeline (MACRO_LANES_CHANGE_SPEC.md, 2026-07-08) ──
 // Playhead at ~1/3: left = RECENT HISTORY (realized, solid), right =
 // POSSIBLE FUTURE FIELD (settings-driven likelihood climate). The future
@@ -13545,6 +14099,7 @@ function drawBehaviorLanes() {
   const ctx = canvasCtx;
   const w = canvas.width, h = canvas.height;
   visBackdrop(ctx, w, h);
+  drawSpecOverlay(ctx, w, h);
 
   // scale factor: draw metrics in CSS-consistent sizes on the DPR backing
   const S = Math.max(1, w / Math.max(1, canvas.clientWidth || w));
@@ -14202,6 +14757,7 @@ function drawPianoRoll() {
   const ctx = canvasCtx;
   const w = canvas.width, h = canvas.height;
   visBackdrop(ctx, w, h);
+  drawSpecOverlay(ctx, w, h);
 
   const tl = synth.getNoteTimeline ? synth.getNoteTimeline() : null;
   const playheadX = Math.round(w * VIS_PLAYHEAD_FRAC);

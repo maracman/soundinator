@@ -3486,9 +3486,11 @@ body.explore-mode #app {
   overflow: auto;
 }
 
+/* Owner 07-08: Beat / Motif / Downbeat stack vertically — three columns
+   squeezed the selects and sliders in the narrow inspector. */
 .production-panel .perc-layers {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .production-panel .perc-layer {
@@ -4204,7 +4206,10 @@ body.explore-mode #app {
   letter-spacing: 0.1em;
   color: rgba(130,150,170,0.45);
   text-transform: uppercase;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  /* the 8va buttons sit in the label row — flex keeps them inside it
+     instead of floating over the sliders below */
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
 }
 .register-mini-canvas {
   width: 100%;
@@ -4233,6 +4238,30 @@ body.explore-mode #app {
     0 1px 3px rgba(0,0,0,0.5);
   outline: 1px solid rgba(30,45,38,0.3);
   outline-offset: 1px;
+}
+
+/* One vertical rhythm for every macro probability display.  The macro
+   inspector is narrow, so it gets a compact height while the larger legacy
+   macro panel keeps enough room for the CRT labels and live-note trace. */
+.macro-monitor {
+  --macro-display-height: 220px;
+}
+
+.macro-monitor .accuracy-canvas,
+.melody-monitor .accuracy-canvas,
+.duration-monitor .accuracy-canvas {
+  display: block;
+  width: 100%;
+  height: var(--macro-display-height) !important;
+  min-height: var(--macro-display-height);
+  max-height: var(--macro-display-height);
+  flex: 0 0 var(--macro-display-height);
+}
+
+.m2-inspector .macro-monitor {
+  --macro-display-height: 150px;
+  flex: none;
+  overflow: visible;
 }
 
 /* ─ Structure / Markov card ─ */
@@ -5647,7 +5676,7 @@ body.explore-mode #app {
   color: var(--accent2);
   font-variant-numeric: tabular-nums;
 }
-.oct-btns { float: right; display: inline-flex; gap: 0.25rem; }
+.oct-btns { display: inline-flex; gap: 0.25rem; flex: none; }
 
 /* Owner 07-07: the strips are their own panel — pinned above the
    timeline (vertical scrolling never moves them), horizontally mirrored
@@ -6314,24 +6343,9 @@ body.dragging { cursor: grabbing; user-select: none; }
 .mod-row .knob-svg { width: 38px; height: 38px; }
 .mod-row .knob-label { font-size: 0.52rem; }
 
-/* ── Bottom instrument cards ── */
-.inst-cards {
-  display: flex; gap: 10px; overflow-x: auto; flex: none;
-  padding: 8px; border: 1px solid var(--border); border-radius: 10px;
-  background: rgba(10, 13, 17, 0.45);
-}
-.inst-card {
-  flex: 0 0 128px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  background: linear-gradient(180deg, rgba(24,29,37,0.9), rgba(15,18,24,0.95));
-  border: 1px solid var(--border); border-radius: 9px;
-  padding: 8px 6px 6px; cursor: pointer; font: inherit; color: var(--text2);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.inst-card:hover { border-color: var(--border2); }
-.inst-card.sel { border-color: var(--res); box-shadow: 0 0 0 1px var(--res), 0 0 18px -6px var(--res); color: var(--text); }
-.inst-card canvas { width: 108px; height: 52px; display: block; background: var(--display); border-radius: 6px; }
-.inst-card-name { font-size: 0.72rem; font-weight: 600; }
+/* (The bottom instrument cards retired 07-08 — the browser strip is the
+   one selection surface in the sub-note view; .m2-preset.sel marks the
+   active recipe there.) */
 
 /* V2: the sub-note right column moved inside the chain (td-side), so the
    two-column workspace grid collapses to a single stacked flow. */
@@ -6567,23 +6581,73 @@ body.dragging { cursor: grabbing; user-select: none; }
   padding: 8px;
   overflow-y: auto;
 }
+/* square icon cards (phase-02 mock): icon above a small centred label */
 .m2-rail-btn {
-  display: flex; align-items: center; gap: 7px;
-  background: none; border: 1px solid transparent; border-radius: 7px;
-  color: var(--text2); font: inherit; font-size: 0.72rem; font-weight: 600;
-  text-align: left; padding: 7px 9px; cursor: pointer; line-height: 1.35;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  background: linear-gradient(180deg, rgba(24,29,37,0.72), rgba(15,18,24,0.88));
+  border: 1px solid var(--border); border-radius: 9px;
+  color: var(--text2); font: inherit; font-size: 0.58rem; font-weight: 600;
+  letter-spacing: 0.02em; text-align: center;
+  padding: 9px 4px 7px; cursor: pointer; line-height: 1.25;
+  min-height: 60px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.m2-rail-btn:hover { background: rgba(255,255,255,0.03); }
-.m2-rail-btn.active { border-color: var(--gen); color: var(--text); background: rgba(245,166,35,0.08); }
+.m2-rail-btn:hover { border-color: var(--border2); }
+.m2-rail-btn.active {
+  border-color: var(--rail-c, var(--gen)); color: var(--text);
+  box-shadow: 0 0 0 1px var(--rail-c, var(--gen)), 0 0 16px -8px var(--rail-c, var(--gen));
+}
+.m2-rail-icon { color: var(--rail-c, var(--text3)); display: block; }
+.m2-rail-btn.active .m2-rail-icon,
+.m2-rail-btn:hover .m2-rail-icon { color: var(--rail-c, var(--text)); }
+.m2-rail-icon svg { width: 22px; height: 22px; display: block; }
 .m2-rail-group {
   border: 1px solid var(--border); border-radius: 8px;
-  padding: 5px; display: flex; flex-direction: column; gap: 2px;
+  padding: 5px; display: flex; flex-direction: column; gap: 5px;
 }
+.m2-rail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.m2-rail-grid .m2-rail-btn { min-height: 56px; padding: 7px 2px 6px; }
 .m2-rail-head {
   font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--text3); padding: 2px 5px 4px;
+  color: var(--text3); padding: 2px 5px 0;
 }
 .m2-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+/* ── searchable scale combo: 12-tone presets + world tunings in one list ── */
+.scale-combo { position: relative; flex: 1; min-width: 0; }
+.scale-combo-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  background: rgba(14, 18, 24, 0.85); border: 1px solid var(--border); border-radius: 7px;
+  color: var(--text); font: inherit; font-size: 0.72rem; font-weight: 600;
+  padding: 6px 9px; cursor: pointer; text-align: left;
+}
+.scale-combo-btn:hover { border-color: var(--border2); }
+.scale-combo-caret { color: var(--text3); font-size: 0.6rem; }
+.scale-combo-pop {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60;
+  background: rgba(12, 16, 22, 0.98); border: 1px solid var(--border2); border-radius: 9px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.55);
+  padding: 6px; display: flex; flex-direction: column; gap: 5px;
+}
+.scale-combo-search {
+  width: 100%; box-sizing: border-box;
+  background: rgba(20, 26, 34, 0.9); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font: inherit; font-size: 0.7rem; padding: 5px 8px;
+}
+.scale-combo-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; }
+.scale-combo-group {
+  font-size: 0.56rem; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--text3); padding: 6px 6px 3px;
+}
+.scale-combo-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: none; border: none; border-radius: 5px;
+  color: var(--text2); font: inherit; font-size: 0.72rem;
+  text-align: left; padding: 5px 7px; cursor: pointer;
+}
+.scale-combo-opt:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.scale-combo-opt.sel { color: var(--gen); }
+.scale-combo-note { font-style: normal; font-size: 0.58rem; color: var(--text3); }
 
 .m2-center { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .m2-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -6634,6 +6698,7 @@ body.dragging { cursor: grabbing; user-select: none; }
   transition: border-color 0.15s;
 }
 .m2-preset:hover { border-color: var(--gen); }
+.m2-preset.sel { border-color: var(--res); box-shadow: 0 0 0 1px var(--res), 0 0 18px -6px var(--res); }
 .m2-preset-name { font-size: 0.68rem; font-weight: 600; color: var(--text); }
 .m2-preset canvas { width: 100%; height: 34px; background: var(--display); border-radius: 5px; }
 .m2-preset-fam { font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
@@ -6903,6 +6968,38 @@ body.dragging { cursor: grabbing; user-select: none; }
   font-style: normal; font-size: 0.58rem; color: var(--text3);
   border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; white-space: nowrap;
 }
+/* layered presets: base sound + N sub-note sources */
+.m2-tag-layers { color: #8ee3ff; border-color: rgba(56,189,248,0.35); }
+/* browser presets drag onto the LAYERS strip */
+[data-m2-drag] { cursor: grab; }
+[data-m2-drag]:active { cursor: grabbing; }
+.layer-strip.drop-ok, .layer-area.drop-ok {
+  outline: 1px dashed rgba(56,189,248,0.7);
+  outline-offset: -1px;
+  background: rgba(56,189,248,0.07);
+}
+/* floating drop zone: appears while dragging a preset, so a layer target is
+   always in view even when the expanded library covers the LAYERS strip */
+.m2-drop-layer {
+  position: fixed;
+  top: 64px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  padding: 16px 28px;
+  border: 2px dashed rgba(56,189,248,0.65);
+  border-radius: 12px;
+  background: rgba(10, 16, 24, 0.94);
+  color: #8ee3ff;
+  font-size: 0.78rem; font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.m2-drop-layer.drop-ok {
+  border-color: #38bdf8;
+  background: rgba(56,189,248,0.16);
+  color: #d9f3ff;
+}
+.m2-drop-layer[hidden] { display: none; }
 .m2-lib-stars { flex: none; font-size: 0.66rem; color: #ffd28a; font-variant-numeric: tabular-nums; width: 52px; }
 .m2-lib-heart {
   background: none; border: none; cursor: pointer;
