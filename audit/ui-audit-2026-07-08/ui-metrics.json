@@ -1,0 +1,1599 @@
+{
+  "metricsExplore": {
+    "clipped": 0,
+    "page": "explore-subnote-persisted",
+    "scrollables": [
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 720,
+          "w": 1280,
+          "x": 0,
+          "y": 0
+        },
+        "scroll": {
+          "ch": 720,
+          "cw": 1280,
+          "h": 790,
+          "w": 1280
+        },
+        "tag": "html",
+        "text": "SOUND STUDIO V0.11.0 · 202 MACRO SUB-NOTE PRODUCER ▶ ■ RANDOMISE ↻ Restart seq SEED 1001 Everything "
+      },
+      {
+        "cls": "explore-mode",
+        "id": "",
+        "rect": {
+          "h": 720,
+          "w": 1280,
+          "x": 0,
+          "y": 0
+        },
+        "scroll": {
+          "ch": 720,
+          "cw": 1280,
+          "h": 790,
+          "w": 1280
+        },
+        "tag": "body",
+        "text": "SOUND STUDIO V0.11.0 · 202 MACRO SUB-NOTE PRODUCER ▶ ■ RANDOMISE ↻ Restart seq SEED 1001 Everything "
+      },
+      {
+        "cls": "",
+        "id": "app",
+        "rect": {
+          "h": 720,
+          "w": 1280,
+          "x": 0,
+          "y": 0
+        },
+        "scroll": {
+          "ch": 720,
+          "cw": 1280,
+          "h": 790,
+          "w": 1280
+        },
+        "tag": "div",
+        "text": "SOUND STUDIO V0.11.0 · 202 MACRO SUB-NOTE PRODUCER ▶ ■ RANDOMISE ↻ Restart seq SEED 1001 Everything "
+      },
+      {
+        "cls": "explore-top",
+        "id": "",
+        "rect": {
+          "h": 34,
+          "w": 230,
+          "x": 4,
+          "y": 4
+        },
+        "scroll": {
+          "ch": 38,
+          "cw": 259,
+          "h": 38,
+          "w": 326
+        },
+        "tag": "div",
+        "text": "SOUND STUDIO V0.11.0 · 202 MACRO SUB-NOTE PRODUCER"
+      },
+      {
+        "cls": "workspace-tabs",
+        "id": "workspaceTabs",
+        "rect": {
+          "h": 25,
+          "w": 83,
+          "x": 145,
+          "y": 8
+        },
+        "scroll": {
+          "ch": 26,
+          "cw": 91,
+          "h": 26,
+          "w": 166
+        },
+        "tag": "div",
+        "text": "MACRO SUB-NOTE PRODUCER"
+      },
+      {
+        "cls": "card transport-card",
+        "id": "",
+        "rect": {
+          "h": 34,
+          "w": 1035,
+          "x": 236,
+          "y": 4
+        },
+        "scroll": {
+          "ch": 36,
+          "cw": 1167,
+          "h": 45,
+          "w": 1167
+        },
+        "tag": "div",
+        "text": "▶ ■ RANDOMISE ↻ Restart seq SEED 1001 Everything Sound source Melody & scale Rhythm & rests Dynamics"
+      },
+      {
+        "cls": "",
+        "id": "ratingSlider",
+        "rect": {
+          "h": 3,
+          "w": 44,
+          "x": 885,
+          "y": 19
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 50,
+          "h": 8,
+          "w": 50
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 62,
+          "x": 535,
+          "y": 99
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 70,
+          "h": 8,
+          "w": 70
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "ch-inspector ch-space",
+        "id": "chInspector",
+        "rect": {
+          "h": 236,
+          "w": 283,
+          "x": 15,
+          "y": 214
+        },
+        "scroll": {
+          "ch": 264,
+          "cw": 318,
+          "h": 636,
+          "w": 318
+        },
+        "tag": "div",
+        "text": "04 · SPACE Room 2.5 m · 0° EARS Average head Small head Large head Prominent pinna Bare sphere KEMAR"
+      },
+      {
+        "cls": "knob-cell cool",
+        "id": "",
+        "rect": {
+          "h": 64,
+          "w": 55,
+          "x": 216,
+          "y": 400
+        },
+        "scroll": {
+          "ch": 73,
+          "cw": 62,
+          "h": 73,
+          "w": 72
+        },
+        "tag": "div",
+        "text": "HEAD DENSITY 0.50"
+      },
+      {
+        "cls": "knob-label",
+        "id": "",
+        "rect": {
+          "h": 12,
+          "w": 55,
+          "x": 216,
+          "y": 439
+        },
+        "scroll": {
+          "ch": 13,
+          "cw": 62,
+          "h": 13,
+          "w": 72
+        },
+        "tag": "div",
+        "text": "HEAD DENSITY"
+      },
+      {
+        "cls": "ch-field-wrap",
+        "id": "",
+        "rect": {
+          "h": 236,
+          "w": 712,
+          "x": 312,
+          "y": 214
+        },
+        "scroll": {
+          "ch": 266,
+          "cw": 804,
+          "h": 389,
+          "w": 804
+        },
+        "tag": "div",
+        "text": "EARS what this position hands to each ear — move the instrument on the pad, left"
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 123
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1075,
+          "y": 155
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1167,
+          "y": 155
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1075,
+          "y": 169
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1167,
+          "y": 169
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1075,
+          "y": 183
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1167,
+          "y": 183
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1075,
+          "y": 197
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 56,
+          "x": 1167,
+          "y": 197
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 63,
+          "h": 8,
+          "w": 63
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 350
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 373
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 395
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 435
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 458
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 480
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 502
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 524
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 95,
+          "x": 1122,
+          "y": 546
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 107,
+          "h": 8,
+          "w": 107
+        },
+        "tag": "input",
+        "text": ""
+      }
+    ],
+    "small24": [
+      {
+        "cls": "workspace-tab",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "MACRO",
+        "w": 39
+      },
+      {
+        "cls": "workspace-tab active",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "SUB-NOTE",
+        "w": 52
+      },
+      {
+        "cls": "workspace-tab workspace-link",
+        "h": 19,
+        "id": "",
+        "tag": "a",
+        "text": "PRODUCER",
+        "w": 54
+      },
+      {
+        "cls": "btn btn-secondary",
+        "h": 21,
+        "id": "regenBtn",
+        "tag": "button",
+        "text": "↻ Restart seq",
+        "w": 82
+      },
+      {
+        "cls": "btn btn-ghost btn-sm",
+        "h": 21,
+        "id": "seedBtn",
+        "tag": "button",
+        "text": "1001",
+        "w": 34
+      },
+      {
+        "cls": "",
+        "h": 23,
+        "id": "presetName",
+        "tag": "input",
+        "text": "Name this preset before saving it locally.",
+        "w": 97
+      },
+      {
+        "cls": "",
+        "h": 22,
+        "id": "presetScope",
+        "tag": "select",
+        "text": "Everything Sound source Melody & scale Rhythm & rests Dynamics Sequence & surpri",
+        "w": 116
+      },
+      {
+        "cls": "btn btn-primary btn-sm",
+        "h": 23,
+        "id": "saveBtn",
+        "tag": "button",
+        "text": "SAVE",
+        "w": 40
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "ratingSlider",
+        "tag": "input",
+        "text": "Rate how much you like the current sound from 1 to 7.",
+        "w": 44
+      },
+      {
+        "cls": "top-action-btn",
+        "h": 21,
+        "id": "topMyPresets",
+        "tag": "button",
+        "text": "MY PRESETS",
+        "w": 62
+      },
+      {
+        "cls": "top-action-btn",
+        "h": 21,
+        "id": "topLibrary",
+        "tag": "button",
+        "text": "LIBRARY",
+        "w": 47
+      },
+      {
+        "cls": "param-select",
+        "h": 23,
+        "id": "",
+        "tag": "select",
+        "text": "Flute Clarinet Violin Cello Trumpet Trombone Piano Vocal",
+        "w": 133
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "",
+        "w": 62
+      },
+      {
+        "cls": "",
+        "h": 19,
+        "id": "earModelSel",
+        "tag": "select",
+        "text": "Average head Small head Large head Prominent pinna Bare sphere KEMAR (fitted) KE",
+        "w": 231
+      },
+      {
+        "cls": "",
+        "h": 18,
+        "id": "",
+        "tag": "input",
+        "text": "Own head — ignore the global listener: Keep this patch's own ear span and head d",
+        "w": 32
+      },
+      {
+        "cls": "layer-add",
+        "h": 18,
+        "id": "layerAdd",
+        "tag": "button",
+        "text": "＋",
+        "w": 23
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Envelope chance: Chance that the onset/decay/sustain/release envelope varies",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Attack: Mean attack/onset time in seconds",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Attack: Standard deviation of attack/onset time",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Decay: Mean decay time in seconds",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Decay: Standard deviation of decay time",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Sustain: Mean sustain level",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Sustain: Standard deviation of sustain level",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Release: Mean release time in seconds",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Release: Standard deviation of release time",
+        "w": 56
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Odd / even: Odd / even",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Comb boost: Comb boost",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Comb centre: Comb centre",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Fund (1): Fund (1)",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Oct (2): Oct (2)",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "3–4: 3–4",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "5–8: 5–8",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "9–16: 9–16",
+        "w": 95
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "17+: 17+",
+        "w": 95
+      },
+      {
+        "cls": "link-btn",
+        "h": 17,
+        "id": "researchChangeBtn",
+        "tag": "button",
+        "text": "Change",
+        "w": 39
+      }
+    ],
+    "small24Count": 35,
+    "small44Count": 48,
+    "unnamedButtons": 0,
+    "viewport": {
+      "h": 720,
+      "w": 1280
+    },
+    "visibleControls": 52
+  },
+  "metricsProducer": {
+    "clippedVisible": [
+      {
+        "cls": "tl2-addbars",
+        "id": "addBars",
+        "rect": {
+          "h": 22,
+          "w": 55,
+          "x": 1369,
+          "y": 173
+        },
+        "text": "＋8 bars"
+      }
+    ],
+    "page": "producer",
+    "scrollables": [
+      {
+        "cls": "",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 84,
+          "x": 806,
+          "y": 22
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 84,
+          "h": 8,
+          "w": 84
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "zoom-slider",
+        "id": "zoomSlider",
+        "rect": {
+          "h": 3,
+          "w": 1257,
+          "x": 12,
+          "y": 48
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 1257,
+          "h": 8,
+          "w": 1257
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "browser-cards",
+        "id": "browserCards",
+        "rect": {
+          "h": 78,
+          "w": 230,
+          "x": 10,
+          "y": 227
+        },
+        "scroll": {
+          "ch": 78,
+          "cw": 230,
+          "h": 391,
+          "w": 230
+        },
+        "tag": "div",
+        "text": "Wood Talk Starter ▶ ＋ Deep Walker Starter ▶ ＋ Slow Sky Starter ▶ ＋ Singing Line Starter ▶ ＋ Glass Be"
+      },
+      {
+        "cls": "tl2",
+        "id": "",
+        "rect": {
+          "h": 119,
+          "w": 1001,
+          "x": 268,
+          "y": 173
+        },
+        "scroll": {
+          "ch": 119,
+          "cw": 1001,
+          "h": 621,
+          "w": 1156
+        },
+        "tag": "div",
+        "text": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 ＋8 bars Wood Talk +0.0dB × M S G ◆ Wood Talk Pentatonic minor"
+      },
+      {
+        "cls": "tl2-row tl2-ruler-row",
+        "id": "",
+        "rect": {
+          "h": 22,
+          "w": 1001,
+          "x": 268,
+          "y": 173
+        },
+        "scroll": {
+          "ch": 22,
+          "cw": 1001,
+          "h": 621,
+          "w": 1156
+        },
+        "tag": "div",
+        "text": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 ＋8 bars"
+      },
+      {
+        "cls": "tl2-ruler",
+        "id": "tlRuler",
+        "rect": {
+          "h": 22,
+          "w": 896,
+          "x": 464,
+          "y": 173
+        },
+        "scroll": {
+          "ch": 20,
+          "cw": 894,
+          "h": 620,
+          "w": 959
+        },
+        "tag": "div",
+        "text": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 ＋8 bars"
+      },
+      {
+        "cls": "tl2-row",
+        "id": "",
+        "rect": {
+          "h": 47,
+          "w": 1001,
+          "x": 268,
+          "y": 199
+        },
+        "scroll": {
+          "ch": 47,
+          "cw": 1001,
+          "h": 47,
+          "w": 1092
+        },
+        "tag": "div",
+        "text": "Wood Talk +0.0dB × M S G ◆ Wood Talk Pentatonic minor 5 splits grid 4 112 bpm glide ✦ R·D +0.0dB"
+      },
+      {
+        "cls": "tl-gain",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 46,
+          "x": 341,
+          "y": 230
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 46,
+          "h": 8,
+          "w": 46
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "tl-pan",
+        "id": "",
+        "rect": {
+          "h": 3,
+          "w": 34,
+          "x": 391,
+          "y": 230
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 34,
+          "h": 8,
+          "w": 34
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "tl2-badges",
+        "id": "",
+        "rect": {
+          "h": 17,
+          "w": 100,
+          "x": 470,
+          "y": 215
+        },
+        "scroll": {
+          "ch": 17,
+          "cw": 100,
+          "h": 17,
+          "w": 308
+        },
+        "tag": "span",
+        "text": "Pentatonic minor 5 splits grid 4 112 bpm glide ✦ R·D"
+      },
+      {
+        "cls": "pb-row pb-compact",
+        "id": "",
+        "rect": {
+          "h": 17,
+          "w": 100,
+          "x": 470,
+          "y": 215
+        },
+        "scroll": {
+          "ch": 17,
+          "cw": 100,
+          "h": 17,
+          "w": 308
+        },
+        "tag": "span",
+        "text": "Pentatonic minor 5 splits grid 4 112 bpm glide ✦ R·D"
+      },
+      {
+        "cls": "tl2-row",
+        "id": "",
+        "rect": {
+          "h": 34,
+          "w": 1001,
+          "x": 268,
+          "y": 250
+        },
+        "scroll": {
+          "ch": 34,
+          "cw": 1001,
+          "h": 34,
+          "w": 1092
+        },
+        "tag": "div",
+        "text": "Drop a palette instrument here to add a track"
+      },
+      {
+        "cls": "",
+        "id": "regionGain",
+        "rect": {
+          "h": 3,
+          "w": 70,
+          "x": 870,
+          "y": 427
+        },
+        "scroll": {
+          "ch": 3,
+          "cw": 70,
+          "h": 8,
+          "w": 70
+        },
+        "tag": "input",
+        "text": ""
+      },
+      {
+        "cls": "daw-editor",
+        "id": "",
+        "rect": {
+          "h": 240,
+          "w": 1280,
+          "x": 0,
+          "y": 460
+        },
+        "scroll": {
+          "ch": 238,
+          "cw": 1278,
+          "h": 313,
+          "w": 1278
+        },
+        "tag": "div",
+        "text": "grid 4/beat · scale Major · key C ✏ add ⌫ M Q ←→ ↑↓ DYNAMICS Click a note to inspect it. Bodies show"
+      }
+    ],
+    "small24": [
+      {
+        "cls": "daw-ctx-select",
+        "h": 20,
+        "id": "arrSelect",
+        "tag": "select",
+        "text": "Untitled arrangement",
+        "w": 130
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "",
+        "w": 84
+      },
+      {
+        "cls": "",
+        "h": 20,
+        "id": "",
+        "tag": "select",
+        "text": "C C# D D# E F F# G G# A A# B",
+        "w": 46
+      },
+      {
+        "cls": "daw-ctx-select",
+        "h": 20,
+        "id": "snapSelect",
+        "tag": "select",
+        "text": "Bar Beat ½ beat Off",
+        "w": 64
+      },
+      {
+        "cls": "zoom-slider",
+        "h": 3,
+        "id": "zoomSlider",
+        "tag": "input",
+        "text": "Zoom (Z = fit arrangement, ⇧Z = fit selection)",
+        "w": 1257
+      },
+      {
+        "cls": "daw-collapse",
+        "h": 14,
+        "id": "leftCollapse",
+        "tag": "button",
+        "text": "◂",
+        "w": 7
+      },
+      {
+        "cls": "filter-chip active",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "All",
+        "w": 35
+      },
+      {
+        "cls": "filter-chip",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "Starters",
+        "w": 61
+      },
+      {
+        "cls": "filter-chip",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "Instruments",
+        "w": 80
+      },
+      {
+        "cls": "filter-chip",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "Mine",
+        "w": 47
+      },
+      {
+        "cls": "filter-chip",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "Sections",
+        "w": 65
+      },
+      {
+        "cls": "splits-filter",
+        "h": 19,
+        "id": "",
+        "tag": "select",
+        "text": "Any splits 5 splits 6 splits 7 splits 8+ splits 12 splits Other",
+        "w": 81
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "▶",
+        "w": 20
+      },
+      {
+        "cls": "br-btn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "＋",
+        "w": 20
+      },
+      {
+        "cls": "pal-btn",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "⏱",
+        "w": 25
+      },
+      {
+        "cls": "pal-btn",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "✎",
+        "w": 25
+      },
+      {
+        "cls": "pal-btn",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "+",
+        "w": 23
+      },
+      {
+        "cls": "pal-btn",
+        "h": 19,
+        "id": "",
+        "tag": "button",
+        "text": "×",
+        "w": 23
+      },
+      {
+        "cls": "pal-half-btn",
+        "h": 14,
+        "id": "",
+        "tag": "button",
+        "text": "MACRO",
+        "w": 71
+      },
+      {
+        "cls": "pal-half-btn active",
+        "h": 14,
+        "id": "",
+        "tag": "button",
+        "text": "BOTH",
+        "w": 71
+      },
+      {
+        "cls": "pal-half-btn",
+        "h": 14,
+        "id": "",
+        "tag": "button",
+        "text": "SUB-NOTE",
+        "w": 71
+      },
+      {
+        "cls": "gs-chevron",
+        "h": 11,
+        "id": "gsToggle",
+        "tag": "button",
+        "text": "▸ Global scale",
+        "w": 63
+      },
+      {
+        "cls": "gs-chevron",
+        "h": 11,
+        "id": "spToggle",
+        "tag": "button",
+        "text": "▸ Global space",
+        "w": 66
+      },
+      {
+        "cls": "tl2-addbars",
+        "h": 22,
+        "id": "addBars",
+        "tag": "button",
+        "text": "＋8 bars",
+        "w": 55
+      },
+      {
+        "cls": "tl-remove",
+        "h": 13,
+        "id": "",
+        "tag": "button",
+        "text": "×",
+        "w": 7
+      },
+      {
+        "cls": "tl2-ms",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "M",
+        "w": 18
+      },
+      {
+        "cls": "tl2-ms tl2-solo",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "S",
+        "w": 18
+      },
+      {
+        "cls": "tl2-ms tl2-gsbtn",
+        "h": 18,
+        "id": "",
+        "tag": "button",
+        "text": "G",
+        "w": 18
+      },
+      {
+        "cls": "tl-gain",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Track level",
+        "w": 46
+      },
+      {
+        "cls": "tl-pan",
+        "h": 3,
+        "id": "",
+        "tag": "input",
+        "text": "Pan (L/R)",
+        "w": 34
+      },
+      {
+        "cls": "",
+        "h": 3,
+        "id": "regionGain",
+        "tag": "input",
+        "text": "regionGain",
+        "w": 70
+      },
+      {
+        "cls": "",
+        "h": 13,
+        "id": "rollDynToggle",
+        "tag": "input",
+        "text": "rollDynToggle",
+        "w": 13
+      }
+    ],
+    "small24Count": 60,
+    "small44Count": 86,
+    "unnamedButtons": 0,
+    "viewport": {
+      "h": 720,
+      "w": 1280
+    },
+    "visibleControls": 86
+  },
+  "logsFinal": []
+}

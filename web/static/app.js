@@ -2303,38 +2303,23 @@ function globalSpaceStripHTML(laneW) {
   const head = sp.head || {};
   const selAnchors = _spSelTrack ? (sp.tracks?.[_spSelTrack] || []) : [];
   const anchorAtPh = selAnchors.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
-  // Owner 07-07: the cross-section sits on the LEFT, in the same column as
-  // the track parameters, with the space controls under it; the cylinder
-  // runs in the lane column at the SAME beat scale as the timeline, so
-  // thread positions line up 1:1 with the regions below.
+  const roomKey = REVERB_PROFILES[head.reverbType || arrangement.context?.reverbType]
+    ? (head.reverbType || arrangement.context?.reverbType) : "room";
+  const roomLabel = (REVERB_PROFILES[roomKey] || REVERB_PROFILES.room).label;
+  const spaceH = 105;
+  // Owner 07-07, compacted 07-09: the cross-section sits on the LEFT at the
+  // same height as the beat-aligned cylinder. Settings live in the drawer below
+  // so the timeline gets the vertical space back.
   const panel = _spOpen ? `
-      <div class="tl2-row">
+      <div class="tl2-row sp-panel-row">
         <div class="tl2-head sp-left">
-          <canvas id="spSection" width="170" height="150" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. A multi-layer patch shows its instruments as faint dots and one brighter HANDLE: in Centered mode the handle rides a ring at their average distance (drag to rotate them together or scale their distances); in Additive mode it sits just in front of your head and shifts them all by the same amount. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here."></canvas>
-          <div class="sp-params">
-            <label class="sp-ctl">Mode
-              <select id="spMode" title="Override replaces each patch's own space; Offset adds the threads on top of it">
-                <option value="override"${sp.mode !== "offset" ? " selected" : ""}>Override</option>
-                <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset</option>
-              </select>
-            </label>
-            <label class="sp-ctl">Layers
-              <select id="spLayerMode" title="How a multi-layer patch's handle moves its instruments: Centered — the notch rides a ring at their average distance; dragging rotates them together and scales every distance by the same ratio (never negative). Additive — the handle is the patch's centre point (shown just in front of your head); dragging shifts every instrument by the same amount.">
-                <option value="centered"${sp.layerMode !== "additive" ? " selected" : ""}>Centered</option>
-                <option value="additive"${sp.layerMode === "additive" ? " selected" : ""}>Additive</option>
-              </select>
-            </label>
-            <button class="sp-ctl sp-room-btn" id="spRoomToggle" title="The shared room every track sits in — open the designer to pick a room and bend its character">${_spRoomOpen ? "▾" : "▸"} Room · ${esc((REVERB_PROFILES[head.reverbType || arrangement.context.reverbType] || REVERB_PROFILES.room).label)}</button>
-            <label class="sp-ctl">Amount <input type="range" id="spWet" min="0" max="0.95" step="0.01" value="${head.reverbWet ?? arrangement.context.reverbWet ?? 0.16}" title="How much of the shared room you hear (only applies while the global space is on)"/></label>
-            <label class="sp-ctl">Ear span <input type="range" id="spEar" min="0.12" max="0.25" step="0.005" value="${head.earDistance ?? 0.175}" title="${esc(PARAM_DESC.earDistance)}"/></label>
-            <label class="sp-ctl">Density <input type="range" id="spDensity" min="0" max="1" step="0.01" value="${head.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>
-            ${anchorAtPh ? `<label class="sp-ctl">Smooth <input type="range" id="spSmooth" min="0" max="1" step="0.05" value="${anchorAtPh.smooth ?? 0.5}" title="How gently the selected track's thread curves through the anchor at the playhead (0 = straight lines)"/></label>` : ""}
-          </div>
+          <canvas id="spSection" width="132" height="${spaceH}" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. A multi-layer patch shows its instruments as faint dots and one brighter HANDLE: in Centered mode the handle rides a ring at their average distance (drag to rotate them together or scale their distances); in Additive mode it sits just in front of your head and shifts them all by the same amount. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here."></canvas>
+          <button class="sp-settings-toggle" id="spRoomToggle" title="Open global-space settings">${_spRoomOpen ? "▾" : "⚙"} ${esc(roomLabel)}</button>
         </div>
-        <div class="sp-cyl-wrap" style="width:${laneW}px">
-          <canvas id="spCylinder" width="${laneW}" height="150" style="width:${laneW}px;height:150px" title="The arrangement's space over time, beat-aligned with the timeline below — one thread per instrument (nearer = thicker; the bright spans are that track's regions; the translucent core is your head). Drag up/down to roll the view; click an anchor dot to jump the playhead."></canvas>
+        <div class="sp-cyl-wrap" style="width:${laneW}px;height:${spaceH}px">
+          <canvas id="spCylinder" width="${laneW}" height="${spaceH}" style="width:${laneW}px;height:${spaceH}px" title="The arrangement's space over time, beat-aligned with the timeline below — one thread per instrument (nearer = thicker; the bright spans are that track's regions; the translucent core is your head). Drag up/down to roll the view; click an anchor dot to jump the playhead."></canvas>
         </div>
-      </div>${_spRoomOpen ? spRoomDesignerHTML(head) : ""}` : "";
+      </div>${_spRoomOpen ? spRoomDesignerHTML(head, sp, anchorAtPh) : ""}` : "";
   return `
       <div class="tl2-row tl2-sp-row">
         <div class="tl2-head tl2-corner gs-head">
@@ -2347,7 +2332,7 @@ function globalSpaceStripHTML(laneW) {
 // The producer's room designer (owner 07-07 round 3): the same editor as
 // the sub-note SPACE stage, writing to the arrangement's shared listener
 // (space.head) instead of the patch.
-function spRoomDesignerHTML(head) {
+function spRoomDesignerHTML(head, sp, anchorAtPh) {
   const ctxP = arrangement.context || {};
   const roomKey = REVERB_PROFILES[head.reverbType || ctxP.reverbType] ? (head.reverbType || ctxP.reverbType) : "room";
   const prof = REVERB_PROFILES[roomKey];
@@ -2358,14 +2343,32 @@ function spRoomDesignerHTML(head) {
   });
   return `
       <div class="sp-designer">
-        <div class="room-tiles">
-          ${Object.entries(REVERB_PROFILES).map(([k, r]) => `
-            <button class="room-tile${k === roomKey ? " sel" : ""}" data-room-tile="${k}" title="${esc(r.label)} — ${esc(r.blurb)}">
-              <canvas data-room-art="${k}" width="44" height="30"></canvas>
-              <span>${esc(r.label)}</span>
-            </button>`).join("")}
+        <div class="sp-room-current" title="${esc(prof.blurb)}">
+          <canvas data-room-art="${roomKey}" width="44" height="30"></canvas>
+          <span>${esc(prof.label)}</span>
         </div>
         <div class="sp-designer-ctls">
+          <label class="sp-ctl">Mode
+            <select id="spMode" title="Override replaces each patch's own space; Offset adds the threads on top of it">
+              <option value="override"${sp.mode !== "offset" ? " selected" : ""}>Override</option>
+              <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset</option>
+            </select>
+          </label>
+          <label class="sp-ctl">Layers
+            <select id="spLayerMode" title="How a multi-layer patch's handle moves its instruments: Centered — the notch rides a ring at their average distance; dragging rotates them together and scales every distance by the same ratio (never negative). Additive — the handle is the patch's centre point (shown just in front of your head); dragging shifts every instrument by the same amount.">
+              <option value="centered"${sp.layerMode !== "additive" ? " selected" : ""}>Centered</option>
+              <option value="additive"${sp.layerMode === "additive" ? " selected" : ""}>Additive</option>
+            </select>
+          </label>
+          <label class="sp-ctl" title="The shared room every track sits in">Room
+            <select id="spRoomType">
+              ${Object.entries(REVERB_PROFILES).map(([k, r]) =>
+                `<option value="${k}"${k === roomKey ? " selected" : ""} title="${esc(r.blurb)}">${esc(r.label)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="sp-ctl">Amount <input type="range" id="spWet" min="0" max="0.95" step="0.01" value="${head.reverbWet ?? ctxP.reverbWet ?? 0.16}" title="How much of the shared room you hear (only applies while the global space is on)"/></label>
+          <label class="sp-ctl">Ear span <input type="range" id="spEar" min="0.12" max="0.25" step="0.005" value="${head.earDistance ?? 0.175}" title="${esc(PARAM_DESC.earDistance)}"/></label>
+          <label class="sp-ctl">Density <input type="range" id="spDensity" min="0" max="1" step="0.01" value="${head.headDensity ?? 0.5}" title="${esc(PARAM_DESC.headDensity)}"/></label>
           <label class="sp-ctl" title="${esc(PARAM_DESC.earModel)}">Ears
             <select id="spEarModel">
               ${Object.entries(EAR_MODELS).map(([k, m]) =>
@@ -2377,6 +2380,7 @@ function spRoomDesignerHTML(head) {
           <label class="sp-ctl" title="${esc(PARAM_DESC.reverbSize)}">Size <input type="range" id="spSize" min="0" max="1" step="0.01" value="${head.reverbSize ?? prof.size}"/></label>
           <label class="sp-ctl" title="${esc(PARAM_DESC.reverbDamping)}">Damping <input type="range" id="spDamp" min="0" max="1" step="0.01" value="${head.reverbDamping ?? prof.damping}"/></label>
           <label class="sp-ctl" title="${esc(PARAM_DESC.reverbDiffusion)}">Diffusion <input type="range" id="spDiff" min="0" max="1" step="0.01" value="${head.reverbDiffusion ?? prof.diffusion}"/></label>
+          ${anchorAtPh ? `<label class="sp-ctl">Smooth <input type="range" id="spSmooth" min="0" max="1" step="0.05" value="${anchorAtPh.smooth ?? 0.5}" title="How gently the selected track's thread curves through the anchor at the playhead (0 = straight lines)"/></label>` : ""}
           <span class="sp-ctl sp-room-blurb">${esc(prof.blurb)}</span>
         </div>
       </div>`;
@@ -2723,20 +2727,22 @@ function wireGlobalSpace(v) {
     liveApply();
     renderProduce(); // the ear-span/density sliders show the new values
   };
+  const chooseRoom = (k) => {
+    if (!REVERB_PROFILES[k]) return;
+    const sp = ensureGlobalSpace();
+    sp.head.reverbType = k;
+    // a fresh pick adopts the room's own character
+    delete sp.head.reverbSize;
+    delete sp.head.reverbDamping;
+    delete sp.head.reverbDiffusion;
+    saveArrangement("global space room");
+    liveApply();
+    renderProduce();
+  };
+  const spRoomType = v.querySelector("#spRoomType");
+  if (spRoomType) spRoomType.onchange = () => chooseRoom(spRoomType.value);
   v.querySelectorAll(".sp-designer [data-room-tile]").forEach(btn => {
-    btn.onclick = () => {
-      const k = btn.dataset.roomTile;
-      if (!REVERB_PROFILES[k]) return;
-      const sp = ensureGlobalSpace();
-      sp.head.reverbType = k;
-      // a fresh pick adopts the room's own character
-      delete sp.head.reverbSize;
-      delete sp.head.reverbDamping;
-      delete sp.head.reverbDiffusion;
-      saveArrangement("global space room");
-      liveApply();
-      renderProduce();
-    };
+    btn.onclick = () => chooseRoom(btn.dataset.roomTile);
   });
   if (_spRoomOpen) drawRoomTiles();
   const spMode = v.querySelector("#spMode");
@@ -3043,6 +3049,57 @@ function wireMidi(v) {
   });
 }
 
+function regionMiniPianoHTML(region) {
+  const notes = Array.isArray(region.notes)
+    ? region.notes.filter(n => !n.isRest && (n.velocity ?? 0) > 0)
+    : [];
+  if (!notes.length) return `<span class="tl2-mini-roll empty" aria-hidden="true"></span>`;
+  const beatDiv = Math.max(1, Math.round(notes[0]?.beatDivisions || arrangement.context?.beatDivisions || 1));
+  const totalDivs = Math.max(beatDiv, Math.ceil(regionLen(region) * beatDiv));
+  const degrees = notes.map(n => Number(n.degree) || 0);
+  let minDeg = Math.min(...degrees);
+  let maxDeg = Math.max(...degrees);
+  if (maxDeg - minDeg < 4) {
+    minDeg -= 2;
+    maxDeg += 2;
+  }
+  const span = Math.max(1, maxDeg - minDeg);
+  const bars = notes.slice(0, 96).map(n => {
+    const off = (Number(n.offsetDivs) || 0) + (Number(n.onsetDevDivs) || 0);
+    const dur = Math.max(0.45, (Number(n.durationDivs) || 1) + (Number(n.durationDevDivs) || 0));
+    const x = clamp((off / totalDivs) * 100, 0, 98);
+    const w = clamp((dur / totalDivs) * 100, 1.2, Math.max(1.2, 100 - x));
+    const y = clamp(84 - (((Number(n.degree) || 0) - minDeg) / span) * 70, 8, 84);
+    const a = clamp(Number(n.velocity) || 0.62, 0.18, 1);
+    return `<i class="tl2-mini-note" style="--x:${x.toFixed(2)}%;--w:${w.toFixed(2)}%;--y:${y.toFixed(2)}%;--a:${a.toFixed(2)}"></i>`;
+  }).join("");
+  return `<span class="tl2-mini-roll" aria-hidden="true">${bars}</span>`;
+}
+
+function regionProbabilityCurveHTML(region, params = {}) {
+  const seed = (Math.floor(Number(region.seed) || 1) ^ 0x9E3779B9) >>> 0;
+  const rng = _fieldRng(seed);
+  const divs = clamp(Number(params.beatDivisions || arrangement.context?.beatDivisions || 1), 1, 6);
+  const on = clamp(Number(params.onBeatProb ?? 0.66), 0, 1);
+  const off = clamp(Number(params.offBeatProb ?? 0.38), 0, 1);
+  const surprise = clamp(Number(params.surpriseDensity ?? params.surpriseRate ?? 0.2), 0, 1);
+  const points = [];
+  let y = clamp(60 - (on - off) * 20 + (rng() - 0.5) * 18, 16, 84);
+  const steps = 11;
+  for (let i = 0; i <= steps; i++) {
+    const x = (i / steps) * 100;
+    const zig = (i % 2 ? 1 : -1) * (9 + off * 14);
+    const drift = (rng() - 0.5) * (18 + divs * 3 + surprise * 16);
+    y = clamp(y + zig + drift, 13, 87);
+    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  const pts = points.join(" ");
+  return `<svg class="tl2-prob-curve" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <polyline class="tl2-prob-shadow" points="${pts}"></polyline>
+    <polyline class="tl2-prob-line" points="${pts}"></polyline>
+  </svg>`;
+}
+
 function produceTimelineHTML() {
   const laneW = totalBeats() * pxPerBeat;
   // Ruler: bar numbers every BEATS_PER_BAR
@@ -3050,6 +3107,7 @@ function produceTimelineHTML() {
   const rulerMarks = Array.from({ length: barCount }, (_, i) =>
     `<span class="tl2-bar" style="left:${i * BEATS_PER_BAR * pxPerBeat}px">${i + 1}</span>`).join("");
   const trackRows = arrangement.tracks.map((t, ti) => {
+    const hue = t.hue ?? _spHue(ti);
     const regions = t.regions.map(r => {
       const sel = (selectedRegion?.regionId === r.id || selectedRegions.has(r.id)) ? " selected" : "";
       const baked = r.type === "baked" ? " baked" : "";
@@ -3066,11 +3124,14 @@ function produceTimelineHTML() {
           loopTicks += `<span class="tl2-looptick" style="left:${lb * pxPerBeat}px"></span>`;
         }
       }
+      const shape = r.type === "baked"
+        ? regionMiniPianoHTML(r)
+        : regionProbabilityCurveHTML(r, pal?.params || t.instrumentParams || {});
       const gainDb = 20 * Math.log10(Math.max(0.02, r.gain ?? 1));
       return `<div class="tl2-region${sel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
-        style="left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
+        style="--track-h:${hue};left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
         title="${esc(label)}${esc(badgeHover)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
-        ${loopTicks}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span><span class="tl2-region-label">${esc(label)}${r.type === "baked" ? `<b class="tl2-baked-tag" title="Baked: the take is frozen into editable notes — double-click to open the note editor">— BAKED</b>` : ""}</span>
+        ${loopTicks}${shape}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span><span class="tl2-region-label">${esc(label)}</span>
         ${sel && pal ? `<span class="tl2-badges">${patchBadgesHTML({ ...pal.params, ...(pal.originScale || {}) }, pal.originTempo, true)}</span>` : ""}
         ${sel ? `<span class="tl2-gain-tag" data-gain-tag="${r.id}" title="Region level — drag vertically">${gainDb >= 0 ? "+" : ""}${gainDb.toFixed(1)}dB</span>` : ""}
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
@@ -3078,7 +3139,6 @@ function produceTimelineHTML() {
     }).join("");
     const gain = t.gain ?? 1;
     const gainDbTrack = 20 * Math.log10(Math.max(0.02, gain));
-    const hue = t.hue ?? _spHue(ti);
     const spacePop = _spTrackPopover === t.id ? `
       <div class="tl2-space-pop">
         <label class="sp-ctl">Angle <input type="range" data-track-space-angle="${t.id}" min="-180" max="180" step="1" value="${t.space?.angle ?? 0}"/></label>
@@ -3088,7 +3148,7 @@ function produceTimelineHTML() {
     // Owner 07-07: the head is TWO rows so its controls never spill onto
     // the lanes — identity on top, mix controls underneath.
     return `<div class="tl2-row">
-      <div class="tl2-head tl2-track-head${trackAudible(t) ? "" : " inaudible"}${_spOpen && _spSelTrack === t.id ? " sp-sel" : ""}" data-track-head="${t.id}">
+      <div class="tl2-head tl2-track-head${trackAudible(t) ? "" : " inaudible"}${_spOpen && _spSelTrack === t.id ? " sp-sel" : ""}" data-track-head="${t.id}" style="--track-h:${hue}">
         <div class="tl2-head-top">
           <span class="tl2-hue" data-track-space="${t.id}" style="background:hsl(${hue},70%,55%)" title="This track's colour (matches its global-space thread). Click for the track's own space position — drag the header to reorder tracks."></span>
           <span class="tl2-name" title="${esc(t.name)} — click to select for the global space; drag to reorder">${esc(t.name)}</span>
@@ -3167,14 +3227,12 @@ function rollPanelHTML() {
   return `
     <div class="roll-panel${rollDynLane ? " dyn" : ""}">
       <div class="roll-head">
-        <span class="roll-title">Baked Note Editor</span>
+        <label class="roll-dyncheck"><input type="checkbox" id="rollDynToggle"${rollDynLane ? " checked" : ""}/> velocities</label>
+        <span class="roll-title">Note editor</span>
         <span class="roll-region" title="The region under edit">${esc(String(regionName))} — Seed ${region.seed ?? "—"}</span>
-        <span class="roll-chip roll-chip-baked" title="The take is frozen into editable notes — Unbake returns it to the seed">Baked</span>
-        <span class="roll-chip roll-chip-det" title="Baked notes replay exactly — no probability draws remain">Deterministic</span>
         <span class="roll-meta">grid <b>${beatDiv}/beat</b> · scale <b>${esc(scaleLabel)}</b> · key <b>${esc(keyName)}</b></span>
         <button class="btn btn-ghost btn-sm${_rollAddMode ? " roll-add-on" : ""}" id="rollAddMode" title="Draw mode: click an empty cell to add a note there">✏ Draw</button>
         <span class="roll-keys" title="Keyboard, with a note selected: ⌫ delete · M mute · Q quantize · ←→ nudge division · ↑↓ scale step · ⌥↑↓ cents">⌫ M Q ←→ ↑↓</span>
-        <label class="roll-dyncheck"><input type="checkbox" id="rollDynToggle"${rollDynLane ? " checked" : ""}/> velocity lane</label>
         <span class="roll-legend">
           <i class="roll-leg-intended"></i> Intended (scale degree)
           <i class="roll-leg-realised"></i> Realised (played)
@@ -3619,15 +3677,11 @@ function produceToolbarHTML() {
   if (selectedRegions.size > 1) {
     return `
       <span class="toolbar-hint"><b>${selectedRegions.size}</b> regions selected</span>
-      <label class="region-gain-label" title="Set every selected region's level">Lvl
-        <input type="range" id="bulkGain" min="0" max="1.5" step="0.05" value="1"/>
-      </label>
-      <button class="btn btn-ghost btn-sm" id="bulkMute" title="Mute/unmute all selected regions">Mute</button>
       <button class="btn btn-ghost btn-sm" id="bulkDuplicate" title="Duplicate each selected region after itself (same seed)">Duplicate</button>
-      <button class="btn btn-ghost btn-sm" id="bulkDelete" title="Delete all selected regions (⌫)">Delete</button>`;
+      <span class="toolbar-hint toolbar-keyhint">⌫ deletes</span>`;
   }
   if (!selectedRegion) {
-    return '<span class="toolbar-hint">Select a region to play it as a loop, reroll its take, or delete it. Press ? for shortcuts.</span>';
+    return '<span class="toolbar-hint">Select a region for loop, bake, reroll, or split. Double-click baked regions for notes.</span>';
   }
   const sel = (() => {
     for (const t of arrangement.tracks) {
@@ -3640,18 +3694,35 @@ function produceToolbarHTML() {
   return `
     <button class="btn btn-primary btn-sm" id="regionPlay">${synth.isPlaying ? "■ Stop loop" : "▶ Loop region"}</button>
     ${baked
-      ? `<button class="btn btn-secondary btn-sm" id="regionEditNotes">${rollOpen ? "Hide notes" : "✎ Edit notes"}</button>
-         <button class="btn btn-secondary btn-sm" id="regionUnbake" title="Return this region to generative playback (the baked notes are discarded; the seed regenerates the same take)">Unbake</button>`
+      ? `<button class="btn btn-secondary btn-sm" id="regionUnbake" title="Return this region to generative playback (the baked notes are discarded; the seed regenerates the same take)">Unbake</button>`
       : `<button class="btn btn-secondary btn-sm" id="regionBake" title="Freeze this take into editable notes — the piano-roll editor works on baked regions">◆ Bake</button>`}
     <button class="btn btn-secondary btn-sm" id="regionReroll" title="Draw a fresh take: new seed, same instrument and context (R)"${baked ? " disabled" : ""}>↻ Reroll</button>
     <button class="btn btn-ghost btn-sm" id="regionSeedBack" title="Step back to the previous seed (⇧R)"${baked ? " disabled" : ""}>⤺ seed</button>
-    <button class="btn btn-ghost btn-sm" id="regionSplit" title="Split at the playhead (⌘T) — both halves keep the same take">✂ Split</button>
-    <button class="btn btn-ghost btn-sm" id="regionMute" title="Mute this region (playback and mixdown skip it)">Mute</button>
-    <label class="region-gain-label" title="Region level (multiplies the track level during this region)">Lvl
-      <input type="range" id="regionGain" min="0" max="1.5" step="0.05" value="${sel?.gain ?? 1}"/>
-    </label>
-    <button class="btn btn-ghost btn-sm" id="regionToStudio" title="Open this region's exact sound and context in the Sound Studio">→ Studio</button>
-    <button class="btn btn-ghost btn-sm" id="regionDelete">Delete</button>`;
+    <button class="btn btn-ghost btn-sm" id="regionSplit" title="Split at the playhead (⌘T) — both halves keep the same take">✂ Split</button>`;
+}
+
+function deleteSelectedRegions() {
+  if (selectedRegions.size > 1) {
+    for (const t of arrangement.tracks) t.regions = t.regions.filter(r => !selectedRegions.has(r.id));
+    selectedRegions.clear();
+    selectedRegion = null;
+    rollOpen = false;
+    rollNoteSel = -1;
+    saveArrangement("bulk delete");
+    renderProduce();
+    return true;
+  }
+  if (!selectedRegion) return false;
+  const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+  const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+  if (!track || !region) return false;
+  track.regions = track.regions.filter(r => r.id !== region.id);
+  selectedRegion = null;
+  rollOpen = false;
+  rollNoteSel = -1;
+  saveArrangement("delete region");
+  renderProduce();
+  return true;
 }
 
 // ── Pointer-based drag & drop (v2.1 U0) ─────────────────────
@@ -3908,6 +3979,94 @@ function maybeShowProducerTour() {
   document.body.appendChild(el);
 }
 
+// ── Studio tour: spotlight coach marks over the live Explore UI ──
+// Audit P0 asked for non-blocking guidance instead of another modal: each
+// step rings a real control (the app stays clickable underneath) and says
+// what it is for. Auto-runs once after the welcome overlay; replayable any
+// time from the ✦ Tour button next to the workspace tabs.
+const STUDIO_TOUR_KEY = "phase0.studioTour.v1";
+const STUDIO_TOUR_STEPS = [
+  [".transport-card", "Hear something first",
+   "▶ Play starts a continuous stream generated from the current settings — nothing is pre-recorded. Randomise reshuffles every behaviour at once, and the Seed makes any take repeatable."],
+  ["#workspaceTabs", "Three workshops",
+   "Macro shapes how the instrument plays: melody, rhythm, dynamics, surprise. Sub-note designs what a single note sounds like (excitor → resonator → body → space). Scale Lab is the tuning workshop."],
+  [".m2-rail", "Pick a behaviour",
+   "Each mode on this rail — Scale & Root, Melody, Duration, Dynamics, Sequence & Surprise, Percussion — opens its own controls in the panel beside it. Change something while playing and listen for the difference."],
+  [".m2-visual", "The behaviour lanes",
+   "This display is the engine thinking out loud: each lane is one behaviour, and the moving beam is the note being chosen right now. The lanes redraw as you move any control."],
+  ["#m2Lib", "The browser",
+   "Ready-made sounds live in this strip. Click one to load it, ♥ to keep favourites, or ▴ Browse all for the full factory, saved and community library."],
+  [".top-rating-row", "Rate what you hear",
+   "The 1–7 rating is how the research learns what sounds good. If you opted in to sharing it is sent anonymously; either way it tags the presets you save."],
+  [".producer-pill", "When you're ready: the Producer",
+   "The Producer arranges your instruments on a multitrack timeline — regions, seeds, baking takes into editable notes. It has its own short tour the first time you open it."],
+];
+
+function maybeStartStudioTour() {
+  if (localStorage.getItem(STUDIO_TOUR_KEY)) return;
+  startStudioTour();
+}
+
+function startStudioTour() {
+  document.getElementById("studioTour")?.remove();
+  const steps = STUDIO_TOUR_STEPS.filter(([sel]) => document.querySelector(sel));
+  if (!steps.length) return;
+  let i = 0;
+  const el = document.createElement("div");
+  el.id = "studioTour";
+  el.innerHTML = `<div class="tour-ring"></div><div class="tour-pop"></div>`;
+  document.body.appendChild(el);
+  const ring = el.querySelector(".tour-ring");
+  const pop = el.querySelector(".tour-pop");
+  const target = () => document.querySelector(steps[i]?.[0]);
+  const place = () => {
+    const t = target();
+    if (!t) return;
+    const r = t.getBoundingClientRect();
+    const pad = 6;
+    Object.assign(ring.style, {
+      left: `${r.left - pad}px`,
+      top: `${r.top - pad}px`,
+      width: `${r.width + pad * 2}px`,
+      height: `${r.height + pad * 2}px`,
+    });
+    const popW = pop.offsetWidth || 320;
+    const popH = pop.offsetHeight || 150;
+    const below = r.bottom + pad + 10;
+    const top = below + popH + 12 > innerHeight
+      ? Math.max(12, r.top - pad - popH - 10)
+      : below;
+    const left = Math.min(Math.max(12, r.left), innerWidth - popW - 12);
+    Object.assign(pop.style, { left: `${left}px`, top: `${top}px` });
+  };
+  const done = () => {
+    localStorage.setItem(STUDIO_TOUR_KEY, "seen");
+    window.removeEventListener("resize", place);
+    el.remove();
+  };
+  const draw = () => {
+    const t = target();
+    if (!t) { if (++i >= steps.length) done(); else draw(); return; }
+    const [, title, body] = steps[i];
+    pop.innerHTML = `
+      <div class="section-label">${esc(title)} <span class="shortcut-close">${i + 1}/${steps.length}</span></div>
+      <p>${esc(body)}</p>
+      <div class="tour-actions">
+        <button class="btn btn-ghost btn-sm" id="tourSkip">Skip tour</button>
+        ${i ? `<button class="btn btn-secondary btn-sm" id="tourBack">Back</button>` : ""}
+        <button class="btn btn-primary btn-sm" id="tourNext">${i === steps.length - 1 ? "Done" : "Next"}</button>
+      </div>`;
+    pop.querySelector("#tourSkip").onclick = done;
+    const back = pop.querySelector("#tourBack");
+    if (back) back.onclick = () => { i--; draw(); };
+    pop.querySelector("#tourNext").onclick = () => { if (++i >= steps.length) done(); else draw(); };
+    t.scrollIntoView({ block: "center", behavior: "auto" });
+    requestAnimationFrame(place);
+  };
+  window.addEventListener("resize", place);
+  draw();
+}
+
 // U4: DAW keyboard transport, active only in the producer view
 if (!window._dawKeysInstalled) {
   window._dawKeysInstalled = true;
@@ -3972,7 +4131,7 @@ if (!window._dawKeysInstalled) {
     // Q9 B2: ⌫ clears the whole multi-selection
     if ((e.key === "Delete" || e.key === "Backspace") && selectedRegions.size > 1) {
       e.preventDefault();
-      document.querySelector("#bulkDelete")?.click();
+      deleteSelectedRegions();
       return;
     }
     if (e.code === "Space") {
@@ -4012,7 +4171,7 @@ if (!window._dawKeysInstalled) {
       renderProduce();
     } else if ((e.key === "Delete" || e.key === "Backspace") && selectedRegion) {
       e.preventDefault();
-      document.querySelector("#regionDelete")?.click();
+      deleteSelectedRegions();
     } else if (e.key === "Escape") {
       selectedRegion = null;
       rollOpen = false;
@@ -4172,6 +4331,46 @@ let browserSearch = "";
 let browserPreviewId = null; // browser item currently previewing
 function saveDawLayout() { localStorage.setItem(DAW_LAYOUT_KEY, JSON.stringify(dawLayout)); }
 
+// Audit P0: demo arrangement — three starter rigs in overlapping regions,
+// built through the SAME path as by hand (palette → track → region), so
+// undo/inspect/reroll all behave normally afterwards. Shared by the
+// producer's empty-state button and the welcome overlay's Load Demo card.
+function loadDemoArrangement() {
+  arrangement = arrangement || loadArrangement();
+  if (arrangement.tracks.length) return false; // never stomp real work
+  const wanted = ["Wood Talk", "Deep Walker", "Slow Sky"];
+  const picks = wanted
+    .map(n => produceSources().find(s => s.kind === "factory" && s.name === n))
+    .filter(Boolean);
+  if (!picks.length) return false;
+  const layout = [
+    { start: 0, len: 8 * BEATS_PER_BAR },
+    { start: 2 * BEATS_PER_BAR, len: 6 * BEATS_PER_BAR },
+    { start: 4 * BEATS_PER_BAR, len: 4 * BEATS_PER_BAR },
+  ];
+  picks.forEach((src, i) => {
+    addToPalette({ id: src.id, name: src.name, kindLabel: "starter", params: src.parameters, parameters: src.parameters });
+    const pl = arrangement.palette[arrangement.palette.length - 1];
+    arrangement.tracks.push({
+      id: crypto.randomUUID(),
+      name: src.name,
+      sourceKind: src.kind,
+      instrumentParams: { ...src.parameters },
+      gain: 1,
+      regions: [{
+        id: crypto.randomUUID(), paletteId: pl.id,
+        startBeat: layout[i]?.start ?? 0,
+        lengthBeats: layout[i]?.len ?? 4 * BEATS_PER_BAR,
+        seed: newSeed(),
+      }],
+    });
+  });
+  const t0 = arrangement.tracks[arrangement.tracks.length - picks.length];
+  if (t0?.regions[0]) selectedRegion = { trackId: t0.id, regionId: t0.regions[0].id };
+  saveArrangement("demo arrangement");
+  return true;
+}
+
 function renderProduce() {
   arrangement = arrangement || loadArrangement();
   dawLayout = dawLayout || loadDawLayout();
@@ -4182,42 +4381,52 @@ function renderProduce() {
   const v = mount(`
     <div class="daw">
       <div class="daw-transport">
-        <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Sound Studio">←</a>
-        <span class="daw-title">Producer <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></span>
-        <select id="arrSelect" class="daw-ctx-select" title="Switch arrangement">
-          ${Object.values(loadArrangementRegistry()).map(a =>
-            `<option value="${a.id}"${a.id === arrangement.id ? " selected" : ""}>${esc(a.name || "Untitled")}</option>`).join("")}
-        </select>
-        <button class="btn btn-ghost btn-sm" id="arrNew" title="New empty arrangement">New</button>
-        <button class="btn btn-ghost btn-sm" id="arrRename" title="Rename this arrangement">Aa</button>
-        <button class="btn btn-ghost btn-sm" id="arrDelete" title="Delete this arrangement">🗑</button>
-        <button class="btn btn-ghost btn-sm" id="arrRTZ" title="Return to bar 1 (Return)">⏮</button>
-        <button class="btn btn-primary btn-sm" id="arrPlayBtn" title="Play / pause (Space)">▶</button>
-        <button class="btn btn-secondary btn-sm" id="prodStop" title="Stop (returns to the start marker)">■</button>
-        <button class="btn btn-ghost btn-sm${arrangement.loopOn ? " loop-on" : ""}" id="arrLoop" title="Cycle the loop range (drag the ruler's top half to set it)">⟳</button>
-        <span class="daw-pos" id="arrPos" title="Position bar.beat — click to locate">${Math.floor(playheadBeat / BEATS_PER_BAR) + 1}.${(Math.floor(playheadBeat) % BEATS_PER_BAR) + 1}</span>
-        <span class="daw-saved" id="arrSaved"></span>
-        <span class="daw-sep"></span>
-        ${sessionBarControlsHTML()}
-        <span class="daw-sep"></span>
-        <button class="btn btn-ghost btn-sm" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">↩</button>
-        <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
-        <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
-        <select id="snapSelect" class="daw-ctx-select" title="Grid snap (⌃-drag bypasses)">
-          <option value="4"${snapBeats === 4 ? " selected" : ""}>Bar</option>
-          <option value="1"${snapBeats === 1 ? " selected" : ""}>Beat</option>
-          <option value="0.5"${snapBeats === 0.5 ? " selected" : ""}>½ beat</option>
-          <option value="0"${snapBeats === 0 ? " selected" : ""}>Off</option>
-        </select>
-        <input type="range" id="zoomSlider" min="6" max="32" step="1" value="${pxPerBeat}" title="Zoom (Z = fit arrangement, ⇧Z = fit selection)" class="zoom-slider"/>
-        <span class="daw-sep"></span>
-        <button class="btn btn-secondary btn-sm" id="arrMixdown" title="Render the arrangement offline and download it as a WAV">⬇ WAV</button>
-        <button class="btn btn-ghost btn-sm" id="arrExport" title="Download this arrangement as a self-contained JSON file (instruments included)">Export</button>
-        <button class="btn btn-ghost btn-sm" id="arrImport" title="Load an arrangement JSON file">Import</button>
-        <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
-        <span class="daw-sep"></span>
-        ${midiToolbarHTML()}
-        <span class="toolbar-hint" id="mixStatus"></span>
+        <div class="daw-cluster daw-cluster-arrangement" aria-label="Arrangement">
+          <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Sound Studio">←</a>
+          <span class="daw-title">Producer <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></span>
+          <select id="arrSelect" class="daw-ctx-select" title="Switch arrangement">
+            ${Object.values(loadArrangementRegistry()).map(a =>
+              `<option value="${a.id}"${a.id === arrangement.id ? " selected" : ""}>${esc(a.name || "Untitled")}</option>`).join("")}
+          </select>
+          <button class="btn btn-ghost btn-sm" id="arrNew" title="New empty arrangement">New</button>
+          <button class="btn btn-ghost btn-sm" id="arrRename" title="Rename this arrangement">Aa</button>
+          <button class="btn btn-ghost btn-sm" id="arrDelete" title="Delete this arrangement">🗑</button>
+        </div>
+        <div class="daw-cluster daw-cluster-playback" aria-label="Transport">
+          <button class="btn btn-ghost btn-sm" id="arrRTZ" title="Return to bar 1 (Return)">⏮</button>
+          <button class="btn btn-primary btn-sm" id="arrPlayBtn" title="Play / pause (Space)">▶</button>
+          <button class="btn btn-secondary btn-sm" id="prodStop" title="Stop (returns to the start marker)">■</button>
+          <button class="btn btn-ghost btn-sm${arrangement.loopOn ? " loop-on" : ""}" id="arrLoop" title="Cycle the loop range (drag the ruler's top half to set it)">⟳</button>
+          <span class="daw-pos" id="arrPos" title="Position bar.beat — click to locate">${Math.floor(playheadBeat / BEATS_PER_BAR) + 1}.${(Math.floor(playheadBeat) % BEATS_PER_BAR) + 1}</span>
+          <span class="daw-saved" id="arrSaved"></span>
+        </div>
+        <div class="daw-cluster daw-cluster-context" aria-label="Session context">
+          ${sessionBarControlsHTML()}
+        </div>
+        <div class="daw-cluster daw-cluster-edit" aria-label="Grid and edit">
+          <button class="btn btn-ghost btn-sm" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">↩</button>
+          <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
+          <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
+          <select id="snapSelect" class="daw-ctx-select" title="Grid snap (⌃-drag bypasses)">
+            <option value="4"${snapBeats === 4 ? " selected" : ""}>Bar</option>
+            <option value="1"${snapBeats === 1 ? " selected" : ""}>Beat</option>
+            <option value="0.5"${snapBeats === 0.5 ? " selected" : ""}>½ beat</option>
+            <option value="0"${snapBeats === 0 ? " selected" : ""}>Off</option>
+          </select>
+          <input type="range" id="zoomSlider" min="6" max="32" step="1" value="${pxPerBeat}" title="Zoom (Z = fit arrangement, ⇧Z = fit selection)" class="zoom-slider"/>
+        </div>
+        <div class="daw-cluster daw-cluster-io" aria-label="File and MIDI">
+          <select id="arrFileMenu" class="daw-ctx-select daw-file-menu" title="Export WAV, export arrangement JSON, or import an arrangement">
+            <option value="">File</option>
+            <option value="wav">Export WAV</option>
+            <option value="json-export">Export arrangement</option>
+            <option value="json-import">Import arrangement</option>
+          </select>
+          <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
+          ${midiToolbarHTML()}
+          <span class="toolbar-hint" id="mixStatus"></span>
+        </div>
+        <div class="daw-cluster daw-cluster-region region-toolbar" id="regionToolbar" aria-label="Selected region actions">${produceToolbarHTML()}</div>
       </div>
       <div class="daw-main">
         <div class="daw-left${dawLayout.leftOpen ? "" : " collapsed"}" style="width:${dawLayout.leftOpen ? dawLayout.leftW : 22}px">
@@ -4269,7 +4478,6 @@ function renderProduce() {
                beat-aligned via scrollLeft sync (wireStripsPanel). -->
           <div class="strips-panel" id="stripsPanel"><div class="tl2 strips-tl2" id="stripsScroll">${globalScaleStripHTML(totalBeats() * pxPerBeat)}${globalSpaceStripHTML(totalBeats() * pxPerBeat)}</div></div>
           <div class="timeline-grid" id="timelineGrid">${produceTimelineHTML()}</div>
-          <div class="region-toolbar" id="regionToolbar">${produceToolbarHTML()}</div>
         </div>
       </div>
       <div class="daw-hsplit${editorOpen ? "" : " hidden"}" id="dawHSplit" title="Drag to resize the editor"></div>
@@ -4444,43 +4652,10 @@ function wireProduce(v) {
     };
   });
 
-  // Audit P0: demo arrangement — three starter rigs in overlapping
-  // regions, built through the SAME path as by hand (palette → track →
-  // region), so undo/inspect/reroll all behave normally afterwards.
+  // Audit P0: demo arrangement (shared builder — also reachable from the
+  // welcome overlay's Load Demo path).
   const demoBtn = v.querySelector("#loadDemo");
-  if (demoBtn) demoBtn.onclick = () => {
-    const wanted = ["Wood Talk", "Deep Walker", "Slow Sky"];
-    const picks = wanted
-      .map(n => produceSources().find(s => s.kind === "factory" && s.name === n))
-      .filter(Boolean);
-    if (!picks.length) return;
-    const layout = [
-      { start: 0, len: 8 * BEATS_PER_BAR },
-      { start: 2 * BEATS_PER_BAR, len: 6 * BEATS_PER_BAR },
-      { start: 4 * BEATS_PER_BAR, len: 4 * BEATS_PER_BAR },
-    ];
-    picks.forEach((src, i) => {
-      addToPalette({ id: src.id, name: src.name, kindLabel: "starter", params: src.parameters, parameters: src.parameters });
-      const pl = arrangement.palette[arrangement.palette.length - 1];
-      arrangement.tracks.push({
-        id: crypto.randomUUID(),
-        name: src.name,
-        sourceKind: src.kind,
-        instrumentParams: { ...src.parameters },
-        gain: 1,
-        regions: [{
-          id: crypto.randomUUID(), paletteId: pl.id,
-          startBeat: layout[i]?.start ?? 0,
-          lengthBeats: layout[i]?.len ?? 4 * BEATS_PER_BAR,
-          seed: newSeed(),
-        }],
-      });
-    });
-    const t0 = arrangement.tracks[arrangement.tracks.length - picks.length];
-    if (t0?.regions[0]) selectedRegion = { trackId: t0.id, regionId: t0.regions[0].id };
-    saveArrangement("demo arrangement");
-    renderProduce();
-  };
+  if (demoBtn) demoBtn.onclick = () => { if (loadDemoArrangement()) renderProduce(); };
 
   v.querySelectorAll("[data-remove-track]").forEach(btn => {
     btn.onclick = () => {
@@ -4639,10 +4814,13 @@ function wireProduce(v) {
         const rect = { l: Math.min(x0, ev.clientX), t: Math.min(y0, ev.clientY), r: Math.max(x0, ev.clientX), b: Math.max(y0, ev.clientY) };
         band.remove();
         if (!swept || (rect.r - rect.l < 4 && rect.b - rect.t < 4)) {
-          // plain click on empty lane: clear selection but don't re-render
-          // needlessly — a re-render here would swallow double-click-create
-          if (selectedRegions.size) {
+          // plain click on empty lane: clear selection and close the note
+          // editor without needing an explicit hide control.
+          if (selectedRegions.size || selectedRegion || rollOpen) {
             selectedRegions.clear();
+            selectedRegion = null;
+            rollOpen = false;
+            rollNoteSel = -1;
             renderProduce();
           }
           return;
@@ -4880,13 +5058,7 @@ function wireProduce(v) {
     renderProduce();
   };
   const bulkDel = v.querySelector("#bulkDelete");
-  if (bulkDel) bulkDel.onclick = () => {
-    for (const t of arrangement.tracks) t.regions = t.regions.filter(r => !selectedRegions.has(r.id));
-    selectedRegions.clear();
-    selectedRegion = null;
-    saveArrangement("bulk delete");
-    renderProduce();
-  };
+  if (bulkDel) bulkDel.onclick = () => deleteSelectedRegions();
 
   const bakeBtn = v.querySelector("#regionBake");
   if (bakeBtn) bakeBtn.onclick = () => {
@@ -5002,14 +5174,7 @@ function wireProduce(v) {
   };
 
   const deleteBtn = v.querySelector("#regionDelete");
-  if (deleteBtn) deleteBtn.onclick = () => {
-    const { track, region } = selected();
-    if (!track || !region) return;
-    track.regions = track.regions.filter(r => r.id !== region.id);
-    selectedRegion = null;
-    saveArrangement();
-    renderProduce();
-  };
+  if (deleteBtn) deleteBtn.onclick = () => deleteSelectedRegions();
 
   const arrPlayBtn = v.querySelector("#arrPlayBtn");
   if (arrPlayBtn) arrPlayBtn.onclick = () => {
@@ -5139,15 +5304,25 @@ function wireProduce(v) {
     };
   });
 
+  const fileMenu = v.querySelector("#arrFileMenu");
+  if (fileMenu) fileMenu.onchange = () => {
+    const action = fileMenu.value;
+    fileMenu.value = "";
+    if (action === "wav") mixdownArrangement(v.querySelector("#mixStatus"), fileMenu);
+    if (action === "json-export") exportArrangement();
+    if (action === "json-import") v.querySelector("#arrImportFile")?.click();
+  };
   const mixBtn = v.querySelector("#arrMixdown");
   if (mixBtn) mixBtn.onclick = () => mixdownArrangement(v.querySelector("#mixStatus"), mixBtn);
   const exportBtn = v.querySelector("#arrExport");
   if (exportBtn) exportBtn.onclick = () => exportArrangement();
   const importBtn = v.querySelector("#arrImport");
   const importFile = v.querySelector("#arrImportFile");
+  if (importFile) {
+    importFile.onchange = () => { if (importFile.files[0]) importArrangement(importFile.files[0]); };
+  }
   if (importBtn && importFile) {
     importBtn.onclick = () => importFile.click();
-    importFile.onchange = () => { if (importFile.files[0]) importArrangement(importFile.files[0]); };
   }
 }
 
@@ -5640,6 +5815,7 @@ function renderExplore() {
         <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
         <button class="workspace-tab${workspaceTab === 'scalelab' ? ' active' : ''}" data-workspace-tab="scalelab" title="The tuning workshop: the scale wheel, N-EDO systems, world tunings, per-degree cents and Scala import/export">Scale Lab</button>
       </div>
+      <button class="btn btn-ghost btn-sm studio-tour-btn" id="studioTourBtn" title="Replay the guided tour of the studio">✦ Tour</button>
     </div>
 
     ${paletteEditBannerHTML()}
@@ -5752,21 +5928,26 @@ function renderExplore() {
 
   // Responsive, high-DPI hero display: match the backing store to the CSS
   // size (capped at 2x DPR) and redraw whenever the layout changes.
+  if (_visResizeObserver) {
+    _visResizeObserver.disconnect();
+    _visResizeObserver = null;
+  }
   if (canvas && window.ResizeObserver) {
-    if (_visResizeObserver) _visResizeObserver.disconnect();
+    const observedCanvas = canvas;
     const fitVis = () => {
+      if (!observedCanvas.isConnected) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const w = Math.round(canvas.clientWidth * dpr);
-      const h = Math.round(canvas.clientHeight * dpr);
-      if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
-        canvas.width = w;
-        canvas.height = h;
+      const w = Math.round(observedCanvas.clientWidth * dpr);
+      const h = Math.round(observedCanvas.clientHeight * dpr);
+      if (w > 0 && h > 0 && (observedCanvas.width !== w || observedCanvas.height !== h)) {
+        observedCanvas.width = w;
+        observedCanvas.height = h;
         layoutLaneHeads(); // lane header overlay tracks the canvas box
         if (!synth.isPlaying) drawStaticVis();
       }
     };
     _visResizeObserver = new ResizeObserver(fitVis);
-    _visResizeObserver.observe(canvas);
+    _visResizeObserver.observe(observedCanvas);
     fitVis();
   }
 
@@ -5811,6 +5992,9 @@ function renderExplore() {
       startVisualiser();
     }
   };
+
+  const tourBtn = v.querySelector("#studioTourBtn");
+  if (tourBtn) tourBtn.onclick = () => startStudioTour();
 
   // Transport
   const playBtn = v.querySelector("#playBtn");
@@ -6038,7 +6222,10 @@ function renderExplore() {
       const key = sel.dataset.paramSelect;
       noteParamChange(key, exploreParams[key], sel.value);
       exploreParams[key] = sel.value;
-      if (key === "spectralProfile") resetSpectralPartialParams(exploreParams);
+      if (key === "spectralProfile") {
+        resetSpectralPartialParams(exploreParams);
+        delete exploreParams.spectralProfileName;
+      }
       const out = v.querySelector(`#out_${key}`);
       if (out) out.textContent = fmtOutput(key, sel.value);
       if (harmonicParams.has(key)) syncHarmonicWorkspace(v);
@@ -6091,6 +6278,7 @@ function renderExplore() {
   wireTonePrint(v);
   wireSpacePad(v);
   wireStageBig(v); // V2 spatial stage — sources around the shared head
+  wireSubnoteTitle(v);
   wireScaleLab(v); // V2 scale lab — the tuning workshop tab
   wireEarRoom(v);
   drawSpaceField(); // SPACE stage ear-response view (display only)
@@ -7126,6 +7314,7 @@ function loadSoundModuleById(id) {
     if (!SPECTRAL_PROFILES[key] || exploreParams.spectralProfile === key) return;
     noteParamChange("spectralProfile", exploreParams.spectralProfile, key);
     exploreParams.spectralProfile = key;
+    delete exploreParams.spectralProfileName;
     resetSpectralPartialParams(exploreParams);
     if ((exploreParams.bodyType || "auto") === "auto") {
       delete exploreParams.bodyBands;
@@ -7138,6 +7327,7 @@ function loadSoundModuleById(id) {
     for (const k of Object.keys(sound)) if (k.startsWith("layer")) delete sound[k];
     if (!Object.keys(sound).length) return;
     Object.assign(exploreParams, sound);
+    if (!Object.prototype.hasOwnProperty.call(sound, "spectralProfileName")) delete exploreParams.spectralProfileName;
     if ((exploreParams.bodyType || "auto") === "auto") {
       delete exploreParams.bodyBands;
       _chBodySel = null;
@@ -7738,11 +7928,17 @@ function drawLayerMiniPads() {
   });
 }
 
+function subnotePresetLabel(p = exploreParams) {
+  const custom = String(p.spectralProfileName || "").trim();
+  if (custom) return custom;
+  return (SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin).label;
+}
+
 function subnoteWorkspaceHTML(p) {
   const formantMode = isFormantMode(p);
   const fourierDisabled = formantMode ? " mode-disabled" : "";
   const formantDisabled = formantMode ? "" : " mode-disabled";
-  const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
+  const title = subnotePresetLabel(p);
   return `
     <div class="card subnote-full-card ${formantMode ? "is-formant-mode" : "is-fourier-mode"}">
       <div class="subnote-full-layout">
@@ -7768,9 +7964,9 @@ function subnoteWorkspaceHTML(p) {
                  selected stage expands into the inspector; the partial field
                  is the shared display everything indexes into. -->
             <div class="ch-head">
-              <div>
-                <div class="section-label">Tone Designer${_chLayerEdit ? ` — <span class="layer-edit-tag">editing layer ${(p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 1 || ""}</span>` : ""}</div>
-                <h2>${esc(profile.label)}</h2>
+              <div class="ch-title-block">
+                <h2 class="ch-preset-title" id="chPresetTitle" title="Double-click to rename this sound">${esc(title)}</h2>
+                ${_chLayerEdit ? `<span class="layer-edit-tag">editing layer ${(p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 1 || ""}</span>` : ""}
               </div>
               ${_chLayerEdit ? `<button class="btn btn-primary btn-sm" id="layerEditDone" title="Save this sound back into the layer and return to the base sound">Done — back to base</button>` : ""}
               <!-- Owner 07-08: no preset dropdown or mix slider here — the
@@ -7790,7 +7986,7 @@ function subnoteWorkspaceHTML(p) {
               ${chRailCardHTML(p, "space", "04", "SPACE")}
             </div>
             <div class="ch-main">
-              <div class="ch-inspector ch-${_chStage}" id="chInspector" style="width:${_studioPanels.chW}px">${chInspectorHTML(p)}</div>
+              <div class="ch-inspector ch-${_chStage}" id="chInspector" style="--ch-w:${_studioPanels.chW}px">${chInspectorHTML(p)}</div>
               <div class="ch-vsplit" id="chVSplit" title="Drag to resize the inspector"></div>
               <div class="ch-field-wrap">
                 <div class="td-field-head">
@@ -8100,12 +8296,11 @@ function syncHarmonicWorkspace(v) {
   const card = v.querySelector(".subnote-full-card");
   if (!card) return;
   ensureSpectralPartialParams(exploreParams);
-  const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
   // Only the Fourier/harmonic stage heading reflects the instrument label.
   // Scope to .harmonic-stage so this never clobbers the formant-stage heading
   // (which shows the vowel space) when in formant mode.
-  const title = card.querySelector(".harmonic-stage .subnote-head h2");
-  if (title) title.textContent = profile.label;
+  const title = card.querySelector(".harmonic-stage .ch-preset-title");
+  if (title) title.textContent = subnotePresetLabel(exploreParams);
   const editor = card.querySelector("#harmonicEditor");
   if (editor) editor.innerHTML = harmonicEditorHTML(exploreParams);
   card.querySelectorAll("select[data-param-select]").forEach(sel => {
@@ -8117,6 +8312,42 @@ function syncHarmonicWorkspace(v) {
   drawBodyRidge();
   drawSpacePad();
   drawChThumbs();
+}
+
+function wireSubnoteTitle(v) {
+  const title = v.querySelector("#chPresetTitle");
+  if (!title) return;
+  title.ondblclick = () => {
+    const input = document.createElement("input");
+    input.className = "ch-title-edit";
+    input.value = subnotePresetLabel(exploreParams);
+    input.maxLength = 48;
+    title.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const commit = (save) => {
+      if (done) return;
+      done = true;
+      if (save) {
+        const next = input.value.trim();
+        const prev = exploreParams.spectralProfileName;
+        if (next) {
+          noteParamChange("spectralProfileName", prev, next);
+          exploreParams.spectralProfileName = next;
+        } else if (prev) {
+          noteParamChange("spectralProfileName", prev, "");
+          delete exploreParams.spectralProfileName;
+        }
+      }
+      renderExplore();
+    };
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") commit(true);
+      if (e.key === "Escape") commit(false);
+    };
+    input.onblur = () => commit(true);
+  };
 }
 
 function applySubnoteModeState(root = document) {
@@ -11433,22 +11664,14 @@ function drawSpacePad() {
   ctx.shadowBlur = 0;
 }
 
-// Q12 QA: scale the fixed 1440×790 plugin canvas to fit the viewport.
-// The stylesheet tried transform: scale(min(calc(100vw/1446), …)) which is
-// invalid CSS (scale() takes a number, not a length) and silently never
-// applied — small windows just clipped the right edge. JS owns it now.
+// Studio sections now use native viewport layout like Producer. Keep this
+// shim because resize/render paths still call it, and clear any persisted
+// transform from older sessions.
 function fitStudioScale() {
   const dash = document.querySelector(".explore-dashboard");
   if (!dash) return;
-  // a zero-size viewport (headless capture, minimised window) must never
-  // collapse the studio to scale(0)
-  if (!window.innerWidth || !window.innerHeight) return;
-  // Owner 07-07: adaptive both ways — small viewports scale the plugin
-  // down, LARGE viewports scale it up to fill (no black band below);
-  // capped at 1.6x so text stays crisp.
-  const s = Math.min(window.innerWidth / 1446, window.innerHeight / 796, 1.6);
-  dash.style.transform = Math.abs(s - 1) > 0.01 ? `scale(${s})` : "";
-  dash.style.transformOrigin = "top left";
+  dash.style.transform = "";
+  dash.style.transformOrigin = "";
 }
 if (!window._studioFitInstalled) {
   window._studioFitInstalled = true;
@@ -11474,22 +11697,20 @@ function wireStudioPanels(v) {
       document.addEventListener("mouseup", up);
     };
   };
-  // The studio is a fixed 1440 px plugin canvas scaled to the viewport —
-  // divide drag distances by the scale to work in layout pixels.
   const dash = v.querySelector(".explore-dashboard");
-  const scaleOf = () => dash ? dash.getBoundingClientRect().width / Math.max(1, dash.offsetWidth) : 1;
   dragX(v.querySelector("#dashVSplit"), (ev) => {
     if (!dash) return;
     const rect = dash.getBoundingClientRect();
-    _studioPanels.dashC1 = Math.max(200, Math.min(380, (ev.clientX - rect.left) / scaleOf()));
+    const maxLeft = Math.max(220, Math.min(430, rect.width - 520));
+    _studioPanels.dashC1 = Math.max(190, Math.min(maxLeft, ev.clientX - rect.left));
     dash.style.setProperty("--dash-c1", `${Math.round(_studioPanels.dashC1)}px`);
   }, saveStudioPanels);
   const inspector = v.querySelector("#chInspector");
   dragX(v.querySelector("#chVSplit"), (ev) => {
     if (!inspector) return;
     const rect = inspector.getBoundingClientRect();
-    _studioPanels.chW = Math.max(190, Math.min(420, (ev.clientX - rect.left) / scaleOf()));
-    inspector.style.width = `${Math.round(_studioPanels.chW)}px`;
+    _studioPanels.chW = Math.max(180, Math.min(460, ev.clientX - rect.left));
+    inspector.style.setProperty("--ch-w", `${Math.round(_studioPanels.chW)}px`);
   }, saveStudioPanels);
 }
 
@@ -11820,9 +12041,8 @@ function wireStageBig(v) {
     }
     return best;
   };
-  // The studio scales to the viewport (fitStudioScale transform), so
-  // mouse coords must map from SCREEN px into the canvas's LAYOUT px
-  // before geometry — rect is post-transform, _cssW is the layout truth.
+  // Canvas backing stores can differ from their CSS size, so map pointer
+  // coordinates back into the geometry size used by the stage renderer.
   const toLocal = (e) => {
     const rect = cv.getBoundingClientRect();
     const w = cv._cssW || rect.width, h = cv._cssH || rect.height;
@@ -12954,67 +13174,146 @@ function wirePaletteEditBanner(v) {
 
 function welcomeCardHTML() {
   if (loadConsent()) return "";
+  // Audit P0 (ui-audit-2026-07-08, phase-01 render): a compact centred
+  // choice card over the dimmed studio — Just Play / Share Ratings / Load
+  // Demo — with a one-click audition strip, instead of a wall of consent
+  // text. The research detail lives one step deeper behind Share Ratings.
+  const wave = Array.from({ length: 56 }, (_, i) => {
+    const t = i / 55;
+    const env = Math.sin(t * Math.PI);
+    const h = 3 + 30 * env * (0.3 + 0.7 * Math.abs(Math.sin(i * 2.7) * Math.cos(i * 1.3)));
+    return `<rect x="${i * 10}" y="${((36 - h) / 2).toFixed(1)}" width="4" height="${h.toFixed(1)}" rx="2"/>`;
+  }).join("");
   return `
     <div class="card welcome-card" id="welcomeCard">
-      <h2>Welcome to the Sound Studio</h2>
-      <p>Shape a stream of generated music by playing with the controls — no musical
-      experience needed. The studio is also part of a research project on why music
-      sounds good: if you opt in, the settings you explore and the ratings you give
-      are shared anonymously with the researchers. No account, no personal details,
-      and everything here works either way. Opting in is for adults (18+).</p>
-      <div class="welcome-demographics">
-        <label>Age
-          <select id="welcomeAge">
-            <option value="">Prefer not to say</option>
-            <option>18–24</option><option>25–34</option><option>35–44</option>
-            <option>45–54</option><option>55–64</option><option>65+</option>
-          </select>
-        </label>
-        <label>Musical training
-          <select id="welcomeTraining">
-            <option value="">Prefer not to say</option>
-            <option>None</option><option>Under 2 years</option><option>2–5 years</option>
-            <option>5–10 years</option><option>10+ years</option>
-          </select>
-        </label>
+      <div class="welcome-hero">
+        <span class="welcome-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <h2>Sound Studio</h2>
       </div>
-      <div class="welcome-actions">
-        <button class="btn btn-primary" id="welcomeOptIn">Play and share my ratings</button>
-        <button class="btn btn-secondary" id="welcomeOptOut">Just play</button>
+      <div class="welcome-rule"><i></i></div>
+      <p class="welcome-tagline">Welcome! Choose how you&rsquo;d like to get started.</p>
+      <div class="welcome-main">
+        <div class="welcome-audition">
+          <svg class="welcome-wave" viewBox="0 0 554 36" preserveAspectRatio="none" aria-hidden="true">${wave}</svg>
+          <button class="welcome-audition-play" id="welcomeAudition" title="Audition the current sound without leaving this card">▶</button>
+        </div>
+        <div class="welcome-choices">
+          <div class="welcome-choice">
+            <span class="welcome-choice-icon wc-amber">▶</span>
+            <h3>Just Play</h3>
+            <p>Start exploring sounds immediately.</p>
+            <button class="welcome-cta cta-amber" id="welcomeOptOut">Just Play</button>
+          </div>
+          <div class="welcome-choice welcome-choice-featured">
+            <span class="welcome-choice-icon wc-green">◈</span>
+            <h3>Share Ratings</h3>
+            <p>Help improve research by sharing ratings.</p>
+            <div class="welcome-scale">${[1, 2, 3, 4, 5, 6, 7].map(n =>
+              `<span class="${n === 4 ? "on" : ""}">${n}</span>`).join("")}</div>
+            <div class="welcome-scale-ends"><span>1 = Dislike</span><span>7 = Love</span></div>
+            <button class="welcome-cta cta-green" id="welcomeShareOpen">Share Ratings</button>
+          </div>
+          <div class="welcome-choice">
+            <span class="welcome-choice-icon wc-purple">≣</span>
+            <h3>Load Demo</h3>
+            <p>Load a demo arrangement to hear ideas in context.</p>
+            <button class="welcome-cta cta-purple" id="welcomeDemo">Load Demo</button>
+          </div>
+        </div>
       </div>
-      <p class="welcome-smallprint">Both questions are optional. You can change your
-      choice any time from the note at the bottom of the page.</p>
+      <div class="welcome-share-step" hidden>
+        <p>Sharing is anonymous and for adults (18+): the settings you explore and
+        the ratings you give go to the researchers studying why music sounds good —
+        no account, no personal details. Two optional questions help the analysis:</p>
+        <div class="welcome-demographics">
+          <label>Age
+            <select id="welcomeAge">
+              <option value="">Prefer not to say</option>
+              <option>18–24</option><option>25–34</option><option>35–44</option>
+              <option>45–54</option><option>55–64</option><option>65+</option>
+            </select>
+          </label>
+          <label>Musical training
+            <select id="welcomeTraining">
+              <option value="">Prefer not to say</option>
+              <option>None</option><option>Under 2 years</option><option>2–5 years</option>
+              <option>5–10 years</option><option>10+ years</option>
+            </select>
+          </label>
+        </div>
+        <div class="welcome-actions">
+          <button class="btn btn-secondary" id="welcomeShareBack">Back</button>
+          <button class="btn btn-primary" id="welcomeOptIn">Start sharing</button>
+        </div>
+      </div>
+      <p class="welcome-anon">🛡 No account. Anonymous if shared.</p>
+      <p class="welcome-smallprint">You can change your choice any time from the note
+      at the bottom of the page.</p>
     </div>`;
 }
 
 function wireWelcomeCard(v) {
   const card = v.querySelector("#welcomeCard");
   if (card) {
+    // Audition without committing: preview the current settings from inside
+    // the overlay. Stopped again on dismissal so the transport stays honest.
+    let auditioning = false;
+    const audBtn = card.querySelector("#welcomeAudition");
+    audBtn.onclick = () => {
+      if (synth.isPlaying) {
+        synth.stop();
+        auditioning = false;
+        audBtn.textContent = "▶";
+        return;
+      }
+      synth.play({ ...exploreParams });
+      auditioning = true;
+      audBtn.textContent = "❚❚";
+    };
+    const dismiss = (consent, { tour = true } = {}) => {
+      if (auditioning && synth.isPlaying) synth.stop();
+      saveConsent(consent);
+      if (consent.status === "granted") {
+        trackEngagement("consent", {
+          consent: { status: "granted", consent_version: CONSENT_VERSION, demographics: consent.demographics },
+        });
+      }
+      card.remove();
+      updateResearchNote(v);
+      window.scrollTo({ top: 0 }); // audit P0: no half-scrolled reveal
+      if (tour) maybeStartStudioTour();
+    };
+    card.querySelector("#welcomeOptOut").onclick = () => dismiss({
+      status: "declined",
+      consent_version: CONSENT_VERSION,
+      decided_at: new Date().toISOString(),
+    });
+    // Load Demo decides nothing about sharing — record a declined consent
+    // (nothing leaves the browser) and jump straight into the producer demo.
+    card.querySelector("#welcomeDemo").onclick = () => {
+      dismiss({
+        status: "declined",
+        consent_version: CONSENT_VERSION,
+        decided_at: new Date().toISOString(),
+      }, { tour: false });
+      loadDemoArrangement();
+      navigate("produce");
+    };
+    const main = card.querySelector(".welcome-main");
+    const share = card.querySelector(".welcome-share-step");
+    card.querySelector("#welcomeShareOpen").onclick = () => { main.hidden = true; share.hidden = false; };
+    card.querySelector("#welcomeShareBack").onclick = () => { share.hidden = true; main.hidden = false; };
     card.querySelector("#welcomeOptIn").onclick = () => {
       const demographics = {
         age_band: card.querySelector("#welcomeAge").value || null,
         musical_training: card.querySelector("#welcomeTraining").value || null,
       };
-      saveConsent({
+      dismiss({
         status: "granted",
         consent_version: CONSENT_VERSION,
         decided_at: new Date().toISOString(),
         demographics,
       });
-      trackEngagement("consent", {
-        consent: { status: "granted", consent_version: CONSENT_VERSION, demographics },
-      });
-      card.remove();
-      updateResearchNote(v);
-    };
-    card.querySelector("#welcomeOptOut").onclick = () => {
-      saveConsent({
-        status: "declined",
-        consent_version: CONSENT_VERSION,
-        decided_at: new Date().toISOString(),
-      });
-      card.remove();
-      updateResearchNote(v);
     };
   }
   updateResearchNote(v);
