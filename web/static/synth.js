@@ -1,5 +1,5 @@
 /**
- * synth.js — Three-timescale generative synthesiser for Sound Studio.
+ * synth.js — Three-timescale generative synthesiser for Resona.
  *
  * Architecture mirrors the mechanistic theory's hierarchical levels:
  *

@@ -1,4 +1,4 @@
-/* ── Sound Studio ────────────────────────────────────────── */
+/* ── Resona ────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -7370,6 +7370,11 @@ body.dragging { cursor: grabbing; user-select: none; }
   height: 100dvh;
   gap: 6px;
   background: #11141a;
+  /* Never grow past the viewport — wide content (timeline, mixer) scrolls in
+     its own panel instead of stretching the shell (owner 2026-07-09). */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .daw-transport {
@@ -7442,9 +7447,28 @@ body.dragging { cursor: grabbing; user-select: none; }
   border-radius: 6px;
 }
 
-.daw-cluster-arrangement #arrSelect {
-  flex: 1 1 170px;
-  max-width: 230px;
+/* The name lives in the double-click-to-rename title; the select is a compact
+   caret-only switcher (owner 2026-07-09). */
+.daw-cluster-arrangement #arrSelect,
+.daw-arr-switch {
+  flex: none; width: 22px; max-width: 22px; min-height: 26px; padding: 0;
+  -webkit-appearance: none; appearance: none;
+  color: transparent; font-size: 0; text-indent: -999px; /* hide the option text */
+  background: var(--surface2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' fill='none' stroke='%239aa0ab' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / 12px;
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+}
+.daw-arr-switch:hover { border-color: var(--border2); background-color: var(--surface); }
+.daw-arr-name {
+  color: var(--text); font-weight: 600; font-size: 0.78rem;
+  max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 3px 7px; border-radius: 5px; cursor: text; letter-spacing: 0.01em;
+}
+.daw-arr-name:hover { background: var(--surface2); box-shadow: inset 0 0 0 1px var(--border); }
+.daw-arr-rename {
+  min-height: 26px; width: 150px; box-sizing: border-box;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--accent); border-radius: 5px; padding: 0 7px;
+  font: inherit; font-size: 0.78rem; font-weight: 600;
 }
 
 .daw-ctx {
@@ -7480,6 +7504,131 @@ body.dragging { cursor: grabbing; user-select: none; }
   background: #171b23;
   border-color: rgba(66, 75, 91, 0.72);
   border-radius: 8px;
+}
+
+/* Producer editor panel: switcher + body (owner 2026-07-09) */
+.editor-panel-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 6px; }
+.editor-topbar { display: flex; align-items: center; gap: 10px; flex: none; }
+.editor-switch { display: inline-flex; gap: 2px; background: var(--display); border: 1px solid var(--border); border-radius: 7px; padding: 2px; }
+.editor-tab {
+  font-size: 0.66rem; font-weight: 600; padding: 3px 11px; border-radius: 5px;
+  background: none; border: none; color: var(--text2); cursor: pointer;
+}
+.editor-tab.active { background: var(--surface2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border2); }
+.editor-tab:hover:not(.active) { color: var(--text); }
+.editor-region-label { font-size: 0.66rem; color: var(--text3); }
+.editor-body { flex: 1; min-height: 0; overflow: auto; position: relative; }
+/* the region layers panel renders inline here, not as a positioned overlay */
+.editor-body .m2-layers-panel { position: static; inset: auto; height: auto; background: transparent; padding: 0; }
+.editor-body-roll .roll-panel { margin-top: 0; }
+
+/* Bake overlay: a blank roll behind a prompt */
+.roll-bake-prompt { position: relative; }
+.roll-blank {
+  width: 100%; height: 180px; display: block; border-radius: 6px; opacity: 0.5;
+  background:
+    repeating-linear-gradient(to right, rgba(154,160,171,0.07) 0 1px, transparent 1px 56px),
+    repeating-linear-gradient(to bottom, rgba(154,160,171,0.06) 0 1px, transparent 1px 20px),
+    var(--display);
+}
+.roll-bake-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px; text-align: center;
+}
+.roll-bake-msg { font-size: 0.78rem; color: var(--text2); max-width: 440px; line-height: 1.5; }
+
+/* ── Mixer view (owner 2026-07-09) ─────────────────────────────────────── */
+.mixer-toggle {
+  position: fixed; right: 14px; bottom: 12px; z-index: 30;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  padding: 7px 13px; border-radius: 8px; cursor: pointer;
+  background: var(--surface2); color: var(--text); border: 1px solid var(--border2);
+  box-shadow: 0 6px 18px -8px rgba(0,0,0,0.7);
+}
+.mixer-toggle:hover { border-color: var(--accent); }
+.mixer-toggle.active { background: var(--accent); color: #1a1205; border-color: var(--accent); }
+
+.mixer-panel { display: flex; gap: 8px; height: 100%; min-height: 0; width: 100%; max-width: 100%; overflow: hidden; }
+.mixer-tracks { display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; flex: 1 1 0; min-width: 0; padding-bottom: 4px; }
+.mixer-empty { color: var(--text3); font-size: 0.72rem; padding: 20px; }
+.mixer-track {
+  flex: 0 0 124px; display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 2px solid hsl(var(--track-h, 210) 65% 52%); border-radius: 7px;
+  padding: 7px; min-height: 0;
+}
+.mixer-track-head { display: flex; align-items: center; gap: 6px; }
+.mixer-track-hue { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.mixer-track-name { font-size: 0.72rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mixer-region-stack { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; flex: 1 1 auto; min-height: 30px; }
+.mixer-no-regions { font-size: 0.62rem; color: var(--text3); font-style: italic; padding: 2px; }
+.mixer-region-row { display: flex; align-items: center; gap: 5px; }
+.mixer-db { font-size: 0.56rem; color: var(--text3); font-family: var(--mono); width: 32px; text-align: right; flex: none; }
+/* Volume as a filled block (not a slider): fill = level, name overlays top-left */
+.mixer-vol-block {
+  position: relative; width: 60px; height: 20px; flex: none;
+  background: var(--display); border: 1px solid var(--border);
+  border-radius: 3px; overflow: hidden; cursor: ew-resize; user-select: none;
+}
+.mixer-vol-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg, hsl(var(--track-h,210) 55% 42%), hsl(var(--track-h,210) 62% 56%));
+}
+.mixer-vol-name {
+  position: absolute; left: 4px; top: 2px; right: 3px;
+  font-size: 0.54rem; font-weight: 600; line-height: 1.1; color: #eef2f6;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.75); pointer-events: none;
+}
+
+/* horizontal faders (drag left/right) */
+.mixer-fader { flex: 1; min-width: 0; height: 16px; -webkit-appearance: none; appearance: none; background: transparent; cursor: ew-resize; }
+.mixer-fader::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: linear-gradient(90deg, hsl(var(--track-h,210) 60% 50%), hsl(var(--track-h,210) 65% 62%)); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
+.mixer-fader::-moz-range-track { height: 8px; border-radius: 4px; background: hsl(var(--track-h,210) 60% 52%); }
+.mixer-fader::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 5px; height: 16px; border-radius: 2px; background: #eef2f6; margin-top: -4px; box-shadow: 0 0 3px rgba(0,0,0,0.6); }
+.mixer-fader::-moz-range-thumb { width: 5px; height: 16px; border: none; border-radius: 2px; background: #eef2f6; }
+.mixer-fader.master::-webkit-slider-runnable-track { background: linear-gradient(90deg, #4ade80, #eab308 78%, #ef4444); }
+.mixer-fader.master::-moz-range-track { background: #eab308; }
+
+.mixer-space-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: none; }
+.mixer-space-cv { width: 108px; height: 108px; background: var(--display); border: 1px solid var(--border); border-radius: 6px; cursor: crosshair; }
+.mixer-additive { display: flex; align-items: center; gap: 4px; font-size: 0.6rem; color: var(--text2); }
+.mixer-track-master { display: flex; align-items: center; gap: 6px; padding-top: 4px; border-top: 1px solid var(--border); }
+.mixer-tm-label { font-size: 0.55rem; letter-spacing: 0.08em; color: var(--text3); width: 34px; flex: none; }
+
+.mixer-master {
+  flex: none; width: 82px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 7px; padding: 8px 7px;
+}
+.mixer-master-label { font-size: 0.55rem; letter-spacing: 0.1em; font-weight: 700; color: var(--text2); flex: none; }
+.mixer-master-body { flex: 1; min-height: 40px; display: flex; gap: 8px; align-items: stretch; justify-content: center; }
+.mixer-master-meter { width: 30px; height: 100%; background: var(--display); border-radius: 4px; }
+.mixer-master .mixer-db { width: auto; text-align: center; flex: none; }
+/* Vertical mixing-desk fader: a horizontal slider rotated -90° (reliable full
+   height); its length is set to the slot height in JS. Up = louder. */
+.mixer-fader-slot {
+  position: relative; width: 26px; height: 100%; min-height: 60px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.mixer-master-fader {
+  position: absolute;
+  -webkit-appearance: none; appearance: none;
+  height: 20px; margin: 0; cursor: ns-resize; background: transparent;
+  transform: rotate(-90deg); /* width (set in JS) becomes the vertical length */
+}
+.mixer-master-fader::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px; background: #2a3038; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);
+}
+.mixer-master-fader::-moz-range-track { height: 6px; border-radius: 3px; background: #2a3038; }
+.mixer-master-fader::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 10px; height: 20px; border-radius: 2px; margin-top: -7px;
+  background: linear-gradient(90deg, #f2f5f8, #aeb8c4);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.3);
+}
+.mixer-master-fader::-moz-range-thumb {
+  width: 10px; height: 20px; border: none; border-radius: 2px;
+  background: linear-gradient(90deg, #f2f5f8, #aeb8c4); box-shadow: 0 2px 4px rgba(0,0,0,0.6);
 }
 
 .daw-left {

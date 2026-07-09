@@ -1,5 +1,5 @@
 /**
- * app.js — Sound Studio web application.
+ * app.js — Resona web application.
  *
  * Two-arm architecture:
  *   Arm 1 (Study)   – structured paradigms (slider, pairwise)
@@ -1171,7 +1171,9 @@ function migrateArrangement(a) {
 
 let arrangement = null;
 let selectedRegion = null; // { trackId, regionId }
-let rollOpen = false;      // piano-roll panel visible for a baked region
+// The producer bottom editor panel (owner 2026-07-09): null | "roll" (piano
+// roll for a baked region) | "layers" (region patch's layers) | "mixer".
+let editorMode = null;
 let rollNoteSel = -1;      // selected note index in the roll
 let _rollAddMode = false;  // Q9 D2: pencil mode — click an empty cell adds a note
 let selectedRegions = new Set(); // Q9 B2: multi-selected region ids (⇧click / rubber band)
@@ -1383,6 +1385,20 @@ function produceSources() {
     id: `pal:${pl.id}`, name: pl.name, kind: "palette", parameters: pl.params,
   }));
   return [...palette, ...instruments, ...factory];
+}
+
+// A producer voice's output level = arrangement master × track × region gain
+// (owner 2026-07-09: the mixer's MASTER fader is arrangement.master).
+function _trackVol(trackGain, regionGain) {
+  return (arrangement?.master ?? 1) * (trackGain ?? 1) * (regionGain ?? 1);
+}
+// Re-push every playing voice's level (used when the master fader moves).
+function applyMasterToVoices() {
+  const b = arrPlay ? arrPlay.beat : playheadBeat;
+  for (const t of (arrangement.tracks || [])) {
+    const voice = producerVoices.get(t.id);
+    if (voice) voice.setMasterVolume?.(_trackVol(t.gain, regionAtBeat(t, b)?.gain));
+  }
 }
 
 function regionVoiceParams(track, region) {
@@ -1652,12 +1668,20 @@ function wireDawLayout(v) {
     left.style.width = `${dawLayout.leftW}px`;
   }, saveDawLayout);
 
-  dragSplit(v.querySelector("#dawHSplit"), (ev) => {
+  const hsplit = v.querySelector("#dawHSplit");
+  dragSplit(hsplit, (ev) => {
     if (!editor) return;
     const daw = v.querySelector(".daw").getBoundingClientRect();
     dawLayout.editorH = Math.max(140, Math.min(420, daw.bottom - ev.clientY));
     editor.style.height = `${dawLayout.editorH}px`;
   }, saveDawLayout);
+  // Double-click the drag-edge to close the editor panel (owner 2026-07-09).
+  if (hsplit) hsplit.ondblclick = () => {
+    editorMode = null;
+    selectedRegion = null;
+    rollNoteSel = -1;
+    renderProduce();
+  };
 }
 
 function sessionBarHTML() {
@@ -1768,7 +1792,7 @@ function producerVoice(track) {
     voice.init(synth.ctx, producerBus);
     producerVoices.set(track.id, voice);
   }
-  voice.setMasterVolume(track.gain ?? 1);
+  voice.setMasterVolume(_trackVol(track.gain, 1));
   voice.setPan(track.pan ?? 0);
   return voice;
 }
@@ -1857,7 +1881,7 @@ function playArrangement(fromBeat = 0) {
       const voice = producerVoice(track);
       if (!trackAudible(track)) { voice.stop(); continue; }
       if (region && !region.muted && (b === Math.ceil(region.startBeat) || b === arrPlay.startAt)) {
-        voice.setMasterVolume((track.gain ?? 1) * (region.gain ?? 1));
+        voice.setMasterVolume(_trackVol(track.gain, region.gain));
         if (region.type === "baked" && Array.isArray(region.notes)) {
           voice.playNotes(regionPlayParams(track, region), region.notes,
             regionLen(region), region.loopSourceBeats || regionLen(region));
@@ -1985,7 +2009,7 @@ async function mixdownArrangement(statusEl, btn) {
       // A fresh voice per region: deterministic take, exactly as live playback
       const voice = new SynthEngine();
       voice.init(off, off.destination);
-      voice.setMasterVolume((track.gain ?? 1) * (region.gain ?? 1));
+      voice.setMasterVolume(_trackVol(track.gain, region.gain));
       voice.setPan(track.pan ?? 0);
       if (region.type === "baked" && Array.isArray(region.notes)) {
         voice.renderNotesSpan(regionPlayParams(track, region), region.notes,
@@ -2297,12 +2321,12 @@ function _spTrackPos(track, beat) {
 
 // The transformed constellation a multi-layer track is ACTUALLY playing
 // from at this beat (null for single-source tracks).
-function _spTrackConstellation(track, beat, dragPos = null) {
+function _spTrackConstellation(track, beat, dragPos = null, modeOverride = null) {
   const vp = _spTrackVoiceParams(track);
   if (!_spIsMulti(vp)) return null;
   const sp = arrangement.space || {};
   const handle = dragPos || _spTrackPos(track, beat);
-  const mode = sp.layerMode === "additive" ? "additive" : "centered";
+  const mode = modeOverride || (sp.layerMode === "additive" ? "additive" : "centered");
   return spTransformSources(_spTrackSources(vp), handle, mode);
 }
 
@@ -3283,6 +3307,417 @@ function produceTimelineHTML() {
       </div>`}
     </div>`;
 }
+// ── Producer bottom editor panel (owner 2026-07-09) ─────────────────────
+// One panel, three modes: roll (baked notes), layers (the region patch's
+// layers), mixer (all tracks). The switcher lives at the top; double-clicking
+// a region opens roll (baked) or layers (generative).
+function editorRegion() {
+  if (!selectedRegion) return null;
+  const track = arrangement.tracks.find(t => t.id === selectedRegion.trackId);
+  const region = track?.regions.find(r => r.id === selectedRegion.regionId);
+  return region ? { track, region } : null;
+}
+
+function regionPatch(track, region) {
+  const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
+  if (pal) return pal.params;
+  if (!track.instrumentParams) track.instrumentParams = {};
+  return track.instrumentParams;
+}
+
+function bakeRegion(track, region) {
+  const ctxP = arrangement.context;
+  const beatSec = 60 / Math.max(30, ctxP.tempo || 104);
+  region.notes = synth.captureSpan(regionPlayParams(track, region), beatSec * regionLen(region));
+  region.type = "baked";
+  region.loopSourceBeats = regionLen(region);
+  saveArrangement("bake region");
+}
+
+function editorSwitcherHTML() {
+  return `
+    <div class="editor-switch" role="group" title="Switch between the region's layers and its piano roll">
+      <button class="editor-tab${editorMode === "layers" ? " active" : ""}" data-editor-mode="layers">Layers</button>
+      <button class="editor-tab${editorMode === "roll" ? " active" : ""}" data-editor-mode="roll">Piano roll</button>
+    </div>`;
+}
+
+function rollBakePromptHTML() {
+  return `
+    <div class="roll-bake-prompt">
+      <canvas class="roll-blank" width="960" height="180" aria-hidden="true"></canvas>
+      <div class="roll-bake-overlay">
+        <div class="roll-bake-msg">This is a live generative take — there are no fixed notes to edit yet.</div>
+        <button class="btn btn-primary btn-sm" id="rollBakeNow">◆ Bake it to edit the notes</button>
+      </div>
+    </div>`;
+}
+
+function editorPanelHTML() {
+  if (editorMode === "mixer") return typeof mixerPanelHTML === "function" ? mixerPanelHTML() : "";
+  const er = editorRegion();
+  if (!er) return "";
+  const { track, region } = er;
+  const baked = region.type === "baked" && Array.isArray(region.notes);
+  const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
+  const label = pal ? pal.name : track.name;
+  const body = editorMode === "layers"
+    ? producerLayersPanelHTML(regionPatch(track, region))
+    : (baked ? rollPanelHTML() : rollBakePromptHTML());
+  return `
+    <div class="editor-panel-wrap">
+      <div class="editor-topbar">
+        ${editorSwitcherHTML()}
+        <span class="editor-region-label" title="The region under edit">${esc(String(label))} · ${baked ? "baked" : "generative"}</span>
+      </div>
+      <div class="editor-body editor-body-${editorMode}">${body}</div>
+    </div>`;
+}
+
+function wireEditorPanel(v) {
+  // Switcher: Layers ↔ Piano roll for the current region.
+  v.querySelectorAll("[data-editor-mode]").forEach(btn => {
+    btn.onclick = () => {
+      if (editorMode === btn.dataset.editorMode) return;
+      editorMode = btn.dataset.editorMode;
+      rollNoteSel = -1;
+      renderProduce();
+    };
+  });
+  // Bake-now overlay (piano roll requested on a generative region).
+  const bakeNow = v.querySelector("#rollBakeNow");
+  if (bakeNow) bakeNow.onclick = () => {
+    const er = editorRegion();
+    if (!er) return;
+    bakeRegion(er.track, er.region);
+    editorMode = "roll";
+    renderProduce();
+  };
+  // Region Layers view: the macro layers panel bound to the region's patch,
+  // persisted to the palette and pushed to the live producer voice.
+  if (editorMode === "layers") {
+    const er = editorRegion();
+    if (!er) return;
+    const { track, region } = er;
+    const patch = regionPatch(track, region);
+    const refreshVoice = () => {
+      saveArrangement("region layers");
+      const voice = producerVoices.get(track.id);
+      if (voice && voice.playing) {
+        const pp = regionPlayParams(track, region);
+        voice.updateGenerationParams?.(pp);
+        voice.updateEffects?.(pp);
+        voice.updateReverb?.(pp);
+      }
+    };
+    bindProducerLayers(v, patch, {
+      applyLive: refreshVoice, applyReverb: refreshVoice, applyEffects: refreshVoice,
+      rerender: () => renderProduce(),
+    });
+  }
+}
+
+// ── Mixer view (owner 2026-07-09) ───────────────────────────────────────
+// The bottom editor panel as a channel mixer: one vertical slot per track with
+// a stack of region faders (dB), the track's position-in-space cross-section
+// (thread + its layer sub-threads), a per-track master, and one overall master
+// output meter on the right.
+function fmtDb(db) {
+  if (!isFinite(db)) return "-∞";
+  return `${db >= 0 ? "+" : ""}${db.toFixed(1)}`;
+}
+function gainToDb(g) { return 20 * Math.log10(Math.max(0.001, g || 0.001)); }
+
+function mixerRegionRowHTML(t, r) {
+  const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
+  const label = pal ? pal.name : (r.type === "baked" ? "baked take" : "take");
+  const key = `${t.id}:${r.id}`;
+  const gain = r.gain ?? 1;
+  const pct = Math.round(Math.min(1, gain / 1.5) * 100);
+  // A filled block (not a slider): the fill width is the level, the patch name
+  // overlays the top-left, drag left/right to set it (owner 2026-07-09).
+  return `
+    <div class="mixer-region-row">
+      <div class="mixer-vol-block" data-mixer-region-gain="${key}" title="${esc(label)} — drag left/right to set this region's level">
+        <div class="mixer-vol-fill" data-fill style="width:${pct}%"></div>
+        <span class="mixer-vol-name">${esc(label)}</span>
+      </div>
+      <span class="mixer-db" data-mixer-region-db="${key}">${fmtDb(gainToDb(gain))}</span>
+    </div>`;
+}
+
+function mixerTrackHTML(t, i) {
+  const hue = t.hue ?? _spHue(i);
+  const regions = t.regions || [];
+  const anchored = !!(arrangement.space?.tracks?.[t.id] || []).length;
+  const additive = t.spaceLayerMode === "additive";
+  const multi = _spIsMulti(_spTrackVoiceParams(t));
+  return `
+    <div class="mixer-track" style="--track-h:${hue}" data-mixer-track="${t.id}">
+      <div class="mixer-track-head">
+        <span class="mixer-track-hue" style="background:hsl(${hue},70%,55%)"></span>
+        <span class="mixer-track-name" title="${esc(t.name)}">${esc(t.name)}</span>
+      </div>
+      <div class="mixer-region-stack">
+        ${regions.length ? regions.map(r => mixerRegionRowHTML(t, r)).join("") : `<div class="mixer-no-regions">no regions</div>`}
+      </div>
+      <div class="mixer-space-wrap">
+        <canvas class="mixer-space-cv" data-mixer-space="${t.id}" width="132" height="132" title="${anchored ? "Anchored in space — a drag snaps back (edit anchors in the global space cross-section)" : "Drag the dot to place this track around the listener"}"></canvas>
+        ${multi ? `<label class="mixer-additive" title="Centered rotates the layers together and scales their distances; Additive shifts every layer by the same amount"><input type="checkbox" data-mixer-additive="${t.id}"${additive ? " checked" : ""}/> additive</label>` : ""}
+      </div>
+      <div class="mixer-track-master">
+        <span class="mixer-tm-label">TRACK</span>
+        <input type="range" class="mixer-fader master" data-mixer-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${t.gain ?? 1}"/>
+        <span class="mixer-db" data-mixer-track-db="${t.id}">${fmtDb(gainToDb(t.gain ?? 1))}</span>
+      </div>
+    </div>`;
+}
+
+function mixerPanelHTML() {
+  const tracks = arrangement.tracks || [];
+  return `
+    <div class="mixer-panel">
+      <div class="mixer-tracks">
+        ${tracks.length ? tracks.map((t, i) => mixerTrackHTML(t, i)).join("")
+          : `<div class="mixer-empty">No tracks yet — drop instruments from the palette onto the timeline.</div>`}
+      </div>
+      <div class="mixer-master" title="The whole mix — stereo output level and master volume">
+        <span class="mixer-master-label">MASTER</span>
+        <div class="mixer-master-body">
+          <canvas id="mixerMaster" class="mixer-master-meter" width="46" height="200"></canvas>
+          <div class="mixer-fader-slot" id="mixerFaderSlot">
+            <input type="range" class="mixer-master-fader" data-mixer-master min="0" max="1.5" step="0.01" value="${arrangement.master ?? 1}" title="Master volume — the whole mix"/>
+          </div>
+        </div>
+        <span class="mixer-db" id="mixerMasterDb">${fmtDb(gainToDb(arrangement.master ?? 1))}</span>
+      </div>
+    </div>`;
+}
+
+// One track's cross-section (this track only): head + thread handle + its
+// layer sub-threads, glowing with the track's live level.
+function drawMixerTrackSpace(cv, track) {
+  if (!cv) return;
+  const g2 = crisp2d(cv);
+  const ctx = g2.ctx, w = g2.w, h = g2.h;
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 8;
+  const sp = arrangement.space || {};
+  ctx.fillStyle = "rgba(60,72,88,0.16)";
+  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(90,110,130,0.25)";
+  for (const dm of [1, 3, 10]) { ctx.beginPath(); ctx.arc(cx, cy, _spaceDistToR(dm, rMax), 0, 2 * Math.PI); ctx.stroke(); }
+  const headR = 4 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 5;
+  ctx.fillStyle = "rgba(200,215,230,0.85)";
+  ctx.beginPath(); ctx.arc(cx, cy, headR, 0, 2 * Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx - 2, cy - headR + 0.5); ctx.lineTo(cx, cy - headR - 3); ctx.lineTo(cx + 2, cy - headR + 0.5); ctx.closePath(); ctx.fill();
+  const hue = _spHue(arrangement.tracks.indexOf(track));
+  const drag = _mixerDrag && _mixerDrag.trackId === track.id ? _mixerDrag.pos : null;
+  const pos = drag || _spTrackPos(track, curPlayBeat());
+  const mode = track.spaceLayerMode === "additive" ? "additive" : "centered";
+  const constellation = _spTrackConstellation(track, curPlayBeat(), drag, mode);
+  const rms = _voiceRms(producerVoices.get(track.id));
+  const xyOf = (p) => {
+    const rad = ((p.angle ?? 0) - 90) * Math.PI / 180;
+    const r = _spaceDistToR(Math.max(0.3, Math.min(30, p.dist ?? 2.5)), rMax);
+    return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r };
+  };
+  const glowAt = (x, y, strength) => {
+    if (rms <= 0.012) return;
+    const level = Math.min(1, rms * 2.6) * strength;
+    const rGlow = 6 + 12 * level;
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, rGlow);
+    gr.addColorStop(0, `hsla(${hue}, 85%, 65%, ${0.4 * level})`);
+    gr.addColorStop(1, `hsla(${hue}, 85%, 65%, 0)`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, rGlow, 0, 2 * Math.PI); ctx.fill();
+  };
+  if (constellation) {
+    for (const s of constellation) {
+      const p = xyOf(s); glowAt(p.x, p.y, 0.85);
+      ctx.fillStyle = `hsla(${hue}, 70%, 62%, 0.5)`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, 2 * Math.PI); ctx.fill();
+    }
+    if (mode === "centered") {
+      ctx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.5)`; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(cx, cy, _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist ?? 2.5)), rMax), 0, 2 * Math.PI); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const hp = _spHandleXY(pos, cx, cy, rMax, true);
+    ctx.fillStyle = `hsla(${hue}, 78%, 70%, 1)`; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(hp.x, hp.y, 5.5, 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(10,14,20,0.9)"; ctx.beginPath(); ctx.arc(hp.x, hp.y, 1.8, 0, 2 * Math.PI); ctx.fill();
+  } else {
+    const { x, y } = xyOf(pos); glowAt(x, y, 1);
+    ctx.fillStyle = `hsla(${hue}, 70%, 66%, 1)`; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
+  }
+}
+
+// Master stereo meter: the summed voice levels, split L/R by each track's pan.
+function drawMixerMaster(cv) {
+  if (!cv) return;
+  const g2 = crisp2d(cv);
+  const ctx = g2.ctx, w = g2.w, h = g2.h;
+  ctx.clearRect(0, 0, w, h);
+  let L = 0, R = 0;
+  for (const t of (arrangement.tracks || [])) {
+    if (t.muted) continue;
+    const rms = _voiceRms(producerVoices.get(t.id));
+    const pan = Math.max(-1, Math.min(1, t.pan ?? 0));
+    L += rms * Math.cos((pan + 1) * Math.PI / 4);
+    R += rms * Math.sin((pan + 1) * Math.PI / 4);
+  }
+  const barW = (w - 6) / 2 - 2;
+  const draw = (x, level) => {
+    const lv = Math.min(1, level * 2.4);
+    const bh = lv * (h - 6);
+    // scale ticks
+    ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(x, 3, barW, h - 6);
+    const grad = ctx.createLinearGradient(0, h, 0, 0);
+    grad.addColorStop(0, "#4ade80"); grad.addColorStop(0.7, "#eab308"); grad.addColorStop(1, "#ef4444");
+    ctx.fillStyle = grad; ctx.fillRect(x, h - 3 - bh, barW, bh);
+  };
+  draw(3, L); draw(3 + barW + 2, R);
+}
+
+let _mixerDrag = null;   // { trackId, pos } while dragging a track's space dot
+let _mixerRaf = null;
+
+function _sizeMasterFader() {
+  const slot = document.getElementById("mixerFaderSlot");
+  const fader = slot && slot.querySelector(".mixer-master-fader");
+  if (!slot || !fader) return;
+  const hh = slot.clientHeight;
+  if (hh && Math.abs((parseFloat(fader.style.width) || 0) - hh) > 1) fader.style.width = `${hh}px`;
+}
+function _mixerAnimate() {
+  if (editorMode !== "mixer" || !document.querySelector(".mixer-panel")) { _mixerRaf = null; return; }
+  document.querySelectorAll("[data-mixer-space]").forEach(cv => {
+    const t = arrangement.tracks.find(t => t.id === cv.dataset.mixerSpace);
+    if (t) drawMixerTrackSpace(cv, t);
+  });
+  drawMixerMaster(document.getElementById("mixerMaster"));
+  _sizeMasterFader();
+  _mixerRaf = requestAnimationFrame(_mixerAnimate);
+}
+
+function wireMixer(v) {
+  // The toggle button is always present (bottom-right of the producer).
+  const toggle = v.querySelector("#mixerToggle");
+  if (toggle) toggle.onclick = () => {
+    editorMode = editorMode === "mixer" ? null : "mixer";
+    renderProduce();
+  };
+  if (editorMode !== "mixer") return;
+  const liveTrack = (t) => {
+    const voice = producerVoices.get(t.id);
+    if (!voice || !voice.playing) return;
+    const region = regionAtBeat(t, arrPlay ? arrPlay.beat : playheadBeat);
+    voice.setMasterVolume(_trackVol(t.gain, region?.gain));
+  };
+  // Region volume blocks: click/drag left-right sets the level; the fill shows
+  // it. gain range 0…1.5 maps to the block's 0…100% width.
+  v.querySelectorAll("[data-mixer-region-gain]").forEach(block => {
+    block.onmousedown = (e) => {
+      e.preventDefault();
+      const [tid, rid] = block.dataset.mixerRegionGain.split(":");
+      const t = arrangement.tracks.find(t => t.id === tid);
+      const r = t?.regions.find(r => r.id === rid);
+      if (!r) return;
+      const fill = block.querySelector("[data-fill]");
+      const db = v.querySelector(`[data-mixer-region-db="${tid}:${rid}"]`);
+      const set = (ev) => {
+        const rect = block.getBoundingClientRect();
+        const frac = Math.max(0, Math.min(1, (ev.clientX - rect.left) / Math.max(1, rect.width)));
+        r.gain = Math.round(frac * 1.5 * 100) / 100;
+        if (fill) fill.style.width = `${Math.round(frac * 100)}%`;
+        if (db) db.textContent = fmtDb(gainToDb(r.gain));
+        liveTrack(t);
+      };
+      set(e);
+      const move = (ev) => set(ev);
+      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); saveArrangement("region level"); };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+  });
+  // Track master faders
+  v.querySelectorAll("[data-mixer-track-gain]").forEach(el => {
+    el.oninput = () => {
+      const t = arrangement.tracks.find(t => t.id === el.dataset.mixerTrackGain);
+      if (!t) return;
+      t.gain = parseFloat(el.value);
+      const out = v.querySelector(`[data-mixer-track-db="${t.id}"]`);
+      if (out) out.textContent = fmtDb(gainToDb(t.gain));
+      producerVoices.get(t.id)?.setMasterVolume?.(_trackVol(t.gain, regionAtBeat(t, arrPlay ? arrPlay.beat : playheadBeat)?.gain));
+    };
+    el.onchange = () => saveArrangement("track level");
+  });
+  // Master volume: scales the whole mix (arrangement.master).
+  const masterFader = v.querySelector("[data-mixer-master]");
+  if (masterFader) {
+    masterFader.oninput = () => {
+      arrangement.master = parseFloat(masterFader.value);
+      const out = v.querySelector("#mixerMasterDb");
+      if (out) out.textContent = fmtDb(gainToDb(arrangement.master));
+      applyMasterToVoices();
+    };
+    masterFader.onchange = () => saveArrangement("master level");
+  }
+  // Per-track additive/centered layer mode
+  v.querySelectorAll("[data-mixer-additive]").forEach(el => {
+    el.onchange = () => {
+      const t = arrangement.tracks.find(t => t.id === el.dataset.mixerAdditive);
+      if (!t) return;
+      t.spaceLayerMode = el.checked ? "additive" : "centered";
+      saveArrangement("track layer mode");
+    };
+  });
+  // Per-track space: drag the thread (only unanchored tracks move; anchored
+  // ones snap back). Mirrors the global cross-section's drop logic.
+  v.querySelectorAll("[data-mixer-space]").forEach(cv => {
+    const t = arrangement.tracks.find(t => t.id === cv.dataset.mixerSpace);
+    if (t) drawMixerTrackSpace(cv, t);
+    cv.onmousedown = (e) => {
+      e.preventDefault();
+      const track = arrangement.tracks.find(t => t.id === cv.dataset.mixerSpace);
+      if (!track) return;
+      const geom = () => {
+        const rect = cv.getBoundingClientRect();
+        const w = cv._cssW || cv.width, h = cv._cssH || cv.height;
+        return { rect, w, h, cx: w / 2, cy: h / 2, rMax: Math.min(w, h) / 2 - 8 };
+      };
+      const posFromEv = (ev) => {
+        const g = geom();
+        const x = (ev.clientX - g.rect.left) * (g.w / Math.max(1, g.rect.width));
+        const y = (ev.clientY - g.rect.top) * (g.h / Math.max(1, g.rect.height));
+        const dx = x - g.cx, dy = y - g.cy;
+        return { angle: Math.max(-180, Math.min(180, Math.atan2(dx, -dy) * 180 / Math.PI)), dist: _spaceRToDist(Math.hypot(dx, dy), g.rMax) };
+      };
+      _mixerDrag = { trackId: track.id, pos: _spTrackPos(track, curPlayBeat()), moved: false };
+      const move = (ev) => { _mixerDrag.moved = true; _mixerDrag.pos = posFromEv(ev); };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        const drag = _mixerDrag; _mixerDrag = null;
+        if (!drag?.moved) return;
+        const sp = ensureGlobalSpace();
+        if ((track.spaceLayerMode === "additive") && _spIsMulti(_spTrackVoiceParams(track)) && drag.pos.dist <= 0.5) drag.pos = { angle: 0, dist: 0 };
+        const anchors = sp.tracks[track.id];
+        const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < 0.26);
+        if (a) { a.angle = drag.pos.angle; a.dist = drag.pos.dist; saveArrangement("move space anchor"); }
+        else if (!anchors || !anchors.length) { sp.static = sp.static || {}; sp.static[track.id] = { ...drag.pos }; saveArrangement("move track in space"); }
+        drawMixerTrackSpace(cv, track); // anchored-without-anchor-here: snaps back
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    };
+  });
+  drawMixerMaster(document.getElementById("mixerMaster"));
+  _sizeMasterFader();
+  if (!_mixerRaf) _mixerRaf = requestAnimationFrame(_mixerAnimate);
+}
+
 function selectedBakedRegion() {
   if (!selectedRegion) return null;
   for (const t of arrangement.tracks) {
@@ -3296,7 +3731,7 @@ let rollDynLane = false; // Logic-style velocity pins lane toggle
 
 function rollPanelHTML() {
   const region = selectedBakedRegion();
-  if (!rollOpen || !region) return "";
+  if (editorMode !== "roll" || !region) return "";
   const ctxP = arrangement.context;
   const beatDiv = region.notes[0]?.beatDivisions || ctxP.beatDivisions || 1;
   const scaleLabel = ctxP.scaleMode === "edo"
@@ -3786,7 +4221,7 @@ function deleteSelectedRegions() {
     for (const t of arrangement.tracks) t.regions = t.regions.filter(r => !selectedRegions.has(r.id));
     selectedRegions.clear();
     selectedRegion = null;
-    rollOpen = false;
+    editorMode = null;
     rollNoteSel = -1;
     saveArrangement("bulk delete");
     renderProduce();
@@ -3798,7 +4233,7 @@ function deleteSelectedRegions() {
   if (!track || !region) return false;
   track.regions = track.regions.filter(r => r.id !== region.id);
   selectedRegion = null;
-  rollOpen = false;
+  editorMode = null;
   rollNoteSel = -1;
   saveArrangement("delete region");
   renderProduce();
@@ -4164,7 +4599,7 @@ if (!window._dawKeysInstalled) {
       return;
     }
     // Q9 D2: roll-note keyboard when a note is selected in the open roll
-    if (rollOpen && rollNoteSel >= 0 && selectedBakedRegion()
+    if (editorMode === "roll" && rollNoteSel >= 0 && selectedBakedRegion()
         && ["Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "m", "M", "q", "Q"].includes(e.key)) {
       e.preventDefault();
       const region = selectedBakedRegion();
@@ -4257,7 +4692,7 @@ if (!window._dawKeysInstalled) {
       deleteSelectedRegions();
     } else if (e.key === "Escape") {
       selectedRegion = null;
-      rollOpen = false;
+      editorMode = null;
       renderProduce();
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
       e.preventDefault();
@@ -4460,19 +4895,20 @@ function renderProduce() {
   pxPerBeat = dawLayout.pxPerBeat || 14;
   snapBeats = 0.5; // owner 2026-07-09: no snap control — dragging always uses the smallest unit (⌃-drag still frees it)
   const sources = produceSources();
-  const editorOpen = rollOpen && !!selectedBakedRegion();
+  const editorOpen = editorMode === "mixer"
+    || ((editorMode === "roll" || editorMode === "layers") && !!editorRegion());
   const v = mount(`
     <div class="daw">
       <div class="daw-transport">
         <div class="daw-cluster daw-cluster-arrangement" aria-label="Arrangement">
-          <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Sound Studio">←</a>
+          <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Studio">←</a>
           <span class="daw-title">Producer <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></span>
-          <select id="arrSelect" class="daw-ctx-select" title="Switch arrangement">
+          <span class="daw-arr-name" id="arrName" title="Double-click to rename this arrangement" tabindex="0">${esc(arrangement.name || "Untitled")}</span>
+          <select id="arrSelect" class="daw-ctx-select daw-arr-switch" title="Switch arrangement" aria-label="Switch arrangement">
             ${Object.values(loadArrangementRegistry()).map(a =>
               `<option value="${a.id}"${a.id === arrangement.id ? " selected" : ""}>${esc(a.name || "Untitled")}</option>`).join("")}
           </select>
           <button class="btn btn-ghost btn-sm" id="arrNew" title="New empty arrangement">New</button>
-          <button class="btn btn-ghost btn-sm" id="arrRename" title="Rename this arrangement">Aa</button>
           <button class="btn btn-ghost btn-sm" id="arrDelete" title="Delete this arrangement">🗑</button>
         </div>
         <div class="daw-cluster daw-cluster-playback" aria-label="Transport">
@@ -4533,7 +4969,7 @@ function renderProduce() {
                     <span class="pal-kind">${esc(pl.kindLabel || "")}</span>
                     <span class="pal-actions">
                       ${pl.originTempo ? `<button class="pal-btn" data-adopt-tempo="${pl.id}" title="Adopt this patch's design tempo (${pl.originTempo} bpm) as the session tempo">⏱</button>` : ""}
-                      <button class="pal-btn" data-palette-edit="${pl.id}" title="Open this instrument in the Sound Studio editor — save it back and every region using it follows">✎</button>
+                      <button class="pal-btn" data-palette-edit="${pl.id}" title="Open this instrument in the Studio editor — save it back and every region using it follows">✎</button>
                       <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="Add a track playing this instrument, with a first region at bar 1">＋ Track</button>
                       <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
                     </span>
@@ -4559,12 +4995,13 @@ function renderProduce() {
       </div>
       <div class="daw-hsplit${editorOpen ? "" : " hidden"}" id="dawHSplit" title="Drag to resize the editor"></div>
       <div class="daw-editor${editorOpen ? "" : " collapsed"}" style="height:${editorOpen ? dawLayout.editorH : 0}px">
-        ${editorOpen ? rollPanelHTML() : ""}
+        ${editorOpen ? editorPanelHTML() : ""}
       </div>
+      ${editorMode === "mixer" ? "" : `<button class="mixer-toggle" id="mixerToggle" title="Open the channel mixer">▥ Mixer</button>`}
     </div>
   `);
   document.body.classList.add("explore-mode");
-  document.title = "Sound Studio — Producer";
+  document.title = "Resona — Producer";
   wireDawLayout(v);
   wireProduce(v);
   maybeShowProducerTour(); // Q9 F: three-step first-visit tour
@@ -4861,10 +5298,10 @@ function wireProduce(v) {
     };
     el.ondblclick = () => {
       selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
-      if (selectedBakedRegion()) {
-        rollOpen = true;
-        renderProduce();
-      }
+      // Baked → piano roll; generative → the region's layers (owner 2026-07-09).
+      const er = editorRegion();
+      editorMode = (er && er.region.type === "baked") ? "roll" : "layers";
+      renderProduce();
     };
   });
 
@@ -4894,10 +5331,10 @@ function wireProduce(v) {
         if (!swept || (rect.r - rect.l < 4 && rect.b - rect.t < 4)) {
           // plain click on empty lane: clear selection and close the note
           // editor without needing an explicit hide control.
-          if (selectedRegions.size || selectedRegion || rollOpen) {
+          if (selectedRegions.size || selectedRegion || (editorMode && editorMode !== "mixer")) {
             selectedRegions.clear();
             selectedRegion = null;
-            rollOpen = false;
+            if (editorMode !== "mixer") editorMode = null; // the mixer isn't region-tied
             rollNoteSel = -1;
             renderProduce();
           }
@@ -5017,6 +5454,8 @@ function wireProduce(v) {
   updatePlayhead(arrPlay ? arrPlay.beat : playheadBeat);
 
   wireRoll(v);
+  wireEditorPanel(v);
+  wireMixer(v);
 
   const selected = () => {
     if (!selectedRegion) return {};
@@ -5083,7 +5522,7 @@ function wireProduce(v) {
         tag.textContent = `${db >= 0 ? "+" : ""}${db.toFixed(1)}dB`;
         if (arrPlay && track) {
           const voice = producerVoices.get(track.id);
-          if (voice) voice.setMasterVolume((track.gain ?? 1) * region.gain);
+          if (voice) voice.setMasterVolume(_trackVol(track.gain, region.gain));
         }
       };
       const up = () => {
@@ -5154,7 +5593,7 @@ function wireProduce(v) {
 
   const editNotesBtn = v.querySelector("#regionEditNotes");
   if (editNotesBtn) editNotesBtn.onclick = () => {
-    rollOpen = !rollOpen;
+    editorMode = editorMode === "roll" ? null : "roll";
     rollNoteSel = -1;
     renderProduce();
   };
@@ -5210,7 +5649,7 @@ function wireProduce(v) {
       if (!track) return;
       track.gain = Number(sl.value);
       saveArrangement();
-      producerVoices.get(track.id)?.setMasterVolume(track.gain);
+      producerVoices.get(track.id)?.setMasterVolume(_trackVol(track.gain, 1));
     };
   });
 
@@ -5241,10 +5680,10 @@ function wireProduce(v) {
     if (!track || !region) return;
     region.gain = Number(regionGain.value);
     saveArrangement();
-    producerVoices.get(track.id)?.setMasterVolume((track.gain ?? 1) * (region.gain ?? 1));
+    producerVoices.get(track.id)?.setMasterVolume(_trackVol(track.gain, region.gain));
   };
 
-  // Send region to the Sound Studio (v2.1 U13) — one-way explore
+  // Send region to the Studio (v2.1 U13) — one-way explore
   const toStudio = v.querySelector("#regionToStudio");
   if (toStudio) toStudio.onclick = () => {
     const { track, region } = selected();
@@ -5293,13 +5732,26 @@ function wireProduce(v) {
     saveArrangementRegistry(reg);
     switchArrangement(a.id);
   };
-  const arrRename = v.querySelector("#arrRename");
-  if (arrRename) arrRename.onclick = () => {
-    const name = prompt("Rename arrangement:", arrangement.name);
-    if (!name || !name.trim()) return;
-    arrangement.name = name.trim().slice(0, 80);
-    saveArrangement();
-    renderProduce();
+  // Double-click the arrangement title to rename it inline (owner 2026-07-09).
+  const arrName = v.querySelector("#arrName");
+  if (arrName) arrName.ondblclick = () => {
+    const input = document.createElement("input");
+    input.className = "daw-arr-rename";
+    input.value = arrangement.name || "Untitled";
+    input.maxLength = 80;
+    arrName.replaceWith(input);
+    input.focus(); input.select();
+    let done = false;
+    const commit = (save) => {
+      if (done) return; done = true;
+      if (save) {
+        const n = input.value.trim();
+        if (n && n !== arrangement.name) { arrangement.name = n.slice(0, 80); saveArrangement("rename arrangement"); }
+      }
+      renderProduce();
+    };
+    input.onkeydown = (ev) => { if (ev.key === "Enter") commit(true); if (ev.key === "Escape") commit(false); };
+    input.onblur = () => commit(true);
   };
   const arrDelete = v.querySelector("#arrDelete");
   if (arrDelete) arrDelete.onclick = () => {
@@ -5839,9 +6291,9 @@ function renderStudyDebrief() {
     </div>
     <div class="card mb-3">
       <h3 class="mb-1">Want to explore more?</h3>
-      <p class="text-sm mb-2">The Sound Studio lets you play freely with the same synthesis
+      <p class="text-sm mb-2">Resona lets you play freely with the same synthesis
       engine used in the study. Discover what you like and save your favourites.</p>
-      <button class="btn btn-primary" id="goExplore">Open Sound Studio</button>
+      <button class="btn btn-primary" id="goExplore">Open Resona</button>
     </div>
     <div class="text-center mt-3">
       <button class="btn btn-ghost btn-sm" id="goHome">Return to start</button>
@@ -5883,7 +6335,7 @@ function renderExplore() {
       <div class="dash-vsplit" id="dashVSplit" title="Drag to resize the left column"></div>
     <div class="explore-top">
       <div class="explore-title">
-        <h1>Sound Studio <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></h1>
+        <h1>Resona <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></h1>
         <div class="studio-subtitle">Probabilistic Synthesiser</div>
       </div>
     </div>
@@ -5995,7 +6447,7 @@ function renderExplore() {
     </div>
   `);
   document.body.classList.add("explore-mode");
-  document.title = "Sound Studio";
+  document.title = "Resona";
 
   // ── Wire up ──
 
@@ -7773,12 +8225,17 @@ function producerLayersPanelHTML(p) {
     </div>`;
 }
 
-function bindProducerLayers(v) {
+// The layers panel works on any params object (owner 2026-07-09): the Macro
+// view binds it to exploreParams; the producer region Layer view binds it to
+// the region's patch (pal.params). hooks route the persistence/live-update.
+function bindProducerLayers(v, target = exploreParams, hooks = {}) {
   const panel = v.querySelector("#m2LayersPanel");
   if (!panel) return;
-  const applyLive = () => synth.updateGenerationParams({ ...exploreParams });
-  const layerById = (id) => (exploreParams.layers || []).find(l => l.id === id);
-  // The effects chain behind a producer row: "base" → the patch itself.
+  const applyLive = hooks.applyLive || (() => synth.updateGenerationParams({ ...target }));
+  const applyReverb = hooks.applyReverb || (() => synth.updateReverb({ ...target }));
+  const applyEffects = hooks.applyEffects || (() => synth.updateEffects(target));
+  const rerender = hooks.rerender || (() => renderExplore());
+  const layerById = (id) => (target.layers || []).find(l => l.id === id);
   const prodChain = (id, create = false) => {
     const l = layerById(id);
     if (!l) return null;
@@ -7800,16 +8257,16 @@ function bindProducerLayers(v) {
   panel.querySelectorAll("[data-prod-angle]").forEach(el => {
     el.oninput = () => {
       const id = el.dataset.prodAngle, val = parseFloat(el.value);
-      if (id === "perc") { exploreParams.percAzimuth = val; applyLive(); synth.updateReverb({ ...exploreParams }); return; }
-      const l = layerById(id); if (l) l.space = { angle: val, dist: l.space?.dist ?? exploreParams.spaceDistance ?? 2.5 };
+      if (id === "perc") { target.percAzimuth = val; applyLive(); applyReverb(); return; }
+      const l = layerById(id); if (l) l.space = { angle: val, dist: l.space?.dist ?? target.spaceDistance ?? 2.5 };
       applyLive();
     };
   });
   panel.querySelectorAll("[data-prod-dist]").forEach(el => {
     el.oninput = () => {
       const id = el.dataset.prodDist, val = parseFloat(el.value);
-      if (id === "perc") { exploreParams.percDistance = val; applyLive(); synth.updateReverb({ ...exploreParams }); return; }
-      const l = layerById(id); if (l) l.space = { angle: l.space?.angle ?? exploreParams.spaceAzimuth ?? 0, dist: val };
+      if (id === "perc") { target.percDistance = val; applyLive(); applyReverb(); return; }
+      const l = layerById(id); if (l) l.space = { angle: l.space?.angle ?? target.spaceAzimuth ?? 0, dist: val };
       applyLive();
     };
   });
@@ -7821,7 +8278,7 @@ function bindProducerLayers(v) {
       const chain = prodChain(el.dataset.prodFxAdd, true);
       if (!inst || !chain) return;
       chain.push(inst);
-      applyLive(); synth.updateEffects(exploreParams); renderExplore();
+      applyLive(); applyEffects(); rerender();
     };
   });
   panel.querySelectorAll("[data-prod-fx-toggle]").forEach(el => {
@@ -7829,7 +8286,7 @@ function bindProducerLayers(v) {
       const { fx } = fxFromKey(el.dataset.prodFxToggle);
       if (!fx) return;
       fx.enabled = fx.enabled === false;
-      applyLive(); synth.updateEffects(exploreParams); renderExplore();
+      applyLive(); applyEffects(); rerender();
     };
   });
   panel.querySelectorAll("[data-prod-fx-wet]").forEach(el => {
@@ -7837,7 +8294,7 @@ function bindProducerLayers(v) {
       const { fx } = fxFromKey(el.dataset.prodFxWet);
       if (!fx) return;
       fx.wet = parseFloat(el.value);
-      applyLive(); synth.updateEffects(exploreParams); // live
+      applyLive(); applyEffects(); // live
     };
   });
   panel.querySelectorAll("[data-prod-fx-remove]").forEach(el => {
@@ -7846,7 +8303,7 @@ function bindProducerLayers(v) {
       if (!chain || !fx) return;
       const i = chain.indexOf(fx);
       if (i >= 0) chain.splice(i, 1);
-      applyLive(); synth.updateEffects(exploreParams); renderExplore();
+      applyLive(); applyEffects(); rerender();
     };
   });
 }
@@ -9143,7 +9600,7 @@ function slExportScl(p) {
   const degs = (p.customDegrees || []).filter(d => d > 0).sort((a, b) => a - b);
   const lines = [
     "! sound-studio.scl", "!",
-    `Sound Studio scale — ${degs.length + 1} notes from ${div}-EDO`,
+    `Resona scale — ${degs.length + 1} notes from ${div}-EDO`,
     ` ${degs.length + 1}`, "!",
     ...degs.map(d => ` ${_slCents(p, d).toFixed(5)}`),
     " 2/1", "",
@@ -13953,7 +14410,7 @@ function welcomeCardHTML() {
     <div class="card welcome-card" id="welcomeCard">
       <div class="welcome-hero">
         <span class="welcome-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-        <h2>Sound Studio</h2>
+        <h2>Resona</h2>
       </div>
       <div class="welcome-rule"><i></i></div>
       <p class="welcome-tagline">Welcome! Choose how you&rsquo;d like to get started.</p>

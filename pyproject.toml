@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "probabilistic-music-synthesiser"
+name = "resona"
 version = "0.1.0"
-description = "Probabilistic Web Audio and offline stimulus toolkit for music aesthetics research."
+description = "Resona — a probabilistic, physically-modelled music studio and stimulus toolkit for research into music's aesthetics and origins."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Marcus Anderson" }]
