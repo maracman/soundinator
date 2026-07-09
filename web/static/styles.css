@@ -29,10 +29,12 @@
   --exc:      #e8994a;   /* excitor — amber-orange   */
   --res:      #3d9df6;   /* resonator — signal blue  */
   --bodyc:    #9d7bf0;   /* body — violet            */
+  --eff:      #e5688f;   /* effects — rack rose       */
   --spc:      #4fc47f;   /* space — stage green      */
   --exc-dim:  #e8994a33;
   --res-dim:  #3d9df633;
   --bodyc-dim:#9d7bf033;
+  --eff-dim:  #e5688f33;
   --spc-dim:  #4fc47f33;
   --radius:   10px;
   --radius-sm: 6px;
@@ -2976,11 +2978,13 @@ body.explore-mode #app {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex: none; /* keep its own space in the crowded transport row (the row scrolls) */
 }
 
 .top-save-bar input[type="text"] {
   min-height: 26px;
-  max-width: 110px;
+  flex: none;       /* never squish the name field (owner 2026-07-09) */
+  width: 130px;
   padding: 0 6px;
   border-color: #314252;
   border-radius: 3px;
@@ -4969,7 +4973,9 @@ body.explore-mode #app {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.3rem 0.4rem;
-  font-size: 0.8rem;
+  font-size: 0.66rem;
+  flex: none;
+  max-width: 90px; /* "Everything" doesn't need 130px — keep the row compact */
 }
 
 .section-chip {
@@ -5815,6 +5821,41 @@ body.explore-mode #app {
   text-overflow: ellipsis;
 }
 .layer-ownhead { white-space: nowrap; }
+/* Per-layer EFFECTS tags on the layer row (docs/EFFECTS_CONTRACT.md) */
+.layer-fx { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 1px; }
+.layer-fx.off { opacity: 0.5; }
+.layer-fx-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-left: 2px solid var(--eff); border-radius: 4px; padding: 1px 4px 1px 5px;
+}
+.layer-fx-tag.off { border-left-color: var(--text3); opacity: 0.55; }
+.layer-fx-name {
+  background: none; border: none; cursor: pointer; padding: 0;
+  font-size: 0.6rem; color: var(--text2); white-space: nowrap;
+}
+.layer-fx-tag:not(.off) .layer-fx-name { color: var(--text); }
+.layer-fx-wet { width: 34px; height: 10px; }
+/* The always-present BASE row (owner 2026-07-09) */
+.layer-row.base-row { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.layer-row.base-row.sel { box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px -8px var(--accent); }
+.layer-base-badge {
+  font-size: 0.5rem; font-weight: 700; letter-spacing: 0.08em; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px;
+}
+/* Editable layer titles (double-click to rename) */
+.layer-name-row { display: flex; align-items: center; gap: 5px; margin-bottom: 1px; }
+.layer-name {
+  font-size: 0.72rem; font-weight: 600; color: var(--text);
+  cursor: text; border-radius: 3px; padding: 0 2px; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.layer-name:hover { background: var(--surface2); box-shadow: inset 0 0 0 1px var(--border); }
+.layer-name-edit {
+  font-size: 0.72rem; font-weight: 600; color: var(--text);
+  background: var(--bg); border: 1px solid var(--accent); border-radius: 3px;
+  padding: 0 3px; width: 140px; font-family: inherit;
+}
 /* the synchronised-variation panel sits to the RIGHT of the rows — and
    scrolls internally rather than squeezing the editors above (the whole
    layer band is height-capped) */
@@ -5988,7 +6029,7 @@ body.explore-mode #app {
   overflow: hidden; /* owner 07-07: controls must never spill onto the lanes */
 }
 /* two-row track head: identity on top, mix controls underneath */
-.tl2-track-head { flex-direction: column; align-items: stretch; gap: 0.15rem; }
+.tl2-track-head { flex-direction: column; align-items: stretch; justify-content: center; gap: 0.15rem; }
 .tl2-track-head.sp-sel { border-color: rgba(56,189,248,0.55); }
 .tl2-head-top { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
 .tl2-head-ctl { display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
@@ -6066,7 +6107,10 @@ body.explore-mode #app {
 .tl2-lane {
   position: relative;
   flex: none;
-  height: 40px;
+  /* Fill the row height (set by the taller two-row head) so there's no dead
+     gap below each lane, and give regions a generous floor (owner 2026-07-09). */
+  align-self: stretch;
+  min-height: 60px;
   background:
     repeating-linear-gradient(to right,
       rgba(154,160,171,0.12) 0, rgba(154,160,171,0.12) 1px,
@@ -6216,6 +6260,17 @@ body.dragging { cursor: grabbing; user-select: none; }
   width: 1px;
   background: rgba(232,234,238,0.3);
   pointer-events: none;
+}
+/* Generative-region motif boundaries: a light dashed vertical line per motif
+   length (owner 2026-07-09 — restored). */
+.tl2-motiftick {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 0;
+  border-left: 1px dashed rgba(232,234,238,0.28);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .tl2-head .tl-pan { width: 34px; height: 3px; flex: none; }
@@ -6470,10 +6525,12 @@ body.dragging { cursor: grabbing; user-select: none; }
 .ch-excitor          { border-color: #4a3517; }
 .ch-resonator        { border-color: #223f63; }
 .ch-body             { border-color: #3f2d58; }
+.ch-effects          { border-color: #542740; }
 .ch-space            { border-color: #224d3e; }
 .ch-excitor.active   { border-color: var(--exc);   box-shadow: 0 0 0 1px var(--exc),   0 0 22px -4px var(--exc); }
 .ch-resonator.active { border-color: var(--res);   box-shadow: 0 0 0 1px var(--res),   0 0 22px -4px var(--res); }
 .ch-body.active      { border-color: var(--bodyc); box-shadow: 0 0 0 1px var(--bodyc), 0 0 22px -4px var(--bodyc); }
+.ch-effects.active   { border-color: var(--eff);   box-shadow: 0 0 0 1px var(--eff),   0 0 22px -4px var(--eff); }
 .ch-space.active     { border-color: var(--spc);   box-shadow: 0 0 0 1px var(--spc),   0 0 22px -4px var(--spc); }
 .ch-power {
   background: none; border: none; cursor: pointer; padding: 2px;
@@ -6484,6 +6541,7 @@ body.dragging { cursor: grabbing; user-select: none; }
 .ch-excitor   .ch-power.on { color: var(--exc); }
 .ch-resonator .ch-power.on { color: var(--res); }
 .ch-body      .ch-power.on { color: var(--bodyc); }
+.ch-effects   .ch-power.on { color: var(--eff); }
 .ch-space     .ch-power.on { color: var(--spc); }
 .ch-power.always { opacity: 0.45; cursor: default; }
 .ch-card.stage-off .ch-thumb, .ch-card.stage-off .ch-headline { opacity: 0.35; }
@@ -6508,7 +6566,137 @@ body.dragging { cursor: grabbing; user-select: none; }
 .ch-excitor-word   { color: var(--exc)  !important; }
 .ch-resonator-word { color: var(--res)  !important; }
 .ch-body-word      { color: var(--bodyc) !important; }
+.ch-effects-word   { color: var(--eff)  !important; }
 .ch-space-word     { color: var(--spc)  !important; }
+
+/* ══ EFFECTS stage — three-panel rack (docs/EFFECTS_CONTRACT.md) ══════════
+   The shell (browser + rack) stays flat/monochrome like the app; each effect
+   FACE brings its own skeuomorphic design language from its module. */
+.fxs-stage {
+  flex: 1; min-height: 0; display: grid;
+  grid-template-columns: 232px minmax(0, 1fr) 268px;
+  gap: 0.5rem;
+}
+.fxs-browser, .fxs-rack {
+  display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); overflow: hidden;
+}
+.fxs-panel-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 11px; font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--text2);
+  border-bottom: 1px solid var(--border); flex: none;
+}
+.fxs-count {
+  font-size: 0.6rem; color: var(--text3); background: var(--surface2);
+  border-radius: 20px; padding: 1px 7px; font-weight: 600;
+}
+.fxs-panel-head .fxs-mini { margin-left: auto; }
+.fxs-mini {
+  font-size: 0.62rem; letter-spacing: 0.04em; color: var(--text2);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 3px 8px; cursor: pointer;
+}
+.fxs-mini:hover { color: var(--text); border-color: var(--border2); }
+
+/* ── Browser: raised header bars over recessed list wells (Logic-style) ── */
+.fxs-browser-list { overflow-y: auto; padding: 0; flex: 1; background: var(--display); }
+.fxs-cat { border-bottom: 1px solid var(--border); }
+.fxs-cat-head {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 8px 11px; cursor: pointer; text-align: left;
+  color: var(--text); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
+  border: none; border-radius: 0;
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
+  position: sticky; top: 0; z-index: 2;
+  box-shadow: 0 1px 0 var(--border);
+}
+.fxs-cat.open .fxs-cat-head { color: var(--eff); }
+.fxs-cat-head:hover { background: linear-gradient(180deg, var(--border2), var(--surface2)); }
+.fxs-cat-caret { width: 9px; color: var(--text3); font-size: 0.58rem; transition: color 0.1s; }
+.fxs-cat.open .fxs-cat-caret { color: var(--eff); }
+.fxs-cat-name { flex: 1; }
+.fxs-cat-n {
+  font-size: 0.58rem; color: var(--text3); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 20px; padding: 0 6px; font-weight: 600;
+}
+/* the expanded list is a recessed well, visually distinct from its header */
+.fxs-cat-body {
+  padding: 4px; background: var(--display);
+  box-shadow: inset 0 2px 4px -3px rgba(0,0,0,0.9);
+}
+.fxs-eff {
+  padding: 5px 8px 5px 20px; border-radius: 5px; cursor: grab;
+  border: 1px solid transparent; display: block; overflow: hidden;
+}
+.fxs-eff:hover { background: var(--surface2); border-color: var(--border); }
+.fxs-eff:active { cursor: grabbing; }
+.fxs-eff-name { display: block; font-size: 0.75rem; color: var(--text); font-weight: 500; }
+.fxs-eff-desc {
+  display: block; font-size: 0.65rem; color: var(--text3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Rack (stack) ── */
+.fxs-rack-list { overflow-y: auto; padding: 6px; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.fxs-rack-list.fxs-droptarget { outline: 1px dashed var(--eff); outline-offset: -3px; border-radius: 8px; }
+.fxs-rack-empty, .fxs-face-empty-sub { color: var(--text3); font-size: 0.7rem; padding: 10px; line-height: 1.5; }
+.fxs-slot {
+  display: flex; align-items: center; gap: 6px; padding: 6px 7px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 7px; border-left: 3px solid var(--eff);
+}
+.fxs-slot.sel { border-color: var(--eff); box-shadow: 0 0 0 1px var(--eff-dim); }
+.fxs-slot.off { opacity: 0.5; border-left-color: var(--text3); }
+.fxs-slot.fxs-dragging { opacity: 0.4; }
+.fxs-slot-grip { color: var(--text3); cursor: grab; font-size: 0.7rem; letter-spacing: -2px; }
+.fxs-slot-power { background: none; border: none; cursor: pointer; color: var(--text3); padding: 0; line-height: 0; }
+.fxs-slot-power svg { width: 13px; height: 13px; }
+.fxs-slot-power.on { color: var(--eff); }
+.fxs-slot-name { flex: 1; font-size: 0.74rem; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fxs-slot-wet { display: flex; align-items: center; gap: 4px; }
+.fxs-slot-wet input { width: 54px; }
+.fxs-slot-wetv { font-size: 0.6rem; color: var(--text3); font-family: var(--mono); width: 30px; text-align: right; }
+.fxs-slot-x { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px; }
+.fxs-slot-x:hover { color: var(--red); }
+.fxs-rack-foot { padding: 7px 11px; font-size: 0.62rem; color: var(--text3); border-top: 1px solid var(--border); flex: none; }
+
+/* ── Face column (the effect's own panel mounts here) ── */
+.fxs-face-col {
+  display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--display); overflow: hidden;
+}
+.fxs-face-head {
+  display: flex; align-items: center; gap: 9px; padding: 8px 11px;
+  border-bottom: 1px solid var(--border); flex: none;
+}
+.fxs-face-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+.fxs-face-cat { font-size: 0.62rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+.fxs-face-tools { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+.fxs-face-preset {
+  font-size: 0.66rem; background: var(--surface2); color: var(--text2);
+  border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px;
+}
+.fxs-face-mount { flex: 1; min-height: 0; position: relative; }
+.fxs-face-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px; color: var(--text2); text-align: center;
+}
+.fxs-face-empty-mark { font-size: 2.4rem; color: var(--text3); opacity: 0.5; }
+.fxs-stage-off .fxs-face-col, .fxs-stage-off .fxs-rack { opacity: 0.6; }
+
+/* ── Expanded overlay: face floats large, subnote page faintly visible ── */
+.fxs-stage.fxs-expanded .fxs-face-col {
+  position: fixed; inset: 3.5vh 3.5vw; z-index: 400;
+  border: 1px solid var(--eff);
+  box-shadow: 0 24px 80px -20px rgba(0,0,0,0.8);
+}
+.fxs-stage.fxs-expanded::after {
+  content: ""; position: fixed; inset: 0; z-index: 399;
+  background: rgba(10,11,14,0.55); backdrop-filter: blur(1px);
+}
 
 /* ── Right column: Envelope / Modulation panel ── */
 .td-side {
@@ -6870,8 +7058,56 @@ body.dragging { cursor: grabbing; user-select: none; }
 .m2-chip-link { cursor: pointer; color: var(--rootc); border-color: #3f3766; font: inherit; font-size: 0.66rem; }
 .m2-chip-link:hover { background: rgba(139,124,246,0.1); }
 .m2-chips .vis-mode-switch { margin-left: auto; }
-.m2-visual { flex: 1; min-height: 0; }
+.m2-visual { flex: 1; min-height: 0; position: relative; }
 .m2-visual #vis { width: 100%; height: 100%; display: block; }
+/* Layers view replaces the roll/lanes canvas with an HTML panel */
+.visualiser-wrap.vis-mode-layers #vis { display: none; }
+.m2-layers-panel {
+  position: absolute; inset: 0; overflow-y: auto;
+  background: var(--display); border-radius: 8px; padding: 10px 12px;
+}
+.prod-layers-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.prod-layers-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
+.prod-layers-note { font-size: 0.64rem; color: var(--text3); }
+.prod-layers-list { display: flex; flex-direction: column; gap: 6px; }
+.prod-layers-empty { color: var(--text3); font-size: 0.7rem; padding: 8px 2px; }
+.prod-layer-row {
+  display: flex; align-items: center; gap: 10px; padding: 7px 9px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--layer-hue, var(--eff)); border-radius: 7px;
+  flex-wrap: wrap;
+}
+.prod-layer-row.base { border-left-color: var(--accent); background: var(--surface2); }
+.prod-layer-row.perc-row { border-left-color: hsl(32 70% 55%); background: color-mix(in srgb, hsl(32 70% 55%) 5%, var(--surface)); }
+.prod-layer-row.perc-row.dim { opacity: 0.62; }
+.prod-layer-row.perc-row .prod-layer-tag { background: color-mix(in srgb, hsl(32 75% 55%) 60%, transparent); }
+.prod-layer-tag {
+  width: 20px; height: 20px; flex: none; display: grid; place-items: center;
+  border-radius: 50%; font-size: 0.62rem; color: var(--text);
+  background: color-mix(in srgb, hsl(var(--layer-hue, 210) 60% 55%) 55%, transparent);
+}
+.prod-layer-name { font-size: 0.74rem; font-weight: 600; color: var(--text); width: 62px; flex: none; }
+.prod-layer-ctls { display: flex; align-items: center; gap: 8px; }
+.prod-ctl { display: flex; align-items: center; gap: 4px; font-size: 0.6rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; }
+.prod-ctl input { width: 66px; }
+.prod-ctl-mute { color: var(--text3); font-style: italic; }
+.prod-layer-fx { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-left: auto; }
+.prod-fx-none { font-size: 0.62rem; color: var(--text3); font-style: italic; }
+.prod-fx-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-left: 2px solid var(--eff); border-radius: 4px; padding: 1px 3px 1px 5px;
+}
+.prod-fx-tag.off { border-left-color: var(--text3); opacity: 0.55; }
+.prod-fx-name { background: none; border: none; cursor: pointer; padding: 0; font-size: 0.62rem; color: var(--text); white-space: nowrap; }
+.prod-fx-tag.off .prod-fx-name { color: var(--text2); }
+.prod-fx-wet { width: 40px; height: 11px; }
+.prod-fx-x { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.85rem; line-height: 1; padding: 0 1px; }
+.prod-fx-x:hover { color: var(--red); }
+.prod-fx-add {
+  font-size: 0.62rem; background: var(--surface2); color: var(--text2);
+  border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px;
+}
 .macro2-card .engine-state { flex: none; }
 
 .m2-inspector {
@@ -6909,6 +7145,14 @@ body.dragging { cursor: grabbing; user-select: none; }
 }
 .m2-preset:hover { border-color: var(--gen); }
 .m2-preset.sel { border-color: var(--res); box-shadow: 0 0 0 1px var(--res), 0 0 18px -6px var(--res); }
+/* Sub-note preview (owner 2026-07-09): the card being auditioned */
+.m2-preset { position: relative; }
+.m2-preset.previewing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 20px -6px var(--accent); }
+.m2-preview-badge {
+  position: absolute; top: 5px; right: 5px;
+  font-size: 0.5rem; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--bg); background: var(--accent); border-radius: 3px; padding: 1px 4px;
+}
 .m2-preset-name { font-size: 0.68rem; font-weight: 600; color: var(--text); }
 .m2-preset canvas { width: 100%; height: 34px; background: var(--display); border-radius: 5px; }
 .m2-preset-fam { font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
@@ -7382,6 +7626,25 @@ body.dragging { cursor: grabbing; user-select: none; }
 
 .gs-chevron:hover { color: #f3f5f7; }
 
+/* Global scale/space active indicators (owner 2026-07-09) */
+.gs-chevron.gs-active { color: #f3f5f7; }
+.gs-onpip { color: var(--acc); font-size: 0.72em; margin-left: 4px; vertical-align: 1px; }
+/* Global space is a toggle button that GLOWS when on */
+.sp-toggle { flex: 1 1 auto; width: auto; }
+.sp-toggle.sp-active { color: #eaf6ff; text-shadow: 0 0 10px rgba(56,189,248,0.6); }
+.sp-onpip { color: #38bdf8; font-size: 0.72em; margin-left: 4px; vertical-align: 1px; text-shadow: 0 0 8px rgba(56,189,248,0.9); }
+.sp-expand { flex: 0 0 auto; width: auto !important; padding: 0 6px; text-align: center; }
+/* Collapsed slim cylinder — sits in the button row, top aligned with it. The
+   box must shrink to the slim canvas (override .sp-cyl-wrap's 105px floor). */
+.tl2-sp-row.sp-collapsed-row { align-items: flex-start; }
+.sp-cyl-wrap.sp-cyl-collapsed {
+  min-height: 0;
+  border: 1px solid rgba(56,189,248,0.26);
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: inset 0 0 16px -7px rgba(56,189,248,0.45);
+}
+
 .gs-strip {
   background: #0c1117;
   border-color: rgba(58,66,80,0.72);
@@ -7529,10 +7792,12 @@ body.dragging { cursor: grabbing; user-select: none; }
 .tl2-baked-tag,
 .tl2-gain-tag,
 .tl2-badges,
+/* Keep these above the shape SVG, but DON'T override their absolute
+   positioning (the resize handle must stay pinned to the region's right edge
+   so the ew-resize cursor is grabbable; loop ticks sit at their `left`). */
 .tl2-resize,
 .tl2-looptick {
-  position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .tl2-region-label {

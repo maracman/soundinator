@@ -55,6 +55,16 @@ import {
   earlyReflectionPattern,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
+// EFFECTS stage (docs/EFFECTS_CONTRACT.md) — browser/stack/faces are driven
+// from this registry. Importing also registers the whole effect roster.
+import {
+  EFFECT_CATEGORIES,
+  effectsByCategory,
+  effectById as effectModuleById,
+  allEffects,
+  newEffectInstance,
+  sanitizeChain as sanitizeFxChain,
+} from "./effects/index.js";
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -320,6 +330,10 @@ const DEFAULTS = {
   percDownbeatVol: 0,
   percDownbeatSound: "wood",
   percDownbeatEvery: 4,
+  // Percussion is its own sound source in space (producer LAYERS view). null =
+  // sit at the patch's own position (owner 2026-07-09).
+  percAzimuth: null,
+  percDistance: null,
   // Space
   reverbType: "room",
   // A touch of room by default: a completely dry first play sounds clinical
@@ -361,6 +375,10 @@ const DEFAULTS = {
   reverbSize: null,     // room designer — null = the picked room's own character
   reverbDamping: null,
   reverbDiffusion: null,
+  // EFFECTS stage (docs/EFFECTS_CONTRACT.md): per-layer ordered effect stack,
+  // sitting between BODY and SPACE. Each entry {uid,type,enabled,wet,params}.
+  effectsChain: [],
+  stageEffectsOn: true,   // whole-stage bypass toggle (rail power button)
   layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
   layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own means kept)
   layerEnvProb: 0.5,       // Q7: the shared variation chance when layerEnvOverride is on
@@ -1382,7 +1400,9 @@ function regionPlayParams(track, region, atBeat = null) {
   // wins; baked regions replay stored degrees and are untouched by
   // construction (pitch derives from degree + division, not this list).
   if (track?.useGlobalScale) {
-    const marker = globalScaleAt(arrangement?.globalScale, region.startBeat ?? 0);
+    // Opting a track in (its G button) IS the activation — no separate enable
+    // (owner 2026-07-09): force enabled so the marker in force applies.
+    const marker = globalScaleAt({ ...(arrangement?.globalScale || {}), enabled: true }, region.startBeat ?? 0);
     if (marker) {
       params.customDegrees = [...marker.degrees];
       params.subScaleNotes = [...(marker.subScaleNotes || [])];
@@ -1461,16 +1481,12 @@ function sessionBarControlsHTML() {
   // is the producer's scale surface) and the Space control moved into the
   // global-space listener panel where it only applies when that's on.
   const ctx = arrangement.context;
-  const root = ctx.keyRoot ?? (Array.isArray(ctx.rootNotes) && ctx.rootNotes.length ? ctx.rootNotes[0] : 0);
+  // Owner 2026-07-09: no project root-pitch control — each patch keeps its own
+  // pitch; there's no global transpose of everything.
   return `
     <label class="daw-ctx">Tempo
       <input type="range" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/>
       <output id="ctxTempoOut">${ctx.tempo}</output>
-    </label>
-    <label class="daw-ctx" title="Root pitch: the whole lattice transposes so degree 0 lands on this pitch class">Key (root pitch)
-      <select data-ctx="root">
-        ${NOTE_NAMES.map((n, i) => `<option value="${i}"${i === root ? " selected" : ""}>${n}</option>`).join("")}
-      </select>
     </label>`;
 }
 
@@ -2110,8 +2126,15 @@ function drawGsStrip() {
   });
 }
 
+// Global scale is active whenever ANY track opts in with its G button — there
+// is no separate checkbox (owner 2026-07-09).
+function globalScaleActive() {
+  return (arrangement.tracks || []).some(t => t.useGlobalScale);
+}
+
 function globalScaleStripHTML(laneW) {
   const gs = arrangement.globalScale || { enabled: false, markers: [] };
+  const active = globalScaleActive();
   const sel = gs.markers?.[_gsSelMarker];
   const div = _gsDivCount();
   const editorRow = (_gsOpen && sel) ? `
@@ -2131,10 +2154,9 @@ function globalScaleStripHTML(laneW) {
   return `
       <div class="tl2-row tl2-gs-row${_gsOpen ? " open" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron" id="gsToggle" title="Global scale — a tiny piano roll of the scale over time; double-click at a bar line to add a change point; tracks opt in with the G button in their header">${_gsOpen ? "▾" : "▸"} Global scale</button>
-          ${_gsOpen ? `<input type="checkbox" id="gsEnabled"${gs.enabled ? " checked" : ""} title="Apply the global scale to opted-in tracks"/>` : ""}
+          <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Global scale — a tiny piano roll of the scale over time; double-click at a bar line to add a change point. It applies to any track that opts in with the G button in its header (no separate switch).">${_gsOpen ? "▾" : "▸"} Global scale${active ? ` <span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}</button>
         </div>
-        ${_gsOpen ? `<div class="gs-strip${gs.enabled ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The scale over time — rows are note divisions, colours are roles (lit = in scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
+        ${_gsOpen ? `<div class="gs-strip${active ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The scale over time — rows are note divisions, colours are roles (lit = in scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
       </div>${editorRow}`;
 }
 
@@ -2310,7 +2332,13 @@ function globalSpaceStripHTML(laneW) {
   // Owner 07-07, compacted 07-09: the cross-section sits on the LEFT at the
   // same height as the beat-aligned cylinder. Settings live in the drawer below
   // so the timeline gets the vertical space back.
-  const panel = _spOpen ? `
+  // Owner 2026-07-09: "Global space" is a toggle BUTTON (glows when on), not a
+  // checkbox. When on it always leaves evidence — a slim cylinder (~40% height,
+  // no cross-section) in the collapsed view whose top aligns with the button,
+  // or the full cross-section + cylinder when expanded.
+  const enabled = !!sp.enabled;
+  const collapsedH = Math.round(spaceH * 0.4);
+  const fullPanel = (enabled && _spOpen) ? `
       <div class="tl2-row sp-panel-row">
         <div class="tl2-head sp-left">
           <canvas id="spSection" width="132" height="${spaceH}" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. A multi-layer patch shows its instruments as faint dots and one brighter HANDLE: in Centered mode the handle rides a ring at their average distance (drag to rotate them together or scale their distances); in Additive mode it sits just in front of your head and shifts them all by the same amount. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here."></canvas>
@@ -2321,12 +2349,13 @@ function globalSpaceStripHTML(laneW) {
         </div>
       </div>${_spRoomOpen ? spRoomDesignerHTML(head, sp, anchorAtPh) : ""}` : "";
   return `
-      <div class="tl2-row tl2-sp-row">
+      <div class="tl2-row tl2-sp-row${enabled && !_spOpen ? " sp-collapsed-row" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron" id="spToggle" title="Global space — position every instrument around the listener along the timeline">${_spOpen ? "▾" : "▸"} Global space</button>
-          ${_spOpen ? `<input type="checkbox" id="spEnabled"${sp.enabled ? " checked" : ""} title="Apply the global space to playback (asks how to initialise on first use)"/>` : ""}
+          <button class="gs-chevron sp-toggle${enabled ? " sp-active" : ""}" id="spToggle" title="Global space — click to turn it ${enabled ? "OFF" : "ON"}. Positions every instrument around the listener along the timeline (asks how to initialise on first use).">◎ Global space${enabled ? ` <span class="sp-onpip" title="Active — instruments are placed by the global space">●</span>` : ""}</button>
+          ${enabled ? `<button class="gs-chevron sp-expand" id="spExpand" title="${_spOpen ? "Collapse to the slim view" : "Expand — cross-section + full cylinder"}">${_spOpen ? "▾" : "▸"}</button>` : ""}
         </div>
-      </div>${panel}`;
+        ${enabled && !_spOpen ? `<div class="sp-cyl-wrap sp-cyl-collapsed" style="width:${laneW}px;height:${collapsedH}px"><canvas id="spCylinder" width="${laneW}" height="${collapsedH}" style="width:${laneW}px;height:${collapsedH}px" title="Global space over time (slim view) — one thread per instrument. Expand for the cross-section and full cylinder."></canvas></div>` : ""}
+      </div>${fullPanel}`;
 }
 
 // The producer's room designer (owner 07-07 round 3): the same editor as
@@ -2495,14 +2524,16 @@ function drawSpCylinder(rockRad) {
   const ctx = cv.getContext("2d");
   const w = cv.width, h = cv.height;
   ctx.clearRect(0, 0, w, h);
-  const cy = h / 2, R = h / 2 - 10;
+  // Adaptive padding so the slim collapsed cylinder (~40% height) still reads.
+  const pad = Math.min(10, h * 0.14);
+  const cy = h / 2, R = h / 2 - pad;
   const beats = Math.max(1, totalBeats());
   // beat-aligned with the timeline: 1 beat = pxPerBeat, same as the lanes
   const xFor = (beat) => beat * pxPerBeat;
   const roll = _spRock.roll;
   // translucent core = the listener's head running down the cylinder
   const sp = arrangement.space || {};
-  const headR = 6 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 8;
+  const headR = Math.min(R - 2, 6 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 8);
   ctx.fillStyle = "rgba(200,215,230,0.07)";
   ctx.fillRect(0, cy - headR, w, headR * 2);
   ctx.strokeStyle = "rgba(200,215,230,0.14)";
@@ -2658,7 +2689,8 @@ function drawSpCylinder(rockRad) {
 }
 
 function _spAnimate() {
-  if (!_spOpen || !document.getElementById("spCylinder")) { _spRaf = null; return; }
+  // Runs whenever a cylinder is on screen — collapsed (slim) or expanded.
+  if (!document.getElementById("spCylinder")) { _spRaf = null; return; }
   const rock = Math.sin(performance.now() / 2400) * (10 * Math.PI / 180); // slow ±10° rocking
   if (!_spRock.dragging) _spRock.roll *= 0.88; // spring back
   drawSpCylinder(rock);
@@ -2667,12 +2699,12 @@ function _spAnimate() {
 }
 
 function wireGlobalSpace(v) {
+  // The "Global space" label is now the activate BUTTON (owner 2026-07-09).
   const spToggle = v.querySelector("#spToggle");
-  if (spToggle) spToggle.onclick = () => { _spOpen = !_spOpen; renderProduce(); };
-  const spEnabled = v.querySelector("#spEnabled");
-  if (spEnabled) spEnabled.onchange = () => {
+  if (spToggle) spToggle.onclick = () => {
     const sp = ensureGlobalSpace();
-    if (spEnabled.checked && !sp.initialised) {
+    const turningOn = !sp.enabled;
+    if (turningOn && !sp.initialised) {
       // Activation flow (owner spec): first use asks how to start.
       if (confirm("Smartly arrange the instruments in space?\n\nOK — spread the tracks around you (override patch positions)\nCancel — keep each patch's own position (threads become offsets)")) {
         spSmartArrange();
@@ -2681,10 +2713,14 @@ function wireGlobalSpace(v) {
       }
       sp.initialised = true;
     }
-    sp.enabled = spEnabled.checked;
+    sp.enabled = turningOn;
+    if (turningOn) _spOpen = true; // owner 2026-07-09: turning it on opens the full view
     saveArrangement("global space on/off");
     renderProduce();
   };
+  // A separate chevron collapses/expands the view (only shown while on).
+  const spExpand = v.querySelector("#spExpand");
+  if (spExpand) spExpand.onclick = () => { _spOpen = !_spOpen; renderProduce(); };
   const liveApply = () => {
     if (!arrPlay) return;
     const b = arrPlay.beat;
@@ -2900,7 +2936,7 @@ function wireGlobalSpace(v) {
     };
   }
 
-  if (_spOpen && !_spRaf) _spRaf = requestAnimationFrame(_spAnimate);
+  if (!_spRaf && v.querySelector("#spCylinder")) _spRaf = requestAnimationFrame(_spAnimate);
 }
 
 // ── Q10: MIDI recording ─────────────────────────────────────
@@ -3083,21 +3119,68 @@ function regionProbabilityCurveHTML(region, params = {}) {
   const on = clamp(Number(params.onBeatProb ?? 0.66), 0, 1);
   const off = clamp(Number(params.offBeatProb ?? 0.38), 0, 1);
   const surprise = clamp(Number(params.surpriseDensity ?? params.surpriseRate ?? 0.2), 0, 1);
+  // Owner 2026-07-09: lengthening a region LOOPS its motif rather than
+  // stretching one curve. One motif length = 100 viewBox units; the profile is
+  // a sum of harmonics (periodic), so it meets itself at every motif boundary
+  // at the same height AND slope — seamless repeats. viewBox width scales with
+  // the number of loops while preserveAspectRatio="none" keeps each loop at a
+  // fixed pixel width (the graphic extends lengthways, no vertical scaling).
+  const motifBeats = Math.max(1, Number(params.motifLengthBeats || params.motifLength || 4));
+  const loops = Math.max(1, regionLen(region) / motifBeats);
+  const base = clamp(52 - (on - off) * 20, 24, 78);
+  const harm = [1, 2, 3, 4].map(k => ({ k, a: (0.35 + rng() * 0.65) / k, ph: rng() * Math.PI * 2 }));
+  const sumA = harm.reduce((s, h) => s + h.a, 0) || 1;
+  const swing = (14 + off * 10 + surprise * 10) / sumA; // bounded so the seam never clamps
+  const yAt = (t) => { // t = phase within one loop, [0,1); periodic in t
+    let y = base;
+    for (const h of harm) y += swing * h.a * Math.sin(2 * Math.PI * h.k * t + h.ph);
+    return clamp(y, 12, 88);
+  };
+  const vbW = 100 * loops;
+  const stepsPerLoop = Math.min(30, 12 + Math.round(divs * 2 + surprise * 6));
+  const totalSteps = Math.max(2, Math.round(stepsPerLoop * loops));
   const points = [];
-  let y = clamp(60 - (on - off) * 20 + (rng() - 0.5) * 18, 16, 84);
-  const steps = 11;
-  for (let i = 0; i <= steps; i++) {
-    const x = (i / steps) * 100;
-    const zig = (i % 2 ? 1 : -1) * (9 + off * 14);
-    const drift = (rng() - 0.5) * (18 + divs * 3 + surprise * 16);
-    y = clamp(y + zig + drift, 13, 87);
-    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  for (let i = 0; i <= totalSteps; i++) {
+    const x = (i / totalSteps) * vbW;
+    points.push(`${x.toFixed(1)},${yAt((x / 100) % 1).toFixed(1)}`);
   }
   const pts = points.join(" ");
-  return `<svg class="tl2-prob-curve" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+  return `<svg class="tl2-prob-curve" viewBox="0 0 ${vbW.toFixed(1)} 100" preserveAspectRatio="none" aria-hidden="true">
     <polyline class="tl2-prob-shadow" points="${pts}"></polyline>
     <polyline class="tl2-prob-line" points="${pts}"></polyline>
   </svg>`;
+}
+
+// Boundary ticks for a region: baked → loop boundaries; generative → motif
+// lengths. Shared by the timeline render and the live resize re-tile.
+function regionTicksHTML(r, params = {}) {
+  let ticks = "";
+  if (r.type === "baked" && r.loopSourceBeats && regionLen(r) > r.loopSourceBeats) {
+    for (let lb = r.loopSourceBeats; lb < regionLen(r); lb += r.loopSourceBeats) {
+      ticks += `<span class="tl2-looptick" style="left:${lb * pxPerBeat}px"></span>`;
+    }
+  } else if (r.type !== "baked") {
+    const mb = Math.max(1, Number(params.motifLengthBeats || params.motifLength || 4));
+    for (let m = mb; m < regionLen(r) - 1e-6; m += mb) {
+      ticks += `<span class="tl2-motiftick" style="left:${m * pxPerBeat}px"></span>`;
+    }
+  }
+  return ticks;
+}
+
+// Rebuild ONLY a region's graphic + boundary ticks in place (not the seed chip,
+// label, or resize handle), so a live resize re-tiles the shape rather than
+// stretching it. Deterministic (seed-driven), so the shape stays stable.
+function retileRegionGraphic(regionEl, region, track) {
+  const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
+  const params = pal?.params || track.instrumentParams || {};
+  const shapeEl = regionEl.querySelector(".tl2-prob-curve, .tl2-mini-roll");
+  if (shapeEl) shapeEl.outerHTML = region.type === "baked"
+    ? regionMiniPianoHTML(region)
+    : regionProbabilityCurveHTML(region, params);
+  regionEl.querySelectorAll(".tl2-motiftick, .tl2-looptick").forEach(t => t.remove());
+  const ticks = regionTicksHTML(region, params);
+  if (ticks) regionEl.insertAdjacentHTML("afterbegin", ticks);
 }
 
 function produceTimelineHTML() {
@@ -3118,12 +3201,9 @@ function produceTimelineHTML() {
         const b = patchBadges(pal.params);
         badgeHover = ` [${b.scaleLabel} · ${b.splits} splits · grid ${b.grid} · ${b.connection}${b.surpriseOn ? ` · ✦ ${b.dims.join("·")}` : ""}]`;
       }
-      let loopTicks = "";
-      if (r.type === "baked" && r.loopSourceBeats && regionLen(r) > r.loopSourceBeats) {
-        for (let lb = r.loopSourceBeats; lb < regionLen(r); lb += r.loopSourceBeats) {
-          loopTicks += `<span class="tl2-looptick" style="left:${lb * pxPerBeat}px"></span>`;
-        }
-      }
+      // Baked → loop-boundary ticks; generative → light dashed motif-length
+      // lines (owner 2026-07-09). Same generator as the live resize re-tile.
+      const ticks = regionTicksHTML(r, pal?.params || t.instrumentParams || {});
       const shape = r.type === "baked"
         ? regionMiniPianoHTML(r)
         : regionProbabilityCurveHTML(r, pal?.params || t.instrumentParams || {});
@@ -3131,7 +3211,7 @@ function produceTimelineHTML() {
       return `<div class="tl2-region${sel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
         style="--track-h:${hue};left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
         title="${esc(label)}${esc(badgeHover)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
-        ${loopTicks}${shape}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span><span class="tl2-region-label">${esc(label)}</span>
+        ${ticks}${shape}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span><span class="tl2-region-label">${esc(label)}</span>
         ${sel && pal ? `<span class="tl2-badges">${patchBadgesHTML({ ...pal.params, ...(pal.originScale || {}) }, pal.originTempo, true)}</span>` : ""}
         ${sel ? `<span class="tl2-gain-tag" data-gain-tag="${r.id}" title="Region level — drag vertically">${gainDb >= 0 ? "+" : ""}${gainDb.toFixed(1)}dB</span>` : ""}
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
@@ -3747,9 +3827,12 @@ function paletteItemAtPoint(x, y) {
     .map(el => (el.closest ? el.closest("[data-palette-item]") : null))
     .find(Boolean) || null;
 }
-function beatAtClientX(lane, clientX) {
+// offsetBeats: how far into the dragged region the cursor grabbed, so the
+// region's START lands at cursor − offset (the grab point stays under the
+// cursor) instead of snapping the start to the cursor.
+function beatAtClientX(lane, clientX, offsetBeats = 0) {
   const rect = lane.getBoundingClientRect();
-  const raw = (clientX - rect.left) / pxPerBeat;
+  const raw = (clientX - rect.left) / pxPerBeat - offsetBeats;
   // snap Off (0) and ⌃-drag both bypass the grid (spec T10; ⌥ stays copy)
   const grid = (pointerDrag && pointerDrag.ctrl) ? 0 : snapBeats;
   const snapped = grid > 0 ? Math.round(raw / grid) * grid : Math.round(raw * 100) / 100;
@@ -4225,7 +4308,7 @@ function pointerDragMove(e) {
     const lane = laneAtPoint(e.clientX, e.clientY);
     const prev = _dropPreviewEl();
     if (lane && lane.dataset.lane !== "__new__") {
-      const beat = beatAtClientX(lane, e.clientX);
+      const beat = beatAtClientX(lane, e.clientX, pointerDrag.kind === "region" ? (pointerDrag.grabOffsetBeats || 0) : 0);
       let lenBeats = 8;
       if (pointerDrag.kind === "region") {
         const srcTrack = arrangement.tracks.find(t => t.id === pointerDrag.data.trackId);
@@ -4284,7 +4367,7 @@ function pointerDragUp(e) {
 
   const lane = laneAtPoint(e.clientX, e.clientY);
   if (drag.kind === "region") {
-    if (lane) dropRegionOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX), drag.alt || e.altKey);
+    if (lane) dropRegionOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX, drag.grabOffsetBeats || 0), drag.alt || e.altKey);
     return;
   }
   if (drag.kind === "palette") {
@@ -4375,7 +4458,7 @@ function renderProduce() {
   arrangement = arrangement || loadArrangement();
   dawLayout = dawLayout || loadDawLayout();
   pxPerBeat = dawLayout.pxPerBeat || 14;
-  snapBeats = dawLayout.snapBeats || 1;
+  snapBeats = 0.5; // owner 2026-07-09: no snap control — dragging always uses the smallest unit (⌃-drag still frees it)
   const sources = produceSources();
   const editorOpen = rollOpen && !!selectedBakedRegion();
   const v = mount(`
@@ -4407,12 +4490,6 @@ function renderProduce() {
           <button class="btn btn-ghost btn-sm" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">↩</button>
           <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
           <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
-          <select id="snapSelect" class="daw-ctx-select" title="Grid snap (⌃-drag bypasses)">
-            <option value="4"${snapBeats === 4 ? " selected" : ""}>Bar</option>
-            <option value="1"${snapBeats === 1 ? " selected" : ""}>Beat</option>
-            <option value="0.5"${snapBeats === 0.5 ? " selected" : ""}>½ beat</option>
-            <option value="0"${snapBeats === 0 ? " selected" : ""}>Off</option>
-          </select>
           <input type="range" id="zoomSlider" min="6" max="32" step="1" value="${pxPerBeat}" title="Zoom (Z = fit arrangement, ⇧Z = fit selection)" class="zoom-slider"/>
         </div>
         <div class="daw-cluster daw-cluster-io" aria-label="File and MIDI">
@@ -4497,12 +4574,8 @@ function renderProduce() {
 function wireGlobalScale(v) {
   const gsToggle = v.querySelector("#gsToggle");
   if (gsToggle) gsToggle.onclick = () => { _gsOpen = !_gsOpen; renderProduce(); };
-  const gsEnabled = v.querySelector("#gsEnabled");
-  if (gsEnabled) gsEnabled.onchange = () => {
-    ensureGlobalScale().enabled = gsEnabled.checked;
-    saveArrangement("global scale on/off");
-    renderProduce();
-  };
+  // No enable checkbox — global scale is active whenever a track's G is on
+  // (globalScaleActive), so the G buttons are the only switch.
   // Owner rework: the strip canvas is the surface. Double-click at a bar
   // line adds a change point (seeded from the scale in force there);
   // clicking a change-point line opens the editor; clicking anywhere else
@@ -4751,8 +4824,13 @@ function wireProduce(v) {
       const move = (ev) => {
         const delta = Math.round((ev.clientX - startX) / pxPerBeat);
         const len = Math.max(1, Math.min(maxRegionLength(track, region), origLen + delta));
+        if (len === region.lengthBeats) return;
         region.lengthBeats = len;
         regionEl.style.width = `${len * pxPerBeat - 2}px`;
+        // Re-tile the graphic live so it extends/contracts by looping rather
+        // than scaling (owner 2026-07-09) — the shape and its motif/loop ticks
+        // regenerate for the new length; the resize handle/label stay put.
+        retileRegionGraphic(regionEl, region, track);
       };
       const up = () => {
         document.removeEventListener("mousemove", move);
@@ -5148,6 +5226,10 @@ function wireProduce(v) {
       beginPointerDrag("region", { trackId: el.dataset.track, regionId: el.dataset.region },
         (e.altKey ? "⧉ " : "") + (pal ? pal.name : track.name), e);
       pointerDrag.alt = e.altKey;
+      // Preserve the grab point: where within the region the cursor went down,
+      // in beats, so the drop keeps that point under the cursor.
+      const regRect = el.getBoundingClientRect();
+      pointerDrag.grabOffsetBeats = Math.max(0, (e.clientX - regRect.left) / pxPerBeat);
       e.preventDefault();
     };
   });
@@ -5200,12 +5282,6 @@ function wireProduce(v) {
   };
   if (zoomIn) zoomIn.onclick = () => setZoom((dawLayout.pxPerBeat || 14) + 3);
   if (zoomOut) zoomOut.onclick = () => setZoom((dawLayout.pxPerBeat || 14) - 3);
-  const snapSelect = v.querySelector("#snapSelect");
-  if (snapSelect) snapSelect.onchange = () => {
-    dawLayout.snapBeats = Number(snapSelect.value);
-    saveDawLayout();
-    renderProduce();
-  };
   // Arrangement registry controls (v2.1 U11)
   const arrSelect = v.querySelector("#arrSelect");
   if (arrSelect) arrSelect.onchange = () => switchArrangement(arrSelect.value);
@@ -5806,16 +5882,10 @@ function renderExplore() {
     <div class="explore-dashboard${workspaceTab === 'subnote' ? ' subnote-workspace-mode' : ''}${workspaceTab === 'scalelab' ? ' scalelab-workspace-mode' : ''}${workspaceTab === 'explore' ? ' macro2-workspace-mode' : ''}" style="--dash-c1:${_studioPanels.dashC1}px">
       <div class="dash-vsplit" id="dashVSplit" title="Drag to resize the left column"></div>
     <div class="explore-top">
-      <div>
+      <div class="explore-title">
         <h1>Sound Studio <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></h1>
         <div class="studio-subtitle">Probabilistic Synthesiser</div>
       </div>
-      <div class="workspace-tabs" id="workspaceTabs">
-        <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore" title="The behaviour half: melody, rhythm, dynamics, sequence & surprise — how the instrument plays">Macro</button>
-        <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
-        <button class="workspace-tab${workspaceTab === 'scalelab' ? ' active' : ''}" data-workspace-tab="scalelab" title="The tuning workshop: the scale wheel, N-EDO systems, world tunings, per-degree cents and Scala import/export">Scale Lab</button>
-      </div>
-      <button class="btn btn-ghost btn-sm studio-tour-btn" id="studioTourBtn" title="Replay the guided tour of the studio">✦ Tour</button>
     </div>
 
     ${paletteEditBannerHTML()}
@@ -5824,6 +5894,12 @@ function renderExplore() {
     <!-- Transport -->
     <div class="card transport-card">
       <div class="transport">
+        <div class="workspace-tabs" id="workspaceTabs">
+          <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore" title="The behaviour half: melody, rhythm, dynamics, sequence & surprise — how the instrument plays">Macro</button>
+          <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
+          <button class="workspace-tab${workspaceTab === 'scalelab' ? ' active' : ''}" data-workspace-tab="scalelab" title="The tuning workshop: the scale wheel, N-EDO systems, world tunings, per-degree cents and Scala import/export">Scale Lab</button>
+        </div>
+        <button class="btn btn-ghost btn-sm studio-tour-btn" id="studioTourBtn" title="Replay the guided tour of the studio">✦ Tour</button>
         <a class="producer-pill" href="#produce" title="Producer: arrange your instruments on a timeline">▦ Producer</a>
         <button class="transport-round transport-play${synth.isPlaying ? ' is-playing' : ''}" id="playBtn">${synth.isPlaying ? "❚❚" : "▶"}</button>
         <button class="transport-round transport-stop" id="stopBtn">■</button>
@@ -5964,7 +6040,10 @@ function renderExplore() {
       }
       const btn = e.target.closest("[data-vismode]");
       if (!btn || btn.dataset.vismode === visMode) return;
+      const prevMode = visMode;
       visMode = btn.dataset.vismode;
+      // The Layers view is HTML, not a canvas render — swap needs a re-render.
+      if (visMode === "layers" || prevMode === "layers") { renderExplore(); if (synth.isPlaying) startVisualiser(); return; }
       visModeSwitch.querySelectorAll(".vis-mode-btn").forEach(b =>
         b.classList.toggle("active", b.dataset.vismode === visMode));
       // Resize canvas + relabel the status header
@@ -5977,6 +6056,7 @@ function renderExplore() {
     };
   }
 
+  bindProducerLayers(v);
   wireOutputControls(v);
 
   const backBtn = v.querySelector("#backHome");
@@ -6003,7 +6083,14 @@ function renderExplore() {
     playBtn.textContent = synth.isPlaying ? "❚❚" : "▶";
     playBtn.classList.toggle("is-playing", synth.isPlaying);
   };
+  const clearPreviewBadge = () => {
+    if (_subnotePreviewId === null) return;
+    _subnotePreviewId = null; // the transport supersedes any browser preview
+    v.querySelectorAll(".m2-preset.previewing").forEach(el => el.classList.remove("previewing"));
+    v.querySelectorAll(".m2-preview-badge").forEach(el => el.remove());
+  };
   playBtn.onclick = () => {
+    clearPreviewBadge();
     if (synth.isPlaying) {
       synth.stop();
       cancelAnimationFrame(animFrame);
@@ -6022,6 +6109,7 @@ function renderExplore() {
   };
   const stopBtn = v.querySelector("#stopBtn");
   if (stopBtn) stopBtn.onclick = () => {
+    clearPreviewBadge();
     synth.stop();
     cancelAnimationFrame(animFrame);
     _markersActive = false;
@@ -7103,7 +7191,7 @@ function m2InspectorHTML(p) {
 
 function m2ChipsHTML(p) {
   // spectrum/motif retired as modes — normalize any stale state to lanes
-  if (visMode !== "lanes" && visMode !== "pianoroll") visMode = "lanes";
+  if (visMode !== "lanes" && visMode !== "pianoroll" && visMode !== "layers") visMode = "lanes";
   const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
   const scaleName = p.scaleMode === "edo"
     ? `${(p.customDegrees || []).length}/${div} degrees`
@@ -7119,6 +7207,7 @@ function m2ChipsHTML(p) {
       <div class="vis-mode-switch" id="visModeSwitch">
         <button class="vis-mode-btn${visMode === "lanes" ? " active" : ""}" data-vismode="lanes" title="Behaviour timeline — history and the possible future field (motif structure lives here too)">Lanes</button>
         <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll" title="Scrolling piano roll of the realized notes">Roll</button>
+        <button class="vis-mode-btn${visMode === "layers" ? " active" : ""}" data-vismode="layers" title="Position each layer in space, set its level, and dress it with effects — the room and head stay in the sub-note SPACE stage">Layers</button>
         <button class="vis-mode-btn vis-spec-toggle${_visSpecOverlay ? " active" : ""}" data-vistoggle="spec" title="Overlay the live frequency response faintly behind the current view — no information lost to a separate mode">Spec</button>
       </div>
     </div>`;
@@ -7269,10 +7358,11 @@ function m2PresetStripHTML(withSave = true) {
         : soundMode
           ? `<div class="m2-presets" id="m2Presets">
               ${soundCards.map(m => `
-                <button class="m2-preset${m.profileKey === exploreParams.spectralProfile && m.kind === "instrument" ? " sel" : ""}" data-m2-sound="${esc(m.id)}" draggable="true" data-m2-drag="${esc(m.id)}" title="${esc(m.desc)} — click to make it the base sound, or drag onto the LAYERS strip to stack it">
+                <button class="m2-preset${_subnotePreviewId === m.id ? " previewing" : ""}" data-m2-sound="${esc(m.id)}" draggable="true" data-m2-drag="${esc(m.id)}" title="${esc(m.desc)} — click to PREVIEW it (existing layers mute); drag onto the LAYERS strip to stack it as a layer">
                   <span class="m2-preset-name">${esc(m.name)}</span>
                   <canvas data-m2-sound-art="${esc(m.id)}" width="180" height="40"></canvas>
                   <span class="m2-preset-fam">${esc(m.kind)}</span>
+                  ${_subnotePreviewId === m.id ? `<span class="m2-preview-badge">▶ PREVIEW</span>` : ""}
                 </button>`).join("") || '<div class="empty-state">No favourites yet — open ▴ Browse all and ♥ some sounds.</div>'}
             </div>`
           : `<div class="m2-presets" id="m2Presets">
@@ -7335,6 +7425,50 @@ function loadSoundModuleById(id) {
   }
   synth.updateGenerationParams({ ...exploreParams });
   renderExplore();
+}
+
+// Resolve a browser id to its sound-half params WITHOUT applying it — used by
+// the sub-note preview (owner 2026-07-09: clicking a browser sound auditions
+// it rather than replacing the base; stacking is drag-only).
+function resolveSoundHalf(id) {
+  if (id.startsWith("r:")) {
+    const key = id.slice(2);
+    if (!SPECTRAL_PROFILES[key]) return null;
+    const sound = { ...extractSectionParams(DEFAULTS, "sound"), spectralProfile: key };
+    resetSpectralPartialParams(sound);
+    return sound;
+  }
+  const params = m2PresetParamsById(id);
+  if (!params) return null;
+  const sound = extractSectionParams(migrateToneParams({ ...params }), "sound");
+  for (const k of Object.keys(sound)) if (k.startsWith("layer")) delete sound[k];
+  return Object.keys(sound).length ? sound : null;
+}
+
+// Sub-note browser PREVIEW: clicking a sound auditions it in isolation —
+// existing layers are muted (the preview plays as the only voice) and a
+// PREVIEW badge marks the card. Clicking it again, clicking another, or using
+// the transport stops it and restores the instrument.
+let _subnotePreviewId = null;
+let _subnotePreviewWasPlaying = false;
+function toggleSubnotePreview(id) {
+  if (_subnotePreviewId === id) { stopSubnotePreview(); return; }
+  const sound = resolveSoundHalf(id);
+  if (!sound) return;
+  if (_subnotePreviewId === null) _subnotePreviewWasPlaying = synth.isPlaying;
+  _subnotePreviewId = id;
+  // layers:null mutes existing layers so only the previewed sound is heard.
+  synth.play({ ...exploreParams, ...sound, layers: null });
+  startVisualiser();
+  renderExplore();
+}
+function stopSubnotePreview(rerender = true) {
+  if (_subnotePreviewId === null) return;
+  const wasPlaying = _subnotePreviewWasPlaying;
+  _subnotePreviewId = null;
+  if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+  else synth.stop();
+  if (rerender) renderExplore();
 }
 
 // Add a browser preset as layer(s): its sound half becomes a new layer, and
@@ -7459,7 +7593,7 @@ function wireM2LibList(v) {
   v.querySelectorAll("[data-m2-load]").forEach(btn => {
     btn.onclick = () => {
       const id = btn.dataset.m2Load;
-      if (m2SoundMode()) { loadSoundModuleById(id); return; }
+      if (m2SoundMode()) { toggleSubnotePreview(id); return; } // click = preview; drag = stack
       const entry = m2LibEntries().find(e => e.id === id);
       if (!entry || !entry.parameters) return;
       const wasPlaying = synth.isPlaying;
@@ -7468,9 +7602,10 @@ function wireM2LibList(v) {
       if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
     };
   });
-  // Sub-note mode: the collapsed strip's sound cards load on click
+  // Sub-note mode: clicking a sound card PREVIEWS it (owner 2026-07-09) —
+  // stacking a layer is drag-and-drop only.
   v.querySelectorAll("[data-m2-sound]").forEach(btn => {
-    btn.onclick = () => loadSoundModuleById(btn.dataset.m2Sound);
+    btn.onclick = () => toggleSubnotePreview(btn.dataset.m2Sound);
   });
 }
 
@@ -7550,6 +7685,172 @@ function drawM2PresetArt() {
   }
 }
 
+// ── Producer LAYERS view (docs/EFFECTS_CONTRACT.md) ─────────────────────
+// Sits in the piano-roll area of the macro workspace. Per layer: level,
+// position in space (relative to the patch), and an effects rack (add a
+// preset, toggle it, ride its wet). The room/head are NOT here — those are
+// the shared SPACE stage in the sub-note editor (an on-panel note says so).
+function prodFxAddSelectHTML(id) {
+  const groups = effectsByCategory().map(({ category, effects }) =>
+    `<optgroup label="${esc(category)}">${effects.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}</optgroup>`).join("");
+  return `<select class="prod-fx-add" data-prod-fx-add="${id}" title="Add an effect to this layer's rack">
+    <option value="">+ effect…</option>${groups}
+  </select>`;
+}
+
+function prodFxTagsHTML(id, chain) {
+  const list = sanitizeFxChain(chain);
+  if (!list.length) return `<span class="prod-fx-none">no effects</span>`;
+  return list.map(fx => {
+    const mod = effectModuleById(fx.type);
+    const enabled = fx.enabled !== false;
+    return `<span class="prod-fx-tag${enabled ? "" : " off"}">
+      <button class="prod-fx-name" data-prod-fx-toggle="${id}::${fx.uid}" title="${enabled ? "Bypass" : "Enable"} ${esc(mod ? mod.name : fx.type)}">${esc(mod ? mod.name : fx.type)}</button>
+      <input type="range" class="prod-fx-wet" data-prod-fx-wet="${id}::${fx.uid}" min="0" max="1" step="0.01" value="${fx.wet ?? 1}" title="Wet / dry"/>
+      <button class="prod-fx-x" data-prod-fx-remove="${id}::${fx.uid}" title="Remove">×</button>
+    </span>`;
+  }).join("");
+}
+
+// Percussion (owner 2026-07-09): its own sound source — sound & mix are set on
+// the macro page, but its LOCATION in space lives here. No effects (percussion
+// bypasses the effects stage) and no per-source level (the three hits carry
+// their own vols on the macro page).
+function producerPercRowHTML(p) {
+  const angle = Number.isFinite(p.percAzimuth) ? p.percAzimuth : (p.spaceAzimuth ?? 0);
+  const dist = Number.isFinite(p.percDistance) ? p.percDistance : (p.spaceDistance ?? 2.5);
+  const active = (p.percBeatVol || 0) + (p.percMotifVol || 0) + (p.percDownbeatVol || 0) > 0;
+  return `
+    <div class="prod-layer-row perc-row${active ? "" : " dim"}" style="--layer-hue:32" title="Where the percussion sits in space. Its sounds and levels are set on the macro page.">
+      <span class="prod-layer-tag">P</span>
+      <span class="prod-layer-name">Percussion</span>
+      <div class="prod-layer-ctls">
+        <label class="prod-ctl">Angle<input type="range" data-prod-angle="perc" min="-180" max="180" step="1" value="${angle}"/></label>
+        <label class="prod-ctl">Dist<input type="range" data-prod-dist="perc" min="0.3" max="30" step="0.1" value="${dist}"/></label>
+      </div>
+      <div class="prod-layer-fx">
+        <span class="prod-fx-none">${active ? "sound &amp; mix on the macro page" : "silent — add hits on the macro page"}</span>
+      </div>
+    </div>`;
+}
+
+function producerLayersRowHTML(l, i, p) {
+  const id = l.id;
+  const hue = l.hue ?? (36 + i * 70) % 360;
+  const gain = l.gain ?? 1;
+  const angle = l.space?.angle ?? p.spaceAzimuth ?? 0;
+  const dist = l.space?.dist ?? p.spaceDistance ?? 2.5;
+  const chain = l.subnote && l.subnote.effectsChain;
+  return `
+    <div class="prod-layer-row" style="--layer-hue:${hue}">
+      <span class="prod-layer-tag">${i + 2}</span>
+      <span class="prod-layer-name">Layer ${i + 2}</span>
+      <div class="prod-layer-ctls">
+        <label class="prod-ctl">Vol<input type="range" data-prod-gain="${id}" min="0" max="1.5" step="0.01" value="${gain}"/></label>
+        <label class="prod-ctl">Angle<input type="range" data-prod-angle="${id}" min="-180" max="180" step="1" value="${angle}"/></label>
+        <label class="prod-ctl">Dist<input type="range" data-prod-dist="${id}" min="0.3" max="30" step="0.1" value="${dist}"/></label>
+      </div>
+      <div class="prod-layer-fx">
+        ${prodFxTagsHTML(id, chain)}
+        ${prodFxAddSelectHTML(id)}
+      </div>
+    </div>`;
+}
+
+function producerLayersPanelHTML(p) {
+  const layers = Array.isArray(p.layers) ? p.layers : [];
+  return `
+    <div class="m2-layers-panel" id="m2LayersPanel">
+      <div class="prod-layers-head">
+        <span class="prod-layers-title">Layers · space &amp; effects</span>
+        <span class="prod-layers-note">position &amp; level per layer plus its effects — the base sound &amp; the room/head live in the sub-note editor</span>
+      </div>
+      <div class="prod-layers-list">
+        ${layers.map((l, i) => producerLayersRowHTML(l, i, p)).join("")}
+        ${producerPercRowHTML(p)}
+        ${layers.length ? "" : `<div class="prod-layers-empty">No extra layers yet — stack them from the sub-note editor's LAYERS panel. Percussion below can still be placed in space.</div>`}
+      </div>
+    </div>`;
+}
+
+function bindProducerLayers(v) {
+  const panel = v.querySelector("#m2LayersPanel");
+  if (!panel) return;
+  const applyLive = () => synth.updateGenerationParams({ ...exploreParams });
+  const layerById = (id) => (exploreParams.layers || []).find(l => l.id === id);
+  // The effects chain behind a producer row: "base" → the patch itself.
+  const prodChain = (id, create = false) => {
+    const l = layerById(id);
+    if (!l) return null;
+    if (!l.subnote) l.subnote = {};
+    if (!Array.isArray(l.subnote.effectsChain)) { if (!create) return l.subnote.effectsChain || []; l.subnote.effectsChain = []; }
+    return l.subnote.effectsChain;
+  };
+  const fxFromKey = (key) => {
+    const [id, uid] = String(key).split("::");
+    const chain = prodChain(id);
+    return { chain, fx: chain ? chain.find(f => f.uid === uid) : null };
+  };
+
+  // ── Position + level (live, no re-render). Percussion is its own source, so
+  // its position drives percAzimuth/percDistance and needs a space reconfigure.
+  panel.querySelectorAll("[data-prod-gain]").forEach(el => {
+    el.oninput = () => { const l = layerById(el.dataset.prodGain); if (l) { l.gain = parseFloat(el.value); applyLive(); } };
+  });
+  panel.querySelectorAll("[data-prod-angle]").forEach(el => {
+    el.oninput = () => {
+      const id = el.dataset.prodAngle, val = parseFloat(el.value);
+      if (id === "perc") { exploreParams.percAzimuth = val; applyLive(); synth.updateReverb({ ...exploreParams }); return; }
+      const l = layerById(id); if (l) l.space = { angle: val, dist: l.space?.dist ?? exploreParams.spaceDistance ?? 2.5 };
+      applyLive();
+    };
+  });
+  panel.querySelectorAll("[data-prod-dist]").forEach(el => {
+    el.oninput = () => {
+      const id = el.dataset.prodDist, val = parseFloat(el.value);
+      if (id === "perc") { exploreParams.percDistance = val; applyLive(); synth.updateReverb({ ...exploreParams }); return; }
+      const l = layerById(id); if (l) l.space = { angle: l.space?.angle ?? exploreParams.spaceAzimuth ?? 0, dist: val };
+      applyLive();
+    };
+  });
+
+  // ── Effects: add / toggle / wet / remove ──
+  panel.querySelectorAll("[data-prod-fx-add]").forEach(el => {
+    el.onchange = () => {
+      const inst = newEffectInstance(el.value);
+      const chain = prodChain(el.dataset.prodFxAdd, true);
+      if (!inst || !chain) return;
+      chain.push(inst);
+      applyLive(); synth.updateEffects(exploreParams); renderExplore();
+    };
+  });
+  panel.querySelectorAll("[data-prod-fx-toggle]").forEach(el => {
+    el.onclick = () => {
+      const { fx } = fxFromKey(el.dataset.prodFxToggle);
+      if (!fx) return;
+      fx.enabled = fx.enabled === false;
+      applyLive(); synth.updateEffects(exploreParams); renderExplore();
+    };
+  });
+  panel.querySelectorAll("[data-prod-fx-wet]").forEach(el => {
+    el.oninput = () => {
+      const { fx } = fxFromKey(el.dataset.prodFxWet);
+      if (!fx) return;
+      fx.wet = parseFloat(el.value);
+      applyLive(); synth.updateEffects(exploreParams); // live
+    };
+  });
+  panel.querySelectorAll("[data-prod-fx-remove]").forEach(el => {
+    el.onclick = () => {
+      const { chain, fx } = fxFromKey(el.dataset.prodFxRemove);
+      if (!chain || !fx) return;
+      const i = chain.indexOf(fx);
+      if (i >= 0) chain.splice(i, 1);
+      applyLive(); synth.updateEffects(exploreParams); renderExplore();
+    };
+  });
+}
+
 function macroWorkspaceHTML(p) {
   return `
     <div class="card macro2-card">
@@ -7562,6 +7863,7 @@ function macroWorkspaceHTML(p) {
           ${m2ChipsHTML(p)}
           <div class="visualiser-wrap vis-mode-${visMode} m2-visual">
             <canvas id="vis" width="980" height="210"></canvas>
+            ${visMode === "layers" ? producerLayersPanelHTML(p) : ""}
             ${visMode === "lanes" ? `
             <div class="m2-lane-heads" id="m2LaneHeads">
               ${LANE_DEFS.map(d => `
@@ -7839,6 +8141,36 @@ function refreshLayerEnvLines() {
   });
 }
 
+// A layer's EFFECTS stack, shown on its row as toggleable tags with a wet
+// mini-slider — the same chain edited in full on the EFFECTS stage when this
+// layer is loaded into the editor (docs/EFFECTS_CONTRACT.md).
+// Effect tags for a layer row (or the base row, ownerId "base"). The
+// data-layer-fx-* keys encode `${ownerId}::${uid}`; the bind resolves "base"
+// to the patch's own chain (docs/EFFECTS_CONTRACT.md).
+function fxTagsHTML(ownerId, chainSpec, stageOff) {
+  const chain = sanitizeFxChain(chainSpec);
+  if (!chain.length) return "";
+  return `<div class="layer-fx${stageOff ? " off" : ""}" title="Effects on this ${ownerId === "base" ? "base sound" : "layer"} — click a tag to bypass it, drag its bar for wet/dry. Select the ${ownerId === "base" ? "base" : "layer"} to edit the full rack on the EFFECTS stage.">
+    ${chain.map(fx => {
+      const mod = effectModuleById(fx.type);
+      const enabled = fx.enabled !== false;
+      return `<span class="layer-fx-tag${enabled ? "" : " off"}">
+        <button class="layer-fx-name" data-layer-fx-toggle="${ownerId}::${fx.uid}" title="${enabled ? "Bypass" : "Enable"} ${esc(mod ? mod.name : fx.type)}">${esc(mod ? mod.name : fx.type)}</button>
+        <input type="range" class="layer-fx-wet" data-layer-fx-wet="${ownerId}::${fx.uid}" min="0" max="1" step="0.01" value="${fx.wet ?? 1}" title="Wet / dry"/>
+      </span>`;
+    }).join("")}
+  </div>`;
+}
+function layerFxTagsHTML(l) {
+  return fxTagsHTML(l.id, l.subnote && l.subnote.effectsChain, l.subnote && l.subnote.stageEffectsOn === false);
+}
+
+// A layer's display title — its own name if set (double-click to rename), else
+// the positional default "Layer N" (base is layer 1, so extras start at 2).
+function layerTitle(l, i) {
+  return (l.name && String(l.name).trim()) || `Layer ${i + 2}`;
+}
+
 function layerStripHTML(p, compact = false) {
   const layers = Array.isArray(p.layers) ? p.layers : [];
   // V2: on the SPACE stage the big stage IS the layers view (chips +
@@ -7858,13 +8190,38 @@ function layerStripHTML(p, compact = false) {
   // and every parameter's mean ± SD) underneath. The synchronised-
   // variation controls live in their own panel to the RIGHT of the rows,
   // greyed out unless synchronisation is on.
-  const rows = layers.map((l, i) => {
+  // The BASE sound is always the first layer (owner 2026-07-09): it is present
+  // even before any preset is loaded (named "Untitled"), so it can always be
+  // reselected and its effects edited after more layers are stacked. It maps to
+  // exploreParams itself, so "selected" means "not editing any other layer".
+  const baseName = (p.spectralProfileName || "").trim() || "Untitled";
+  const baseSel = !_chLayerEdit && !_chLayerSel;
+  const baseRow = `
+    <div class="layer-row base-row${baseSel ? " sel" : ""}" data-layer-row="base" style="--layer-hue:210" title="The base sound — the foundation every layer sits on. Click to edit it in the stages above (always present).">
+      <span class="layer-row-tag">1</span>
+      <canvas class="layer-minipad" data-layer-pad="base" width="40" height="40" title="Where the base sound sits around your head (set on the SPACE stage)"></canvas>
+      <div class="layer-row-lines">
+        <div class="layer-name-row">
+          <span class="layer-name" data-layer-name="base" title="Double-click to rename the base sound">${esc(baseName)}</span>
+          <span class="layer-base-badge">BASE</span>
+        </div>
+        <div class="layer-row-space">
+          <label class="sp-ctl">Angle <input type="range" data-layer-angle="base" min="-180" max="180" step="1" value="${p.spaceAzimuth ?? 0}" title="Where the base sound sits around you"/></label>
+          <label class="sp-ctl">Dist <input type="range" data-layer-dist="base" min="0.3" max="30" step="0.1" value="${p.spaceDistance ?? 2.5}" title="How far the base sound stands"/></label>
+        </div>
+        ${fxTagsHTML("base", p.effectsChain, p.stageEffectsOn === false)}
+      </div>
+    </div>`;
+  const rows = baseRow + layers.map((l, i) => {
     const envStr = layerEnvLineText(l, p);
     return `
     <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}" title="Click to load this layer's sound into the editor above (click again, or Done, to return to the base)">
-      <span class="layer-row-tag">${i + 1}</span>
+      <span class="layer-row-tag">${i + 2}</span>
       <canvas class="layer-minipad" data-layer-pad="${l.id}" width="40" height="40" title="Where this layer sits around your head — set it with the Angle and Dist sliders (shaded half = behind you)"></canvas>
       <div class="layer-row-lines">
+        <div class="layer-name-row">
+          <span class="layer-name" data-layer-name="${l.id}" title="Double-click to rename this layer">${esc(layerTitle(l, i))}</span>
+        </div>
         <div class="layer-row-space">
           <label class="sp-ctl">Vol <input type="range" data-layer-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}" title="This layer's level relative to the base sound"/></label>
           <label class="sp-ctl">Angle <input type="range" data-layer-angle="${l.id}" min="-180" max="180" step="1" value="${l.space?.angle ?? (p.spaceAzimuth ?? 0)}" title="Where this layer sits around you"/></label>
@@ -7874,6 +8231,7 @@ function layerStripHTML(p, compact = false) {
           <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
         </div>
         <div class="layer-env" title="This layer's envelope baseline: variation chance and each parameter's mean ± magnitude. While synchronised, the chance and the ± magnitudes come from the shared panel (same for every layer); the means stay the layer's own.">${esc(envStr)}</div>
+        ${layerFxTagsHTML(l)}
       </div>
     </div>`;
   }).join("");
@@ -7881,12 +8239,12 @@ function layerStripHTML(p, compact = false) {
   return `
     <div class="layer-strip" id="layerStrip">
       <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
-      <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer underneath">＋</button>
-      ${layers.length ? "" : `<span class="layer-strip-note">＋ captures the current sound as a layer — or drag a preset from the browser below (its sound comes across; the shared room and head stay yours)</span>`}
+      <button class="layer-add" id="layerAdd" title="Capture the current sound as another layer underneath the base">＋</button>
+      <span class="layer-strip-note">${layers.length ? "" : "drag a sound from the browser below to stack it as a layer — the base above is always here"}</span>
     </div>
-    ${layers.length ? `
     <div class="layer-area">
       <div class="layer-rows">${rows}</div>
+      ${layers.length ? `
       <div class="layer-sync">
         <div class="subsection-label">Synchronised variation</div>
         <label class="layer-env-sync" title="${esc(PARAM_DESC.layerEnvOverride)}">
@@ -7900,13 +8258,17 @@ function layerStripHTML(p, compact = false) {
           ${controlRow("layerEnvReleaseSd", "Release SD", p.layerEnvReleaseSd ?? 0.05, 0, 0.3, 0.001)}
           <div class="ch-caption">one roll per note triggers the envelope variation on the base sound and every layer AT ONCE, at these shared magnitudes — each still varies around its own means (shown on its row)</div>
         </div>
-      </div>
-    </div>` : ""}`;
+      </div>` : ""}
+    </div>`;
 }
 
 // The tiny head-relation diagram on each layer row.
 function drawLayerMiniPads() {
-  (exploreParams.layers || []).forEach(l => {
+  // The base row is always present (owner 2026-07-09): draw its pad too, from
+  // the patch's own position.
+  const pads = [{ id: "base", space: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 }, hue: 210 },
+                ...(exploreParams.layers || [])];
+  pads.forEach(l => {
     const cv = document.querySelector(`[data-layer-pad="${l.id}"]`);
     if (!cv) return;
     const ctx = cv.getContext("2d");
@@ -7966,7 +8328,7 @@ function subnoteWorkspaceHTML(p) {
             <div class="ch-head">
               <div class="ch-title-block">
                 <h2 class="ch-preset-title" id="chPresetTitle" title="Double-click to rename this sound">${esc(title)}</h2>
-                ${_chLayerEdit ? `<span class="layer-edit-tag">editing layer ${(p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 1 || ""}</span>` : ""}
+                ${_chLayerEdit ? `<span class="layer-edit-tag">editing layer ${((p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 2) || ""}</span>` : ""}
               </div>
               ${_chLayerEdit ? `<button class="btn btn-primary btn-sm" id="layerEditDone" title="Save this sound back into the layer and return to the base sound">Done — back to base</button>` : ""}
               <!-- Owner 07-08: no preset dropdown or mix slider here — the
@@ -7983,8 +8345,11 @@ function subnoteWorkspaceHTML(p) {
               <div class="ch-sep">›</div>
               ${chRailCardHTML(p, "body", "03", "BODY")}
               <div class="ch-sep">›</div>
-              ${chRailCardHTML(p, "space", "04", "SPACE")}
+              ${chRailCardHTML(p, "effects", "04", "EFFECTS")}
+              <div class="ch-sep">›</div>
+              ${chRailCardHTML(p, "space", "05", "SPACE")}
             </div>
+            ${_chStage === "effects" ? effectsStageHTML(p) : `
             <div class="ch-main">
               <div class="ch-inspector ch-${_chStage}" id="chInspector" style="--ch-w:${_studioPanels.chW}px">${chInspectorHTML(p)}</div>
               <div class="ch-vsplit" id="chVSplit" title="Drag to resize the inspector"></div>
@@ -8027,7 +8392,7 @@ function subnoteWorkspaceHTML(p) {
             </div>
             <div class="ch-status">${_chStage === "space"
               ? `<span>curves follow the pad and knobs live · <b>L</b> ear blue · <b>R</b> ear amber</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
-              : `<span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span>`}</div>
+              : `<span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span>`}</div>`}
             ${layerStripHTML(p) /* V2.2: full rows on every stage — the space rows ARE the source list */}
             ${m2PresetStripHTML(false) /* owner 07-08: ONE browser is the whole selection surface — sound modules + recipes to click or drag onto LAYERS; save lives in the top bar */}
           </div>
@@ -10541,6 +10906,7 @@ const _chBypass = { body: null, space: null };
 
 function stagePowerState(p, stage) {
   if (stage === "body") return (p.spectralResonanceAmount ?? 0.35) > 0.001;
+  if (stage === "effects") return p.stageEffectsOn !== false;
   if (stage === "space") return (p.reverbWet ?? 0.16) > 0.001;
   return true; // excitor + resonator are always in the chain
 }
@@ -10553,6 +10919,10 @@ function toggleStagePower(p, stage) {
     } else {
       p.spectralResonanceAmount = _chBypass.body ?? 0.35;
     }
+    return;
+  }
+  if (stage === "effects") {
+    p.stageEffectsOn = !(p.stageEffectsOn !== false); // whole-stack bypass
     return;
   }
   if (stage === "space") {
@@ -10584,6 +10954,12 @@ function chStageHeadline(p, stage) {
     }
     return BODY_PRESETS[p.bodyType]?.label || p.bodyType;
   }
+  if (stage === "effects") {
+    const chain = sanitizeFxChain(p.effectsChain);
+    if (!chain.length) return "No effects";
+    const first = effectModuleById(chain[0].type);
+    return chain.length === 1 ? (first?.name || chain[0].type) : `${first?.name || chain[0].type} +${chain.length - 1}`;
+  }
   const prof = REVERB_PROFILES[p.reverbType] || REVERB_PROFILES.room;
   return prof.label;
 }
@@ -10611,13 +10987,19 @@ function chCardSummary(p, stage) {
     const label = !p.bodyType || p.bodyType === "auto" ? "auto" : (BODY_PRESETS[p.bodyType]?.label || p.bodyType);
     return `${label} · amount ${(p.spectralResonanceAmount ?? 0.35).toFixed(2)}`;
   }
+  if (stage === "effects") {
+    const chain = sanitizeFxChain(p.effectsChain);
+    const on = chain.filter(fx => fx.enabled !== false).length;
+    if (!chain.length) return "empty rack · click to add";
+    return `${chain.length} effect${chain.length > 1 ? "s" : ""} · ${on} on${p.stageEffectsOn === false ? " · stage bypassed" : ""}`;
+  }
   return `${(p.spaceDistance ?? 2.5).toFixed(1)} m · ${Math.round(p.spaceAzimuth ?? 0)}° · wet ${(p.reverbWet ?? 0).toFixed(2)}`;
 }
 
 const _POWER_SVG = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 1.5v6"/><path d="M4.2 3.6a5.5 5.5 0 1 0 7.6 0"/></svg>`;
 
 function chRailCardHTML(p, stage, num, name) {
-  const toggleable = stage === "body" || stage === "space";
+  const toggleable = stage === "body" || stage === "space" || stage === "effects";
   const on = stagePowerState(p, stage);
   const title = name[0] + name.slice(1).toLowerCase();
   return `
@@ -10686,6 +11068,290 @@ function bodyBandChipsHTML(p) {
       ${artic.map((b, i) => chip("artic", i, `F${i + 1} ${fmtF(b.freq)}`)).join("")}
       ${Array.isArray(p.bodyBands) && p.bodyBands.length ? `<button class="ch-chip band-reset" data-body-reset title="Discard band edits and reload the preset's bands">↺ preset</button>` : ""}
     </div>${editor}`;
+}
+
+// ══ EFFECTS stage (docs/EFFECTS_CONTRACT.md) ════════════════════════════
+// The stage that sits between BODY and SPACE. Three vertical panels sharing
+// the sub-note field space: browser (left) · effect face (middle) · rack
+// (right). The chain edited is exploreParams.effectsChain — the base voice,
+// or the layer's sound half while a layer is being edited (it is swapped
+// into exploreParams by enterLayerEdit, and saved back by _soundHalf).
+let _fxSel = null;          // uid of the rack slot whose face is shown
+let _fxCatOpen = null;      // Set of expanded browser categories (lazy = all)
+let _fxExpanded = false;    // face shown as a large overlay
+let _fxDragUid = null;      // rack slot being drag-reordered
+let _fxMount = null;        // { uid, dispose } for the live face module
+
+function activeFxChain(p) {
+  if (!Array.isArray(p.effectsChain)) p.effectsChain = [];
+  return p.effectsChain;
+}
+
+// Push the current chain to the running graph. rerender redraws the panels
+// (needed for structural edits); param/wet drags pass false to keep the live
+// face and slider intact.
+function commitFx(rerender = true) {
+  synth.updateGenerationParams({ ...exploreParams });
+  synth.updateEffects(exploreParams);
+  if (rerender) renderExplore();
+}
+
+function fxEllipsisTitle(desc) {
+  return esc(desc || "").replace(/"/g, "&quot;");
+}
+
+function effectsStageHTML(p) {
+  const chain = activeFxChain(p);
+  if (_fxSel && !chain.some(fx => fx.uid === _fxSel)) _fxSel = null;
+  if (!_fxSel && chain.length) _fxSel = chain[chain.length - 1].uid;
+  const stageOff = p.stageEffectsOn === false;
+  return `
+    <div class="fxs-stage${_fxExpanded ? " fxs-expanded" : ""}${stageOff ? " fxs-stage-off" : ""}">
+      <div class="fxs-browser">
+        <div class="fxs-panel-head">Effects <span class="fxs-count">${allEffects().length}</span></div>
+        <div class="fxs-browser-list">${fxBrowserHTML()}</div>
+      </div>
+      <div class="fxs-face-col">
+        ${fxFaceHTML(chain)}
+      </div>
+      <div class="fxs-rack">
+        <div class="fxs-panel-head">Rack <span class="fxs-count">${chain.length}</span>
+          ${chain.length ? `<button class="fxs-mini" data-fx-clear title="Remove every effect from the rack">clear</button>` : ""}
+        </div>
+        <div class="fxs-rack-list" data-fx-racklist>${fxStackHTML(chain)}</div>
+        <div class="fxs-rack-foot">${stageOff ? "stage bypassed — power on the EFFECTS card" : "signal flows top → bottom, then into SPACE"}</div>
+      </div>
+    </div>`;
+}
+
+function fxBrowserHTML() {
+  if (!_fxCatOpen) _fxCatOpen = new Set(EFFECT_CATEGORIES);
+  return effectsByCategory().map(({ category, effects }) => {
+    const open = _fxCatOpen.has(category);
+    return `
+      <div class="fxs-cat${open ? " open" : ""}">
+        <button class="fxs-cat-head" data-fx-cat="${esc(category)}">
+          <span class="fxs-cat-caret">${open ? "▾" : "▸"}</span>
+          <span class="fxs-cat-name">${esc(category)}</span>
+          <span class="fxs-cat-n">${effects.length}</span>
+        </button>
+        ${open ? `<div class="fxs-cat-body">${effects.map(m => `
+          <div class="fxs-eff" data-fx-add="${esc(m.id)}" draggable="true" title="${fxEllipsisTitle(m.description)}">
+            <span class="fxs-eff-name">${esc(m.name)}</span>
+            <span class="fxs-eff-desc">${esc(m.description || "")}</span>
+          </div>`).join("")}</div>` : ""}
+      </div>`;
+  }).join("");
+}
+
+function fxStackHTML(chain) {
+  if (!chain.length) return `<div class="fxs-rack-empty">Click an effect on the left to add it here — or drag it to a slot.</div>`;
+  return chain.map((fx, i) => {
+    const mod = effectModuleById(fx.type);
+    const name = mod ? mod.name : fx.type;
+    const enabled = fx.enabled !== false;
+    const wetPct = Math.round((fx.wet ?? 1) * 100);
+    return `
+      <div class="fxs-slot${fx.uid === _fxSel ? " sel" : ""}${enabled ? "" : " off"}" data-fx-slot="${fx.uid}" draggable="true">
+        <span class="fxs-slot-grip" title="Drag to reorder">⋮⋮</span>
+        <button class="fxs-slot-power${enabled ? " on" : ""}" data-fx-toggle="${fx.uid}" title="${enabled ? "Bypass" : "Enable"} this effect">${_POWER_SVG}</button>
+        <span class="fxs-slot-name" data-fx-select="${fx.uid}">${esc(name)}</span>
+        <label class="fxs-slot-wet" title="Dry / wet mix">
+          <input type="range" data-fx-wet="${fx.uid}" min="0" max="1" step="0.01" value="${fx.wet ?? 1}">
+          <span class="fxs-slot-wetv" data-fx-wetv="${fx.uid}">${wetPct}%</span>
+        </label>
+        <button class="fxs-slot-x" data-fx-remove="${fx.uid}" title="Remove">×</button>
+      </div>`;
+  }).join("");
+}
+
+function fxFaceHTML(chain) {
+  const fx = chain.find(f => f.uid === _fxSel);
+  const mod = fx && effectModuleById(fx.type);
+  if (!fx || !mod) {
+    return `<div class="fxs-face-empty">
+      <div class="fxs-face-empty-mark">⌁</div>
+      <div>${chain.length ? "Select an effect in the rack" : "Your rack is empty"}</div>
+      <div class="fxs-face-empty-sub">${chain.length ? "" : "Pick one from the browser on the left."}</div>
+    </div>`;
+  }
+  return `
+    <div class="fxs-face-head">
+      <span class="fxs-face-name">${esc(mod.name)}</span>
+      <span class="fxs-face-cat">${esc(mod.category)}</span>
+      <div class="fxs-face-tools">
+        ${(mod.presets && mod.presets.length) ? `<select class="fxs-face-preset" data-fx-preset="${fx.uid}" title="Load a preset">
+          <option value="">presets…</option>
+          ${mod.presets.map((pr, i) => `<option value="${i}">${esc(pr.name)}</option>`).join("")}
+        </select>` : ""}
+        <button class="fxs-mini" data-fx-face-expand title="${_fxExpanded ? "Shrink" : "Expand to a large overlay"}">${_fxExpanded ? "⤡ close" : "⤢ expand"}</button>
+      </div>
+    </div>
+    <div class="fxs-face-mount" id="fxFaceMount" data-fx-face-uid="${fx.uid}"></div>`;
+}
+
+// Drag payload shared between the browser (add) and the rack (reorder).
+let _fxDrag = null;
+
+function fxDropIndex(listEl, clientY) {
+  const slots = [...listEl.querySelectorAll(".fxs-slot")];
+  for (let i = 0; i < slots.length; i++) {
+    const r = slots[i].getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) return i;
+  }
+  return slots.length;
+}
+
+function mountFxFace(v) {
+  // Dispose the previous face module (stop its rAF/observers) before the DOM
+  // node it lived in is replaced by this render.
+  if (_fxMount) { try { _fxMount.dispose && _fxMount.dispose(); } catch {} _fxMount = null; }
+  const mountEl = v.querySelector("#fxFaceMount");
+  if (!mountEl) return;
+  const uid = mountEl.dataset.fxFaceUid;
+  const chain = activeFxChain(exploreParams);
+  const entry = chain.find(f => f.uid === uid);
+  const mod = entry && effectModuleById(entry.type);
+  if (!entry || !mod || typeof mod.ui !== "function") return;
+  const host = {
+    get params() { return entry.params; },
+    setParam(k, val) {
+      entry.params[k] = val;
+      synth.updateEffects(exploreParams);        // live, click-free DSP
+      synth.updateGenerationParams({ ...exploreParams }); // keep next-note in sync
+    },
+    get expanded() { return _fxExpanded; },
+    analyser: null, // per-effect analyser tap: not wired yet (contract allows null)
+  };
+  let dispose = null;
+  try { dispose = mod.ui(mountEl, host); }
+  catch (e) { console.warn("effects: face failed to mount", mod.id, e); }
+  _fxMount = { uid, dispose: typeof dispose === "function" ? dispose : null };
+}
+
+function bindEffectsStage(v) {
+  if (_chStage !== "effects") {
+    if (_fxMount) { try { _fxMount.dispose && _fxMount.dispose(); } catch {} _fxMount = null; }
+    return;
+  }
+  const chain = activeFxChain(exploreParams);
+
+  // ── Browser: category expand/collapse ──
+  v.querySelectorAll("[data-fx-cat]").forEach(el => {
+    el.onclick = () => {
+      const cat = el.dataset.fxCat;
+      if (!_fxCatOpen) _fxCatOpen = new Set(EFFECT_CATEGORIES);
+      _fxCatOpen.has(cat) ? _fxCatOpen.delete(cat) : _fxCatOpen.add(cat);
+      renderExplore();
+    };
+  });
+
+  // ── Browser: click to add to the END of the rack ──
+  v.querySelectorAll("[data-fx-add]").forEach(el => {
+    el.onclick = () => {
+      const inst = newEffectInstance(el.dataset.fxAdd);
+      if (!inst) return;
+      chain.push(inst);
+      _fxSel = inst.uid;
+      commitFx(true);
+    };
+    el.ondragstart = (e) => {
+      _fxDrag = { kind: "add", typeId: el.dataset.fxAdd };
+      e.dataTransfer.effectAllowed = "copy";
+      try { e.dataTransfer.setData("text/plain", el.dataset.fxAdd); } catch {}
+    };
+    el.ondragend = () => { _fxDrag = null; };
+  });
+
+  // ── Rack: drop target for add + reorder ──
+  const rackList = v.querySelector("[data-fx-racklist]");
+  if (rackList) {
+    rackList.ondragover = (e) => {
+      if (!_fxDrag) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = _fxDrag.kind === "move" ? "move" : "copy";
+      rackList.classList.add("fxs-droptarget");
+    };
+    rackList.ondragleave = () => rackList.classList.remove("fxs-droptarget");
+    rackList.ondrop = (e) => {
+      rackList.classList.remove("fxs-droptarget");
+      if (!_fxDrag) return;
+      e.preventDefault();
+      let idx = fxDropIndex(rackList, e.clientY);
+      if (_fxDrag.kind === "add") {
+        const inst = newEffectInstance(_fxDrag.typeId);
+        if (inst) { chain.splice(idx, 0, inst); _fxSel = inst.uid; }
+      } else if (_fxDrag.kind === "move") {
+        const from = chain.findIndex(f => f.uid === _fxDrag.uid);
+        if (from >= 0) {
+          const [moved] = chain.splice(from, 1);
+          if (from < idx) idx--; // account for the removed slot
+          chain.splice(idx, 0, moved);
+        }
+      }
+      _fxDrag = null;
+      commitFx(true);
+    };
+  }
+
+  // ── Rack slots ──
+  v.querySelectorAll("[data-fx-slot]").forEach(el => {
+    el.ondragstart = (e) => {
+      _fxDrag = { kind: "move", uid: el.dataset.fxSlot };
+      e.dataTransfer.effectAllowed = "move";
+      el.classList.add("fxs-dragging");
+    };
+    el.ondragend = () => { _fxDrag = null; el.classList.remove("fxs-dragging"); };
+  });
+  v.querySelectorAll("[data-fx-select]").forEach(el => {
+    el.onclick = () => { _fxSel = el.dataset.fxSelect; renderExplore(); };
+  });
+  v.querySelectorAll("[data-fx-toggle]").forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const fx = chain.find(f => f.uid === el.dataset.fxToggle);
+      if (!fx) return;
+      fx.enabled = fx.enabled === false;
+      commitFx(true);
+    };
+  });
+  v.querySelectorAll("[data-fx-remove]").forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const i = chain.findIndex(f => f.uid === el.dataset.fxRemove);
+      if (i >= 0) chain.splice(i, 1);
+      commitFx(true);
+    };
+  });
+  v.querySelectorAll("[data-fx-wet]").forEach(el => {
+    el.oninput = () => {
+      const fx = chain.find(f => f.uid === el.dataset.fxWet);
+      if (!fx) return;
+      fx.wet = parseFloat(el.value);
+      const out = v.querySelector(`[data-fx-wetv="${fx.uid}"]`);
+      if (out) out.textContent = `${Math.round(fx.wet * 100)}%`;
+      synth.updateEffects(exploreParams); // live, no rebuild (keep the slider)
+      synth.updateGenerationParams({ ...exploreParams });
+    };
+  });
+  const clearBtn = v.querySelector("[data-fx-clear]");
+  if (clearBtn) clearBtn.onclick = () => { chain.length = 0; _fxSel = null; commitFx(true); };
+
+  // ── Face tools ──
+  v.querySelectorAll("[data-fx-preset]").forEach(el => {
+    el.onchange = () => {
+      const fx = chain.find(f => f.uid === el.dataset.fxPreset);
+      const mod = fx && effectModuleById(fx.type);
+      const pr = mod && mod.presets && mod.presets[parseInt(el.value, 10)];
+      if (!fx || !pr) return;
+      fx.params = { ...mod.defaults, ...pr.params };
+      commitFx(true);
+    };
+  });
+  const expandBtn = v.querySelector("[data-fx-face-expand]");
+  if (expandBtn) expandBtn.onclick = () => { _fxExpanded = !_fxExpanded; renderExplore(); };
+
+  mountFxFace(v);
 }
 
 function chInspectorHTML(p) {
@@ -11432,6 +12098,7 @@ function wireTonePrint(v) {
       renderExplore();
     };
   });
+  bindEffectsStage(v);
   const cv = v.querySelector("#cvTonePrint");
   if (!cv) return;
   const hitNeedle = (e) => {
@@ -11676,6 +12343,14 @@ function fitStudioScale() {
 if (!window._studioFitInstalled) {
   window._studioFitInstalled = true;
   window.addEventListener("resize", fitStudioScale);
+  // Rail thumbnails (esp. the SPACE room plan — circles + head) are drawn in
+  // CSS-pixel space, so a width change without a redraw leaves the old bitmap
+  // stretched. Redraw at most once per frame while the window resizes.
+  let _thumbRAF = 0;
+  window.addEventListener("resize", () => {
+    if (_thumbRAF) return;
+    _thumbRAF = requestAnimationFrame(() => { _thumbRAF = 0; try { drawChThumbs(); } catch {} });
+  });
 }
 
 // Q12: draggable studio panel dividers — same pattern as the producer's
@@ -11720,9 +12395,16 @@ function wireStudioPanels(v) {
 // row again — writes the sound back into the layer and restores the base.
 let _chLayerEdit = null; // { layerId, baseStash }
 
+// Deep-copy an effects chain so a captured layer never aliases the base
+// chain's array (or another layer's) — extractSectionParams copies by ref.
+function cloneFxChain(chain) {
+  return Array.isArray(chain) ? chain.map(fx => ({ ...fx, params: { ...fx.params } })) : [];
+}
+
 function _soundHalf(params) {
   const half = extractSectionParams(params, "sound");
   for (const k of Object.keys(half)) if (k.startsWith("layer")) delete half[k];
+  if ("effectsChain" in half) half.effectsChain = cloneFxChain(half.effectsChain);
   return half;
 }
 
@@ -11775,6 +12457,7 @@ function wireLayerStrip(v) {
     const subnote = extractSectionParams(exploreParams, "sound");
     // a layer never nests layers or carries the shared-sync settings
     for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k];
+    subnote.effectsChain = cloneFxChain(subnote.effectsChain); // own the chain, don't alias the base's
     const layer = {
       id: crypto.randomUUID(),
       hue: (36 + exploreParams.layers.length * 70) % 360,
@@ -11798,11 +12481,48 @@ function wireLayerStrip(v) {
 
   v.querySelectorAll("[data-layer-row]").forEach(row => {
     row.onclick = (e) => {
-      if (e.target.closest("input, button, canvas")) return; // controls stay controls
+      if (e.target.closest("input, button, canvas, [data-layer-name]")) return; // controls + rename title stay put
       const id = row.dataset.layerRow;
+      if (id === "base") { // the base sound is always here — select/return to it
+        if (_chLayerEdit) exitLayerEdit();
+        else if (_chLayerSel) { _chLayerSel = null; renderExplore(); }
+        return;
+      }
       if (_chLayerEdit?.layerId === id) { exitLayerEdit(); return; } // same row = done
       const layer = (exploreParams.layers || []).find(l => l.id === id);
       if (layer) enterLayerEdit(layer); // exits any other edit first
+    };
+  });
+  // Double-click a layer title to rename it. Base → spectralProfileName (shared
+  // with the big preset title); a layer → its own layer.name.
+  v.querySelectorAll("[data-layer-name]").forEach(el => {
+    el.ondblclick = (e) => {
+      e.stopPropagation();
+      const id = el.dataset.layerName;
+      const input = document.createElement("input");
+      input.className = "layer-name-edit";
+      input.value = el.textContent;
+      input.maxLength = 40;
+      el.replaceWith(input);
+      input.focus(); input.select();
+      let done = false;
+      const commit = (save) => {
+        if (done) return; done = true;
+        if (save) {
+          const next = input.value.trim();
+          if (id === "base") {
+            if (next && next !== "Untitled") exploreParams.spectralProfileName = next;
+            else delete exploreParams.spectralProfileName;
+          } else {
+            const l = (exploreParams.layers || []).find(x => x.id === id);
+            if (l) { if (next) l.name = next; else delete l.name; }
+          }
+          applyLive();
+        }
+        renderExplore();
+      };
+      input.onkeydown = (ev) => { if (ev.key === "Enter") commit(true); if (ev.key === "Escape") commit(false); };
+      input.onblur = () => commit(true);
     };
   });
   const layerOf = (id) => (exploreParams.layers || []).find(l => l.id === id);
@@ -11832,6 +12552,20 @@ function wireLayerStrip(v) {
     syncEditedSpace(l);
     drawStageBig(); updateStageReadouts();
   });
+  // The base row's Angle/Dist drive the patch's own position (there is no
+  // layer object — the base IS exploreParams).
+  const baseAngle = v.querySelector('[data-layer-angle="base"]');
+  if (baseAngle) baseAngle.oninput = () => {
+    exploreParams.spaceAzimuth = Number(baseAngle.value);
+    applyLive(); synth.updateReverb({ ...exploreParams });
+    drawLayerMiniPads(); drawSpacePad(); drawStageBig(); updateStageReadouts();
+  };
+  const baseDist = v.querySelector('[data-layer-dist="base"]');
+  if (baseDist) baseDist.oninput = () => {
+    exploreParams.spaceDistance = Number(baseDist.value);
+    applyLive(); synth.updateReverb({ ...exploreParams });
+    drawLayerMiniPads(); drawSpacePad(); drawStageBig(); updateStageReadouts();
+  };
   // Owner 07-07: solo a layer to hear it alone (base + unsoloed layers
   // silent); multiple solos combine like track solos
   v.querySelectorAll("[data-layer-solo]").forEach(el => {
@@ -11861,6 +12595,37 @@ function wireLayerStrip(v) {
       _chLayerSel = null;
       applyLive();
       renderExplore();
+    };
+  });
+  // Per-layer EFFECTS: toggle a tag or drag its wet from the layer row.
+  const fxTagEntry = (key) => {
+    const [ownerId, uid] = String(key).split("::");
+    let chain = null;
+    if (ownerId === "base") {
+      chain = Array.isArray(exploreParams.effectsChain) ? exploreParams.effectsChain : null;
+    } else {
+      const layer = (exploreParams.layers || []).find(l => l.id === ownerId);
+      chain = layer && layer.subnote && Array.isArray(layer.subnote.effectsChain) ? layer.subnote.effectsChain : null;
+    }
+    return chain ? { chain, fx: chain.find(f => f.uid === uid) } : { chain: null, fx: null };
+  };
+  v.querySelectorAll("[data-layer-fx-toggle]").forEach(el => {
+    el.onclick = () => {
+      const { fx } = fxTagEntry(el.dataset.layerFxToggle);
+      if (!fx) return;
+      fx.enabled = fx.enabled === false;
+      applyLive();
+      synth.updateEffects(exploreParams);
+      renderExplore();
+    };
+  });
+  v.querySelectorAll("[data-layer-fx-wet]").forEach(el => {
+    el.oninput = () => {
+      const { fx } = fxTagEntry(el.dataset.layerFxWet);
+      if (!fx) return;
+      fx.wet = parseFloat(el.value);
+      applyLive();
+      synth.updateEffects(exploreParams); // live, no rebuild
     };
   });
   const sync = v.querySelector("#layerEnvSync");
@@ -13704,6 +14469,7 @@ function drawLoop() {
     drawMacroDistsAll();   // one final clean redraw to clear the trace
   }
 
+  if (visMode === "layers") return; // Layers is an HTML panel, not a canvas view
   if (visMode === "lanes") { drawBehaviorLanes(); return; }
   if (visMode === "motifs") { drawMotifTimeline(); return; }
   if (visMode === "pianoroll") { drawPianoRoll(); return; }
@@ -13722,6 +14488,7 @@ function drawLoop() {
 
 function drawStaticVis() {
   if (!canvas || !canvasCtx) return;
+  if (visMode === "layers") return; // Layers is an HTML panel, not a canvas view
   if (visMode === "lanes") {
     // The future field keeps flowing while stopped (a slow audition drift),
     // so the lanes view stays on the animation loop even without playback.

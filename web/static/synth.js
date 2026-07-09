@@ -14,6 +14,10 @@
 // ─── Seeded PRNG (xorshift32) ───────────────────────────────
 
 import { KEMAR_HRIR, kemarBuffers } from "./kemar-hrir.js";
+// Effects stage (docs/EFFECTS_CONTRACT.md). Importing index.js also registers
+// the whole effect roster as a side effect, so createChainHost can resolve
+// every effect type by the time playback starts.
+import { createChainHost, sanitizeChain } from "./effects/index.js";
 
 export class SeededRNG {
   constructor(seed = 42) { this.s = (seed >>> 0) || 1; }
@@ -2089,11 +2093,14 @@ export class GenerationEngine {
     } finally {
       this.p = saved;
     }
+    const sub = layer.subnote || {};
     return {
       id: layer.id || `layer${index}`,
       gain: layer.gain ?? 1,
       space: layer.space || null,
       solo: !!layer.solo, // owner 07-07: soloed layers play alone
+      effectsChain: sub.effectsChain || null,     // per-layer EFFECTS stack
+      stageEffectsOn: sub.stageEffectsOn !== false, // whole-stage bypass
       note: fields,
     };
   }
@@ -3273,10 +3280,26 @@ export class SynthEngine {
     this._limiter.connect(this._dest);
     this._applyLimiterRouting();
 
-    // Percussion bus
+    // Effects stage (docs/EFFECTS_CONTRACT.md): the base voice sums into a
+    // dedicated bus so its per-layer effects chain wraps ONLY the tonal voice.
+    // Percussion feeds master directly (downstream of effects, undressed).
+    // Empty chain ⇒ voiceBus passes straight through to master → SPACE.
+    this._voiceBus = this.ctx.createGain();
+    this._baseFxHost = createChainHost(this.ctx, this._voiceBus, this.master);
+
+    // Percussion bus. Owner 2026-07-09: percussion is its OWN sound source with
+    // its own position in space (set in the producer LAYERS view), so it runs
+    // through a dedicated spatial chain (percAzimuth/percDistance) rather than
+    // riding the base voice's position via master. The 0.45 keeps its loudness
+    // now that it bypasses master's 0.45 trim.
     this._percGain = this.ctx.createGain();
-    this._percGain.gain.value = 1.0;
-    this._percGain.connect(this.master);
+    this._percGain.gain.value = 0.45;
+    this._percChain = this._layerChain("__perc__");
+    // Percussion never has effects, but the chain host only wires its
+    // passthrough on the first update() — call it once so signal flows even
+    // though _render (which updates layer hosts) never touches this one.
+    this._percChain.fxHost.update([], true);
+    this._percGain.connect(this._percChain.input);
 
     // Pre-generate noise buffer for percussion synthesis
     const sr = this.ctx.sampleRate;
@@ -3536,6 +3559,15 @@ export class SynthEngine {
       pinnaShelf: this._pinnaShelf, pinnaNotch: this._pinnaNotch,
       distGain: this._spaceDistGain,
     }, p);
+    // Percussion is its own source: place it at percAzimuth/percDistance,
+    // falling back to the patch position when unset (owner 2026-07-09).
+    if (this._percChain) {
+      this._configureSpaceNodes(this._percChain, {
+        ...p,
+        spaceAzimuth: Number.isFinite(p.percAzimuth) ? p.percAzimuth : (p.spaceAzimuth ?? 0),
+        spaceDistance: Number.isFinite(p.percDistance) ? p.percDistance : (p.spaceDistance ?? 2.5),
+      });
+    }
     this._configureMeasuredEar(p);
   }
 
@@ -3638,8 +3670,12 @@ export class SynthEngine {
       pinnaShelf: bi("highshelf", 8000),
       pinnaNotch: bi("peaking", 4300, 2),
       distGain: this.ctx.createGain(),
+      fxOut: this.ctx.createGain(), // post-effects tap → dry spatial + reverb send
     };
-    c.input.connect(c.proximity);
+    // EFFECTS stage sits between the synthesis input and SPACE. Empty chain ⇒
+    // input passes straight through fxOut. Updated per-render from lr.effectsChain.
+    c.fxHost = createChainHost(this.ctx, c.input, c.fxOut);
+    c.fxOut.connect(c.proximity);
     c.proximity.connect(c.air);
     c.air.connect(c.delay);
     c.delay.connect(c.earDelayL);
@@ -3654,7 +3690,7 @@ export class SynthEngine {
     c.pinnaShelf.connect(c.pinnaNotch);
     c.pinnaNotch.connect(c.distGain);
     c.distGain.connect(this._dryGain);
-    c.input.connect(this._preDelay); // shared diffuse reverb send
+    c.fxOut.connect(this._preDelay); // shared diffuse reverb send (post-effects)
     this._layerChains.set(id, c);
     return c;
   }
@@ -3662,6 +3698,31 @@ export class SynthEngine {
   updateGenerationParams(params = {}) {
     if (!this._engine) return;
     this._engine.p = { ...this._engine.p, ...params };
+  }
+
+  /**
+   * Live-apply the EFFECTS stage to the running graph (docs/EFFECTS_CONTRACT).
+   * The effect hosts are persistent subgraphs, so param/stack edits land
+   * click-free WITHOUT waiting for the next note. Call whenever effectsChain,
+   * stageEffectsOn, or any effect param changes while playing/paused.
+   */
+  updateEffects(params = {}) {
+    if (!this.ctx) return;
+    if (this._spaceP) {
+      this._spaceP.effectsChain = params.effectsChain;
+      this._spaceP.stageEffectsOn = params.stageEffectsOn;
+    }
+    if (this._baseFxHost) {
+      this._baseFxHost.update(sanitizeChain(params.effectsChain), params.stageEffectsOn !== false);
+    }
+    if (Array.isArray(params.layers) && this._layerChains) {
+      for (const layer of params.layers) {
+        const c = this._layerChains.get(layer.id);
+        if (!c || !c.fxHost) continue;
+        const sub = layer.subnote || {};
+        c.fxHost.update(sanitizeChain(sub.effectsChain), sub.stageEffectsOn !== false);
+      }
+    }
   }
 
   /**
@@ -4004,6 +4065,12 @@ export class SynthEngine {
     // the listener's head (owner 07-07: the head is a patch/space-level
     // choice now, never per-layer). Solo: when any layer is soloed, only
     // the soloed layers sound — the base and the rest go quiet.
+    // EFFECTS stage: the base voice's chain lives on the sound-half params
+    // (remembered as _spaceP by _configureSpace); each layer carries its own.
+    // stageEffectsOn:false bypasses the whole stack. Applied per-note so live
+    // edits land within a note, matching the rest of the sound-half model.
+    const bp = this._spaceP || {};
+    if (this._baseFxHost) this._baseFxHost.update(sanitizeChain(bp.effectsChain), bp.stageEffectsOn !== false);
     const lrs = (Array.isArray(note.layerRenders) && this._dryGain) ? note.layerRenders : [];
     const soloed = lrs.filter(lr => lr.solo);
     if (!soloed.length) dispatch(note); // the base plays unless something is soloed
@@ -4018,6 +4085,7 @@ export class SynthEngine {
       const sp = { ...(this._spaceP || {}) };
       if (lr.space) { sp.spaceAzimuth = lr.space.angle; sp.spaceDistance = lr.space.dist; }
       this._configureSpaceNodes(chain, sp);
+      if (chain.fxHost) chain.fxHost.update(sanitizeChain(lr.effectsChain), lr.stageEffectsOn !== false);
       ln._out = chain.input;
       ln._vibratoEvents = note._vibratoEvents; // coherent FM across layers
       dispatch(ln);
@@ -4075,7 +4143,7 @@ export class SynthEngine {
     }
     this._renderSpectralPartials(note, t0, t1, env);
     this._renderBreath(note, t0, t1, env);
-    env.connect(note._out || this.master);
+    env.connect(note._out || this._voiceBus || this.master);
 
     osc.start(t0);
     osc.stop(t1 + 0.08 + (note._ringSec || 0));
@@ -4096,7 +4164,7 @@ export class SynthEngine {
     base.connect(env);
     this._renderSpectralPartials(note, t0, t1, env);
     this._renderBreath(note, t0, t1, env);
-    env.connect(note._out || this.master);
+    env.connect(note._out || this._voiceBus || this.master);
     osc.start(t0);
     osc.stop(t1 + 0.06 + (note._ringSec || 0));
     this._track(osc);
@@ -4109,7 +4177,7 @@ export class SynthEngine {
     this._renderSpectralPartials(note, t0, t1, env);
     this._renderAttackNoise(note, t0, env);
     this._renderBreath(note, t0, t1, env);
-    env.connect(note._out || this.master);
+    env.connect(note._out || this._voiceBus || this.master);
   }
 
   _spectralMix(note) {
