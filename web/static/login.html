@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Resona — Sign in</title>
+<style>
+  :root{
+    --bg:#16181d; --surface:#1c1f25; --surface2:#24272e; --border:#2b2f37;
+    --border2:#363b45; --text:#e8eaee; --text2:#9aa0ab; --text3:#5d636e;
+    --accent:#f5a623; --accent2:#ffc768; --red:#ef4444; --green:#22c55e;
+    --radius:10px; --radius-sm:6px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 600px at 50% -10%,#20242c,var(--bg));
+    color:var(--text);font-family:var(--font);padding:24px}
+  .card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:28px 26px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  .brand{font-size:1.5rem;font-weight:700;letter-spacing:.5px;margin:0 0 2px}
+  .brand span{color:var(--accent)}
+  .tagline{color:var(--text3);font-size:.82rem;margin:0 0 22px}
+  .tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--border);
+    border-radius:var(--radius-sm);padding:4px;margin-bottom:20px}
+  .tab{flex:1;text-align:center;padding:8px 0;font-size:.85rem;font-weight:600;
+    color:var(--text2);border-radius:5px;cursor:pointer;user-select:none;border:none;background:none}
+  .tab.active{background:var(--surface2);color:var(--text)}
+  label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--text3);margin:14px 0 5px}
+  input{width:100%;padding:10px 12px;background:var(--bg);color:var(--text);
+    border:1px solid var(--border2);border-radius:var(--radius-sm);font-family:inherit;font-size:.92rem}
+  input:focus{outline:none;border-color:var(--accent)}
+  .btn{width:100%;margin-top:20px;padding:11px;border:none;border-radius:var(--radius-sm);
+    background:var(--accent);color:#000;font-family:inherit;font-weight:700;font-size:.92rem;cursor:pointer}
+  .btn:hover:not(:disabled){background:var(--accent2)}
+  .btn:disabled{opacity:.55;cursor:default}
+  .msg{margin-top:14px;font-size:.82rem;min-height:1.1em}
+  .msg.error{color:var(--red)}
+  .msg.ok{color:var(--green)}
+  .hint{margin-top:16px;font-size:.72rem;color:var(--text3);line-height:1.5}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 class="brand">Reson<span>a</span></h1>
+  <p class="tagline">Sign in to your studio</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" id="tabLogin" role="tab">Sign in</button>
+    <button class="tab" id="tabRegister" role="tab">Create account</button>
+  </div>
+
+  <form id="form" autocomplete="on">
+    <div id="handleRow" class="hidden">
+      <label for="handle">Display name <span style="text-transform:none;color:var(--text3)">(optional)</span></label>
+      <input id="handle" name="handle" type="text" autocomplete="nickname" maxlength="40"/>
+    </div>
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email" required/>
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8"/>
+
+    <div id="inviteRow" class="hidden">
+      <label for="invite">Invite code</label>
+      <input id="invite" name="invite" type="text" autocomplete="off"/>
+    </div>
+
+    <button class="btn" id="submit" type="submit">Sign in</button>
+    <div class="msg" id="msg"></div>
+  </form>
+
+  <p class="hint" id="hint"></p>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let mode = "login"; // or "register"
+  let openSignup = false;
+
+  const nextUrl = new URLSearchParams(location.search).get("next") || "/";
+
+  function setMode(m) {
+    mode = m;
+    const reg = m === "register";
+    $("tabLogin").classList.toggle("active", !reg);
+    $("tabRegister").classList.toggle("active", reg);
+    $("handleRow").classList.toggle("hidden", !reg);
+    $("inviteRow").classList.toggle("hidden", !reg || openSignup);
+    $("invite").required = reg && !openSignup;
+    $("password").autocomplete = reg ? "new-password" : "current-password";
+    $("submit").textContent = reg ? "Create account" : "Sign in";
+    $("hint").textContent = reg
+      ? (openSignup ? "" : "Registration is invite-only. Ask the owner for a code.")
+      : "";
+    setMsg("");
+  }
+  function setMsg(text, kind) {
+    const m = $("msg");
+    m.textContent = text || "";
+    m.className = "msg" + (kind ? " " + kind : "");
+  }
+
+  $("tabLogin").onclick = () => setMode("login");
+  $("tabRegister").onclick = () => setMode("register");
+
+  // If already signed in, skip straight to the app.
+  fetch("/api/auth/me").then(r => r.json()).then(d => {
+    openSignup = !!d.open_signup;
+    if (d.user) { location.replace(nextUrl); return; }
+    setMode("login");
+  }).catch(() => setMode("login"));
+
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submit = $("submit");
+    submit.disabled = true;
+    setMsg(mode === "register" ? "Creating account…" : "Signing in…");
+    const body = { email: $("email").value.trim(), password: $("password").value };
+    let path = "/api/auth/login";
+    if (mode === "register") {
+      path = "/api/auth/register";
+      body.handle = $("handle").value.trim() || undefined;
+      if (!openSignup) body.invite_code = $("invite").value.trim();
+    }
+    try {
+      const r = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      setMsg("Welcome, " + (d.user?.handle || d.user?.email) + "!", "ok");
+      location.replace(nextUrl);
+    } catch (err) {
+      setMsg(err.message || "Something went wrong", "error");
+      submit.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

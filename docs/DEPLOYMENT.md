@@ -16,6 +16,9 @@ pilot study.
 | `PHASE0_CACHE_DIR`   | no       | Server-render cache; safe to lose (regenerable)     |
 | `PHASE0_ADMIN_TOKEN` | recommended | Enables `/api/export.csv`; keep it secret        |
 | `PHASE0_RATE_LIMIT`  | no       | POSTs/min/IP (default 120; 0 disables)              |
+| `RESONA_AUTH_REQUIRED` | no     | `1` locks the whole app behind sign-in (logged-out → `/login`, protected APIs → 401). Unset = open, anonymous mode (default). |
+| `RESONA_OPEN_SIGNUP` | no       | `1` allows self-registration without a code. Leave unset to keep registration **invite-only** (the default). |
+| `RESONA_COOKIE_SECURE` | no     | `1` marks the session cookie `Secure` (set it whenever the app is served over HTTPS). |
 
 Process command (already in `Procfile`):
 
@@ -56,6 +59,29 @@ web: PYTHONPATH=src python3 -m synthesiser.web.server --host 0.0.0.0
 - **Back up**: schedule a periodic `export.csv` pull for each table, or snapshot
   the volume. `stimuli.csv` + the app version is sufficient to regenerate any
   rated sound exactly.
+
+## Accounts & invite codes (optional, self-hosted)
+
+The server ships an optional, dependency-light account layer (SQLite + stdlib
+crypto — no external database). It is **off unless `RESONA_AUTH_REQUIRED=1`**, so
+the anonymous research/explore flows above are unchanged by default.
+
+To run an invite-only deployment (per-user profiles + private "cloud patches"):
+
+1. Set `RESONA_AUTH_REQUIRED=1` and `RESONA_COOKIE_SECURE=1` (behind HTTPS).
+2. Seed the first owner and mint invites with the CLI (writes to
+   `PHASE0_DATA_DIR/accounts.db`):
+
+   ```bash
+   PYTHONPATH=src python3 -m synthesiser.web.accounts create-admin \
+       --email you@example.com --password '<strong>' --handle owner
+   PYTHONPATH=src python3 -m synthesiser.web.accounts create-invite --count 10
+   ```
+
+3. Testers redeem a code on the **Create account** tab at `/login`.
+
+For a full one-box VPS walkthrough (systemd + nginx + Let's Encrypt), see
+[`HOSTINGER_DEPLOY.md`](HOSTINGER_DEPLOY.md).
 
 ## Notes
 

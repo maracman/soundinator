@@ -9,9 +9,20 @@ the two existing operational runbooks:
 
 - [`PHASE0_HOSTING.md`](PHASE0_HOSTING.md) — original single-server hosting.
 - [`DEPLOYMENT.md`](DEPLOYMENT.md) — Render / Railway / Fly runbook for the Python server.
+- [`HOSTINGER_DEPLOY.md`](HOSTINGER_DEPLOY.md) — **self-hosted, invite-only** deploy
+  on a Hostinger VPS.
 
 Where they differ, this document is the plan for the community launch; those two
 remain correct for running the Python server on its own (e.g. for a closed study).
+
+> **Two accounts models now exist.** This document describes the *open* community
+> launch on **Supabase** (managed auth, open registration + moderation queue).
+> A simpler, fully **self-hosted invite-only** alternative is now implemented in
+> the Python server itself (SQLite accounts + invite codes, no external service)
+> — see [`HOSTINGER_DEPLOY.md`](HOSTINGER_DEPLOY.md) and
+> [`accounts.py`](../src/synthesiser/web/accounts.py). Use that for a closed beta
+> or research cohort; use the Supabase model below if/when you want a large,
+> self-serve public community. They are mutually exclusive — pick one.
 
 ---
 

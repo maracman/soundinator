@@ -18078,3 +18078,197 @@ document.addEventListener("input", (e) => {
 
 pid();
 route();
+
+// ─── Accounts, invite gate & cloud patches ───────────────────
+// Server-side user profiles are optional: the account bar only shows when the
+// server reports an account layer. When the deployment sets RESONA_AUTH_REQUIRED
+// the server has already gated page loads, so unauthenticated users never reach
+// this code — they're bounced to /login. Signed-in users get private, per-account
+// "cloud patches" backed by /api/patches (see src/synthesiser/web/accounts.py).
+
+let authState = { user: null, authRequired: false, openSignup: false };
+
+async function refreshAuth() {
+  try {
+    const r = await fetch("/api/auth/me");
+    const d = await r.json();
+    authState = {
+      user: d.user || null,
+      authRequired: !!d.auth_required,
+      openSignup: !!d.open_signup,
+    };
+  } catch {
+    authState = { user: null, authRequired: false, openSignup: false };
+  }
+  renderAccountBar();
+}
+
+function initAccountUI() {
+  if (!document.getElementById("accountBar")) {
+    const bar = document.createElement("div");
+    bar.id = "accountBar";
+    document.body.appendChild(bar);
+  }
+  refreshAuth();
+}
+
+function renderAccountBar() {
+  const bar = document.getElementById("accountBar");
+  if (!bar) return;
+  const u = authState.user;
+  // Locked deployments never render the app for signed-out users; if somehow
+  // signed-out and open, offer a discreet sign-in link. Otherwise hide.
+  if (!u) {
+    bar.innerHTML = authState.authRequired
+      ? ""
+      : `<button class="acct-pill signin" id="acctSignin">Sign in</button>`;
+    const s = document.getElementById("acctSignin");
+    if (s) s.onclick = () => { location.href = "/login?next=" + encodeURIComponent(location.pathname + location.hash); };
+    return;
+  }
+  const label = u.handle || u.email;
+  bar.innerHTML = `
+    <button class="acct-pill" id="acctPill" title="${esc(u.email)}">
+      <span class="acct-dot"></span>${esc(label)} ▾
+    </button>
+    <div class="acct-menu" id="acctMenu" hidden>
+      <div class="acct-who"><b>${esc(label)}</b><span>${esc(u.email)}</span></div>
+      <button id="acctPatches">☁︎ My cloud patches</button>
+      <button id="acctSignout">Sign out</button>
+    </div>`;
+  const pill = document.getElementById("acctPill");
+  const menu = document.getElementById("acctMenu");
+  pill.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; };
+  document.addEventListener("click", () => { if (menu) menu.hidden = true; }, { once: true });
+  document.getElementById("acctPatches").onclick = () => { menu.hidden = true; openCloudPatches(); };
+  document.getElementById("acctSignout").onclick = signOut;
+}
+
+async function signOut() {
+  try { await fetch("/api/auth/logout", { method: "POST" }); } catch {}
+  if (authState.authRequired) { location.href = "/login"; return; }
+  authState.user = null;
+  renderAccountBar();
+}
+
+// ── Cloud patches: private, per-account saved sounds ──────────
+
+async function cloudFetchPatches() {
+  const d = await api("/api/patches");
+  return d.patches || [];
+}
+
+async function cloudSaveEntry(entry) {
+  return api("/api/patches", {
+    method: "POST",
+    body: JSON.stringify({ name: entry.name, kind: entry.section || "preset", data: entry }),
+  });
+}
+
+function currentSoundEntry(name) {
+  return {
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+    name: (name || "Untitled").slice(0, 80),
+    section: "full",
+    rating: typeof exploreRating === "number" ? exploreRating : 0,
+    parameters: { ...exploreParams },
+    stimulus_id: stimulusIdFor(exploreParams),
+    app_version: APP_VERSION,
+  };
+}
+
+async function openCloudPatches() {
+  if (!authState.user) { location.href = "/login"; return; }
+  let overlay = document.getElementById("cloudOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "cloudOverlay";
+    overlay.className = "cloud-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="cloud-modal" role="dialog" aria-label="My cloud patches">
+      <header><h3>☁︎ My cloud patches</h3><button class="x" id="cloudClose" title="Close">×</button></header>
+      <div class="cloud-actions">
+        <button class="primary" id="cloudSaveCurrent">Save current sound</button>
+        <button id="cloudBackupLocal">Back up my local presets</button>
+      </div>
+      <ul class="cloud-list" id="cloudList"><li class="cloud-empty">Loading…</li></ul>
+    </div>`;
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.hidden = true; };
+  document.getElementById("cloudClose").onclick = () => { overlay.hidden = true; };
+  document.getElementById("cloudSaveCurrent").onclick = async () => {
+    const name = prompt("Name this patch:", "");
+    if (!name || !name.trim()) return;
+    try { await cloudSaveEntry(currentSoundEntry(name.trim())); await renderCloudList(); }
+    catch (err) { alert("Could not save: " + err.message); }
+  };
+  document.getElementById("cloudBackupLocal").onclick = cloudBackupLocal;
+  await renderCloudList();
+}
+
+async function renderCloudList() {
+  const ul = document.getElementById("cloudList");
+  if (!ul) return;
+  let patches;
+  try { patches = await cloudFetchPatches(); }
+  catch (err) { ul.innerHTML = `<li class="cloud-empty">${esc(err.message)}</li>`; return; }
+  if (!patches.length) {
+    ul.innerHTML = `<li class="cloud-empty">No cloud patches yet. Save the current sound to start your library.</li>`;
+    return;
+  }
+  ul.innerHTML = patches.map(p => {
+    const when = (p.updated_at ? new Date(p.updated_at * 1000).toLocaleDateString() : "");
+    return `<li data-id="${esc(p.id)}">
+      <div class="c-name"><b>${esc(p.name)}</b><span>${esc(p.kind || "preset")} · ${when}</span></div>
+      <button class="c-act" data-cloud-load="${esc(p.id)}">Load</button>
+      <button class="c-act danger" data-cloud-del="${esc(p.id)}">Delete</button>
+    </li>`;
+  }).join("");
+  ul.querySelectorAll("[data-cloud-load]").forEach(btn => {
+    btn.onclick = () => {
+      const p = patches.find(x => x.id === btn.dataset.cloudLoad);
+      if (p) cloudLoadPatch(p);
+    };
+  });
+  ul.querySelectorAll("[data-cloud-del]").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm("Delete this cloud patch?")) return;
+      try { await api("/api/patches/" + encodeURIComponent(btn.dataset.cloudDel), { method: "DELETE" }); await renderCloudList(); }
+      catch (err) { alert("Could not delete: " + err.message); }
+    };
+  });
+}
+
+function cloudLoadPatch(patch) {
+  const entry = patch.data || {};
+  if (!entry.parameters) { alert("This patch has no sound data."); return; }
+  const wasPlaying = synth.isPlaying;
+  exploreParams = mergedPresetParams({ parameters: { ...entry.parameters }, section: entry.section || "full" });
+  const overlay = document.getElementById("cloudOverlay");
+  if (overlay) overlay.hidden = true;
+  const onExplore = (location.hash.replace(/^#\/?/, "") || "explore") === "explore";
+  if (onExplore) renderExplore(); else location.hash = "#explore";
+  if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+  trackEngagement("cloud_load");
+}
+
+async function cloudBackupLocal() {
+  const locals = loadPresets();
+  if (!locals.length) { alert("You have no local presets to back up."); return; }
+  let existing = [];
+  try { existing = await cloudFetchPatches(); } catch {}
+  const known = new Set(existing.map(p => p.data && p.data.id).filter(Boolean));
+  const todo = locals.filter(e => !known.has(e.id));
+  if (!todo.length) { alert("All local presets are already backed up."); return; }
+  let ok = 0;
+  for (const entry of todo) {
+    try { await cloudSaveEntry(entry); ok++; } catch {}
+  }
+  await renderCloudList();
+  alert(`Backed up ${ok} preset${ok === 1 ? "" : "s"} to your cloud library.`);
+}
+
+initAccountUI();

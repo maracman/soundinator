@@ -27,6 +27,7 @@ except ImportError:  # non-POSIX platform; appends fall back to unlocked
     fcntl = None
 from datetime import datetime, timezone
 from http import HTTPStatus
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,11 @@ import hmac
 from urllib.parse import parse_qs, unquote, urlparse
 from uuid import uuid4
 
+from synthesiser.web.accounts import (
+    SESSION_TTL_DAYS,
+    AccountError,
+    AccountStore,
+)
 from synthesiser.web.phase0 import (
     PHASE0_SCHEMA_VERSION,
     SYNTH_VERSION_HASH,
@@ -45,6 +51,16 @@ from synthesiser.web.phase0 import (
 # Version stamp for records appended to explore_events.jsonl; bump on any
 # field addition/rename so exports can branch on record shape.
 EXPLORE_EVENT_SCHEMA_VERSION = "explore-event-1.0"
+
+# Name of the session cookie set on sign-in.
+SESSION_COOKIE = "resona_session"
+
+# Sentinel so current_user() can cache a None result for the request's lifetime.
+_UNSET = object()
+
+
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def project_root() -> Path:
@@ -113,6 +129,31 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        # ── Auth surfaces (always available, even in auth-required mode) ──
+        if path in ("/login", "/login.html"):
+            self.serve_file(self.roots["static"] / "login.html")
+            return
+
+        if path == "/api/auth/me":
+            self.send_json({
+                "user": self.current_user(),
+                "auth_required": bool(getattr(self.server, "auth_required", False)),
+                "open_signup": bool(getattr(self.server, "open_signup", False)),
+            })
+            return
+
+        # ── Access gate (no-op unless RESONA_AUTH_REQUIRED is set) ──
+        if self._page_requires_login(path) and not self.current_user():
+            self.redirect("/login")
+            return
+        if self._api_requires_auth(path) and not self.current_user():
+            self.send_error_json(HTTPStatus.UNAUTHORIZED, "authentication required")
+            return
+
+        if path == "/api/patches":
+            self.handle_patches_list()
+            return
+
         if path == "/api/health":
             data_dir = self.roots["events"].parent
             cache_dir = self.roots["cache"]
@@ -166,6 +207,26 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         try:
             payload = self.read_json_body()
 
+            # ── Auth endpoints (open even when the app is locked) ──
+            if parsed.path == "/api/auth/register":
+                self.handle_register(payload)
+                return
+            if parsed.path == "/api/auth/login":
+                self.handle_login(payload)
+                return
+            if parsed.path == "/api/auth/logout":
+                self.handle_logout()
+                return
+
+            # ── Access gate for every other POST endpoint ──
+            if self._api_requires_auth(parsed.path) and not self.current_user():
+                self.send_error_json(HTTPStatus.UNAUTHORIZED, "authentication required")
+                return
+
+            if parsed.path == "/api/patches":
+                self.handle_patch_save(payload)
+                return
+
             if parsed.path == "/api/study/submit":
                 self.handle_study_submit(payload)
                 return
@@ -187,6 +248,156 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
         except Exception as exc:
             self.send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, f"server error: {exc}")
+
+    # ── DELETE routes ───────────────────────────────────────
+
+    def do_DELETE(self) -> None:
+        path = urlparse(self.path).path
+        if self._api_requires_auth(path) and not self.current_user():
+            self.send_error_json(HTTPStatus.UNAUTHORIZED, "authentication required")
+            return
+        if path.startswith("/api/patches/"):
+            self.handle_patch_delete(unquote(path.removeprefix("/api/patches/")))
+            return
+        self.send_error_json(HTTPStatus.NOT_FOUND, "unknown endpoint")
+
+    # ── Accounts: sessions, invite-gated registration, patches ──
+
+    def _accounts(self) -> AccountStore:
+        store = getattr(self.server, "accounts", None)
+        if store is None:
+            raise ValueError("accounts backend not configured")
+        return store
+
+    def _session_token(self) -> str | None:
+        raw = self.headers.get("Cookie")
+        if not raw:
+            return None
+        jar = SimpleCookie()
+        try:
+            jar.load(raw)
+        except Exception:
+            return None
+        morsel = jar.get(SESSION_COOKIE)
+        return morsel.value if morsel else None
+
+    def current_user(self) -> dict[str, Any] | None:
+        cached = getattr(self, "_user_cache", _UNSET)
+        if cached is not _UNSET:
+            return cached
+        store = getattr(self.server, "accounts", None)
+        user = store.user_for_session(self._session_token()) if store else None
+        self._user_cache = user
+        return user
+
+    def _page_requires_login(self, path: str) -> bool:
+        """True when an unauthenticated page load should bounce to /login."""
+        if not getattr(self.server, "auth_required", False):
+            return False
+        if path in ("/login", "/login.html"):
+            return False
+        return path in ("/", "/index.html") or path.endswith(".html")
+
+    def _api_requires_auth(self, path: str) -> bool:
+        """True when an API call must carry a valid session.
+
+        Patch endpoints always require a signed-in owner; every other API
+        requires auth only when the whole app is locked (RESONA_AUTH_REQUIRED).
+        Health and the auth endpoints themselves are always open.
+        """
+        if path.startswith("/api/patches"):
+            return True
+        if not getattr(self.server, "auth_required", False):
+            return False
+        if path == "/api/health" or path.startswith("/api/auth/"):
+            return False
+        return path.startswith("/api/")
+
+    def _cookie_header(self, token: str, max_age: int) -> str:
+        secure = "; Secure" if getattr(self.server, "cookie_secure", False) else ""
+        return (f"{SESSION_COOKIE}={token}; Max-Age={max_age}; Path=/; "
+                f"HttpOnly; SameSite=Lax{secure}")
+
+    def _clear_cookie_header(self) -> str:
+        secure = "; Secure" if getattr(self.server, "cookie_secure", False) else ""
+        return f"{SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{secure}"
+
+    def redirect(self, location: str) -> None:
+        self.send_response(HTTPStatus.FOUND)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def handle_register(self, payload: dict[str, Any]) -> None:
+        store = self._accounts()
+        open_signup = bool(getattr(self.server, "open_signup", False))
+        try:
+            user = store.register(
+                payload.get("email", ""),
+                payload.get("password", ""),
+                invite_code=truncate_text(payload.get("invite_code"), 80) or None,
+                handle=truncate_text(payload.get("handle"), 40) or None,
+                require_invite=not open_signup,
+            )
+        except AccountError as exc:
+            self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
+            return
+        token = store.create_session(user["id"])
+        self.send_json(
+            {"ok": True, "user": user},
+            status=HTTPStatus.CREATED,
+            cookies=[self._cookie_header(token, SESSION_TTL_DAYS * 86400)],
+        )
+
+    def handle_login(self, payload: dict[str, Any]) -> None:
+        store = self._accounts()
+        user = store.authenticate(payload.get("email", ""), payload.get("password", ""))
+        if not user:
+            self.send_error_json(HTTPStatus.UNAUTHORIZED, "invalid email or password")
+            return
+        token = store.create_session(user["id"])
+        self.send_json(
+            {"ok": True, "user": user},
+            cookies=[self._cookie_header(token, SESSION_TTL_DAYS * 86400)],
+        )
+
+    def handle_logout(self) -> None:
+        store = getattr(self.server, "accounts", None)
+        if store is not None:
+            store.delete_session(self._session_token())
+        self.send_json({"ok": True}, cookies=[self._clear_cookie_header()])
+
+    def handle_patches_list(self) -> None:
+        store = self._accounts()
+        user = self.current_user()  # gate guarantees a user here
+        self.send_json({"patches": store.list_patches(user["id"])})
+
+    def handle_patch_save(self, payload: dict[str, Any]) -> None:
+        store = self._accounts()
+        user = self.current_user()
+        if payload.get("data") is None:
+            self.send_error_json(HTTPStatus.BAD_REQUEST, "data is required")
+            return
+        try:
+            patch = store.save_patch(
+                user["id"],
+                name=truncate_text(payload.get("name"), 120),
+                data=payload.get("data"),
+                kind=truncate_text(payload.get("kind"), 40) or "preset",
+                patch_id=truncate_text(payload.get("id"), 64) or None,
+            )
+        except AccountError as exc:
+            self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
+            return
+        self.send_json({"ok": True, "patch": patch}, status=HTTPStatus.CREATED)
+
+    def handle_patch_delete(self, patch_id: str) -> None:
+        store = self._accounts()
+        user = self.current_user()
+        if not store.delete_patch(user["id"], patch_id):
+            self.send_error_json(HTTPStatus.NOT_FOUND, "patch not found")
+            return
+        self.send_json({"ok": True})
 
     # ── Arm 1: Study data collection ────────────────────────
 
@@ -383,12 +594,22 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             raise ValueError("body must be a JSON object")
         return data
 
-    def send_json(self, data: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
+    def send_json(
+        self,
+        data: Any,
+        status: HTTPStatus = HTTPStatus.OK,
+        cookies: list[str] | None = None,
+    ) -> None:
         encoded = json.dumps(data, sort_keys=True).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        # Credentialed (cookie-bearing) responses can't use a wildcard origin;
+        # auth is same-origin, so only advertise open CORS for cookieless JSON.
+        if not cookies:
+            self.send_header("Access-Control-Allow-Origin", "*")
+        for cookie in cookies or []:
+            self.send_header("Set-Cookie", cookie)
         self.end_headers()
         self.wfile.write(encoded)
 
@@ -431,6 +652,12 @@ def build_server(
     server.rate_state = {}  # type: ignore[attr-defined]
     server.rate_lock = threading.Lock()  # type: ignore[attr-defined]
     server.admin_token = os.environ.get("PHASE0_ADMIN_TOKEN", "")  # type: ignore[attr-defined]
+    # Accounts / invite gate. The store is always available (so profiles work
+    # locally), but sign-in is only *enforced* when RESONA_AUTH_REQUIRED is set.
+    server.accounts = AccountStore(data / "accounts.db")  # type: ignore[attr-defined]
+    server.auth_required = _env_flag("RESONA_AUTH_REQUIRED")  # type: ignore[attr-defined]
+    server.open_signup = _env_flag("RESONA_OPEN_SIGNUP")  # type: ignore[attr-defined]
+    server.cookie_secure = _env_flag("RESONA_COOKIE_SECURE")  # type: ignore[attr-defined]
     return server
 
 
@@ -453,6 +680,11 @@ def main(argv: list[str] | None = None) -> None:
     print(f"  Arm 1 (Study)  : consent -> demographics -> headphones -> paradigm -> debrief")
     print(f"  Arm 2 (Explore): real-time Web Audio synth + preset library")
     print(f"  Data directory : {server.roots['study_data'].parent}")
+    if getattr(server, "auth_required", False):
+        signup = "open" if getattr(server, "open_signup", False) else "invite-only"
+        print(f"  Access         : LOCKED — sign-in required ({signup} registration)")
+    else:
+        print(f"  Access         : open (accounts optional; set RESONA_AUTH_REQUIRED=1 to lock)")
     print(f"  Ctrl+C to stop\n")
     try:
         server.serve_forever()

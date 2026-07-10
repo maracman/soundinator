@@ -24,5 +24,9 @@ web/cache/*
 web/data/*.jsonl
 web/data/session_events.jsonl
 web/data/global_presets.json
+# Account database holds password hashes + sessions — never commit it.
+*.db
+*.db-wal
+*.db-shm
 !web/data/.gitkeep
 exports/

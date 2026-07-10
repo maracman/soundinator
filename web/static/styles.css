@@ -9965,3 +9965,50 @@ body.explore-mode .view {
 .hg-choice-list button b,.hg-choice-list button i { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hg-choice-list button b { font-size:.62rem; }.hg-choice-list button i { color:var(--text3); font-size:.56rem; font-style:normal; }
 .tl2-gsbtn { min-width:25px; font-size:.57rem; letter-spacing:-.04em; }
+
+/* ─── Account bar, invite gate & cloud patches (server-side profiles) ─── */
+#accountBar { position: fixed; top: 10px; right: 12px; z-index: 4000; font-family: var(--font); }
+#accountBar .acct-pill { display:inline-flex; align-items:center; gap:7px; padding:6px 11px;
+  background: var(--surface); border:1px solid var(--border2); border-radius: 999px;
+  color: var(--text); font-size:.82rem; font-weight:600; cursor:pointer; line-height:1;
+  box-shadow: 0 6px 18px rgba(0,0,0,.32); }
+#accountBar .acct-pill:hover { border-color: var(--accent); }
+#accountBar .acct-dot { width:7px; height:7px; border-radius:50%; background: var(--green); }
+#accountBar .acct-pill.signin { color: var(--text2); font-weight:500; }
+#accountBar .acct-menu { position:absolute; top:40px; right:0; min-width:180px; background: var(--surface);
+  border:1px solid var(--border2); border-radius: var(--radius); padding:6px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.5); }
+#accountBar .acct-menu[hidden] { display:none; }
+#accountBar .acct-who { padding:7px 9px 9px; border-bottom:1px solid var(--border); margin-bottom:5px; }
+#accountBar .acct-who b { display:block; font-size:.85rem; color:var(--text); }
+#accountBar .acct-who span { font-size:.72rem; color:var(--text3); }
+#accountBar .acct-menu button { display:block; width:100%; text-align:left; padding:8px 9px;
+  background:none; border:none; color: var(--text2); font-family:inherit; font-size:.83rem;
+  border-radius: var(--radius-sm); cursor:pointer; }
+#accountBar .acct-menu button:hover { background: var(--surface2); color: var(--text); }
+
+.cloud-overlay { position: fixed; inset:0; z-index: 4100; background: rgba(8,9,12,.62);
+  display:flex; align-items:center; justify-content:center; padding:24px; }
+.cloud-overlay[hidden] { display:none; }
+.cloud-modal { width:100%; max-width:520px; max-height:82vh; overflow:auto; background: var(--surface);
+  border:1px solid var(--border2); border-radius: var(--radius); box-shadow: 0 24px 70px rgba(0,0,0,.55); }
+.cloud-modal header { display:flex; align-items:center; justify-content:space-between;
+  padding:16px 18px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); }
+.cloud-modal header h3 { margin:0; font-size:1.02rem; }
+.cloud-modal header button.x { background:none; border:none; color:var(--text2); font-size:1.3rem; cursor:pointer; }
+.cloud-actions { display:flex; gap:8px; padding:14px 18px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.cloud-actions button { padding:8px 12px; border-radius: var(--radius-sm); border:1px solid var(--border2);
+  background: var(--surface2); color: var(--text); font-family:inherit; font-size:.82rem; font-weight:600; cursor:pointer; }
+.cloud-actions button.primary { background: var(--accent); color:#000; border-color: var(--accent); }
+.cloud-actions button:hover { border-color: var(--accent); }
+.cloud-list { list-style:none; margin:0; padding:8px 12px 16px; }
+.cloud-list li { display:flex; align-items:center; gap:10px; padding:9px 8px; border-bottom:1px solid var(--border); }
+.cloud-list li:last-child { border-bottom:none; }
+.cloud-list .c-name { flex:1; min-width:0; }
+.cloud-list .c-name b { display:block; font-size:.88rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cloud-list .c-name span { font-size:.7rem; color:var(--text3); }
+.cloud-list .c-act { background:none; border:1px solid var(--border2); border-radius:5px; color:var(--text2);
+  padding:4px 9px; font-size:.76rem; cursor:pointer; }
+.cloud-list .c-act:hover { color:var(--text); border-color:var(--accent); }
+.cloud-list .c-act.danger:hover { color:var(--red); border-color:var(--red); }
+.cloud-empty { padding:22px 18px; color: var(--text3); font-size:.86rem; text-align:center; }
