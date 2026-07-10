@@ -1682,6 +1682,10 @@ export class GenerationEngine {
   constructor(params) {
     this.p = params;
     this.rng = new SeededRNG(params.seed || 42);
+    // Percussion instrument one-shots draw from a SEPARATE seeded stream, so
+    // enabling/adding percussion never perturbs the melodic sequence a given
+    // seed produces (owner 2026-07-10).
+    this._percRng = new SeededRNG(((params.seed || 42) ^ 0x9e3779b9) >>> 0);
     this.scale = this._buildScale();
     this.repertoire = null;
     this._motif = null;
@@ -2102,6 +2106,36 @@ export class GenerationEngine {
       effectsChain: sub.effectsChain || null,     // per-layer EFFECTS stack
       stageEffectsOn: sub.stageEffectsOn !== false, // whole-stage bypass
       note: fields,
+    };
+  }
+
+  // Percussion v2 (owner 2026-07-10): render note-fields for ONE short attack
+  // of a sub-note instrument. Mirrors _layerRender's overlay pattern, but swaps
+  // in the dedicated percussion RNG (melodic stream untouched) and forces a
+  // tight percussive envelope + a dead (non-ringing) material so ANY patch —
+  // even a sustaining one — reads as a single hit rather than a held tone.
+  _percInstrumentNote(subnote, { velocity = 0.7, pitchHz = 220, duration = 0.12 } = {}) {
+    const savedP = this.p, savedRng = this.rng;
+    this.p = { ...savedP, ...(subnote || {}) };
+    this.rng = this._percRng || (this._percRng = new SeededRNG(1234567));
+    let fields;
+    try {
+      fields = this._spectralFingerprint(velocity, pitchHz, 0, null);
+    } finally {
+      this.p = savedP;
+      this.rng = savedRng;
+    }
+    return {
+      ...fields,
+      frequency: pitchHz,
+      velocity,
+      duration,
+      partialMaterial: 0,                       // no resonator ring/T60 → a hit
+      envelopeAttack: 0.002,
+      envelopeDecay: Math.max(0.01, duration * 0.5),
+      envelopeSustain: 0,
+      envelopeRelease: Math.max(0.02, duration * 0.5),
+      legatoFromPrevious: false,
     };
   }
 
@@ -3287,19 +3321,11 @@ export class SynthEngine {
     this._voiceBus = this.ctx.createGain();
     this._baseFxHost = createChainHost(this.ctx, this._voiceBus, this.master);
 
-    // Percussion bus. Owner 2026-07-09: percussion is its OWN sound source with
-    // its own position in space (set in the producer LAYERS view), so it runs
-    // through a dedicated spatial chain (percAzimuth/percDistance) rather than
-    // riding the base voice's position via master. The 0.45 keeps its loudness
-    // now that it bypasses master's 0.45 trim.
-    this._percGain = this.ctx.createGain();
-    this._percGain.gain.value = 0.45;
-    this._percChain = this._layerChain("__perc__");
-    // Percussion never has effects, but the chain host only wires its
-    // passthrough on the first update() — call it once so signal flows even
-    // though _render (which updates layer hosts) never touches this one.
-    this._percChain.fxHost.update([], true);
-    this._percGain.connect(this._percChain.input);
+    // Percussion v2 (owner 2026-07-10): each percussion LAYER is its own sound
+    // source with its own position, so hits route through per-layer spatial
+    // chains built lazily in _renderPercLayerHit (id "__perc__<layerId>"). There
+    // is no single shared percussion bus any more; the old 0.45 loudness trim is
+    // folded into each hit (PERC_SAMPLE_TRIM / one-shot velocity).
 
     // Pre-generate noise buffer for percussion synthesis
     const sr = this.ctx.sampleRate;
@@ -3329,15 +3355,7 @@ export class SynthEngine {
     this._lastSurpriseAt = 0;
     this._timeline = [];
     this._configureReverb(params);
-    this._percParams = {
-      percBeatVol: params.percBeatVol || 0,
-      percBeatSound: params.percBeatSound || "click",
-      percMotifVol: params.percMotifVol || 0,
-      percMotifSound: params.percMotifSound || "bell",
-      percDownbeatVol: params.percDownbeatVol || 0,
-      percDownbeatSound: params.percDownbeatSound || "wood",
-      percDownbeatEvery: params.percDownbeatEvery || 4,
-    };
+    this._percLayers = this._normalizePercLayers(params);
     this._engine = new GenerationEngine(params);
     this._engine.initialise();
     this._nextTime = this.ctx.currentTime + 0.05;
@@ -3361,15 +3379,7 @@ export class SynthEngine {
     this._vibratoCycleDepth = 0;
     this._timeline = [];
     this._configureReverb(params);
-    this._percParams = {
-      percBeatVol: params.percBeatVol || 0,
-      percBeatSound: params.percBeatSound || "click",
-      percMotifVol: params.percMotifVol || 0,
-      percMotifSound: params.percMotifSound || "bell",
-      percDownbeatVol: params.percDownbeatVol || 0,
-      percDownbeatSound: params.percDownbeatSound || "wood",
-      percDownbeatEvery: params.percDownbeatEvery || 4,
-    };
+    this._percLayers = this._normalizePercLayers(params);
     this._engine = new GenerationEngine(params);
     this._engine.initialise();
     // Producer v3 split support: skipBeats fast-forwards through the take
@@ -3436,15 +3446,7 @@ export class SynthEngine {
     this._vibratoCycleDepth = 0;
     this._timeline = [];
     this._configureReverb(params);
-    this._percParams = {
-      percBeatVol: params.percBeatVol || 0,
-      percBeatSound: params.percBeatSound || "click",
-      percMotifVol: params.percMotifVol || 0,
-      percMotifSound: params.percMotifSound || "bell",
-      percDownbeatVol: params.percDownbeatVol || 0,
-      percDownbeatSound: params.percDownbeatSound || "wood",
-      percDownbeatEvery: params.percDownbeatEvery || 4,
-    };
+    this._percLayers = this._normalizePercLayers(params);
     this._engine = new GenerationEngine(params); // rng for render-time draws
     const beatDiv = params.beatDivisions || 1;
     const divSec = 60 / ((params.tempo || 104) * beatDiv);
@@ -3559,15 +3561,8 @@ export class SynthEngine {
       pinnaShelf: this._pinnaShelf, pinnaNotch: this._pinnaNotch,
       distGain: this._spaceDistGain,
     }, p);
-    // Percussion is its own source: place it at percAzimuth/percDistance,
-    // falling back to the patch position when unset (owner 2026-07-09).
-    if (this._percChain) {
-      this._configureSpaceNodes(this._percChain, {
-        ...p,
-        spaceAzimuth: Number.isFinite(p.percAzimuth) ? p.percAzimuth : (p.spaceAzimuth ?? 0),
-        spaceDistance: Number.isFinite(p.percDistance) ? p.percDistance : (p.spaceDistance ?? 2.5),
-      });
-    }
+    // Percussion v2: each percussion layer positions its OWN spatial chain in
+    // _renderPercLayerHit (per hit), so there is nothing to place here.
     this._configureMeasuredEar(p);
   }
 
@@ -3698,6 +3693,18 @@ export class SynthEngine {
   updateGenerationParams(params = {}) {
     if (!this._engine) return;
     this._engine.p = { ...this._engine.p, ...params };
+  }
+
+  // Live-apply percussion edits (owner 2026-07-10): rebuild the normalised
+  // layer list so future scheduled hits pick up level/role/sound/position/
+  // enable changes without restarting playback. Group-position fallbacks
+  // (percAzimuth/percDistance) are mirrored onto the remembered space params.
+  updatePercLayers(params = {}) {
+    this._percLayers = this._normalizePercLayers(params);
+    if (this._spaceP) {
+      this._spaceP.percAzimuth = params.percAzimuth;
+      this._spaceP.percDistance = params.percDistance;
+    }
   }
 
   /**
@@ -3982,11 +3989,40 @@ export class SynthEngine {
     this._timer = setTimeout(() => this._schedule(), 90);
   }
 
-  // ── Percussion scheduling ──
+  // ── Percussion scheduling (v2, owner 2026-07-10) ──
+
+  // Resolve params → a normalised percussion layer array. Mirrors app.js
+  // resolvePercEnabled/ensurePercLayers exactly so the engine agrees with the
+  // UI even for un-normalised legacy params. The enable gate comes first:
+  // OFF (or absent + silent) → [] → no hits scheduled at all.
+  _normalizePercLayers(params = {}) {
+    const audible = Array.isArray(params.percLayers)
+      ? params.percLayers.some(l => (Number(l.vol) || 0) > 0)
+      : ((Number(params.percBeatVol) || 0) > 0 || (Number(params.percMotifVol) || 0) > 0
+         || (Number(params.percDownbeatVol) || 0) > 0);
+    const enabled = typeof params.percEnabled === "boolean" ? params.percEnabled : audible;
+    if (!enabled) return [];
+    const src = (Array.isArray(params.percLayers) && params.percLayers.length)
+      ? params.percLayers
+      : [
+          { role: "beat", vol: params.percBeatVol, sound: { kind: "sample", key: params.percBeatSound || "click" } },
+          { role: "motif", vol: params.percMotifVol, sound: { kind: "sample", key: params.percMotifSound || "bell" } },
+          { role: "downbeat", vol: params.percDownbeatVol, every: params.percDownbeatEvery || 4,
+            sound: { kind: "sample", key: params.percDownbeatSound || "wood" } },
+        ];
+    return src.map((l, i) => ({
+      id: l.id || `perc${i}`,
+      role: l.role || "beat",
+      every: l.role === "downbeat" ? (l.every || 4) : null,
+      vol: Number(l.vol) || 0,
+      sound: (l.sound && l.sound.kind) ? l.sound : { kind: "sample", key: "click" },
+      space: l.space || null,
+    })).filter(l => l.vol > 0);
+  }
 
   _schedulePerc(note, noteStartTime, divSec) {
-    const p = this._percParams;
-    if (!p) return;
+    const layers = this._percLayers;
+    if (!layers || !layers.length) return;
     const beatDiv = note.beatDivisions || 1;
 
     for (let i = 0; i < note.durationDivs; i++) {
@@ -3994,26 +4030,55 @@ export class SynthEngine {
       const t = noteStartTime + i * divSec;
       const isOnBeat = d % beatDiv === 0;
       const beatNum = Math.floor(d / beatDiv);
-
-      // Layer 1: Beat tick
-      if (isOnBeat && p.percBeatVol > 0) {
-        this._renderPercHit(p.percBeatSound, t, p.percBeatVol);
-      }
-      // Layer 2: Motif accent
-      if (d === 0 && p.percMotifVol > 0) {
-        this._renderPercHit(p.percMotifSound, t, p.percMotifVol);
-      }
-      // Layer 3: Downbeat every N beats
-      if (isOnBeat && p.percDownbeatVol > 0 && beatNum % (p.percDownbeatEvery || 4) === 0) {
-        this._renderPercHit(p.percDownbeatSound, t, p.percDownbeatVol);
+      for (const layer of layers) {
+        const fire =
+          layer.role === "beat" ? isOnBeat
+          : layer.role === "motif" ? (d === 0)
+          : layer.role === "downbeat" ? (isOnBeat && beatNum % (layer.every || 4) === 0)
+          : false;
+        if (fire) this._renderPercLayerHit(layer, t);
       }
     }
   }
 
-  _renderPercHit(soundName, t0, vol) {
-    const sound = PERC_SOUNDS[soundName];
-    if (!sound || vol <= 0 || t0 < this.ctx.currentTime - 0.02) return;
+  // One percussion layer's hit at t0, routed through the layer's OWN spatial
+  // chain (id "__perc__<layerId>", lazily built) so each layer sits at its own
+  // position. Sample layers use the built-in PERC_SOUNDS recipes; instrument
+  // layers render a single sub-note attack via the GenerationEngine.
+  _renderPercLayerHit(layer, t0) {
+    if (!layer || layer.vol <= 0 || t0 < this.ctx.currentTime - 0.02) return;
+    const chain = this._layerChain(`__perc__${layer.id}`);
+    const sp = { ...(this._spaceP || {}) };
+    if (layer.space) {
+      sp.spaceAzimuth = layer.space.angle;
+      sp.spaceDistance = layer.space.dist;
+    } else {
+      // no per-layer position → fall back to the legacy group position, then base
+      sp.spaceAzimuth = Number.isFinite(sp.percAzimuth) ? sp.percAzimuth : (sp.spaceAzimuth ?? 0);
+      sp.spaceDistance = Number.isFinite(sp.percDistance) ? sp.percDistance : (sp.spaceDistance ?? 2.5);
+    }
+    this._configureSpaceNodes(chain, sp);
+    if (chain.fxHost) chain.fxHost.update([], true); // percussion carries no effects
+    const snd = layer.sound || { kind: "sample", key: "click" };
+    if (snd.kind === "instrument" && snd.subnote && this._engine) {
+      const note = this._engine._percInstrumentNote(snd.subnote, {
+        velocity: this._clamp(layer.vol, 0.05, 1),
+        pitchHz: Number.isFinite(snd.pitchHz) ? snd.pitchHz : 220,
+        duration: 0.12,
+      });
+      note._out = chain.input;
+      this._renderFourier(note, t0);
+    } else {
+      this._renderPercHit(snd.key || "click", t0, layer.vol, chain.input);
+    }
+  }
 
+  // Sample hit into `dest`. PERC_SAMPLE_TRIM preserves the loudness the old
+  // shared _percGain (0.45) provided now that hits route through layer chains.
+  _renderPercHit(soundName, t0, vol, dest) {
+    const sound = PERC_SOUNDS[soundName];
+    if (!sound || vol <= 0 || t0 < this.ctx.currentTime - 0.02 || !dest) return;
+    const PERC_SAMPLE_TRIM = 0.45;
     const decay = sound.decay || 0.05;
 
     if (sound.type === "noise") {
@@ -4024,9 +4089,9 @@ export class SynthEngine {
       filt.frequency.setValueAtTime(sound.filterFreq || 4000, t0);
       filt.Q.value = sound.filterQ || 1;
       const env = this.ctx.createGain();
-      env.gain.setValueAtTime(vol * sound.amp, t0);
+      env.gain.setValueAtTime(vol * sound.amp * PERC_SAMPLE_TRIM, t0);
       env.gain.exponentialRampToValueAtTime(0.001, t0 + decay);
-      src.connect(filt); filt.connect(env); env.connect(this._percGain);
+      src.connect(filt); filt.connect(env); env.connect(dest);
       src.start(t0); src.stop(t0 + decay + 0.01);
       this._track(src);
     } else if (sound.type === "sine") {
@@ -4035,9 +4100,9 @@ export class SynthEngine {
       osc.frequency.setValueAtTime(sound.freq || 800, t0);
       if (sound.freqEnd) osc.frequency.exponentialRampToValueAtTime(sound.freqEnd, t0 + decay);
       const env = this.ctx.createGain();
-      env.gain.setValueAtTime(vol * sound.amp, t0);
+      env.gain.setValueAtTime(vol * sound.amp * PERC_SAMPLE_TRIM, t0);
       env.gain.exponentialRampToValueAtTime(0.001, t0 + decay);
-      osc.connect(env); env.connect(this._percGain);
+      osc.connect(env); env.connect(dest);
       osc.start(t0); osc.stop(t0 + decay + 0.01);
       this._track(osc);
     }

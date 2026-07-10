@@ -123,6 +123,9 @@ const _MELODY_PARAMS = new Set([
   "rootPullShape", "intervalPeakedness", "intervalRange", "momentum",
   "registerCenter", "registerWidth", "registerSkew", "precision",
   "precisionRange", "motifHitProb", "motifHitRange",
+  // Arpeggiator controls govern degree selection, so they belong to the
+  // melody module rather than leaking into the sub-note sound half.
+  "melodyPattern", "arpStep", "arpOctaves",
 ]);
 const _RHYTHM_PARAMS = new Set([
   "tempo", "beatDivisions", "onBeatProb", "offBeatProb", "sameLengthProb",
@@ -156,6 +159,160 @@ function extractSectionParams(params, section) {
   return out;
 }
 
+// ── Percussion v2 model (owner 2026-07-10) ──────────────────
+// Percussion is a list of layers, each a role-triggered hit whose sound is
+// either a built-in sample (PERC_SOUNDS key) or a single-attack render of a
+// sub-note instrument. These helpers migrate the legacy fixed trio and resolve
+// the on/off state without a stored default (see DEFAULTS note). The synth
+// engine mirrors this exact logic in _normalizePercLayers so audio always
+// agrees with the UI even for un-normalised legacy params.
+function percLayerId() {
+  return (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID() : `perc_${Math.random().toString(36).slice(2)}`;
+}
+function ensurePercLayers(p) {
+  if (Array.isArray(p.percLayers) && p.percLayers.length) return p.percLayers;
+  // Legacy → array: one sample layer per fixed role, so old patches look
+  // unchanged (three rows) and fresh patches open with a sensible starter set.
+  return [
+    { id: percLayerId(), role: "beat", vol: Number(p.percBeatVol) || 0,
+      sound: { kind: "sample", key: p.percBeatSound || "click" }, space: null },
+    { id: percLayerId(), role: "motif", vol: Number(p.percMotifVol) || 0,
+      sound: { kind: "sample", key: p.percMotifSound || "bell" }, space: null },
+    { id: percLayerId(), role: "downbeat", vol: Number(p.percDownbeatVol) || 0,
+      sound: { kind: "sample", key: p.percDownbeatSound || "wood" }, space: null,
+      every: p.percDownbeatEvery || 4 },
+  ];
+}
+function percHasAudible(p) {
+  if (Array.isArray(p.percLayers)) return p.percLayers.some(l => (Number(l.vol) || 0) > 0);
+  return (Number(p.percBeatVol) || 0) > 0 || (Number(p.percMotifVol) || 0) > 0
+      || (Number(p.percDownbeatVol) || 0) > 0;
+}
+// undefined → infer from audible content (legacy patches stay ON); a stored
+// boolean always wins. Fresh patches are silent, so they resolve to OFF.
+function resolvePercEnabled(p) {
+  return typeof p.percEnabled === "boolean" ? p.percEnabled : percHasAudible(p);
+}
+
+// ── Smart dropdown (reusable component) — docs/SMART_DROPDOWN_SPEC.md ────
+// A searchable popover picker generalised from the one-off scale combo. Unlike
+// that prototype it is MULTI-INSTANCE: selectors are class/data based and the
+// outside-click listener is per-element, so any number can coexist (one per
+// percussion layer, etc.). Build markup with smartComboHTML(), then wire
+// behaviour with wireSmartCombos(root, onSelect). Selecting an option updates
+// the button label + `data-combo-value` and calls onSelect(comboEl, value).
+//   groups: [{ label, options: [{ value, label, note?, title?, selected? }] }]
+function smartComboHTML({ id, value = "", buttonLabel = "", placeholder = "Search…", groups = [] } = {}) {
+  const optHTML = (o) => {
+    const sel = o.selected || (o.value != null && String(o.value) === String(value));
+    const note = o.note ? `<i class="smart-combo-note">${esc(o.note)}</i>` : "";
+    return `<button type="button" class="smart-combo-opt${sel ? " sel" : ""}" role="option"${o.title ? titleAttr(o.title) : ""} data-combo-choice="${esc(String(o.value))}"><span class="smart-combo-opt-label">${esc(o.label)}</span>${note}</button>`;
+  };
+  const body = groups.map((g) => {
+    const opts = (g.options || []).map(optHTML).join("");
+    if (!opts) return "";
+    return `${g.label ? `<div class="smart-combo-group">${esc(g.label)}</div>` : ""}${opts}`;
+  }).join("");
+  return `<div class="smart-combo" data-combo${id ? ` id="${esc(id)}"` : ""} data-combo-value="${esc(String(value))}">`
+    + `<button type="button" class="smart-combo-btn" data-combo-btn><span class="smart-combo-btn-label">${esc(buttonLabel || placeholder)}</span><span class="smart-combo-caret">▾</span></button>`
+    + `<div class="smart-combo-pop" data-combo-pop hidden>`
+    + `<input type="search" class="smart-combo-search" data-combo-search placeholder="${esc(placeholder)}"/>`
+    + `<div class="smart-combo-list" role="listbox">${body || `<div class="smart-combo-empty">No options</div>`}</div>`
+    + `</div></div>`;
+}
+
+function wireSmartCombos(root, onSelect) {
+  if (!root) return;
+  root.querySelectorAll(".smart-combo[data-combo]").forEach((combo) => {
+    if (combo._comboWired) return;            // idempotent for repeat wire calls on the same DOM
+    combo._comboWired = true;
+    const btn = combo.querySelector("[data-combo-btn]");
+    const pop = combo.querySelector("[data-combo-pop]");
+    const search = combo.querySelector("[data-combo-search]");
+    if (!btn || !pop || !search) return;
+    const filter = () => {
+      const q = search.value.trim().toLowerCase();
+      combo.querySelectorAll("[data-combo-choice]").forEach((b) => {
+        b.hidden = !!q && !b.textContent.toLowerCase().includes(q);
+      });
+      combo.querySelectorAll(".smart-combo-group").forEach((g) => {
+        let sib = g.nextElementSibling, any = false;
+        while (sib && !sib.classList.contains("smart-combo-group")) {
+          if (!sib.hidden) any = true;
+          sib = sib.nextElementSibling;
+        }
+        g.hidden = !any;
+      });
+    };
+    const close = () => {
+      if (pop.hidden) return;
+      pop.hidden = true;
+      pop.classList.remove("smart-combo-pop-up");
+      // clear the fixed-positioning inline styles so a future open recomputes
+      for (const k of ["position", "left", "top", "bottom", "width", "maxHeight", "zIndex"]) pop.style[k] = "";
+      if (combo._comboDocClick) document.removeEventListener("click", combo._comboDocClick, true);
+      if (combo._comboOnScroll) {
+        window.removeEventListener("scroll", combo._comboOnScroll, true);
+        window.removeEventListener("resize", combo._comboOnScroll);
+      }
+    };
+    combo._comboClose = close;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const willOpen = pop.hidden;
+      // Single-open: close every other combo first.
+      document.querySelectorAll(".smart-combo").forEach((c) => { if (c !== combo && c._comboClose) c._comboClose(); });
+      if (!willOpen) { close(); return; }
+      pop.hidden = false;
+      // Position as a FIXED popover so it escapes any overflow-clipping ancestor
+      // (the patch-inspector panes scroll internally) and can fall UP when the
+      // button sits low in the viewport (owner 2026-07-10).
+      const place = () => {
+        const br = btn.getBoundingClientRect();
+        const gap = 4, vpH = window.innerHeight, vpW = window.innerWidth;
+        const w = Math.min(Math.max(br.width, 190), vpW - 16);
+        pop.style.position = "fixed";
+        pop.style.zIndex = "3000";
+        pop.style.width = `${w}px`;
+        pop.style.left = `${Math.max(8, Math.min(br.left, vpW - w - 8))}px`;
+        pop.style.maxHeight = "";               // clear to measure natural height
+        const wanted = pop.offsetHeight;
+        const below = vpH - br.bottom - gap - 8;
+        const above = br.top - gap - 8;
+        const up = wanted > below && above > below;
+        pop.classList.toggle("smart-combo-pop-up", up);
+        pop.style.maxHeight = `${Math.max(140, up ? above : below)}px`;
+        if (up) { pop.style.top = "auto"; pop.style.bottom = `${vpH - br.top + gap}px`; }
+        else { pop.style.bottom = "auto"; pop.style.top = `${br.bottom + gap}px`; }
+      };
+      place();
+      search.value = ""; filter();
+      search.focus({ preventScroll: true });
+      combo._comboDocClick = (ev) => { if (!combo.contains(ev.target)) close(); };
+      document.addEventListener("click", combo._comboDocClick, true);
+      // Close on any scroll/resize EXCEPT scrolling within the options list.
+      combo._comboOnScroll = (ev) => { if (ev.type === "resize" || !pop.contains(ev.target)) close(); };
+      window.addEventListener("scroll", combo._comboOnScroll, true);
+      window.addEventListener("resize", combo._comboOnScroll);
+    };
+    search.oninput = filter;
+    combo.querySelectorAll("[data-combo-choice]").forEach((b) => {
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        const val = b.dataset.comboChoice;
+        combo.dataset.comboValue = val;
+        combo.querySelectorAll("[data-combo-choice]").forEach((x) => x.classList.toggle("sel", x === b));
+        const lblEl = combo.querySelector(".smart-combo-btn-label");
+        const optLbl = b.querySelector(".smart-combo-opt-label");
+        if (lblEl && optLbl) lblEl.textContent = optLbl.textContent;
+        close();
+        if (onSelect) onSelect(combo, val);
+      };
+    });
+  });
+}
+
 // ── Instruments (producer mode, docs/DAW_MODE_DESIGN.md) ────
 // An instrument is a complete voice: everything timbral and behavioural,
 // EXCLUDING the session-context tier (tempo, key/scale, master dynamics,
@@ -163,8 +320,11 @@ function extractSectionParams(params, section) {
 // Loading an instrument therefore merges over the current state, leaving
 // the musical context untouched.
 const SESSION_CONTEXT_PARAMS = new Set([
-  "seed", "tempo", "scaleMode", "scalePreset", "customDegrees",
-  "edoDivisions", "tonicHz", "rootNotes", "dynamicsLevel",
+  // A palette patch now owns both its Macro and Sub-note modules. Only the
+  // transport seed/tempo belong to the session; scale, root, dynamics and
+  // percussion remain editable parts of the patch (global scale still wins
+  // later for tracks that opt in).
+  "seed", "tempo",
   // Owner 07-07: reverb/space keys are no longer session context — each
   // patch owns its space (SPACE inspector) and the GLOBAL space overrides
   // it only when activated. Instruments saved before this change simply
@@ -196,39 +356,6 @@ function patchBadgesHTML(params, originTempo = null, compact = false) {
       : `<span class="pb-chip pb-off" title="Surprise is off">no ✦</span>`,
   ].filter(Boolean);
   return `<span class="pb-row${compact ? " pb-compact" : ""}">${chips.join("")}</span>`;
-}
-
-// The two halves of a patch: MACRO ENGINE (how it behaves — melody, rhythm,
-// dynamics, surprise) and SUBNOTE MODULE (how it sounds). Loading a preset
-// with a half selected replaces only that half's keys; percussion and space
-// ride along only on full (BOTH) loads.
-const _MACRO_SECTIONS = new Set(["melody", "rhythm", "dynamics", "surprise"]);
-function loadPresetIntoPatch(pl, item, half) {
-  const incoming = voiceParamsFor(item);
-  if (half === "macro" || half === "subnote") {
-    const wanted = half === "macro"
-      ? (k) => _MACRO_SECTIONS.has(sectionForParam(k))
-      : (k) => sectionForParam(k) === "sound";
-    for (const [k, val] of Object.entries(incoming)) {
-      if (wanted(k)) pl.params[k] = val;
-    }
-  } else {
-    pl.params = incoming;
-    pl.name = item.name;
-    pl.kindLabel = item.kindLabel;
-    pl.sourceId = item.id;
-  }
-  // The design tempo + scale travel with macro/full loads only — a sound
-  // has neither.
-  if (half !== "subnote" && item.params) {
-    if (item.params.tempo != null) pl.originTempo = item.params.tempo;
-    if (item.params.scalePreset || item.params.customDegrees) {
-      pl.originScale = {
-        scaleMode: item.params.scaleMode, scalePreset: item.params.scalePreset,
-        customDegrees: item.params.customDegrees, edoDivisions: item.params.edoDivisions,
-      };
-    }
-  }
 }
 
 function loadInstruments() {
@@ -330,6 +457,12 @@ const DEFAULTS = {
   percDownbeatVol: 0,
   percDownbeatSound: "wood",
   percDownbeatEvery: 4,
+  // Percussion v2 (owner 2026-07-10): a layer list supersedes the fixed
+  // Beat/Motif/Downbeat trio above. null = derive from those legacy fields on
+  // first load (ensurePercLayers). The on/off state is NOT stored here — it is
+  // resolved (resolvePercEnabled): absent → infer from audible content, so
+  // legacy patches with percussion stay ON while fresh patches start silent.
+  percLayers: null,
   // Percussion is its own sound source in space (producer LAYERS view). null =
   // sit at the patch's own position (owner 2026-07-09).
   percAzimuth: null,
@@ -367,6 +500,11 @@ const DEFAULTS = {
   // SPACE positioning: where the instrument stands relative to the listener
   spaceDistance: 2.5,
   spaceAzimuth: 0,
+  // Global-space thread behaviour belongs to the patch/region. Centered makes
+  // the thread the constellation's centre; additive carries the patch's own
+  // offsets along the thread. The global designer owns threads, never this
+  // choice (owner 2026-07-10).
+  spaceMovement: "centered",
   earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
   headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
   spaceOwnHead: false, // owner 07-07: keep THIS patch's head even when the global space is on
@@ -764,7 +902,6 @@ let lastPlayStartedAt = null; // Date.now() of most recent play start this visit
 let _visResizeObserver = null; // hero display fit observer
 let libraryFilter = "all";    // section filter shared across library tabs
 let splitsFilter = "all";     // Q1: filter presets by scale splits (degrees/octave)
-let _palHalfSel = {};         // Q1: paletteId → "macro"|"both"|"subnote" load target
 // Q12: adjustable studio panels (persisted like the producer's dawLayout)
 const STUDIO_PANELS_KEY = "phase0.studioPanels.v1";
 let _studioPanels = (() => {
@@ -1141,6 +1278,7 @@ function saveArrangementRegistry(reg) {
 const BEATS_PER_BAR = 4;
 let pxPerBeat = 14;   // lane pixel scale (zoom; persisted in dawLayout)
 let snapBeats = 1;    // grid snap: 4 = bar, 1 = beat, 0.5 = half
+let _timelineZoomAnchor = null; // preserve the beat under the trackpad
 
 function totalBeats() { return Math.max(16, arrangement?.lengthBeats || 64); }
 
@@ -1149,6 +1287,14 @@ function totalBeats() { return Math.max(16, arrangement?.lengthBeats || 64); }
 function migrateArrangement(a) {
   if (a.version === 2) return a;
   if (!Array.isArray(a.palette)) a.palette = [];
+  for (const pl of a.palette) {
+    if (!pl.parts) {
+      // Existing palette entries were complete instruments. Preserve that
+      // behaviour while giving the new two-zone editor a truthful shape.
+      const label = pl.name || "Legacy patch";
+      pl.parts = { subnote: "legacy", macro: "legacy", subnoteName: label, macroName: label };
+    }
+  }
   for (const t of a.tracks || []) {
     let palId = null;
     if (t.instrumentParams && (t.regions || []).length) {
@@ -1174,6 +1320,10 @@ let selectedRegion = null; // { trackId, regionId }
 // The producer bottom editor panel (owner 2026-07-09): null | "roll" (piano
 // roll for a baked region) | "layers" (region patch's layers) | "mixer".
 let editorMode = null;
+let palettePreviewId = null; // palette patch shown in the three-pane editor
+let _patchStageSel = "base"; // selected source id in the patch inspector's draggable stage
+let _patchStage = null;      // the mounted stage handle ({ redraw }) for the current inspector
+let paletteTarget = null;    // { paletteId, half: "subnote"|"macro" } awaiting a browser module
 let rollNoteSel = -1;      // selected note index in the roll
 let _rollAddMode = false;  // Q9 D2: pencil mode — click an empty cell adds a note
 let selectedRegions = new Set(); // Q9 B2: multi-selected region ids (⇧click / rubber band)
@@ -1352,14 +1502,72 @@ function setPaletteEditState(state) {
   else localStorage.removeItem(PALETTE_EDIT_KEY);
 }
 
+const PALETTE_MACRO_SECTIONS = new Set(["melody", "rhythm", "dynamics", "surprise", "percussion"]);
+const PALETTE_SUBNOTE_SECTIONS = new Set(["sound", "space"]);
+
+function palettePartsFor(item) {
+  if (item.section === "full" || item.section === "instrument") return { subnote: item.id, macro: item.id };
+  if (PALETTE_SUBNOTE_SECTIONS.has(item.section)) return { subnote: item.id, macro: null };
+  return { subnote: null, macro: item.id };
+}
+function paletteIsPlayable(pl) { return !!(pl?.parts?.subnote && pl?.parts?.macro); }
+function paletteDisplayName(pl) {
+  const s = pl?.parts?.subnoteName, m = pl?.parts?.macroName;
+  return s && m ? (s === m ? s : `${s} × ${m}`) : (s || m || pl?.name || "Untitled patch");
+}
+function createEmptyPalettePatch() {
+  const pl = {
+    id: crypto.randomUUID(), name: "Untitled patch", kindLabel: "Patch", params: {},
+    parts: { subnote: null, macro: null, subnoteName: null, macroName: null },
+    originTempo: null, originScale: null,
+  };
+  arrangement.palette.push(pl);
+  saveArrangement("new palette patch");
+  return pl;
+}
+function applyItemToPalettePatch(pl, item, half = null) {
+  if (!pl || !item) return false;
+  const incoming = voiceParamsFor(item);
+  const requested = half || (PALETTE_SUBNOTE_SECTIONS.has(item.section) ? "subnote" : "macro");
+  pl.parts = pl.parts || { subnote: null, macro: null, subnoteName: null, macroName: null };
+  if (item.section === "full" || item.section === "instrument") {
+    pl.params = { ...incoming };
+    pl.parts = { subnote: item.id, macro: item.id, subnoteName: item.name, macroName: item.name };
+  } else {
+    const allowed = requested === "subnote" ? PALETTE_SUBNOTE_SECTIONS : PALETTE_MACRO_SECTIONS;
+    if (!allowed.has(item.section)) return false;
+    const next = { ...(pl.params || {}) };
+    for (const [key, value] of Object.entries(incoming)) {
+      if (allowed.has(sectionForParam(key))) next[key] = value;
+    }
+    pl.params = next;
+    if (requested === "subnote") {
+      pl.parts.subnote = item.id; pl.parts.subnoteName = item.name;
+    } else {
+      pl.parts.macro = item.id; pl.parts.macroName = item.name;
+    }
+  }
+  pl.name = paletteDisplayName(pl);
+  pl.kindLabel = paletteIsPlayable(pl) ? "Patch" : "Module draft";
+  if (item.params?.tempo != null) pl.originTempo = item.params.tempo;
+  if (item.params?.scalePreset || item.params?.customDegrees) {
+    pl.originScale = { scaleMode: item.params.scaleMode, scalePreset: item.params.scalePreset,
+      customDegrees: item.params.customDegrees, edoDivisions: item.params.edoDivisions };
+  }
+  saveArrangement("compose palette patch");
+  return true;
+}
+
 function addToPalette(item) {
   if (!Array.isArray(arrangement.palette)) arrangement.palette = [];
-  arrangement.palette.push({
+  const pl = {
     id: crypto.randomUUID(),
     name: item.name,
-    kindLabel: item.kindLabel,
+    kindLabel: ["full", "instrument"].includes(item.section) ? "Patch" : item.kindLabel,
     sourceId: item.id,
     params: voiceParamsFor(item),
+    parts: { ...palettePartsFor(item), subnoteName: PALETTE_SUBNOTE_SECTIONS.has(item.section) || item.section === "full" || item.section === "instrument" ? item.name : null,
+      macroName: PALETTE_MACRO_SECTIONS.has(item.section) || item.section === "full" || item.section === "instrument" ? item.name : null },
     // Voices deliberately drop tempo (session context) — remember the design
     // tempo here so "adopt tempo" can offer it to the session (Q1).
     originTempo: (item.params && item.params.tempo) ?? null,
@@ -1369,8 +1577,32 @@ function addToPalette(item) {
       scaleMode: item.params.scaleMode, scalePreset: item.params.scalePreset,
       customDegrees: item.params.customDegrees, edoDivisions: item.params.edoDivisions,
     } : null,
-  });
+  };
+  pl.name = paletteDisplayName(pl);
+  arrangement.palette.push(pl);
   saveArrangement();
+  return pl;
+}
+
+// Early Producer builds recorded a full-patch source but left its two visible
+// module slots empty. Repair only that unambiguous legacy shape; a patch the
+// user has deliberately edited keeps its chosen modules.
+function repairFullPaletteModules() {
+  let changed = false;
+  for (const pl of arrangement.palette || []) {
+    if (pl?.parts?.subnote || pl?.parts?.macro) continue;
+    // The earliest palette entries omitted sourceId but retained the factory
+    // "Starter" kind and display name, which is enough to repair them too.
+    const source = browserItems().find(item => item.id === pl.sourceId)
+      || (String(pl?.kindLabel || "").toLowerCase() === "starter" && browserItems().find(item => item.section === "full" && item.name === pl.name));
+    if (!source || !["full", "instrument"].includes(source.section)) continue;
+    pl.sourceId = source.id;
+    pl.parts = { ...(pl.parts || {}), subnote: source.id, macro: source.id, subnoteName: source.name, macroName: source.name };
+    pl.name = paletteDisplayName(pl);
+    pl.kindLabel = "Patch";
+    changed = true;
+  }
+  if (changed) saveArrangement("repair full patch modules");
 }
 
 function produceSources() {
@@ -1402,6 +1634,7 @@ function applyMasterToVoices() {
 }
 
 function regionVoiceParams(track, region) {
+  if (region?.paramsOverride) return region.paramsOverride;
   const pal = (arrangement?.palette || []).find(pl => pl.id === region.paletteId);
   return pal ? pal.params : (track.instrumentParams || {});
 }
@@ -1411,12 +1644,12 @@ function regionPlayParams(track, region, atBeat = null) {
   // Tier 2 instrument (from the palette) + Tier 3 take
   const context = arrangement?.context || defaultArrangementContext();
   const params = { ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed };
-  // Q5 global scale: an opted-in track regenerates under the marker in
+  // Q5 Harmonic guide: an opted-in track regenerates under the marker in
   // force at the region's position. Applied AFTER the voice so the marker
   // wins; baked regions replay stored degrees and are untouched by
   // construction (pitch derives from degree + division, not this list).
   if (track?.useGlobalScale) {
-    // Opting a track in (its G button) IS the activation — no separate enable
+    // Opting a track in (its HG button) IS the activation — no separate enable
     // (owner 2026-07-09): force enabled so the marker in force applies.
     const marker = globalScaleAt({ ...(arrangement?.globalScale || {}), enabled: true }, region.startBeat ?? 0);
     if (marker) {
@@ -1431,43 +1664,17 @@ function regionPlayParams(track, region, atBeat = null) {
     if (Number.isFinite(track.space.angle)) params.spaceAzimuth = track.space.angle;
     if (Number.isFinite(track.space.dist)) params.spaceDistance = track.space.dist;
   }
-  // Q6 global space: designer threads position each track over time —
-  // resolved at atBeat (the walker passes the playing beat so positions
-  // evolve mid-region). Override replaces the patch's space; offset adds
-  // the anchors as deltas (angle adds, distance shifts around 2.5 m).
-  // The designer's head (listener) properties apply to every track.
+  // Q6 global space: designer threads position each track over time. The
+  // patch/region decides whether its own source positions move as a centred
+  // constellation or additively. There is deliberately no global
+  // override/offset policy any more.
   const sp = arrangement?.space;
   if (sp?.enabled && track) {
     // anchors interpolate over time; an unanchored track that was dragged
     // freely sits at its static designer position
     const pos = trackSpaceAt(sp.tracks?.[track.id], atBeat ?? region.startBeat ?? 0)
       || sp.static?.[track.id] || null;
-    const patchLayers = Array.isArray(params.layers) && params.layers.length ? params.layers : null;
-    if (pos && patchLayers) {
-      // Multi-layer patch: the designer value is a GROUP HANDLE — the whole
-      // constellation (base + layers) moves together, centered (rotate +
-      // distance ratio) or additive (rigid translation). Same math as the
-      // canvases (spTransformSources), so what you see is what you hear.
-      const sources = [
-        { angle: params.spaceAzimuth ?? 0, dist: params.spaceDistance ?? 2.5 },
-        ...patchLayers.map(l => ({ angle: l.space?.angle ?? 0, dist: l.space?.dist ?? 2.5 })),
-      ];
-      const out = spTransformSources(sources, pos, sp.layerMode === "additive" ? "additive" : "centered");
-      params.spaceAzimuth = out[0].angle;
-      params.spaceDistance = Math.max(0.3, out[0].dist);
-      params.layers = patchLayers.map((l, i) => ({
-        ...l,
-        space: { angle: out[i + 1].angle, dist: Math.max(0.3, out[i + 1].dist) },
-      }));
-    } else if (pos) {
-      if (sp.mode === "offset") {
-        params.spaceAzimuth = Math.max(-180, Math.min(180, (params.spaceAzimuth ?? 0) + pos.angle));
-        params.spaceDistance = Math.max(0.3, Math.min(30, (params.spaceDistance ?? 2.5) + (pos.dist - 2.5)));
-      } else {
-        params.spaceAzimuth = pos.angle;
-        params.spaceDistance = pos.dist;
-      }
-    }
+    if (pos) spApplyThreadToPatch(params, pos);
     if (sp.head && !params.spaceOwnHead) {
       // the global listener overrides the patch head — unless the patch's
       // SPACE section opted out (owner 07-07)
@@ -1485,6 +1692,16 @@ function regionPlayParams(track, region, atBeat = null) {
       }
       if (Number.isFinite(sp.head.reverbWet)) params.reverbWet = sp.head.reverbWet;
       if (Number.isFinite(sp.head.reverbDecay)) params.reverbDecay = sp.head.reverbDecay;
+      // Head yaw: turning the listener rotates every source's bearing relative
+      // to the ears — world sources stay put, but what you HEAR shifts. The
+      // cross-section shows this as the head visibly turned (owner 2026-07-10).
+      const facing = Number(sp.head.facing) || 0;
+      if (facing) {
+        const rot = (a) => { const v = (Number(a) || 0) - facing; return ((v + 180) % 360 + 360) % 360 - 180; };
+        params.spaceAzimuth = rot(params.spaceAzimuth);
+        if (Array.isArray(params.layers)) params.layers = params.layers.map(l => l?.space ? { ...l, space: { ...l.space, angle: rot(l.space.angle) } } : l);
+        if (Array.isArray(params.percLayers)) params.percLayers = params.percLayers.map(l => l?.space ? { ...l, space: { ...l.space, angle: rot(l.space.angle) } } : l);
+      }
     }
   }
   return params;
@@ -1510,30 +1727,32 @@ function renderBrowserCards(v) {
   const container = v.querySelector("#browserCards");
   if (!container) return;
   const q = browserSearch.trim().toLowerCase();
+  const targetHalf = paletteTarget?.half || null;
   const items = browserItems().filter(item =>
     (browserFilter === "all" || item.cat === browserFilter) &&
     (splitsFilter === "all" || splitsBucketOf(item.params) === splitsFilter) &&
+    (!targetHalf || (targetHalf === "subnote" ? PALETTE_SUBNOTE_SECTIONS.has(item.section) : PALETTE_MACRO_SECTIONS.has(item.section))) &&
     (!q || item.name.toLowerCase().includes(q) || (item.description || "").toLowerCase().includes(q)));
-  // Owner 07-07: compact rows, many patches visible at once. Name +
-  // kind chip + two small actions per line; the description rides the
-  // hover title; drag anywhere on the row to place it.
+  // A Browser row is a draggable, double-clickable source.  Creation happens
+  // through those direct gestures, leaving only audition as a row action.
   container.innerHTML = items.length ? items.map(item => `
-    <div class="browser-row" data-browser-item="${esc(item.id)}" title="${esc(item.description || item.name)} — drag onto a track, or ＋ to add to the palette">
+    <div class="browser-row" data-browser-item="${esc(item.id)}" title="${esc(item.description || item.name)} — double-click or drag to add it to the palette">
       <span class="br-name">${esc(item.name)}</span>
       <span class="br-kind">${esc(item.kindLabel)}</span>
       <button class="br-btn${browserPreviewId === item.id ? " on" : ""}" data-browser-preview="${esc(item.id)}" title="Hear it in the session context">${browserPreviewId === item.id ? "■" : "▶"}</button>
-      <button class="br-btn br-add" data-browser-add="${esc(item.id)}" title="Add to your palette — the instrument rack for this arrangement">＋ Add</button>
     </div>`).join("") : '<div class="empty-state">No presets match.</div>';
 
   const findItem = (id) => browserItems().find(i => i.id === id);
-  container.querySelectorAll("[data-browser-add]").forEach(btn => {
-    btn.onclick = () => {
-      const item = findItem(btn.dataset.browserAdd);
-      if (!item) return;
-      addToPalette(item);
-      renderProduce();
-    };
-  });
+  const addOrFill = (item) => {
+    if (!item) return;
+    let pl = paletteTarget && (arrangement.palette || []).find(x => x.id === paletteTarget.paletteId);
+    if (pl) applyItemToPalettePatch(pl, item, paletteTarget.half);
+    else pl = addToPalette(item);
+    paletteTarget = null;
+    palettePreviewId = pl?.id || null;
+    editorMode = "patch";
+    renderProduce();
+  };
   container.querySelectorAll("[data-browser-preview]").forEach(btn => {
     btn.onclick = () => {
       const id = btn.dataset.browserPreview;
@@ -1555,7 +1774,14 @@ function renderBrowserCards(v) {
     card.onmousedown = (e) => {
       if (e.target.closest(".br-btn, .pal-btn")) return; // buttons stay clickable
       const item = browserItems().find(i => i.id === card.dataset.browserItem);
+      // Pointer dragging begins on the first press; catch the second press so
+      // a genuine double-click still has the promised "add + open" action.
+      if (e.detail >= 2) { e.preventDefault(); addOrFill(item); return; }
       if (item) beginPointerDrag("browser", item.id, item.name, e);
+    };
+    card.ondblclick = (e) => {
+      if (e.target.closest(".br-btn, .pal-btn")) return;
+      addOrFill(findItem(card.dataset.browserItem));
     };
   });
 }
@@ -1580,11 +1806,32 @@ function wireBrowserPalette(v) {
     splitsFilter = splitsSel.value;
     renderBrowserCards(v);
   };
-  // Q1: which half of a patch presets load into
-  v.querySelectorAll("[data-pal-half]").forEach(btn => {
+  const newPatch = v.querySelector("[data-palette-new]");
+  if (newPatch) newPatch.onclick = () => {
+    const pl = createEmptyPalettePatch();
+    palettePreviewId = pl.id;
+    editorMode = "patch";
+    renderProduce();
+  };
+  v.querySelectorAll("[data-palette-zone]").forEach(btn => {
     btn.onclick = () => {
-      const [palId, half] = btn.dataset.palHalf.split(":");
-      _palHalfSel[palId] = half;
+      const [paletteId, half] = btn.dataset.paletteZone.split(":");
+      paletteTarget = { paletteId, half };
+      browserFilter = "section";
+      browserSearch = "";
+      renderProduce();
+    };
+  });
+  v.querySelectorAll("[data-palette-preview]").forEach(btn => {
+    btn.onclick = () => {
+      const pl = (arrangement.palette || []).find(x => x.id === btn.dataset.palettePreview);
+      if (!pl) return;
+      palettePreviewId = pl.id;
+      editorMode = "patch";
+      if (paletteIsPlayable(pl)) {
+        stopArrangement();
+        synth.play({ ...DEFAULTS, ...arrangement.context, ...pl.params, seed: 20260710 });
+      }
       renderProduce();
     };
   });
@@ -1834,6 +2081,7 @@ function stopArrangement(ringOut = false) {
   // last notes' releases and the reverb tail play out. Explicit stops cut.
   producerVoices.forEach(v => ringOut ? v.finish() : v.stop());
   updatePlayhead(playheadBeat);
+  stopRollTransportPlayhead();
 }
 
 // The beat under the playhead RIGHT NOW — fractional during playback
@@ -1855,6 +2103,7 @@ function playArrangement(fromBeat = 0) {
   if (!ends.length) return;
   const lastBeat = Math.max(...ends) - 1;
   arrPlay = { beat: Math.max(0, Math.floor(fromBeat)), lastBeat, timer: null };
+  _kickSpAnim(); // restart the global-space animation for this performance
   const step = () => {
     if (!arrPlay) return;
     let b = arrPlay.beat;
@@ -1922,6 +2171,7 @@ function playArrangement(fromBeat = 0) {
   };
   arrPlay.startAt = arrPlay.beat; // regions already sounding at the start beat begin here
   step();
+  startRollTransportPlayhead();
 }
 // ── Arrangement export / import / mixdown (G6) ───────────────
 
@@ -2073,9 +2323,9 @@ function maxRegionLength(track, region) {
   return limit;
 }
 
-// ── Q5: global scale strip ──────────────────────────────────
+// ── Q5: Harmonic guide strip ─────────────────────────────────
 // Collapsible strip above the ruler carrying scale MARKERS. Opted-in
-// tracks (G in the track head) regenerate their takes under the marker in
+// tracks (HG in the track head) regenerate their takes under the marker in
 // force at each region's position; baked notes never move.
 function ensureGlobalScale() {
   if (!arrangement.globalScale) arrangement.globalScale = { enabled: false, markers: [] };
@@ -2156,6 +2406,62 @@ function globalScaleActive() {
   return (arrangement.tracks || []).some(t => t.useGlobalScale);
 }
 
+let _hgChoices = new Map();
+function _hgScaleData(params) {
+  if (!params || (!params.scalePreset && !Array.isArray(params.customDegrees))) return null;
+  const mode = params.scaleMode || "12tone";
+  const div = mode === "edo" ? (params.edoDivisions || 12) : 12;
+  const degrees = Array.isArray(params.customDegrees) && params.customDegrees.length
+    ? params.customDegrees : (SCALE_PRESETS[params.scalePreset] || SCALE_PRESETS.major).degrees;
+  const label = mode === "edo" ? `${div}-EDO` : (SCALE_PRESETS[params.scalePreset]?.label || params.scalePreset || "Scale");
+  return { label, degrees: [...degrees], subScaleNotes: [...(params.subScaleNotes || [])], rootNotes: [...(params.rootNotes || [0])], scaleMode: mode, edoDivisions: div, scalePreset: params.scalePreset || "major" };
+}
+function harmonicGuideChoices() {
+  const out = [], seen = new Set();
+  const add = (id, data, label, note, group) => {
+    if (!data) return;
+    const sig = JSON.stringify([data.edoDivisions, data.degrees, data.subScaleNotes, data.rootNotes]);
+    // Keep named palette/submodule provenance even when the tuning itself is
+    // identical, but do not duplicate the same named source.
+    const key = `${id}:${sig}`;
+    if (seen.has(key)) return;
+    seen.add(key); out.push({ id, ...data, label, note, group });
+  };
+  for (const pl of arrangement.palette || []) {
+    add(`palette:${pl.id}`, _hgScaleData(pl.params), _hgScaleData(pl.params)?.label || "Patch scale", pl.name || "Palette patch", "Palette");
+    for (const half of ["subnote", "macro"]) {
+      const ref = pl.parts?.[half];
+      if (!ref || ref === "legacy") continue;
+      const item = browserItems().find(x => x.id === ref);
+      const data = _hgScaleData(item?.params);
+      if (data) add(`palette:${pl.id}:${half}`, data, data.label, `${item.name} (${half === "subnote" ? "Sub-note" : "Macro"})`, "Palette modules");
+    }
+  }
+  for (const [key, spec] of Object.entries(SCALE_PRESETS)) {
+    add(`factory:${key}`, { label: spec.label, degrees: [...spec.degrees], subScaleNotes: [], rootNotes: [0], scaleMode: "12tone", edoDivisions: 12, scalePreset: key }, spec.label, "Factory scale", "Factory");
+  }
+  _hgChoices = new Map(out.map(c => [c.id, c]));
+  return out;
+}
+function harmonicGuidePickerHTML() {
+  const choices = harmonicGuideChoices();
+  return `<div class="hg-picker"><input type="search" id="hgScaleSearch" placeholder="Search scales in palette and factory…" aria-label="Search Harmonic guide scales"/>
+    <div class="hg-choice-list" id="hgChoiceList">${choices.map(c => `<button data-hg-choice="${esc(c.id)}" data-hg-search="${esc(`${c.label} ${c.note}`.toLowerCase())}"><b>${esc(c.label)}</b><i>${esc(c.note)}</i></button>`).join("") || '<span>No scale sources in the palette yet.</span>'}</div></div>`;
+}
+
+function setHarmonicGuideFromParams(params, sourceLabel = "this module") {
+  const choice = _hgScaleData(params);
+  if (!choice) return false;
+  const gs = ensureGlobalScale();
+  const hasExistingGuide = globalScaleActive() && (gs.markers || []).length > 0;
+  if (hasExistingGuide && !confirm(`This Harmonic guide already has markers used by HG tracks. Loading ${sourceLabel}'s scale will overwrite the existing guide. Continue?`)) return false;
+  gs.markers = [{ atBeat: 0, degrees: [...choice.degrees], subScaleNotes: [...choice.subScaleNotes], rootNotes: [...choice.rootNotes] }];
+  gs.enabled = true;
+  _gsSelMarker = 0;
+  saveArrangement("set Harmonic guide scale");
+  return true;
+}
+
 function globalScaleStripHTML(laneW) {
   const gs = arrangement.globalScale || { enabled: false, markers: [] };
   const active = globalScaleActive();
@@ -2178,9 +2484,9 @@ function globalScaleStripHTML(laneW) {
   return `
       <div class="tl2-row tl2-gs-row${_gsOpen ? " open" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Global scale — a tiny piano roll of the scale over time; double-click at a bar line to add a change point. It applies to any track that opts in with the G button in its header (no separate switch).">${_gsOpen ? "▾" : "▸"} Global scale${active ? ` <span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}</button>
+          <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Harmonic guide — choose a starting scale, then add and edit timeline change points. It applies to tracks with HG on.">${_gsOpen ? "▾" : "▸"} Harmonic guide${active ? ` <span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}</button>
         </div>
-        ${_gsOpen ? `<div class="gs-strip${active ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The scale over time — rows are note divisions, colours are roles (lit = in scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
+        ${_gsOpen ? `<div class="gs-strip${active ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><div class="hg-head">${harmonicGuidePickerHTML()}</div><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The Harmonic guide over time — rows are note divisions, colours are roles (lit = scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
       </div>${editorRow}`;
 }
 
@@ -2193,7 +2499,18 @@ let _spOpen = false;
 let _spRoomOpen = false; // owner 07-07 round 3: the room-designer drawer
 let _spSelTrack = null;
 let _spRock = { roll: 0, dragging: false, drag: null };
+let _spRockAmp = 0; // eases 0→1 with playback so the auto-rock stops when idle
 let _spRaf = null;
+// Head-orientation edit mode: double-click the listener head in the cross-section
+// to arm it, then drag the rim "dash" to yaw the head. `dragging` keeps the rAF
+// loop alive (owner 2026-07-10). Facing itself persists in space.head.facing.
+let _spHeadTurn = { active: false, dragging: false };
+// The listener head's radius in the cross-section, ∝ ear distance. Shared by the
+// draw and the hit-tests so "on the head" means the same to both.
+function _spSectionHeadR() {
+  const ear = arrangement.space?.head?.earDistance ?? 0.175;
+  return 12 + (Math.max(0.12, Math.min(0.25, ear)) - 0.12) / (0.25 - 0.12) * 7;
+}
 // Sound-glow mapping: which beat sat under the playhead at which ctx time.
 // Frozen when playback ends so ring-out glows keep fading IN PLACE.
 let _spGlowMap = null;
@@ -2212,14 +2529,15 @@ function ensureGlobalSpace() {
   if (!arrangement.space) {
     arrangement.space = {
       enabled: false,
-      mode: "override",
-      layerMode: "centered", // multi-layer handle behaviour: centered | additive
       head: { earDistance: 0.175, headDensity: 0.5, reverbType: arrangement.context.reverbType || "room" },
       tracks: {},
     };
   }
   if (!arrangement.space.tracks) arrangement.space.tracks = {};
-  if (!arrangement.space.layerMode) arrangement.space.layerMode = "centered";
+  // Migration: global `mode` and `layerMode` were the old Override/Offset
+  // model. Movement is now owned by each patch (`spaceMovement`).
+  delete arrangement.space.mode;
+  delete arrangement.space.layerMode;
   return arrangement.space;
 }
 
@@ -2236,21 +2554,27 @@ function ensureGlobalSpace() {
 //     (drawn slightly in front of the head so it can be grabbed); every
 //     source shifts by the same vector.
 
-function _spTrackVoiceParams(track) {
-  return (arrangement.palette || []).find(pl => pl.id === track.regions?.[0]?.paletteId)?.params
-    || track.instrumentParams || {};
+function _spTrackVoiceParams(track, beat = playheadBeat) {
+  const region = regionAtBeat(track, beat) || track.regions?.[0];
+  return region ? regionVoiceParams(track, region) : (track.instrumentParams || {});
 }
 
-// The patch's own constellation: base source first, then its layers.
+// The patch's own constellation: base source first, followed by Sub-note and
+// percussion layers. Percussion without an explicit position inherits the
+// base before a thread transforms it, exactly as the renderer does.
 function _spTrackSources(vp) {
-  const sources = [{ angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 }];
+  const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
+  const sources = [base];
   for (const l of Array.isArray(vp.layers) ? vp.layers : []) {
-    sources.push({ angle: l.space?.angle ?? 0, dist: l.space?.dist ?? 2.5 });
+    sources.push({ angle: l.space?.angle ?? base.angle, dist: l.space?.dist ?? base.dist });
+  }
+  for (const l of Array.isArray(vp.percLayers) ? vp.percLayers : []) {
+    sources.push({ angle: l.space?.angle ?? base.angle, dist: l.space?.dist ?? base.dist });
   }
   return sources;
 }
 
-function _spIsMulti(vp) { return Array.isArray(vp.layers) && vp.layers.length > 0; }
+function _spIsMulti(vp) { return _spTrackSources(vp).length > 1; }
 
 // Circular-mean angle + mean distance of a constellation.
 function _spCentroid(sources) {
@@ -2290,6 +2614,29 @@ function spTransformSources(sources, handle, mode) {
 }
 if (typeof window !== "undefined") window.spTransformSources = spTransformSources;  // debug/validation hook
 
+// Apply a track-thread point to the patch itself. This is the one resolution
+// law for live playback: patch layer positions + thread + PATCH movement mode.
+// It also includes percussion's independently-placeable hit layers.
+function spApplyThreadToPatch(params, handle) {
+  const sources = _spTrackSources(params);
+  const mode = params.spaceMovement === "additive" ? "additive" : "centered";
+  const out = spTransformSources(sources, handle, mode);
+  params.spaceAzimuth = out[0].angle;
+  params.spaceDistance = Math.max(0.3, out[0].dist);
+  let at = 1;
+  if (Array.isArray(params.layers)) {
+    params.layers = params.layers.map(l => ({
+      ...l, space: { angle: out[at].angle, dist: Math.max(0.3, out[at++].dist) },
+    }));
+  }
+  if (Array.isArray(params.percLayers)) {
+    params.percLayers = params.percLayers.map(l => ({
+      ...l, space: { angle: out[at].angle, dist: Math.max(0.3, out[at++].dist) },
+    }));
+  }
+  return params;
+}
+
 const _SP_HUES = [36, 152, 205, 280, 0, 60, 320, 100];
 function _spHue(i) { return _SP_HUES[i % _SP_HUES.length]; }
 
@@ -2301,33 +2648,37 @@ function _spHue(i) { return _SP_HUES[i % _SP_HUES.length]; }
 function _spTrackPos(track, beat) {
   const sp = arrangement.space || {};
   const res = trackSpaceAt(sp.tracks?.[track.id], beat) || sp.static?.[track.id] || null;
-  const vp = _spTrackVoiceParams(track);
+  const vp = _spTrackVoiceParams(track, beat);
   if (_spIsMulti(vp)) {
     if (res) return res;
-    return sp.layerMode === "additive"
-      ? { angle: 0, dist: 0 }
-      : _spCentroid(_spTrackSources(vp));
+    return _spCentroid(_spTrackSources(vp));
   }
   const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
-  if (!res) return base;
-  if (sp.mode === "offset") {
-    return {
-      angle: Math.max(-180, Math.min(180, base.angle + res.angle)),
-      dist: Math.max(0.3, Math.min(30, base.dist + res.dist - 2.5)),
-    };
-  }
-  return res;
+  return res || base;
 }
 
 // The transformed constellation a multi-layer track is ACTUALLY playing
 // from at this beat (null for single-source tracks).
 function _spTrackConstellation(track, beat, dragPos = null, modeOverride = null) {
-  const vp = _spTrackVoiceParams(track);
+  const vp = _spTrackVoiceParams(track, beat);
   if (!_spIsMulti(vp)) return null;
-  const sp = arrangement.space || {};
   const handle = dragPos || _spTrackPos(track, beat);
-  const mode = modeOverride || (sp.layerMode === "additive" ? "additive" : "centered");
+  const mode = modeOverride || (vp.spaceMovement === "additive" ? "additive" : "centered");
   return spTransformSources(_spTrackSources(vp), handle, mode);
+}
+
+// A patch is allowed to seed a thread exactly once: when it is placed on an
+// empty track (or when a pre-existing arrangement first turns Global space
+// on). Later regions never re-home the thread; they follow the established
+// track path and their patch positions simply resolve through it.
+function initialiseTrackThreadFromPatch(track, params = null) {
+  const sp = ensureGlobalSpace();
+  if (sp.tracks?.[track.id]?.length || sp.static?.[track.id]) return false;
+  const vp = params || _spTrackVoiceParams(track, 0);
+  const at = _spCentroid(_spTrackSources(vp));
+  if (!sp.static) sp.static = {};
+  sp.static[track.id] = { angle: at.angle, dist: Math.max(0.3, at.dist) };
+  return true;
 }
 
 function spSmartArrange() {
@@ -2341,11 +2692,10 @@ function spSmartArrange() {
       { beat: totalBeats(), angle, dist, smooth: 0.5 },
     ];
   });
-  sp.mode = "override";
 }
 
 function globalSpaceStripHTML(laneW) {
-  const sp = arrangement.space || { enabled: false, mode: "override", head: {}, tracks: {} };
+  const sp = arrangement.space || { enabled: false, head: {}, tracks: {} };
   const head = sp.head || {};
   const selAnchors = _spSelTrack ? (sp.tracks?.[_spSelTrack] || []) : [];
   const anchorAtPh = selAnchors.find(a => Math.abs(a.beat - playheadBeat) < 0.26);
@@ -2365,7 +2715,7 @@ function globalSpaceStripHTML(laneW) {
   const fullPanel = (enabled && _spOpen) ? `
       <div class="tl2-row sp-panel-row">
         <div class="tl2-head sp-left">
-          <canvas id="spSection" width="132" height="${spaceH}" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. A multi-layer patch shows its instruments as faint dots and one brighter HANDLE: in Centered mode the handle rides a ring at their average distance (drag to rotate them together or scale their distances); in Additive mode it sits just in front of your head and shifts them all by the same amount. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here."></canvas>
+          <canvas id="spSection" width="132" height="${spaceH}" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. A multi-layer patch shows its instruments as faint dots and one brighter HANDLE: in Centered mode the handle rides a ring at their average distance (drag to rotate them together or scale their distances); in Additive mode it sits just in front of your head and shifts them all by the same amount. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here. Double-click the head to turn it, then drag the dash around the rim to yaw the listener."></canvas>
           <button class="sp-settings-toggle" id="spRoomToggle" title="Open global-space settings">${_spRoomOpen ? "▾" : "⚙"} ${esc(roomLabel)}</button>
         </div>
         <div class="sp-cyl-wrap" style="width:${laneW}px;height:${spaceH}px">
@@ -2401,18 +2751,7 @@ function spRoomDesignerHTML(head, sp, anchorAtPh) {
           <span>${esc(prof.label)}</span>
         </div>
         <div class="sp-designer-ctls">
-          <label class="sp-ctl">Mode
-            <select id="spMode" title="Override replaces each patch's own space; Offset adds the threads on top of it">
-              <option value="override"${sp.mode !== "offset" ? " selected" : ""}>Override</option>
-              <option value="offset"${sp.mode === "offset" ? " selected" : ""}>Offset</option>
-            </select>
-          </label>
-          <label class="sp-ctl">Layers
-            <select id="spLayerMode" title="How a multi-layer patch's handle moves its instruments: Centered — the notch rides a ring at their average distance; dragging rotates them together and scales every distance by the same ratio (never negative). Additive — the handle is the patch's centre point (shown just in front of your head); dragging shifts every instrument by the same amount.">
-              <option value="centered"${sp.layerMode !== "additive" ? " selected" : ""}>Centered</option>
-              <option value="additive"${sp.layerMode === "additive" ? " selected" : ""}>Additive</option>
-            </select>
-          </label>
+          <span class="sp-ctl sp-room-blurb">Threads are track-level. Each patch chooses whether its own layers move as a centred constellation or additively.</span>
           <label class="sp-ctl" title="The shared room every track sits in">Room
             <select id="spRoomType">
               ${Object.entries(REVERB_PROFILES).map(([k, r]) =>
@@ -2439,30 +2778,119 @@ function spRoomDesignerHTML(head, sp, anchorAtPh) {
       </div>`;
 }
 
+// Top-down slice of the listener's head drawn as a glowing wireframe MESH, so
+// the "you at the centre" core reads as a 3-D scanned cross-section: a nose bump
+// points forward (up = 0°), pinna flaps sit to the sides, the occiput is flatter
+// at the back, and ear-canal marks show where sound enters (owner 2026-07-10).
+// The cross-section head: a clean, detailed anatomical silhouette (nose forward,
+// pinnae to the sides). The wireframe MESH now lives on the cylinder core; this
+// slice is just a crisp shaded head so the cross-section reads sharply.
+function drawSectionHead(ctx, cx, cy, R, rot = 0) {
+  const N = 128, hw = R * 0.9, hh = R;            // slightly deeper than wide
+  const rAt = (a) => {                            // a: 0 = front(up), clockwise
+    const na = Math.atan2(Math.sin(a), Math.cos(a)); // wrap to -π..π
+    let r = 1;
+    r -= 0.10 * Math.max(0, -Math.cos(na));                       // flatter occiput
+    r += 0.26 * Math.exp(-(na * na) / (2 * 0.11 * 0.11));         // nose bump (front)
+    const earA = 102 * Math.PI / 180;                            // pinnae, sides→back
+    for (const s of [earA, -earA]) {
+      const d = Math.atan2(Math.sin(na - s), Math.cos(na - s));
+      r += 0.20 * Math.exp(-(d * d) / (2 * 0.055 * 0.055));
+    }
+    return r;
+  };
+  // draw in a local frame rotated by `rot` (the head's yaw) — front is +Y up
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rot);
+  const trace = (scale) => {
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * 2 * Math.PI, rr = rAt(a) * scale;
+      const x = Math.sin(a) * rr * hw, y = -Math.cos(a) * rr * hh;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  };
+  // soft shaded fill + one faint inner contour + a bright glowing outline
+  const g = ctx.createRadialGradient(0, -hh * 0.3, 1, 0, 0, R * 1.25);
+  g.addColorStop(0, "rgba(178,208,236,0.34)");
+  g.addColorStop(1, "rgba(120,160,200,0.08)");
+  trace(1); ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = "rgba(150,185,220,0.2)"; ctx.lineWidth = 0.6;
+  trace(0.62); ctx.stroke();
+  ctx.save();
+  ctx.shadowColor = "rgba(150,200,240,0.5)"; ctx.shadowBlur = 5;
+  ctx.strokeStyle = "rgba(206,228,248,0.95)"; ctx.lineWidth = 1.2;
+  trace(1); ctx.stroke();
+  ctx.restore();
+  // ear-canal marks (where the sound enters) at the pinnae
+  for (const s of [1, -1]) {
+    const a = s * 96 * Math.PI / 180, rr = rAt(a);
+    const x = Math.sin(a) * rr * hw * 0.8, y = -Math.cos(a) * rr * hh * 0.8;
+    ctx.fillStyle = "rgba(9,13,19,0.85)";
+    ctx.beginPath(); ctx.arc(x, y, 1.5, 0, 2 * Math.PI); ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawSpSection() {
   const cv = document.getElementById("spSection");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv); // DPR-sharp (owner 2026-07-10)
   ctx.clearRect(0, 0, w, h);
-  const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 8;
+  const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 9;
   const sp = arrangement.space || {};
-  // rings + behind shading (same language as the patch space pad)
-  ctx.fillStyle = "rgba(60,72,88,0.16)";
+  // field: a soft vignette centres the eye, the lower half (behind you) is
+  // shaded, and log-spaced distance rings carry tiny labels + azimuth ticks.
+  const vg = ctx.createRadialGradient(cx, cy, rMax * 0.12, cx, cy, rMax * 1.18);
+  vg.addColorStop(0, "rgba(30,40,54,0)");
+  vg.addColorStop(1, "rgba(6,9,14,0.5)");
+  ctx.fillStyle = vg;
+  ctx.beginPath(); ctx.arc(cx, cy, rMax + 5, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "rgba(60,72,88,0.13)";
   ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = "rgba(90,110,130,0.25)";
+  ctx.font = "8px ui-monospace, monospace"; ctx.textAlign = "center";
   for (const dm of [1, 3, 10, 30]) {
-    ctx.beginPath(); ctx.arc(cx, cy, _spaceDistToR(dm, rMax), 0, 2 * Math.PI); ctx.stroke();
+    const r = _spaceDistToR(dm, rMax);
+    ctx.strokeStyle = "rgba(90,110,130,0.22)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillStyle = "rgba(120,135,150,0.45)";
+    ctx.fillText(`${dm}m`, cx, cy - r - 2);
   }
-  // the head, radius ∝ ear distance — with ears and a front-pointing nose
-  const headR = 4 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 5;
-  ctx.fillStyle = "rgba(200,215,230,0.85)";
-  ctx.beginPath(); ctx.arc(cx, cy, headR, 0, 2 * Math.PI); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx - headR, cy, 1.8, 0, 2 * Math.PI); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx + headR, cy, 1.8, 0, 2 * Math.PI); ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - 2, cy - headR + 0.5); ctx.lineTo(cx, cy - headR - 3); ctx.lineTo(cx + 2, cy - headR + 0.5);
-  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(120,140,165,0.35)";
+  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, 2 * Math.PI); ctx.stroke();
+  for (let a = 0; a < 360; a += 30) {
+    const rad = (a - 90) * Math.PI / 180;
+    const len = a % 90 === 0 ? 5 : 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax);
+    ctx.lineTo(cx + Math.cos(rad) * (rMax - len), cy + Math.sin(rad) * (rMax - len));
+    ctx.stroke();
+  }
+  // the listener at the centre: an anatomical head-slice mesh (nose forward,
+  // pinnae to the sides, flatter occiput) — radius ∝ ear distance, yaw = facing.
+  const headR = _spSectionHeadR();
+  const facing = Number(sp.head?.facing) || 0;
+  drawSectionHead(ctx, cx, cy, headR, facing * Math.PI / 180);
+  // head-turn mode: a grabbable "dash" from the head out to the rim marks where
+  // the nose points; drag it around the ring to yaw the head (owner 2026-07-10).
+  if (_spHeadTurn.active) {
+    const rad = (facing - 90) * Math.PI / 180;
+    const nx = Math.cos(rad), ny = Math.sin(rad);
+    ctx.save();
+    ctx.strokeStyle = "rgba(245,166,35,0.32)"; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, 2 * Math.PI); ctx.stroke();   // spin ring
+    ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(245,166,35,0.92)";
+    ctx.beginPath();
+    ctx.moveTo(cx + nx * (headR + 2), cy + ny * (headR + 2));
+    ctx.lineTo(cx + nx * rMax, cy + ny * rMax);                             // the dash
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(245,166,35,1)";
+    ctx.beginPath(); ctx.arc(cx + nx * rMax, cy + ny * rMax, 4.2, 0, 2 * Math.PI); ctx.fill(); // rim knob
+    ctx.restore();
+  }
   // track dots at the playhead — live during playback (curPlayBeat), and
   // pulsing with each voice's real output level. Multi-layer tracks show
   // their sources as fainter dots plus one GROUP HANDLE (ring + notch in
@@ -2480,6 +2908,7 @@ function drawSpSection() {
     const seld = t.id === _spSelTrack;
     const hue = _spHue(i);
     const rms = _voiceRms(producerVoices.get(t.id));
+    const vp = _spTrackVoiceParams(t, phBeat);
     const constellation = _spTrackConstellation(t, phBeat, dragPos);
     const glowAt = (x, y, strength) => {
       if (rms <= 0.012) return;
@@ -2500,7 +2929,7 @@ function drawSpSection() {
         ctx.fillStyle = `hsla(${hue}, 70%, 62%, ${seld ? 0.55 : 0.4})`;
         ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, 2 * Math.PI); ctx.fill();
       }
-      const additive = (arrangement.space?.layerMode === "additive");
+      const additive = vp.spaceMovement === "additive";
       if (seld && !additive) {
         // the ring the notch rides: the handle's distance around you
         ctx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.5)`;
@@ -2510,7 +2939,7 @@ function drawSpSection() {
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      const hp = _spHandleXY(pos, cx, cy, rMax, true);
+      const hp = _spHandleXY(pos, cx, cy, rMax, true, additive);
       ctx.fillStyle = `hsla(${hue}, 78%, ${seld ? 70 : 58}%, 1)`;
       if (seld) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; }
       ctx.beginPath(); ctx.arc(hp.x, hp.y, seld ? 5.5 : 4.5, 0, 2 * Math.PI); ctx.fill();
@@ -2532,9 +2961,8 @@ function drawSpSection() {
 // Where a track's handle is DRAWN: normally its polar position; an additive
 // multi-layer handle at rest is the head centre, shown slightly in front of
 // the head so it can be seen and grabbed. Shared by drawing and hit-tests.
-function _spHandleXY(pos, cx, cy, rMax, multi) {
-  const sp = arrangement.space || {};
-  if (multi && sp.layerMode === "additive" && (pos.dist ?? 0) < 0.35) {
+function _spHandleXY(pos, cx, cy, rMax, multi, additive = false) {
+  if (multi && additive && (pos.dist ?? 0) < 0.35) {
     return { x: cx, y: cy - 16 };
   }
   const rad = ((pos.angle ?? 0) - 90) * Math.PI / 180;
@@ -2542,11 +2970,73 @@ function _spHandleXY(pos, cx, cy, rMax, multi) {
   return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r };
 }
 
+// The cylinder's core: the listener's head slice (nose forward, pinnae to the
+// sides) EXTRUDED along the timeline as a wireframe mesh tube — rib ellipses show
+// the slice shape, longitudinal wires the surface, and `phase` (the rock + roll)
+// rotates it so the ears/nose swing into view (owner 2026-07-10).
+function drawCylinderMeshCore(ctx, w, cy, headR, phase, highlight = false) {
+  const rHead = (a) => {                                  // slice radius at angle a (0 = front)
+    let r = 1;
+    r -= 0.10 * Math.max(0, -Math.cos(a));                // flatter occiput
+    r += 0.22 * Math.exp(-(a * a) / (2 * 0.12 * 0.12));   // nose (front)
+    for (const s of [1.75, -1.75]) {                      // pinnae ~ sides/back
+      const d = Math.atan2(Math.sin(a - s), Math.cos(a - s));
+      r += 0.18 * Math.exp(-(d * d) / (2 * 0.06 * 0.06));
+    }
+    return r;
+  };
+  const ribW = headR * 0.6;
+  const pt = (theta, x) => {                              // screen point, rotated by phase
+    const a = theta + phase;
+    return { x: x + Math.cos(a) * ribW, y: cy + Math.sin(a) * headR * rHead(theta) };
+  };
+  // soft band fill spanning the tube's vertical extent
+  let top = Infinity, bot = -Infinity;
+  for (let k = 0; k < 24; k++) { const th = (k / 24) * 2 * Math.PI - Math.PI; const y = cy + Math.sin(th + phase) * headR * rHead(th); if (y < top) top = y; if (y > bot) bot = y; }
+  const g = ctx.createLinearGradient(0, top, 0, bot);
+  g.addColorStop(0, "rgba(150,190,225,0.03)");
+  g.addColorStop(0.5, "rgba(180,212,240,0.11)");
+  g.addColorStop(1, "rgba(150,190,225,0.03)");
+  ctx.fillStyle = g; ctx.fillRect(0, top - 1, w, bot - top + 2);
+  // longitudinal wires — one per slice angle, running along time (front brighter)
+  const NW = 14;
+  for (let k = 0; k < NW; k++) {
+    const th = (k / NW) * 2 * Math.PI - Math.PI;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 12) { const p = pt(th, x); x === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); }
+    ctx.strokeStyle = `rgba(178,214,244,${Math.cos(th + phase) > 0 ? 0.24 : 0.09})`;
+    ctx.lineWidth = Math.cos(th + phase) > 0 ? 0.7 : 0.5;
+    ctx.stroke();
+  }
+  // rib ellipses — the head SLICE (ears + nose) drawn at intervals along the tube
+  const M = 44, ribStep = 54;
+  for (let x = ribStep * 0.5; x < w; x += ribStep) {
+    ctx.beginPath();
+    for (let i = 0; i <= M; i++) { const th = (i / M) * 2 * Math.PI - Math.PI; const p = pt(th, x); i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); }
+    ctx.closePath();
+    ctx.strokeStyle = "rgba(196,226,250,0.3)"; ctx.lineWidth = 0.75; ctx.stroke();
+  }
+  // Head-turn anchor: highlight the nose→back PLANE through the mesh (its
+  // silhouette is the θ=0 and θ=π longitudinal wires) so the yaw reads in the
+  // core (owner 2026-07-10).
+  if (highlight) {
+    ctx.beginPath();                                          // faint plane fill
+    for (let x = 0; x <= w; x += 10) { const p = pt(0, x); x === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); }
+    for (let x = w; x >= 0; x -= 10) { const p = pt(Math.PI, x); ctx.lineTo(p.x, p.y); }
+    ctx.closePath(); ctx.fillStyle = "rgba(245,166,35,0.09)"; ctx.fill();
+    for (const th of [0, Math.PI]) {                          // its two edges (nose brighter)
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 10) { const p = pt(th, x); x === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); }
+      ctx.strokeStyle = th === 0 ? "rgba(245,190,90,0.95)" : "rgba(245,166,35,0.5)";
+      ctx.lineWidth = th === 0 ? 1.6 : 1.1; ctx.stroke();
+    }
+  }
+}
+
 function drawSpCylinder(rockRad) {
   const cv = document.getElementById("spCylinder");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  const { ctx, w, h } = crisp2d(cv); // DPR-sharp (owner 2026-07-10)
   ctx.clearRect(0, 0, w, h);
   // Adaptive padding so the slim collapsed cylinder (~40% height) still reads.
   const pad = Math.min(10, h * 0.14);
@@ -2555,14 +3045,13 @@ function drawSpCylinder(rockRad) {
   // beat-aligned with the timeline: 1 beat = pxPerBeat, same as the lanes
   const xFor = (beat) => beat * pxPerBeat;
   const roll = _spRock.roll;
-  // translucent core = the listener's head running down the cylinder
+  // core = the listener's head, extruded down the cylinder as a wireframe MESH
+  // of the middle slice — the nose/ears rotate into view with the rock (this is
+  // the DAW's signature core; owner 2026-07-10).
   const sp = arrangement.space || {};
-  const headR = Math.min(R - 2, 6 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 8);
-  ctx.fillStyle = "rgba(200,215,230,0.07)";
-  ctx.fillRect(0, cy - headR, w, headR * 2);
-  ctx.strokeStyle = "rgba(200,215,230,0.14)";
-  ctx.beginPath(); ctx.moveTo(0, cy - headR); ctx.lineTo(w, cy - headR); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, cy + headR); ctx.lineTo(w, cy + headR); ctx.stroke();
+  const headR = Math.min(R - 2, 9 + ((sp.head?.earDistance ?? 0.175) - 0.12) / (0.25 - 0.12) * 10);
+  const facing = (Number(sp.head?.facing) || 0) * Math.PI / 180;
+  drawCylinderMeshCore(ctx, w, cy, headR, rockRad + roll + facing, _spHeadTurn.active);
   // playhead line — live during playback
   const phBeat = curPlayBeat();
   ctx.strokeStyle = "rgba(56,189,248,0.55)";
@@ -2603,10 +3092,10 @@ function drawSpCylinder(rockRad) {
     ctx.lineWidth = 1;
     // multi-layer patches: ultra-thin threads for every source (base +
     // layers) around the patch's main thread — the sound lives on these
-    const vp = _spTrackVoiceParams(t);
+    const vp = _spTrackVoiceParams(t, phBeat);
     if (_spIsMulti(vp)) {
       const sources0 = _spTrackSources(vp);
-      const mode = (arrangement.space?.layerMode === "additive") ? "additive" : "centered";
+      const mode = vp.spaceMovement === "additive" ? "additive" : "centered";
       const paths = sources0.map(() => []);
       for (let px = 0; px <= w; px += 6) {
         const out = spTransformSources(sources0, _spTrackPos(t, px / pxPerBeat), mode);
@@ -2712,14 +3201,35 @@ function drawSpCylinder(rockRad) {
   }
 }
 
+function _spAnyVoiceRinging() {
+  for (const v of producerVoices.values()) { if (_voiceRms(v) > 0.012) return true; }
+  return false;
+}
+// (Re)start the space rAF if a cylinder/cross-section is on screen and it's idle.
+function _kickSpAnim() {
+  if (!_spRaf && (document.getElementById("spCylinder") || document.getElementById("spSection"))) {
+    _spRaf = requestAnimationFrame(_spAnimate);
+  }
+}
 function _spAnimate() {
-  // Runs whenever a cylinder is on screen — collapsed (slim) or expanded.
-  if (!document.getElementById("spCylinder")) { _spRaf = null; return; }
-  const rock = Math.sin(performance.now() / 2400) * (10 * Math.PI / 180); // slow ±10° rocking
+  // Draws whenever a cylinder/cross-section is on screen, but only KEEPS
+  // scheduling while something actually moves — so it settles and stops after
+  // playback ends instead of rocking forever (owner 2026-07-10 bug fix).
+  if (!document.getElementById("spCylinder") && !document.getElementById("spSection")) { _spRaf = null; return; }
+  const playing = !!arrPlay;
+  // ease the gentle auto-rock in with playback and out when it stops
+  _spRockAmp += ((playing ? 1 : 0) - _spRockAmp) * 0.05;
+  if (_spRockAmp < 0.002) _spRockAmp = 0;
+  const rock = Math.sin(performance.now() / 2400) * (10 * Math.PI / 180) * _spRockAmp;
   if (!_spRock.dragging) _spRock.roll *= 0.88; // spring back
+  if (Math.abs(_spRock.roll) < 0.0004) _spRock.roll = 0;
   drawSpCylinder(rock);
   drawSpSection();
-  _spRaf = requestAnimationFrame(_spAnimate);
+  // `drag` = a cross-section dot drag, `dragging` = a cylinder roll drag,
+  // `headTurn?.dragging` = a head-rotation drag — all must keep the loop alive
+  // (the drag handlers mutate state and rely on this loop to redraw).
+  const busy = playing || _spRock.dragging || _spRock.drag || _spHeadTurn.dragging || _spRockAmp > 0 || _spRock.roll !== 0 || _spAnyVoiceRinging();
+  _spRaf = busy ? requestAnimationFrame(_spAnimate) : null;
 }
 
 function wireGlobalSpace(v) {
@@ -2729,11 +3239,12 @@ function wireGlobalSpace(v) {
     const sp = ensureGlobalSpace();
     const turningOn = !sp.enabled;
     if (turningOn && !sp.initialised) {
-      // Activation flow (owner spec): first use asks how to start.
-      if (confirm("Smartly arrange the instruments in space?\n\nOK — spread the tracks around you (override patch positions)\nCancel — keep each patch's own position (threads become offsets)")) {
+      // Activation flow: either place a fresh arrangement or seed each thread
+      // from its patch constellation. Override/offset has been retired.
+      if (confirm("Smartly arrange the instruments in space?\n\nOK — spread the tracks around you\nCancel — begin each thread at its patch's own position")) {
         spSmartArrange();
       } else {
-        sp.mode = "offset";
+        for (const track of arrangement.tracks) initialiseTrackThreadFromPatch(track);
       }
       sp.initialised = true;
     }
@@ -2805,18 +3316,6 @@ function wireGlobalSpace(v) {
     btn.onclick = () => chooseRoom(btn.dataset.roomTile);
   });
   if (_spRoomOpen) drawRoomTiles();
-  const spMode = v.querySelector("#spMode");
-  if (spMode) spMode.onchange = () => {
-    ensureGlobalSpace().mode = spMode.value;
-    saveArrangement("global space mode");
-    liveApply();
-  };
-  const spLayerMode = v.querySelector("#spLayerMode");
-  if (spLayerMode) spLayerMode.onchange = () => {
-    ensureGlobalSpace().layerMode = spLayerMode.value;
-    saveArrangement("global space layer mode");
-    liveApply();
-  };
   const spSmooth = v.querySelector("#spSmooth");
   if (spSmooth) spSmooth.onchange = () => {
     const anchors = ensureGlobalSpace().tracks[_spSelTrack] || [];
@@ -2850,7 +3349,8 @@ function wireGlobalSpace(v) {
         // the HANDLE is the grabbable thing (for multi-layer patches the
         // faint source dots are display-only — their sound is placed from
         // the sub-note stage)
-        const hp = _spHandleXY(pos, g.cx, g.cy, g.rMax, _spIsMulti(_spTrackVoiceParams(t)));
+        const vp = _spTrackVoiceParams(t, curPlayBeat());
+        const hp = _spHandleXY(pos, g.cx, g.cy, g.rMax, _spIsMulti(vp), vp.spaceMovement === "additive");
         const d = Math.hypot(hp.x - g.x, hp.y - g.y);
         if (d < 10 && (!best || d < best.d)) best = { t, d };
       });
@@ -2859,10 +3359,34 @@ function wireGlobalSpace(v) {
     section.onmousedown = (e) => {
       e.preventDefault();
       const g = xy(e);
+      // Head-turn mode (armed by double-clicking the head): a drag outside the
+      // head yaws the listener toward the cursor and persists space.head.facing.
+      if (_spHeadTurn.active && Math.hypot(g.x - g.cx, g.y - g.cy) > _spSectionHeadR() * 0.7) {
+        _spHeadTurn.dragging = true;
+        _kickSpAnim();
+        const sp = ensureGlobalSpace();
+        const aim = (ev) => {
+          const gg = xy(ev);
+          sp.head = sp.head || {};
+          sp.head.facing = Math.round(Math.atan2(gg.x - gg.cx, -(gg.y - gg.cy)) * 180 / Math.PI);
+        };
+        aim(e);
+        const move = (ev) => aim(ev);
+        const up = () => {
+          window.removeEventListener("mousemove", move);
+          window.removeEventListener("mouseup", up);
+          _spHeadTurn.dragging = false;
+          saveArrangement("turn head");
+        };
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+        return;
+      }
       const t = trackAtXY(g);
       if (!t) return;
       _spSelTrack = t.id; // clicking a dot selects that track (owner 07-07)
       _spRock.drag = { trackId: t.id, pos: _spTrackPos(t, curPlayBeat()), moved: false };
+      _kickSpAnim(); // animate the drag even when playback is stopped
       const move = (ev) => {
         _spRock.drag.moved = true;
         _spRock.drag.pos = posFromXY(xy(ev));
@@ -2879,7 +3403,7 @@ function wireGlobalSpace(v) {
         const sp = ensureGlobalSpace();
         // additive multi-layer handle: dropping near the head snaps back to
         // rest (no translation) so the constellation returns home exactly
-        if (sp.layerMode === "additive" && _spIsMulti(_spTrackVoiceParams(t)) && drag.pos.dist <= 0.5) {
+        if (_spTrackVoiceParams(t, curPlayBeat()).spaceMovement === "additive" && _spIsMulti(_spTrackVoiceParams(t, curPlayBeat())) && drag.pos.dist <= 0.5) {
           drag.pos = { angle: 0, dist: 0 };
         }
         const anchors = sp.tracks[t.id];
@@ -2901,6 +3425,13 @@ function wireGlobalSpace(v) {
     };
     section.ondblclick = (e) => {
       const g = xy(e);
+      // Double-clicking the listener head arms/disarms head-turn mode (drag the
+      // rim dash to yaw) instead of anchoring a track (owner 2026-07-10).
+      if (Math.hypot(g.x - g.cx, g.y - g.cy) <= _spSectionHeadR() + 3) {
+        _spHeadTurn.active = !_spHeadTurn.active;
+        _kickSpAnim();
+        return;
+      }
       const t = trackAtXY(g) || arrangement.tracks.find(t => t.id === _spSelTrack);
       if (!t) return;
       _spSelTrack = t.id;
@@ -2948,6 +3479,7 @@ function wireGlobalSpace(v) {
         return;
       }
       _spRock.dragging = true;
+      _kickSpAnim(); // animate the roll drag even when playback is stopped
       const y0 = e.clientY, roll0 = _spRock.roll;
       const move = (ev) => { _spRock.roll = roll0 + (ev.clientY - y0) * 0.01; };
       const up = () => {
@@ -2960,7 +3492,7 @@ function wireGlobalSpace(v) {
     };
   }
 
-  if (!_spRaf && v.querySelector("#spCylinder")) _spRaf = requestAnimationFrame(_spAnimate);
+  _kickSpAnim(); // draw once (and settle) whenever the space strip re-renders
 }
 
 // ── Q10: MIDI recording ─────────────────────────────────────
@@ -3262,7 +3794,7 @@ function produceTimelineHTML() {
         <div class="tl2-head-ctl">
           <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
           <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
-          <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the global scale strip: this track's takes regenerate under the marker in force (baked notes stay put)">G</button>
+          <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the Harmonic guide: this track's takes regenerate under the marker in force (baked notes stay put)">HG</button>
           ${_midi.access ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
           <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
           <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
@@ -3319,6 +3851,7 @@ function editorRegion() {
 }
 
 function regionPatch(track, region) {
+  if (region?.paramsOverride) return region.paramsOverride;
   const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
   if (pal) return pal.params;
   if (!track.instrumentParams) track.instrumentParams = {};
@@ -3334,10 +3867,292 @@ function bakeRegion(track, region) {
   saveArrangement("bake region");
 }
 
+function ensureRegionPatchOverride(track, region) {
+  if (!region.paramsOverride) region.paramsOverride = JSON.parse(JSON.stringify(regionPatch(track, region) || {}));
+  const pl = (arrangement.palette || []).find(p => p.id === region.paletteId);
+  const savedParts = region.parts || pl?.parts || {};
+  const p = region.paramsOverride;
+  // Older regions did not retain module names.  Infer friendly labels instead
+  // of presenting an empty inspector, while preserving any existing IDs.
+  region.parts = {
+    subnote: savedParts.subnote || null,
+    macro: savedParts.macro || null,
+    subnoteName: savedParts.subnoteName || SPECTRAL_PROFILES[p.spectralProfile]?.label || "Sound source",
+    macroName: savedParts.macroName || (p.melodyPattern ? `${p.melodyPattern} macro` : "Patch macro"),
+    percussion: savedParts.percussion || null,
+    percussionName: savedParts.percussionName || null,
+    scale: savedParts.scale || null,
+    scaleName: savedParts.scaleName || null,
+    engine: savedParts.engine || null,
+    engineName: savedParts.engineName || null,
+  };
+  return region;
+}
+function editorPatchSubject() {
+  const er = editorRegion();
+  if (er && editorMode === "patch") {
+    const region = ensureRegionPatchOverride(er.track, er.region);
+    const palette = (arrangement.palette || []).find(p => p.id === er.region.paletteId);
+    return { patch: region, label: palette?.name || region.name || "Region patch", region: er.region, track: er.track, regionScoped: true };
+  }
+  const pl = (arrangement.palette || []).find(p => p.id === palettePreviewId);
+  return pl ? { patch: pl, label: paletteDisplayName(pl), regionScoped: false } : null;
+}
+function patchModuleOptions(half, selected) {
+  const allowed = half === "subnote" ? PALETTE_SUBNOTE_SECTIONS : PALETTE_MACRO_SECTIONS;
+  const options = browserItems().filter(item => allowed.has(item.section)).map(item => ({
+    value: item.id, label: item.name, note: item.kindLabel, selected: item.id === selected,
+  }));
+  return [{ label: half === "subnote" ? "Sub-note modules" : "Macro modules", options }];
+}
+function percussionModuleOptions(selected) {
+  return [{ label: "Percussion kits", options: browserItems().filter(item => item.section === "percussion").map(item => ({
+    value: item.id, label: item.name, note: item.kindLabel, selected: item.id === selected,
+  })) }];
+}
+function scaleModuleOptions(selected) {
+  return [{ label: "Scale modules", options: browserItems().filter(item => item.section === "melody").map(item => ({
+    value: item.id, label: item.name, note: item.kindLabel, selected: item.id === selected,
+  })) }];
+}
+function engineModuleOptions(selected) {
+  return [{ label: "Note engines", options: browserItems().filter(item => ["melody", "rhythm", "dynamics", "surprise"].includes(item.section)).map(item => ({
+    value: item.id, label: item.name, note: item.kindLabel, selected: item.id === selected,
+  })) }];
+}
+function patchSpatialSources(p) {
+  const angle = p.spaceAzimuth ?? 0, dist = p.spaceDistance ?? 2.5;
+  return [
+    { id: "base", label: "Base", kind: "base", num: "B", hue: 36, angle, dist, color: "gold", mute: false },
+    ...(p.layers || []).map((l, i) => ({ id: l.id, label: `Layer ${i + 1}`, kind: "layer", num: String(i + 1), hue: l.hue ?? (36 + i * 70) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "blue", mute: !!l.mute, solo: !!l.solo })),
+    ...(p.percLayers || []).map((l, i) => ({ id: `perc:${l.id}`, label: l.sound?.name || l.sound?.key || `Hit ${i + 1}`, kind: "percussion", num: `P${i + 1}`, hue: (32 + i * 47) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "pink", mute: !!l.mute })),
+  ];
+}
+
+// Draggable spatial stage for the producer patch inspector (owner 2026-07-10).
+// It mirrors the sub-note SPACE stage's interaction but is params-agnostic and
+// self-contained, sharing the geometry helpers (_stageGeom / _spaceDistToR /
+// _spaceRToDist). cfg.sources() yields dots {id,kind,num,hue,angle,dist,mute,
+// solo}; cfg.onMove(source,angle,dist) persists a drag; cfg.selected()/onSelect
+// drive the cross-pane highlight. Returns { redraw } so the layers pane can keep
+// the dots in sync when its sliders/mute/solo change.
+function mountPatchStage(canvas, cfg) {
+  if (!canvas) return { redraw() {} };
+  const sources = () => cfg.sources() || [];
+  const selId = () => (cfg.selected ? cfg.selected() : null);
+
+  const draw = () => {
+    const { ctx, w, h } = crisp2d(canvas);
+    ctx.clearRect(0, 0, w, h);
+    const { cx, cy, rMax } = _stageGeom(w, h);
+    const GRID = "rgba(90,110,130,0.3)", TXT = "rgba(120,135,150,0.8)";
+    ctx.font = "10px ui-monospace, monospace";
+    // behind-you half shaded, then log-spaced distance rings
+    ctx.fillStyle = "rgba(60,72,88,0.13)";
+    ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = GRID; ctx.setLineDash([3, 4]); ctx.fillStyle = TXT;
+    for (const dm of [1, 2, 4, 8, 16]) {
+      const r = _spaceDistToR(dm, rMax);
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+      ctx.fillText(`${dm} m`, cx + 5, cy - r - 3);
+    }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(120,140,165,0.5)";
+    ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, 2 * Math.PI); ctx.stroke();
+    for (let a = -180; a < 180; a += 15) {
+      const rad = (a - 90) * Math.PI / 180;
+      const len = a % 45 === 0 ? 8 : 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(rad) * rMax, cy + Math.sin(rad) * rMax);
+      ctx.lineTo(cx + Math.cos(rad) * (rMax + len), cy + Math.sin(rad) * (rMax + len));
+      ctx.stroke();
+    }
+    ctx.fillStyle = TXT; ctx.textAlign = "center";
+    for (const a of [-90, -45, 0, 45, 90]) {
+      const rad = (a - 90) * Math.PI / 180;
+      ctx.fillText(`${a}°`, cx + Math.cos(rad) * (rMax + 18), cy + Math.sin(rad) * (rMax + 18) + 3);
+    }
+    ctx.fillStyle = "rgba(120,135,150,0.45)";
+    ctx.fillText("behind", cx, cy + rMax + 20);
+    // listener head (ears + nose forward)
+    ctx.fillStyle = "rgba(200,215,230,0.9)";
+    ctx.beginPath(); ctx.arc(cx, cy, 8, 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx - 8, cy, 2.6, 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 8, cy, 2.6, 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - 2.6, cy - 7.4); ctx.lineTo(cx, cy - 12); ctx.lineTo(cx + 2.6, cy - 7.4);
+    ctx.closePath(); ctx.fill();
+    // sources — muted dots dim, soloed dots get a gold dashed ring, selected a ring
+    const sel = selId();
+    for (const s of sources()) {
+      const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
+      const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
+      const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+      const col = `hsl(${s.hue}, 70%, 62%)`;
+      ctx.globalAlpha = s.mute ? 0.3 : 1;
+      if (s.id === sel) {
+        ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, 14, 0, 2 * Math.PI); ctx.stroke();
+      }
+      if (s.solo) {
+        ctx.strokeStyle = "rgba(245,196,90,0.95)"; ctx.lineWidth = 1.6; ctx.setLineDash([2, 2]);
+        ctx.beginPath(); ctx.arc(x, y, 15.5, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.fillStyle = "rgba(13,16,21,0.9)";
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, 2 * Math.PI); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, 2 * Math.PI); ctx.stroke();
+      ctx.fillStyle = col; ctx.font = "600 10px ui-monospace, monospace"; ctx.textAlign = "center";
+      ctx.fillText(s.num, x, y + 3.5);
+      ctx.globalAlpha = 1;
+    }
+    ctx.textAlign = "left";
+  };
+
+  // crisp2d backing store ≠ CSS size → map pointer coords into geometry space.
+  const toLocal = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const w = canvas._cssW || rect.width, h = canvas._cssH || rect.height;
+    return {
+      x: (e.clientX - rect.left) * (w / Math.max(1, rect.width)),
+      y: (e.clientY - rect.top) * (h / Math.max(1, rect.height)),
+      w, h,
+    };
+  };
+  const srcAt = (x, y, w, h) => {
+    const { cx, cy, rMax } = _stageGeom(w, h);
+    let best = null, bestD = 18;
+    const sel = selId();
+    for (const s of sources()) {
+      const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
+      const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
+      const d = Math.hypot(cx + Math.cos(rad) * r - x, cy + Math.sin(rad) * r - y);
+      // ties go to the already-selected source so stacked dots stay grabbable
+      if (d < bestD || (best && s.id === sel && d < 18)) { best = s; bestD = Math.min(d, bestD); }
+    }
+    return best;
+  };
+  const applyAt = (e, s) => {
+    const { x, y, w, h } = toLocal(e);
+    const { cx, cy, rMax } = _stageGeom(w, h);
+    const az = Math.round(clamp(Math.atan2(x - cx, -(y - cy)) * 180 / Math.PI, -180, 180));
+    const dist = Number(_spaceRToDist(Math.hypot(x - cx, y - cy), rMax).toFixed(2));
+    cfg.onMove?.(s, az, dist);
+    draw();
+  };
+  canvas.onmousedown = (e) => {
+    e.preventDefault();
+    const pt = toLocal(e);
+    const hit = srcAt(pt.x, pt.y, pt.w, pt.h);
+    if (!hit) return;
+    cfg.onSelect?.(hit);
+    draw();
+    applyAt(e, hit);
+    const move = (ev) => applyAt(ev, hit);
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  // Redraw on resize so the bitmap never stretches (matches the sub-note stage).
+  if (canvas._patchStageRO) canvas._patchStageRO.disconnect();
+  if (window.ResizeObserver) {
+    canvas._patchStageRO = new ResizeObserver(() => { try { draw(); } catch {} });
+    canvas._patchStageRO.observe(canvas);
+  }
+  draw();
+  return { redraw: draw };
+}
+// Layers pane — a sub-note-style layer strip on the patch's own params (base row
+// + one row per layer) with level/position + mute + solo + remove. Mute/solo are
+// reflected as dimmed / gold-ringed dots on the space stage (owner 2026-07-10).
+function patchLayerStripHTML(p) {
+  const layers = Array.isArray(p.layers) ? p.layers : [];
+  const percLayers = Array.isArray(p.percLayers) ? p.percLayers : [];
+  const row = (id, tag, hue, name, badge, gainInput, angle, dist, buttons, muted, extraCls = "") => `
+    <div class="patch-lyr${muted ? " muted" : ""}${_patchStageSel === id ? " sel" : ""}${extraCls ? " " + extraCls : ""}" data-patch-lyr="${id}" style="--layer-hue:${hue}">
+      <span class="patch-lyr-tag">${tag}</span>
+      <div class="patch-lyr-body">
+        <div class="patch-lyr-name">${esc(name)}${badge}</div>
+        <div class="patch-lyr-ctls">
+          ${gainInput}
+          <label class="sp-ctl">Angle <input type="range" data-patch-lyr-angle="${id}" min="-180" max="180" step="1" value="${angle}"/></label>
+          <label class="sp-ctl">Dist <input type="range" data-patch-lyr-dist="${id}" min="0.3" max="30" step="0.1" value="${dist}"/></label>
+          ${buttons}
+        </div>
+      </div>
+    </div>`;
+  const baseRow = row("base", "B", 36, "Base", ` <span class="patch-lyr-badge">MAIN</span>`, "",
+    p.spaceAzimuth ?? 0, p.spaceDistance ?? 2.5, "", false);
+  const rows = layers.map((l, i) => row(
+    l.id, String(i + 1), l.hue ?? (36 + i * 70) % 360, l.name || `Layer ${i + 1}`, "",
+    `<label class="sp-ctl">Vol <input type="range" data-patch-lyr-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}"/></label>`,
+    l.space?.angle ?? (p.spaceAzimuth ?? 0), l.space?.dist ?? (p.spaceDistance ?? 2.5),
+    `<button class="pal-btn patch-lyr-mute${l.mute ? " on" : ""}" data-patch-layer-mute="${l.id}" title="${l.mute ? "Unmute" : "Mute"} layer">M</button>`
+    + `<button class="pal-btn patch-lyr-solo${l.solo ? " on" : ""}" data-patch-layer-solo="${l.id}" title="Solo layer — hear it alone">S</button>`
+    + `<button class="pal-btn" data-patch-layer-remove="${l.id}" title="Remove layer">×</button>`,
+    !!l.mute)).join("");
+  // Percussion hits are their OWN group — kept visually distinct from the melodic
+  // sound layers, each independently positionable + mutable (owner 2026-07-10).
+  const percRows = percLayers.length ? (
+    `<div class="patch-lyr-group"><span>Percussion</span><small>${percLayers.length} hit${percLayers.length === 1 ? "" : "s"}</small></div>` +
+    percLayers.map((l, i) => row(
+      `perc:${l.id}`, `P${i + 1}`, l.hue ?? (32 + i * 47) % 360,
+      l.sound?.name || l.sound?.key || `Hit ${i + 1}`, ` <span class="patch-lyr-badge perc">HIT</span>`,
+      `<label class="sp-ctl">Vol <input type="range" data-patch-perc-gain="${l.id}" min="0" max="1" step="0.01" value="${l.vol ?? 0.35}"/></label>`,
+      l.space?.angle ?? (p.spaceAzimuth ?? 0), l.space?.dist ?? (p.spaceDistance ?? 2.5),
+      `<button class="pal-btn patch-lyr-mute${l.mute ? " on" : ""}" data-patch-perc-mute="${l.id}" title="${l.mute ? "Unmute" : "Mute"} hit">M</button>`,
+      !!l.mute, "patch-lyr-perc")).join("")
+  ) : "";
+  const emptyNote = layers.length ? "" : `<div class="patch-lyr-empty">One sound layer. Stack more from the sub-note editor's LAYERS panel, or drag a preset onto this patch.</div>`;
+  return baseRow + rows + emptyNote + percRows;
+}
+function patchScaleHTML(p, parts, regionScoped) {
+  const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
+  const degrees = Array.isArray(p.customDegrees) && p.customDegrees.length ? p.customDegrees : (SCALE_PRESETS[p.scalePreset] || SCALE_PRESETS.major).degrees;
+  return `<div class="patch-scale"><div class="patch-scale-head">Scale · ${esc(p.scaleMode === "edo" ? `${div}-EDO` : (SCALE_PRESETS[p.scalePreset]?.label || p.scalePreset || "Major"))}</div>
+    ${smartComboHTML({ id: "patchScaleCombo", value: parts?.scale || "", buttonLabel: parts?.scaleName || "Choose scale", groups: scaleModuleOptions(parts?.scale) })}
+    <div class="patch-degrees">${degrees.map(d => `<button data-patch-degree="${d}" class="${(p.rootNotes || []).includes(d) ? "root" : (p.subScaleNotes || []).includes(d) ? "sub" : ""}" title="Cycle: scale → sub-scale → root → off">${d}</button>`).join("")}</div>
+    ${regionScoped ? '<div class="patch-global-note">If this track follows Harmonic guide, these patch-scale edits are stored but are not heard until HG is off.</div>' : ''}</div>`;
+}
+function producerPatchInspectorHTML(subject) {
+  const p = subject.patch.params || {};
+  const parts = subject.patch.parts || {};
+  const movement = p.spaceMovement === "additive" ? "additive" : "centered";
+  const percOn = Array.isArray(p.percLayers) && p.percLayers.some(l => (Number(l.vol) || 0) > 0);
+  const badges = patchBadges(p);
+  const context = subject.regionScoped ? "Region-local edits" : "Palette patch";
+  const subnoteName = parts.subnoteName || SPECTRAL_PROFILES[p.spectralProfile]?.label || "Sound source";
+  const macroName = parts.macroName || (p.melodyPattern ? `${p.melodyPattern} macro` : "Patch macro");
+  return `<div class="patch-inspector" data-patch-inspector>
+    <header class="patch-inspector-titlebar"><div><span>Inspecting ${subject.regionScoped ? "region" : "patch"}</span><h3>${esc(subject.label)}</h3></div><div class="patch-inspector-badges"><i>${esc(badges.scaleLabel)}</i><i>${badges.splits} splits</i><i>grid ${badges.grid}</i><i class="patch-local-badge">${context}</i></div><div class="patch-title-actions">${editorSwitcherHTML()}<button class="patch-close" data-patch-close title="Close inspector">×</button></div></header>
+    <div class="patch-inspector-grid">
+      <section class="patch-pane patch-pane-subnote" data-patch-drop="subnote"><header><span>Sub-note</span><small class="patch-pane-name" title="${esc(subnoteName)}">${esc(subnoteName)}</small><div><button data-patch-clear="subnote" title="Clear sub-note">×</button><button data-patch-edit="subnote" title="Edit sub-note">✎</button></div></header>
+        <div class="patch-sound-meta">Sound &amp; layers <span>${esc(SPECTRAL_PROFILES[p.spectralProfile]?.label || p.spectralProfile || "Custom source")}</span></div>
+        <div class="patch-layer-list" data-patch-layer-list>${patchLayerStripHTML(p)}</div>
+        <div class="patch-drop-hint" data-patch-drophint="subnote">Drag a sound preset here to swap the sub-note</div>
+      </section>
+      <section class="patch-pane patch-pane-space" data-patch-drop="subnote"><header><span>Patch space</span><small>Drag to place each source</small></header>
+        <div class="patch-stage-wrap"><canvas id="patchStage" title="Drag a dot to place that source around the listener — front is up, rings are metres. Muted sources dim; soloed sources ring gold."></canvas></div>
+        <div class="patch-stage-readout" id="patchStageReadout"></div>
+        <div class="patch-movement-control"><span>Global movement</span><select data-patch-movement><option value="centered"${movement === "centered" ? " selected" : ""}>Centered</option><option value="additive"${movement === "additive" ? " selected" : ""}>Additive</option></select></div>
+        <p>The track thread moves these saved positions. Drag a dot to set a source's own place without touching the global space.</p>
+      </section>
+      <section class="patch-pane patch-pane-macro" data-patch-drop="macro"><header><span>Macro &amp; harmony</span><small class="patch-pane-name" title="${esc(macroName)}">${esc(macroName)}</small><div><button data-patch-clear="macro" title="Clear macro">×</button><button data-patch-edit="macro" title="Edit macro">✎</button></div></header>
+        <div class="patch-macro-2col">
+          <div class="patch-module-card"><div class="patch-module-card-head"><b>Percussion</b><label class="patch-perc-toggle"><input type="checkbox" data-patch-perc${percOn ? " checked" : ""}/> On</label><button data-patch-edit="percussion" title="Edit percussion">✎</button></div>${smartComboHTML({ id: "patchPercCombo", value: parts.percussion || "", buttonLabel: parts.percussionName || "Choose kit", groups: percussionModuleOptions(parts.percussion) })}</div>
+          <div class="patch-module-card"><div class="patch-module-card-head"><b>Note engine</b><span>grid ${p.beatDivisions ?? 1}</span></div>${smartComboHTML({ id: "patchEngineCombo", value: parts.engine || "", buttonLabel: parts.engineName || "Choose engine", groups: engineModuleOptions(parts.engine) })}</div>
+        </div>
+        <div class="patch-module-card patch-scale-card">${patchScaleHTML(p, parts, subject.regionScoped)}<button class="patch-text-action" data-patch-edit="scale">✎ Edit scale</button></div>
+        <div class="patch-drop-hint" data-patch-drophint="macro">Drag a macro / behaviour preset here to swap the macro</div>
+      </section>
+    </div>
+  </div>`;
+}
+
 function editorSwitcherHTML() {
   return `
-    <div class="editor-switch" role="group" title="Switch between the region's layers and its piano roll">
-      <button class="editor-tab${editorMode === "layers" ? " active" : ""}" data-editor-mode="layers">Layers</button>
+    <div class="editor-switch" role="group" title="Switch between the patch inspector and piano roll">
+      <button class="editor-tab${editorMode === "patch" ? " active" : ""}" data-editor-mode="patch">▥ Patch</button>
       <button class="editor-tab${editorMode === "roll" ? " active" : ""}" data-editor-mode="roll">Piano roll</button>
     </div>`;
 }
@@ -3355,15 +4170,17 @@ function rollBakePromptHTML() {
 
 function editorPanelHTML() {
   if (editorMode === "mixer") return typeof mixerPanelHTML === "function" ? mixerPanelHTML() : "";
+  const subject = editorMode === "patch" ? editorPatchSubject() : null;
   const er = editorRegion();
-  if (!er) return "";
-  const { track, region } = er;
-  const baked = region.type === "baked" && Array.isArray(region.notes);
-  const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
-  const label = pal ? pal.name : track.name;
-  const body = editorMode === "layers"
-    ? producerLayersPanelHTML(regionPatch(track, region))
+  if (!subject && !er) return "";
+  const { track, region } = er || {};
+  const baked = !!region && region.type === "baked" && Array.isArray(region.notes);
+  const pal = region ? (arrangement.palette || []).find(pl => pl.id === region.paletteId) : null;
+  const label = subject?.label || (pal ? pal.name : track?.name || "Patch");
+  const body = editorMode === "patch"
+    ? producerPatchInspectorHTML(subject)
     : (baked ? rollPanelHTML() : rollBakePromptHTML());
+  if (editorMode === "patch") return `<div class="editor-panel-wrap patch-editor-wrap"><div class="editor-body editor-body-patch">${body}</div></div>`;
   return `
     <div class="editor-panel-wrap">
       <div class="editor-topbar">
@@ -3375,7 +4192,7 @@ function editorPanelHTML() {
 }
 
 function wireEditorPanel(v) {
-  // Switcher: Layers ↔ Piano roll for the current region.
+  // Switcher: patch inspector ↔ Piano roll for the current region.
   v.querySelectorAll("[data-editor-mode]").forEach(btn => {
     btn.onclick = () => {
       if (editorMode === btn.dataset.editorMode) return;
@@ -3393,28 +4210,203 @@ function wireEditorPanel(v) {
     editorMode = "roll";
     renderProduce();
   };
-  // Region Layers view: the macro layers panel bound to the region's patch,
-  // persisted to the palette and pushed to the live producer voice.
-  if (editorMode === "layers") {
-    const er = editorRegion();
-    if (!er) return;
-    const { track, region } = er;
-    const patch = regionPatch(track, region);
-    const refreshVoice = () => {
-      saveArrangement("region layers");
-      const voice = producerVoices.get(track.id);
-      if (voice && voice.playing) {
-        const pp = regionPlayParams(track, region);
-        voice.updateGenerationParams?.(pp);
-        voice.updateEffects?.(pp);
-        voice.updateReverb?.(pp);
+  if (editorMode === "patch") bindPatchInspector(v);
+}
+
+function bindPatchInspector(v) {
+  const panel = v.querySelector("[data-patch-inspector]");
+  const subject = editorPatchSubject();
+  if (!panel || !subject) return;
+  const patch = subject.patch;
+  const params = patch.params || (patch.params = {});
+  const persist = (label = "patch inspector") => {
+    saveArrangement(label);
+    if (subject.regionScoped) {
+      const voice = producerVoices.get(subject.track.id);
+      if (voice?.playing) voice.updateGenerationParams?.(regionPlayParams(subject.track, subject.region));
+    }
+  };
+  wireSmartCombos(panel, (combo, value) => {
+    if (combo.id === "patchEngineCombo") {
+      const item = browserItems().find(x => x.id === value);
+      if (!item || !["melody", "rhythm", "dynamics", "surprise"].includes(item.section)) return;
+      const scaleKeys = new Set(["scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz", "degreeTuning", "subScaleNotes", "subScaleWeight", "rootNotes"]);
+      for (const [key, val] of Object.entries(voiceParamsFor(item))) {
+        if (sectionForParam(key) !== "percussion" && !scaleKeys.has(key)) params[key] = val;
       }
+      patch.parts = patch.parts || {};
+      patch.parts.engine = item.id; patch.parts.engineName = item.name;
+      persist("replace note engine"); renderProduce();
+      return;
+    }
+    if (combo.id === "patchScaleCombo") {
+      const item = browserItems().find(x => x.id === value);
+      if (!item || item.section !== "melody") return;
+      const scaleKeys = new Set(["scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz", "degreeTuning", "subScaleNotes", "subScaleWeight", "rootNotes"]);
+      for (const [key, val] of Object.entries(voiceParamsFor(item))) if (scaleKeys.has(key)) params[key] = val;
+      patch.parts = patch.parts || {};
+      patch.parts.scale = item.id; patch.parts.scaleName = item.name;
+      persist("replace patch scale"); renderProduce();
+      return;
+    }
+    if (combo.id === "patchPercCombo") {
+      const item = browserItems().find(x => x.id === value);
+      if (!item || item.section !== "percussion") return;
+      for (const [key, val] of Object.entries(voiceParamsFor(item))) {
+        if (sectionForParam(key) === "percussion") params[key] = val;
+      }
+      patch.parts = patch.parts || {};
+      patch.parts.percussion = item.id; patch.parts.percussionName = item.name;
+      persist("replace percussion kit"); renderProduce();
+      return;
+    }
+    // Sub-note and Macro modules are now swapped by dragging a preset onto the
+    // pane (see pointerDragUp / patchDropZoneAtPoint), not via a dropdown.
+  });
+  panel.querySelectorAll("[data-patch-clear]").forEach(btn => {
+    btn.onclick = () => {
+      const half = btn.dataset.patchClear;
+      const sections = half === "subnote" ? PALETTE_SUBNOTE_SECTIONS : PALETTE_MACRO_SECTIONS;
+      for (const key of Object.keys(params)) if (sections.has(sectionForParam(key))) delete params[key];
+      patch.parts = patch.parts || {};
+      patch.parts[half] = null; patch.parts[`${half}Name`] = null;
+      patch.name = paletteDisplayName(patch);
+      persist("clear patch module"); renderProduce();
     };
-    bindProducerLayers(v, patch, {
-      applyLive: refreshVoice, applyReverb: refreshVoice, applyEffects: refreshVoice,
-      rerender: () => renderProduce(),
+  });
+  panel.querySelector("[data-patch-close]")?.addEventListener("click", () => {
+    editorMode = null;
+    if (!subject.regionScoped) palettePreviewId = null;
+    renderProduce();
+  });
+  panel.querySelectorAll("[data-patch-edit]").forEach(btn => {
+    btn.onclick = () => {
+      exploreParams = migrateToneParams({ ...DEFAULTS, ...params });
+      if (btn.dataset.patchEdit === "subnote") workspaceTab = "subnote";
+      else {
+        workspaceTab = "explore";
+        if (btn.dataset.patchEdit === "percussion") _macroMode = "percussion";
+        else if (btn.dataset.patchEdit === "scale") _macroMode = "scale";
+        else { _macroMode = "melody"; macroTab = "melody"; }
+      }
+      navigate("explore");
+    };
+  });
+  const movement = panel.querySelector("[data-patch-movement]");
+  if (movement) movement.onchange = () => { params.spaceMovement = movement.value; persist("patch space movement"); };
+  // ── Draggable space stage + sub-note-style layer strip (owner 2026-07-10) ──
+  const layerById = (id) => (params.layers || []).find(l => l.id === id);
+  const percById = (id) => (params.percLayers || []).find(l => l.id === id);
+  const mirrorSliders = (id, az, dist) => {
+    const a = panel.querySelector(`[data-patch-lyr-angle="${id}"]`); if (a) a.value = az;
+    const d = panel.querySelector(`[data-patch-lyr-dist="${id}"]`); if (d) d.value = dist;
+  };
+  const syncLayerRowSel = () => panel.querySelectorAll("[data-patch-lyr]").forEach(r =>
+    r.classList.toggle("sel", r.dataset.patchLyr === _patchStageSel));
+  const updateReadout = () => {
+    const el = panel.querySelector("#patchStageReadout"); if (!el) return;
+    const list = patchSpatialSources(params);
+    const s = list.find(x => x.id === _patchStageSel) || list[0];
+    el.textContent = s ? `${s.label} · ${Math.round(s.angle)}° · ${s.dist.toFixed(2)} m${s.mute ? " · muted" : ""}${s.solo ? " · solo" : ""}` : "";
+  };
+  const redrawStage = () => { if (_patchStage) _patchStage.redraw(); updateReadout(); };
+  if (!patchSpatialSources(params).some(s => s.id === _patchStageSel)) _patchStageSel = "base";
+  _patchStage = mountPatchStage(panel.querySelector("#patchStage"), {
+    sources: () => patchSpatialSources(params),
+    selected: () => _patchStageSel,
+    onSelect: (s) => { _patchStageSel = s.id; syncLayerRowSel(); updateReadout(); },
+    onMove: (s, az, dist) => {
+      if (s.kind === "base") { params.spaceAzimuth = az; params.spaceDistance = dist; mirrorSliders("base", az, dist); }
+      else if (s.kind === "percussion") { const l = percById(s.id.slice(5)); if (l) l.space = { angle: az, dist }; mirrorSliders(s.id, az, dist); }
+      else { const l = layerById(s.id); if (l) l.space = { angle: az, dist }; mirrorSliders(s.id, az, dist); }
+      persist("patch source position"); updateReadout();
+    },
+  });
+  updateReadout();
+  // Layer strip: level / position + remove. A row click selects it (rings its dot).
+  panel.querySelectorAll("[data-patch-lyr-gain]").forEach(el => {
+    el.oninput = () => { const l = layerById(el.dataset.patchLyrGain); if (!l) return; l.gain = parseFloat(el.value); if (l.mute && l.gain > 0) l.mute = false; persist("layer level"); };
+  });
+  // Angle/Dist sliders route by id: "base", a "perc:<id>" hit, or a melodic layer.
+  const spaceTargetFor = (id) => id.startsWith("perc:") ? percById(id.slice(5)) : layerById(id);
+  panel.querySelectorAll("[data-patch-lyr-angle]").forEach(el => {
+    el.oninput = () => {
+      const id = el.dataset.patchLyrAngle, val = parseFloat(el.value);
+      if (id === "base") params.spaceAzimuth = val;
+      else { const l = spaceTargetFor(id); if (l) l.space = { angle: val, dist: l.space?.dist ?? (params.spaceDistance ?? 2.5) }; }
+      persist("layer angle"); redrawStage();
+    };
+  });
+  panel.querySelectorAll("[data-patch-lyr-dist]").forEach(el => {
+    el.oninput = () => {
+      const id = el.dataset.patchLyrDist, val = parseFloat(el.value);
+      if (id === "base") params.spaceDistance = val;
+      else { const l = spaceTargetFor(id); if (l) l.space = { angle: l.space?.angle ?? (params.spaceAzimuth ?? 0), dist: val }; }
+      persist("layer dist"); redrawStage();
+    };
+  });
+  panel.querySelectorAll("[data-patch-perc-gain]").forEach(el => {
+    el.oninput = () => { const l = percById(el.dataset.patchPercGain); if (!l) return; l.vol = parseFloat(el.value); if (l.mute && l.vol > 0) l.mute = false; persist("percussion hit level"); };
+  });
+  panel.querySelectorAll("[data-patch-layer-remove]").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.patchLayerRemove;
+      params.layers = (params.layers || []).filter(l => l.id !== id);
+      if (!params.layers.length) params.layers = null;
+      if (_patchStageSel === id) _patchStageSel = "base";
+      persist("remove layer"); renderProduce();
+    };
+  });
+  panel.querySelectorAll("[data-patch-lyr]").forEach(row => {
+    row.addEventListener("mousedown", (e) => {
+      if (e.target.closest("input,button")) return; // don't steal slider/button clicks
+      _patchStageSel = row.dataset.patchLyr;
+      syncLayerRowSel(); redrawStage();
     });
-  }
+  });
+  panel.querySelectorAll("[data-patch-layer-mute]").forEach(btn => {
+    btn.onclick = () => {
+      const l = layerById(btn.dataset.patchLayerMute); if (!l) return;
+      if (l.mute) { l.gain = l._gainBeforeMute ?? 1; l.mute = false; } else { l._gainBeforeMute = l.gain ?? 1; l.gain = 0; l.mute = true; }
+      btn.classList.toggle("on", l.mute);
+      btn.title = l.mute ? "Unmute layer" : "Mute layer";
+      btn.closest("[data-patch-lyr]")?.classList.toggle("muted", l.mute);
+      const g = panel.querySelector(`[data-patch-lyr-gain="${l.id}"]`); if (g) g.value = l.gain ?? 1;
+      persist("mute patch layer"); redrawStage();
+    };
+  });
+  panel.querySelectorAll("[data-patch-layer-solo]").forEach(btn => {
+    btn.onclick = () => {
+      const l = layerById(btn.dataset.patchLayerSolo); if (!l) return;
+      l.solo = !l.solo; btn.classList.toggle("on", l.solo);
+      persist("solo patch layer"); redrawStage();
+    };
+  });
+  panel.querySelectorAll("[data-patch-perc-mute]").forEach(btn => {
+    btn.onclick = () => {
+      const l = percById(btn.dataset.patchPercMute);
+      if (!l) return;
+      if (l.mute) { l.vol = l._volBeforeMute ?? 0.35; l.mute = false; } else { l._volBeforeMute = l.vol ?? 0; l.vol = 0; l.mute = true; }
+      btn.classList.toggle("on", l.mute);
+      btn.title = l.mute ? "Unmute hit" : "Mute hit";
+      btn.closest("[data-patch-lyr]")?.classList.toggle("muted", l.mute);
+      const g = panel.querySelector(`[data-patch-perc-gain="${l.id}"]`); if (g) g.value = l.vol ?? 0;
+      persist("mute percussion hit"); redrawStage();
+    };
+  });
+  const perc = panel.querySelector("[data-patch-perc]");
+  if (perc) perc.onchange = () => { params.percEnabled = perc.checked; persist("toggle patch percussion"); };
+  panel.querySelectorAll("[data-patch-degree]").forEach(btn => {
+    btn.onclick = () => {
+      const d = Number(btn.dataset.patchDegree);
+      const roots = new Set(params.rootNotes || []), sub = new Set(params.subScaleNotes || []);
+      if (roots.has(d)) { roots.delete(d); sub.add(d); }
+      else if (sub.has(d)) sub.delete(d);
+      else roots.add(d);
+      params.rootNotes = [...roots]; params.subScaleNotes = [...sub];
+      persist("patch scale degree"); renderProduce();
+    };
+  });
 }
 
 // ── Mixer view (owner 2026-07-09) ───────────────────────────────────────
@@ -3514,7 +4506,8 @@ function drawMixerTrackSpace(cv, track) {
   const hue = _spHue(arrangement.tracks.indexOf(track));
   const drag = _mixerDrag && _mixerDrag.trackId === track.id ? _mixerDrag.pos : null;
   const pos = drag || _spTrackPos(track, curPlayBeat());
-  const mode = track.spaceLayerMode === "additive" ? "additive" : "centered";
+  const vp = _spTrackVoiceParams(track, curPlayBeat());
+  const mode = vp.spaceMovement === "additive" ? "additive" : "centered";
   const constellation = _spTrackConstellation(track, curPlayBeat(), drag, mode);
   const rms = _voiceRms(producerVoices.get(track.id));
   const xyOf = (p) => {
@@ -3542,7 +4535,7 @@ function drawMixerTrackSpace(cv, track) {
       ctx.beginPath(); ctx.arc(cx, cy, _spaceDistToR(Math.max(0.3, Math.min(30, pos.dist ?? 2.5)), rMax), 0, 2 * Math.PI); ctx.stroke();
       ctx.setLineDash([]);
     }
-    const hp = _spHandleXY(pos, cx, cy, rMax, true);
+    const hp = _spHandleXY(pos, cx, cy, rMax, true, mode === "additive");
     ctx.fillStyle = `hsla(${hue}, 78%, 70%, 1)`; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
     ctx.beginPath(); ctx.arc(hp.x, hp.y, 5.5, 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
     ctx.fillStyle = "rgba(10,14,20,0.9)"; ctx.beginPath(); ctx.arc(hp.x, hp.y, 1.8, 0, 2 * Math.PI); ctx.fill();
@@ -3728,6 +4721,32 @@ function selectedBakedRegion() {
 }
 
 let rollDynLane = false; // Logic-style velocity pins lane toggle
+let rollZoom = { x: 1, y: 1 }; // Cmd + two-finger horizontal / vertical scroll
+let rollPan = { x: 0, y: 0 };  // ordinary two-finger scroll through the zoomed roll
+let _rollTransportRaf = null;
+
+function selectedRollRegion() {
+  return editorMode === "roll" ? selectedBakedRegion() : null;
+}
+function drawRollTransportPlayhead() {
+  const region = selectedRollRegion();
+  if (region) drawRoll(region);
+}
+function startRollTransportPlayhead() {
+  if (_rollTransportRaf != null) return;
+  const tick = () => {
+    _rollTransportRaf = null;
+    if (!arrPlay) return;
+    drawRollTransportPlayhead();
+    _rollTransportRaf = requestAnimationFrame(tick);
+  };
+  _rollTransportRaf = requestAnimationFrame(tick);
+}
+function stopRollTransportPlayhead() {
+  if (_rollTransportRaf != null) cancelAnimationFrame(_rollTransportRaf);
+  _rollTransportRaf = null;
+  drawRollTransportPlayhead();
+}
 
 function rollPanelHTML() {
   const region = selectedBakedRegion();
@@ -3753,7 +4772,7 @@ function rollPanelHTML() {
           <i class="roll-leg-realised"></i> Realised (played)
         </span>
       </div>
-      <canvas id="rollCanvas" width="960" height="${rollDynLane ? 300 : 240}"></canvas>
+      <canvas id="rollCanvas" width="960" height="${rollDynLane ? 300 : 240}" title="Two-finger scroll pans the zoomed roll. ⌘ + two-finger up/down zooms pitch; ⌘ + two-finger left/right zooms time."></canvas>
       <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies show the realised pitch AND timing; dashed outlines mark the intended scale note and grid slot. ⇧-drag = micro-timing off the grid.</div>
     </div>`;
 }
@@ -3785,16 +4804,29 @@ function drawRoll(region) {
   // Defensive: a note with a non-finite degree must never NaN the row
   // math and blank the whole roll.
   const degs = notes.map(n => n.degree).filter(Number.isFinite);
-  const minDeg = (degs.length ? Math.min(...degs) : 0) - 2;
-  const maxDeg = (degs.length ? Math.max(...degs) : 0) + 2;
+  const allMinDeg = (degs.length ? Math.min(...degs) : 0) - 2;
+  const allMaxDeg = (degs.length ? Math.max(...degs) : 0) + 2;
   const laneH = rollDynLane ? 52 : 0; // Logic-style velocity pins lane
   const pitchH = plotH - laneH;
-  const rows = maxDeg - minDeg + 1;
-  const rowH = pitchH / rows;
+  const allRows = allMaxDeg - allMinDeg + 1;
   const beatDivRoll = notes[0]?.beatDivisions || arrangement.context.beatDivisions || 1;
   const totalDivs = Math.max(regionLen(region) * beatDivRoll,
     1, ...notes.map(n => (n.offsetDivs || 0) + (n.durationDivs || 1)));
-  const xFor = (divs) => padL + (divs / totalDivs) * plotW;
+  const activeDiv = arrPlay && selectedRegion?.regionId === region.id
+    ? Math.max(0, Math.min(totalDivs, (curPlayBeat() - region.startBeat) * beatDivRoll)) : null;
+  const selectedDiv = rollNoteSel >= 0 ? (notes[rollNoteSel]?.offsetDivs || 0) : null;
+  const focusDiv = (activeDiv ?? selectedDiv ?? totalDivs / 2) + rollPan.x;
+  const viewDivs = Math.max(2, Math.min(totalDivs, totalDivs / rollZoom.x));
+  const viewStartDivs = Math.max(0, Math.min(totalDivs - viewDivs, focusDiv - viewDivs / 2));
+  const focusDeg = (rollNoteSel >= 0 && Number.isFinite(notes[rollNoteSel]?.degree)
+    ? notes[rollNoteSel].degree : Math.round((allMinDeg + allMaxDeg) / 2)) + rollPan.y;
+  const viewRows = Math.min(allRows, Math.max(3, Math.round(allRows / rollZoom.y)));
+  let minDeg = Math.max(allMinDeg, Math.min(allMaxDeg - viewRows + 1, focusDeg - Math.floor(viewRows / 2)));
+  minDeg = Math.round(minDeg);
+  const maxDeg = minDeg + viewRows - 1;
+  const rows = maxDeg - minDeg + 1;
+  const rowH = pitchH / rows;
+  const xFor = (divs) => padL + ((divs - viewStartDivs) / viewDivs) * plotW;
   const yForPitch = (deg, cents) => padT + (maxDeg - (deg + (cents || 0) / 100)) * rowH;
   const rowInfo = {};
   for (let d = minDeg; d <= maxDeg; d++) {
@@ -3806,7 +4838,7 @@ function drawRoll(region) {
       pc,
     };
   }
-  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, totalDivs, W, H, rowInfo, div, laneH, laneTop: padT + pitchH };
+  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, allMinDeg, allMaxDeg, totalDivs, viewStartDivs, viewDivs, W, H, rowInfo, div, laneH, laneTop: padT + pitchH };
 
   // Display well + scale-aware rows: out-of-scale divisions render dark
   // and are LOCKED from drags; sub-scale rows gold; root rows violet.
@@ -3842,14 +4874,15 @@ function drawRoll(region) {
     }
   }
   const beatDiv = region.notes[0]?.beatDivisions || 1;
-  for (let b = 0; b <= totalDivs; b += beatDiv) {
+  const firstGridDiv = Math.ceil(viewStartDivs / beatDiv) * beatDiv;
+  for (let b = firstGridDiv; b <= viewStartDivs + viewDivs + 0.01; b += beatDiv) {
     const x = xFor(b);
     ctx.strokeStyle = b % (beatDiv * 4) === 0 ? "rgba(154,160,171,0.16)" : "rgba(154,160,171,0.06)";
     ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
   }
 
   _rollHits = [];
-  const pxPerDiv = plotW / totalDivs;
+  const pxPerDiv = plotW / viewDivs;
   notes.forEach((n, i) => {
     if (n.isRest || !n.velocity) return;
     // GRID slot (intended timing) vs REALISED timing: micro-devs and
@@ -3915,6 +4948,19 @@ function drawRoll(region) {
     });
     ctx.lineWidth = 1;
   }
+  // Arrangement transport is shown in region-local time, and only while it
+  // is actually travelling through this inspected region.
+  const playheadVisible = activeDiv != null && activeDiv >= viewStartDivs && activeDiv <= viewStartDivs + viewDivs;
+  if (playheadVisible) {
+    const x = xFor(activeDiv);
+    ctx.strokeStyle = "rgba(75,207,255,0.95)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, padT - 2); ctx.lineTo(x, padT + plotH + 2); ctx.stroke();
+    ctx.fillStyle = "rgba(75,207,255,0.95)";
+    ctx.beginPath(); ctx.moveTo(x - 4, padT - 2); ctx.lineTo(x + 4, padT - 2); ctx.lineTo(x, padT + 3); ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 1;
+  }
+  window._rollPlayheadQA = playheadVisible ? activeDiv : null;
   window._rollHitsQA = _rollHits; // QA hook: exact note rects for tests
   window._rollGeomQA = _rollGeom; // QA hook: lane/row geometry for tests
 }
@@ -3957,6 +5003,29 @@ function wireRoll(v) {
   const region = selectedBakedRegion();
   if (!cv || !region) return;
   drawRoll(region);
+  cv.addEventListener("wheel", (e) => {
+    const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if (e.metaKey) {
+      const delta = horizontal ? e.deltaX : e.deltaY;
+      if (Math.abs(delta) < 0.1) return;
+      e.preventDefault();
+      const key = horizontal ? "x" : "y";
+      const direction = delta > 0 ? 1 : -1;
+      const max = horizontal ? 8 : 5;
+      rollZoom[key] = Math.max(1, Math.min(max, rollZoom[key] * (direction > 0 ? 1.09 : 1 / 1.09)));
+    } else if (_rollGeom) {
+      // Once zoomed in, the canvas itself becomes a two-axis trackpad
+      // viewport: horizontal scroll pans time; vertical scroll pans pitch.
+      const canPan = horizontal
+        ? _rollGeom.viewDivs < _rollGeom.totalDivs
+        : (_rollGeom.maxDeg - _rollGeom.minDeg) < (_rollGeom.allMaxDeg - _rollGeom.allMinDeg);
+      if (!canPan) return;
+      e.preventDefault();
+      if (horizontal) rollPan.x += e.deltaX * _rollGeom.viewDivs / Math.max(1, _rollGeom.plotW);
+      else rollPan.y -= e.deltaY / Math.max(10, _rollGeom.rowH * 2);
+    } else return;
+    drawRoll(region);
+  }, { passive: false });
   const dynToggle = v.querySelector("#rollDynToggle");
   if (dynToggle) dynToggle.onchange = () => {
     rollDynLane = dynToggle.checked;
@@ -4023,7 +5092,7 @@ function wireRoll(v) {
       if (_rollAddMode && _rollGeom && y < _rollGeom.laneTop) {
         const g = _rollGeom;
         const deg = g.maxDeg - Math.floor((y - g.padT) / g.rowH);
-        const divIdx = Math.max(0, Math.min(g.totalDivs - 1, Math.floor((x - g.padL) / g.plotW * g.totalDivs)));
+        const divIdx = Math.max(0, Math.min(g.totalDivs - 1, Math.floor(g.viewStartDivs + (x - g.padL) / g.plotW * g.viewDivs)));
         if (deg >= g.minDeg && deg <= g.maxDeg && g.rowInfo[deg]?.inScale) {
           const proto = region.notes[0] || {};
           const beatDivAdd = proto.beatDivisions || arrangement.context.beatDivisions || 1;
@@ -4094,7 +5163,7 @@ function wireRoll(v) {
       showNote(note);
       return;
     }
-    const pxPerDivW = g.plotW / g.totalDivs;
+    const pxPerDivW = g.plotW / g.viewDivs;
     if (drag.micro) {
       // ⇧: micro-deviations — fractional divs off the grid, underlying
       // grid values untouched (the timing twin of cents).
@@ -4107,7 +5176,7 @@ function wireRoll(v) {
       showNote(note);
       return;
     }
-    const divDelta = Math.round(dx / (g.plotW / g.totalDivs));
+    const divDelta = Math.round(dx / (g.plotW / g.viewDivs));
     // monophonic neighbours bound the trims
     const prevEnd = Math.max(0, ...region.notes
       .filter((nn, ix) => ix !== drag.i && (nn.offsetDivs || 0) < drag.orig.offsetDivs)
@@ -4262,6 +5331,19 @@ function paletteItemAtPoint(x, y) {
     .map(el => (el.closest ? el.closest("[data-palette-item]") : null))
     .find(Boolean) || null;
 }
+function harmonicGuideAtPoint(x, y) {
+  return document.elementsFromPoint(x, y)
+    .map(el => (el.closest ? el.closest(".tl2-gs-row") : null))
+    .find(Boolean) || null;
+}
+// A patch-inspector pane tagged as a module drop target (left two panes swap the
+// sub-note, the macro pane swaps the macro). Returns {el, half} or null.
+function patchDropZoneAtPoint(x, y) {
+  const el = document.elementsFromPoint(x, y)
+    .map(e => (e.closest ? e.closest("[data-patch-drop]") : null))
+    .find(Boolean);
+  return el ? { el, half: el.dataset.patchDrop } : null;
+}
 // offsetBeats: how far into the dragged region the cursor grabbed, so the
 // region's START lands at cursor − offset (the grab point stays under the
 // cursor) instead of snapping the start to the cursor.
@@ -4291,19 +5373,23 @@ function trackFreeFrom(track, fromBeat) {
 
 function dropPaletteOnLane(laneId, palId, beat) {
   const pal = (arrangement.palette || []).find(pl => pl.id === palId);
-  if (!pal) return false;
+  if (!pal || !paletteIsPlayable(pal)) return false;
   let track;
+  let wasEmpty = false;
   if (laneId === "__new__") {
     track = { id: crypto.randomUUID(), name: pal.name, gain: 1, regions: [] };
     arrangement.tracks.push(track);
+    wasEmpty = true;
   } else {
     track = arrangement.tracks.find(t => t.id === laneId);
+    wasEmpty = !!track && !(track.regions || []).length;
   }
   if (!track) return false;
   const len = Math.min(BEATS_PER_BAR * 2, trackFreeFrom(track, beat));
   if (len < 1) return false;
   const region = { id: crypto.randomUUID(), paletteId: pal.id, startBeat: beat, lengthBeats: len, seed: newSeed() };
   track.regions.push(region);
+  if (wasEmpty) initialiseTrackThreadFromPatch(track, pal.params);
   selectedRegion = { trackId: track.id, regionId: region.id };
   saveArrangement();
   renderProduce();
@@ -4777,11 +5863,19 @@ function pointerDragMove(e) {
   const lane = laneAtPoint(e.clientX, e.clientY);
   if (lane) lane.classList.add("drop-target");
   else if (pointerDrag.kind === "browser") {
-    const itemEl = paletteItemAtPoint(e.clientX, e.clientY);
-    if (itemEl) itemEl.classList.add("drop-target");
+    const dz = patchDropZoneAtPoint(e.clientX, e.clientY);
+    if (dz) dz.el.classList.add("drop-target");
     else {
-      const zone = paletteZoneAtPoint(e.clientX, e.clientY);
-      if (zone) zone.classList.add("drop-target");
+      const hg = harmonicGuideAtPoint(e.clientX, e.clientY);
+      if (hg) hg.classList.add("drop-target");
+      else {
+        const itemEl = paletteItemAtPoint(e.clientX, e.clientY);
+        if (itemEl) itemEl.classList.add("drop-target");
+        else {
+          const zone = paletteZoneAtPoint(e.clientX, e.clientY);
+          if (zone) zone.classList.add("drop-target");
+        }
+      }
     }
   }
   e.preventDefault();
@@ -4812,6 +5906,28 @@ function pointerDragUp(e) {
   if (drag.kind === "browser") {
     const item = browserItems().find(i => i.id === drag.data);
     if (!item) return;
+    // Dropping onto the patch inspector: the left two panes swap the sub-note,
+    // the macro pane swaps the macro (replaces the old module dropdowns).
+    const dz = patchDropZoneAtPoint(e.clientX, e.clientY);
+    if (dz) {
+      const subject = editorPatchSubject();
+      if (subject && applyItemToPalettePatch(subject.patch, item, dz.half)) {
+        if (subject.regionScoped) {
+          const voice = producerVoices.get(subject.track.id);
+          if (voice?.playing) voice.updateGenerationParams?.(regionPlayParams(subject.track, subject.region));
+        } else {
+          palettePreviewId = subject.patch.id;
+        }
+        renderProduce();
+      }
+      return;
+    }
+    // A scale-bearing module or complete patch can seed the Harmonic guide
+    // directly.  The guide's own overwrite safeguard applies here too.
+    if (harmonicGuideAtPoint(e.clientX, e.clientY)) {
+      if (setHarmonicGuideFromParams(item.params, item.name)) renderProduce();
+      return;
+    }
     if (lane) {
       // Straight from the browser onto a track: add to palette, then place
       addToPalette(item);
@@ -4819,14 +5935,13 @@ function pointerDragUp(e) {
       dropPaletteOnLane(lane.dataset.lane, palId, beatAtClientX(lane, e.clientX));
       return;
     }
-    // Q1: dropping ON an existing patch loads the preset into it — the
-    // patch's MACRO/BOTH/SUB-NOTE selector decides which half is replaced.
+    // Dropping on a patch is now direct: a full patch fills both slots, while
+    // a module replaces its natural Sub-note or Macro slot.
     const palEl = paletteItemAtPoint(e.clientX, e.clientY);
     const pl = palEl && (arrangement.palette || []).find(x => x.id === palEl.dataset.paletteItem);
     if (pl) {
-      const half = _palHalfSel[pl.id] || "both";
-      loadPresetIntoPatch(pl, item, half);
-      saveArrangement(`load ${item.name} → ${pl.name} (${half})`);
+      applyItemToPalettePatch(pl, item);
+      saveArrangement(`load ${item.name} → ${pl.name}`);
       renderProduce();
     } else if (paletteZoneAtPoint(e.clientX, e.clientY)) {
       addToPalette(item);
@@ -4889,14 +6004,44 @@ function loadDemoArrangement() {
   return true;
 }
 
+function paletteZoneHTML(pl, half, label) {
+  const filled = pl.parts?.[half];
+  const name = pl.parts?.[`${half}Name`];
+  return `<button class="palette-zone${filled ? " filled" : ""}" data-palette-zone="${pl.id}:${half}" title="${filled ? `Replace ${label.toLowerCase()} module` : `Choose a ${label.toLowerCase()} module from the browser above`}">
+    <b>${half === "subnote" ? "◫" : "≋"} ${esc(label)}</b>
+    <span>${filled ? esc(name || "module") : "＋ Add"}</span>
+  </button>`;
+}
+function producerPaletteHTML() {
+  const items = arrangement.palette || [];
+  if (!items.length) return '<div class="empty-state">Create a patch, then fill its Sub-note and Macro zones from the browser above.</div>';
+  return items.map(pl => {
+    const playable = paletteIsPlayable(pl);
+    return `<div class="palette-item${palettePreviewId === pl.id ? " selected" : ""}" data-palette-item="${pl.id}" title="Build a patch from its two modules, then drag it to a track.">
+      <div class="pal-top"><span class="pal-name">${esc(paletteDisplayName(pl))}</span><span class="pal-kind">${esc(pl.kindLabel || "Patch")}</span>
+        <span class="pal-actions">
+          <button class="pal-btn" data-palette-preview="${pl.id}" title="Open this patch in the three-pane editor${playable ? " and preview it" : ""}">▥</button>
+          <button class="pal-btn" data-palette-edit="${pl.id}" title="Edit this patch in the Studio">✎</button>
+          <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="Add a track playing this patch">＋ Track</button>
+          <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
+        </span>
+      </div>
+      <div class="palette-zones">${paletteZoneHTML(pl, "subnote", "Sub-note")}${paletteZoneHTML(pl, "macro", "Macro")}</div>
+      ${playable ? patchBadgesHTML({ ...pl.params, ...(pl.originScale || {}) }, pl.originTempo) : '<span class="pal-draft-note">Add both modules to preview or place this patch.</span>'}
+    </div>`;
+  }).join("");
+}
+
 function renderProduce() {
   arrangement = arrangement || loadArrangement();
+  repairFullPaletteModules();
   dawLayout = dawLayout || loadDawLayout();
   pxPerBeat = dawLayout.pxPerBeat || 14;
   snapBeats = 0.5; // owner 2026-07-09: no snap control — dragging always uses the smallest unit (⌃-drag still frees it)
   const sources = produceSources();
   const editorOpen = editorMode === "mixer"
-    || ((editorMode === "roll" || editorMode === "layers") && !!editorRegion());
+    || (editorMode === "patch" && !!editorPatchSubject())
+    || (editorMode === "roll" && !!editorRegion());
   const v = mount(`
     <div class="daw">
       <div class="daw-transport">
@@ -4959,28 +6104,8 @@ function renderProduce() {
               <div class="browser-cards" id="browserCards"></div>
             </div>
             <div class="daw-palette" id="dawPalette">
-              <div class="section-label">Palette</div>
-              <div class="palette-rack" id="paletteRack">
-                ${(arrangement.palette || []).length ? (arrangement.palette || []).map(pl => {
-                  const half = _palHalfSel[pl.id] || "both";
-                  return `
-                  <div class="palette-item${half !== "both" ? " half-armed" : ""}" data-palette-item="${pl.id}" title="Your working instrument — drag onto a track (P3) or add a track with +. Drop a browser preset ON this card to load it into the selected half.">
-                    <span class="pal-name">${esc(pl.name)}</span>
-                    <span class="pal-kind">${esc(pl.kindLabel || "")}</span>
-                    <span class="pal-actions">
-                      ${pl.originTempo ? `<button class="pal-btn" data-adopt-tempo="${pl.id}" title="Adopt this patch's design tempo (${pl.originTempo} bpm) as the session tempo">⏱</button>` : ""}
-                      <button class="pal-btn" data-palette-edit="${pl.id}" title="Open this instrument in the Studio editor — save it back and every region using it follows">✎</button>
-                      <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="Add a track playing this instrument, with a first region at bar 1">＋ Track</button>
-                      <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
-                    </span>
-                    ${patchBadgesHTML({ ...pl.params, ...(pl.originScale || {}) }, pl.originTempo)}
-                    <span class="pal-half" role="group" title="Which half of this patch browser presets load into: MACRO = behaviour (melody, rhythm, dynamics, surprise), SUB-NOTE = the sound itself, BOTH = the whole patch">
-                      ${[["macro", "MACRO"], ["both", "BOTH"], ["subnote", "SUB-NOTE"]].map(([h, label]) =>
-                        `<button class="pal-half-btn${half === h ? " active" : ""}" data-pal-half="${pl.id}:${h}">${label}</button>`).join("")}
-                    </span>
-                  </div>`;
-                }).join("") : '<div class="empty-state">Drag presets here from the browser above — this is your instrument rack for the arrangement.</div>'}
-              </div>
+              <div class="section-label">Palette <button class="pal-btn" data-palette-new title="Create an empty patch with Sub-note and Macro zones">＋</button></div>
+              <div class="palette-rack" id="paletteRack">${producerPaletteHTML()}</div>
             </div>
           </div>
         </div>
@@ -4994,7 +6119,7 @@ function renderProduce() {
         </div>
       </div>
       <div class="daw-hsplit${editorOpen ? "" : " hidden"}" id="dawHSplit" title="Drag to resize the editor"></div>
-      <div class="daw-editor${editorOpen ? "" : " collapsed"}" style="height:${editorOpen ? dawLayout.editorH : 0}px">
+      <div class="daw-editor${editorOpen ? "" : " collapsed"}" style="height:${editorOpen ? (editorMode === "patch" ? Math.max(dawLayout.editorH, 300) : dawLayout.editorH) : 0}px">
         ${editorOpen ? editorPanelHTML() : ""}
       </div>
       ${editorMode === "mixer" ? "" : `<button class="mixer-toggle" id="mixerToggle" title="Open the channel mixer">▥ Mixer</button>`}
@@ -5011,8 +6136,19 @@ function renderProduce() {
 function wireGlobalScale(v) {
   const gsToggle = v.querySelector("#gsToggle");
   if (gsToggle) gsToggle.onclick = () => { _gsOpen = !_gsOpen; renderProduce(); };
-  // No enable checkbox — global scale is active whenever a track's G is on
-  // (globalScaleActive), so the G buttons are the only switch.
+  // No enable checkbox — Harmonic guide is active whenever a track's HG is on.
+  const hgSearch = v.querySelector("#hgScaleSearch");
+  if (hgSearch) hgSearch.oninput = () => {
+    const q = hgSearch.value.trim().toLowerCase();
+    v.querySelectorAll("[data-hg-choice]").forEach(btn => { btn.hidden = !!q && !btn.dataset.hgSearch.includes(q); });
+  };
+  v.querySelectorAll("[data-hg-choice]").forEach(btn => {
+    btn.onclick = () => {
+      const choice = _hgChoices.get(btn.dataset.hgChoice);
+      if (!choice) return;
+      if (setHarmonicGuideFromParams(choice, choice.note || choice.label)) renderProduce();
+    };
+  });
   // Owner rework: the strip canvas is the surface. Double-click at a bar
   // line adds a change point (seeded from the scale in force there);
   // clicking a change-point line opens the editor; clicking anywhere else
@@ -5055,7 +6191,7 @@ function wireGlobalScale(v) {
       gs.markers.sort((a, b) => a.atBeat - b.atBeat);
       _gsSelMarker = gs.markers.findIndex(m => m.atBeat === atBeat);
       gs.enabled = true; // adding the first change point is an unambiguous opt-in
-      saveArrangement("global scale change point");
+      saveArrangement("Harmonic guide change point");
       renderProduce();
     };
   }
@@ -5077,7 +6213,7 @@ function wireGlobalScale(v) {
       } else {
         m.degrees = add(m.degrees);
       }
-      saveArrangement("global scale edit");
+      saveArrangement("Harmonic guide edit");
       renderProduce();
     };
   });
@@ -5085,7 +6221,7 @@ function wireGlobalScale(v) {
   if (gsDel) gsDel.onclick = () => {
     ensureGlobalScale().markers.splice(_gsSelMarker, 1);
     _gsSelMarker = -1;
-    saveArrangement("global scale marker removed");
+    saveArrangement("Harmonic guide marker removed");
     renderProduce();
   };
   v.querySelectorAll("[data-track-gscale]").forEach(btn => {
@@ -5093,7 +6229,7 @@ function wireGlobalScale(v) {
       const t = arrangement.tracks.find(t => t.id === btn.dataset.trackGscale);
       if (!t) return;
       t.useGlobalScale = !t.useGlobalScale;
-      saveArrangement("track follows global scale");
+      saveArrangement("track follows Harmonic guide");
       renderProduce();
     };
   });
@@ -5125,6 +6261,15 @@ function wireStripsPanel(v) {
 
 function wireProduce(v) {
   const sources = produceSources();
+
+  if (_timelineZoomAnchor) {
+    const anchor = _timelineZoomAnchor;
+    _timelineZoomAnchor = null;
+    requestAnimationFrame(() => {
+      const grid = v.querySelector("#timelineGrid");
+      if (grid) grid.scrollLeft = Math.max(0, anchor.beat * pxPerBeat - anchor.offsetPx);
+    });
+  }
 
   wireSessionBar(v);
   wireBrowserPalette(v);
@@ -5300,7 +6445,7 @@ function wireProduce(v) {
       selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
       // Baked → piano roll; generative → the region's layers (owner 2026-07-09).
       const er = editorRegion();
-      editorMode = (er && er.region.type === "baked") ? "roll" : "layers";
+      editorMode = (er && er.region.type === "baked") ? "roll" : "patch";
       renderProduce();
     };
   });
@@ -5714,13 +6859,27 @@ function wireProduce(v) {
   // Zoom / snap / length (v2.1 U5, U6)
   const zoomIn = v.querySelector("#zoomIn");
   const zoomOut = v.querySelector("#zoomOut");
-  const setZoom = (px) => {
+  const setZoom = (px, anchor = null) => {
     dawLayout.pxPerBeat = Math.max(6, Math.min(32, px));
+    if (anchor) _timelineZoomAnchor = anchor;
     saveDawLayout();
     renderProduce();
   };
   if (zoomIn) zoomIn.onclick = () => setZoom((dawLayout.pxPerBeat || 14) + 3);
   if (zoomOut) zoomOut.onclick = () => setZoom((dawLayout.pxPerBeat || 14) - 3);
+  const trackArea = v.querySelector("#timelineGrid");
+  if (trackArea) trackArea.addEventListener("wheel", (e) => {
+    // Command + two-finger horizontal gesture zooms the arrangement only.
+    // Ordinary scrolling, and vertical Command gestures, retain their normal
+    // browser/timeline behaviour.
+    if (!e.metaKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || Math.abs(e.deltaX) < 0.1) return;
+    e.preventDefault();
+    const rect = trackArea.getBoundingClientRect();
+    const offsetPx = Math.max(0, Math.min(trackArea.clientWidth, e.clientX - rect.left));
+    const anchorBeat = (trackArea.scrollLeft + offsetPx) / Math.max(1, pxPerBeat);
+    const factor = e.deltaX > 0 ? 1.08 : 1 / 1.08;
+    setZoom((dawLayout.pxPerBeat || 14) * factor, { beat: anchorBeat, offsetPx });
+  }, { passive: false });
   // Arrangement registry controls (v2.1 U11)
   const arrSelect = v.querySelector("#arrSelect");
   if (arrSelect) arrSelect.onchange = () => switchArrangement(arrSelect.value);
@@ -6351,31 +7510,45 @@ function renderExplore() {
           <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
           <button class="workspace-tab${workspaceTab === 'scalelab' ? ' active' : ''}" data-workspace-tab="scalelab" title="The tuning workshop: the scale wheel, N-EDO systems, world tunings, per-degree cents and Scala import/export">Scale Lab</button>
         </div>
-        <button class="btn btn-ghost btn-sm studio-tour-btn" id="studioTourBtn" title="Replay the guided tour of the studio">✦ Tour</button>
         <a class="producer-pill" href="#produce" title="Producer: arrange your instruments on a timeline">▦ Producer</a>
-        <button class="transport-round transport-play${synth.isPlaying ? ' is-playing' : ''}" id="playBtn">${synth.isPlaying ? "❚❚" : "▶"}</button>
-        <button class="transport-round transport-stop" id="stopBtn">■</button>
-        <button class="btn btn-secondary rand-btn" id="randBtn">Randomise</button>
-        <button class="btn btn-secondary" id="regenBtn" title="Rebuild the sequence from the start using the current parameters">↻ Restart seq</button>
+        <!-- One play/stop toggle: it already stopped when playing, so the old
+             separate ■ Stop button was redundant (owner 2026-07-10). Restart and
+             Randomise are icon buttons to save the header's width. -->
+        <div class="transport-cluster">
+          <button class="transport-round transport-play${synth.isPlaying ? ' is-playing' : ''}" id="playBtn" title="Play / Stop">${synth.isPlaying ? "■" : "▶"}</button>
+          <button class="transport-round transport-icon" id="regenBtn" title="Restart the sequence from the top with the current settings">↻</button>
+          <button class="transport-round transport-icon rand-icon" id="randBtn" title="Randomise every behaviour and roll a fresh seed">◇</button>
+        </div>
         <div class="seed-box">
           <span>Seed</span>
           <button class="btn btn-ghost btn-sm" id="seedBtn">${p.seed}</button>
         </div>
       </div>
+      <div class="tc-spacer"></div>
       ${workspaceTab === 'explore' ? '' : `
-      <div class="top-save-bar">
-        <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
-        <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
-          <option value="full">Everything</option>
-          ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
-        </select>
-        <button class="btn btn-primary btn-sm" id="saveBtn">Save</button>
+      <!-- Save collapses into a popover so the name field + scope don't eat the
+           header's width (owner 2026-07-10). -->
+      <div class="top-save" id="topSave">
+        <button class="btn btn-primary btn-sm top-save-toggle" id="saveToggle" title="Save the current sound as a preset">Save<span class="caret">▾</span></button>
+        <div class="save-pop" id="savePop" hidden>
+          <label class="save-pop-row"><span>Name</span>
+            <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
+          </label>
+          <label class="save-pop-row"><span>Capture</span>
+            <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
+              <option value="full">Everything</option>
+              ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
+            </select>
+          </label>
+          <button class="btn btn-primary btn-sm" id="saveBtn">Save preset</button>
+        </div>
       </div>`}
       <div class="top-rating-row">
         <span class="label">Rating</span>
         <input type="range" id="ratingSlider" min="1" max="7" step="1" value="${exploreRating}"/>
         <output id="ratingOut">${exploreRating}/7</output>
       </div>
+      <button class="transport-round transport-icon studio-tour-btn" id="studioTourBtn" title="Replay the guided tour of the studio">✦</button>
       <div class="controls-grid tempo-grid">
         ${controlRow("tempo", "Tempo", p.tempo, 50, 180, 1)}
       </div>
@@ -6532,7 +7705,8 @@ function renderExplore() {
   const playBtn = v.querySelector("#playBtn");
   const syncPlayButton = () => {
     if (!playBtn) return;
-    playBtn.textContent = synth.isPlaying ? "❚❚" : "▶";
+    // one toggle: ▶ when idle, ■ when playing (clicking it stops)
+    playBtn.textContent = synth.isPlaying ? "■" : "▶";
     playBtn.classList.toggle("is-playing", synth.isPlaying);
   };
   const clearPreviewBadge = () => {
@@ -6559,17 +7733,7 @@ function renderExplore() {
     syncPlayButton();
     trackEngagement("play");
   };
-  const stopBtn = v.querySelector("#stopBtn");
-  if (stopBtn) stopBtn.onclick = () => {
-    clearPreviewBadge();
-    synth.stop();
-    cancelAnimationFrame(animFrame);
-    _markersActive = false;
-    drawMacroDistsAll();   // clear any lingering live note-trace beam
-    drawStaticVis();
-    resetMeters();
-    syncPlayButton();
-  };
+  // (the separate #stopBtn was removed — the play button toggles play/stop)
   const regenBtn = v.querySelector("#regenBtn");
   if (regenBtn) regenBtn.onclick = () => {
     // Rebuild the Markov sequence from the start with the current params. If
@@ -7347,13 +8511,8 @@ function renderExplore() {
     };
   }
 
-  // Percussion sound selectors
-  v.querySelectorAll("select[data-perc]").forEach(sel => {
-    sel.onchange = () => {
-      exploreParams[sel.dataset.perc] = sel.value;
-      debouncedReplay();
-    };
-  });
+  // Percussion (v2): enable toggle + editable layer list + smart-combo sounds
+  wirePercussionPanel(v);
 
   // Rating
   const ratingSlider = v.querySelector("#ratingSlider");
@@ -7382,8 +8541,26 @@ function renderExplore() {
   // Per-panel section preset bars
   wirePanelPresetBars(v);
 
-  // Save preset (full rig or a single section)
-  v.querySelector("#saveBtn").onclick = () => {
+  // Save preset (full rig or a single section). The name field + scope live in
+  // a popover toggled by #saveToggle so the header stays compact.
+  const saveToggle = v.querySelector("#saveToggle");
+  const savePop = v.querySelector("#savePop");
+  if (saveToggle && savePop) {
+    saveToggle.onclick = (e) => {
+      e.stopPropagation();
+      savePop.hidden = !savePop.hidden;
+      if (!savePop.hidden) {
+        const n = v.querySelector("#presetName"); if (n) n.focus();
+        if (window._savePopDoc) document.removeEventListener("click", window._savePopDoc, true);
+        window._savePopDoc = (ev) => {
+          if (!ev.target.closest("#topSave")) { savePop.hidden = true; document.removeEventListener("click", window._savePopDoc, true); }
+        };
+        document.addEventListener("click", window._savePopDoc, true);
+      }
+    };
+  }
+  const saveBtn = v.querySelector("#saveBtn");
+  if (saveBtn) saveBtn.onclick = () => {
     const name = v.querySelector("#presetName").value.trim() || `Preset ${new Date().toLocaleTimeString()}`;
     const scope = v.querySelector("#presetScope")?.value || "full";
     const entry = {
@@ -7401,6 +8578,7 @@ function renderExplore() {
     savePresets(list);
     renderPresetList(v.querySelector("#myPresets"), loadPresets(), "my");
     trackEngagement("save");
+    if (savePop) savePop.hidden = true;
     maybeShowContribute(v);
   };
 
@@ -7682,18 +8860,21 @@ function m2LibEntries() {
   if (_m2Lib.tab === "mine") {
     return loadPresets().map(e => ({
       id: `m:${e.id}`, name: e.name, section: e.section || "full",
-      family: null, rating: e.rating ?? null, parameters: e.parameters, desc: "",
+      family: e.family || null, tags: e.tags || [], roles: e.roles || [],
+      rating: e.rating ?? null, parameters: e.parameters, desc: e.description || "",
     }));
   }
   if (_m2Lib.tab === "community") {
     return (_m2LibCommunity || []).map((e, i) => ({
       id: `g:${e.id ?? i}`, name: e.name || "Shared preset", section: e.section || "full",
-      family: e.family || null, rating: e.rating ?? null, parameters: e.parameters, desc: e.description || "",
+      family: e.family || null, tags: e.tags || [], roles: e.roles || [],
+      rating: e.rating ?? null, parameters: e.parameters, desc: e.description || "",
     }));
   }
   return FACTORY_PRESETS.map(f => ({
     id: `f:${f.id}`, name: f.name, section: f.section || "full",
-    family: f.family || null, rating: null, parameters: f.parameters, desc: f.description || "",
+    family: f.family || null, tags: f.tags || [], roles: f.roles || [],
+    rating: null, parameters: f.parameters, desc: f.description || "",
   }));
 }
 
@@ -7709,7 +8890,8 @@ function m2LibFiltered() {
     ? [
         ...Object.entries(SPECTRAL_PROFILES).map(([k, prof]) => ({
           id: `r:${k}`, name: prof.label, section: "sound", family: null, rating: null,
-          parameters: null, desc: `${prof.label} recipe — partial levels, envelope and performance defaults`,
+          tags: [k, "measured"], roles: ["sub-note"], parameters: null,
+          desc: `${prof.label} recipe — partial levels, envelope and performance defaults`,
         })),
         ...m2LibEntries(),
       ]
@@ -7717,7 +8899,8 @@ function m2LibFiltered() {
   const rows = entries.filter(e =>
     (soundMode || _m2Lib.fam === "all" || e.family === _m2Lib.fam || e.section === _m2Lib.fam) &&
     (!_m2Lib.favOnly || favs.has(e.id)) &&
-    (!q || e.name.toLowerCase().includes(q) || (e.desc || "").toLowerCase().includes(q)));
+    (!q || [e.name, e.desc, e.family, ...(e.tags || []), ...(e.roles || [])]
+      .filter(Boolean).some(value => String(value).toLowerCase().includes(q))));
   if (soundMode) rows.sort((a, b) => (a.section === "sound" ? 0 : 1) - (b.section === "sound" ? 0 : 1));
   return rows;
 }
@@ -7738,6 +8921,7 @@ function m2LibRowsHTML() {
       <span class="m2-lib-tags">
         <i class="m2-tag">${esc(PRESET_SECTIONS[e.section]?.label || (e.section === "full" ? "Full rig" : e.section))}</i>
         ${e.family ? `<i class="m2-tag">${esc(e.family)}</i>` : ""}
+        ${(e.tags || []).slice(0, 2).map(tag => `<i class="m2-tag">${esc(tag)}</i>`).join("")}
         ${splits && splits !== "all" ? `<i class="m2-tag">${esc(splits)} splits</i>` : ""}
         ${layerCount ? `<i class="m2-tag m2-tag-layers" title="Base sound plus ${layerCount} layered sub-note source${layerCount > 1 ? "s" : ""}">+${layerCount} layer${layerCount > 1 ? "s" : ""}</i>` : ""}
       </span>
@@ -7793,7 +8977,7 @@ function m2PresetStripHTML(withSave = true) {
             `<button class="m2-lib-chip m2-lib-tab${_m2Lib.tab === k ? " active" : ""}" data-m2-tab="${k}">${label}</button>`).join("")}
         </span>
         <input type="search" id="m2LibSearch" class="m2-lib-search" placeholder="Search…" value="${esc(_m2Lib.search)}"/>` : ""}
-        ${soundMode ? "" : `${famChip("all", "All")}${famChip("percussive", "Percussive")}${famChip("bass", "Bass")}${famChip("atmos", "Atmos")}${famChip("melody", "Melody")}`}
+        ${soundMode ? "" : `${famChip("all", "All")}${famChip("percussive", "Percussive")}${famChip("bass", "Bass")}${famChip("atmos", "Atmos")}${famChip("melody", "Melody")}${famChip("vocal", "Vocal")}${famChip("experimental", "Experimental")}`}
         <button class="m2-lib-chip m2-lib-fav${_m2Lib.favOnly ? " active" : ""}" id="m2LibFavOnly" title="Only favourites">♥</button>
         ${withSave ? `
         <span class="m2-lib-save">
@@ -8524,42 +9708,196 @@ function macroPanelHTML(p) {
     </div>`;
 }
 
+// ── Percussion v2 UI (owner 2026-07-10) ─────────────────────
+// A user-editable layer list replaces the fixed Beat/Motif/Downbeat trio.
+// Percussion can be switched off (greyed out) and is off by default on fresh
+// patches (see resolvePercEnabled). Each layer picks a role (its trigger), a
+// sound (a built-in sample OR a single-attack render of a sub-note instrument,
+// chosen from a searchable smart dropdown), a level, and — in the sub-note
+// SPACE panel — its own position.
+const PERC_ROLES = [["beat", "Beat"], ["motif", "Motif"], ["downbeat", "Downbeat"]];
+function percLayerHue(i) { return (32 + i * 47) % 360; }
+
+// value strings for the sound smart-combo: "sample:<key>" | "inst:<presetId>"
+function percSoundValue(sound) {
+  if (sound && sound.kind === "instrument") return `inst:${sound.presetId ?? sound.name ?? ""}`;
+  return `sample:${(sound && sound.key) || "click"}`;
+}
+function percSoundLabel(sound) {
+  if (sound && sound.kind === "instrument") return sound.name || "Instrument";
+  const key = (sound && sound.key) || "click";
+  return (PERC_SOUNDS[key] && PERC_SOUNDS[key].label) || key;
+}
+// Single-layer sub-note patches offered as percussion instruments: any preset
+// carrying a sound half and NOT stacking extra layers.
+function percInstrumentOptions() {
+  const seen = new Set();
+  const opts = [];
+  for (const preset of [...FACTORY_PRESETS, ...loadPresets()]) {
+    const params = preset && preset.parameters;
+    if (!params) continue;
+    if (Array.isArray(params.layers) && params.layers.length) continue; // single-layer only
+    const id = String(preset.id);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    opts.push({ value: `inst:${id}`, label: preset.name || id, note: preset.family || preset.section || "instrument" });
+  }
+  return opts;
+}
+// value → a sound descriptor, snapshotting the instrument's sound half.
+function percResolveSound(value) {
+  const idx = String(value).indexOf(":");
+  const kind = idx < 0 ? "sample" : String(value).slice(0, idx);
+  const key = idx < 0 ? String(value) : String(value).slice(idx + 1);
+  if (kind !== "inst") return { kind: "sample", key: key || "click" };
+  const preset = [...FACTORY_PRESETS, ...loadPresets()].find(x => String(x.id) === key);
+  if (!preset || !preset.parameters) return { kind: "sample", key: "click" };
+  const subnote = extractSectionParams(migrateToneParams({ ...preset.parameters }), "sound");
+  for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k]; // never nest layers
+  return { kind: "instrument", name: preset.name || key, presetId: key, pitchHz: 220, subnote };
+}
+function percSoundComboHTML(l) {
+  const groups = [
+    { label: "Samples", options: Object.entries(PERC_SOUNDS).map(([k, s]) => ({ value: `sample:${k}`, label: s.label, note: "sample" })) },
+    { label: "Sub-note instruments", options: percInstrumentOptions() },
+  ];
+  return smartComboHTML({
+    id: `percSnd-${l.id}`,
+    value: percSoundValue(l.sound),
+    buttonLabel: percSoundLabel(l.sound),
+    placeholder: "Search sounds…",
+    groups,
+  });
+}
+function percLayerRowHTML(l, i) {
+  const roleOpts = PERC_ROLES.map(([v, label]) =>
+    `<option value="${v}"${l.role === v ? " selected" : ""}>${label}</option>`).join("");
+  const isInst = !!(l.sound && l.sound.kind === "instrument");
+  return `
+    <div class="perc-lyr" data-perc-layer="${l.id}" style="--layer-hue:${percLayerHue(i)}">
+      <div class="perc-lyr-head">
+        <select class="perc-lyr-role" data-perc-role="${l.id}" title="When this layer fires">${roleOpts}</select>
+        <button type="button" class="pal-btn perc-lyr-remove" data-perc-remove="${l.id}" title="Remove this layer">×</button>
+      </div>
+      <div class="perc-lyr-sound">${percSoundComboHTML(l)}</div>
+      <div class="perc-lyr-ctls">
+        <label class="sp-ctl">Vol <input type="range" data-perc-vol="${l.id}" min="0" max="1" step="0.01" value="${l.vol ?? 0}"/></label>
+        ${l.role === "downbeat" ? `<label class="sp-ctl">Every <input type="range" data-perc-every="${l.id}" min="1" max="16" step="1" value="${l.every ?? 4}"/></label>` : ""}
+        ${isInst ? `<label class="sp-ctl" title="Fixed pitch of the instrument hit (does not track the key)">Pitch <input type="range" data-perc-pitch="${l.id}" min="60" max="880" step="1" value="${l.sound.pitchHz ?? 220}"/></label>` : ""}
+      </div>
+    </div>`;
+}
 function productionPanelHTML(p) {
-  // Q2: the standalone reverb card is gone from the macro production tab.
   // Owner-clarified model: reverb/space TYPE lives with the global space
-  // (producer, Q6); each patch keeps its own space in the SPACE stage
-  // inspector. The reverb params stay in the params object — patches and
-  // saved presets still carry and use them.
+  // (producer, Q6); each patch keeps its own space in the SPACE stage. The
+  // reverb params stay in the params object. Percussion is a switchable,
+  // user-editable layer list (percLayers); off by default on fresh patches.
+  const enabled = resolvePercEnabled(p);
+  const layers = ensurePercLayers(p);
+  const rows = layers.map((l, i) => percLayerRowHTML(l, i)).join("");
   return `
     <div class="perf-panel production-panel">
       <div class="perf-section percussion-section">
-        ${panelPresetBarHTML("percussion")}
-        <div class="perc-layers">
-          <div class="perc-layer">
-            <div class="perc-header">Beat</div>
-            <select data-perc="percBeatSound" class="perc-select">
-              ${percSoundOptions(p.percBeatSound)}
-            </select>
-            ${controlRow("percBeatVol", "Vol", p.percBeatVol, 0, 1, 0.01)}
-          </div>
-          <div class="perc-layer">
-            <div class="perc-header">Motif</div>
-            <select data-perc="percMotifSound" class="perc-select">
-              ${percSoundOptions(p.percMotifSound)}
-            </select>
-            ${controlRow("percMotifVol", "Vol", p.percMotifVol, 0, 1, 0.01)}
-          </div>
-          <div class="perc-layer">
-            <div class="perc-header">Downbeat</div>
-            <select data-perc="percDownbeatSound" class="perc-select">
-              ${percSoundOptions(p.percDownbeatSound)}
-            </select>
-            ${controlRow("percDownbeatVol", "Vol", p.percDownbeatVol, 0, 1, 0.01)}
-            ${controlRow("percDownbeatEvery", "Every", p.percDownbeatEvery, 1, 16, 1)}
-          </div>
+        <div class="perc-enable-row">
+          <label class="perc-enable-toggle" title="Turn percussion on or off for this patch">
+            <input type="checkbox" data-perc-enable ${enabled ? "checked" : ""}/>
+            <span>Percussion</span>
+          </label>
+          <span class="perc-enable-hint">${enabled ? "Accents layer over the motif — sound, level & position are per layer." : "Off — enable to add rhythmic accents."}</span>
+        </div>
+        <div class="perc-body${enabled ? "" : " perc-disabled"}" data-perc-body${enabled ? "" : ' aria-disabled="true"'}>
+          ${panelPresetBarHTML("percussion")}
+          <div class="perc-list" data-perc-list>${rows || `<div class="perc-empty">No layers yet — add one below.</div>`}</div>
+          <button type="button" class="perc-add" data-perc-add>＋ Add layer</button>
         </div>
       </div>
     </div>`;
+}
+
+// Re-render just the percussion production panel in place (add/remove/role/kind
+// changes restructure it) and re-wire, so the rest of the view is untouched.
+function rerenderProductionPanel(v) {
+  const old = v.querySelector(".production-panel");
+  if (!old) return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = productionPanelHTML(exploreParams);
+  const fresh = tmp.firstElementChild;
+  if (!fresh) return;
+  old.replaceWith(fresh);
+  wirePercussionPanel(v);
+  wirePanelPresetBars(v);
+}
+
+// Live-apply percussion edits to a running performance (no restart). When
+// stopped this is a no-op — the next play() reads exploreParams directly.
+function applyPerc() {
+  if (synth.isPlaying) synth.updatePercLayers({ ...exploreParams });
+}
+
+function wirePercussionPanel(v) {
+  const percLayers = () => Array.isArray(exploreParams.percLayers)
+    ? exploreParams.percLayers
+    : (exploreParams.percLayers = ensurePercLayers(exploreParams));
+  const byId = (id) => (exploreParams.percLayers || []).find(l => l.id === id);
+
+  const enableEl = v.querySelector("[data-perc-enable]");
+  if (enableEl) enableEl.onchange = () => {
+    exploreParams.percEnabled = enableEl.checked;
+    if (enableEl.checked) percLayers(); // materialise the list so it round-trips
+    rerenderProductionPanel(v);
+    applyPerc();
+  };
+
+  const list = v.querySelector("[data-perc-list]");
+  if (!list) return;
+
+  v.querySelectorAll("[data-perc-role]").forEach(sel => {
+    sel.onchange = () => {
+      const l = byId(sel.dataset.percRole);
+      if (!l) return;
+      l.role = sel.value;
+      if (l.role === "downbeat" && l.every == null) l.every = 4;
+      rerenderProductionPanel(v); // Every control appears/disappears with the role
+      applyPerc();
+    };
+  });
+  v.querySelectorAll("[data-perc-vol]").forEach(sl => {
+    sl.oninput = () => { const l = byId(sl.dataset.percVol); if (l) { l.vol = parseFloat(sl.value); applyPerc(); } };
+  });
+  v.querySelectorAll("[data-perc-every]").forEach(sl => {
+    sl.oninput = () => { const l = byId(sl.dataset.percEvery); if (l) { l.every = parseInt(sl.value, 10) || 4; applyPerc(); } };
+  });
+  v.querySelectorAll("[data-perc-pitch]").forEach(sl => {
+    sl.oninput = () => {
+      const l = byId(sl.dataset.percPitch);
+      if (l && l.sound && l.sound.kind === "instrument") { l.sound.pitchHz = parseFloat(sl.value); applyPerc(); }
+    };
+  });
+  v.querySelectorAll("[data-perc-remove]").forEach(btn => {
+    btn.onclick = () => {
+      exploreParams.percLayers = (exploreParams.percLayers || []).filter(l => l.id !== btn.dataset.percRemove);
+      rerenderProductionPanel(v);
+      applyPerc();
+    };
+  });
+  const addBtn = v.querySelector("[data-perc-add]");
+  if (addBtn) addBtn.onclick = () => {
+    percLayers().push({ id: percLayerId(), role: "beat", vol: 0.35, sound: { kind: "sample", key: "click" }, space: null });
+    rerenderProductionPanel(v);
+    applyPerc();
+  };
+
+  // Sound pickers (searchable). Changing sound KIND toggles the pitch control,
+  // so re-render on an instrument↔sample switch; otherwise just apply live.
+  wireSmartCombos(list, (combo, value) => {
+    const id = combo.id.replace("percSnd-", "");
+    const l = byId(id);
+    if (!l) return;
+    const wasInst = !!(l.sound && l.sound.kind === "instrument");
+    l.sound = percResolveSound(value);
+    if ((l.sound.kind === "instrument") !== wasInst) rerenderProductionPanel(v);
+    applyPerc();
+  });
 }
 
 // ── Q7: layered subnote modules ─────────────────────────────
@@ -8812,24 +10150,18 @@ function subnoteWorkspaceHTML(p) {
               <div class="ch-vsplit" id="chVSplit" title="Drag to resize the inspector"></div>
               <div class="ch-field-wrap">
                 <div class="td-field-head">
-                  <span class="td-field-title"><span class="td-stage-word ch-${_chStage}-word">${_chStage[0].toUpperCase()}${_chStage.slice(1)}</span> — ${_chStage === "space" ? "Ear Response" : "Partial Field"}</span>
+                  <span class="td-field-title"><span class="td-stage-word ch-${_chStage}-word">${_chStage[0].toUpperCase()}${_chStage.slice(1)}</span> — ${_chStage === "space" ? "Stage" : "Partial Field"}</span>
                 </div>
                 ${_chStage === "space" ? `
-                <!-- V2 spatial stage (renders phase-04): the field IS the
-                     stage. Sources = base sound + layers; the only per-
-                     layer space property is position (owner 07-08). The
-                     binaural analysis strip below follows the SELECTED
-                     source live. -->
-                <!-- V2.2 (owner): no chip strip above the stage — the layer
-                     rows below are the one list; dots + rows share selection -->
+                <!-- V2 spatial stage: the field IS the stage. Sources = base +
+                     layers; the only per-layer space property is position. The
+                     ear-response (arrival + colouring) now lives in the right
+                     column stacked vertically (owner 2026-07-10), so this column
+                     is purely the placement view. -->
                 <div class="ch-field-pos stage-pos">
-                  <canvas id="cvStageBig" title="The stage around your head, seen from above — front is up, the shaded half is behind you. Drag a numbered dot to place that source; rings are metres away."></canvas>
+                  <canvas id="cvStageBig" title="The stage around your head, seen from above — front is up, the shaded half is behind you. Drag a numbered dot to place that source; rings are metres away. Double-click the P dot to position individual percussion layers."></canvas>
                 </div>
-                ${stageReadoutsHTML(p)}
-                <div class="ch-focus-row"><span class="ch-focus-label">EARS</span><span class="ch-focus-sum">what the selected source hands to each ear — arrival on the left, colouring on the right</span></div>
-                <div class="ch-field-pos">
-                  <canvas id="cvSpaceField" width="1200" height="170" style="width:100%;height:170px" title="Left: when the sound arrives — the direct hit, then the room's tail (the inset zooms the sub-millisecond gap between your ears). Right: how it's coloured — each ear's frequency response from head shadow, pinna, air and proximity."></canvas>
-                </div>` : `
+                ${stageReadoutsHTML(p)}` : `
                 <div class="ch-focus-row" id="chFocus">
                   <span class="ch-focus-label">FOCUS</span>
                   ${[["all", "All"], ["odd", "Odd"], ["even", "Even"], ["coupled", "Coupled"], ["longring", "Long ring"], ["wobbly", "Wobbly"]].map(([c, label]) =>
@@ -8843,9 +10175,19 @@ function subnoteWorkspaceHTML(p) {
                 <div class="ch-lens-row"><span class="ch-lens-label">LENS</span><canvas id="cvLens" width="1200" height="34"></canvas></div>
                 <div class="ch-strip" id="chStrip"></div>`}
               </div>
+              ${_chStage === "space" ? `
+              <!-- On the SPACE stage the right column carries the EAR RESPONSE
+                   (arrival + colouring, stacked vertically) instead of the
+                   Envelope/Modulation panel (owner 2026-07-10). -->
+              <div class="td-side td-side-ears">
+                <div class="ears-head"><span class="ears-head-title">EARS</span><span class="ears-head-sum">what reaches each ear · <b>L</b> blue · <b>R</b> amber</span></div>
+                <div class="ears-slot">
+                  <canvas id="cvSpaceField" title="Top — WHEN IT ARRIVES: the direct hit then the room's tail (the inset zooms the sub-millisecond gap between your ears). Bottom — HOW IT'S COLOURED: each ear's frequency response from head shadow, pinna, air and proximity."></canvas>
+                </div>
+              </div>` : `
               <div class="td-side${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
                 ${tdSidePanelHTML(p)}
-              </div>
+              </div>`}
             </div>
             <div class="ch-status">${_chStage === "space"
               ? `<span>curves follow the pad and knobs live · <b>L</b> ear blue · <b>R</b> ear amber</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
@@ -12552,6 +13894,7 @@ function wireTonePrint(v) {
     card.onclick = () => {
       if (_chStage === card.dataset.chStage) return;
       _chStage = card.dataset.chStage;
+      _percSpaceMode = false; // leaving the stage exits percussion focus mode
       renderExplore();
     };
   });
@@ -12806,7 +14149,12 @@ if (!window._studioFitInstalled) {
   let _thumbRAF = 0;
   window.addEventListener("resize", () => {
     if (_thumbRAF) return;
-    _thumbRAF = requestAnimationFrame(() => { _thumbRAF = 0; try { drawChThumbs(); } catch {} });
+    _thumbRAF = requestAnimationFrame(() => {
+      _thumbRAF = 0;
+      // SPACE-stage field canvases are CSS-pixel drawn too — redraw them (they
+      // early-return when their stage isn't showing).
+      try { drawChThumbs(); drawStageBig(); drawSpaceField(); } catch {}
+    });
   });
 }
 
@@ -12843,6 +14191,9 @@ function wireStudioPanels(v) {
     const rect = inspector.getBoundingClientRect();
     _studioPanels.chW = Math.max(180, Math.min(460, ev.clientX - rect.left));
     inspector.style.setProperty("--ch-w", `${Math.round(_studioPanels.chW)}px`);
+    // the field (stage + ear response) just changed width — redraw so its
+    // bitmap tracks the new size instead of stretching
+    try { drawStageBig(); drawSpaceField(); } catch {}
   }, saveStudioPanels);
 }
 
@@ -13101,8 +14452,38 @@ function wireLayerStrip(v) {
 // is dragging a dot. The binaural strip below follows the selection.
 let _stageSel = "base";
 let _stageViewPos = null; // non-base selection: {angle, dist} the ear view follows
+// Percussion focus sub-mode: double-clicking the aggregate "P" dot swaps the
+// stage to show each percussion LAYER as its own draggable dot (owner spec).
+let _percSpaceMode = false;
+// SPACE-stage canvases are drawn in CSS-pixel space (crisp2d), so a container
+// size change — window resize OR dragging the inspector splitter — leaves the
+// old bitmap stretched until the next redraw. Observe the canvases and redraw
+// on any resize (owner 2026-07-10).
+let _spaceResizeObserver = null;
+
+function percRoleLabel(role) { const r = PERC_ROLES.find(x => x[0] === role); return r ? r[1] : role; }
+function percGroupAngle(p) { return Number.isFinite(p.percAzimuth) ? p.percAzimuth : (p.spaceAzimuth ?? 0); }
+function percGroupDist(p) { return Number.isFinite(p.percDistance) ? p.percDistance : (p.spaceDistance ?? 2.5); }
 
 function stageSourceList(p) {
+  // Materialise the layer list (stable ids) whenever percussion is in play, so
+  // the focus-mode dots keep their identity across redraws.
+  const percOn = resolvePercEnabled(p) || _percSpaceMode;
+  const pl = percOn
+    ? ((Array.isArray(p.percLayers) && p.percLayers.length) ? p.percLayers : (p.percLayers = ensurePercLayers(p)))
+    : null;
+
+  if (_percSpaceMode) {
+    return (pl || []).map((l, i) => ({
+      id: `perc:${l.id}`, num: `P${i + 1}`,
+      label: `${percRoleLabel(l.role)} · ${percSoundLabel(l.sound)}`,
+      hue: percLayerHue(i),
+      angle: l.space?.angle ?? percGroupAngle(p),
+      dist: l.space?.dist ?? percGroupDist(p),
+      percLayer: l,
+    }));
+  }
+
   const list = [{
     id: "base", num: "B", label: "Base", hue: 36,
     angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5,
@@ -13114,6 +14495,15 @@ function stageSourceList(p) {
     dist: l.space?.dist ?? (p.spaceDistance ?? 2.5),
     layer: l,
   }));
+  // Aggregate percussion dot — drag to move the whole kit; double-click to
+  // position individual percussion layers (focus mode).
+  if (resolvePercEnabled(p) && pl && pl.length) {
+    list.push({
+      id: "perc", num: "P", label: "Percussion", hue: 32,
+      angle: percGroupAngle(p), dist: percGroupDist(p),
+      isPercGroup: true,
+    });
+  }
   return list;
 }
 
@@ -13148,11 +14538,15 @@ function updateStageReadouts() {
   set("stageRoTof", `${(spaceArrivalDelay(s.dist) * 1000).toFixed(1)} ms`);
   set("stageRoLvl", `${(20 * Math.log10(spaceDistanceGain(s.dist))).toFixed(1)} dB`);
   // stage selection ↔ layer rows: the picked dot highlights its row as the
-  // active layer (base clears it) — one selection, two views (V2.2)
-  _chLayerSel = s.id === "base" ? null : s.id;
-  document.querySelectorAll("[data-layer-row]").forEach(row =>
-    row.classList.toggle("sel", row.dataset.layerRow === _stageSel));
-  _stageViewPos = s.id === "base" ? null : { angle: s.angle, dist: s.dist };
+  // active layer (base clears it) — one selection, two views (V2.2). In the
+  // percussion focus sub-mode the selection is a percussion layer, which owns
+  // no tonal layer row, so leave the tonal-layer selection untouched.
+  if (!_percSpaceMode) {
+    _chLayerSel = s.id === "base" ? null : s.id;
+    document.querySelectorAll("[data-layer-row]").forEach(row =>
+      row.classList.toggle("sel", row.dataset.layerRow === _stageSel));
+  }
+  _stageViewPos = (s.id === "base" && !_percSpaceMode) ? null : { angle: s.angle, dist: s.dist };
 }
 
 function _stageGeom(w, h) {
@@ -13226,6 +14620,15 @@ function drawStageBig() {
     const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
     const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
     const col = `hsl(${s.hue}, 70%, 62%)`;
+    if (s.isPercGroup) {
+      // dashed halo marks the double-click-to-edit percussion handle (it can
+      // sit on top of the base dot when percussion inherits the base position)
+      ctx.save();
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.arc(x, y, 15, 0, 2 * Math.PI); ctx.stroke();
+      ctx.restore();
+    }
     if (s.id === _stageSel) {
       ctx.strokeStyle = col;
       ctx.lineWidth = 1.5;
@@ -13248,6 +14651,18 @@ function drawStageBig() {
 function wireStageBig(v) {
   const cv = v.querySelector("#cvStageBig");
   if (!cv) return;
+  // Redraw the stage + ear-response on any container resize so the browser
+  // never shows a stretched bitmap (window resize or inspector-splitter drag).
+  if (_spaceResizeObserver) { _spaceResizeObserver.disconnect(); _spaceResizeObserver = null; }
+  if (window.ResizeObserver) {
+    // Redraw synchronously on any size change. Safe from a feedback loop: both
+    // canvases are CSS-sized (width/height:100%), so crisp2d rewriting the
+    // backing store never changes their layout box.
+    _spaceResizeObserver = new ResizeObserver(() => { try { drawStageBig(); drawSpaceField(); } catch {} });
+    _spaceResizeObserver.observe(cv);
+    const field = v.querySelector("#cvSpaceField");
+    if (field) _spaceResizeObserver.observe(field);
+  }
   const srcAt = (x, y) => {
     const w = cv._cssW || cv.getBoundingClientRect().width;
     const h = cv._cssH || cv.getBoundingClientRect().height;
@@ -13285,6 +14700,15 @@ function wireStageBig(v) {
       exploreParams.spaceDistance = dist;
       synth.updateReverb({ ...exploreParams });
       drawChThumbs();
+    } else if (s.percLayer) {
+      // focus mode: reposition ONE percussion layer
+      s.percLayer.space = { angle: az, dist };
+      applyPerc();
+    } else if (s.isPercGroup) {
+      // normal mode: move the whole percussion kit (per-layer fallback anchor)
+      exploreParams.percAzimuth = az;
+      exploreParams.percDistance = dist;
+      applyPerc();
     } else if (s.layer) {
       s.layer.space = { angle: az, dist };
       // mirror to the layer strip's sliders so the two stay one control
@@ -13320,6 +14744,23 @@ function wireStageBig(v) {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
+  // Double-clicking the aggregate "P" dot drops into percussion focus mode.
+  // The P dot is drawn on top and can sit exactly over the base dot (default
+  // percussion position inherits the base), where srcAt would prefer base — so
+  // test the percussion-group dot's position directly rather than via srcAt.
+  cv.ondblclick = (e) => {
+    e.preventDefault();
+    if (_percSpaceMode) return;
+    const { x, y, w, h } = toLocal(e);
+    const { cx, cy, rMax } = _stageGeom(w, h);
+    const grp = stageSourceList(exploreParams).find(s => s.isPercGroup);
+    if (!grp) return;
+    const rad = (clamp(grp.angle, -180, 180) - 90) * Math.PI / 180;
+    const r = _spaceDistToR(clamp(grp.dist, SPACE_DMIN, SPACE_DMAX), rMax);
+    if (Math.hypot(cx + Math.cos(rad) * r - x, cy + Math.sin(rad) * r - y) < 18) {
+      enterPercSpaceMode(v);
+    }
+  };
   v.querySelectorAll("[data-stage-src]").forEach(chip => {
     chip.onclick = (e) => {
       if (e.target.closest("button")) return; // solo stays solo
@@ -13330,8 +14771,49 @@ function wireStageBig(v) {
       drawSpaceField();
     };
   });
+  ensurePercModeChrome(v);
   updateStageReadouts();
   drawStageBig();
+}
+
+// The percussion focus mode's on-stage chrome: a tinted border, a "PERCUSSION"
+// badge, and an × to return to the normal layer view. Created once per stage,
+// shown only while _percSpaceMode is on.
+function ensurePercModeChrome(v) {
+  const host = v.querySelector(".ch-field-pos.stage-pos");
+  if (!host) return null;
+  let chrome = host.querySelector(".perc-mode-chrome");
+  if (!chrome) {
+    if (!host.style.position) host.style.position = "relative";
+    chrome = document.createElement("div");
+    chrome.className = "perc-mode-chrome";
+    chrome.innerHTML =
+      `<span class="perc-mode-badge">PERCUSSION</span>`
+      + `<button type="button" class="perc-mode-exit" title="Back to layers">×</button>`;
+    host.appendChild(chrome);
+    chrome.querySelector(".perc-mode-exit").onclick = () => exitPercSpaceMode(v);
+  }
+  chrome.style.display = _percSpaceMode ? "flex" : "none";
+  return chrome;
+}
+
+function enterPercSpaceMode(v) {
+  _percSpaceMode = true;
+  const first = stageSourceList(exploreParams)[0];
+  _stageSel = first ? first.id : "base";
+  ensurePercModeChrome(v);
+  updateStageReadouts();
+  drawStageBig();
+  drawSpaceField();
+}
+
+function exitPercSpaceMode(v) {
+  _percSpaceMode = false;
+  _stageSel = "base";
+  ensurePercModeChrome(v);
+  updateStageReadouts();
+  drawStageBig();
+  drawSpaceField();
 }
 
 // Owner 07-07 round 2: the SPACE stage's field is the BINAURAL RESPONSE —
@@ -13345,8 +14827,10 @@ function wireStageBig(v) {
 function drawSpaceField() {
   const cv = document.getElementById("cvSpaceField");
   if (!cv) return;
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
+  // Responsive: the ear-response now lives in the SPACE editor's right column
+  // (portrait), so draw at the element's real size and stack the two panels
+  // vertically (owner 2026-07-10).
+  const { ctx, w, h } = crisp2d(cv);
   ctx.clearRect(0, 0, w, h);
 
   const p = exploreParams;
@@ -13378,10 +14862,13 @@ function drawSpaceField() {
   const GRID = "rgba(90,110,130,0.22)", TXT = "rgba(120,135,150,0.75)";
   ctx.font = "10px ui-monospace, monospace";
 
-  // ── left panel: WHEN it arrives (direct hit + room tail) ──────────
-  const L = { x: 14, y: 30, w: 610, h: h - 78 };
+  // ── top panel: WHEN it arrives (direct hit + room tail) ──────────
+  // Two panels stacked vertically; each spans the full width of the column.
+  const PADX = 12, TOPY = 22, GAPY = 30, FOOTY = 40;
+  const panelH = Math.max(70, (h - TOPY - GAPY - FOOTY) / 2);
+  const L = { x: PADX, y: TOPY, w: w - PADX * 2, h: panelH };
   ctx.fillStyle = TXT; ctx.textAlign = "left";
-  ctx.fillText("WHEN IT ARRIVES", L.x, 16);
+  ctx.fillText("WHEN IT ARRIVES", L.x, L.y - 6);
   ctx.strokeStyle = GRID;
   ctx.strokeRect(L.x + 0.5, L.y + 0.5, L.w, L.h);
   // sqrt-compressed time axis: the first milliseconds matter as much as
@@ -13443,8 +14930,10 @@ function drawSpaceField() {
   ctx.fillText(`direct ${(t0 * 1000).toFixed(1)}ms · ${distDb.toFixed(1)}dB`, xT(t0) + 6, L.y + 14);
   if (wet > 0.001) ctx.fillText(`room tail · ${decay.toFixed(1)}s`, xT(tail0 + decay * 0.12), base - wet * (L.h - 26) * 0.5);
 
-  // inset: the sub-millisecond gap between the ears (Woodworth ITD)
-  const I = { x: L.x + L.w - 218, y: L.y + 10, w: 206, h: 92 };
+  // inset: the sub-millisecond gap between the ears (Woodworth ITD) — sized to
+  // the narrow panel, tucked into its bottom-right corner
+  const iw = Math.min(L.w - 10, 190), ih = Math.min(74, L.h - 20);
+  const I = { x: L.x + L.w - iw - 4, y: L.y + L.h - ih - 6, w: iw, h: ih };
   ctx.fillStyle = "rgba(10,14,20,0.88)";
   ctx.fillRect(I.x, I.y, I.w, I.h);
   ctx.strokeStyle = "rgba(90,110,130,0.45)";
@@ -13476,11 +14965,11 @@ function drawSpaceField() {
       : `${itdMs > 0 ? "left" : "right"} ear ${Math.abs(itdMs).toFixed(2)}ms later`,
     I.x + I.w / 2, I.y + I.h - 5);
 
-  // ── right panel: HOW it's coloured (per-ear frequency response) ───
-  const R = { x: 660, y: 30, w: w - 660 - 14, h: h - 78 };
+  // ── bottom panel: HOW it's coloured (per-ear frequency response) ───
+  const R = { x: PADX, y: L.y + L.h + GAPY, w: w - PADX * 2, h: panelH };
   ctx.textAlign = "left";
   ctx.fillStyle = TXT;
-  ctx.fillText("HOW IT'S COLOURED", R.x, 16);
+  ctx.fillText("HOW IT'S COLOURED", R.x, R.y - 6);
   ctx.strokeStyle = GRID;
   ctx.strokeRect(R.x + 0.5, R.y + 0.5, R.w, R.h);
   const FMIN = 60, FMAX = 20000, DB_TOP = 12, DB_BOT = -36;
@@ -13537,26 +15026,27 @@ function drawSpaceField() {
     ctx.fillStyle = col;
     ctx.fillText(lbl, pts[pts.length - 1][0] - 12, pts[pts.length - 1][1] - 6);
   }
-  // readout line: the numbers behind the curves
+  // readout line under the colour panel: the numbers behind the curves,
+  // trimmed for the narrow column (distance/azimuth are in the readouts strip
+  // and the room knobs, so they are not repeated here)
   ctx.fillStyle = TXT;
   ctx.textAlign = "left";
-  const bits = [
-    `shadow from ${Math.round(f0)} Hz`,
-    `air to ${(airFc / 1000).toFixed(1)} kHz`,
-    proxDb > 0.05 ? `proximity +${proxDb.toFixed(1)} dB` : null,
-    pinna.conchaDb < -0.1 ? `behind: concha ${pinna.conchaDb.toFixed(1)} dB` : null,
-  ].filter(Boolean);
-  ctx.fillText(bits.join(" · "), R.x, h - 8);
   const emKey = _earModelOf(p);
   const measuredMode = !!EAR_MODELS[emKey]?.measured;
   const earLbl = EAR_MODELS[emKey]?.label ?? "custom ears";
+  const bits = [
+    `shadow ${Math.round(f0)}Hz`,
+    `air ${(airFc / 1000).toFixed(1)}k`,
+    proxDb > 0.05 ? `prox +${proxDb.toFixed(1)}dB` : null,
+    earLbl.toLowerCase(),
+  ].filter(Boolean);
+  ctx.fillText(bits.join(" · "), R.x, R.y + R.h + 27);
   if (measuredMode) {
     ctx.fillStyle = "rgba(88,214,169,0.9)";
     ctx.textAlign = "right";
-    ctx.fillText("● convolving measured HRIR — curves show the fitted model", w - 14, 16);
+    ctx.fillText("● measured HRIR", w - PADX, L.y - 6);
     ctx.textAlign = "left";
   }
-  ctx.fillText(`${d.toFixed(1)} m · ${Math.round(clamp(p.spaceAzimuth ?? 0, -180, 180))}° · ${prof.label.toLowerCase()} ${decay.toFixed(1)}s · size ${size.toFixed(2)} · damp ${damping.toFixed(2)} · diffuse ${diffusion.toFixed(2)} · ${earLbl.toLowerCase()}`, L.x, h - 8);
 }
 
 function wireSpacePad(v) {
@@ -13970,12 +15460,6 @@ function formantWeightControlsHTML(p) {
           </label>`;
       }).join("")}
     </div>`;
-}
-
-function percSoundOptions(selected) {
-  return Object.entries(PERC_SOUNDS).map(([k, v]) =>
-    `<option value="${k}" ${selected === k ? 'selected' : ''}>${v.label}</option>`
-  ).join('');
 }
 
 function bakedSurpriseOptions(selected) {

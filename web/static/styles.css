@@ -966,6 +966,15 @@ body.explore-mode .view {
   border-radius: 3px;
 }
 .dash-vsplit:hover { background: rgba(245,166,35,0.18); }
+/* The dashboard column divider only maps to a real column boundary in the
+   classic 5-column dashboard. The Macro / Sub-note / Scale-Lab workspaces are
+   absolute overlay cards with their own rail+inspector layout, so here the
+   divider resizes a hidden grid column (no visible effect) and its hover
+   highlight merely paints a bar across the panels — hide it in those modes.
+   (owner 2026-07-10) */
+.macro2-workspace-mode .dash-vsplit,
+.subnote-workspace-mode .dash-vsplit,
+.scalelab-workspace-mode .dash-vsplit { display: none; }
 .ch-vsplit {
   flex: none;
   width: 7px;
@@ -2930,6 +2939,22 @@ body.explore-mode #app {
   color: #9aa7b5;
 }
 
+/* Grouped transport + icon-only secondary actions (owner 2026-07-10): keeps the
+   header compact. The play button is the single play/stop toggle. */
+.transport-cluster { display: flex; align-items: center; gap: 5px; }
+.tc-spacer { flex: 1 1 auto; min-width: 6px; }
+.transport-icon {
+  color: #aeb9c6;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-transform: none;
+}
+.transport-icon:hover { color: #fff; border-color: var(--border2); }
+.transport-icon.rand-icon { color: var(--blue); }
+.transport-icon.rand-icon:hover { color: #cfe0ff; }
+.transport-icon.studio-tour-btn { color: #9aa7b5; flex-shrink: 0; }
+.transport-icon.studio-tour-btn:hover { color: var(--accent); }
+
 .rand-btn {
   min-height: 28px;
   padding: 0 8px;
@@ -3004,6 +3029,31 @@ body.explore-mode #app {
   text-transform: uppercase;
   font-size: 0.6rem;
 }
+
+/* Save collapsed into a popover (owner 2026-07-10) — keeps the header compact */
+.top-save { position: relative; flex: none; }
+.top-save-toggle { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.top-save-toggle .caret { font-size: 0.6rem; opacity: 0.8; }
+.save-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 70;
+  min-width: 232px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; border-radius: 9px;
+  background: rgba(12, 16, 22, 0.98); border: 1px solid var(--border2);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+}
+.save-pop[hidden] { display: none; }
+.save-pop-row { display: flex; align-items: center; gap: 8px; }
+.save-pop-row > span {
+  flex: none; width: 54px; font-size: 0.58rem; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text3);
+}
+.save-pop-row input[type="text"], .save-pop-row select {
+  flex: 1; min-width: 0; min-height: 28px; padding: 0 8px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: #101216; color: var(--text); font-size: 0.72rem;
+}
+.save-pop #saveBtn { min-height: 30px; text-transform: none; }
 
 .top-rating-row {
   display: flex;
@@ -6174,6 +6224,8 @@ body.explore-mode #app {
   border-radius: 5px;
 }
 .tl2-newtrack.drop-target { border-color: var(--accent); color: var(--text2); }
+.tl2-gs-row.drop-target .gs-chevron,
+.tl2-gs-row.drop-target .gs-strip { outline: 1px dashed var(--accent); outline-offset: 2px; }
 
 .tl2-head .tl-gain { width: 46px; height: 3px; flex: none; }
 
@@ -6755,6 +6807,16 @@ body.dragging { cursor: grabbing; user-select: none; }
 .td-side > * { flex: none; }
 .ch-card { min-height: 0; }
 
+/* SPACE editor: the right column carries the ear response (arrival + colouring
+   stacked vertically) instead of Envelope/Modulation (owner 2026-07-10) */
+.td-side-ears { overflow: hidden; }
+.ears-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ears-head-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; color: var(--text); }
+.ears-head-sum { font-size: 0.56rem; color: var(--text3); }
+.ears-head-sum b { color: var(--text2); font-weight: 700; }
+.td-side-ears > .ears-slot { flex: 1 1 auto; min-height: 300px; position: relative; }
+.td-side-ears canvas#cvSpaceField { width: 100%; height: 100%; display: block; }
+
 /* ── V2 Spatial Stage (render phase-04) ── */
 .stage-sources {
   display: flex; gap: 7px; align-items: center; flex-wrap: wrap; flex: none;
@@ -7046,6 +7108,103 @@ body.dragging { cursor: grabbing; user-select: none; }
 .scale-combo-opt:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 .scale-combo-opt.sel { color: var(--gen); }
 .scale-combo-note { font-style: normal; font-size: 0.58rem; color: var(--text3); }
+
+/* ── smart-combo: reusable searchable dropdown (docs/SMART_DROPDOWN_SPEC.md) ── */
+.smart-combo { position: relative; flex: 1; min-width: 0; }
+.smart-combo-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  background: rgba(14, 18, 24, 0.85); border: 1px solid var(--border); border-radius: 7px;
+  color: var(--text); font: inherit; font-size: 0.72rem; font-weight: 600;
+  padding: 6px 9px; cursor: pointer; text-align: left;
+}
+.smart-combo-btn:hover { border-color: var(--border2); }
+.smart-combo-btn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smart-combo-caret { color: var(--text3); font-size: 0.6rem; flex: none; }
+.smart-combo-pop {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60;
+  background: rgba(12, 16, 22, 0.98); border: 1px solid var(--border2); border-radius: 9px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.55);
+  padding: 6px; display: flex; flex-direction: column; gap: 5px;
+}
+/* the `hidden` attribute must win over the display:flex above (author rules
+   beat the UA [hidden] rule, so an explicit attribute selector is required) */
+.smart-combo-pop[hidden] { display: none; }
+/* fall UP when there isn't room below (set by wireSmartCombos, owner 2026-07-10) */
+.smart-combo-pop.smart-combo-pop-up { top: auto; bottom: calc(100% + 4px); }
+.smart-combo-search {
+  width: 100%; box-sizing: border-box;
+  background: rgba(20, 26, 34, 0.9); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font: inherit; font-size: 0.7rem; padding: 5px 8px;
+}
+.smart-combo-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; }
+.smart-combo-group {
+  font-size: 0.56rem; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--text3); padding: 6px 6px 3px;
+}
+.smart-combo-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: none; border: none; border-radius: 5px;
+  color: var(--text2); font: inherit; font-size: 0.72rem;
+  text-align: left; padding: 5px 7px; cursor: pointer;
+}
+.smart-combo-opt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smart-combo-opt:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.smart-combo-opt.sel { color: var(--gen); }
+.smart-combo-note { font-style: normal; font-size: 0.58rem; color: var(--text3); flex: none; }
+.smart-combo-empty { color: var(--text3); font-size: 0.68rem; padding: 8px 7px; }
+
+/* ── percussion v2: enable toggle + editable layer list (owner 2026-07-10) ── */
+.perc-enable-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.perc-enable-toggle {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text);
+}
+.perc-enable-toggle input { accent-color: var(--gen); width: 15px; height: 15px; cursor: pointer; }
+.perc-enable-hint { font-size: 0.64rem; color: var(--text3); }
+.perc-body { display: flex; flex-direction: column; gap: 9px; transition: opacity 0.15s ease; }
+.perc-body.perc-disabled { opacity: 0.4; pointer-events: none; filter: grayscale(0.5); }
+.perc-list { display: flex; flex-direction: column; gap: 8px; }
+.perc-empty { color: var(--text3); font-size: 0.7rem; padding: 10px 2px; }
+.perc-lyr {
+  display: flex; flex-direction: column; gap: 7px; padding: 9px 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid hsl(var(--layer-hue, 32) 70% 55%); border-radius: 8px;
+}
+.perc-lyr-head { display: flex; align-items: center; gap: 8px; }
+.perc-lyr-role {
+  flex: none; background: rgba(14, 18, 24, 0.85); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font: inherit; font-size: 0.72rem; font-weight: 600;
+  padding: 5px 8px; cursor: pointer;
+}
+.perc-lyr-remove { margin-left: auto; }
+.perc-lyr-sound { display: flex; min-width: 0; }
+.perc-lyr-ctls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.perc-add {
+  align-self: flex-start; background: rgba(14, 18, 24, 0.7); border: 1px dashed var(--border2);
+  border-radius: 7px; color: var(--text2); font: inherit; font-size: 0.72rem; font-weight: 600;
+  padding: 6px 12px; cursor: pointer;
+}
+.perc-add:hover { color: var(--text); border-color: var(--gen); }
+
+/* percussion focus mode — chrome overlaid on the SPACE stage */
+.perc-mode-chrome {
+  position: absolute; inset: 0; z-index: 5; display: none; pointer-events: none;
+  align-items: flex-start; justify-content: space-between; padding: 8px 10px;
+  border: 1.5px solid hsl(32 75% 55% / 0.55); border-radius: 10px;
+  background: hsl(32 75% 50% / 0.07);
+}
+.perc-mode-badge {
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.14em;
+  color: hsl(32 80% 70%); background: hsl(32 55% 20% / 0.9);
+  border: 1px solid hsl(32 70% 50% / 0.5); border-radius: 5px; padding: 3px 8px;
+}
+.perc-mode-exit {
+  pointer-events: auto; cursor: pointer; width: 24px; height: 24px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; color: var(--text); background: rgba(20, 26, 34, 0.92);
+  border: 1px solid var(--border2); border-radius: 6px;
+}
+.perc-mode-exit:hover { border-color: hsl(32 70% 55%); color: hsl(32 80% 72%); }
 
 .m2-center { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .m2-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -8807,9 +8966,9 @@ body.explore-mode .view {
 
 .top-rating-row {
   display: grid;
-  grid-template-columns: auto 56px auto;
+  grid-template-columns: auto 46px auto;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   flex: none;
 }
 
@@ -8820,7 +8979,7 @@ body.explore-mode .view {
 }
 
 .top-rating-row input[type="range"] {
-  width: 56px;
+  width: 46px;
 }
 
 .top-rating-row output {
@@ -9364,26 +9523,35 @@ body.explore-mode .view {
   display: block;
 }
 
+/* A slim label that fades up out of the cross-section instead of a floating
+   boxed overlay — seamless with the canvas above (owner 2026-07-10). */
 .sp-settings-toggle {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
-  max-width: calc(100% - 12px);
-  min-height: 20px;
-  padding: 2px 6px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 17px;
+  padding: 6px 8px 4px;
   overflow: hidden;
-  color: rgba(244,246,249,0.92);
+  color: rgba(214,224,236,0.68);
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: rgba(8, 10, 14, 0.76);
-  border: 1px solid rgba(148,163,184,0.34);
-  border-radius: 5px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.32);
+  font-size: 0.54rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: linear-gradient(to top, rgba(8,11,16,0.9) 30%, rgba(8,11,16,0));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   cursor: pointer;
+  transition: color 0.15s ease;
 }
 
 .sp-settings-toggle:hover {
-  border-color: rgba(245,166,35,0.54);
   color: #ffe0a3;
 }
 
@@ -9392,10 +9560,12 @@ body.explore-mode .view {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px 12px;
-  padding: 7px 8px;
-  border-top: 1px solid rgba(42,49,62,0.96);
-  border-bottom: 1px solid rgba(42,49,62,0.55);
-  background: rgba(10, 13, 17, 0.66);
+  padding: 9px 10px;
+  /* Reads as an extension of the cross-section drawer, not a separate panel:
+     a thin accent hairline at the top, a gentle fade below (owner 2026-07-10). */
+  border: 0;
+  border-top: 1px solid rgba(245,166,35,0.22);
+  background: linear-gradient(180deg, rgba(245,166,35,0.055), rgba(10,13,17,0.42) 70%);
 }
 
 .sp-room-current {
@@ -9636,3 +9806,162 @@ body.explore-mode .view {
 .subnote-workspace-mode .harmonic-stage.chorda .ch-main {
   min-height: clamp(170px, 30vh, 250px);
 }
+
+/* Producer patch composer: a deliberately small three-pane inspector. */
+.palette-item.selected { border-color: color-mix(in srgb, var(--accent) 72%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent); }
+.pal-top { display:flex; align-items:center; gap:6px; width:100%; }
+.palette-zones { display:grid; grid-template-columns:1fr 1fr; gap:5px; width:100%; }
+.palette-zone { min-width:0; border:1px dashed var(--border); background:var(--surface2); border-radius:6px; padding:5px 6px; text-align:left; color:var(--text3); cursor:pointer; }
+.palette-zone b,.palette-zone span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.palette-zone b { color:var(--text2); font-size:.59rem; text-transform:uppercase; letter-spacing:.06em; }
+.palette-zone span { font-size:.68rem; margin-top:2px; }
+.palette-zone.filled { border-style:solid; border-color:color-mix(in srgb,var(--accent) 38%,var(--border)); color:var(--text); background:color-mix(in srgb,var(--accent) 7%,var(--surface2)); }
+.pal-draft-note { width:100%; font-size:.62rem; color:var(--text3); }
+.patch-inspector { display:grid; grid-template-columns:minmax(250px,1fr) minmax(270px,1.05fr) minmax(250px,1fr); min-height:220px; background:var(--surface); }
+.patch-pane { min-width:0; padding:10px; border-right:1px solid var(--border); display:flex; flex-direction:column; gap:8px; }
+.patch-pane:last-child { border-right:0; }
+.patch-pane header { display:flex; gap:6px; align-items:center; min-height:20px; color:var(--text2); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; }
+.patch-pane header span { margin-left:auto; color:var(--text3); text-transform:none; letter-spacing:0; font-size:.62rem; }
+.patch-pane header button { margin-left:auto; border:0; color:var(--text3); background:transparent; cursor:pointer; }
+.patch-pane header button + button { margin-left:0; }
+.patch-layer-list,.patch-space-map { display:flex; flex-direction:column; gap:5px; overflow:auto; max-height:230px; }
+.patch-layer-list h4 { margin:2px 0; color:var(--text3); font-size:.64rem; text-transform:uppercase; letter-spacing:.08em; }
+.patch-source-row { display:flex; align-items:center; gap:5px; padding:5px; background:var(--surface2); border-left:2px solid var(--accent); border-radius:4px; font-size:.62rem; }
+.patch-source-row.muted { opacity:.45; }
+.patch-source-row b { min-width:54px; color:var(--text2); }
+.patch-source-row label { display:flex; align-items:center; gap:3px; color:var(--text3); min-width:0; flex:1; }
+.patch-source-row input { width:58px; min-width:0; }
+.patch-source-row button { border:1px solid var(--border); border-radius:3px; background:var(--display); color:var(--text3); font-size:.58rem; }
+.patch-source-note,.patch-pane p,.patch-engine-summary,.patch-global-note { color:var(--text3); font-size:.64rem; line-height:1.35; }
+.patch-pane > label { font-size:.66rem; color:var(--text2); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.patch-pane select { max-width:130px; background:var(--display); color:var(--text); border:1px solid var(--border); border-radius:4px; }
+.patch-perc-toggle { justify-content:flex-start !important; }
+.patch-scale { border-top:1px solid var(--border); padding-top:7px; }
+.patch-scale-head { color:var(--text2); font-size:.66rem; margin-bottom:5px; }
+.patch-degrees { display:flex; gap:3px; flex-wrap:wrap; }
+.patch-degrees button { width:23px; height:20px; border:1px solid var(--border); border-radius:3px; background:var(--display); color:var(--text3); font-size:.61rem; }
+.patch-degrees button.sub { border-color:#d9a441; color:#d9a441; }.patch-degrees button.root { border-color:#7fce82; color:#7fce82; }
+@media (max-width: 900px) { .patch-inspector { grid-template-columns:1fr; }.patch-pane { border-right:0; border-bottom:1px solid var(--border); }.patch-pane:last-child { border-bottom:0; } }
+
+/* Patch inspector v2 — one named, spatially legible object instead of three
+   disconnected forms.  These rules intentionally supersede the first pass
+   above while keeping its compact controls usable at narrow widths. */
+.patch-editor-wrap { gap:0; }
+.patch-editor-wrap .editor-body { overflow:auto; }
+.patch-inspector { display:block; min-height:0; background:var(--surface); }
+.patch-inspector-titlebar { display:flex; align-items:center; gap:12px; min-height:42px; padding:6px 12px; border-bottom:1px solid var(--border); background:linear-gradient(90deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface) 52%); }
+.patch-inspector-titlebar > div:first-child { min-width:170px; }
+.patch-inspector-titlebar span { display:block; color:var(--text3); font-size:.58rem; letter-spacing:.11em; text-transform:uppercase; }
+.patch-inspector-titlebar h3 { margin:2px 0 0; color:var(--text); font-size:.92rem; line-height:1.05; font-weight:650; }
+.patch-inspector-badges { display:flex; gap:5px; flex:1; align-items:center; min-width:0; overflow:auto; }
+.patch-inspector-badges i { flex:0 0 auto; border:1px solid var(--border); border-radius:999px; background:var(--display); padding:3px 6px; color:var(--text3); font-size:.58rem; font-style:normal; white-space:nowrap; }
+.patch-inspector-badges .patch-local-badge { color:color-mix(in srgb, var(--accent) 75%, var(--text)); border-color:color-mix(in srgb, var(--accent) 38%, var(--border)); }
+.patch-title-actions { display:flex; align-items:center; gap:7px; flex:0 0 auto; }.patch-title-actions .editor-switch { margin:0; }.patch-title-actions .editor-tab { padding:3px 8px; }
+.patch-close { width:25px; height:25px; border:1px solid var(--border); border-radius:5px; background:transparent; color:var(--text3); font-size:1rem; cursor:pointer; }
+.patch-close:hover { background:var(--surface2); color:var(--text); }
+.patch-inspector-grid { display:grid; grid-template-columns:minmax(235px,.88fr) minmax(310px,1.18fr) minmax(270px,.98fr); min-height:280px; }
+.patch-inspector-grid .patch-pane { gap:9px; padding:11px 12px; border-right:1px solid var(--border); }
+.patch-inspector-grid .patch-pane:last-child { border-right:0; }
+.patch-inspector-grid .patch-pane > header { justify-content:space-between; min-height:18px; color:var(--text2); }
+.patch-inspector-grid .patch-pane > header > span { color:var(--text2); font-size:.64rem; text-transform:uppercase; letter-spacing:.1em; font-weight:700; }
+.patch-inspector-grid .patch-pane > header small { color:var(--text3); font-size:.59rem; text-transform:none; letter-spacing:0; font-weight:400; }
+.patch-inspector-grid .patch-pane > header div { display:flex; gap:4px; }
+.patch-inspector-grid .patch-pane > header button { width:20px; height:20px; margin:0; padding:0; border:1px solid transparent; border-radius:4px; }
+.patch-inspector-grid .patch-pane > header button:hover { color:var(--text); border-color:var(--border); background:var(--surface2); }
+.patch-sound-meta { display:flex; align-items:baseline; justify-content:space-between; margin-top:3px; color:var(--text2); font-size:.72rem; font-weight:600; }
+.patch-sound-meta span { max-width:52%; overflow:hidden; color:var(--text3); font-size:.59rem; font-weight:400; text-overflow:ellipsis; white-space:nowrap; }
+.patch-layer-list { max-height:none; gap:6px; overflow:visible; }
+.patch-main-source { display:flex; align-items:center; gap:8px; min-height:42px; padding:7px 8px; border:1px solid color-mix(in srgb, var(--accent) 42%, var(--border)); border-radius:7px; background:linear-gradient(110deg, color-mix(in srgb, var(--accent) 15%, var(--surface2)), var(--surface2)); }
+.patch-main-source > div { min-width:0; display:flex; flex:1; flex-direction:column; gap:1px; }
+.patch-main-source b { color:var(--text); font-size:.7rem; }.patch-main-source span { color:var(--text3); font-size:.58rem; }
+.patch-main-source .patch-main-source-pos { flex:0 0 auto; color:var(--text3); }
+.patch-layer-card { display:flex; align-items:center; gap:7px; min-height:31px; padding:4px 7px; border:1px solid var(--border); border-radius:6px; background:var(--surface2); }
+.patch-layer-card.muted { opacity:.5; }
+.patch-layer-card b { min-width:0; color:var(--text2); font-size:.65rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.patch-layer-card > span:not(.patch-layer-dot) { flex:1; color:var(--text3); font-size:.57rem; }
+.patch-layer-card > div { display:flex; gap:3px; }
+.patch-layer-dot { width:7px; height:7px; flex:0 0 auto; border-radius:50%; background:#d7a640; box-shadow:0 0 0 2px rgba(215,166,64,.14); }.patch-layer-dot.blue { background:#6da8df; box-shadow:0 0 0 2px rgba(109,168,223,.14); }.patch-layer-dot.pink { background:#cf7bc3; box-shadow:0 0 0 2px rgba(207,123,195,.14); }
+.patch-layer-toggle { min-width:19px; height:18px; padding:0 3px; border:1px solid var(--border); border-radius:3px; background:var(--display); color:var(--text3); font-size:.55rem; cursor:pointer; }.patch-layer-toggle.active { color:var(--text); border-color:var(--accent); background:color-mix(in srgb, var(--accent) 18%, var(--display)); }
+.patch-layer-empty { padding:9px; border:1px dashed var(--border); border-radius:6px; color:var(--text3); font-size:.62rem; line-height:1.35; }
+.patch-space-stage { position:relative; align-self:center; width:min(160px,50vw); aspect-ratio:1; margin:1px auto -2px; overflow:hidden; border:1px solid color-mix(in srgb, var(--accent) 26%, var(--border)); border-radius:50%; background:radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, var(--surface2)) 0 3%, transparent 3.5% 100%), var(--surface2); }
+.patch-space-stage > i { position:absolute; inset:18%; border:1px solid color-mix(in srgb, var(--text3) 28%, transparent); border-radius:50%; pointer-events:none; }.patch-space-stage > i:nth-child(2) { inset:34%; }.patch-space-stage > i:nth-child(3) { inset:0; border-color:color-mix(in srgb, var(--accent) 15%, var(--border)); }
+.patch-space-centre { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:var(--text3); font-size:.55rem; pointer-events:none; }
+.patch-space-dot { position:absolute; left:var(--dot-x); top:var(--dot-y); width:10px; height:10px; transform:translate(-50%,-50%); border:2px solid var(--surface); border-radius:50%; background:#d7a640; box-shadow:0 0 0 2px rgba(215,166,64,.25),0 2px 5px rgba(0,0,0,.5); }.patch-space-dot.blue { background:#6da8df; box-shadow:0 0 0 2px rgba(109,168,223,.25),0 2px 5px rgba(0,0,0,.5); }.patch-space-dot.pink { background:#cf7bc3; box-shadow:0 0 0 2px rgba(207,123,195,.25),0 2px 5px rgba(0,0,0,.5); }.patch-space-dot.muted { opacity:.3; }
+.patch-movement-control { display:flex; align-items:center; justify-content:space-between; margin-top:1px; padding:5px 7px; border:1px solid var(--border); border-radius:5px; background:var(--surface2); color:var(--text2); font-size:.62rem; }.patch-movement-control select { max-width:112px; padding:2px 4px; font-size:.62rem; }
+.patch-pane-space > p { margin:0; color:var(--text3); font-size:.59rem; line-height:1.3; }
+.patch-placement-list { display:flex; flex-direction:column; gap:4px; max-height:104px; overflow:auto; }
+.patch-placement-row { display:grid; grid-template-columns:9px minmax(47px,.75fr) minmax(80px,1fr) minmax(80px,1fr); align-items:center; gap:5px; padding:4px 5px; border-radius:5px; background:var(--surface2); }.patch-placement-row.muted { opacity:.46; }.patch-placement-row b { overflow:hidden; color:var(--text2); font-size:.59rem; text-overflow:ellipsis; white-space:nowrap; }.patch-placement-row label { display:flex; align-items:center; gap:3px; color:var(--text3); font-size:.54rem; }.patch-placement-row input { min-width:0; width:100%; }
+.patch-pane-macro { background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 3%, var(--surface)), var(--surface)); }
+.patch-module-card { display:flex; flex-direction:column; gap:5px; padding:7px; border:1px solid var(--border); border-radius:7px; background:var(--surface2); }.patch-module-card-head { display:flex; align-items:center; gap:6px; min-height:15px; }.patch-module-card-head b { color:var(--text2); font-size:.65rem; }.patch-module-card-head > span { flex:1; overflow:hidden; color:var(--text3); font-size:.57rem; text-align:right; text-overflow:ellipsis; white-space:nowrap; }.patch-module-card-head > button { margin-left:0; border:0; background:transparent; color:var(--text3); cursor:pointer; }
+.patch-perc-toggle { margin-left:auto; color:var(--text3); font-size:.58rem; text-transform:none; letter-spacing:0; }.patch-perc-toggle input { margin:0 3px 0 0; vertical-align:middle; }
+.patch-module-card .smart-combo-btn { min-height:25px; font-size:.65rem; }.patch-module-card .smart-combo-pop { z-index:20; }
+.patch-scale-card { gap:4px; }.patch-scale { border-top:0; padding-top:0; }.patch-scale-head { margin-bottom:5px; color:var(--text2); font-size:.64rem; }.patch-degrees { flex-wrap:nowrap; overflow:auto; padding-bottom:1px; }.patch-degrees button { flex:0 0 auto; }.patch-global-note { margin-top:4px; color:var(--text3); font-size:.56rem; }.patch-text-action { align-self:flex-start; padding:0; border:0; background:none; color:var(--text3); font-size:.59rem; cursor:pointer; }.patch-text-action:hover { color:var(--text); }
+@media (max-width: 1000px) { .patch-inspector-grid { grid-template-columns:1fr 1.1fr; }.patch-pane-macro { grid-column:1 / -1; }.patch-pane-macro .patch-module-card { flex:1; }.patch-pane-macro { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; }.patch-pane-macro > header { grid-column:1 / -1; }.patch-scale-card { grid-column:1 / -1; } }
+@media (max-width: 720px) { .patch-inspector-titlebar { align-items:flex-start; flex-wrap:wrap; gap:7px; }.patch-inspector-badges { order:3; flex-basis:calc(100% - 32px); }.patch-inspector-grid,.patch-pane-macro { grid-template-columns:1fr; }.patch-pane-macro { display:flex; }.patch-pane-macro > header { grid-column:auto; }.patch-scale-card { grid-column:auto; }.patch-inspector-grid .patch-pane { border-right:0; border-bottom:1px solid var(--border); }.patch-space-stage { width:130px; }.patch-placement-list { max-height:none; } }
+
+/* Producer patch inspector v3 (owner 2026-07-10): a draggable space stage + a
+   sub-note-style layer strip replace the static dots, placement sliders and
+   layer cards. Reuses .sp-ctl / .pal-btn from the sub-note layer strip. */
+.patch-pane-space { min-height:0; }
+.patch-stage-wrap { flex:1; min-height:148px; display:flex; }
+#patchStage { flex:1; width:100%; height:100%; min-height:148px; display:block; border:1px solid var(--border); border-radius:8px; background:var(--display); cursor:crosshair; }
+.patch-stage-readout { min-height:14px; color:var(--text3); font-size:.6rem; font-variant-numeric:tabular-nums; }
+.patch-lyr { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--border); border-left:3px solid hsl(var(--layer-hue,36) 70% 55%); border-radius:7px; background:var(--surface2); }
+.patch-lyr.base { background:linear-gradient(110deg, color-mix(in srgb, var(--accent) 12%, var(--surface2)), var(--surface2)); }
+.patch-lyr.sel { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.patch-lyr.muted { opacity:.5; }
+.patch-lyr-tag { flex:0 0 auto; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:4px; background:color-mix(in srgb, hsl(var(--layer-hue,36) 70% 55%) 55%, transparent); color:#0d1015; font-size:.6rem; font-weight:700; font-family:var(--mono); }
+.patch-lyr-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.patch-lyr-name { display:flex; align-items:center; gap:6px; color:var(--text2); font-size:.66rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.patch-lyr-badge { flex:0 0 auto; padding:1px 5px; border-radius:999px; background:color-mix(in srgb, var(--accent) 22%, var(--display)); color:var(--accent); font-size:.5rem; letter-spacing:.06em; }
+.patch-lyr-ctls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.patch-lyr-ctls .sp-ctl { font-size:.56rem; }
+.patch-lyr-ctls .sp-ctl input[type=range] { width:54px; }
+.patch-lyr-mute.on { color:var(--text); border-color:#c96; background:color-mix(in srgb, #c96 22%, var(--display)); }
+.patch-lyr-solo.on { color:#0d1015; border-color:#e7b34a; background:#e7b34a; }
+.patch-lyr-empty { padding:8px; border:1px dashed var(--border); border-radius:6px; color:var(--text3); font-size:.6rem; line-height:1.3; }
+/* Percussion hits are grouped + tinted apart from the melodic layers (owner 2026-07-10) */
+.patch-lyr-group { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:6px 2px 2px; padding-top:6px; border-top:1px dashed var(--border2); color:var(--eff); font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; font-weight:700; }
+.patch-lyr-group small { color:var(--text3); text-transform:none; letter-spacing:0; font-weight:400; font-size:.55rem; }
+.patch-lyr-perc { background:linear-gradient(110deg, color-mix(in srgb, var(--eff) 9%, var(--surface2)), var(--surface2)); }
+.patch-lyr-badge.perc { background:color-mix(in srgb, var(--eff) 22%, var(--display)); color:var(--eff); }
+
+/* The module smart-combo sits in a COLUMN flex here; keep it button-height so
+   it can't stretch open a big gap (which also dropped its popover to the pane
+   bottom) — the root of the "weird layers panel" (owner 2026-07-10). */
+.patch-inspector .smart-combo { flex:0 0 auto; }
+/* Fit the three-column view into the dock: the inspector fills the dock and each
+   pane scrolls INTERNALLY, so the whole editor never scroll-jumps and the space
+   stage stays put (owner 2026-07-10). Combined with a taller patch dock. */
+.patch-editor-wrap .editor-body { overflow:hidden; }
+.patch-inspector { display:flex; flex-direction:column; height:100%; min-height:0; }
+.patch-inspector-grid { flex:1; min-height:120px; }
+.patch-inspector-grid .patch-pane { gap:7px; padding:9px 11px; overflow-y:auto; min-height:0; }
+.patch-inspector-grid .patch-pane::-webkit-scrollbar { width:6px; }
+.patch-inspector-grid .patch-pane::-webkit-scrollbar-thumb { background:rgba(120,130,150,0.3); border-radius:4px; }
+.patch-sound-meta { margin-top:1px; }
+.patch-module-card { padding:6px 7px; gap:4px; }
+.patch-pane p, .patch-pane-space > p, .patch-global-note { line-height:1.28; }
+
+/* ── patch inspector: drag-drop module swap + 2-col macro (owner 2026-07-10) ── */
+/* Percussion + Note engine sit side by side to shorten the macro pane; Scale
+   spans full width below. */
+.patch-macro-2col { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-items:start; }
+.patch-pane-name { max-width:58%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* the sub-note & macro dropdowns are gone — swap a module by dragging a browser
+   preset onto the pane; it outlines GREEN before dropping */
+.patch-drop-hint { margin-top:auto; padding:5px 7px; border:1px dashed var(--border2); border-radius:6px; color:var(--text3); font-size:.57rem; line-height:1.3; text-align:center; opacity:.65; }
+.patch-inspector-grid [data-patch-drop] { transition:background-color .08s; }
+.patch-inspector-grid [data-patch-drop].drop-target { outline:2px solid var(--green); outline-offset:-2px; background:color-mix(in srgb, var(--green) 9%, transparent); }
+.patch-inspector-grid [data-patch-drop].drop-target .patch-drop-hint { border-color:var(--green); border-style:solid; color:var(--green); opacity:1; }
+/* keep the left (sub-note) pane stacked above the middle/macro panes (d) */
+.patch-inspector-grid .patch-pane-subnote { position:relative; z-index:2; }
+
+/* Harmonic guide: palette-first scale source search above the marker roll. */
+.hg-head { padding:5px 7px; border-bottom:1px solid var(--border); background:var(--surface); }
+.hg-picker { display:flex; align-items:center; gap:6px; min-width:0; }
+.hg-picker input { width:min(260px,38%); min-width:150px; border:1px solid var(--border); border-radius:4px; background:var(--display); color:var(--text); padding:4px 6px; font-size:.65rem; }
+.hg-choice-list { display:flex; align-items:center; gap:4px; overflow:auto; min-width:0; }
+.hg-choice-list button { flex:0 0 auto; max-width:180px; border:1px solid var(--border); border-radius:4px; background:var(--surface2); color:var(--text); padding:3px 6px; text-align:left; cursor:pointer; }
+.hg-choice-list button b,.hg-choice-list button i { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hg-choice-list button b { font-size:.62rem; }.hg-choice-list button i { color:var(--text3); font-size:.56rem; font-style:normal; }
+.tl2-gsbtn { min-width:25px; font-size:.57rem; letter-spacing:-.04em; }
