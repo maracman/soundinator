@@ -5132,6 +5132,22 @@ body.explore-mode #app {
   white-space: nowrap;
 }
 
+.panel-preset-control { align-items: stretch; }
+.panel-preset-picker { flex: 1; min-width: 0; }
+.panel-preset-display { min-height: 34px; box-sizing: border-box; }
+.panel-preset-name-input {
+  flex: 1; min-width: 0; width: 100%; box-sizing: border-box;
+  border: 0; outline: 0; background: transparent; color: var(--text);
+  font: inherit; font-weight: 600; padding: 0;
+}
+.panel-preset-save:disabled {
+  opacity: 0.34; cursor: not-allowed; filter: grayscale(0.75);
+}
+.panel-preset-save:not(:disabled) {
+  border-color: rgba(245,166,35,0.58); color: #ffd28a;
+  background: rgba(245,166,35,0.08);
+}
+
 /* ── Instrument library tab ──────────────────────────────── */
 
 .instrument-actions {
@@ -5999,10 +6015,10 @@ body.explore-mode #app {
 .note-circle .note-cell {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 30px;
-  height: 30px;
+  width: var(--note-node-size, 28px);
+  height: var(--note-node-size, 28px);
   border-radius: 50%;
-  font-size: 0.62rem;
+  font-size: var(--note-node-font, 0.58rem);
   flex-direction: column;
   line-height: 1;
   gap: 1px;
@@ -7032,8 +7048,35 @@ body.dragging { cursor: grabbing; user-select: none; }
 .sl-kv b { color: var(--text); font-variant-numeric: tabular-nums; }
 .sl-kv-sub { grid-column: 2; color: var(--text3); font-size: 0.6rem; font-variant-numeric: tabular-nums; }
 .sl-audition { display: flex; flex-direction: column; gap: 5px; }
-.sl-keys-wrap { flex: none; }
+.sl-keys-wrap { flex: none; display: flex; flex-direction: column; gap: 7px; }
+.sl-map-heading { display: flex; flex-direction: column; gap: 5px; align-items: stretch; }
+.sl-map-heading > div:first-child { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.sl-map-note { margin-top: 3px; color: var(--text3); font-size: 0.6rem; line-height: 1.35; }
+.sl-map-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.sl-map-group {
+  min-width: 0; margin: 0; padding: 4px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px;
+  border: 1px solid var(--border); border-radius: 7px;
+}
+.sl-map-group legend {
+  padding: 0 4px; color: var(--text3); font-size: 0.56rem;
+  font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.sl-map-choice {
+  min-width: 0; display: flex; align-items: center; gap: 5px; padding: 4px 5px;
+  border: 1px solid transparent; border-radius: 5px; color: var(--text2);
+  cursor: pointer; transition: background 0.12s, border-color 0.12s;
+}
+.sl-map-choice:hover { background: rgba(255,255,255,0.035); }
+.sl-map-choice.active { border-color: rgba(139,124,246,0.55); background: rgba(139,124,246,0.09); color: var(--text); }
+.sl-map-choice input { width: 12px; height: 12px; margin: 0; accent-color: var(--rootc); flex: none; }
+.sl-map-choice span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sl-map-choice b { overflow: hidden; text-overflow: ellipsis; font-size: 0.61rem; line-height: 1.2; white-space: nowrap; }
+.sl-map-choice small { overflow: hidden; text-overflow: ellipsis; color: var(--text3); font-size: 0.51rem; line-height: 1.2; white-space: nowrap; }
 #slKeys { display: block; background: var(--display); border: 1px solid var(--border); border-radius: 8px; }
+@media (max-width: 1200px) {
+  .sl-map-options { grid-template-columns: 1fr; }
+}
 
 /* Scale Lab owns the whole plugin area below the transport, like the
    sub-note workspace does */
@@ -9159,6 +9202,10 @@ body.explore-mode .view {
   gap: 8px;
   overflow: visible;
   padding: 0;
+}
+
+.m2-inspector .macro-inline-monitor {
+  padding: 5px 0 2px;
 }
 
 .m2-inspector .duration-monitor {

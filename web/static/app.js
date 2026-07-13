@@ -855,9 +855,6 @@ const PARAM_DESC = {
   layerEnvDecaySd: "The shared decay variation magnitude — applied to the base and every layer while synchronised",
   layerEnvSustainSd: "The shared sustain variation magnitude — applied to the base and every layer while synchronised",
   layerEnvReleaseSd: "The shared release variation magnitude — applied to the base and every layer while synchronised",
-  midiMapKeys: "Which keys of a MIDI keyboard play this patch: only the white keys, or every key",
-  midiMapCoverage: "What the keys cover: every scale subdivision, every subdivision with out-of-scale keys silent, or only in-scale degrees packed onto consecutive keys",
-  midiMapAnchor: "Where the mapping repeats: degree 0 sits at C and restarts at every C, or the scale restarts on the very next key after its last degree",
   spectralLoudnessNorm: "How strongly random harmonic amplitude draws are normalised back toward expected loudness",
   spectralDriftProb: "Chance that harmonic amplitudes keep wandering during a held note",
   spectralDriftDepth: "How much of each harmonic's SD is used for within-note amplitude drift",
@@ -1474,6 +1471,7 @@ const BEATS_PER_BAR = 4;
 let pxPerBeat = 14;   // lane pixel scale (zoom; persisted in dawLayout)
 let snapBeats = 1;    // grid snap: 4 = bar, 1 = beat, 0.5 = half
 let _timelineZoomAnchor = null; // preserve the beat under the trackpad
+let _tlScroll = null; // timeline scroll (vertical + horizontal) preserved across re-render
 
 function totalBeats() { return Math.max(16, arrangement?.lengthBeats || 64); }
 
@@ -1948,7 +1946,7 @@ function regionPlayParams(track, region, atBeat = null) {
   // Percussion-only patches keep the note grid (for percussion timing) but the
   // pitched voice stays silent.
   const srcPatch = (arrangement?.palette || []).find(p => p.id === region.paletteId);
-  if (srcPatch && isPercussionOnlyPatch(srcPatch)) params.percussionOnly = true;
+  if (region.percussionOnly || (srcPatch && isPercussionOnlyPatch(srcPatch))) params.percussionOnly = true;
   // Q5 Harmonic guide: an opted-in track regenerates under the marker in
   // force at the region's position. Applied AFTER the voice so the marker
   // wins; baked regions replay stored degrees and are untouched by
@@ -4299,6 +4297,7 @@ function bakeRegion(track, region) {
   const bakeParams = regionPlayParams(track, region);
   region.notes = synth.captureSpan(bakeParams, beatSec * regionLen(region));
   region.percStrikes = synth.capturePercStrikes(bakeParams, region.notes);
+  region.percussionOnly = !!bakeParams.percussionOnly;
   region.type = "baked";
   region.loopSourceBeats = regionLen(region);
   saveArrangement("bake region");
@@ -5302,8 +5301,14 @@ function rollPanelHTML() {
     : (SCALE_PRESETS[ctxP.scalePreset]?.label || ctxP.scalePreset || "major");
   const keyName = NOTE_NAMES[((ctxP.keyRoot ?? 0) % 12 + 12) % 12] || "C";
   const regionName = (arrangement.palette || []).find(pl => pl.id === region.paletteId)?.name || "Region";
-  return `
-    <div class="roll-panel${rollDynLane ? " dyn" : ""}">
+  const percOnly = !!region.percussionOnly;
+  const head = percOnly ? `
+      <div class="roll-head">
+        <span class="roll-title">Percussion</span>
+        <span class="roll-region" title="The region under edit">${esc(String(regionName))} — Seed ${region.seed ?? "—"}</span>
+        <span class="roll-meta">grid <b>${beatDiv}/beat</b></span>
+        <button class="btn btn-ghost btn-sm${_rollAddMode ? " roll-add-on" : ""}" id="rollAddMode" title="Draw mode: click a lane to add a hit">✏ Draw</button>
+      </div>` : `
       <div class="roll-head">
         <label class="roll-dyncheck"><input type="checkbox" id="rollDynToggle"${rollDynLane ? " checked" : ""}/> velocities</label>
         <span class="roll-title">Note editor</span>
@@ -5315,9 +5320,15 @@ function rollPanelHTML() {
           <i class="roll-leg-intended"></i> Intended (scale degree)
           <i class="roll-leg-realised"></i> Realised (played)
         </span>
-      </div>
-      <canvas id="rollCanvas" width="960" height="${(rollDynLane ? 300 : 240) + regionPercH(region)}" title="Two-finger scroll pans the zoomed roll. ⌘ + two-finger up/down zooms pitch; ⌘ + two-finger left/right zooms time. Drag a percussion * up/down to change its dynamics."></canvas>
-      <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies show the realised pitch AND timing; dashed outlines mark the intended scale note and grid slot. ⇧-drag = micro-timing off the grid.</div>
+      </div>`;
+  const readout = percOnly
+    ? "Drag a ✳ up/down to change its dynamics · ⇧-drag to slide it along the lane · ✏ Draw, then click a lane to add a hit."
+    : "Click a note to inspect it. Bodies show the realised pitch AND timing; dashed outlines mark the intended scale note and grid slot. ⇧-drag = micro-timing off the grid.";
+  return `
+    <div class="roll-panel${rollDynLane && !percOnly ? " dyn" : ""}">
+      ${head}
+      <canvas id="rollCanvas" width="960" height="${rollCanvasHeight(region)}" title="Drag a percussion ✳ up/down to change its dynamics; ⇧-drag to slide it along the lane."></canvas>
+      <div class="roll-readout" id="rollReadout">${readout}</div>
     </div>`;
 }
 
@@ -5350,6 +5361,75 @@ function drawAsterisk(ctx, x, y, r) {
 let _rollPercHits = []; // {si, x, y, size} strike hit-targets for the current draw
 let _rollPercSel = -1;  // index into region.percStrikes of the selected strike
 
+// Canvas height for the roll: percussion-only regions size to their lanes;
+// pitched regions size to the pitch grid (+ velocity lane) + percussion lanes.
+function rollCanvasHeight(region) {
+  if (region?.percussionOnly) return Math.max(120, 40 + regionPercLanes(region).length * 46);
+  return (rollDynLane ? 300 : 240) + regionPercH(region);
+}
+
+// A baked percussion-only region shows just its drum lanes — no pitched note
+// grid. Lanes fill the canvas; strikes and their drag/⇧-move/Draw-add all work
+// as in the mixed view (they read the same _rollGeom + _rollPercHits).
+function drawPercOnlyRoll(region, cv) {
+  const { ctx, w: W, h: H } = crisp2d(cv);
+  ctx.clearRect(0, 0, W, H);
+  const padL = 44, padR = 8, padT = 10, padB = 18;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const beatDiv = region.notes?.[0]?.beatDivisions || arrangement.context.beatDivisions || 1;
+  const totalDivs = Math.max(regionLen(region) * beatDiv, 1);
+  const viewStartDivs = 0, viewDivs = totalDivs;
+  const xFor = (divs) => padL + ((divs - viewStartDivs) / viewDivs) * plotW;
+  ctx.fillStyle = "#101216"; ctx.fillRect(padL - 2, padT - 2, plotW + 4, plotH + 4);
+  for (let b = 0; b <= totalDivs + 0.01; b += beatDiv) {
+    const x = xFor(b);
+    ctx.strokeStyle = b % (beatDiv * 4) === 0 ? "rgba(154,160,171,0.16)" : "rgba(154,160,171,0.06)";
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+  }
+  const percLanes = regionPercLanes(region);
+  const strikes = region.percStrikes || [];
+  const laneH = percLanes.length ? plotH / percLanes.length : plotH;
+  const percLaneGeom = [];
+  _rollHits = [];
+  _rollPercHits = [];
+  ctx.font = "10px 'SF Mono', monospace";
+  percLanes.forEach((lane, li) => {
+    const top = padT + laneH * li, y = top + laneH / 2;
+    percLaneGeom.push({ layerId: lane.layerId, name: lane.name, top, bottom: top + laneH });
+    ctx.strokeStyle = "rgba(154,160,171,0.16)"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+    ctx.fillStyle = "rgba(229,104,143,0.92)"; ctx.textAlign = "right";
+    ctx.fillText(String(lane.name).slice(0, 7), padL - 5, y + 3.5);
+    strikes.forEach((s, si) => {
+      if (s.layerId !== lane.layerId) return;
+      const divs = (s.beat || 0) * beatDiv;
+      if (divs < -0.5 || divs > totalDivs + 0.5) return;
+      const x = xFor(divs);
+      const vel = Math.max(0.05, Math.min(1, s.velocity || 0));
+      const size = 3 + vel * Math.min(11, laneH / 2 - 3);
+      const selp = _rollPercSel === si;
+      ctx.strokeStyle = selp ? "#ffe3b0" : `rgba(229,104,143,${0.45 + 0.55 * vel})`;
+      ctx.lineWidth = selp ? 2.2 : 1.6;
+      drawAsterisk(ctx, x, y, size);
+      _rollPercHits.push({ si, x, y, size });
+    });
+  });
+  ctx.lineWidth = 1;
+  const activeDiv = arrPlay && selectedRegion?.regionId === region.id
+    ? (curPlayBeat() - (region.startBeat || 0)) * beatDiv : null;
+  if (activeDiv != null && activeDiv >= 0 && activeDiv <= totalDivs) {
+    const x = xFor(activeDiv);
+    ctx.strokeStyle = "rgba(75,207,255,0.95)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, padT - 2); ctx.lineTo(x, padT + plotH + 2); ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+  _rollGeom = { padL, padT, plotW, plotH, totalDivs, viewStartDivs, viewDivs, W, H,
+    beatDivRoll: beatDiv, percLaneGeom, percOnly: true, laneTop: padT + plotH,
+    rowH: 10, minDeg: 0, maxDeg: 0, allMinDeg: 0, allMaxDeg: 0, rowInfo: {}, div: 12 };
+  window._rollPercHitsQA = _rollPercHits;
+  window._rollGeomQA = _rollGeom;
+}
+
 // Piano roll for a baked region: rows = scale degrees, columns = beat
 // divisions. Dual pitch representation per the bake design — the note BODY
 // is positioned at its precise pitch (degree + cents as a fractional row
@@ -5358,6 +5438,7 @@ let _rollPercSel = -1;  // index into region.percStrikes of the selected strike
 function drawRoll(region) {
   const cv = document.getElementById("rollCanvas");
   if (!cv) return;
+  if (region.percussionOnly) { drawPercOnlyRoll(region, cv); return; }
   const { ctx, w: W, h: H } = crisp2d(cv);
   ctx.clearRect(0, 0, W, H);
   const notes = region.notes;
@@ -5703,8 +5784,9 @@ function wireRoll(v) {
         const lane = _rollGeom.percLaneGeom.find(L => y >= L.top && y < L.bottom);
         if (lane) {
           const g = _rollGeom, bd = g.beatDivRoll || 1;
-          const divs = Math.max(0, Math.min(g.totalDivs - 1,
-            Math.round(g.viewStartDivs + (x - g.padL) / g.plotW * g.viewDivs)));
+          // Granular: the hit lands exactly where you click (no grid snap).
+          const divs = Math.max(0, Math.min(g.totalDivs,
+            g.viewStartDivs + (x - g.padL) / g.plotW * g.viewDivs));
           region.percStrikes = region.percStrikes || [];
           region.percStrikes.push({ layerId: lane.layerId, beat: divs / bd, velocity: 0.7, name: lane.name });
           _rollPercSel = region.percStrikes.length - 1;
@@ -5809,10 +5891,11 @@ function wireRoll(v) {
       const s = region.percStrikes[drag.si];
       if (s) {
         if (drag.shiftMove) {
+          // Granular slide along the line — no grid snap (like note micro-timing).
           const bd = g.beatDivRoll || 1;
           const pxPerDivW = g.plotW / g.viewDivs;
-          let divs = Math.round((drag.origBeat || 0) * bd + (x - drag.startX) / pxPerDivW);
-          divs = Math.max(0, Math.min(g.totalDivs - 1, divs));
+          let divs = (drag.origBeat || 0) * bd + (x - drag.startX) / pxPerDivW;
+          divs = Math.max(0, Math.min(g.totalDivs, divs));
           s.beat = divs / bd;
           setReadout(`${s.name} · beat ${s.beat.toFixed(2)}`);
         } else {
@@ -6773,6 +6856,18 @@ function producerPaletteHTML() {
 }
 
 function renderProduce() {
+  // Preserve the timeline scroll across the re-render so selecting/editing a
+  // region doesn't snap the track view back to the top (owner bug report).
+  const _prevCenter = document.querySelector(".daw-center");
+  const _prevGrid = document.getElementById("timelineGrid");
+  if (_prevCenter || _prevGrid) {
+    _tlScroll = {
+      cTop: _prevCenter?.scrollTop || 0, cLeft: _prevCenter?.scrollLeft || 0,
+      gTop: _prevGrid?.scrollTop || 0, gLeft: _prevGrid?.scrollLeft || 0,
+      // The track rows scroll vertically inside their own .tl2 table.
+      tl2Top: _prevGrid?.querySelector(".tl2")?.scrollTop || 0,
+    };
+  }
   // Route-level safety net: any ordinary navigation back to Producer commits
   // the Studio edit, even if the user uses browser history or the header link.
   if (paletteEditState()) {
@@ -6790,7 +6885,9 @@ function renderProduce() {
     || (editorMode === "patch" && !!editorPatchSubject())
     || (editorMode === "roll" && !!editorRegion());
   // Grow the roll editor so a baked region's percussion lanes are visible.
-  const rollPercExtra = editorMode === "roll" ? regionPercH(selectedBakedRegion()) : 0;
+  const rollPercExtra = editorMode === "roll"
+    ? Math.max(0, rollCanvasHeight(selectedBakedRegion()) + 90 - 300)
+    : 0;
   const v = mount(`
     <div class="daw">
       <div class="daw-transport">
@@ -7025,12 +7122,22 @@ function wireStripsPanel(v) {
 function wireProduce(v) {
   const sources = produceSources();
 
-  if (_timelineZoomAnchor) {
-    const anchor = _timelineZoomAnchor;
-    _timelineZoomAnchor = null;
+  const _zoomAnchor = _timelineZoomAnchor;
+  const _savedScroll = _tlScroll;
+  _timelineZoomAnchor = null;
+  _tlScroll = null;
+  if (_zoomAnchor || _savedScroll) {
     requestAnimationFrame(() => {
       const grid = v.querySelector("#timelineGrid");
-      if (grid) grid.scrollLeft = Math.max(0, anchor.beat * pxPerBeat - anchor.offsetPx);
+      const center = v.querySelector(".daw-center");
+      if (_savedScroll) {
+        if (center) { center.scrollTop = _savedScroll.cTop; center.scrollLeft = _savedScroll.cLeft; }
+        if (grid) { grid.scrollTop = _savedScroll.gTop; if (!_zoomAnchor) grid.scrollLeft = _savedScroll.gLeft; }
+        const tl2 = grid?.querySelector(".tl2");
+        if (tl2) tl2.scrollTop = _savedScroll.tl2Top;
+      }
+      // A zoom gesture pins the beat under the cursor — it wins for scrollLeft.
+      if (_zoomAnchor && grid) grid.scrollLeft = Math.max(0, _zoomAnchor.beat * pxPerBeat - _zoomAnchor.offsetPx);
     });
   }
 
@@ -7503,6 +7610,7 @@ function wireProduce(v) {
     const params = regionPlayParams(track, region);
     region.notes = synth.captureSpan(params, beatSec * regionLen(region));
     region.percStrikes = synth.capturePercStrikes(params, region.notes);
+    region.percussionOnly = !!params.percussionOnly;
     region.type = "baked";
     region.loopSourceBeats = regionLen(region);
     saveArrangement();
@@ -9180,64 +9288,16 @@ function renderExplore() {
     };
   }
 
-  // Scale circle: click cycles a degree's role; dragging a node around the
-  // ring adjusts its pitch centre (per-degree cents); double-click resets it.
+  // Scale circle in Macro is deliberately role-only. Scale Lab owns tuning;
+  // here a click simply cycles off → in scale → sub-scale → root.
   const noteGridContainer = v.querySelector("#noteGridContainer");
   if (noteGridContainer) {
-    noteGridContainer.onmousedown = (e) => {
+    noteGridContainer.onclick = (e) => {
       const cell = e.target.closest(".note-cell");
       if (!cell) return;
-      e.preventDefault();
-      const d = parseInt(cell.dataset.degree);
-      const circle = cell.closest(".note-circle");
-      const rect = circle.getBoundingClientRect();
-      const divisions = exploreParams.scaleMode === "edo" ? (exploreParams.edoDivisions || 12) : 12;
-      const maxCents = Math.max(5, Math.floor(1200 / divisions / 2) - 1); // never cross a neighbour
-      let moved = false;
-      const centsAt = (ev) => {
-        const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
-        let angle = Math.atan2(ev.clientY - cy, ev.clientX - cx) + Math.PI / 2; // 0 at 12 o'clock
-        let frac = angle / (2 * Math.PI);
-        frac = ((frac % 1) + 1) % 1;
-        let cents = (frac - d / divisions) * 1200;
-        if (cents > 600) cents -= 1200;
-        if (cents < -600) cents += 1200;
-        return Math.max(-maxCents, Math.min(maxCents, Math.round(cents)));
-      };
-      const move = (ev) => {
-        if (Math.abs(ev.clientX - e.clientX) + Math.abs(ev.clientY - e.clientY) < 4 && !moved) return;
-        moved = true;
-        const cents = centsAt(ev);
-        exploreParams.degreeTuning = { ...(exploreParams.degreeTuning || {}) };
-        if (cents) exploreParams.degreeTuning[d] = cents;
-        else delete exploreParams.degreeTuning[d];
-        if (!Object.keys(exploreParams.degreeTuning).length) exploreParams.degreeTuning = null;
-        rerenderNoteGrid(v);
-        synth.updateGenerationParams({ ...exploreParams });
-      };
-      const up = () => {
-        window.removeEventListener("mousemove", move);
-        window.removeEventListener("mouseup", up);
-        if (!moved) {
-          // plain click: cycle the role exactly as before
-          handleNoteGridClick(cell);
-          syncRootNotesWithScale(v);
-        } else {
-          debouncedReplay();
-        }
-      };
-      window.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", up);
-    };
-    noteGridContainer.ondblclick = (e) => {
-      const cell = e.target.closest(".note-cell");
-      if (!cell || !exploreParams.degreeTuning) return;
-      const d = parseInt(cell.dataset.degree);
-      delete exploreParams.degreeTuning[d];
-      if (!Object.keys(exploreParams.degreeTuning).length) exploreParams.degreeTuning = null;
-      rerenderNoteGrid(v);
+      handleNoteGridClick(cell);
+      syncRootNotesWithScale(v);
       synth.updateGenerationParams({ ...exploreParams });
-      debouncedReplay();
     };
   }
 
@@ -9532,29 +9592,12 @@ function _scaleComboLabel(p) {
 function m2ScaleInspectorHTML(p) {
   return `
     <div class="section-label">Scale & Root</div>
-    ${panelPresetBarHTML("melody")}
+    ${panelPresetBarHTML("scale")}
     <div class="mode-btns" id="scaleModeGroup">
       <button class="mode-btn${p.scaleMode !== 'edo' ? ' active' : ''}" data-smode="12tone">12-tone</button>
       <button class="mode-btn${p.scaleMode === 'edo' ? ' active' : ''}" data-smode="edo">N-EDO</button>
     </div>
     <div id="scaleOptions">
-      <div class="scale-preset-row">
-        <span class="text-sm" style="color:var(--text2)">Preset</span>
-        <div class="scale-combo" id="scaleCombo">
-          <button type="button" class="scale-combo-btn" id="scaleComboBtn" title="Scale presets and world tunings in one list — open and type to search">${esc(_scaleComboLabel(p))}<span class="scale-combo-caret">▾</span></button>
-          <div class="scale-combo-pop" id="scaleComboPop" hidden>
-            <input type="search" class="scale-combo-search" id="scaleComboSearch" placeholder="Search scales &amp; tunings…"/>
-            <div class="scale-combo-list" id="scaleComboList">
-              <div class="scale-combo-group">12-tone presets</div>
-              ${Object.entries(SCALE_PRESETS).map(([k, s]) =>
-                `<button type="button" class="scale-combo-opt${p.scaleMode !== 'edo' && !_scaleComboWorld && p.scalePreset === k ? " sel" : ""}" data-scale-choice="p:${k}">${esc(s.label)}</button>`).join("")}
-              <div class="scale-combo-group">World tunings</div>
-              ${Object.entries(CULTURAL_SCALES).map(([k, s]) =>
-                `<button type="button" class="scale-combo-opt${_scaleComboWorld === k ? " sel" : ""}" data-scale-choice="w:${k}" title="${esc(s.description || s.label)}">${esc(s.label)}<i class="scale-combo-note">${s.edo}-EDO</i></button>`).join("")}
-            </div>
-          </div>
-        </div>
-      </div>
       ${p.scaleMode === 'edo' ? `
         <div class="edo-row">
           <span class="text-sm" style="color:var(--text2)">Divisions:</span>
@@ -9585,7 +9628,7 @@ function m2ScaleInspectorHTML(p) {
 function m2SequenceInspectorHTML(p) {
   return `
     <div class="section-label">Markov Sequence &amp; Surprise</div>
-    ${panelPresetBarHTML("surprise")}
+    ${panelPresetBarHTML("markov")}
     <div class="section-subhead">Sequence</div>
     <div class="controls-grid">
       ${controlRow("motifCount", "Motif states", p.motifCount, 1, 8, 1)}
@@ -10351,11 +10394,17 @@ function macroPanelHTML(p) {
     const tunSub = macroSubTab.tuning;
     return `
       <div class="macro-panel tuning-panel">
+        ${panelPresetBarHTML("tuning")}
         <div class="macro-controls">
           <div class="macro-subsection${tunSub === "accuracy" ? " active" : ""}" data-section="accuracy">
             <div class="subsection-label">Accuracy</div>
             ${controlRow("precision", "Probability", p.precision, 0, 1, 0.01)}
             ${controlRow("precisionRange", "Hit range", p.precisionRange, 0, 100, 1)}
+          </div>
+
+          <div class="macro-monitor macro-inline-monitor">
+            <div class="monitor-title">Tuning Deviation (Cents)</div>
+            <canvas class="dist-canvas accuracy-canvas" id="cvTuningAccuracy" width="620" height="220"></canvas>
           </div>
 
           <div class="macro-subsection${!p.surpriseTuningEnabled ? " surprise-disabled" : ""}${tunSub === "surprise" ? " active" : ""}" data-section="surprise">
@@ -10365,17 +10414,13 @@ function macroPanelHTML(p) {
             ${controlRow("surpriseTuningDistance", "Range", p.surpriseTuningDistance, 0, 1, 0.01)}
           </div>
         </div>
-        <div class="macro-monitor">
-          <div class="monitor-title">Tuning Deviation (Cents)</div>
-          <canvas class="dist-canvas accuracy-canvas" id="cvTuningAccuracy" width="620" height="220"></canvas>
-        </div>
       </div>`;
   }
   if (macroTab === "duration") {
     const durSub = macroSubTab.duration;
     return `
       <div class="macro-panel duration-panel">
-        ${panelPresetBarHTML("rhythm")}
+        ${panelPresetBarHTML("duration")}
         <div class="macro-controls">
           <div class="macro-subsection${durSub === "generation" ? " active" : ""}" data-section="generation">
             <div class="subsection-label">Generation</div>
@@ -10388,6 +10433,11 @@ function macroPanelHTML(p) {
             ${controlRow("restOffMeterRatio", "Rest off-meter", p.restOffMeterRatio, 0, 0.95, 0.01)}
           </div>
 
+          <div class="macro-monitor macro-inline-monitor">
+            <div class="monitor-title">Duration Difference (Divisions)</div>
+            <canvas class="dist-canvas accuracy-canvas" id="cvDurationAccuracy" width="620" height="220"></canvas>
+          </div>
+
           <div class="macro-subsection${!p.surpriseRhythmEnabled ? " surprise-disabled" : ""}${durSub === "surprise" ? " active" : ""}" data-section="surprise">
             <div class="subsection-label">Surprise</div>
             ${checkboxControl("surpriseRhythmEnabled", "Enable surprise", p.surpriseRhythmEnabled)}
@@ -10396,9 +10446,7 @@ function macroPanelHTML(p) {
             ${checkboxControl("surpriseRestEnabled", "Include surprise rests", p.surpriseRestEnabled)}
           </div>
         </div>
-        <div class="macro-monitor duration-monitor">
-          <div class="monitor-title">Duration Difference (Divisions)</div>
-          <canvas class="dist-canvas accuracy-canvas" id="cvDurationAccuracy" width="620" height="220"></canvas>
+        <div class="duration-monitor">
           <div class="breaks-block">
             <div class="section-label">Breaks & Slides</div>
             <div class="breaks-grid">
@@ -10439,6 +10487,11 @@ function macroPanelHTML(p) {
             ${controlRow("dynamicsHitRange", "Hit range", p.dynamicsHitRange ?? Math.round(p.dynamicsRange * 100), 0, 75, 1)}
           </div>
 
+          <div class="macro-monitor macro-inline-monitor">
+            <div class="monitor-title">Dynamic Difference (%)</div>
+            <canvas class="dist-canvas accuracy-canvas" id="cvDynamicsAccuracy" width="620" height="220"></canvas>
+          </div>
+
           <div class="macro-subsection${!p.surpriseDynamicsEnabled ? " surprise-disabled" : ""}${dynSub === "surprise" ? " active" : ""}" data-section="surprise">
             <div class="subsection-label">Surprise</div>
             ${checkboxControl("surpriseDynamicsEnabled", "Enable surprise", p.surpriseDynamicsEnabled)}
@@ -10453,15 +10506,12 @@ function macroPanelHTML(p) {
             <canvas class="mini-canvas register-mini-canvas" id="cvLoudnessRegister" width="280" height="50"></canvas>
           </div>
         </div>
-        <div class="macro-monitor">
-          <div class="monitor-title">Dynamic Difference (%)</div>
-          <canvas class="dist-canvas accuracy-canvas" id="cvDynamicsAccuracy" width="620" height="220"></canvas>
-        </div>
       </div>`;
   }
   const melSub = macroSubTab.melody;
   return `
     <div class="macro-panel melody-panel">
+      ${panelPresetBarHTML("melody")}
       <div class="macro-controls">
         <div class="macro-subsection${melSub === "generation" ? " active" : ""}" data-section="generation">
           <div class="subsection-label">Generation</div>
@@ -10481,6 +10531,11 @@ function macroPanelHTML(p) {
           <div class="subsection-label">Accuracy</div>
           ${controlRow("motifHitProb", "Probability", p.motifHitProb, 0, 1, 0.01)}
           ${controlRow("motifHitRange", "Hit range", p.motifHitRange, 0, 12, 1)}
+        </div>
+
+        <div class="macro-monitor macro-inline-monitor">
+          <div class="monitor-title">Scale Degree Difference (Steps)</div>
+          <canvas class="dist-canvas accuracy-canvas" id="cvMelodyAccuracy" width="620" height="220"></canvas>
         </div>
 
         <div class="macro-subsection${!p.surprisePitchEnabled ? " surprise-disabled" : ""}${melSub === "surprise" ? " active" : ""}" data-section="surprise">
@@ -10504,10 +10559,6 @@ function macroPanelHTML(p) {
           ${controlRow("registerSkew", "Skew", p.registerSkew, -1, 1, 0.05)}
           <canvas class="mini-canvas register-mini-canvas" id="cvRegister" width="280" height="50"></canvas>
         </div>
-      </div>
-      <div class="macro-monitor melody-monitor">
-        <div class="monitor-title">Scale Degree Difference (Steps)</div>
-        <canvas class="dist-canvas accuracy-canvas" id="cvMelodyAccuracy" width="620" height="220"></canvas>
       </div>
     </div>`;
 }
@@ -11342,42 +11393,36 @@ function applySubnoteModeState(root = document) {
 
 // ─── Explore: Note Grid ─────────────────────────────────────
 
-// Owner 07-07: the scale is a CIRCLE — one octave around the ring, degree
-// 0 at 12 o'clock. Click a node to cycle its role (off → scale → sub →
-// root, as before); when a tuning system offsets a degree from the equal
-// grid, the node slides around the ring by its cents and shows them —
-// drag a node around the ring to adjust its pitch centre by hand,
-// double-click to snap it back to the grid.
-const NOTE_CIRCLE_R = 96;
+// The compact Macro scale ring is role-only: one division per node, degree 0
+// at 12 o'clock, and click cycles off → scale → sub-scale → root. Pitch-centre
+// editing remains in Scale Lab and is intentionally not duplicated here.
+const NOTE_CIRCLE_R = 78;
 function buildNoteGridHTML(p) {
   const isEDO = p.scaleMode === "edo";
   const divisions = isEDO ? (p.edoDivisions || 12) : 12;
   const customDeg = p.customDegrees || [];
   const subNotes = p.subScaleNotes || [];
   const rootNotes = p.rootNotes || [];
-  const tuning = p.degreeTuning || {};
   const size = NOTE_CIRCLE_R * 2 + 36;
   const c = size / 2;
-  let html = `<div class="note-circle" style="width:${size}px;height:${size}px">`;
+  const nodeSize = divisions > 24 ? 16 : divisions > 16 ? 20 : divisions > 12 ? 24 : 28;
+  const nodeFont = divisions > 16 ? "0.44rem" : divisions > 12 ? "0.5rem" : "0.58rem";
+  let html = `<div class="note-circle" style="width:${size}px;height:${size}px;--note-node-size:${nodeSize}px;--note-node-font:${nodeFont}">`;
   html += `<div class="note-circle-ring" style="inset:${18 - 1}px"></div>`;
   for (let d = 0; d < divisions; d++) {
     const name = (divisions === 12) ? NOTE_NAMES_12[d] : String(d);
     const inScale = customDeg.includes(d);
     const inSub = subNotes.includes(d) && inScale;
     const isRoot = rootNotes.includes(d) && inScale;
-    const cents = Math.round(tuning[d] || 0);
     let cls = "note-cell";
     if (isRoot) cls += " is-root";
     else if (inSub) cls += " in-sub";
     else if (inScale) cls += " in-scale";
-    if (cents) cls += " tuned";
-    // the node's TRUE position: grid angle + its cent offset (one octave
-    // = a full turn, so angle = 2π · sounding-pitch / octave)
-    const angle = 2 * Math.PI * (d / divisions + cents / 1200) - Math.PI / 2;
+    const angle = 2 * Math.PI * d / divisions - Math.PI / 2;
     const x = c + Math.cos(angle) * NOTE_CIRCLE_R;
     const y = c + Math.sin(angle) * NOTE_CIRCLE_R;
     html += `<div class="${cls}" data-degree="${d}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"
-      title="${name}: click cycles off → in scale → sub-scale → root · drag around the ring to move its pitch centre${cents ? ` (now ${cents > 0 ? "+" : ""}${cents}¢)` : ""} · double-click resets the tuning">${name}${cents ? `<span class="note-cents">${cents > 0 ? "+" : ""}${cents}</span>` : ""}</div>`;
+      title="${name}: click cycles off → in scale → sub-scale → root">${name}</div>`;
   }
   html += "</div>";
   return html;
@@ -11728,28 +11773,48 @@ function drawSlKeys() {
   const loMidi = 48, hiMidi = 84; // C3..C6
   const keyW = w / (hiMidi - loMidi);
   const isBlack = (m) => [1, 3, 6, 8, 10].includes(m % 12);
+  const div = _slDivisions(p);
+  const degrees = Array.isArray(p.customDegrees) && p.customDegrees.length
+    ? p.customDegrees : Array.from({ length: div }, (_, i) => i);
+  const scale = new Scale(div, degrees, p.subScaleNotes || [], p.subScaleWeight || 0.5,
+    p.tonicHz || 261.63, p.degreeTuning || null);
+  const colFor = { root: "#8b7cf6", sub: "#4caf7d", scale: "#9aa0ab" };
   for (let m = loMidi; m < hiMidi; m++) {
     const x = (m - loMidi) * keyW;
-    ctx.fillStyle = isBlack(m) ? "#161a21" : "#252a33";
-    ctx.fillRect(x + 0.5, 0, keyW - 1, h - 22);
+    const black = isBlack(m);
+    const degree = midiMapDegree(m, scale, midiMapping);
+    const participates = midiMapping.keys === "all" || !black;
+    ctx.fillStyle = black ? "#13171d" : "#262c35";
+    ctx.fillRect(x + 0.5, 0, keyW - 1, h - 24);
+    if (degree != null) {
+      const pc = scale.norm(degree);
+      const st = _slDegreeStatus(p, pc);
+      ctx.fillStyle = `${colFor[st] || colFor.scale}2e`;
+      ctx.fillRect(x + 1, 1, keyW - 2, h - 26);
+      ctx.fillStyle = colFor[st] || colFor.scale;
+      ctx.fillRect(x + 1, h - 29, keyW - 2, 4);
+      ctx.fillStyle = st === "root" ? "#d8d0ff" : "#d2d7de";
+      ctx.font = "10px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`°${degree}`, x + keyW / 2, h - 39);
+    } else if (participates) {
+      ctx.fillStyle = "rgba(125,135,148,0.42)";
+      ctx.font = "12px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("×", x + keyW / 2, h - 38);
+    }
     if (m % 12 === 0) {
       ctx.fillStyle = "rgba(120,135,150,0.7)";
       ctx.font = "9px ui-monospace, monospace";
+      ctx.textAlign = "left";
       ctx.fillText(`C${m / 12 - 1}`, x + 2, h - 26);
     }
+    ctx.fillStyle = degree == null ? "rgba(110,120,132,0.45)" : "rgba(205,211,220,0.78)";
+    ctx.font = "9px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(NOTE_NAMES_12[m % 12], x + keyW / 2, h - 8);
   }
-  const colFor = { root: "#8b7cf6", sub: "#4caf7d", scale: "#9aa0ab" };
-  for (const d of (p.customDegrees || [])) {
-    const st = _slDegreeStatus(p, d);
-    for (let oct = -2; oct <= 2; oct++) {
-      const hz = _slFreq(p, d) * Math.pow(2, oct);
-      const midi = 69 + 12 * Math.log2(hz / 440);
-      if (midi < loMidi || midi >= hiMidi) continue;
-      const x = (midi - loMidi) * keyW + keyW / 2;
-      ctx.fillStyle = colFor[st] || colFor.scale;
-      ctx.beginPath(); ctx.arc(x, h - 10, st === "root" ? 5 : 3.5, 0, 2 * Math.PI); ctx.fill();
-    }
-  }
+  ctx.textAlign = "left";
 }
 
 let _slAudCtx = null;
@@ -11828,6 +11893,17 @@ function slImportScl(text, p) {
 function wireScaleLab(v) {
   if (!v.querySelector("#slWheel")) return;
   const p = exploreParams;
+  v.querySelectorAll("[data-sl-map]").forEach(input => {
+    input.onchange = () => {
+      if (!input.checked) return;
+      midiMapping = normaliseMidiMapping({ ...midiMapping, [input.dataset.slMap]: input.value });
+      saveMidiMapping();
+      v.querySelectorAll(`[data-sl-map="${input.dataset.slMap}"]`).forEach(peer => {
+        peer.closest(".sl-map-choice")?.classList.toggle("active", peer.checked);
+      });
+      drawSlKeys();
+    };
+  });
   const applyScale = () => {
     syncSurpriseFeatureParams?.(p);
     synth.updateGenerationParams({ ...p });
@@ -16902,59 +16978,333 @@ function maybeShowContribute(v) {
   };
 }
 
-// ── Per-panel preset bars (owner feedback: presets live where the controls
-// live). Each section panel gets a compact load-select + save button acting
-// on that section only; the central library remains for browsing/sharing.
-function panelPresetBarHTML(section) {
-  const label = PRESET_SECTIONS[section]?.label || section;
-  const options = [...FACTORY_PRESETS, ...loadPresets()]
-    .filter(p => (p.section || "full") === section)
-    .map(p => `<option value="${esc(String(p.id))}">${esc(p.name || "Untitled")}</option>`)
-    .join("");
+// ── Macro panel preset pickers ──────────────────────────────
+// One interaction everywhere: the closed field names the active setting;
+// click opens a searchable list; double-click edits the name without opening;
+// Save only becomes available for a non-empty, unique edited name.
+const MACRO_PANEL_META = {
+  scale:    { label: "Scale", legacy: ["melody"] },
+  melody:  { label: "Melody", legacy: ["melody"] },
+  tuning:  { label: "Tuning", legacy: [] },
+  duration:{ label: "Duration", legacy: ["rhythm"] },
+  dynamics:{ label: "Dynamics", legacy: ["dynamics"] },
+  markov:  { label: "Markov", legacy: ["surprise"] },
+  percussion: { label: "Percussion", legacy: ["percussion"] },
+};
+
+const MACRO_PANEL_KEYS = {
+  scale: new Set([
+    "scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz",
+    "degreeTuning", "subScaleNotes", "subScaleWeight", "rootNotes",
+    "rootPullStrength", "rootPullShape",
+  ]),
+  melody: new Set([
+    "melodyPattern", "arpStep", "arpOctaves", "intervalPeakedness", "intervalRange", "momentum",
+    "motifHitProb", "motifHitRange", "registerCenter", "registerWidth", "registerSkew",
+    "surprisePitchEnabled", "melSurpriseAmount", "surprisePitchDistance",
+  ]),
+  tuning: new Set([
+    "precision", "precisionRange", "surpriseTuningEnabled", "tunSurpriseAmount", "surpriseTuningDistance",
+  ]),
+  duration: new Set([
+    "tempo", "beatDivisions", "sameLengthProb", "onBeatProb", "offBeatProb",
+    "restMotifStartRatio", "restOnMeterRatio", "restOffMeterRatio",
+    "gapProb", "gapMin", "gapMax", "gapDistanceSlope", "gapTimingRange", "phraseGap",
+    "noteConnection", "slideSpeed", "surpriseRhythmEnabled", "surpriseRestEnabled",
+    "durSurpriseAmount", "surpriseRhythmDistance",
+  ]),
+  dynamics: new Set([
+    "dynamicsLevel", "loudnessRange", "dynamicsPrecision", "dynamicsHitRange", "dynamicsRange",
+    "surpriseDynamicsEnabled", "dynSurpriseAmount", "surpriseDynamicsDistance",
+  ]),
+  percussion: new Set([
+    "percEnabled", "percLayers", "percBeatVol", "percMotifVol", "percDownbeatVol",
+  ]),
+};
+
+const TUNING_PANEL_PRESETS = [
+  { id: "tuning-grid", name: "Grid Locked", parameters: { precision: 1, precisionRange: 0, surpriseTuningEnabled: false, tunSurpriseAmount: 0.25, surpriseTuningDistance: 0.2 } },
+  { id: "tuning-human", name: "Human Intonation", parameters: { precision: 0.88, precisionRange: 14, surpriseTuningEnabled: false, tunSurpriseAmount: 0.4, surpriseTuningDistance: 0.5 } },
+  { id: "tuning-loose", name: "Loose Pitch", parameters: { precision: 0.62, precisionRange: 38, surpriseTuningEnabled: true, tunSurpriseAmount: 0.55, surpriseTuningDistance: 0.7 } },
+  { id: "tuning-volatile", name: "Volatile Tuning", parameters: { precision: 0.42, precisionRange: 70, surpriseTuningEnabled: true, tunSurpriseAmount: 0.82, surpriseTuningDistance: 0.95 } },
+];
+
+let _macroPresetUi = {};
+
+function extractMacroPanelParams(params, panel) {
+  const out = {};
+  if (panel === "markov") {
+    const exact = new Set(["motifCount", "motifLengthBeats", "motifLength", "sequenceProb", "motifSurpriseProb", "incorporationRate"]);
+    for (const [key, value] of Object.entries(params || {})) {
+      if (exact.has(key) || key.startsWith("surprise")) out[key] = value;
+    }
+    return out;
+  }
+  const keys = MACRO_PANEL_KEYS[panel] || new Set();
+  for (const [key, value] of Object.entries(params || {})) if (keys.has(key)) out[key] = value;
+  return out;
+}
+
+function scalePanelEntries() {
+  const twelve = Object.entries(SCALE_PRESETS).map(([key, scale]) => ({
+    value: `scale:p:${key}`, name: scale.label || key, note: "12-EDO",
+    parameters: {
+      scaleMode: "12tone", scalePreset: key, edoDivisions: 12,
+      customDegrees: [...scale.degrees], subScaleNotes: [], rootNotes: [scale.degrees[0] ?? 0], degreeTuning: null,
+    },
+  }));
+  const world = Object.entries(CULTURAL_SCALES).map(([key, scale]) => ({
+    value: `scale:w:${key}`, name: scale.label, note: `${scale.edo}-EDO`, title: scale.description,
+    parameters: {
+      scaleMode: scale.edo === 12 ? "12tone" : "edo", scalePreset: "major", edoDivisions: scale.edo,
+      customDegrees: [...scale.degrees], subScaleNotes: [...(scale.sub || [])],
+      rootNotes: [...(scale.roots || [0])], degreeTuning: scale.tuning ? { ...scale.tuning } : null,
+    },
+  }));
+  return [{ label: "12-tone scales", entries: twelve }, { label: "World tunings", entries: world }];
+}
+
+function macroPanelPresetGroups(panel) {
+  let factory = [];
+  if (panel === "scale") return scalePanelEntries().concat(macroPanelUserGroup(panel));
+  if (panel === "tuning") {
+    factory = TUNING_PANEL_PRESETS.map(p => ({ value: `factory:${p.id}`, name: p.name, note: "factory", parameters: { ...p.parameters } }));
+  } else {
+    const section = { melody: "melody", duration: "rhythm", dynamics: "dynamics", markov: "surprise", percussion: "percussion" }[panel];
+    factory = FACTORY_PRESETS.filter(p => p.section === section).map(p => ({
+      value: `factory:${p.id}`, name: p.name || "Untitled", note: "factory", title: p.description,
+      parameters: extractMacroPanelParams(p.parameters, panel),
+    })).filter(p => Object.keys(p.parameters).length);
+  }
+  const groups = factory.length ? [{ label: "Factory presets", entries: factory }] : [];
+  return groups.concat(macroPanelUserGroup(panel));
+}
+
+function macroPanelUserGroup(panel) {
+  const meta = MACRO_PANEL_META[panel] || { legacy: [] };
+  const sections = new Set([`macro-${panel}`, ...(meta.legacy || [])]);
+  const entries = loadPresets().filter(p => sections.has(p.section)).map(p => ({
+    value: `user:${p.id}`, name: p.name || "Untitled", note: "mine",
+    parameters: extractMacroPanelParams(p.parameters, panel), userId: String(p.id), section: p.section,
+  })).filter(p => Object.keys(p.parameters).length);
+  return entries.length ? [{ label: "My presets", entries }] : [];
+}
+
+function flatMacroPanelEntries(panel) {
+  return macroPanelPresetGroups(panel).flatMap(group => group.entries || []);
+}
+
+function macroPanelEntryMatches(entry, panel, params = exploreParams) {
+  const values = extractMacroPanelParams(entry.parameters, panel);
+  const pairs = Object.entries(values);
+  return pairs.length > 0 && pairs.every(([key, value]) => JSON.stringify(params[key]) === JSON.stringify(value));
+}
+
+function macroPanelPresetState(panel) {
+  if (_macroPresetUi[panel]) return _macroPresetUi[panel];
+  const meta = MACRO_PANEL_META[panel] || { label: panel };
+  const match = flatMacroPanelEntries(panel).find(entry => macroPanelEntryMatches(entry, panel));
+  const fallback = panel === "scale" ? _scaleComboLabel(exploreParams) : `Custom ${meta.label}`;
+  _macroPresetUi[panel] = {
+    selectedId: match?.value || "", name: match?.name || fallback,
+    originalName: match?.name || fallback, dirty: false,
+  };
+  return _macroPresetUi[panel];
+}
+
+function macroPresetNameAvailable(name, ignoreUserId = null) {
+  const wanted = String(name || "").trim().toLocaleLowerCase();
+  if (!wanted) return false;
+  const fixed = [
+    ...FACTORY_PRESETS.map(p => p.name),
+    ...Object.values(SCALE_PRESETS).map(p => p.label),
+    ...Object.values(CULTURAL_SCALES).map(p => p.label),
+    ...TUNING_PANEL_PRESETS.map(p => p.name),
+  ];
+  if (fixed.some(name => String(name || "").trim().toLocaleLowerCase() === wanted)) return false;
+  return !loadPresets().some(p => String(p.id) !== String(ignoreUserId || "") && String(p.name || "").trim().toLocaleLowerCase() === wanted);
+}
+
+function panelPresetBarHTML(panel) {
+  const meta = MACRO_PANEL_META[panel] || { label: panel };
+  const state = macroPanelPresetState(panel);
+  const groups = macroPanelPresetGroups(panel);
+  const options = groups.map(group => {
+    const rows = group.entries.map(entry => `
+      <button type="button" class="smart-combo-opt${entry.value === state.selectedId ? " sel" : ""}" role="option"
+        data-panel-preset-choice="${esc(entry.value)}"${entry.title ? titleAttr(entry.title) : ""}>
+        <span class="smart-combo-opt-label">${esc(entry.name)}</span>${entry.note ? `<i class="smart-combo-note">${esc(entry.note)}</i>` : ""}
+      </button>`).join("");
+    return rows ? `<div class="smart-combo-group">${esc(group.label)}</div>${rows}` : "";
+  }).join("");
   return `
-    <div class="panel-presets" data-panel-section="${section}">
-      <select data-panel-preset-load="${section}" title="Load a saved ${esc(label)} preset into this section only — everything else stays as it is">
-        <option value="">${esc(label)} presets…</option>${options}
-      </select>
-      <button class="btn btn-ghost btn-sm" data-panel-preset-save="${section}" title="Save the current ${esc(label)} settings as a section preset">+ Save</button>
+    <div class="panel-presets panel-preset-control" data-panel-preset="${panel}">
+      <div class="smart-combo panel-preset-picker" data-panel-preset-picker>
+        <div class="smart-combo-btn panel-preset-display" role="button" tabindex="0" data-panel-preset-display
+          title="Click to choose a ${esc(meta.label)} preset · double-click its name to edit without opening">
+          <span class="smart-combo-btn-label" data-panel-preset-name>${esc(state.name)}</span><span class="smart-combo-caret">▾</span>
+        </div>
+        <div class="smart-combo-pop" data-panel-preset-pop hidden>
+          <input type="search" class="smart-combo-search" data-panel-preset-search placeholder="Search ${esc(meta.label)} presets…"/>
+          <div class="smart-combo-list" role="listbox">${options || `<div class="smart-combo-empty">No saved presets yet</div>`}</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm panel-preset-save" data-panel-preset-save disabled title="Double-click the preset name and enter a unique name to save">Save</button>
     </div>`;
 }
 
+function applyMacroPanelPreset(panel, value) {
+  const entry = flatMacroPanelEntries(panel).find(item => item.value === value);
+  if (!entry) return;
+  const wasPlaying = presetPreview ? presetPreview.wasPlaying : synth.isPlaying;
+  presetPreview = null;
+  const loaded = migrateToneParams(JSON.parse(JSON.stringify(entry.parameters || {})));
+  exploreParams = { ...exploreParams, ...loaded };
+  if (panel === "scale") {
+    _scaleComboWorld = value.startsWith("scale:w:") ? value.slice("scale:w:".length) : null;
+    if (!Array.isArray(exploreParams.customDegrees) || !exploreParams.customDegrees.length) exploreParams.customDegrees = [0];
+    exploreParams.rootNotes = (exploreParams.rootNotes || [exploreParams.customDegrees[0]])
+      .filter(degree => exploreParams.customDegrees.includes(degree));
+    if (!exploreParams.rootNotes.length) exploreParams.rootNotes = [exploreParams.customDegrees[0]];
+  }
+  syncSurpriseFeatureParams(exploreParams);
+  _macroPresetUi[panel] = { selectedId: value, name: entry.name, originalName: entry.name, dirty: false };
+  renderExplore();
+  if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+}
+
 function wirePanelPresetBars(v) {
-  const findEntry = (id) =>
-    [...FACTORY_PRESETS, ...loadPresets()].find(p => String(p.id) === id);
-  v.querySelectorAll("[data-panel-preset-load]").forEach(sel => {
-    sel.onchange = () => {
-      const entry = sel.value && findEntry(sel.value);
-      if (!entry) return;
-      const wasPlaying = presetPreview ? presetPreview.wasPlaying : synth.isPlaying;
-      presetPreview = null;
-      exploreParams = mergedPresetParams(entry);
-      renderExplore();
-      if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+  v.querySelectorAll("[data-panel-preset]").forEach(control => {
+    const panel = control.dataset.panelPreset;
+    const picker = control.querySelector("[data-panel-preset-picker]");
+    const display = control.querySelector("[data-panel-preset-display]");
+    const label = control.querySelector("[data-panel-preset-name]");
+    const pop = control.querySelector("[data-panel-preset-pop]");
+    const search = control.querySelector("[data-panel-preset-search]");
+    const save = control.querySelector("[data-panel-preset-save]");
+    if (!picker || !display || !label || !pop || !search || !save) return;
+    const state = macroPanelPresetState(panel);
+    let clickTimer = null;
+    const close = () => {
+      if (pop.hidden) return;
+      pop.hidden = true;
+      for (const key of ["position", "left", "top", "bottom", "width", "maxHeight", "zIndex"]) pop.style[key] = "";
+      if (picker._docClose) document.removeEventListener("click", picker._docClose, true);
     };
-  });
-  v.querySelectorAll("[data-panel-preset-save]").forEach(btn => {
-    btn.onclick = () => {
-      const section = btn.dataset.panelPresetSave;
-      const label = PRESET_SECTIONS[section]?.label || section;
-      const name = prompt(`Name this ${label} preset:`);
-      if (!name || !name.trim()) return;
-      const entry = {
-        id: crypto.randomUUID(),
-        created_at: new Date().toISOString(),
-        name: name.trim().slice(0, 80),
-        section,
-        rating: exploreRating,
-        parameters: extractSectionParams(exploreParams, section),
-        app_version: APP_VERSION,
+    const filter = () => {
+      const query = search.value.trim().toLocaleLowerCase();
+      picker.querySelectorAll("[data-panel-preset-choice]").forEach(option => {
+        option.hidden = !!query && !option.textContent.toLocaleLowerCase().includes(query);
+      });
+      picker.querySelectorAll(".smart-combo-group").forEach(group => {
+        let sibling = group.nextElementSibling, any = false;
+        while (sibling && !sibling.classList.contains("smart-combo-group")) {
+          if (!sibling.hidden) any = true;
+          sibling = sibling.nextElementSibling;
+        }
+        group.hidden = !any;
+      });
+    };
+    const open = () => {
+      document.querySelectorAll("[data-panel-preset-picker]").forEach(other => { if (other !== picker && other._close) other._close(); });
+      pop.hidden = false;
+      const rect = display.getBoundingClientRect(), gap = 4;
+      const width = Math.min(Math.max(rect.width, 210), window.innerWidth - 16);
+      const below = window.innerHeight - rect.bottom - gap - 8;
+      const above = rect.top - gap - 8;
+      const up = pop.offsetHeight > below && above > below;
+      pop.style.position = "fixed"; pop.style.zIndex = "3000"; pop.style.width = `${width}px`;
+      pop.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
+      pop.style.maxHeight = `${Math.max(140, up ? above : below)}px`;
+      if (up) { pop.style.top = "auto"; pop.style.bottom = `${window.innerHeight - rect.top + gap}px`; }
+      else { pop.style.bottom = "auto"; pop.style.top = `${rect.bottom + gap}px`; }
+      search.value = ""; filter(); search.focus({ preventScroll: true });
+      picker._docClose = event => { if (!picker.contains(event.target) && !pop.contains(event.target)) close(); };
+      document.addEventListener("click", picker._docClose, true);
+    };
+    picker._close = close;
+    const updateSave = () => {
+      const userId = state.selectedId.startsWith("user:") ? state.selectedId.slice(5) : null;
+      const current = userId && loadPresets().find(p => String(p.id) === userId && p.section === `macro-${panel}`);
+      const valid = state.dirty && macroPresetNameAvailable(state.name, current ? userId : null);
+      save.disabled = !valid;
+      save.title = valid ? `Save ${state.name.trim()}` : "Enter a non-empty name that does not match another preset";
+    };
+    const beginNameEdit = () => {
+      close();
+      if (display.querySelector("input")) return;
+      const before = state.name;
+      const wasDirty = state.dirty;
+      label.hidden = true;
+      const input = document.createElement("input");
+      input.type = "text"; input.className = "panel-preset-name-input"; input.maxLength = 80; input.value = state.name;
+      display.insertBefore(input, label);
+      input.focus(); input.select();
+      let finishing = false;
+      const finish = (cancel = false) => {
+        if (finishing || !input.isConnected) return;
+        finishing = true;
+        if (cancel) { state.name = before; state.dirty = wasDirty; }
+        input.remove(); label.hidden = false; label.textContent = state.name;
+        updateSave();
       };
-      const list = loadPresets();
-      list.unshift(entry);
-      savePresets(list);
-      trackEngagement("save");
-      renderExplore(); // refresh every panel bar + library list
+      input.oninput = () => {
+        state.name = input.value.slice(0, 80);
+        state.dirty = state.name.trim() !== state.originalName.trim();
+        updateSave();
+      };
+      input.onclick = event => event.stopPropagation();
+      input.ondblclick = event => event.stopPropagation();
+      input.onkeydown = event => {
+        if (event.key === "Enter") { event.preventDefault(); finish(false); }
+        if (event.key === "Escape") { event.preventDefault(); finish(true); }
+      };
+      input.onblur = () => finish(false);
     };
+    display.onclick = event => {
+      if (event.target.closest("input")) return;
+      clearTimeout(clickTimer);
+      if (event.detail > 1) return;
+      clickTimer = setTimeout(() => { if (pop.hidden) open(); else close(); }, 220);
+    };
+    display.ondblclick = event => {
+      if (!event.target.closest("[data-panel-preset-name]")) return;
+      event.preventDefault(); event.stopPropagation(); clearTimeout(clickTimer); beginNameEdit();
+    };
+    display.onkeydown = event => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (pop.hidden) open(); else close(); }
+    };
+    search.oninput = filter;
+    picker.querySelectorAll("[data-panel-preset-choice]").forEach(option => {
+      option.onclick = event => {
+        event.stopPropagation(); close(); applyMacroPanelPreset(panel, option.dataset.panelPresetChoice);
+      };
+    });
+    save.onclick = () => {
+      updateSave();
+      if (save.disabled) return;
+      const name = state.name.trim().slice(0, 80);
+      const list = loadPresets();
+      const selectedUserId = state.selectedId.startsWith("user:") ? state.selectedId.slice(5) : null;
+      const existing = selectedUserId && list.find(p => String(p.id) === selectedUserId && p.section === `macro-${panel}`);
+      let id;
+      if (existing) {
+        id = existing.id; existing.name = name; existing.parameters = extractMacroPanelParams(exploreParams, panel);
+        existing.updated_at = new Date().toISOString();
+      } else {
+        id = crypto.randomUUID();
+        list.unshift({
+          id, created_at: new Date().toISOString(), name, section: `macro-${panel}`,
+          rating: exploreRating, parameters: extractMacroPanelParams(exploreParams, panel), app_version: APP_VERSION,
+        });
+      }
+      savePresets(list); trackEngagement("save");
+      _macroPresetUi[panel] = { selectedId: `user:${id}`, name, originalName: name, dirty: false };
+      const wasPlaying = synth.isPlaying;
+      renderExplore();
+      if (wasPlaying) startVisualiser();
+    };
+    updateSave();
   });
 }
 
