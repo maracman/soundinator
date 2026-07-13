@@ -3356,6 +3356,7 @@ export class SynthEngine {
     this._timeline = [];
     this._configureReverb(params);
     this._percLayers = this._normalizePercLayers(params);
+    this._percussionOnly = !!params.percussionOnly;
     this._engine = new GenerationEngine(params);
     this._engine.initialise();
     this._nextTime = this.ctx.currentTime + 0.05;
@@ -3380,6 +3381,7 @@ export class SynthEngine {
     this._timeline = [];
     this._configureReverb(params);
     this._percLayers = this._normalizePercLayers(params);
+    this._percussionOnly = !!params.percussionOnly;
     this._engine = new GenerationEngine(params);
     this._engine.initialise();
     // Producer v3 split support: skipBeats fast-forwards through the take
@@ -3433,12 +3435,53 @@ export class SynthEngine {
   }
 
   /**
+   * Freeze the procedural percussion for a baked note list into an explicit
+   * list of strikes { layerId, beat, velocity, name }. Mirrors _schedulePerc's
+   * firing rules exactly (beat / motif / downbeat roles), positioning each hit
+   * by its note's span offset. This is what the drum-lane editor edits and what
+   * baked playback then replays (per-strike velocity) instead of regenerating.
+   */
+  capturePercStrikes(params, notes) {
+    const layers = this._normalizePercLayers(params);
+    if (!Array.isArray(layers) || !layers.length || !Array.isArray(notes)) return [];
+    const strikes = [];
+    for (const note of notes) {
+      const beatDiv = note.beatDivisions || 1;
+      for (let i = 0; i < (note.durationDivs || 0); i++) {
+        const d = (note.startDiv || 0) + i;          // beat-grid phase (fire decision)
+        const posDiv = (note.offsetDivs || 0) + i;   // position within the baked span
+        const isOnBeat = d % beatDiv === 0;
+        const beatNum = Math.floor(d / beatDiv);
+        for (const layer of layers) {
+          const fire =
+            layer.role === "beat" ? isOnBeat
+            : layer.role === "motif" ? (d === 0)
+            : layer.role === "downbeat" ? (isOnBeat && beatNum % (layer.every || 4) === 0)
+            : false;
+          if (fire && (layer.vol || 0) > 0) {
+            strikes.push({
+              layerId: layer.id,
+              beat: posDiv / beatDiv,
+              velocity: this._clamp(layer.vol, 0.05, 1),
+              name: layer.sound?.name || layer.sound?.key || "Perc",
+            });
+          }
+        }
+      }
+    }
+    return strikes;
+  }
+
+  /**
    * Schedule a baked note list into the current context from t0. Timbre is
    * frozen per note (each carries its sampled fingerprint); timing follows
    * the CURRENT tempo via beat-space offsets. Graph must be initialised.
    */
-  renderNotesSpan(params, notes, t0, totalBeats = null, loopBeats = null) {
+  renderNotesSpan(params, notes, t0, totalBeats = null, loopBeats = null, percStrikes = null) {
     if (!this.ctx || !Array.isArray(notes)) return;
+    // Baked regions carry an explicit, editable strike list; when present it
+    // replaces the procedural per-note percussion so edited dynamics play back.
+    const useStoredPerc = Array.isArray(percStrikes) && percStrikes.length > 0;
     this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
     this._vibratoActive = false;
     this._vibratoPhase = 0;
@@ -3447,6 +3490,7 @@ export class SynthEngine {
     this._timeline = [];
     this._configureReverb(params);
     this._percLayers = this._normalizePercLayers(params);
+    this._percussionOnly = !!params.percussionOnly;
     this._engine = new GenerationEngine(params); // rng for render-time draws
     const beatDiv = params.beatDivisions || 1;
     const divSec = 60 / ((params.tempo || 104) * beatDiv);
@@ -3479,7 +3523,7 @@ export class SynthEngine {
           note.duration = Math.max(0.03, (note.duration || note.durationDivs * divSec) + note.durationDevDivs * divSec);
         }
         this._render(note, t);
-        this._schedulePerc(note, t, divSec);
+        if (!useStoredPerc) this._schedulePerc(note, t, divSec);
         // Event record for the visualisers. Baked spans schedule upfront,
         // so unlike _schedule() the timeline fills with FUTURE events —
         // keep them all (within reason) rather than trimming the oldest,
@@ -3494,11 +3538,21 @@ export class SynthEngine {
           });
         }
       }
+      // Edited per-strike percussion for this loop repetition.
+      if (useStoredPerc) {
+        for (const s of percStrikes) {
+          const beatPos = (s.beat || 0) + rep * (loopBeats || 0);
+          if (totalBeats != null && beatPos >= totalBeats) continue;
+          const t = t0 + (s.beat * beatDiv + repDivs) * divSec;
+          const layer = this._percLayers.find(l => l.id === s.layerId);
+          if (layer) this._renderPercLayerHit(layer, t, s.velocity);
+        }
+      }
     }
   }
 
   /** Live playback of a baked note list (all scheduled upfront). */
-  playNotes(params, notes, totalBeats = null, loopBeats = null) {
+  playNotes(params, notes, totalBeats = null, loopBeats = null, percStrikes = null) {
     this.init();
     if (this.ctx.state === "suspended") this.ctx.resume();
     this.stop();
@@ -3507,7 +3561,7 @@ export class SynthEngine {
       this._masterOut.gain.cancelScheduledValues(now);
       this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
     }
-    this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05, totalBeats, loopBeats);
+    this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05, totalBeats, loopBeats, percStrikes);
     this.playing = true;
   }
 
@@ -4045,8 +4099,9 @@ export class SynthEngine {
   // chain (id "__perc__<layerId>", lazily built) so each layer sits at its own
   // position. Sample layers use the built-in PERC_SOUNDS recipes; instrument
   // layers render a single sub-note attack via the GenerationEngine.
-  _renderPercLayerHit(layer, t0) {
-    if (!layer || layer.vol <= 0 || t0 < this.ctx.currentTime - 0.02) return;
+  _renderPercLayerHit(layer, t0, velOverride) {
+    const vel = (velOverride == null ? (layer ? layer.vol : 0) : velOverride);
+    if (!layer || vel <= 0 || t0 < this.ctx.currentTime - 0.02) return;
     const chain = this._layerChain(`__perc__${layer.id}`);
     const sp = { ...(this._spaceP || {}) };
     if (layer.space) {
@@ -4111,6 +4166,9 @@ export class SynthEngine {
   // ── Rendering ──
 
   _render(note, t0) {
+    // Percussion-only patches keep the note stream (it drives the beat grid for
+    // percussion) but never voice a pitched sound.
+    if (this._percussionOnly) return;
     if (t0 < this.ctx.currentTime - 0.02) return;
     if (note.isRest || note.velocity <= 0) return; // silence for rest surprises
     note._vibratoEvents = this._buildVibratoEvents(note, t0, t0 + note.duration);

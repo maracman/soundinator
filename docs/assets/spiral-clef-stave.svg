@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Four independently editable layers: Stave, Spiral clef, Notes, Line with x marks. -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="2048" height="1152" viewBox="0 0 2048 1152">
+  <title>Custom spiral-clef notation</title>
+  <desc>Four-line stave with a custom spiral-and-cross clef, three enlarged notes joined by a heavy beam, and an independent timing line with three x marks.</desc>
+  <rect width="2048" height="1152" fill="#fff"/>
+
+  <g id="stave" inkscape:groupmode="layer" inkscape:label="Stave" fill="none" stroke="#000" stroke-width="10" stroke-linecap="square">
+    <path d="M 90,275 H 1620"/>
+    <path d="M 90,365 H 1620"/>
+    <path d="M 90,455 H 1620"/>
+    <path d="M 90,545 H 1620"/>
+    <path d="M 90,275 V 545"/>
+  </g>
+
+  <g id="clef" inkscape:groupmode="layer" inkscape:label="Spiral clef" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">
+    <!-- One continuous, fluid spiral, following the supplied invented-clef sketch. -->
+    <path d="M 549,125
+             C 505,201 448,231 394,231
+             C 310,231 259,290 259,367
+             C 259,443 319,499 394,499
+             C 472,499 532,445 532,370
+             C 532,294 477,263 407,274
+             C 355,283 323,321 323,369
+             C 323,415 358,443 400,433
+             C 444,424 466,391 466,369
+             C 466,347 451,339 421,347" stroke-width="17"/>
+    <!-- The single crossing slash from the sketch. -->
+    <path d="M 243,620 L 549,125" stroke-width="17"/>
+  </g>
+
+  <g id="notes" inkscape:groupmode="layer" inkscape:label="Notes" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">
+    <!-- The angular note brace is deliberately heavier than the stave. -->
+    <path d="M 840,545 V 205 L 1420,110 V 365" stroke-width="23"/>
+    <path d="M 1130,158 V 455" stroke-width="23"/>
+    <!-- Including the outline, each notehead is 90 px tall: one stave-line interval. -->
+    <ellipse cx="795" cy="545" rx="51" ry="39" transform="rotate(-23 795 545)" fill="#fff" stroke-width="12"/>
+    <ellipse cx="1085" cy="455" rx="51" ry="39" transform="rotate(-23 1085 455)" fill="#fff" stroke-width="12"/>
+    <ellipse cx="1375" cy="365" rx="51" ry="39" transform="rotate(-23 1375 365)" fill="#fff" stroke-width="12"/>
+  </g>
+
+  <g id="timing-line" inkscape:groupmode="layer" inkscape:label="Line with x marks" fill="none" stroke="#000" stroke-width="11" stroke-linecap="square">
+    <path d="M 90,860 H 1620"/>
+    <path d="M 755,815 L 845,905 M 845,815 L 755,905"/>
+    <path d="M 1040,815 L 1130,905 M 1130,815 L 1040,905"/>
+    <path d="M 1325,815 L 1415,905 M 1415,815 L 1325,905"/>
+  </g>
+</svg>

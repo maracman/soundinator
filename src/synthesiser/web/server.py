@@ -189,6 +189,14 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             self.serve_file(self.roots["cache"] / Path(unquote(path.removeprefix("/api/cache/"))).name)
             return
 
+        # The producer's five-part notation badge is authored as PNG
+        # layers outside the generated/static bundle so the artwork remains
+        # directly editable. Expose only those named image files here.
+        if path.startswith("/saem-icons/"):
+            name = Path(unquote(path.removeprefix("/saem-icons/"))).name
+            self.serve_file(self.roots["saem_icons"] / name)
+            return
+
         # Static files
         if path == "/":
             self.serve_file(self.roots["static"] / "index.html")
@@ -539,7 +547,11 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
     def serve_file(self, path: Path) -> None:
         try:
             resolved = path.resolve()
-            allowed = [self.roots["static"].resolve(), self.roots["cache"].resolve()]
+            allowed = [
+                self.roots["static"].resolve(),
+                self.roots["cache"].resolve(),
+                self.roots["saem_icons"].resolve(),
+            ]
             if not any(resolved == r or r in resolved.parents for r in allowed):
                 self.send_error_json(HTTPStatus.FORBIDDEN, "forbidden")
                 return
@@ -635,6 +647,7 @@ def build_server(
     roots = {
         "root": root,
         "static": root / "web" / "static",
+        "saem_icons": root / "png icons",
         "cache": cache_dir or root / "web" / "cache",
         "library": data / "global_presets.json",
         "events": data / "explore_events.jsonl",

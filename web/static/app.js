@@ -55,6 +55,7 @@ import {
   earlyReflectionPattern,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
+import { FACTORY_SESSIONS } from "./factory-sessions.js";
 // EFFECTS stage (docs/EFFECTS_CONTRACT.md) — browser/stack/faces are driven
 // from this registry. Importing also registers the whole effect roster.
 import {
@@ -87,6 +88,7 @@ const EVENT_SCHEMA_VERSION = "explore-event-1.0";
 const SESSION_ID = crypto.randomUUID(); // fresh per page visit
 const CONSENT_KEY = "phase0.consent.v1";
 const INSTRUMENTS_KEY = "phase0.instruments.v1";
+const MIDI_MAPPING_KEY = "phase0.midiMapping.v1";
 // Bump when the consent wording or what-we-collect changes; stored with every
 // consent decision so records can be tied to the text the volunteer saw.
 const CONSENT_VERSION = "explore-consent-1.0";
@@ -157,6 +159,167 @@ function extractSectionParams(params, section) {
     if (sectionForParam(k) === section) out[k] = val;
   }
   return out;
+}
+
+// Five-part notation vocabulary used throughout Producer. The supplied PNGs
+// are independent alpha layers; CSS places them into one compact badge and
+// colours every layer according to whether that attribute is present.
+const CAPTURE_PARTS = ["notes", "space", "stave", "clef", "percussion"];
+const CAPTURE_PART_LABELS = {
+  notes: "Sound",
+  space: "Space",
+  stave: "Note behaviour",
+  clef: "Scale and harmony",
+  percussion: "Percussion",
+};
+const _SCALE_CAPTURE_KEYS = new Set([
+  "scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz",
+  "degreeTuning", "subScaleNotes", "subScaleWeight", "rootNotes",
+  "rootPullStrength", "rootPullShape",
+]);
+
+function capturePartForParam(key) {
+  if (_SCALE_CAPTURE_KEYS.has(key)) return "clef";
+  const section = sectionForParam(key);
+  if (section === "sound") return "notes";
+  if (section === "space") return "space";
+  if (section === "percussion") return "percussion";
+  if (["melody", "rhythm", "dynamics", "surprise"].includes(section)) return "stave";
+  return null;
+}
+
+function hasAssignedPercussion(params = {}) {
+  if (Array.isArray(params.percLayers) && params.percLayers.some(layer => layer?.sound)) return true;
+  return Object.entries(params).some(([key, value]) =>
+    key.startsWith("perc") && key !== "percLayers" && value != null && value !== false && value !== 0 && value !== "");
+}
+
+function capturePartsFor(params = {}, section = "full", explicit = null) {
+  const out = Object.fromEntries(CAPTURE_PARTS.map(part => [part, false]));
+  for (const key of Object.keys(params || {})) {
+    const part = capturePartForParam(key);
+    if (part) out[part] = true;
+  }
+  // V1 metadata had four parts and folded Space into Notes. Preserve its
+  // explicit choices while deriving the newly introduced Slur/Space part.
+  if (explicit) {
+    for (const part of CAPTURE_PARTS) if (part in explicit) out[part] = !!explicit[part];
+  }
+  // Old single-section saves carry trustworthy provenance even when a value
+  // happens to equal a default and therefore looks semantically empty.
+  if (section === "sound") out.notes = true;
+  if (section === "space") out.space = true;
+  if (["rhythm", "dynamics", "surprise"].includes(section)) out.stave = true;
+  if (section === "melody") { out.stave = true; out.clef = true; }
+  if (section === "percussion") out.percussion = true;
+  if (!hasAssignedPercussion(params)) out.percussion = false;
+  return out;
+}
+
+const CAPTURE_PART_NAME_KEYS = {
+  notes: "subnoteName",
+  space: "spaceName",
+  stave: "macroName",
+  clef: "scaleName",
+  percussion: "percussionName",
+};
+
+function titleWords(value) {
+  return String(value || "").replace(/[_-]+/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function exactModuleName(params = {}, part) {
+  if (part === "notes") return SPECTRAL_PROFILES[params.spectralProfile]?.label || titleWords(params.voiceMode) || "Sound";
+  if (part === "space") {
+    const dist = Number(params.spaceDistance);
+    const angle = Number(params.spaceAzimuth);
+    if (Number.isFinite(dist) || Number.isFinite(angle)) return `${Number.isFinite(dist) ? `${dist.toFixed(1)} m` : "Placed"}${Number.isFinite(angle) ? ` · ${Math.round(angle)}°` : ""}`;
+    return params.reverbType ? `${titleWords(params.reverbType)} space` : "Space";
+  }
+  if (part === "stave") return `${titleWords(params.melodyPattern || "Note")} engine`;
+  if (part === "clef") {
+    const div = params.scaleMode === "edo" ? (params.edoDivisions || 12) : 12;
+    const preset = params.scalePreset || "major";
+    return params.scaleMode === "edo" ? `${div}-EDO` : (SCALE_PRESETS[preset]?.label || titleWords(preset) || "Scale");
+  }
+  if (part === "percussion") {
+    const sounds = (params.percLayers || []).map(layer => layer?.sound?.name || layer?.sound?.key).filter(Boolean);
+    return sounds.length ? `${titleWords(sounds[0])}${sounds.length > 1 ? " kit" : ""}` : "Percussion";
+  }
+  return "Module";
+}
+
+function moduleNameFromItem(item, part) {
+  const exactSource = capturePartList(item.captureParts).length === 1;
+  if (exactSource) return item.name;
+  const exact = exactModuleName(item.params, part);
+  return exact.toLowerCase() === String(item.name).toLowerCase() ? item.name : `${exact} (${item.name})`;
+}
+
+function moduleNameForPatch(patch, part) {
+  return patch?.parts?.[CAPTURE_PART_NAME_KEYS[part]] || exactModuleName(patch?.params || {}, part);
+}
+
+function setPatchModuleName(patch, part, name) {
+  const clean = String(name || "").trim().slice(0, 80);
+  if (!clean || !CAPTURE_PART_NAME_KEYS[part]) return false;
+  patch.parts = patch.parts || {};
+  patch.parts[CAPTURE_PART_NAME_KEYS[part]] = clean;
+  if (capturePartList(capturePartsFor(patch.params, "full", patch.captureParts)).length === 1) patch.name = clean;
+  return true;
+}
+
+function startInlineRename(el, current, onCommit) {
+  if (!el || el.querySelector("input")) return;
+  const input = document.createElement("input");
+  input.className = "inline-name-input";
+  input.value = current;
+  input.maxLength = 80;
+  el.replaceWith(input);
+  input.focus(); input.select();
+  let finished = false;
+  const finish = (commit) => {
+    if (finished) return;
+    finished = true;
+    const value = input.value.trim();
+    if (commit && value) onCommit(value);
+    else renderProduce();
+  };
+  input.onkeydown = event => {
+    if (event.key === "Enter") { event.preventDefault(); finish(true); }
+    if (event.key === "Escape") { event.preventDefault(); finish(false); }
+  };
+  input.onblur = () => finish(true);
+}
+
+function capturePartList(parts) { return CAPTURE_PARTS.filter(part => parts?.[part]); }
+
+function extractCaptureParams(params, selected) {
+  const out = {};
+  for (const [key, value] of Object.entries(params || {})) {
+    const part = capturePartForParam(key);
+    if (part && selected?.[part]) out[key] = value;
+  }
+  return out;
+}
+
+function notationIconHTML(parts, { compact = false, title = "" } = {}) {
+  const active = Array.isArray(parts) ? new Set(parts) : new Set(capturePartList(parts));
+  const label = CAPTURE_PARTS.filter(part => active.has(part)).map(part => CAPTURE_PART_LABELS[part]).join(", ") || "No saved parts";
+  return `<span class="saem-icon${compact ? " compact" : ""}${active.size ? " has-active" : ""}" role="img" aria-label="${esc(title || label)}" title="${esc(title || label)}">
+    ${CAPTURE_PARTS.map(part => `<i class="saem-part saem-${part}${active.has(part) ? " active" : ""}" aria-hidden="true"></i>`).join("")}
+  </span>`;
+}
+
+function capturePartSelectorHTML(available, selected) {
+  return `<div class="saem-selector" role="group" aria-label="Parts to save">
+    ${CAPTURE_PARTS.map(part => {
+      const enabled = !!available?.[part];
+      return `<button type="button" data-save-part="${part}"${enabled ? "" : " disabled"} class="saem-selector-part${selected?.[part] ? " selected" : ""}" title="${enabled ? `Include ${CAPTURE_PART_LABELS[part]}` : `${CAPTURE_PART_LABELS[part]} is not present`}">
+        ${notationIconHTML(enabled && selected?.[part] ? [part] : [], { compact: true })}<span>${CAPTURE_PART_LABELS[part]}</span>
+      </button>`;
+    }).join("")}
+  </div>`;
 }
 
 // ── Percussion v2 model (owner 2026-07-10) ──────────────────
@@ -524,9 +687,6 @@ const DEFAULTS = {
   layerEnvDecaySd: 0.04,    // parameter for the base and every layer while
   layerEnvSustainSd: 0.08,  // synchronisation is on (owner 07-07)
   layerEnvReleaseSd: 0.05,
-  midiMapKeys: "white",       // Q10: which keys play — "white" | "all"
-  midiMapCoverage: "packed",  // Q10: "all" divisions | "muted" out-of-scale | "packed" in-scale only
-  midiMapAnchor: "octave",    // Q10: degree 0 repeats at each C ("octave") or right after the last degree ("consecutive")
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
@@ -892,6 +1052,24 @@ let headphonePassed = false;
 let exploreParams = { ...DEFAULTS };
 let exploreRating = 4;
 let exploreEngagement = loadEngagement();
+const MIDI_MAPPING_DEFAULTS = Object.freeze({ keys: "white", coverage: "packed", anchor: "octave" });
+function normaliseMidiMapping(value = {}) {
+  return {
+    keys: value.keys === "all" ? "all" : "white",
+    // Scale Lab intentionally offers the two useful performance layouts:
+    // pack playable degrees, or retain the scale's unplayable divisions as gaps.
+    coverage: value.coverage === "muted" ? "muted" : "packed",
+    anchor: value.anchor === "consecutive" ? "consecutive" : "octave",
+  };
+}
+function loadMidiMapping() {
+  try { return normaliseMidiMapping(JSON.parse(localStorage.getItem(MIDI_MAPPING_KEY) || "{}")); }
+  catch { return { ...MIDI_MAPPING_DEFAULTS }; }
+}
+function saveMidiMapping() {
+  localStorage.setItem(MIDI_MAPPING_KEY, JSON.stringify(midiMapping));
+}
+let midiMapping = loadMidiMapping();
 let workspaceTab = "explore";
 let macroTab = "melody";
 let macroSubTab = { melody: "accuracy", tuning: "accuracy", duration: "generation", dynamics: "generation" };
@@ -902,6 +1080,7 @@ let lastPlayStartedAt = null; // Date.now() of most recent play start this visit
 let _visResizeObserver = null; // hero display fit observer
 let libraryFilter = "all";    // section filter shared across library tabs
 let splitsFilter = "all";     // Q1: filter presets by scale splits (degrees/octave)
+let layersFilter = "all";     // smart tag: filter sound presets by layer count
 // Q12: adjustable studio panels (persisted like the producer's dawLayout)
 const STUDIO_PANELS_KEY = "phase0.studioPanels.v1";
 let _studioPanels = (() => {
@@ -1265,6 +1444,7 @@ function mount(html) {
 const ARRANGEMENT_KEY = "phase0.arrangement.v1"; // legacy single-slot (migrated)
 const ARRANGEMENTS_KEY = "phase0.arrangements.v1";
 const ARRANGEMENT_CURRENT_KEY = "phase0.arrangement.current";
+const ARRANGEMENT_RECENTS_KEY = "phase0.arrangementRecents.v1";
 
 function loadArrangementRegistry() {
   try {
@@ -1274,6 +1454,21 @@ function loadArrangementRegistry() {
 }
 function saveArrangementRegistry(reg) {
   localStorage.setItem(ARRANGEMENTS_KEY, JSON.stringify(reg));
+}
+function arrangementRecents() {
+  try { return JSON.parse(localStorage.getItem(ARRANGEMENT_RECENTS_KEY) || "{}"); } catch { return {}; }
+}
+function markArrangementRecent(id) {
+  if (!id) return;
+  const next = arrangementRecents();
+  next[id] = Date.now();
+  const keep = Object.entries(next).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  localStorage.setItem(ARRANGEMENT_RECENTS_KEY, JSON.stringify(Object.fromEntries(keep)));
+}
+function recentArrangements() {
+  const reg = loadArrangementRegistry();
+  const recents = arrangementRecents();
+  return Object.values(reg).sort((a, b) => (recents[b.id] || 0) - (recents[a.id] || 0) || String(a.name).localeCompare(String(b.name))).slice(0, 8);
 }
 const BEATS_PER_BAR = 4;
 let pxPerBeat = 14;   // lane pixel scale (zoom; persisted in dawLayout)
@@ -1321,6 +1516,11 @@ let selectedRegion = null; // { trackId, regionId }
 // roll for a baked region) | "layers" (region patch's layers) | "mixer".
 let editorMode = null;
 let palettePreviewId = null; // palette patch shown in the three-pane editor
+let producerBrowserTarget = null; // null | { kind:"patch"|"harmonic", part }
+let patchDirty = false;
+let patchSaveOpen = false;
+let patchSaveSelection = null;
+let patchSaveSubjectId = null;
 let _patchStageSel = "base"; // selected source id in the patch inspector's draggable stage
 let _patchStage = null;      // the mounted stage handle ({ redraw }) for the current inspector
 let paletteTarget = null;    // { paletteId, half: "subnote"|"macro" } awaiting a browser module
@@ -1380,6 +1580,7 @@ function loadArrangement() {
     saveArrangementRegistry(reg);
   }
   localStorage.setItem(ARRANGEMENT_CURRENT_KEY, a.id);
+  markArrangementRecent(a.id);
   return normaliseArrangement(a);
 }
 // Producer v3 undo model (spec §8): a labelled snapshot stack, >=100
@@ -1406,6 +1607,7 @@ function saveArrangement(label = "edit") {
   reg[arrangement.id] = arrangement;
   saveArrangementRegistry(reg);
   localStorage.setItem(ARRANGEMENT_CURRENT_KEY, arrangement.id);
+  markArrangementRecent(arrangement.id);
   _lastSavedAt = Date.now();
   const tick = document.getElementById("arrSaved");
   if (tick) {
@@ -1445,6 +1647,7 @@ function switchArrangement(id) {
   stopArrangement();
   synth.stop();
   localStorage.setItem(ARRANGEMENT_CURRENT_KEY, id);
+  markArrangementRecent(id);
   arrangement = null;
   selectedRegion = null;
   _undoStack = [];
@@ -1463,6 +1666,7 @@ function browserItems() {
       kindLabel: f.section === "full" ? "Starter" : (PRESET_SECTIONS[f.section]?.label || f.section),
       description: f.description || "",
       section: f.section, params: f.parameters,
+      captureParts: capturePartsFor(f.parameters, f.section, f.captureParts),
     });
   }
   for (const u of loadPresets()) {
@@ -1471,6 +1675,7 @@ function browserItems() {
       cat: (!u.section || u.section === "full") ? "mine" : "section",
       kindLabel: (!u.section || u.section === "full") ? "My preset" : (PRESET_SECTIONS[u.section]?.label || u.section),
       description: "", section: u.section || "full", params: u.parameters,
+      captureParts: capturePartsFor(u.parameters, u.section || "full", u.captureParts),
     });
   }
   for (const inst of loadInstruments()) {
@@ -1478,6 +1683,7 @@ function browserItems() {
       id: `inst:${inst.id}`, name: inst.name,
       cat: "instrument", kindLabel: "Instrument",
       description: "", section: "instrument", params: inst.parameters,
+      captureParts: capturePartsFor(inst.parameters, "instrument", inst.captureParts),
     });
   }
   return items;
@@ -1502,16 +1708,68 @@ function setPaletteEditState(state) {
   else localStorage.removeItem(PALETTE_EDIT_KEY);
 }
 
+function commitPaletteEdit() {
+  const state = paletteEditState();
+  if (!state) return false;
+  arrangement = arrangement || loadArrangement();
+  const pl = (arrangement.palette || []).find(x => x.id === state.paletteId);
+  if (!pl) return false;
+  pl.params = extractInstrumentParams(exploreParams);
+  pl.captureParts = capturePartsFor(pl.params, "full", pl.captureParts);
+  // The browser/palette title is identity, not a generated description.
+  // Editing its contents must never silently rename it.
+  pl.name = state.name || pl.name;
+  saveArrangement("edit palette patch");
+  return true;
+}
+
+function showAppDialog({ title, message = "", value = "", confirmLabel = "Continue", danger = false, input = false, onConfirm }) {
+  document.querySelector("#appDialog")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "appDialog";
+  overlay.className = "app-dialog-overlay";
+  overlay.innerHTML = `<div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">
+    <h2 id="appDialogTitle">${esc(title)}</h2>
+    ${message ? `<p>${esc(message)}</p>` : ""}
+    ${input ? `<input class="app-dialog-input" maxlength="80" value="${esc(value)}" aria-label="${esc(title)}"/>` : ""}
+    <div class="app-dialog-actions"><button class="btn btn-ghost" data-dialog-cancel>Cancel</button><button class="btn ${danger ? "btn-danger" : "btn-primary"}" data-dialog-confirm>${esc(confirmLabel)}</button></div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const field = overlay.querySelector("input");
+  const close = () => overlay.remove();
+  const confirm = () => { const next = field ? field.value.trim() : true; if (field && !next) return; close(); onConfirm?.(next); };
+  overlay.querySelector("[data-dialog-cancel]").onclick = close;
+  overlay.querySelector("[data-dialog-confirm]").onclick = confirm;
+  overlay.onclick = e => { if (e.target === overlay) close(); };
+  overlay.onkeydown = e => { if (e.key === "Escape") close(); if (e.key === "Enter") confirm(); };
+  if (field) { field.focus(); field.select(); } else overlay.querySelector("[data-dialog-confirm]").focus();
+}
+
 const PALETTE_MACRO_SECTIONS = new Set(["melody", "rhythm", "dynamics", "surprise", "percussion"]);
 const PALETTE_SUBNOTE_SECTIONS = new Set(["sound", "space"]);
 
 function palettePartsFor(item) {
-  if (item.section === "full" || item.section === "instrument") return { subnote: item.id, macro: item.id };
+  if (item.section === "full" || item.section === "instrument") return {
+    subnote: item.captureParts?.notes === false ? null : item.id,
+    macro: item.captureParts?.stave === false ? null : item.id,
+  };
   if (PALETTE_SUBNOTE_SECTIONS.has(item.section)) return { subnote: item.id, macro: null };
   return { subnote: null, macro: item.id };
 }
-function paletteIsPlayable(pl) { return !!(pl?.parts?.subnote && pl?.parts?.macro); }
+function paletteIsPlayable(pl) {
+  const parts = capturePartsFor(pl?.params || {}, "full", pl?.captureParts);
+  // A pitched patch needs a sound + note engine; a percussion-only patch is
+  // playable on its own (it plays/bakes just its hits, no pitched voice).
+  return !!((parts.notes && parts.stave) || parts.percussion);
+}
+// True when a patch is percussion only — has percussion but no sound source, so
+// its pitched voice is silenced while the beat grid still drives the hits.
+function isPercussionOnlyPatch(pl) {
+  const parts = capturePartsFor(pl?.params || {}, "full", pl?.captureParts);
+  return !!parts.percussion && !parts.notes;
+}
 function paletteDisplayName(pl) {
+  if (pl?.customName) return pl.customName;
   const s = pl?.parts?.subnoteName, m = pl?.parts?.macroName;
   return s && m ? (s === m ? s : `${s} × ${m}`) : (s || m || pl?.name || "Untitled patch");
 }
@@ -1549,6 +1807,7 @@ function applyItemToPalettePatch(pl, item, half = null) {
   }
   pl.name = paletteDisplayName(pl);
   pl.kindLabel = paletteIsPlayable(pl) ? "Patch" : "Module draft";
+  pl.captureParts = capturePartsFor(pl.params, "full");
   if (item.params?.tempo != null) pl.originTempo = item.params.tempo;
   if (item.params?.scalePreset || item.params?.customDegrees) {
     pl.originScale = { scaleMode: item.params.scaleMode, scalePreset: item.params.scalePreset,
@@ -1556,6 +1815,47 @@ function applyItemToPalettePatch(pl, item, half = null) {
   }
   saveArrangement("compose palette patch");
   return true;
+}
+
+function applyItemCapturePart(pl, item, part) {
+  if (!pl || !item || !CAPTURE_PARTS.includes(part) || !item.captureParts?.[part]) return false;
+  const incoming = voiceParamsFor(item);
+  const next = { ...(pl.params || {}) };
+  for (const key of Object.keys(next)) if (capturePartForParam(key) === part) delete next[key];
+  for (const [key, value] of Object.entries(incoming)) if (capturePartForParam(key) === part) next[key] = value;
+  pl.params = next;
+  pl.captureParts = { ...capturePartsFor(pl.params, "full", pl.captureParts), [part]: true };
+  pl.parts = pl.parts || {};
+  const moduleName = moduleNameFromItem(item, part);
+  if (part === "notes") {
+    pl.parts.subnote = item.id; pl.parts.subnoteName = moduleName;
+  } else if (part === "stave") {
+    pl.parts.macro = item.id; pl.parts.macroName = moduleName;
+  } else {
+    pl.parts[part] = item.id; pl.parts[CAPTURE_PART_NAME_KEYS[part]] = moduleName;
+  }
+  pl.name = paletteDisplayName(pl);
+  pl.kindLabel = paletteIsPlayable(pl) ? "Patch" : "Module draft";
+  saveArrangement(`replace ${CAPTURE_PART_LABELS[part]}`);
+  return true;
+}
+
+function addModuleToPalette(item, part) {
+  if (!item?.captureParts?.[part]) return null;
+  const incoming = voiceParamsFor(item);
+  const params = extractCaptureParams(incoming, { [part]: true });
+  const name = moduleNameFromItem(item, part);
+  const captureParts = Object.fromEntries(CAPTURE_PARTS.map(key => [key, key === part]));
+  const pl = {
+    id: crypto.randomUUID(), name, kindLabel: CAPTURE_PART_LABELS[part], sourceId: item.id,
+    params, captureParts, parts: {}, originTempo: null, originScale: null,
+  };
+  if (part === "notes") { pl.parts.subnote = item.id; pl.parts.subnoteName = name; }
+  else if (part === "stave") { pl.parts.macro = item.id; pl.parts.macroName = name; }
+  else { pl.parts[part] = item.id; pl.parts[CAPTURE_PART_NAME_KEYS[part]] = name; }
+  arrangement.palette.push(pl);
+  saveArrangement(`add ${CAPTURE_PART_LABELS[part]} module to palette`);
+  return pl;
 }
 
 function addToPalette(item) {
@@ -1566,8 +1866,8 @@ function addToPalette(item) {
     kindLabel: ["full", "instrument"].includes(item.section) ? "Patch" : item.kindLabel,
     sourceId: item.id,
     params: voiceParamsFor(item),
-    parts: { ...palettePartsFor(item), subnoteName: PALETTE_SUBNOTE_SECTIONS.has(item.section) || item.section === "full" || item.section === "instrument" ? item.name : null,
-      macroName: PALETTE_MACRO_SECTIONS.has(item.section) || item.section === "full" || item.section === "instrument" ? item.name : null },
+    parts: { ...palettePartsFor(item), subnoteName: (PALETTE_SUBNOTE_SECTIONS.has(item.section) || (["full", "instrument"].includes(item.section) && item.captureParts?.notes !== false)) ? item.name : null,
+      macroName: (PALETTE_MACRO_SECTIONS.has(item.section) || (["full", "instrument"].includes(item.section) && item.captureParts?.stave !== false)) ? item.name : null },
     // Voices deliberately drop tempo (session context) — remember the design
     // tempo here so "adopt tempo" can offer it to the session (Q1).
     originTempo: (item.params && item.params.tempo) ?? null,
@@ -1577,6 +1877,7 @@ function addToPalette(item) {
       scaleMode: item.params.scaleMode, scalePreset: item.params.scalePreset,
       customDegrees: item.params.customDegrees, edoDivisions: item.params.edoDivisions,
     } : null,
+    captureParts: { ...item.captureParts },
   };
   pl.name = paletteDisplayName(pl);
   arrangement.palette.push(pl);
@@ -1644,6 +1945,10 @@ function regionPlayParams(track, region, atBeat = null) {
   // Tier 2 instrument (from the palette) + Tier 3 take
   const context = arrangement?.context || defaultArrangementContext();
   const params = { ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed };
+  // Percussion-only patches keep the note grid (for percussion timing) but the
+  // pitched voice stays silent.
+  const srcPatch = (arrangement?.palette || []).find(p => p.id === region.paletteId);
+  if (srcPatch && isPercussionOnlyPatch(srcPatch)) params.percussionOnly = true;
   // Q5 Harmonic guide: an opted-in track regenerates under the marker in
   // force at the region's position. Applied AFTER the voice so the marker
   // wins; baked regions replay stored degrees and are untouched by
@@ -1653,6 +1958,8 @@ function regionPlayParams(track, region, atBeat = null) {
     // (owner 2026-07-09): force enabled so the marker in force applies.
     const marker = globalScaleAt({ ...(arrangement?.globalScale || {}), enabled: true }, region.startBeat ?? 0);
     if (marker) {
+      if (marker.scaleMode) params.scaleMode = marker.scaleMode;
+      if (Number.isFinite(marker.edoDivisions)) params.edoDivisions = marker.edoDivisions;
       params.customDegrees = [...marker.degrees];
       params.subScaleNotes = [...(marker.subScaleNotes || [])];
       params.rootNotes = [...(marker.rootNotes || [0])];
@@ -1716,27 +2023,56 @@ function sessionBarControlsHTML() {
   const ctx = arrangement.context;
   // Owner 2026-07-09: no project root-pitch control — each patch keeps its own
   // pitch; there's no global transpose of everything.
-  return `
-    <label class="daw-ctx">Tempo
-      <input type="range" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/>
-      <output id="ctxTempoOut">${ctx.tempo}</output>
-    </label>`;
+  return `<label class="daw-tempo-readout"><span>Tempo</span><input type="number" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/><b>BPM</b></label>`;
+}
+
+// Total sound layers = the base (Layer 1) plus any stacked layers.
+function layersBucketOf(params) {
+  const n = 1 + (Array.isArray(params?.layers) ? params.layers.length : 0);
+  return n >= 4 ? "4+" : String(n);
+}
+
+// Smart tags: the secondary filter row reflects the *kind* of thing the Browser
+// is currently narrowed to. Splits (scale degrees/octave) only make sense for
+// scales; layer count only for sounds; other parts get no property tag yet.
+function browserPropertyTagsHTML(part) {
+  const sel = (attr, cur, opts) =>
+    `<select class="splits-filter" ${attr}>${opts.map(([k, l]) =>
+      `<option value="${k}"${cur === k ? " selected" : ""}>${l}</option>`).join("")}</select>`;
+  if (part === "clef") {
+    return sel("data-splits-filter title=\"Scale degrees per octave (splits)\"", splitsFilter,
+      [["all", "Any splits"], ["5", "5 splits"], ["6", "6 splits"], ["7", "7 splits"], ["8+", "8+ splits"], ["12", "12 splits"], ["other", "Other"]]);
+  }
+  if (part === "notes") {
+    return sel("data-layers-filter title=\"Number of stacked sound layers\"", layersFilter,
+      [["all", "Any layers"], ["1", "1 layer"], ["2", "2 layers"], ["3", "3 layers"], ["4+", "4+ layers"]]);
+  }
+  return "";
+}
+function browserFiltersHTML() {
+  const chips = [["all", "All"], ["starter", "Starters"], ["instrument", "Instruments"], ["mine", "Mine"], ["section", "Sections"]]
+    .map(([k, label]) => `<button class="filter-chip${browserFilter === k ? " active" : ""}" data-browser-filter="${k}">${label}</button>`).join("");
+  return chips + browserPropertyTagsHTML(producerBrowserTarget?.part || null);
 }
 
 function renderBrowserCards(v) {
   const container = v.querySelector("#browserCards");
   if (!container) return;
-  const q = browserSearch.trim().toLowerCase();
   const targetHalf = paletteTarget?.half || null;
+  const part = producerBrowserTarget?.part || null;
   const items = browserItems().filter(item =>
     (browserFilter === "all" || item.cat === browserFilter) &&
-    (splitsFilter === "all" || splitsBucketOf(item.params) === splitsFilter) &&
+    // Property tags filter only within their own kind (splits ⇒ scales, layers ⇒ sounds).
+    (part !== "clef" || splitsFilter === "all" || splitsBucketOf(item.params) === splitsFilter) &&
+    (part !== "notes" || layersFilter === "all" || layersBucketOf(item.params) === layersFilter) &&
+    (!producerBrowserTarget?.part || item.captureParts?.[producerBrowserTarget.part]) &&
     (!targetHalf || (targetHalf === "subnote" ? PALETTE_SUBNOTE_SECTIONS.has(item.section) : PALETTE_MACRO_SECTIONS.has(item.section))) &&
-    (!q || item.name.toLowerCase().includes(q) || (item.description || "").toLowerCase().includes(q)));
+    true);
   // A Browser row is a draggable, double-clickable source.  Creation happens
   // through those direct gestures, leaving only audition as a row action.
   container.innerHTML = items.length ? items.map(item => `
     <div class="browser-row" data-browser-item="${esc(item.id)}" title="${esc(item.description || item.name)} — double-click or drag to add it to the palette">
+      ${notationIconHTML(item.captureParts, { compact: true })}
       <span class="br-name">${esc(item.name)}</span>
       <span class="br-kind">${esc(item.kindLabel)}</span>
       <button class="br-btn${browserPreviewId === item.id ? " on" : ""}" data-browser-preview="${esc(item.id)}" title="Hear it in the session context">${browserPreviewId === item.id ? "■" : "▶"}</button>
@@ -1745,6 +2081,39 @@ function renderBrowserCards(v) {
   const findItem = (id) => browserItems().find(i => i.id === id);
   const addOrFill = (item) => {
     if (!item) return;
+    if (producerBrowserTarget?.kind === "harmonic") {
+      if (setHarmonicGuideFromParams(item.params, item.name)) {
+        addModuleToPalette(item, "clef");
+        producerBrowserTarget = null;
+        renderProduce();
+      }
+      return;
+    }
+    if (producerBrowserTarget?.kind === "patch") {
+      const subject = editorPatchSubject();
+      if (subject && applyItemCapturePart(subject.patch, item, producerBrowserTarget.part)) {
+        patchDirty = true;
+        producerBrowserTarget = null;
+        palettePreviewId = subject.regionScoped ? palettePreviewId : subject.patch.id;
+        renderProduce();
+      }
+      return;
+    }
+    if (producerBrowserTarget?.kind === "filter") {
+      const pl = addModuleToPalette(item, producerBrowserTarget.part);
+      if (pl) {
+        palettePreviewId = pl.id;
+        editorMode = "patch";
+        renderProduce();
+      }
+      return;
+    }
+    const exactParts = capturePartList(item.captureParts);
+    if (exactParts.length === 1) {
+      const pl = addModuleToPalette(item, exactParts[0]);
+      if (pl) { palettePreviewId = pl.id; editorMode = "patch"; renderProduce(); }
+      return;
+    }
     let pl = paletteTarget && (arrangement.palette || []).find(x => x.id === paletteTarget.paletteId);
     if (pl) applyItemToPalettePatch(pl, item, paletteTarget.half);
     else pl = addToPalette(item);
@@ -1774,9 +2143,6 @@ function renderBrowserCards(v) {
     card.onmousedown = (e) => {
       if (e.target.closest(".br-btn, .pal-btn")) return; // buttons stay clickable
       const item = browserItems().find(i => i.id === card.dataset.browserItem);
-      // Pointer dragging begins on the first press; catch the second press so
-      // a genuine double-click still has the promised "add + open" action.
-      if (e.detail >= 2) { e.preventDefault(); addOrFill(item); return; }
       if (item) beginPointerDrag("browser", item.id, item.name, e);
     };
     card.ondblclick = (e) => {
@@ -1788,11 +2154,13 @@ function renderBrowserCards(v) {
 
 function wireBrowserPalette(v) {
   renderBrowserCards(v);
-  const search = v.querySelector("#browserSearch");
-  if (search) search.oninput = () => {
-    browserSearch = search.value;
-    renderBrowserCards(v);
-  };
+  v.querySelectorAll("[data-browser-part]").forEach(btn => {
+    btn.onclick = () => {
+      const part = btn.dataset.browserPart;
+      producerBrowserTarget = part === "all" ? null : { kind: "filter", part };
+      renderProduce();
+    };
+  });
   v.querySelectorAll("[data-browser-filter]").forEach(chip => {
     chip.onclick = () => {
       browserFilter = chip.dataset.browserFilter;
@@ -1806,11 +2174,23 @@ function wireBrowserPalette(v) {
     splitsFilter = splitsSel.value;
     renderBrowserCards(v);
   };
+  const layersSel = v.querySelector("[data-layers-filter]");
+  if (layersSel) layersSel.onchange = () => {
+    layersFilter = layersSel.value;
+    renderBrowserCards(v);
+  };
   const newPatch = v.querySelector("[data-palette-new]");
   if (newPatch) newPatch.onclick = () => {
     const pl = createEmptyPalettePatch();
     palettePreviewId = pl.id;
     editorMode = "patch";
+    patchDirty = false; patchSaveOpen = false; patchSaveSelection = null; patchSaveSubjectId = pl.id;
+    renderProduce();
+  };
+  const paletteCollapse = v.querySelector("[data-palette-collapse]");
+  if (paletteCollapse) paletteCollapse.onclick = () => {
+    dawLayout.paletteMin = !dawLayout.paletteMin;
+    saveDawLayout();
     renderProduce();
   };
   v.querySelectorAll("[data-palette-zone]").forEach(btn => {
@@ -1822,16 +2202,23 @@ function wireBrowserPalette(v) {
       renderProduce();
     };
   });
-  v.querySelectorAll("[data-palette-preview]").forEach(btn => {
-    btn.onclick = () => {
-      const pl = (arrangement.palette || []).find(x => x.id === btn.dataset.palettePreview);
-      if (!pl) return;
-      palettePreviewId = pl.id;
-      editorMode = "patch";
-      if (paletteIsPlayable(pl)) {
-        stopArrangement();
-        synth.play({ ...DEFAULTS, ...arrangement.context, ...pl.params, seed: 20260710 });
+  v.querySelectorAll("[data-palette-item]").forEach(item => {
+    item.onclick = e => {
+      if (e.target.closest("button, input, select, .editable-name")) return;
+      const id = item.dataset.paletteItem;
+      const now = Date.now();
+      // Double-click opens the patch in the lower editor panel. The timing is
+      // tracked at module scope so it survives the re-render a single click
+      // triggers (otherwise the recreated element would never see the 2nd click).
+      if (_palLastClickId === id && now - _palLastClickAt < 350) {
+        _palLastClickId = null; _palLastClickAt = 0;
+        openPaletteInEditor(id);
+        return;
       }
+      _palLastClickId = id; _palLastClickAt = now;
+      palettePreviewId = id;
+      const match = arrangement.tracks.flatMap(track => (track.regions || []).map(region => ({ track, region }))).find(x => x.region.paletteId === id);
+      selectedRegion = match ? { trackId: match.track.id, regionId: match.region.id } : null;
       renderProduce();
     };
   });
@@ -1859,6 +2246,7 @@ function wireBrowserPalette(v) {
       setPaletteEditState({ paletteId: pl.id, name: pl.name });
       // Load the voice as it sounds in the arrangement: session context + voice
       exploreParams = migrateToneParams({ ...DEFAULTS, ...arrangement.context, ...pl.params });
+      workspaceTab = "subnote";
       navigate("explore");
     };
   });
@@ -1868,6 +2256,29 @@ function wireBrowserPalette(v) {
       arrangement.palette = (arrangement.palette || []).filter(pl => pl.id !== btn.dataset.paletteRemove);
       saveArrangement();
       renderProduce();
+    };
+  });
+  v.querySelectorAll("[data-palette-name]").forEach(el => {
+    el.ondblclick = event => {
+      event.preventDefault(); event.stopPropagation();
+      const pl = (arrangement.palette || []).find(item => item.id === el.dataset.paletteName);
+      if (!pl) return;
+      startInlineRename(el, paletteDisplayName(pl), value => {
+        pl.customName = value; pl.name = value;
+        saveArrangement("rename palette item"); renderProduce();
+      });
+    };
+  });
+  v.querySelectorAll("[data-pal-module-name]").forEach(el => {
+    el.ondblclick = event => {
+      event.preventDefault(); event.stopPropagation();
+      const [id, part] = el.dataset.palModuleName.split(":");
+      const pl = (arrangement.palette || []).find(item => item.id === id);
+      if (!pl) return;
+      startInlineRename(el, moduleNameForPatch(pl, part), value => {
+        setPatchModuleName(pl, part, value);
+        saveArrangement(`rename ${CAPTURE_PART_LABELS[part]}`); renderProduce();
+      });
     };
   });
   // (browser→palette drops are handled by the pointer-drag machinery)
@@ -1909,10 +2320,25 @@ function wireDawLayout(v) {
   };
 
   dragSplit(v.querySelector("#dawVSplit"), (ev) => {
-    if (!dawLayout.leftOpen || !left) return;
-    const main = v.querySelector(".daw-main").getBoundingClientRect();
-    dawLayout.leftW = Math.max(160, Math.min(430, ev.clientX - main.left));
-    left.style.width = `${dawLayout.leftW}px`;
+    if (!dawLayout.leftOpen) return;
+    const mainEl = v.querySelector(".daw-main");
+    const rect = mainEl.getBoundingClientRect();
+    dawLayout.leftW = Math.max(160, Math.min(430, ev.clientX - rect.left));
+    mainEl.style.gridTemplateColumns = `${dawLayout.leftW}px 6px 1fr`;
+  }, saveDawLayout);
+
+  // Horizontal splitter between the Browser and the Palette (owner request):
+  // drag to trade vertical space between the two library panes.
+  const contentEl = v.querySelector(".daw-left-content");
+  const browserEl = v.querySelector(".daw-browser");
+  const paletteEl = v.querySelector(".daw-palette");
+  dragSplit(v.querySelector("#dawLSplit"), (ev) => {
+    if (!contentEl || !browserEl || !paletteEl) return;
+    const rect = contentEl.getBoundingClientRect();
+    const frac = Math.max(0.2, Math.min(0.85, (ev.clientY - rect.top) / rect.height));
+    dawLayout.browserFrac = frac;
+    browserEl.style.flexGrow = `${frac}`;
+    paletteEl.style.flexGrow = `${1 - frac}`;
   }, saveDawLayout);
 
   const hsplit = v.querySelector("#dawHSplit");
@@ -1993,7 +2419,7 @@ function wireSessionBar(v) {
         ctx.scalePreset = input.value;
         ctx.scaleMode = "12tone";
         ctx.customDegrees = [...(SCALE_PRESETS[input.value]?.degrees || SCALE_PRESETS.major.degrees)];
-      } else if (input.type === "range") {
+      } else if (input.type === "range" || input.type === "number") {
         ctx[key] = Number(input.value);
         if (key === "tempo") {
           const out = v.querySelector("#ctxTempoOut");
@@ -2133,7 +2559,7 @@ function playArrangement(fromBeat = 0) {
         voice.setMasterVolume(_trackVol(track.gain, region.gain));
         if (region.type === "baked" && Array.isArray(region.notes)) {
           voice.playNotes(regionPlayParams(track, region), region.notes,
-            regionLen(region), region.loopSourceBeats || regionLen(region));
+            regionLen(region), region.loopSourceBeats || regionLen(region), region.percStrikes);
         } else if (region.takeOffsetBeats) {
           // split tail: schedule the later part of the same take upfront
           voice.stop();
@@ -2263,7 +2689,7 @@ async function mixdownArrangement(statusEl, btn) {
       voice.setPan(track.pan ?? 0);
       if (region.type === "baked" && Array.isArray(region.notes)) {
         voice.renderNotesSpan(regionPlayParams(track, region), region.notes,
-          region.startBeat * beatSec + 0.05, regionLen(region), region.loopSourceBeats || regionLen(region));
+          region.startBeat * beatSec + 0.05, regionLen(region), region.loopSourceBeats || regionLen(region), region.percStrikes);
       } else {
         voice.renderSpan(regionPlayParams(track, region), region.startBeat * beatSec + 0.05,
           beatSec * regionLen(region), region.takeOffsetBeats || 0);
@@ -2444,9 +2870,13 @@ function harmonicGuideChoices() {
   return out;
 }
 function harmonicGuidePickerHTML() {
-  const choices = harmonicGuideChoices();
-  return `<div class="hg-picker"><input type="search" id="hgScaleSearch" placeholder="Search scales in palette and factory…" aria-label="Search Harmonic guide scales"/>
-    <div class="hg-choice-list" id="hgChoiceList">${choices.map(c => `<button data-hg-choice="${esc(c.id)}" data-hg-search="${esc(`${c.label} ${c.note}`.toLowerCase())}"><b>${esc(c.label)}</b><i>${esc(c.note)}</i></button>`).join("") || '<span>No scale sources in the palette yet.</span>'}</div></div>`;
+  const current = _gsScaleAt(0);
+  return `<div class="hg-picker">
+    <button class="hg-browser-route${producerBrowserTarget?.kind === "harmonic" ? " active" : ""}" data-browser-route-harmonic title="Choose scale and harmony from the Browser">
+      ${notationIconHTML(["clef"], { compact: true })}<span>Choose from Browser</span>
+    </button>
+    <span class="hg-current">${esc(current?.label || `${_gsDivCount()} divisions`)}</span>
+  </div>`;
 }
 
 function setHarmonicGuideFromParams(params, sourceLabel = "this module") {
@@ -2455,7 +2885,7 @@ function setHarmonicGuideFromParams(params, sourceLabel = "this module") {
   const gs = ensureGlobalScale();
   const hasExistingGuide = globalScaleActive() && (gs.markers || []).length > 0;
   if (hasExistingGuide && !confirm(`This Harmonic guide already has markers used by HG tracks. Loading ${sourceLabel}'s scale will overwrite the existing guide. Continue?`)) return false;
-  gs.markers = [{ atBeat: 0, degrees: [...choice.degrees], subScaleNotes: [...choice.subScaleNotes], rootNotes: [...choice.rootNotes] }];
+  gs.markers = [{ atBeat: 0, scaleMode: choice.scaleMode, edoDivisions: choice.edoDivisions, degrees: [...choice.degrees], subScaleNotes: [...choice.subScaleNotes], rootNotes: [...choice.rootNotes] }];
   gs.enabled = true;
   _gsSelMarker = 0;
   saveArrangement("set Harmonic guide scale");
@@ -2484,7 +2914,7 @@ function globalScaleStripHTML(laneW) {
   return `
       <div class="tl2-row tl2-gs-row${_gsOpen ? " open" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Harmonic guide — choose a starting scale, then add and edit timeline change points. It applies to tracks with HG on.">${_gsOpen ? "▾" : "▸"} Harmonic guide${active ? ` <span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}</button>
+          <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Harmonic guide — choose a starting scale, then add and edit timeline change points. It applies to tracks with HG on.">${notationIconHTML(["clef"], { compact: true })}${_gsOpen ? "▾" : "▸"} Harmonic guide${active ? ` <span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}</button>
         </div>
         ${_gsOpen ? `<div class="gs-strip${active ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><div class="hg-head">${harmonicGuidePickerHTML()}</div><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The Harmonic guide over time — rows are note divisions, colours are roles (lit = scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
       </div>${editorRow}`;
@@ -2725,7 +3155,7 @@ function globalSpaceStripHTML(laneW) {
   return `
       <div class="tl2-row tl2-sp-row${enabled && !_spOpen ? " sp-collapsed-row" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron sp-toggle${enabled ? " sp-active" : ""}" id="spToggle" title="Global space — click to turn it ${enabled ? "OFF" : "ON"}. Positions every instrument around the listener along the timeline (asks how to initialise on first use).">◎ Global space${enabled ? ` <span class="sp-onpip" title="Active — instruments are placed by the global space">●</span>` : ""}</button>
+          <button class="gs-chevron sp-toggle${enabled ? " sp-active" : ""}" id="spToggle" title="Global space — click to turn it ${enabled ? "OFF" : "ON"}. Positions every instrument around the listener along the timeline (asks how to initialise on first use).">${notationIconHTML(["space"], { compact: true })}Global space${enabled ? ` <span class="sp-onpip" title="Active — instruments are placed by the global space">●</span>` : ""}</button>
           ${enabled ? `<button class="gs-chevron sp-expand" id="spExpand" title="${_spOpen ? "Collapse to the slim view" : "Expand — cross-section + full cylinder"}">${_spOpen ? "▾" : "▸"}</button>` : ""}
         </div>
         ${enabled && !_spOpen ? `<div class="sp-cyl-wrap sp-cyl-collapsed" style="width:${laneW}px;height:${collapsedH}px"><canvas id="spCylinder" width="${laneW}" height="${collapsedH}" style="width:${laneW}px;height:${collapsedH}px" title="Global space over time (slim view) — one thread per instrument. Expand for the cross-section and full cylinder."></canvas></div>` : ""}
@@ -3497,9 +3927,10 @@ function wireGlobalSpace(v) {
 
 // ── Q10: MIDI recording ─────────────────────────────────────
 // MIDI input overrides duration/dynamics/melody; the armed track's patch
-// supplies the voice and its midiMap setting decides how keys land in the
-// scale. Recording stops → a BAKED region in beat-space, so the roll and
-// the Q3 drill-down work unchanged.
+// supplies the voice. Keyboard mapping is a user preference, deliberately
+// separate from patches and scales, so loading either never changes how the
+// player's physical keyboard behaves. Recording stops → a BAKED region in
+// beat-space, so the roll and the Q3 drill-down work unchanged.
 let _midi = { access: null, deviceId: null, armedTrackId: null, rec: null, engine: null };
 
 function _midiTrackParams(track) {
@@ -3519,12 +3950,10 @@ function onMidiMessage(ev) {
   const params = _midiTrackParams(track);
   if (!_midi.engine) { _midi.engine = new GenerationEngine(params); _midi.engine.initialise(); }
   const engine = _midi.engine;
-  const degree = midiMapDegree(noteNumber, engine.scale, {
-    keys: params.midiMapKeys, coverage: params.midiMapCoverage, anchor: params.midiMapAnchor,
-  });
-  if (degree == null) return;
   const now = performance.now();
   if (isOn) {
+    const degree = midiMapDegree(noteNumber, engine.scale, midiMapping);
+    if (degree == null) return;
     if (!_midi.rec) _midi.rec = { t0: now, startBeat: Math.max(0, Math.round(playheadBeat)), notes: [], open: new Map() };
     _midi.rec.open.set(noteNumber, { degree, velocity: Math.max(0.05, rawVel / 127), tOn: now });
     // monitor: hear the key through the patch voice (velocity → dynamics)
@@ -3749,6 +4178,7 @@ function produceTimelineHTML() {
     const hue = t.hue ?? _spHue(ti);
     const regions = t.regions.map(r => {
       const sel = (selectedRegion?.regionId === r.id || selectedRegions.has(r.id)) ? " selected" : "";
+      const patchSel = palettePreviewId && r.paletteId === palettePreviewId ? " patch-selected" : "";
       const baked = r.type === "baked" ? " baked" : "";
       const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
       const label = pal ? pal.name : t.name;
@@ -3764,7 +4194,7 @@ function produceTimelineHTML() {
         ? regionMiniPianoHTML(r)
         : regionProbabilityCurveHTML(r, pal?.params || t.instrumentParams || {});
       const gainDb = 20 * Math.log10(Math.max(0.02, r.gain ?? 1));
-      return `<div class="tl2-region${sel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
+      return `<div class="tl2-region${sel}${patchSel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
         style="--track-h:${hue};left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
         title="${esc(label)}${esc(badgeHover)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
         ${ticks}${shape}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span><span class="tl2-region-label">${esc(label)}</span>
@@ -3797,7 +4227,7 @@ function produceTimelineHTML() {
           <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the Harmonic guide: this track's takes regenerate under the marker in force (baked notes stay put)">HG</button>
           ${_midi.access ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
           <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
-          <input type="range" class="tl-pan" data-track-pan="${t.id}" min="-1" max="1" step="0.05" value="${t.pan ?? 0}" title="Pan (L/R)"/>
+          <canvas class="tl-space-dot" data-track-space-dot="${t.id}" width="28" height="28" title="Spatial position — drag: left/right rotates around you, up/down changes distance"></canvas>
         </div>
         ${spacePop}
       </div>
@@ -3834,7 +4264,12 @@ function produceTimelineHTML() {
             <span class="tl2-guide-arrow">→</span>
             <span class="tl2-guide-step"><b>3</b> ＋ Track, or drag it onto the lane above</span>
           </div>
-          <button class="btn btn-primary" id="loadDemo" title="Build a small three-instrument arrangement so you can see how tracks, regions and seeds fit together — then reroll, bake and edit it">▶ Load demo arrangement</button>
+          <div class="factory-session-picker" aria-label="Factory starter sessions">
+            <span class="factory-session-label">Factory starter sessions</span>
+            <div class="factory-session-list">${FACTORY_SESSIONS.map(session =>
+              `<button class="factory-session-card" data-load-factory-session="${esc(session.id)}" title="${esc(session.description)}"><b>${esc(session.name)}</b><span>${esc(session.theme)}</span></button>`).join("")}</div>
+          </div>
+          <button class="btn btn-primary" id="loadDemo" title="Load Dawn Observatory, a spatial Harmonic-guide starter session">▶ Load featured session</button>
         </div>
       </div>`}
     </div>`;
@@ -3861,7 +4296,9 @@ function regionPatch(track, region) {
 function bakeRegion(track, region) {
   const ctxP = arrangement.context;
   const beatSec = 60 / Math.max(30, ctxP.tempo || 104);
-  region.notes = synth.captureSpan(regionPlayParams(track, region), beatSec * regionLen(region));
+  const bakeParams = regionPlayParams(track, region);
+  region.notes = synth.captureSpan(bakeParams, beatSec * regionLen(region));
+  region.percStrikes = synth.capturePercStrikes(bakeParams, region.notes);
   region.type = "baked";
   region.loopSourceBeats = regionLen(region);
   saveArrangement("bake region");
@@ -3881,6 +4318,8 @@ function ensureRegionPatchOverride(track, region) {
     macroName: savedParts.macroName || (p.melodyPattern ? `${p.melodyPattern} macro` : "Patch macro"),
     percussion: savedParts.percussion || null,
     percussionName: savedParts.percussionName || null,
+    space: savedParts.space || null,
+    spaceName: savedParts.spaceName || null,
     scale: savedParts.scale || null,
     scaleName: savedParts.scaleName || null,
     engine: savedParts.engine || null,
@@ -3923,8 +4362,8 @@ function engineModuleOptions(selected) {
 function patchSpatialSources(p) {
   const angle = p.spaceAzimuth ?? 0, dist = p.spaceDistance ?? 2.5;
   return [
-    { id: "base", label: "Base", kind: "base", num: "B", hue: 36, angle, dist, color: "gold", mute: false },
-    ...(p.layers || []).map((l, i) => ({ id: l.id, label: `Layer ${i + 1}`, kind: "layer", num: String(i + 1), hue: l.hue ?? (36 + i * 70) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "blue", mute: !!l.mute, solo: !!l.solo })),
+    { id: "base", label: "Layer 1", kind: "base", num: "1", hue: 36, angle, dist, color: "gold", mute: false },
+    ...(p.layers || []).map((l, i) => ({ id: l.id, label: `Layer ${i + 2}`, kind: "layer", num: String(i + 2), hue: l.hue ?? (36 + i * 70) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "blue", mute: !!l.mute, solo: !!l.solo })),
     ...(p.percLayers || []).map((l, i) => ({ id: `perc:${l.id}`, label: l.sound?.name || l.sound?.key || `Hit ${i + 1}`, kind: "percussion", num: `P${i + 1}`, hue: (32 + i * 47) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "pink", mute: !!l.mute })),
   ];
 }
@@ -4081,10 +4520,10 @@ function patchLayerStripHTML(p) {
         </div>
       </div>
     </div>`;
-  const baseRow = row("base", "B", 36, "Base", ` <span class="patch-lyr-badge">MAIN</span>`, "",
+  const baseRow = row("base", "1", 36, "Layer 1", ` <span class="patch-lyr-badge">MAIN</span>`, "",
     p.spaceAzimuth ?? 0, p.spaceDistance ?? 2.5, "", false);
   const rows = layers.map((l, i) => row(
-    l.id, String(i + 1), l.hue ?? (36 + i * 70) % 360, l.name || `Layer ${i + 1}`, "",
+    l.id, String(i + 2), l.hue ?? (36 + i * 70) % 360, l.name || `Layer ${i + 2}`, "",
     `<label class="sp-ctl">Vol <input type="range" data-patch-lyr-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}"/></label>`,
     l.space?.angle ?? (p.spaceAzimuth ?? 0), l.space?.dist ?? (p.spaceDistance ?? 2.5),
     `<button class="pal-btn patch-lyr-mute${l.mute ? " on" : ""}" data-patch-layer-mute="${l.id}" title="${l.mute ? "Unmute" : "Mute"} layer">M</button>`
@@ -4110,9 +4549,28 @@ function patchScaleHTML(p, parts, regionScoped) {
   const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
   const degrees = Array.isArray(p.customDegrees) && p.customDegrees.length ? p.customDegrees : (SCALE_PRESETS[p.scalePreset] || SCALE_PRESETS.major).degrees;
   return `<div class="patch-scale"><div class="patch-scale-head">Scale · ${esc(p.scaleMode === "edo" ? `${div}-EDO` : (SCALE_PRESETS[p.scalePreset]?.label || p.scalePreset || "Major"))}</div>
-    ${smartComboHTML({ id: "patchScaleCombo", value: parts?.scale || "", buttonLabel: parts?.scaleName || "Choose scale", groups: scaleModuleOptions(parts?.scale) })}
     <div class="patch-degrees">${degrees.map(d => `<button data-patch-degree="${d}" class="${(p.rootNotes || []).includes(d) ? "root" : (p.subScaleNotes || []).includes(d) ? "sub" : ""}" title="Cycle: scale → sub-scale → root → off">${d}</button>`).join("")}</div>
     ${regionScoped ? '<div class="patch-global-note">If this track follows Harmonic guide, these patch-scale edits are stored but are not heard until HG is off.</div>' : ''}</div>`;
+}
+
+function patchSaveHTML(subject, p) {
+  const available = capturePartsFor(p, "full", subject.patch.captureParts);
+  if (patchSaveSubjectId !== subject.patch.id || !patchSaveSelection) {
+    patchSaveSubjectId = subject.patch.id;
+    patchSaveSelection = { ...available };
+  }
+  return `<div class="patch-save-wrap">
+    <button class="btn btn-primary btn-sm patch-save-toggle${patchDirty ? " dirty" : ""}" data-patch-save-toggle${patchDirty ? "" : " disabled"}>Save patch${patchDirty ? " •" : ""}</button>
+    ${patchSaveOpen ? `<div class="patch-save-pop">
+      <label><span>Name</span><input id="patchSaveName" maxlength="80" value="${esc(subject.label || "Untitled patch")}"/></label>
+      <span class="patch-save-label">Include</span>
+      ${capturePartSelectorHTML(available, patchSaveSelection)}
+      <div class="patch-save-actions">
+        <button class="btn btn-primary btn-sm" data-patch-save-palette>Save to Palette</button>
+        <button class="btn btn-secondary btn-sm" data-patch-save-library>Save to Library</button>
+      </div>
+    </div>` : ""}
+  </div>`;
 }
 function producerPatchInspectorHTML(subject) {
   const p = subject.patch.params || {};
@@ -4121,28 +4579,31 @@ function producerPatchInspectorHTML(subject) {
   const percOn = Array.isArray(p.percLayers) && p.percLayers.some(l => (Number(l.vol) || 0) > 0);
   const badges = patchBadges(p);
   const context = subject.regionScoped ? "Region-local edits" : "Palette patch";
-  const subnoteName = parts.subnoteName || SPECTRAL_PROFILES[p.spectralProfile]?.label || "Sound source";
-  const macroName = parts.macroName || (p.melodyPattern ? `${p.melodyPattern} macro` : "Patch macro");
+  const subnoteName = moduleNameForPatch(subject.patch, "notes");
+  const spaceName = moduleNameForPatch(subject.patch, "space");
+  const macroName = moduleNameForPatch(subject.patch, "stave");
+  const scaleName = moduleNameForPatch(subject.patch, "clef");
+  const percussionName = moduleNameForPatch(subject.patch, "percussion");
   return `<div class="patch-inspector" data-patch-inspector>
-    <header class="patch-inspector-titlebar"><div><span>Inspecting ${subject.regionScoped ? "region" : "patch"}</span><h3>${esc(subject.label)}</h3></div><div class="patch-inspector-badges"><i>${esc(badges.scaleLabel)}</i><i>${badges.splits} splits</i><i>grid ${badges.grid}</i><i class="patch-local-badge">${context}</i></div><div class="patch-title-actions">${editorSwitcherHTML()}<button class="patch-close" data-patch-close title="Close inspector">×</button></div></header>
+    <header class="patch-inspector-titlebar"><div><span>Inspecting ${subject.regionScoped ? "region" : "patch"}</span><h3>${esc(subject.label)}</h3></div><div class="patch-inspector-badges"><i>${esc(badges.scaleLabel)}</i><i>${badges.splits} splits</i><i>grid ${badges.grid}</i><i class="patch-local-badge">${context}</i></div><div class="patch-title-actions">${patchSaveHTML(subject, p)}${editorSwitcherHTML()}<button class="patch-close" data-patch-close title="Close inspector">×</button></div></header>
     <div class="patch-inspector-grid">
-      <section class="patch-pane patch-pane-subnote" data-patch-drop="subnote"><header><span>Sub-note</span><small class="patch-pane-name" title="${esc(subnoteName)}">${esc(subnoteName)}</small><div><button data-patch-clear="subnote" title="Clear sub-note">×</button><button data-patch-edit="subnote" title="Edit sub-note">✎</button></div></header>
+      <section class="patch-pane patch-pane-subnote" data-patch-drop="notes"><header><button class="saem-route${producerBrowserTarget?.part === "notes" ? " active" : ""}" data-browser-route="notes" title="Choose sound from the Browser">${notationIconHTML(["notes"], { compact: true })}</button><span>Sub-note</span><small class="patch-pane-name editable-name" data-module-name="notes" title="Double-click to rename">${esc(subnoteName)}</small><div><button data-patch-clear="notes" title="Clear sub-note">×</button><button data-patch-edit="subnote" title="Edit sub-note">✎</button></div></header>
         <div class="patch-sound-meta">Sound &amp; layers <span>${esc(SPECTRAL_PROFILES[p.spectralProfile]?.label || p.spectralProfile || "Custom source")}</span></div>
         <div class="patch-layer-list" data-patch-layer-list>${patchLayerStripHTML(p)}</div>
         <div class="patch-drop-hint" data-patch-drophint="subnote">Drag a sound preset here to swap the sub-note</div>
       </section>
-      <section class="patch-pane patch-pane-space" data-patch-drop="subnote"><header><span>Patch space</span><small>Drag to place each source</small></header>
+      <section class="patch-pane patch-pane-space" data-patch-drop="space"><header><button class="saem-route${producerBrowserTarget?.part === "space" ? " active" : ""}" data-browser-route="space" title="Choose space from the Browser">${notationIconHTML(["space"], { compact: true })}</button><span>Patch space</span><small class="patch-pane-name editable-name" data-module-name="space" title="Double-click to rename">${esc(spaceName)}</small></header>
         <div class="patch-stage-wrap"><canvas id="patchStage" title="Drag a dot to place that source around the listener — front is up, rings are metres. Muted sources dim; soloed sources ring gold."></canvas></div>
         <div class="patch-stage-readout" id="patchStageReadout"></div>
         <div class="patch-movement-control"><span>Global movement</span><select data-patch-movement><option value="centered"${movement === "centered" ? " selected" : ""}>Centered</option><option value="additive"${movement === "additive" ? " selected" : ""}>Additive</option></select></div>
         <p>The track thread moves these saved positions. Drag a dot to set a source's own place without touching the global space.</p>
       </section>
-      <section class="patch-pane patch-pane-macro" data-patch-drop="macro"><header><span>Macro &amp; harmony</span><small class="patch-pane-name" title="${esc(macroName)}">${esc(macroName)}</small><div><button data-patch-clear="macro" title="Clear macro">×</button><button data-patch-edit="macro" title="Edit macro">✎</button></div></header>
+      <section class="patch-pane patch-pane-macro" data-patch-drop="stave"><header><button class="saem-route${producerBrowserTarget?.part === "stave" ? " active" : ""}" data-browser-route="stave" title="Choose note behaviour from the Browser">${notationIconHTML(["stave"], { compact: true })}</button><span>Macro &amp; harmony</span><small class="patch-pane-name editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small><div><button data-patch-clear="stave" title="Clear note behaviour">×</button><button data-patch-edit="macro" title="Edit macro">✎</button></div></header>
         <div class="patch-macro-2col">
-          <div class="patch-module-card"><div class="patch-module-card-head"><b>Percussion</b><label class="patch-perc-toggle"><input type="checkbox" data-patch-perc${percOn ? " checked" : ""}/> On</label><button data-patch-edit="percussion" title="Edit percussion">✎</button></div>${smartComboHTML({ id: "patchPercCombo", value: parts.percussion || "", buttonLabel: parts.percussionName || "Choose kit", groups: percussionModuleOptions(parts.percussion) })}</div>
-          <div class="patch-module-card"><div class="patch-module-card-head"><b>Note engine</b><span>grid ${p.beatDivisions ?? 1}</span></div>${smartComboHTML({ id: "patchEngineCombo", value: parts.engine || "", buttonLabel: parts.engineName || "Choose engine", groups: engineModuleOptions(parts.engine) })}</div>
+          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="percussion" title="Choose percussion from the Browser">${notationIconHTML(["percussion"], { compact: true })}</button><b>Percussion</b><label class="patch-perc-toggle"><input type="checkbox" data-patch-perc${percOn ? " checked" : ""}/> On</label><button data-patch-edit="percussion" title="Edit percussion">✎</button></div><small class="editable-name" data-module-name="percussion" title="Double-click to rename">${esc(percussionName)}</small></div>
+          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="stave" title="Choose note behaviour from the Browser">${notationIconHTML(["stave"], { compact: true })}</button><b>Note engine</b><span>grid ${p.beatDivisions ?? 1}</span></div><small class="editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small></div>
         </div>
-        <div class="patch-module-card patch-scale-card">${patchScaleHTML(p, parts, subject.regionScoped)}<button class="patch-text-action" data-patch-edit="scale">✎ Edit scale</button></div>
+        <div class="patch-module-card patch-scale-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="clef" title="Choose scale and harmony from the Browser">${notationIconHTML(["clef"], { compact: true })}</button><b>Scale &amp; harmony</b><small class="editable-name" data-module-name="clef" title="Double-click to rename">${esc(scaleName)}</small></div>${patchScaleHTML(p, parts, subject.regionScoped)}<button class="patch-text-action" data-patch-edit="scale">✎ Edit scale</button></div>
         <div class="patch-drop-hint" data-patch-drophint="macro">Drag a macro / behaviour preset here to swap the macro</div>
       </section>
     </div>
@@ -4220,57 +4681,80 @@ function bindPatchInspector(v) {
   const patch = subject.patch;
   const params = patch.params || (patch.params = {});
   const persist = (label = "patch inspector") => {
+    patchDirty = true;
+    patch.captureParts = capturePartsFor(params, "full");
     saveArrangement(label);
     if (subject.regionScoped) {
       const voice = producerVoices.get(subject.track.id);
       if (voice?.playing) voice.updateGenerationParams?.(regionPlayParams(subject.track, subject.region));
     }
   };
-  wireSmartCombos(panel, (combo, value) => {
-    if (combo.id === "patchEngineCombo") {
-      const item = browserItems().find(x => x.id === value);
-      if (!item || !["melody", "rhythm", "dynamics", "surprise"].includes(item.section)) return;
-      const scaleKeys = new Set(["scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz", "degreeTuning", "subScaleNotes", "subScaleWeight", "rootNotes"]);
-      for (const [key, val] of Object.entries(voiceParamsFor(item))) {
-        if (sectionForParam(key) !== "percussion" && !scaleKeys.has(key)) params[key] = val;
+  panel.querySelectorAll("[data-browser-route]").forEach(btn => {
+    btn.onclick = (event) => {
+      event.stopPropagation();
+      producerBrowserTarget = { kind: "patch", part: btn.dataset.browserRoute };
+      browserFilter = "all";
+      if (dawLayout) { dawLayout.leftOpen = true; saveDawLayout(); }
+      renderProduce();
+    };
+  });
+  const saveToggle = panel.querySelector("[data-patch-save-toggle]");
+  if (saveToggle) saveToggle.onclick = () => { patchSaveOpen = !patchSaveOpen; renderProduce(); };
+  panel.querySelectorAll("[data-save-part]").forEach(btn => {
+    btn.onclick = () => {
+      const part = btn.dataset.savePart;
+      if (!patchSaveSelection?.[part]) {
+        patchSaveSelection = { ...(patchSaveSelection || {}), [part]: true };
+      } else if (capturePartList(patchSaveSelection).length > 1) {
+        patchSaveSelection = { ...patchSaveSelection, [part]: false };
       }
-      patch.parts = patch.parts || {};
-      patch.parts.engine = item.id; patch.parts.engineName = item.name;
-      persist("replace note engine"); renderProduce();
-      return;
-    }
-    if (combo.id === "patchScaleCombo") {
-      const item = browserItems().find(x => x.id === value);
-      if (!item || item.section !== "melody") return;
-      const scaleKeys = new Set(["scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz", "degreeTuning", "subScaleNotes", "subScaleWeight", "rootNotes"]);
-      for (const [key, val] of Object.entries(voiceParamsFor(item))) if (scaleKeys.has(key)) params[key] = val;
-      patch.parts = patch.parts || {};
-      patch.parts.scale = item.id; patch.parts.scaleName = item.name;
-      persist("replace patch scale"); renderProduce();
-      return;
-    }
-    if (combo.id === "patchPercCombo") {
-      const item = browserItems().find(x => x.id === value);
-      if (!item || item.section !== "percussion") return;
-      for (const [key, val] of Object.entries(voiceParamsFor(item))) {
-        if (sectionForParam(key) === "percussion") params[key] = val;
-      }
-      patch.parts = patch.parts || {};
-      patch.parts.percussion = item.id; patch.parts.percussionName = item.name;
-      persist("replace percussion kit"); renderProduce();
-      return;
-    }
-    // Sub-note and Macro modules are now swapped by dragging a preset onto the
-    // pane (see pointerDragUp / patchDropZoneAtPoint), not via a dropdown.
+      renderProduce();
+    };
+  });
+  const finishPatchSave = () => {
+    patchDirty = false; patchSaveOpen = false;
+    patch.captureParts = capturePartsFor(params, "full");
+    saveArrangement("save patch to palette");
+    renderProduce();
+  };
+  panel.querySelector("[data-patch-save-palette]")?.addEventListener("click", finishPatchSave);
+  panel.querySelector("[data-patch-save-library]")?.addEventListener("click", () => {
+    const name = panel.querySelector("#patchSaveName")?.value.trim() || subject.label || "Untitled patch";
+    const selected = patchSaveSelection || capturePartsFor(params, "full");
+    const entry = {
+      id: crypto.randomUUID(), created_at: new Date().toISOString(), name: name.slice(0, 80),
+      section: "full", captureParts: { ...selected },
+      parameters: extractCaptureParams(params, selected), rating: 0, app_version: APP_VERSION,
+    };
+    const list = loadPresets(); list.unshift(entry); savePresets(list);
+    trackEngagement("save");
+    patchDirty = false; patchSaveOpen = false;
+    renderProduce();
+  });
+  panel.querySelectorAll("[data-module-name]").forEach(el => {
+    el.ondblclick = event => {
+      event.preventDefault(); event.stopPropagation();
+      const part = el.dataset.moduleName;
+      startInlineRename(el, moduleNameForPatch(patch, part), value => {
+        if (setPatchModuleName(patch, part, value)) {
+          if (subject.regionScoped) {
+            const palettePatch = (arrangement.palette || []).find(item => item.id === subject.region?.paletteId);
+            if (palettePatch) setPatchModuleName(palettePatch, part, value);
+          }
+          persist(`rename ${CAPTURE_PART_LABELS[part]}`);
+        }
+        renderProduce();
+      });
+    };
   });
   panel.querySelectorAll("[data-patch-clear]").forEach(btn => {
     btn.onclick = () => {
-      const half = btn.dataset.patchClear;
-      const sections = half === "subnote" ? PALETTE_SUBNOTE_SECTIONS : PALETTE_MACRO_SECTIONS;
-      for (const key of Object.keys(params)) if (sections.has(sectionForParam(key))) delete params[key];
+      const part = btn.dataset.patchClear;
+      for (const key of Object.keys(params)) if (capturePartForParam(key) === part) delete params[key];
       patch.parts = patch.parts || {};
-      patch.parts[half] = null; patch.parts[`${half}Name`] = null;
-      patch.name = paletteDisplayName(patch);
+      if (part === "notes") patch.parts.subnote = null;
+      if (part === "stave") patch.parts.macro = null;
+      patch.parts[CAPTURE_PART_NAME_KEYS[part]] = null;
       persist("clear patch module"); renderProduce();
     };
   });
@@ -4282,6 +4766,9 @@ function bindPatchInspector(v) {
   panel.querySelectorAll("[data-patch-edit]").forEach(btn => {
     btn.onclick = () => {
       exploreParams = migrateToneParams({ ...DEFAULTS, ...params });
+      const paletteId = subject.regionScoped ? subject.region?.paletteId : subject.patch.id;
+      const palettePatch = (arrangement.palette || []).find(item => item.id === paletteId);
+      if (palettePatch) setPaletteEditState({ paletteId, name: palettePatch.name });
       if (btn.dataset.patchEdit === "subnote") workspaceTab = "subnote";
       else {
         workspaceTab = "explore";
@@ -4419,6 +4906,33 @@ function fmtDb(db) {
   return `${db >= 0 ? "+" : ""}${db.toFixed(1)}`;
 }
 function gainToDb(g) { return 20 * Math.log10(Math.max(0.001, g || 0.001)); }
+
+// Track/region gain readouts live in two places at once (the timeline track head
+// and the open mixer). These keep them in lockstep so editing one reflects
+// immediately in the other, without a full re-render mid-drag.
+function _timelineDbStr(gain) {
+  const db = 20 * Math.log10(Math.max(0.02, gain ?? 1));
+  return `${db >= 0 ? "+" : ""}${db.toFixed(1)}dB`;
+}
+function syncTrackGainDom(track) {
+  const g = track.gain ?? 1;
+  document.querySelectorAll(`[data-track-gain="${track.id}"], [data-mixer-track-gain="${track.id}"]`)
+    .forEach(s => { if (s !== document.activeElement) s.value = g; });
+  const tdb = document.querySelector(`[data-track-head="${track.id}"] .tl2-db`);
+  if (tdb) tdb.textContent = _timelineDbStr(g);
+  const mdb = document.querySelector(`[data-mixer-track-db="${track.id}"]`);
+  if (mdb) mdb.textContent = fmtDb(gainToDb(g));
+}
+function syncRegionGainDom(track, region) {
+  const g = region.gain ?? 1;
+  const tag = document.querySelector(`[data-gain-tag="${region.id}"]`);
+  if (tag) tag.textContent = _timelineDbStr(g);
+  const key = `${track.id}:${region.id}`;
+  const mdb = document.querySelector(`[data-mixer-region-db="${key}"]`);
+  if (mdb) mdb.textContent = fmtDb(gainToDb(g));
+  const fill = document.querySelector(`[data-mixer-region-gain="${key}"] [data-fill]`);
+  if (fill) fill.style.width = `${Math.round(g / 1.5 * 100)}%`;
+}
 
 function mixerRegionRowHTML(t, r) {
   const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
@@ -4575,6 +5089,36 @@ function drawMixerMaster(cv) {
 
 let _mixerDrag = null;   // { trackId, pos } while dragging a track's space dot
 let _mixerRaf = null;
+let _threadDrag = null;  // { trackId, pos, moved } while dragging a track-head space target
+
+// Compact spatial "target" for the track head: concentric rings with the
+// listener at centre and a coloured dot at the track thread's (angle, distance).
+// A greyed dot means the track is anchored in the global space (dragging it
+// snaps back — you edit anchors in the cross-section, same rule as the mixer).
+function drawTrackSpaceDot(cv, track) {
+  if (!cv) return;
+  const g2 = crisp2d(cv);
+  const ctx = g2.ctx, w = g2.w, h = g2.h;
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 3;
+  const anchored = !!(arrangement.space?.tracks?.[track.id] || []).length;
+  ctx.strokeStyle = "rgba(120,140,160,0.30)";
+  ctx.lineWidth = 1;
+  for (const frac of [0.5, 1]) { ctx.beginPath(); ctx.arc(cx, cy, rMax * frac, 0, 2 * Math.PI); ctx.stroke(); }
+  ctx.strokeStyle = "rgba(120,140,160,0.16)";
+  ctx.beginPath(); ctx.moveTo(cx - rMax, cy); ctx.lineTo(cx + rMax, cy); ctx.moveTo(cx, cy - rMax); ctx.lineTo(cx, cy + rMax); ctx.stroke();
+  ctx.fillStyle = "rgba(205,218,232,0.7)";
+  ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI); ctx.fill();
+  const hue = track.hue ?? _spHue(arrangement.tracks.indexOf(track));
+  const drag = _threadDrag && _threadDrag.trackId === track.id ? _threadDrag.pos : null;
+  const pos = drag || _spTrackPos(track, curPlayBeat());
+  const rad = ((pos.angle ?? 0) - 90) * Math.PI / 180;
+  const r = _spaceDistToR(Math.max(SPACE_DMIN, Math.min(SPACE_DMAX, pos.dist ?? 2.5)), rMax);
+  const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+  ctx.fillStyle = anchored ? "hsla(215,12%,58%,0.9)" : `hsla(${hue},78%,64%,1)`;
+  ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = anchored ? 0 : 5;
+  ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
+}
 
 function _sizeMasterFader() {
   const slot = document.getElementById("mixerFaderSlot");
@@ -4625,6 +5169,7 @@ function wireMixer(v) {
         r.gain = Math.round(frac * 1.5 * 100) / 100;
         if (fill) fill.style.width = `${Math.round(frac * 100)}%`;
         if (db) db.textContent = fmtDb(gainToDb(r.gain));
+        syncRegionGainDom(t, r);
         liveTrack(t);
       };
       set(e);
@@ -4640,8 +5185,7 @@ function wireMixer(v) {
       const t = arrangement.tracks.find(t => t.id === el.dataset.mixerTrackGain);
       if (!t) return;
       t.gain = parseFloat(el.value);
-      const out = v.querySelector(`[data-mixer-track-db="${t.id}"]`);
-      if (out) out.textContent = fmtDb(gainToDb(t.gain));
+      syncTrackGainDom(t);
       producerVoices.get(t.id)?.setMasterVolume?.(_trackVol(t.gain, regionAtBeat(t, arrPlay ? arrPlay.beat : playheadBeat)?.gain));
     };
     el.onchange = () => saveArrangement("track level");
@@ -4772,10 +5316,39 @@ function rollPanelHTML() {
           <i class="roll-leg-realised"></i> Realised (played)
         </span>
       </div>
-      <canvas id="rollCanvas" width="960" height="${rollDynLane ? 300 : 240}" title="Two-finger scroll pans the zoomed roll. ⌘ + two-finger up/down zooms pitch; ⌘ + two-finger left/right zooms time."></canvas>
+      <canvas id="rollCanvas" width="960" height="${(rollDynLane ? 300 : 240) + regionPercH(region)}" title="Two-finger scroll pans the zoomed roll. ⌘ + two-finger up/down zooms pitch; ⌘ + two-finger left/right zooms time. Drag a percussion * up/down to change its dynamics."></canvas>
       <div class="roll-readout" id="rollReadout">Click a note to inspect it. Bodies show the realised pitch AND timing; dashed outlines mark the intended scale note and grid slot. ⇧-drag = micro-timing off the grid.</div>
     </div>`;
 }
+
+// Percussion lanes for the roll (owner request): one lane per baked percussion
+// layer, in first-appearance order, carrying the sound/instrument name.
+const PERC_LANE_H = 18;
+function regionPercLanes(region) {
+  const strikes = region?.percStrikes;
+  if (!Array.isArray(strikes) || !strikes.length) return [];
+  const seen = new Map();
+  for (const s of strikes) {
+    if (!seen.has(s.layerId)) seen.set(s.layerId, { layerId: s.layerId, name: s.name || "Perc" });
+  }
+  return [...seen.values()];
+}
+function regionPercH(region) {
+  const n = regionPercLanes(region).length;
+  return n ? n * PERC_LANE_H + 6 : 0;
+}
+// A little * (three crossed strokes), size ∝ strike velocity.
+function drawAsterisk(ctx, x, y, r) {
+  ctx.beginPath();
+  for (let k = 0; k < 3; k++) {
+    const a = (k * 60) * Math.PI / 180;
+    ctx.moveTo(x - Math.cos(a) * r, y - Math.sin(a) * r);
+    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+  }
+  ctx.stroke();
+}
+let _rollPercHits = []; // {si, x, y, size} strike hit-targets for the current draw
+let _rollPercSel = -1;  // index into region.percStrikes of the selected strike
 
 // Piano roll for a baked region: rows = scale degrees, columns = beat
 // divisions. Dual pitch representation per the bake design — the note BODY
@@ -4789,7 +5362,9 @@ function drawRoll(region) {
   ctx.clearRect(0, 0, W, H);
   const notes = region.notes;
   const padL = 40, padR = 8, padT = 8, padB = 18;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const percLanes = regionPercLanes(region);
+  const percH = percLanes.length ? percLanes.length * PERC_LANE_H + 6 : 0;
+  const plotW = W - padL - padR, plotH = H - padT - padB - percH;
 
   // The pitch system for THIS region under the session context: every
   // division is a row; the scale decides which rows are open.
@@ -4838,7 +5413,7 @@ function drawRoll(region) {
       pc,
     };
   }
-  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, allMinDeg, allMaxDeg, totalDivs, viewStartDivs, viewDivs, W, H, rowInfo, div, laneH, laneTop: padT + pitchH };
+  _rollGeom = { padL, padT, plotW, plotH, rowH, minDeg, maxDeg, allMinDeg, allMaxDeg, totalDivs, viewStartDivs, viewDivs, W, H, rowInfo, div, laneH, laneTop: padT + pitchH, beatDivRoll, percLaneGeom: [] };
 
   // Display well + scale-aware rows: out-of-scale divisions render dark
   // and are LOCKED from drags; sub-scale rows gold; root rows violet.
@@ -4878,7 +5453,7 @@ function drawRoll(region) {
   for (let b = firstGridDiv; b <= viewStartDivs + viewDivs + 0.01; b += beatDiv) {
     const x = xFor(b);
     ctx.strokeStyle = b % (beatDiv * 4) === 0 ? "rgba(154,160,171,0.16)" : "rgba(154,160,171,0.06)";
-    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH + percH); ctx.stroke();
   }
 
   _rollHits = [];
@@ -4947,6 +5522,43 @@ function drawRoll(region) {
       ctx.beginPath(); ctx.arc(px, laneTop + laneH - 4 - ph, 2.6, 0, 2 * Math.PI); ctx.fill();
     });
     ctx.lineWidth = 1;
+  }
+  // Percussion lanes: a line per baked percussion layer (labelled with its
+  // sound), an * per strike sized by velocity; strikes share the note grid so
+  // they line up with beats. Drag one up/down to change its dynamics.
+  _rollPercHits = [];
+  if (percLanes.length) {
+    const strikes = region.percStrikes || [];
+    const percTop = padT + plotH + 3;
+    _rollGeom.percLaneGeom = percLanes.map((lane, li) => ({
+      layerId: lane.layerId, name: lane.name,
+      top: percTop + PERC_LANE_H * li, bottom: percTop + PERC_LANE_H * (li + 1),
+    }));
+    ctx.font = "8px 'SF Mono', monospace";
+    percLanes.forEach((lane, li) => {
+      const y = percTop + PERC_LANE_H * li + PERC_LANE_H / 2;
+      ctx.strokeStyle = "rgba(154,160,171,0.16)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+      ctx.fillStyle = "rgba(229,104,143,0.9)";
+      ctx.textAlign = "right";
+      ctx.fillText(String(lane.name).slice(0, 6), padL - 4, y + 3);
+      strikes.forEach((s, si) => {
+        if (s.layerId !== lane.layerId) return;
+        const divs = (s.beat || 0) * beatDivRoll;
+        if (divs < viewStartDivs - 0.5 || divs > viewStartDivs + viewDivs + 0.5) return;
+        const x = xFor(divs);
+        const vel = Math.max(0.05, Math.min(1, s.velocity || 0));
+        const size = 2 + vel * (PERC_LANE_H / 2 - 2);
+        const selp = _rollPercSel === si;
+        ctx.strokeStyle = selp ? "#ffe3b0" : `rgba(229,104,143,${0.45 + 0.55 * vel})`;
+        ctx.lineWidth = selp ? 2 : 1.4;
+        drawAsterisk(ctx, x, y, size);
+        _rollPercHits.push({ si, x, y, size });
+      });
+    });
+    ctx.lineWidth = 1;
+    window._rollPercHitsQA = _rollPercHits;
   }
   // Arrangement transport is shown in region-local time, and only while it
   // is actually travelling through this inspected region.
@@ -5067,6 +5679,43 @@ function wireRoll(v) {
   };
   cv.onmousedown = (e) => {
     const { x, y } = canvasXY(e);
+    // Percussion strikes: drag a * up/down to set velocity, ⇧-drag to slide it
+    // along its lane; in Draw mode, click a lane to add a new hit.
+    if (_rollPercHits.length) {
+      let best = null;
+      for (const h of _rollPercHits) {
+        const d = Math.hypot(h.x - x, h.y - y);
+        if (d < 10 && (!best || d < best.d)) best = { si: h.si, d };
+      }
+      if (best) {
+        _rollPercSel = best.si;
+        const s = region.percStrikes[best.si];
+        drag = { mode: "perc", si: best.si, startX: x, startY: y, orig: s.velocity || 0, origBeat: s.beat || 0, shiftMove: e.shiftKey, moved: false };
+        drawRoll(region);
+        setReadout(e.shiftKey
+          ? `${s.name} · beat ${(s.beat || 0).toFixed(2)} — drag to move it along the line`
+          : `${s.name} · vel ${(s.velocity || 0).toFixed(2)} — drag up/down (⇧ to move)`);
+        e.preventDefault();
+        return;
+      }
+      // Draw mode: click an empty spot on a lane to add a new hit there.
+      if (_rollAddMode && _rollGeom?.percLaneGeom?.length) {
+        const lane = _rollGeom.percLaneGeom.find(L => y >= L.top && y < L.bottom);
+        if (lane) {
+          const g = _rollGeom, bd = g.beatDivRoll || 1;
+          const divs = Math.max(0, Math.min(g.totalDivs - 1,
+            Math.round(g.viewStartDivs + (x - g.padL) / g.plotW * g.viewDivs)));
+          region.percStrikes = region.percStrikes || [];
+          region.percStrikes.push({ layerId: lane.layerId, beat: divs / bd, velocity: 0.7, name: lane.name });
+          _rollPercSel = region.percStrikes.length - 1;
+          saveArrangement("add percussion strike");
+          drawRoll(region);
+          setReadout(`${lane.name} · added a hit at beat ${(divs / bd).toFixed(2)}`);
+          e.preventDefault();
+          return;
+        }
+      }
+    }
     // dynamics lane: grab the nearest velocity pin
     if (rollDynLane && _rollGeom && y > _rollGeom.laneTop) {
       let best = null;
@@ -5156,6 +5805,24 @@ function wireRoll(v) {
     const dx = x - drag.startX;
     const dy = y - drag.startY;
     if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
+    if (drag.mode === "perc") {
+      const s = region.percStrikes[drag.si];
+      if (s) {
+        if (drag.shiftMove) {
+          const bd = g.beatDivRoll || 1;
+          const pxPerDivW = g.plotW / g.viewDivs;
+          let divs = Math.round((drag.origBeat || 0) * bd + (x - drag.startX) / pxPerDivW);
+          divs = Math.max(0, Math.min(g.totalDivs - 1, divs));
+          s.beat = divs / bd;
+          setReadout(`${s.name} · beat ${s.beat.toFixed(2)}`);
+        } else {
+          s.velocity = Math.max(0.05, Math.min(1, drag.orig + (drag.startY - y) / 90)); // ~90px = full range
+          setReadout(`${s.name} · vel ${s.velocity.toFixed(2)}`);
+        }
+        drawRoll(region);
+      }
+      return;
+    }
     const note = drag.note;
     if (drag.mode === "velocity") {
       note.velocity = Math.max(0.05, Math.min(1, drag.orig.velocity + (drag.startY - y) / Math.max(20, g.laneH - 8)));
@@ -5218,6 +5885,18 @@ function wireRoll(v) {
 
   const finishDrag = (commit) => {
     if (!drag) return;
+    if (drag.mode === "perc") {
+      const s = region.percStrikes[drag.si];
+      if (s) {
+        if (!commit || !drag.moved) {
+          s.velocity = drag.orig;                    // click/cancel restores
+          if (drag.origBeat != null) s.beat = drag.origBeat;
+        } else saveArrangement("percussion edit");
+      }
+      drag = null;
+      drawRoll(region);
+      return;
+    }
     const note = drag.note;
     if (!commit || !drag.moved) {
       // Plain click or cancel: restore values, keep the selection.
@@ -5336,13 +6015,12 @@ function harmonicGuideAtPoint(x, y) {
     .map(el => (el.closest ? el.closest(".tl2-gs-row") : null))
     .find(Boolean) || null;
 }
-// A patch-inspector pane tagged as a module drop target (left two panes swap the
-// sub-note, the macro pane swaps the macro). Returns {el, half} or null.
+// A patch-inspector pane tagged as an exact module drop target.
 function patchDropZoneAtPoint(x, y) {
   const el = document.elementsFromPoint(x, y)
     .map(e => (e.closest ? e.closest("[data-patch-drop]") : null))
     .find(Boolean);
-  return el ? { el, half: el.dataset.patchDrop } : null;
+  return el ? { el, part: el.dataset.patchDrop } : null;
 }
 // offsetBeats: how far into the dragged region the cursor grabbed, so the
 // region's START lands at cursor − offset (the grab point stays under the
@@ -5805,6 +6483,10 @@ if (!window._dawKeysInstalled) {
 }
 
 function beginPointerDrag(kind, data, label, e) {
+  // Only the left button drags. A right/middle click here would start a drag
+  // whose mouseup the context menu swallows, leaving the name "ghost" stuck on
+  // screen (owner bug report). Ignore non-primary buttons outright.
+  if (e && typeof e.button === "number" && e.button !== 0) return;
   pointerDrag = { kind, data, label, startX: e.clientX, startY: e.clientY, started: false, ghost: null };
   document.addEventListener("mousemove", pointerDragMove);
   document.addEventListener("mouseup", pointerDragUp);
@@ -5906,12 +6588,12 @@ function pointerDragUp(e) {
   if (drag.kind === "browser") {
     const item = browserItems().find(i => i.id === drag.data);
     if (!item) return;
-    // Dropping onto the patch inspector: the left two panes swap the sub-note,
-    // the macro pane swaps the macro (replaces the old module dropdowns).
+    // Dropping onto the patch inspector extracts only that exact icon/module.
     const dz = patchDropZoneAtPoint(e.clientX, e.clientY);
     if (dz) {
       const subject = editorPatchSubject();
-      if (subject && applyItemToPalettePatch(subject.patch, item, dz.half)) {
+      if (subject && applyItemCapturePart(subject.patch, item, dz.part)) {
+        patchDirty = true;
         if (subject.regionScoped) {
           const voice = producerVoices.get(subject.track.id);
           if (voice?.playing) voice.updateGenerationParams?.(regionPlayParams(subject.track, subject.region));
@@ -5922,13 +6604,24 @@ function pointerDragUp(e) {
       }
       return;
     }
+    const filteredPart = producerBrowserTarget?.kind === "filter" ? producerBrowserTarget.part : null;
+    const exactParts = capturePartList(item.captureParts);
+    const extractedPart = filteredPart || (exactParts.length === 1 ? exactParts[0] : null);
     // A scale-bearing module or complete patch can seed the Harmonic guide
     // directly.  The guide's own overwrite safeguard applies here too.
     if (harmonicGuideAtPoint(e.clientX, e.clientY)) {
-      if (setHarmonicGuideFromParams(item.params, item.name)) renderProduce();
+      if (setHarmonicGuideFromParams(item.params, item.name)) {
+        addModuleToPalette(item, "clef");
+        renderProduce();
+      }
       return;
     }
     if (lane) {
+      if (extractedPart) {
+        addModuleToPalette(item, extractedPart);
+        renderProduce();
+        return;
+      }
       // Straight from the browser onto a track: add to palette, then place
       addToPalette(item);
       const palId = arrangement.palette[arrangement.palette.length - 1].id;
@@ -5940,11 +6633,13 @@ function pointerDragUp(e) {
     const palEl = paletteItemAtPoint(e.clientX, e.clientY);
     const pl = palEl && (arrangement.palette || []).find(x => x.id === palEl.dataset.paletteItem);
     if (pl) {
-      applyItemToPalettePatch(pl, item);
+      if (extractedPart) applyItemCapturePart(pl, item, extractedPart);
+      else applyItemToPalettePatch(pl, item);
       saveArrangement(`load ${item.name} → ${pl.name}`);
       renderProduce();
     } else if (paletteZoneAtPoint(e.clientX, e.clientY)) {
-      addToPalette(item);
+      if (extractedPart) addModuleToPalette(item, extractedPart);
+      else addToPalette(item);
       renderProduce();
     }
   }
@@ -5954,9 +6649,9 @@ function pointerDragUp(e) {
 const DAW_LAYOUT_KEY = "phase0.dawLayout.v1";
 function loadDawLayout() {
   try {
-    return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false, pxPerBeat: 14, snapBeats: 1,
+    return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false, pxPerBeat: 14, snapBeats: 1, paletteMin: true, browserFrac: 0.6,
       ...(JSON.parse(localStorage.getItem(DAW_LAYOUT_KEY) || "{}")) };
-  } catch { return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false, pxPerBeat: 14, snapBeats: 1 }; }
+  } catch { return { leftW: 250, editorH: 240, leftOpen: true, editorOpen: false, pxPerBeat: 14, snapBeats: 1, paletteMin: true, browserFrac: 0.6 }; }
 }
 let dawLayout = null;
 let browserFilter = "all";   // all | starter | instrument | mine | section
@@ -5964,44 +6659,69 @@ let browserSearch = "";
 let browserPreviewId = null; // browser item currently previewing
 function saveDawLayout() { localStorage.setItem(DAW_LAYOUT_KEY, JSON.stringify(dawLayout)); }
 
-// Audit P0: demo arrangement — three starter rigs in overlapping regions,
-// built through the SAME path as by hand (palette → track → region), so
-// undo/inspect/reroll all behave normally afterwards. Shared by the
-// producer's empty-state button and the welcome overlay's Load Demo card.
+function factorySessionById(id) {
+  return FACTORY_SESSIONS.find(session => session.id === id) || null;
+}
+
+// Resolve a declarative factory recipe into an ordinary editable arrangement.
+// The result deliberately has fresh IDs, but all patch sources remain linked
+// to their stable factory IDs for palette provenance and future upgrades.
+function loadFactorySession(id) {
+  const session = factorySessionById(id);
+  if (!session) return false;
+  stopArrangement();
+  synth.stop();
+  const next = freshArrangement(session.name);
+  next.lengthBeats = session.lengthBeats;
+  next.context = { ...defaultArrangementContext(), ...JSON.parse(JSON.stringify(session.context || {})) };
+  next.globalScale = { enabled: true, markers: JSON.parse(JSON.stringify(session.harmonicGuide?.markers || [])) };
+  next.space = {
+    enabled: true, initialised: true,
+    head: { earDistance: 0.175, headDensity: 0.5, reverbType: next.context.reverbType || "room", ...JSON.parse(JSON.stringify(session.space?.head || {})) },
+    tracks: {}, static: {},
+  };
+  for (const spec of session.tracks || []) {
+    const patch = FACTORY_PRESETS.find(preset => preset.id === spec.patchId && preset.section === "full");
+    if (!patch) throw new Error(`Factory session '${session.id}' references missing patch '${spec.patchId}'.`);
+    const sourceId = `factory:${patch.id}`;
+    const params = voiceParamsFor({ section: "full", params: patch.parameters });
+    const paletteId = crypto.randomUUID();
+    next.palette.push({
+      id: paletteId, name: patch.name, kindLabel: "Patch", sourceId, params,
+      parts: { subnote: sourceId, macro: sourceId, subnoteName: patch.name, macroName: patch.name },
+      originTempo: patch.parameters.tempo ?? null,
+      originScale: {
+        scaleMode: patch.parameters.scaleMode, scalePreset: patch.parameters.scalePreset,
+        customDegrees: patch.parameters.customDegrees, edoDivisions: patch.parameters.edoDivisions,
+      },
+    });
+    const trackId = crypto.randomUUID();
+    const track = {
+      id: trackId, name: spec.name || patch.name, sourceKind: "factory", instrumentParams: { ...params },
+      gain: spec.gain ?? 1, pan: spec.pan ?? 0, useGlobalScale: !!spec.useHarmonicGuide,
+      regions: (spec.regions || []).map(r => ({ id: crypto.randomUUID(), paletteId, startBeat: r.startBeat, lengthBeats: r.lengthBeats, seed: r.seed })),
+    };
+    next.tracks.push(track);
+    const points = JSON.parse(JSON.stringify(spec.anchors || []));
+    if (points.length) next.space.tracks[trackId] = points;
+    else if (spec.static) next.space.static[trackId] = { ...spec.static };
+  }
+  arrangement = normaliseArrangement(next);
+  selectedRegions.clear();
+  const firstTrack = arrangement.tracks[0];
+  if (firstTrack?.regions[0]) selectedRegion = { trackId: firstTrack.id, regionId: firstTrack.regions[0].id };
+  _gsOpen = true;
+  _spOpen = true;
+  _spSelTrack = firstTrack?.id || null;
+  saveArrangement(`load factory session: ${session.name}`);
+  return true;
+}
+
+// The original one-click demo now opens the first, fully authored session.
 function loadDemoArrangement() {
   arrangement = arrangement || loadArrangement();
   if (arrangement.tracks.length) return false; // never stomp real work
-  const wanted = ["Wood Talk", "Deep Walker", "Slow Sky"];
-  const picks = wanted
-    .map(n => produceSources().find(s => s.kind === "factory" && s.name === n))
-    .filter(Boolean);
-  if (!picks.length) return false;
-  const layout = [
-    { start: 0, len: 8 * BEATS_PER_BAR },
-    { start: 2 * BEATS_PER_BAR, len: 6 * BEATS_PER_BAR },
-    { start: 4 * BEATS_PER_BAR, len: 4 * BEATS_PER_BAR },
-  ];
-  picks.forEach((src, i) => {
-    addToPalette({ id: src.id, name: src.name, kindLabel: "starter", params: src.parameters, parameters: src.parameters });
-    const pl = arrangement.palette[arrangement.palette.length - 1];
-    arrangement.tracks.push({
-      id: crypto.randomUUID(),
-      name: src.name,
-      sourceKind: src.kind,
-      instrumentParams: { ...src.parameters },
-      gain: 1,
-      regions: [{
-        id: crypto.randomUUID(), paletteId: pl.id,
-        startBeat: layout[i]?.start ?? 0,
-        lengthBeats: layout[i]?.len ?? 4 * BEATS_PER_BAR,
-        seed: newSeed(),
-      }],
-    });
-  });
-  const t0 = arrangement.tracks[arrangement.tracks.length - picks.length];
-  if (t0?.regions[0]) selectedRegion = { trackId: t0.id, regionId: t0.regions[0].id };
-  saveArrangement("demo arrangement");
-  return true;
+  return loadFactorySession(FACTORY_SESSIONS[0]?.id);
 }
 
 function paletteZoneHTML(pl, half, label) {
@@ -6012,104 +6732,138 @@ function paletteZoneHTML(pl, half, label) {
     <span>${filled ? esc(name || "module") : "＋ Add"}</span>
   </button>`;
 }
+// Double-click a palette patch to open it in the lower editor panel (replaces
+// the old ▥ button). State is module-scoped so it survives the re-render a
+// single click triggers.
+let _palLastClickId = null;
+let _palLastClickAt = 0;
+function openPaletteInEditor(id) {
+  const pl = (arrangement.palette || []).find(x => x.id === id);
+  if (!pl) return;
+  palettePreviewId = pl.id;
+  editorMode = "patch";
+  patchDirty = false; patchSaveOpen = false; patchSaveSelection = null; patchSaveSubjectId = pl.id;
+  if (paletteIsPlayable(pl)) {
+    stopArrangement();
+    synth.play({ ...DEFAULTS, ...arrangement.context, ...pl.params, seed: 20260710 });
+  }
+  renderProduce();
+}
+
 function producerPaletteHTML() {
   const items = arrangement.palette || [];
-  if (!items.length) return '<div class="empty-state">Create a patch, then fill its Sub-note and Macro zones from the browser above.</div>';
+  if (!items.length) return '<div class="empty-state">Create a patch, then use its notation icons to route compatible parts from the Browser.</div>';
   return items.map(pl => {
     const playable = paletteIsPlayable(pl);
-    return `<div class="palette-item${palettePreviewId === pl.id ? " selected" : ""}" data-palette-item="${pl.id}" title="Build a patch from its two modules, then drag it to a track.">
-      <div class="pal-top"><span class="pal-name">${esc(paletteDisplayName(pl))}</span><span class="pal-kind">${esc(pl.kindLabel || "Patch")}</span>
+    const parts = capturePartsFor(pl.params, "full", pl.captureParts);
+    const moduleNames = capturePartList(parts).map(part =>
+      `<span class="pal-module-name editable-name" data-pal-module-name="${pl.id}:${part}" title="Double-click to rename ${esc(CAPTURE_PART_LABELS[part])}"><b>${esc(CAPTURE_PART_LABELS[part])}</b>${esc(moduleNameForPatch(pl, part))}</span>`).join("");
+    return `<div class="palette-item${palettePreviewId === pl.id ? " selected" : ""}" data-palette-item="${pl.id}" title="Double-click to open this patch in the editor below. Drag it onto a track to place it.">
+      <div class="pal-top">${notationIconHTML(parts, { compact: true })}<span class="pal-name editable-name" data-palette-name="${pl.id}" title="Double-click to rename">${esc(paletteDisplayName(pl))}</span><span class="pal-kind">${esc(pl.kindLabel || "Patch")}</span>
         <span class="pal-actions">
-          <button class="pal-btn" data-palette-preview="${pl.id}" title="Open this patch in the three-pane editor${playable ? " and preview it" : ""}">▥</button>
           <button class="pal-btn" data-palette-edit="${pl.id}" title="Edit this patch in the Studio">✎</button>
-          <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="Add a track playing this patch">＋ Track</button>
+          <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="${playable ? "Add a track playing this patch" : "Add Sound and Note behaviour before creating a track"}"${playable ? "" : " disabled"}>＋</button>
           <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
         </span>
       </div>
-      <div class="palette-zones">${paletteZoneHTML(pl, "subnote", "Sub-note")}${paletteZoneHTML(pl, "macro", "Macro")}</div>
-      ${playable ? patchBadgesHTML({ ...pl.params, ...(pl.originScale || {}) }, pl.originTempo) : '<span class="pal-draft-note">Add both modules to preview or place this patch.</span>'}
+      ${moduleNames ? `<div class="pal-module-names">${moduleNames}</div>` : ""}
+      ${playable ? "" : '<span class="pal-draft-note">Add sound and note behaviour before placing this patch.</span>'}
     </div>`;
   }).join("");
 }
 
 function renderProduce() {
+  // Route-level safety net: any ordinary navigation back to Producer commits
+  // the Studio edit, even if the user uses browser history or the header link.
+  if (paletteEditState()) {
+    commitPaletteEdit();
+    setPaletteEditState(null);
+  }
   arrangement = arrangement || loadArrangement();
   repairFullPaletteModules();
   dawLayout = dawLayout || loadDawLayout();
   pxPerBeat = dawLayout.pxPerBeat || 14;
   snapBeats = 0.5; // owner 2026-07-09: no snap control — dragging always uses the smallest unit (⌃-drag still frees it)
   const sources = produceSources();
+  const recentSessions = recentArrangements();
   const editorOpen = editorMode === "mixer"
     || (editorMode === "patch" && !!editorPatchSubject())
     || (editorMode === "roll" && !!editorRegion());
+  // Grow the roll editor so a baked region's percussion lanes are visible.
+  const rollPercExtra = editorMode === "roll" ? regionPercH(selectedBakedRegion()) : 0;
   const v = mount(`
     <div class="daw">
       <div class="daw-transport">
         <div class="daw-cluster daw-cluster-arrangement" aria-label="Arrangement">
           <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Studio">←</a>
+          <div class="daw-file-wrap">
+            <button class="btn btn-ghost btn-sm daw-file-button" id="arrFileToggle" aria-expanded="false">File <span>▾</span></button>
+            <div class="daw-file-pop" id="arrFilePop" hidden>
+              <button data-file-action="new"><b>New arrangement</b><span>Start with an empty session</span></button>
+              <button class="danger" data-file-action="delete"><b>Delete arrangement</b><span>Remove the current session</span></button>
+              <div class="daw-file-divider"></div>
+              <div class="daw-file-sub">
+                <button class="daw-file-subtrigger" aria-haspopup="true"><b>Recent</b><span class="daw-file-arrow">▸</span></button>
+                <div class="daw-file-flyout">${recentSessions.map(a => `<button data-file-action="recent:${esc(a.id)}"><b>${esc(a.name || "Untitled")}</b></button>`).join("") || `<div class="daw-file-empty">No recent arrangements</div>`}</div>
+              </div>
+              <div class="daw-file-sub">
+                <button class="daw-file-subtrigger" aria-haspopup="true"><b>Templates</b><span class="daw-file-arrow">▸</span></button>
+                <div class="daw-file-flyout">${FACTORY_SESSIONS.map(session => `<button data-file-action="starter:${esc(session.id)}"><b>${esc(session.name)}</b><span>${esc(session.theme)}</span></button>`).join("")}</div>
+              </div>
+              <div class="daw-file-sub">
+                <button class="daw-file-subtrigger" aria-haspopup="true"><b>Import / Export</b><span class="daw-file-arrow">▸</span></button>
+                <div class="daw-file-flyout"><button data-file-action="wav"><b>Export WAV</b></button><button data-file-action="json-export"><b>Export arrangement</b></button><button data-file-action="json-import"><b>Import arrangement</b></button></div>
+              </div>
+            </div>
+          </div>
           <span class="daw-title">Producer <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></span>
           <span class="daw-arr-name" id="arrName" title="Double-click to rename this arrangement" tabindex="0">${esc(arrangement.name || "Untitled")}</span>
-          <select id="arrSelect" class="daw-ctx-select daw-arr-switch" title="Switch arrangement" aria-label="Switch arrangement">
-            ${Object.values(loadArrangementRegistry()).map(a =>
-              `<option value="${a.id}"${a.id === arrangement.id ? " selected" : ""}>${esc(a.name || "Untitled")}</option>`).join("")}
-          </select>
-          <button class="btn btn-ghost btn-sm" id="arrNew" title="New empty arrangement">New</button>
-          <button class="btn btn-ghost btn-sm" id="arrDelete" title="Delete this arrangement">🗑</button>
         </div>
         <div class="daw-cluster daw-cluster-playback" aria-label="Transport">
           <button class="btn btn-ghost btn-sm" id="arrRTZ" title="Return to bar 1 (Return)">⏮</button>
           <button class="btn btn-primary btn-sm" id="arrPlayBtn" title="Play / pause (Space)">▶</button>
           <button class="btn btn-secondary btn-sm" id="prodStop" title="Stop (returns to the start marker)">■</button>
           <button class="btn btn-ghost btn-sm${arrangement.loopOn ? " loop-on" : ""}" id="arrLoop" title="Cycle the loop range (drag the ruler's top half to set it)">⟳</button>
-          <span class="daw-pos" id="arrPos" title="Position bar.beat — click to locate">${Math.floor(playheadBeat / BEATS_PER_BAR) + 1}.${(Math.floor(playheadBeat) % BEATS_PER_BAR) + 1}</span>
+          <div class="daw-transport-display"><label><span>Bar · beat</span><button class="daw-pos" id="arrPos" title="Position bar.beat — click to locate">${Math.floor(playheadBeat / BEATS_PER_BAR) + 1}.${(Math.floor(playheadBeat) % BEATS_PER_BAR) + 1}</button></label>${sessionBarControlsHTML()}</div>
           <span class="daw-saved" id="arrSaved"></span>
-        </div>
-        <div class="daw-cluster daw-cluster-context" aria-label="Session context">
-          ${sessionBarControlsHTML()}
         </div>
         <div class="daw-cluster daw-cluster-edit" aria-label="Grid and edit">
           <button class="btn btn-ghost btn-sm" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">↩</button>
           <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
           <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
-          <input type="range" id="zoomSlider" min="6" max="32" step="1" value="${pxPerBeat}" title="Zoom (Z = fit arrangement, ⇧Z = fit selection)" class="zoom-slider"/>
         </div>
         <div class="daw-cluster daw-cluster-io" aria-label="File and MIDI">
-          <select id="arrFileMenu" class="daw-ctx-select daw-file-menu" title="Export WAV, export arrangement JSON, or import an arrangement">
-            <option value="">File</option>
-            <option value="wav">Export WAV</option>
-            <option value="json-export">Export arrangement</option>
-            <option value="json-import">Import arrangement</option>
-          </select>
           <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
           ${midiToolbarHTML()}
           <span class="toolbar-hint" id="mixStatus"></span>
         </div>
-        <div class="daw-cluster daw-cluster-region region-toolbar" id="regionToolbar" aria-label="Selected region actions">${produceToolbarHTML()}</div>
       </div>
-      <div class="daw-main">
-        <div class="daw-left${dawLayout.leftOpen ? "" : " collapsed"}" style="width:${dawLayout.leftOpen ? dawLayout.leftW : 22}px">
+      <div class="daw-main" style="grid-template-columns:${dawLayout.leftOpen ? dawLayout.leftW : 22}px 6px 1fr">
+        <div class="daw-left${dawLayout.leftOpen ? "" : " collapsed"}">
           <button class="daw-collapse" id="leftCollapse" title="${dawLayout.leftOpen ? "Collapse" : "Expand"} the library panel">${dawLayout.leftOpen ? "◂" : "▸"}</button>
           <div class="daw-left-content${dawLayout.leftOpen ? "" : " hidden"}">
-            <div class="daw-browser">
+            <div class="daw-browser" style="flex:${dawLayout.browserFrac} 1 0">
               <div class="section-label">Browser</div>
-              <input type="search" id="browserSearch" placeholder="Search presets…" value="${esc(browserSearch)}"/>
-              <div class="browser-filters">
-                ${[["all", "All"], ["starter", "Starters"], ["instrument", "Instruments"], ["mine", "Mine"], ["section", "Sections"]].map(([k, label]) =>
-                  `<button class="filter-chip${browserFilter === k ? " active" : ""}" data-browser-filter="${k}">${label}</button>`).join("")}
-                <select class="splits-filter" data-splits-filter title="Filter presets by number of splits (scale degrees per octave)">
-                  ${[["all", "Any splits"], ["5", "5 splits"], ["6", "6 splits"], ["7", "7 splits"], ["8+", "8+ splits"], ["12", "12 splits"], ["other", "Other"]].map(([k, label]) =>
-                    `<option value="${k}"${splitsFilter === k ? " selected" : ""}>${label}</option>`).join("")}
-                </select>
+              <div class="saem-browser-facets" aria-label="Filter Browser by saved part">
+                <button data-browser-part="all" class="${producerBrowserTarget ? "" : "active"}">All</button>
+                ${CAPTURE_PARTS.map(part => `<button data-browser-part="${part}" class="${producerBrowserTarget?.part === part ? "active" : ""}" title="Show ${CAPTURE_PART_LABELS[part]}">${notationIconHTML([part], { compact: true })}</button>`).join("")}
               </div>
+              <div class="browser-filters">${browserFiltersHTML()}</div>
               <div class="browser-cards" id="browserCards"></div>
             </div>
-            <div class="daw-palette" id="dawPalette">
-              <div class="section-label">Palette <button class="pal-btn" data-palette-new title="Create an empty patch with Sub-note and Macro zones">＋</button></div>
+            <div class="daw-lsplit" id="dawLSplit" title="Drag to resize the Browser and Palette"></div>
+            <div class="daw-palette${dawLayout.paletteMin ? " min" : ""}" id="dawPalette" style="flex:${1 - dawLayout.browserFrac} 1 0">
+              <div class="section-label section-label-row">
+                <button class="pal-collapse pal-info${dawLayout.paletteMin ? "" : " on"}" data-palette-collapse title="${dawLayout.paletteMin ? "Show each patch's details" : "Hide details"}" aria-pressed="${dawLayout.paletteMin ? "false" : "true"}">ⓘ</button>
+                <span class="section-label-title">Palette</span>
+                <button class="pal-btn" data-palette-new title="Create an empty patch and add parts from the Browser">＋</button>
+              </div>
               <div class="palette-rack" id="paletteRack">${producerPaletteHTML()}</div>
             </div>
           </div>
         </div>
         <div class="daw-vsplit" id="dawVSplit" title="Drag to resize the library panel"></div>
+        <div class="daw-cluster daw-cluster-region region-toolbar" id="regionToolbar" aria-label="Selected region actions">${produceToolbarHTML()}</div>
         <div class="daw-center">
           <!-- Owner 07-07: the global strips are a SEPARATE panel — vertical
                timeline scrolling never moves them; horizontal position stays
@@ -6119,7 +6873,7 @@ function renderProduce() {
         </div>
       </div>
       <div class="daw-hsplit${editorOpen ? "" : " hidden"}" id="dawHSplit" title="Drag to resize the editor"></div>
-      <div class="daw-editor${editorOpen ? "" : " collapsed"}" style="height:${editorOpen ? (editorMode === "patch" ? Math.max(dawLayout.editorH, 300) : dawLayout.editorH) : 0}px">
+      <div class="daw-editor${editorOpen ? "" : " collapsed"}" style="height:${editorOpen ? (editorMode === "patch" ? Math.max(dawLayout.editorH, 300) : Math.max(dawLayout.editorH, 300 + rollPercExtra)) : 0}px">
         ${editorOpen ? editorPanelHTML() : ""}
       </div>
       ${editorMode === "mixer" ? "" : `<button class="mixer-toggle" id="mixerToggle" title="Open the channel mixer">▥ Mixer</button>`}
@@ -6136,6 +6890,13 @@ function renderProduce() {
 function wireGlobalScale(v) {
   const gsToggle = v.querySelector("#gsToggle");
   if (gsToggle) gsToggle.onclick = () => { _gsOpen = !_gsOpen; renderProduce(); };
+  const browserRoute = v.querySelector("[data-browser-route-harmonic]");
+  if (browserRoute) browserRoute.onclick = () => {
+    producerBrowserTarget = { kind: "harmonic", part: "clef" };
+    browserFilter = "all";
+    if (dawLayout) { dawLayout.leftOpen = true; saveDawLayout(); }
+    renderProduce();
+  };
   // No enable checkbox — Harmonic guide is active whenever a track's HG is on.
   const hgSearch = v.querySelector("#hgScaleSearch");
   if (hgSearch) hgSearch.oninput = () => {
@@ -6184,6 +6945,8 @@ function wireGlobalScale(v) {
       const seed = _gsScaleAt(atBeat); // continue the scale in force here
       gs.markers.push({
         atBeat,
+        scaleMode: arrangement.context.scaleMode || "12tone",
+        edoDivisions: arrangement.context.edoDivisions || 12,
         degrees: [...(seed.degrees || [])],
         subScaleNotes: [...(seed.subScaleNotes || [])],
         rootNotes: [...(seed.rootNotes || [0])],
@@ -6311,18 +7074,20 @@ function wireProduce(v) {
   // welcome overlay's Load Demo path).
   const demoBtn = v.querySelector("#loadDemo");
   if (demoBtn) demoBtn.onclick = () => { if (loadDemoArrangement()) renderProduce(); };
+  v.querySelectorAll("[data-load-factory-session]").forEach(btn => {
+    btn.onclick = () => { if (loadFactorySession(btn.dataset.loadFactorySession)) renderProduce(); };
+  });
 
   v.querySelectorAll("[data-remove-track]").forEach(btn => {
     btn.onclick = () => {
       const track = arrangement.tracks.find(t => t.id === btn.dataset.removeTrack);
-      // Q9 C: deleting a track with regions is destructive — confirm first
-      if (track && track.regions.length && !confirm(`Remove track "${track.name}" and its ${track.regions.length} region${track.regions.length > 1 ? "s" : ""}?`)) return;
-      arrangement.tracks = arrangement.tracks.filter(t => t.id !== btn.dataset.removeTrack);
-      if (selectedRegion && !arrangement.tracks.some(t => t.id === selectedRegion.trackId)) {
-        selectedRegion = null;
-      }
-      saveArrangement("remove track");
-      renderProduce();
+      const remove = () => {
+        arrangement.tracks = arrangement.tracks.filter(t => t.id !== btn.dataset.removeTrack);
+        if (selectedRegion && !arrangement.tracks.some(t => t.id === selectedRegion.trackId)) selectedRegion = null;
+        saveArrangement("remove track"); renderProduce();
+      };
+      if (track && track.regions.length) showAppDialog({ title: `Remove “${track.name}”?`, message: `This also removes ${track.regions.length} region${track.regions.length > 1 ? "s" : ""}.`, danger: true, confirmLabel: "Remove track", onConfirm: remove });
+      else remove();
     };
   });
 
@@ -6439,10 +7204,16 @@ function wireProduce(v) {
       selectedRegions.clear();
       if (selectedRegion?.regionId !== el.dataset.region) rollNoteSel = -1;
       selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
+      const track = arrangement.tracks.find(t => t.id === el.dataset.track);
+      const region = track?.regions.find(r => r.id === el.dataset.region);
+      palettePreviewId = region?.paletteId || null;
       renderProduce();
     };
     el.ondblclick = () => {
       selectedRegion = { trackId: el.dataset.track, regionId: el.dataset.region };
+      const track = arrangement.tracks.find(t => t.id === el.dataset.track);
+      const region = track?.regions.find(r => r.id === el.dataset.region);
+      palettePreviewId = region?.paletteId || null;
       // Baked → piano roll; generative → the region's layers (owner 2026-07-09).
       const er = editorRegion();
       editorMode = (er && er.region.type === "baked") ? "roll" : "patch";
@@ -6617,7 +7388,7 @@ function wireProduce(v) {
     if (synth.isPlaying) { synth.stop(); }
     else if (region.type === "baked" && Array.isArray(region.notes)) {
       synth.playNotes(regionPlayParams(track, region), region.notes,
-        regionLen(region), region.loopSourceBeats || regionLen(region));
+        regionLen(region), region.loopSourceBeats || regionLen(region), region.percStrikes);
     }
     else { synth.play(regionPlayParams(track, region)); }
     renderProduce();
@@ -6665,6 +7436,7 @@ function wireProduce(v) {
         const db = 20 * Math.log10(Math.max(0.02, startGain)) + (startY - ev.clientY) * 0.15;
         region.gain = clamp(Math.pow(10, db / 20), 0.02, 1.5);
         tag.textContent = `${db >= 0 ? "+" : ""}${db.toFixed(1)}dB`;
+        syncRegionGainDom(track, region);
         if (arrPlay && track) {
           const voice = producerVoices.get(track.id);
           if (voice) voice.setMasterVolume(_trackVol(track.gain, region.gain));
@@ -6730,6 +7502,7 @@ function wireProduce(v) {
     const beatSec = 60 / Math.max(30, ctxP.tempo || 104);
     const params = regionPlayParams(track, region);
     region.notes = synth.captureSpan(params, beatSec * regionLen(region));
+    region.percStrikes = synth.capturePercStrikes(params, region.notes);
     region.type = "baked";
     region.loopSourceBeats = regionLen(region);
     saveArrangement();
@@ -6776,14 +7549,43 @@ function wireProduce(v) {
     };
   });
 
-  // Per-track pan (live on the playing voice)
-  v.querySelectorAll("[data-track-pan]").forEach(sl => {
-    sl.oninput = () => {
-      const track = arrangement.tracks.find(t => t.id === sl.dataset.trackPan);
+  // Per-track spatial target: drag left/right to rotate the track around the
+  // listener, up/down to change its distance (kept deliberately gentle). Moves
+  // the track thread only when the global space is unanchored for that track —
+  // the same rule as the mixer cross-section (anchored tracks snap back).
+  v.querySelectorAll("[data-track-space-dot]").forEach(cv => {
+    const tr0 = arrangement.tracks.find(t => t.id === cv.dataset.trackSpaceDot);
+    if (tr0) drawTrackSpaceDot(cv, tr0);
+    cv.onmousedown = (e) => {
+      e.preventDefault(); e.stopPropagation(); // don't start the head reorder-drag
+      const track = arrangement.tracks.find(t => t.id === cv.dataset.trackSpaceDot);
       if (!track) return;
-      track.pan = Number(sl.value);
-      saveArrangement();
-      producerVoices.get(track.id)?.setPan(track.pan);
+      const sx = e.clientX, sy = e.clientY;
+      const base = { ..._spTrackPos(track, curPlayBeat()) };
+      _threadDrag = { trackId: track.id, pos: { ...base }, moved: false };
+      const move = (ev) => {
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        if (Math.abs(dx) + Math.abs(dy) > 2) _threadDrag.moved = true;
+        let angle = (base.angle ?? 0) + dx * 0.5;                    // ~0.5°/px — gentle
+        angle = ((angle + 180) % 360 + 360) % 360 - 180;
+        const dist = Math.max(SPACE_DMIN, Math.min(SPACE_DMAX, (base.dist ?? 2.5) * Math.exp(-dy * 0.005))); // up = farther
+        _threadDrag.pos = { angle, dist };
+        drawTrackSpaceDot(cv, track);
+      };
+      const up = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        const drag = _threadDrag; _threadDrag = null;
+        if (!drag?.moved) { drawTrackSpaceDot(cv, track); return; }
+        const sp = ensureGlobalSpace();
+        const anchors = sp.tracks[track.id];
+        const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < 0.26);
+        if (a) { a.angle = drag.pos.angle; a.dist = drag.pos.dist; saveArrangement("move space anchor"); renderProduce(); }
+        else if (!anchors || !anchors.length) { sp.static = sp.static || {}; sp.static[track.id] = { ...drag.pos }; saveArrangement("move track in space"); renderProduce(); }
+        else { drawTrackSpaceDot(cv, track); } // anchored elsewhere — snaps back
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
     };
   });
 
@@ -6794,6 +7596,7 @@ function wireProduce(v) {
       if (!track) return;
       track.gain = Number(sl.value);
       saveArrangement();
+      syncTrackGainDom(track);
       producerVoices.get(track.id)?.setMasterVolume(_trackVol(track.gain, 1));
     };
   });
@@ -6881,16 +7684,13 @@ function wireProduce(v) {
     setZoom((dawLayout.pxPerBeat || 14) * factor, { beat: anchorBeat, offsetPx });
   }, { passive: false });
   // Arrangement registry controls (v2.1 U11)
-  const arrSelect = v.querySelector("#arrSelect");
-  if (arrSelect) arrSelect.onchange = () => switchArrangement(arrSelect.value);
-  const arrNew = v.querySelector("#arrNew");
-  if (arrNew) arrNew.onclick = () => {
-    const a = freshArrangement(prompt("Name the new arrangement:") || "Untitled arrangement");
+  const createArrangement = () => showAppDialog({ title: "New arrangement", message: "Choose a name for the new session.", value: "Untitled arrangement", input: true, confirmLabel: "Create", onConfirm: name => {
+    const a = freshArrangement(name || "Untitled arrangement");
     const reg = loadArrangementRegistry();
     reg[a.id] = a;
     saveArrangementRegistry(reg);
     switchArrangement(a.id);
-  };
+  }});
   // Double-click the arrangement title to rename it inline (owner 2026-07-09).
   const arrName = v.querySelector("#arrName");
   if (arrName) arrName.ondblclick = () => {
@@ -6912,16 +7712,14 @@ function wireProduce(v) {
     input.onkeydown = (ev) => { if (ev.key === "Enter") commit(true); if (ev.key === "Escape") commit(false); };
     input.onblur = () => commit(true);
   };
-  const arrDelete = v.querySelector("#arrDelete");
-  if (arrDelete) arrDelete.onclick = () => {
-    if (!confirm(`Delete arrangement "${arrangement.name}"? This cannot be undone.`)) return;
+  const deleteArrangement = () => showAppDialog({ title: "Delete arrangement?", message: `“${arrangement.name}” will be permanently removed.`, danger: true, confirmLabel: "Delete", onConfirm: () => {
     const reg = loadArrangementRegistry();
     delete reg[arrangement.id];
     saveArrangementRegistry(reg);
     const next = Object.keys(reg)[0];
     if (next) switchArrangement(next);
     else { localStorage.removeItem(ARRANGEMENT_CURRENT_KEY); arrangement = null; renderProduce(); }
-  };
+  }});
 
   const undoBtn = v.querySelector("#undoBtn");
   if (undoBtn) undoBtn.onclick = () => undoArrangement();
@@ -6943,17 +7741,13 @@ function wireProduce(v) {
   };
   const posEl = v.querySelector("#arrPos");
   if (posEl) posEl.onclick = () => {
-    const raw = prompt("Go to (bar or bar.beat):", posEl.textContent);
-    if (!raw) return;
-    const [bar, beat] = raw.split(".").map(Number);
-    if (!Number.isFinite(bar)) return;
-    playheadBeat = Math.max(0, Math.min(totalBeats() - 1,
-      (bar - 1) * BEATS_PER_BAR + (Number.isFinite(beat) ? beat - 1 : 0)));
-    updatePlayhead(playheadBeat);
+    showAppDialog({ title: "Go to bar", message: "Enter a bar, or bar.beat position.", value: posEl.textContent, input: true, confirmLabel: "Go", onConfirm: raw => {
+      const [bar, beat] = raw.split(".").map(Number);
+      if (!Number.isFinite(bar)) return;
+      playheadBeat = Math.max(0, Math.min(totalBeats() - 1, (bar - 1) * BEATS_PER_BAR + (Number.isFinite(beat) ? beat - 1 : 0)));
+      updatePlayhead(playheadBeat);
+    }});
   };
-  const zoomSlider = v.querySelector("#zoomSlider");
-  if (zoomSlider) zoomSlider.onchange = () => setZoom(Number(zoomSlider.value));
-
   const addBars = v.querySelector("#addBars");
   if (addBars) addBars.onclick = () => {
     arrangement.lengthBeats = totalBeats() + 8 * BEATS_PER_BAR;
@@ -6991,14 +7785,23 @@ function wireProduce(v) {
     };
   });
 
-  const fileMenu = v.querySelector("#arrFileMenu");
-  if (fileMenu) fileMenu.onchange = () => {
-    const action = fileMenu.value;
-    fileMenu.value = "";
-    if (action === "wav") mixdownArrangement(v.querySelector("#mixStatus"), fileMenu);
+  const fileToggle = v.querySelector("#arrFileToggle");
+  const filePop = v.querySelector("#arrFilePop");
+  if (fileToggle && filePop) {
+    fileToggle.onclick = e => { e.stopPropagation(); const open = filePop.hidden; filePop.hidden = !open; fileToggle.setAttribute("aria-expanded", String(open)); };
+    v.addEventListener("click", e => { if (!e.target.closest?.(".daw-file-wrap")) filePop.hidden = true; });
+  }
+  v.querySelectorAll("[data-file-action]").forEach(item => item.onclick = () => {
+    const action = item.dataset.fileAction;
+    if (filePop) filePop.hidden = true;
+    if (action === "new") { createArrangement(); return; }
+    if (action === "delete") { deleteArrangement(); return; }
+    if (action.startsWith("recent:")) { switchArrangement(action.slice(7)); return; }
+    if (action.startsWith("starter:")) { if (loadFactorySession(action.slice(8))) renderProduce(); return; }
+    if (action === "wav") mixdownArrangement(v.querySelector("#mixStatus"), item);
     if (action === "json-export") exportArrangement();
     if (action === "json-import") v.querySelector("#arrImportFile")?.click();
-  };
+  });
   const mixBtn = v.querySelector("#arrMixdown");
   if (mixBtn) mixBtn.onclick = () => mixdownArrangement(v.querySelector("#mixStatus"), mixBtn);
   const exportBtn = v.querySelector("#arrExport");
@@ -9340,9 +10143,9 @@ function prodFxTagsHTML(id, chain) {
   return list.map(fx => {
     const mod = effectModuleById(fx.type);
     const enabled = fx.enabled !== false;
-    return `<span class="prod-fx-tag${enabled ? "" : " off"}">
-      <button class="prod-fx-name" data-prod-fx-toggle="${id}::${fx.uid}" title="${enabled ? "Bypass" : "Enable"} ${esc(mod ? mod.name : fx.type)}">${esc(mod ? mod.name : fx.type)}</button>
-      <input type="range" class="prod-fx-wet" data-prod-fx-wet="${id}::${fx.uid}" min="0" max="1" step="0.01" value="${fx.wet ?? 1}" title="Wet / dry"/>
+    return `<span class="prod-fx-tag${enabled ? "" : " off"}" style="--wet:${Math.round((fx.wet ?? 1) * 100)}%">
+      <button class="prod-fx-name" data-prod-fx-toggle="${id}::${fx.uid}" title="Double-click to ${enabled ? "bypass" : "enable"} ${esc(mod ? mod.name : fx.type)}">${esc(mod ? mod.name : fx.type)}</button>
+      <label class="prod-fx-mix"><span>dry</span><input type="range" class="prod-fx-wet" data-prod-fx-wet="${id}::${fx.uid}" min="0" max="1" step="0.01" value="${fx.wet ?? 1}" title="Wet / dry"/><span>wet</span></label>
       <button class="prod-fx-x" data-prod-fx-remove="${id}::${fx.uid}" title="Remove">×</button>
     </span>`;
   }).join("");
@@ -9466,7 +10269,7 @@ function bindProducerLayers(v, target = exploreParams, hooks = {}) {
     };
   });
   panel.querySelectorAll("[data-prod-fx-toggle]").forEach(el => {
-    el.onclick = () => {
+    el.ondblclick = () => {
       const { fx } = fxFromKey(el.dataset.prodFxToggle);
       if (!fx) return;
       fx.enabled = fx.enabled === false;
@@ -9478,6 +10281,7 @@ function bindProducerLayers(v, target = exploreParams, hooks = {}) {
       const { fx } = fxFromKey(el.dataset.prodFxWet);
       if (!fx) return;
       fx.wet = parseFloat(el.value);
+      el.closest(".prod-fx-tag")?.style.setProperty("--wet", `${Math.round(fx.wet * 100)}%`);
       applyLive(); applyEffects(); // live
     };
   });
@@ -9949,9 +10753,9 @@ function fxTagsHTML(ownerId, chainSpec, stageOff) {
     ${chain.map(fx => {
       const mod = effectModuleById(fx.type);
       const enabled = fx.enabled !== false;
-      return `<span class="layer-fx-tag${enabled ? "" : " off"}">
-        <button class="layer-fx-name" data-layer-fx-toggle="${ownerId}::${fx.uid}" title="${enabled ? "Bypass" : "Enable"} ${esc(mod ? mod.name : fx.type)}">${esc(mod ? mod.name : fx.type)}</button>
-        <input type="range" class="layer-fx-wet" data-layer-fx-wet="${ownerId}::${fx.uid}" min="0" max="1" step="0.01" value="${fx.wet ?? 1}" title="Wet / dry"/>
+      return `<span class="layer-fx-tag${enabled ? "" : " off"}" style="--wet:${Math.round((fx.wet ?? 1) * 100)}%">
+        <button class="layer-fx-name" data-layer-fx-toggle="${ownerId}::${fx.uid}" title="Double-click to ${enabled ? "bypass" : "enable"} ${esc(mod ? mod.name : fx.type)}">${esc(mod ? mod.name : fx.type)}</button>
+        <label class="layer-fx-mix"><span>dry</span><input type="range" class="layer-fx-wet" data-layer-fx-wet="${ownerId}::${fx.uid}" min="0" max="1" step="0.01" value="${fx.wet ?? 1}" title="Wet / dry"/><span>wet</span></label>
       </span>`;
     }).join("")}
   </div>`;
@@ -10834,6 +11638,32 @@ function slInspectorHTML(p) {
   `;
 }
 
+function slMappingOptionsHTML() {
+  const choice = (group, value, label, detail) => `
+    <label class="sl-map-choice${midiMapping[group] === value ? " active" : ""}">
+      <input type="radio" name="sl-map-${group}" data-sl-map="${group}" value="${value}"${midiMapping[group] === value ? " checked" : ""}/>
+      <span><b>${label}</b><small>${detail}</small></span>
+    </label>`;
+  return `
+    <div class="sl-map-options" aria-label="MIDI keyboard mapping preferences">
+      <fieldset class="sl-map-group">
+        <legend>Keyboard notes</legend>
+        ${choice("keys", "all", "All notes", "White and black keys")}
+        ${choice("keys", "white", "White notes only", "Black keys do nothing")}
+      </fieldset>
+      <fieldset class="sl-map-group">
+        <legend>Playable notes</legend>
+        ${choice("coverage", "packed", "Consecutive", "No gaps between scale notes")}
+        ${choice("coverage", "muted", "Keep divisions", "Out-of-scale divisions are silent")}
+      </fieldset>
+      <fieldset class="sl-map-group">
+        <legend>Next scale degree 1</legend>
+        ${choice("anchor", "octave", "At next available C", "Restart from each C key")}
+        ${choice("anchor", "consecutive", "Immediately after", "Restart on the next mapped key")}
+      </fieldset>
+    </div>`;
+}
+
 function scaleLabWorkspaceHTML(p) {
   const div = _slDivisions(p);
   return `
@@ -10880,8 +11710,11 @@ function scaleLabWorkspaceHTML(p) {
         <div class="sl-right" id="slInspector">${slInspectorHTML(p)}</div>
       </div>
       <div class="sl-keys-wrap">
-        <div class="sl-sec-label">Keyboard mapping — where the scale lands on a piano axis (C3–C6)</div>
-        <canvas id="slKeys" width="1200" height="90" style="width:100%;height:90px"></canvas>
+        <div class="sl-map-heading">
+          <div><div class="sl-sec-label">MIDI keyboard mapping</div><div class="sl-map-note">Saved for you on this browser · loading a scale or preset will not change it</div></div>
+          ${slMappingOptionsHTML()}
+        </div>
+        <canvas id="slKeys" width="1200" height="104" style="width:100%;height:104px" aria-label="Preview of MIDI notes mapped from C3 through B5"></canvas>
       </div>
     </div>`;
 }
@@ -14418,7 +15251,7 @@ function wireLayerStrip(v) {
     return chain ? { chain, fx: chain.find(f => f.uid === uid) } : { chain: null, fx: null };
   };
   v.querySelectorAll("[data-layer-fx-toggle]").forEach(el => {
-    el.onclick = () => {
+    el.ondblclick = () => {
       const { fx } = fxTagEntry(el.dataset.layerFxToggle);
       if (!fx) return;
       fx.enabled = fx.enabled === false;
@@ -14432,6 +15265,7 @@ function wireLayerStrip(v) {
       const { fx } = fxTagEntry(el.dataset.layerFxWet);
       if (!fx) return;
       fx.wet = parseFloat(el.value);
+      el.closest(".layer-fx-tag")?.style.setProperty("--wet", `${Math.round(fx.wet * 100)}%`);
       applyLive();
       synth.updateEffects(exploreParams); // live, no rebuild
     };
@@ -14485,11 +15319,11 @@ function stageSourceList(p) {
   }
 
   const list = [{
-    id: "base", num: "B", label: "Base", hue: 36,
+    id: "base", num: "1", label: "Layer 1", hue: 36,
     angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5,
   }];
   (p.layers || []).forEach((l, i) => list.push({
-    id: l.id, num: String(i + 1), label: `Layer ${i + 1}`,
+    id: l.id, num: String(i + 2), label: `Layer ${i + 2}`,
     hue: l.hue ?? (36 + i * 70) % 360,
     angle: l.space?.angle ?? (p.spaceAzimuth ?? 0),
     dist: l.space?.dist ?? (p.spaceDistance ?? 2.5),
@@ -15834,48 +16668,20 @@ function paletteEditBannerHTML() {
   if (!state) return "";
   return `
     <div class="card palette-edit-banner">
-      <span>Editing palette instrument <strong>${esc(state.name)}</strong> — tweak the sound, then:</span>
+      <span>Editing palette patch <strong>${esc(state.name)}</strong> · changes apply automatically</span>
       <span class="peb-actions">
-        <button class="btn btn-primary btn-sm" id="palSave" title="Update the instrument — every region using it follows">Save to palette</button>
-        <button class="btn btn-secondary btn-sm" id="palSaveCopy" title="Keep the original and add this as a new palette instrument">Save as copy</button>
-        <button class="btn btn-ghost btn-sm" id="palDiscard">Discard</button>
+        <a class="btn btn-primary btn-sm" id="palBackProducer" href="#produce" title="Apply the current patch and return to its arrangement">← Back to Producer</a>
       </span>
     </div>`;
 }
 
 function wirePaletteEditBanner(v) {
-  const state = paletteEditState();
-  if (!state) return;
-  const done = () => {
-    setPaletteEditState(null);
-    synth.stop();
-    navigate("produce");
-  };
-  const save = v.querySelector("#palSave");
-  if (save) save.onclick = () => {
-    arrangement = arrangement || loadArrangement();
-    const pl = (arrangement.palette || []).find(x => x.id === state.paletteId);
-    if (pl) {
-      pl.params = extractInstrumentParams(exploreParams);
-      saveArrangement();
-    }
-    done();
-  };
-  const copy = v.querySelector("#palSaveCopy");
-  if (copy) copy.onclick = () => {
-    arrangement = arrangement || loadArrangement();
-    arrangement.palette = arrangement.palette || [];
-    arrangement.palette.push({
-      id: crypto.randomUUID(),
-      name: `${state.name} copy`,
-      kindLabel: "Edited",
-      params: extractInstrumentParams(exploreParams),
-    });
-    saveArrangement();
-    done();
-  };
-  const discard = v.querySelector("#palDiscard");
-  if (discard) discard.onclick = done;
+  // Both return controls are ordinary links. renderProduce() owns the commit,
+  // which also covers browser Back/Forward and direct #produce navigation.
+  if (!paletteEditState()) return;
+  v.querySelectorAll("#palBackProducer, .producer-pill").forEach(link => {
+    link.addEventListener("click", () => synth.stop(), { once: true });
+  });
 }
 
 function welcomeCardHTML() {
