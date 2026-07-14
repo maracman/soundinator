@@ -28,6 +28,7 @@ import {
   spaceProximityDb,
   SPECTRAL_PROFILES,
   GenerationEngine,
+  layerMixPlan,
 } from "../web/static/synth.js";
 
 let failures = 0;
@@ -36,6 +37,21 @@ const check = (name, cond, detail = "") => {
   else { failures++; console.error(`FAIL  ${name}${detail ? " — " + detail : ""}`); }
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+console.log("Sub-note base layer mixing");
+{
+  const layers = [{ id: "a", solo: false }, { id: "b", solo: true }];
+  const normal = layerMixPlan({ baseLayerGain: 0.6 }, layers.map(l => ({ ...l, solo: false })));
+  check("base level is preserved in the mix plan", normal.baseAudible && normal.baseGain === 0.6);
+  check("without solos every captured layer plays", normal.layers.length === 2);
+  const capturedSolo = layerMixPlan({ baseLayerSolo: false }, layers);
+  check("captured-layer solo silences base", !capturedSolo.baseAudible && capturedSolo.layers.length === 1 && capturedSolo.layers[0].id === "b");
+  const baseSolo = layerMixPlan({ baseLayerSolo: true }, layers.map(l => ({ ...l, solo: false })));
+  check("base solo silences unsoloed captured layers", baseSolo.baseAudible && baseSolo.layers.length === 0);
+  const additiveSolo = layerMixPlan({ baseLayerSolo: true }, layers);
+  check("base and captured solos combine", additiveSolo.baseAudible && additiveSolo.layers.length === 1);
+  check("zero base level silences base", !layerMixPlan({ baseLayerGain: 0 }, []).baseAudible);
+}
 
 console.log("T-B3: stiff-string inharmonicity law");
 {

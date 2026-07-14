@@ -61,6 +61,7 @@ def test_phase0_server_render_and_global_library(tmp_path) -> None:
     (tmp_path / "web" / "static").mkdir(parents=True)
     (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")
     server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.experiments = True  # legacy library now lives behind RESONA_EXPERIMENTS
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     host, port = server.server_address
@@ -214,6 +215,171 @@ def test_post_rate_limit(tmp_path) -> None:
         except urllib.error.HTTPError as exc:
             raised = True
             assert exc.code == 429
+        assert raised
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def _static(tmp_path) -> None:
+    (tmp_path / "web" / "static").mkdir(parents=True)
+    (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")
+    (tmp_path / "web" / "static" / "login.html").write_text("login", encoding="utf-8")
+
+
+def _start(server):
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    host, port = server.server_address
+    return f"http://{host}:{port}"
+
+
+def _post_raw(url: str, payload: dict, cookie: str = ""):
+    headers = {"Content-Type": "application/json"}
+    if cookie:
+        headers["Cookie"] = cookie
+    request = urllib.request.Request(
+        url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
+    )
+    try:
+        resp = urllib.request.urlopen(request, timeout=20)
+        return resp.status, json.loads(resp.read().decode("utf-8")), resp
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read().decode("utf-8")), exc
+
+
+def test_feedback_endpoint_appends_report_and_screenshot(tmp_path) -> None:
+    _static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    base = _start(server)
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 24
+    try:
+        import base64 as b64
+        status, body, _ = _post_raw(f"{base}/api/feedback", {
+            "description": "The drum editor froze after undo.",
+            "category": "bug",
+            "route": "#produce",
+            "app_version": "test-1.0",
+            "errors": ["TypeError: x is undefined (app.js:12)"],
+            "image_base64": b64.b64encode(png).decode(),
+        })
+        assert status == 201 and body["ok"] is True
+
+        # Missing description is rejected.
+        assert _post_raw(f"{base}/api/feedback", {"description": ""})[0] == 400
+        # Garbage screenshot is rejected.
+        assert _post_raw(f"{base}/api/feedback", {
+            "description": "x", "image_base64": b64.b64encode(b"notanimage").decode(),
+        })[0] == 400
+
+        lines = (tmp_path / "web" / "data" / "feedback.jsonl").read_text().splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["description"].startswith("The drum editor froze")
+        assert record["errors"] == ["TypeError: x is undefined (app.js:12)"]
+        shot = tmp_path / "web" / "data" / "feedback_shots" / record["screenshot"]
+        assert shot.read_bytes() == png
+
+        # Feedback rides the admin export like every other table.
+        server.admin_token = "sekrit"
+        with urllib.request.urlopen(f"{base}/api/export.csv?table=feedback&token=sekrit") as resp:
+            csv_text = resp.read().decode("utf-8")
+        assert "The drum editor froze" in csv_text
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_security_headers_on_html_and_json(tmp_path) -> None:
+    _static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    base = _start(server)
+    try:
+        with urllib.request.urlopen(f"{base}/") as resp:
+            assert "default-src 'self'" in resp.headers["Content-Security-Policy"]
+            assert resp.headers["X-Frame-Options"] == "DENY"
+            assert resp.headers["X-Content-Type-Options"] == "nosniff"
+            assert resp.headers["Referrer-Policy"] == "same-origin"
+        with urllib.request.urlopen(f"{base}/api/health") as resp:
+            assert resp.headers["X-Content-Type-Options"] == "nosniff"
+            assert resp.headers.get("Content-Security-Policy") is None
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_login_backoff_blocks_after_repeated_failures(tmp_path) -> None:
+    _static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.accounts.register(
+        "carol@x.com", "correct-horse", invite_code=None, require_invite=False
+    )
+    base = _start(server)
+    try:
+        for _ in range(5):
+            status, body, _ = _post_raw(f"{base}/api/auth/login",
+                                        {"email": "carol@x.com", "password": "wrong"})
+            assert status == 401
+        # Sixth attempt is refused outright — even with the right password.
+        status, body, _ = _post_raw(f"{base}/api/auth/login",
+                                    {"email": "carol@x.com", "password": "correct-horse"})
+        assert status == 429
+        # A different account on the same IP is unaffected.
+        server.accounts.register(
+            "dave@x.com", "password1", invite_code=None, require_invite=False
+        )
+        assert _post_raw(f"{base}/api/auth/login",
+                         {"email": "dave@x.com", "password": "password1"})[0] == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_session_tokens_stored_hashed(tmp_path) -> None:
+    _static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.open_signup = True
+    base = _start(server)
+    try:
+        status, body, resp = _post_raw(f"{base}/api/auth/register",
+                                       {"email": "erin@x.com", "password": "password1"})
+        assert status == 201
+        cookie = resp.headers["Set-Cookie"].split(";", 1)[0]
+        raw_token = cookie.split("=", 1)[1]
+
+        import sqlite3
+        conn = sqlite3.connect(tmp_path / "web" / "data" / "accounts.db")
+        stored = [r[0] for r in conn.execute("SELECT token FROM sessions")]
+        conn.close()
+        assert len(stored) == 1
+        assert stored[0] != raw_token          # never the bearer token itself
+        assert len(stored[0]) == 64            # sha256 hex digest
+        # ...and the cookie still authenticates.
+        request = urllib.request.Request(f"{base}/api/patches", headers={"Cookie": cookie})
+        with urllib.request.urlopen(request, timeout=20) as r:
+            assert json.loads(r.read())["patches"] == []
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_locked_deployment_keeps_landing_public(tmp_path) -> None:
+    _static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.auth_required = True
+    base = _start(server)
+    try:
+        # The app shell and login page load without a session...
+        with urllib.request.urlopen(f"{base}/") as resp:
+            assert resp.status == 200
+        with urllib.request.urlopen(f"{base}/login") as resp:
+            assert resp.status == 200
+        # ...but data APIs stay gated.
+        try:
+            urllib.request.urlopen(f"{base}/api/patches")
+            raised = False
+        except urllib.error.HTTPError as exc:
+            raised = True
+            assert exc.code == 401
         assert raised
     finally:
         server.shutdown()

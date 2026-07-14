@@ -80,11 +80,11 @@ def test_ratings_and_stimuli_tables(tmp_path) -> None:
     assert by_id["def456"]["param_tempo"] == 120
 
 
-def test_export_all_writes_five_tables(tmp_path) -> None:
+def test_export_all_writes_every_table(tmp_path) -> None:
     data_dir = _write_events(tmp_path, [EVENT])
     out = tmp_path / "exports"
     written = export_all(data_dir, out)
-    assert set(written) == {"events", "ratings", "stimuli", "study_trials", "presets"}
+    assert set(written) == {"events", "ratings", "stimuli", "study_trials", "presets", "feedback"}
     for path in written.values():
         assert path.exists()
 

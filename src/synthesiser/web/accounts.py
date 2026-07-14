@@ -62,6 +62,12 @@ def hash_password(password: str, *, iterations: int = PBKDF2_ITERATIONS) -> str:
     return f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
 
 
+def hash_session_token(token: str) -> str:
+    """Sessions are stored as SHA-256 digests so a copied database file never
+    contains a usable bearer token; the raw token lives only in the cookie."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def verify_password(password: str, encoded: str) -> bool:
     try:
         algorithm, iter_s, salt_hex, hash_hex = encoded.split("$", 3)
@@ -317,7 +323,7 @@ class AccountStore:
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-                (token, user_id, now, now + ttl_days * 86400),
+                (hash_session_token(token), user_id, now, now + ttl_days * 86400),
             )
         return token
 
@@ -329,7 +335,7 @@ class AccountStore:
             row = conn.execute(
                 "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id"
                 " WHERE s.token = ? AND s.expires_at > ?",
-                (token, now),
+                (hash_session_token(token), now),
             ).fetchone()
         return self._user_public(row)
 
@@ -337,7 +343,7 @@ class AccountStore:
         if not token:
             return
         with self._connect() as conn:
-            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            conn.execute("DELETE FROM sessions WHERE token = ?", (hash_session_token(token),))
 
     def purge_expired_sessions(self) -> int:
         with self._connect() as conn:

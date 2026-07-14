@@ -2518,8 +2518,19 @@ body.explore-mode #app {
   padding: 0 6px;
   background: transparent;
   border-right: 1px solid rgba(49,69,86,0.35);
-  overflow: hidden;
+  /* Must stay visible: the account dropdown hangs below this 46px strip.
+     Width pressure is handled by letting the title/pill shrink instead. */
+  overflow: visible;
   min-width: 0;
+}
+
+.explore-top .explore-title { min-width: 0; }
+/* The pill never shrinks — the title's version tail truncates first
+   (the handle is actionable; the build number is not). */
+.explore-top .account-bar { flex-shrink: 0; }
+.explore-top .acct-pill.signin {
+  display: block; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .explore-top h1 {
@@ -3176,6 +3187,30 @@ body.explore-mode #app {
   border-color: rgba(245,166,35,0.5);
   box-shadow: inset 0 0 0 1px rgba(245,166,35,0.22);
 }
+
+/* Lanes ⇄ Roll reads as ONE segmented switch (exactly one side is always on);
+   Spec reads as an independent on/off toggle with an indicator dot — it
+   underlays the chosen view rather than replacing it. */
+.vis-seg { display: inline-flex; }
+.vis-seg .vis-mode-btn { border-radius: 0; }
+.vis-seg .vis-mode-btn:first-child { border-radius: 3px 0 0 3px; }
+.vis-seg .vis-mode-btn:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
+.vis-spec-toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 17px; padding: 1px 7px 1px 5px;
+  border: 1px dashed #2f4050; border-radius: 999px; background: #101216;
+  color: #8f9baa; font-size: 0.5rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase; cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.vis-spec-dot { width: 6px; height: 6px; border-radius: 50%; background: #2f4050;
+  transition: background 0.15s, box-shadow 0.15s; }
+.vis-spec-toggle:hover { color: #c3cedb; border-color: #3d5366; }
+.vis-spec-toggle.active { color: var(--accent2, #f5a623);
+  border-color: rgba(245,166,35,0.5); border-style: solid; }
+.vis-spec-toggle.active .vis-spec-dot { background: var(--accent2, #f5a623);
+  box-shadow: 0 0 6px rgba(245,166,35,0.7); }
+.m2-chips .vis-spec-toggle { margin-left: 4px; }
 
 .visualiser-wrap {
   border: 0;
@@ -4013,6 +4048,12 @@ body.explore-mode #app {
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
   white-space: nowrap;
   flex-shrink: 0;
+  /* When the column is tight the version tail truncates; the brand never
+     scrolls off-screen (the old overflow:hidden header could be shoved
+     left by click-focus on the account pill). */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ─ Workspace tabs ─ */
@@ -4804,27 +4845,47 @@ body.explore-mode #app {
   gap: 0.7rem;
 }
 
-/* Tiny four-bar "waveform in a tile" logo, pure CSS */
-.welcome-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #f5a623, #e8632a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  flex-shrink: 0;
-}
-.welcome-logo i {
-  width: 3px;
-  border-radius: 2px;
-  background: rgba(12, 10, 6, 0.85);
-}
-.welcome-logo i:nth-child(1) { height: 10px; }
-.welcome-logo i:nth-child(2) { height: 18px; }
-.welcome-logo i:nth-child(3) { height: 13px; }
-.welcome-logo i:nth-child(4) { height: 7px; }
+/* The Soundinator marks: the street organ, themed to the UI's ink. The wide
+   lockup goes where there's horizontal room; the square icon fits corners. */
+.app-mark-bg { fill: var(--display); stroke: var(--text2); stroke-linecap: round; stroke-linejoin: round; }
+.app-mark-art { fill: var(--surface2); stroke: var(--text2); stroke-linecap: round; stroke-linejoin: round; }
+.app-mark-detail { fill: none; stroke: var(--text2); stroke-linecap: round; stroke-linejoin: round; }
+.app-mark-fill { fill: var(--text2); }
+.app-icon .app-mark-bg, .app-icon .app-mark-art { stroke-width: 24; }
+.app-icon .app-mark-detail { stroke-width: 14; }
+.app-logo .app-mark-bg, .app-logo .app-mark-art { stroke-width: 6; }
+.app-logo .app-mark-detail { stroke-width: 3; }
+.app-icon { width: 26px; height: 26px; flex: none; vertical-align: middle; overflow: visible; }
+.app-icon.sm { width: 20px; height: 20px; }
+.app-logo { width: 86px; height: 30px; flex: none; vertical-align: middle; overflow: visible; }
+.app-logo.lg { width: 126px; height: 44px; }
+/* The wordmark rows centre everything on one line — mark, name, build tag,
+   and the account pill all share a baseline (owner 2026-07-15). */
+.explore-top { align-items: center; }
+.explore-title { min-width: 0; flex: 1 1 auto; }
+/* The header column is user-resizable and often narrow: the brand name and
+   the account pill's name BOTH shrink, so neither vanishes outright. */
+.explore-top .account-bar { flex: 0 1 auto; min-width: 0; }
+.explore-top .account-bar .acct-pill { min-width: 0; max-width: 100%; }
+.explore-top .account-bar .acct-name { flex: 0 1 auto; min-width: 2ch; }
+.explore-title h1 { display: flex; align-items: center; gap: 8px; margin: 0; white-space: nowrap; min-width: 0; }
+/* The wordmark takes a rounded face wherever it sits beside the machine
+   marks — matching the artwork's fat round line-caps. */
+:root { --brand-font: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Quicksand", "Comfortaa", var(--font); }
+.explore-title .app-name { overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  font-family: var(--brand-font); font-weight: 800; letter-spacing: .02em; }
+.welcome-hero h2 { font-family: var(--brand-font); font-weight: 800; letter-spacing: .02em; }
+.auth-modal header h3 { font-family: var(--brand-font); font-weight: 800; letter-spacing: .02em; }
+.landing-header h1 { font-family: var(--brand-font); font-weight: 800; letter-spacing: .02em; }
+.explore-title .build-tag { flex: none; }
+/* The header column is user-resizable, so the wordmark responds to the
+   COLUMN's width, not the window's: full lockup when roomy, then the build
+   tag yields, then the name — the machine logo alone carries the brand in a
+   tight corner. */
+.explore-top { container-type: inline-size; }
+@container (max-width: 560px) { .explore-title .build-tag { display: none; } }
+@container (max-width: 400px) { .explore-title .app-name { display: none; } }
+.daw-title { display: inline-flex; align-items: center; gap: 7px; }
 
 .welcome-rule {
   position: relative;
@@ -5762,23 +5823,8 @@ body.explore-mode #app {
   height: 10px;
   border-radius: 3px;
   flex: none;
-  cursor: pointer;
 }
 .tl2-db { font-size: 0.55rem; color: var(--text3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tl2-space-pop {
-  position: absolute;
-  left: 4px;
-  top: 100%;
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.35rem 0.45rem;
-  background: var(--surface2);
-  border: 1px solid var(--border2);
-  border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-}
 .tl2-head { position: relative; }
 .tl2-band {
   position: fixed;
@@ -5820,14 +5866,15 @@ body.explore-mode #app {
    tour runs; only the tooltip card is interactive. The dim comes from the
    ring's giant box-shadow, which never captures clicks. */
 #studioTour { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
-#studioTour .tour-ring {
+#audTour { position: fixed; inset: 0; z-index: 5300; pointer-events: none; }
+#studioTour .tour-ring, #audTour .tour-ring {
   position: fixed;
   border: 2px solid var(--accent);
   border-radius: 10px;
   box-shadow: 0 0 0 200vmax rgba(4, 6, 10, 0.55), 0 0 18px rgba(245, 166, 35, 0.35);
   transition: all 0.25s ease;
 }
-#studioTour .tour-pop {
+#studioTour .tour-pop, #audTour .tour-pop {
   position: fixed;
   width: min(330px, calc(100vw - 24px));
   pointer-events: auto;
@@ -5838,7 +5885,7 @@ body.explore-mode #app {
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
   transition: left 0.25s ease, top 0.25s ease;
 }
-#studioTour .tour-pop p {
+#studioTour .tour-pop p, #audTour .tour-pop p {
   font-size: 0.78rem;
   color: var(--text2);
   line-height: 1.5;
@@ -6136,7 +6183,6 @@ body.explore-mode #app {
 .tl2-head-top { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
 .tl2-head-ctl { display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
 .tl2-head-ctl .tl-gain { flex: 1 1 40px; min-width: 24px; }
-.tl2-head-ctl .tl-pan { flex: 1 1 30px; min-width: 20px; }
 .tl2-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .tl2-corner { background: transparent; border: none; overflow: visible; }
 .tl2-addbars {
@@ -6355,7 +6401,7 @@ body.dragging { cursor: grabbing; user-select: none; }
   padding: 0.1rem 0.3rem;
 }
 
-/* ── Loop ticks + pan (v2.1 U9, U10) ─────────────────────── */
+/* ── Loop ticks + spatial target (v2.1 U9, U10) ─────────── */
 
 .tl2-looptick {
   position: absolute;
@@ -6377,7 +6423,6 @@ body.dragging { cursor: grabbing; user-select: none; }
   z-index: 1;
 }
 
-.tl2-head .tl-pan { width: 34px; height: 3px; flex: none; }
 /* Compact spatial target that replaces the old L/R pan slider. */
 .tl2-head .tl-space-dot {
   width: 26px; height: 26px; flex: none;
@@ -6389,6 +6434,35 @@ body.dragging { cursor: grabbing; user-select: none; }
 }
 .tl2-head .tl-space-dot:hover { border-color: rgba(90,104,124,0.9); }
 .tl2-head .tl-space-dot:active { cursor: grabbing; }
+
+/* One compact spatial target everywhere a source can be placed. The dot is
+   angle + physical distance together; the text is a readout, not a second
+   control. */
+.space-target-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text3);
+  font: 0.56rem/1.15 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.compact-space-target {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(58,66,80,0.65);
+  background: rgba(10,14,20,0.5);
+  cursor: grab;
+  touch-action: none;
+}
+.compact-space-target:hover { border-color: rgba(104,124,148,0.95); }
+.compact-space-target:active { cursor: grabbing; }
+.patch-space-target { margin-right: 2px; }
+.layer-space-target { flex: 0 0 auto; }
+.layer-space-target > span { display: none; }
 
 /* ── Region gain (v2.1 U12) ──────────────────────────────── */
 
@@ -7268,7 +7342,10 @@ body.dragging { cursor: grabbing; user-select: none; }
 }
 .perc-lyr-remove { margin-left: auto; }
 .perc-lyr-sound { display: flex; min-width: 0; }
-.perc-lyr-ctls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* One line per hit: position pad + volume (+ every/pitch) share the row. */
+.perc-lyr-ctls { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.perc-lyr-ctls .sp-ctl { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.perc-lyr-ctls .sp-ctl input[type="range"] { flex: 1; min-width: 28px; width: auto; }
 .perc-add {
   align-self: flex-start; background: rgba(14, 18, 24, 0.7); border: 1px dashed var(--border2);
   border-radius: 7px; color: var(--text2); font: inherit; font-size: 0.72rem; font-weight: 600;
@@ -8131,8 +8208,7 @@ body.dragging { cursor: grabbing; user-select: none; }
   background: hsla(var(--track-h, 36), 72%, 45%, 0.16);
 }
 
-.tl2-head .tl-gain,
-.tl2-head .tl-pan {
+.tl2-head .tl-gain {
   height: 12px;
   min-width: 34px;
 }
@@ -8981,7 +9057,10 @@ body.explore-mode .view {
   align-items: center;
   gap: 9px;
   padding: 0 8px;
-  overflow: hidden;
+  /* Visible, not hidden: the account dropdown hangs below this strip and
+     was being clipped to a 4px sliver. The title truncates via its own
+     overflow instead. */
+  overflow: visible;
   background: linear-gradient(180deg, rgba(15,22,31,0.84), rgba(7,11,17,0.66));
   border: 1px solid rgba(58,75,92,0.72);
   border-radius: 7px;
@@ -9497,8 +9576,7 @@ body.explore-mode .view {
   font-size: 0.54rem;
 }
 
-.timeline-grid .tl2-head .tl-gain,
-.timeline-grid .tl2-head .tl-pan {
+.timeline-grid .tl2-head .tl-gain {
   height: 3px;
 }
 
@@ -10178,30 +10256,40 @@ body.explore-mode .view {
   .patch-save-pop { position:fixed; left:10px; right:10px; top:auto; bottom:10px; width:auto; }
 }
 
-/* ─── Account bar, invite gate & cloud patches (server-side profiles) ─── */
-#accountBar { position: fixed; top: 10px; right: 12px; z-index: 4000; font-family: var(--font); }
-#accountBar .acct-pill { display:inline-flex; align-items:center; gap:7px; padding:6px 11px;
+/* ─── Account control: embedded in each view's top panel ─── */
+.account-bar { position:relative; display:inline-flex; align-items:center; flex:none;
+  margin-left:auto; font-family: var(--font); }
+.account-bar .acct-pill { display:inline-flex; align-items:center; gap:7px; padding:5px 11px;
   background: var(--surface); border:1px solid var(--border2); border-radius: 999px;
-  color: var(--text); font-size:.82rem; font-weight:600; cursor:pointer; line-height:1;
-  box-shadow: 0 6px 18px rgba(0,0,0,.32); }
-#accountBar .acct-pill:hover { border-color: var(--accent); }
-#accountBar .acct-dot { width:7px; height:7px; border-radius:50%; background: var(--green); }
-#accountBar .acct-pill.signin { color: var(--text2); font-weight:500; }
-#accountBar .acct-menu { position:absolute; top:40px; right:0; min-width:180px; background: var(--surface);
-  border:1px solid var(--border2); border-radius: var(--radius); padding:6px;
+  color: var(--text); font-size:.82rem; font-weight:600; cursor:pointer; line-height:1; }
+.account-bar .acct-pill:hover { border-color: var(--accent); }
+.account-bar .acct-pill:focus { outline: none; }
+.account-bar .acct-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.account-bar .acct-dot { width:7px; height:7px; border-radius:50%; background: var(--green); flex:none; }
+.account-bar .acct-avatar { width:22px; height:22px; border-radius:50%; object-fit:cover;
+  margin:-2px 0 -2px -5px; flex:none; }
+.account-bar .acct-avatar.none { display:none; }
+.account-bar .acct-avatar:not(.none) + .acct-dot { display:none; }
+.account-bar .acct-name { max-width:14ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.account-bar .acct-pill.signin { color: var(--text2); font-weight:500; }
+.account-bar .acct-pill.signin.primary { background: var(--accent); color:#000; border-color: var(--accent); font-weight:700; }
+.account-bar .acct-pill.signin.primary:hover { filter:brightness(1.08); }
+.account-bar .acct-menu { position:absolute; top:calc(100% + 6px); right:0; min-width:180px; z-index:4000;
+  background: var(--surface); border:1px solid var(--border2); border-radius: var(--radius); padding:6px;
   box-shadow: 0 14px 40px rgba(0,0,0,.5); }
-#accountBar .acct-menu[hidden] { display:none; }
-#accountBar .acct-who { padding:7px 9px 9px; border-bottom:1px solid var(--border); margin-bottom:5px; }
-#accountBar .acct-who b { display:block; font-size:.85rem; color:var(--text); }
-#accountBar .acct-who span { font-size:.72rem; color:var(--text3); }
-#accountBar .acct-menu button { display:block; width:100%; text-align:left; padding:8px 9px;
+.account-bar .acct-menu[hidden] { display:none; }
+.account-bar .acct-who { padding:7px 9px 9px; border-bottom:1px solid var(--border); margin-bottom:5px; }
+.account-bar .acct-who b { display:block; font-size:.85rem; color:var(--text); }
+.account-bar .acct-who span { font-size:.72rem; color:var(--text3); }
+.account-bar .acct-menu button { display:block; width:100%; text-align:left; padding:8px 9px;
   background:none; border:none; color: var(--text2); font-family:inherit; font-size:.83rem;
   border-radius: var(--radius-sm); cursor:pointer; }
-#accountBar .acct-menu button:hover { background: var(--surface2); color: var(--text); }
-
-/* Keep the fixed profile control in a dedicated header lane. */
-.explore-mode .daw-transport { padding-right: 158px; }
-.explore-mode .explore-top { padding-right: 158px; }
+.account-bar .acct-menu button:hover { background: var(--surface2); color: var(--text); }
+.explore-top { display:flex; align-items:flex-start; }
+.landing-header { position:relative; }
+.landing-acct { position:absolute; top:14px; right:16px; }
+.profile-back { display:flex; align-items:center; }
+.daw-transport .account-bar { margin-left:auto; }
 
 /* App-owned dialogs and Producer file menu. */
 .app-dialog-overlay { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(4,7,11,.72); backdrop-filter:blur(5px); }
@@ -10264,3 +10352,661 @@ body.explore-mode .view {
 .cloud-list .c-act:hover { color:var(--text); border-color:var(--accent); }
 .cloud-list .c-act.danger:hover { color:var(--red); border-color:var(--red); }
 .cloud-empty { padding:22px 18px; color: var(--text3); font-size:.86rem; text-align:center; }
+
+/* ─── Auth overlay (in-app create profile / log in) ─── */
+.auth-modal { max-width:400px; }
+.auth-modal header h3 { display:flex; align-items:center; gap:8px; }
+.auth-tabs { display:flex; gap:4px; margin:14px 18px 0; padding:4px; background: var(--display);
+  border:1px solid var(--border); border-radius: var(--radius-sm); }
+.auth-tabs button { flex:1; padding:8px 0; background:none; border:none; border-radius:5px;
+  color: var(--text3); font-family:inherit; font-size:.84rem; font-weight:600; cursor:pointer; }
+.auth-tabs button.active { background: var(--surface2); color: var(--text); }
+.auth-tabs button:hover { color: var(--text); }
+.auth-reason { margin:12px 18px 0; padding:9px 11px; background: var(--surface2); border:1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text2); font-size:.8rem; }
+.auth-form { display:flex; flex-direction:column; gap:11px; padding:16px 18px 6px; }
+.auth-form label { display:flex; flex-direction:column; gap:5px; color: var(--text2); font-size:.78rem; font-weight:600; }
+.auth-form input { padding:9px 10px; border:1px solid var(--border2); border-radius:7px;
+  background: var(--display); color: var(--text); font:inherit; }
+.auth-form input:focus { border-color: var(--accent); outline:none; }
+.auth-hint { color: var(--text3); font-size:.72rem; font-weight:400; margin:0; }
+.auth-form .auth-hint b { color: var(--text2); }
+.auth-error { padding:8px 10px; background: color-mix(in srgb, var(--red) 14%, var(--surface));
+  border:1px solid var(--red); border-radius: var(--radius-sm); color: var(--text); font-size:.78rem; }
+.auth-error[hidden] { display:none; }
+.auth-form button.primary { margin-top:4px; padding:10px 12px; border-radius: var(--radius-sm);
+  border:1px solid var(--accent); background: var(--accent); color:#000; font-family:inherit;
+  font-size:.86rem; font-weight:700; cursor:pointer; }
+.auth-form button.primary:hover { filter:brightness(1.08); }
+.auth-switch { display:block; width:100%; padding:12px 18px 16px; background:none; border:none;
+  color: var(--text3); font-family:inherit; font-size:.78rem; cursor:pointer; text-align:center; }
+.auth-switch:hover { color: var(--accent); }
+.auth-form textarea { padding:9px 10px; border:1px solid var(--border2); border-radius:7px;
+  background: var(--display); color: var(--text); font:inherit; resize:vertical; }
+.save-share-row { flex-direction:row !important; align-items:center; gap:8px !important;
+  color: var(--text2); font-size:.82rem; cursor:pointer; }
+.top-save-btn { white-space:nowrap; }
+.auth-form textarea:focus { border-color: var(--accent); outline:none; }
+
+/* ─── Community: context menu, stars, browser tier ─── */
+.ctx-menu { position:fixed; z-index:5200; min-width:190px; margin:0; padding:5px; list-style:none;
+  background: var(--surface); border:1px solid var(--border2); border-radius:9px;
+  box-shadow: 0 18px 55px rgba(0,0,0,.58); }
+.ctx-menu li { margin:0; padding:0; }
+.ctx-menu button { display:block; width:100%; padding:8px 10px; background:none; border:none;
+  border-radius:5px; color: var(--text2); font-family:inherit; font-size:.8rem; text-align:left; cursor:pointer; }
+.ctx-menu button:hover { background: var(--surface2); color: var(--text); }
+.ctx-menu button.danger:hover { color: var(--red); }
+
+.br-author { display:block; color: var(--text3); font-size:.64rem; font-weight:400; }
+.browser-row .br-author { margin-top:1px; }
+
+.stars { display:inline-flex; align-items:center; gap:1px; color: var(--text3); font-size:.85rem; line-height:1; }
+.stars .star { color: var(--border2); cursor:default; }
+.stars .star.on { color: var(--accent); }
+.stars.editable .star { cursor:pointer; transition: transform .1s ease, color .12s ease; }
+/* Fill left→right up to the hovered star (`:has(~ :hover)` = earlier siblings). */
+.stars.editable .star:hover, .stars.editable .star:has(~ .star:hover) { color: var(--accent2); }
+.stars.editable .star:hover { transform: scale(1.25); }
+.stars.editable .star:active { transform: scale(1.45); }
+.stars .stars-label { margin-left:6px; color: var(--text3); font-size:.68rem; }
+.rate-modal .rate-body { padding:14px 18px 20px; display:flex; flex-direction:column; gap:12px; }
+.rate-modal .stars { font-size:1.5rem; gap:5px; }
+
+/* ─── Community browser overlay ─── */
+.pal-btn.community-open { width:auto; padding:2px 9px; font-size:.66rem; letter-spacing:.04em;
+  border:1px solid color-mix(in srgb, var(--accent) 45%, var(--border2)); border-radius:999px;
+  color: var(--accent2); transition: background .15s ease, color .15s ease; }
+.pal-btn.community-open:hover { background: var(--accent); color:#000; }
+.cmty-modal { max-width:1080px; width:94vw; height:86vh; max-height:86vh; display:flex; flex-direction:column; overflow:hidden; }
+.cmty-modal header { flex:none; gap:14px; }
+.cmty-tabs { display:flex; gap:4px; margin-right:auto; margin-left:10px; }
+.cmty-tabs button { padding:6px 12px; background:none; border:1px solid transparent; border-radius:999px;
+  color: var(--text3); font-family:inherit; font-size:.8rem; font-weight:600; cursor:pointer; }
+.cmty-tabs button:hover { color: var(--text); }
+.cmty-tabs button.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+.cmty-controls { flex:none; display:flex; align-items:center; gap:8px; padding:10px 18px;
+  border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.cmty-controls input[type="search"] { flex:1; min-width:180px; padding:8px 11px; border:1px solid var(--border2);
+  border-radius:999px; background: var(--display); color: var(--text); font:inherit; font-size:.84rem; }
+.cmty-controls input[type="search"]:focus { border-color: var(--accent); outline:none; }
+.cmty-byuser { display:flex; align-items:center; gap:5px; color: var(--text3); font-size:.75rem; white-space:nowrap; }
+.cmty-controls select { padding:7px 9px; border:1px solid var(--border2); border-radius:7px;
+  background: var(--surface2); color: var(--text2); font:inherit; font-size:.76rem; }
+.cmty-results { flex:1; overflow:auto; padding:14px 18px; }
+.cmty-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px; }
+.cmty-card { display:flex; flex-direction:column; gap:6px; padding:11px 12px; background: var(--surface2);
+  border:1px solid var(--border); border-radius:9px; cursor:grab;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.cmty-card:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border2));
+  transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.32); }
+.cmty-card:active { cursor:grabbing; transform: translateY(0); }
+.cmty-card-head { display:flex; align-items:flex-start; gap:8px; }
+.cmty-card-title { flex:1; min-width:0; }
+.cmty-card-title b { display:block; font-size:.85rem; color: var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cmty-author { background:none; border:none; padding:0; color: var(--text3); font-family:inherit; font-size:.7rem; cursor:pointer; }
+.cmty-author:hover { color: var(--accent); text-decoration:underline; }
+.cmty-author.big { font-size:.88rem; color: var(--text); font-weight:600; text-align:left; }
+.cmty-author.big span { color: var(--text3); font-weight:400; font-size:.74rem; }
+.cmty-kind { color: var(--text3); font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
+.cmty-desc { margin:0; color: var(--text2); font-size:.74rem; line-height:1.4; }
+.cmty-tags { display:flex; flex-wrap:wrap; gap:4px; }
+.cmty-tag { padding:2px 8px; background: var(--display); border:1px solid var(--border); border-radius:999px;
+  color: var(--text3); font-family:inherit; font-size:.66rem; cursor:pointer; }
+.cmty-tag:hover { color: var(--accent); border-color: var(--accent); }
+.cmty-card-foot { display:flex; align-items:center; gap:7px; margin-top:auto; }
+.cmty-spacer { flex:1; }
+.cmty-add { padding:4px 10px; border:1px solid var(--border2); border-radius:999px; background: var(--surface);
+  color: var(--text2); font-family:inherit; font-size:.72rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+.cmty-add:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.cmty-add.added { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, var(--border2)); cursor:default; }
+.cmty-yours { color: var(--text3); font-size:.68rem; font-style:italic; }
+.cmty-empty { display:flex; flex-direction:column; align-items:center; gap:12px;
+  padding:40px 20px; color: var(--text3); font-size:.86rem; text-align:center; }
+.cmty-empty .aud-mini-svg { width:64px; height:64px; opacity:.6; }
+.cmty-empty .aud-mini-svg .icon-art { fill:none; stroke: var(--text3); }
+.cmty-empty .aud-mini-svg .icon-fill { fill: var(--text3); }
+
+/* Loading: shimmer skeleton cards instead of a bare "Loading…". */
+@keyframes cmty-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.cmty-skel { height:118px; border-radius:9px; border:1px solid var(--border);
+  background: linear-gradient(100deg, var(--surface2) 40%, color-mix(in srgb, var(--border2) 45%, var(--surface2)) 50%, var(--surface2) 60%);
+  background-size: 200% 100%; animation: cmty-shimmer 1.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .cmty-skel { animation:none; } }
+
+.cmty-toplist { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:2px;
+  counter-reset: cmty-rank; }
+.cmty-toplist li { display:flex; align-items:baseline; gap:12px; padding:10px 8px;
+  border-bottom:1px solid var(--border); counter-increment: cmty-rank; }
+.cmty-toplist li::before { content: counter(cmty-rank); flex:none; width:26px; height:26px;
+  display:inline-flex; align-items:center; justify-content:center; align-self:center;
+  border-radius:50%; border:1px solid var(--border2); color: var(--text3);
+  font-size:.74rem; font-weight:700; font-family: var(--mono); }
+.cmty-toplist li:nth-child(1)::before { border-color: var(--accent); color: var(--accent); }
+.cmty-toplist li:nth-child(2)::before, .cmty-toplist li:nth-child(3)::before {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border2)); color: var(--text2); }
+.cmty-topscore { color: var(--accent); font-size:.8rem; font-weight:700; white-space:nowrap; }
+.cmty-topitems { color: var(--text3); font-size:.72rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ─── Auditioner: the interactive machine overhanging the strip ─── */
+.cmty-auditioner { flex:none; position:relative; display:flex; flex-direction:column;
+  padding:7px 18px 8px; border-top:1px solid var(--border2);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--surface)), var(--surface)); }
+.aud-bar { flex:none; display:flex; align-items:center; gap:8px; min-height:40px; }
+/* Let the last cards scroll clear of the machine standing over the results. */
+.cmty-results { padding-bottom:170px; }
+.aud-title { color: var(--text3); font-size:.62rem; font-weight:700; letter-spacing:.12em; white-space:nowrap; }
+.aud-btn { padding:4px 11px; border:1px solid var(--border2); border-radius:999px; background: var(--surface2);
+  color: var(--text2); font-family:inherit; font-size:.72rem; font-weight:600; cursor:pointer; }
+.aud-btn:hover { border-color: var(--accent); color: var(--text); }
+.aud-btn.primary { background: var(--accent); border-color: var(--accent); color:#000; }
+
+/* The contraption: Marcus's ink-line street organ, standing ON the strip and
+   overhanging the results above it. The wrapper is aspect-locked to the
+   980×172 viewBox. It ignores pointer events except on the machine's own
+   interactive parts, so cards behind its empty air stay clickable. */
+.aud-machine { position:absolute; bottom:calc(100% - 1px); left:24px; z-index:6;
+  height:150px; aspect-ratio: 980 / 172; max-width:calc(100% - 48px);
+  pointer-events:none;
+  --aud-ink: #d9dce2;            /* line work on the dark stage */
+  --aud-paper: #2b2417;          /* warm body fill when a part is inked in */
+  --aud-ink-on: #f2c56b;         /* brass ink for awake parts */
+}
+/* A pool of shadow under the machine: a plain dark gradient that drops the
+   contrast of whatever sits behind it, so the contraption reads as the
+   foreground object. No blur. */
+.aud-machine::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  inset: -38px -74px -10px;
+  background:
+    radial-gradient(ellipse 58% 40% at 50% 90%, color-mix(in srgb, var(--accent) 7%, transparent) 0%, transparent 68%),
+    radial-gradient(ellipse 76% 82% at 50% 72%, rgba(4, 5, 8, .88) 0%, rgba(4, 5, 8, .62) 50%, transparent 76%);
+}
+.aud-svg { display:block; width:100%; height:100%; overflow:visible; }
+.aud-svg .aud-part { pointer-events:auto; }
+/* The dim ink for empty/sleeping parts: the greyed-out DARK look, but built
+   from solid colours — fully opaque, nothing shows through the machine. */
+.aud-machine { --aud-ink-dim: color-mix(in srgb, #d9dce2 30%, #181b21); }
+.aud-svg .aud-hit { cursor:pointer; }
+.aud-svg #audDial { cursor:grab; }
+.aud-svg #audDial:active { cursor:grabbing; }
+.aud-svg .aud-hit-ns { cursor:ns-resize; }
+.aud-svg #audCrankHit { cursor:grab; }
+.aud-svg .aud-tick { fill: var(--aud-ink); stroke:none; font: 700 7px var(--mono); letter-spacing:.06em; }
+.aud-svg .aud-tick.num { font-size: 11px; }
+.aud-svg .aud-tick.sep { font-size: 9px; opacity:.6; }
+.aud-part.on .aud-tick { fill: var(--aud-ink-on); }
+/* Drum rig states (extra .aud-svg specificity so they beat the .on brass on
+   a loaded engine):
+   no-perc — the engine simply has no percussion: greyed out and asleep.
+   muted   — percussion exists but was clicked off: stays brass, mallet stills. */
+.aud-part.no-perc .anim-mallet, .aud-part.no-perc .anim-cymbal,
+.aud-part.muted .anim-mallet, .aud-part.muted .anim-cymbal { animation-play-state:paused !important; }
+.aud-svg .aud-part.no-perc .line-art { stroke: var(--aud-ink-dim); fill: var(--surface2); }
+.aud-svg .aud-part.no-perc .detail { stroke: var(--aud-ink-dim); }
+.aud-svg .aud-part.no-perc .filled { fill: var(--aud-ink-dim); }
+.aud-svg .aud-part.no-perc .bg-fill { fill: var(--display); }
+/* (Fast-forward speed is driven via the Web Animations API playbackRate —
+   see rampMachineRate() — so the crank eases up and coasts back down.) */
+.aud-svg .line-art { fill: var(--surface2); stroke: var(--aud-ink-dim); stroke-width:3;
+  stroke-linecap:round; stroke-linejoin:round; }
+.aud-svg .detail { fill:none; stroke: var(--aud-ink-dim); stroke-width:1.5;
+  stroke-linecap:round; stroke-linejoin:round; }
+.aud-svg .filled { fill: var(--aud-ink-dim); }
+.aud-svg .bg-fill { fill: var(--display); }
+.aud-svg .aud-hub { fill: var(--aud-ink-dim); }
+
+/* Always opaque: empty parts sit in dim dark ink; a loaded slot turns its
+   parts brass. (The highlight is the state signal, never transparency.) */
+.aud-part { opacity:1; }
+.aud-part.on .line-art { stroke: var(--aud-ink-on); fill: var(--aud-paper); }
+.aud-part.on .detail { stroke: var(--aud-ink-on); }
+.aud-part.on .filled { fill: var(--aud-ink-on); }
+.aud-part.on .bg-fill { fill: color-mix(in srgb, var(--aud-paper) 55%, var(--display)); }
+.aud-part.on .aud-hub { fill: var(--aud-ink-on); }
+.aud-part.drop-target { opacity:1; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 60%, transparent)); }
+.aud-part.drop-target .line-art, .aud-part.drop-target .detail { stroke: var(--accent); }
+.aud-part.drop-target .filled { fill: var(--accent); }
+
+/* The two slot wells riding the toolbar: SYNTH and NOTE ENGINE. */
+.aud-well { flex:1; min-width:0; display:flex; align-items:center; gap:6px; padding:4px 10px;
+  border:1px dashed var(--border2); border-radius:999px; background: var(--display); }
+.aud-well-label { flex:none; color: var(--text3); font-size:.56rem; font-weight:700; letter-spacing:.1em; }
+.aud-well-hint { color: var(--text3); font-size:.68rem; font-style:italic; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.aud-well b { font-size:.7rem; color: var(--text); max-width:18ch; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.aud-well .cmty-author { font-size:.62rem; }
+.aud-well.on { border-style:solid; border-color: color-mix(in srgb, var(--accent) 45%, var(--border2));
+  background: color-mix(in srgb, var(--accent) 7%, var(--display)); }
+.aud-well.drop-target { border-color: var(--accent); border-style:solid; }
+
+/* Every moving piece carries its animation PAUSED. It runs only when its own
+   module is loaded (.on) and the machine is playing — parts stall until the
+   relevant module drives them. Speeds come from the loaded music via the
+   --crank-dur/--roll-dur/--spin-dur/--lever-dur/--tap-dur vars set inline. */
+@keyframes audg-spin { to { transform: rotate(360deg); } }
+@keyframes audg-waggle { 0%, 100% { transform: rotate(-25deg); } 50% { transform: rotate(25deg); } }
+@keyframes audg-tap { 0%, 100% { transform: rotate(-25deg); } 45% { transform: rotate(0deg); } 60% { transform: rotate(-25deg); } }
+@keyframes audg-shiver { 0%, 9%, 31%, 100% { transform: rotate(0deg); } 12%, 24% { transform: rotate(5deg); } 18%, 30% { transform: rotate(-5deg); } }
+@keyframes audg-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+@keyframes audg-scroll1 { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -20; } }
+@keyframes audg-scroll2 { from { stroke-dashoffset: -3; } to { stroke-dashoffset: -23; } }
+@keyframes audg-scroll3 { from { stroke-dashoffset: -7; } to { stroke-dashoffset: -27; } }
+@keyframes audg-comb { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes audg-steam1 { 0% { transform: translateY(0) scale(.5); opacity: 0; } 20% { transform: translateY(-10px) scale(1); opacity: .7; } 100% { transform: translateY(-40px) scale(1.5); opacity: 0; } }
+@keyframes audg-steam2 { 0% { transform: translateY(0) scale(.5); opacity: 0; } 30% { transform: translateY(-15px) scale(1); opacity: .7; } 100% { transform: translateY(-45px) scale(1.5); opacity: 0; } }
+@keyframes audg-steam3 { 0% { transform: translateY(0) scale(.5); opacity: 0; } 10% { transform: translateY(-8px) scale(1); opacity: .7; } 100% { transform: translateY(-38px) scale(1.5); opacity: 0; } }
+@keyframes audg-steam4 { 0% { transform: translateY(0) scale(.5); opacity: 0; } 25% { transform: translateY(-12px) scale(1); opacity: .7; } 100% { transform: translateY(-42px) scale(1.5); opacity: 0; } }
+
+.aud-svg .anim-crank   { transform-origin: 65px 100px;  animation: audg-spin var(--crank-dur, 2s) linear infinite paused; }
+.aud-svg .anim-spinner { transform-origin: 240px 105px; animation: audg-spin var(--spin-dur, 4s) linear infinite paused; }
+.aud-svg .anim-lever   { transform-origin: 360px 130px; animation: audg-waggle var(--lever-dur, 2.5s) ease-in-out infinite paused; }
+.aud-svg .anim-mallet  { transform-origin: 750px 140px; animation: audg-tap var(--tap-dur, 1.2s) ease-in-out infinite paused; }
+.aud-svg .anim-cymbal  { transform-origin: 840px 20px;  animation: audg-shiver var(--tap-dur, 1.2s) linear infinite paused; }
+.aud-svg .anim-gear-fwd { transform-origin: 200px 35px; animation: audg-spin var(--roll-dur, 2s) linear infinite paused; }
+.aud-svg .anim-gear-rev { transform-origin: 360px 35px; animation: audg-spin var(--roll-dur, 2s) linear infinite reverse paused; }
+.aud-svg .anim-horn    { transform-origin: 460px 105px; animation: audg-pulse .8s ease-in-out infinite paused; }
+.aud-svg .anim-roll-1  { stroke-dasharray: 4 6; animation: audg-scroll1 var(--roll-dur, 1s) linear infinite paused; }
+.aud-svg .anim-roll-2  { stroke-dasharray: 6 4; animation: audg-scroll2 var(--roll-dur, 1s) linear infinite paused; }
+.aud-svg .anim-roll-3  { stroke-dasharray: 3 7; animation: audg-scroll3 var(--roll-dur, 1s) linear infinite paused; }
+.aud-svg .anim-comb    { animation: audg-comb 1.4s ease-in-out infinite paused; }
+/* Reverb off = the pipes fall silent: no shimmer, no steam. */
+.aud-svg .anim-comb.muted { animation-play-state: paused !important; }
+/* Steam: invisible while the machine is stalled (opacity lives entirely in
+   the keyframes), puffing from the pipes only when the sound module plays. */
+.aud-svg .steam-bubble { fill: var(--text2); stroke: var(--aud-ink); stroke-width:.5;
+  opacity:0; animation: audg-steam1 2s linear infinite paused; }
+.aud-part.on .steam-bubble { fill: var(--text); }
+.aud-machine.playing .aud-part.on .anim-crank, .aud-machine.playing .aud-part.on .anim-spinner,
+.aud-machine.playing .aud-part.on .anim-lever, .aud-machine.playing .aud-part.on .anim-mallet,
+.aud-machine.playing .aud-part.on .anim-cymbal, .aud-machine.playing .aud-part.on .anim-gear-fwd,
+.aud-machine.playing .aud-part.on .anim-gear-rev, .aud-machine.playing .aud-part.on .anim-horn,
+.aud-machine.playing .aud-part.on .anim-roll-1, .aud-machine.playing .aud-part.on .anim-roll-2,
+.aud-machine.playing .aud-part.on .anim-roll-3, .aud-machine.playing .aud-part.on .anim-comb,
+.aud-machine.playing .aud-part.on .steam-bubble {
+  animation-play-state: running; }
+@media (prefers-reduced-motion: reduce) {
+  .aud-svg [class*="anim-"], .aud-svg .steam-bubble { animation: none !important; }
+}
+
+.aud-occ-stars { color: var(--accent); font-size:.62rem; }
+.aud-occ-x { background:none; border:none; color: var(--text3); font-size:.8rem; cursor:pointer; padding:0 1px; line-height:1; }
+.aud-occ-x:hover { color: var(--red); }
+
+/* Minimised: the strip folds away into a floating machine button. */
+.cmty-modal { position:relative; }
+.cmty-auditioner.min { height:auto; padding:0; border-top:none; background:none; }
+.aud-fab { position:absolute; right:16px; bottom:14px; z-index:6; width:42px; height:42px;
+  border-radius:50%; border:1px solid var(--border2); background: var(--surface2);
+  box-shadow: 0 6px 20px rgba(0,0,0,.45); cursor:pointer; padding:6px;
+  display:flex; align-items:center; justify-content:center; }
+.aud-fab:hover { border-color: var(--accent); }
+/* The minimise button wears the same little machine, smaller still. */
+.aud-btn.aud-btn-icon { display:inline-flex; align-items:center; justify-content:center;
+  width:30px; padding:3px 5px; }
+.aud-btn.aud-btn-icon .aud-mini-svg { width:20px; height:16px; }
+.aud-btn.aud-btn-icon .icon-art { fill:none; stroke: var(--text2); }
+.aud-btn.aud-btn-icon:hover .icon-art { stroke: var(--accent); }
+.aud-btn.aud-btn-icon:hover .icon-fill { fill: var(--accent); }
+.aud-mini-svg { width:100%; height:100%; overflow:visible; }
+.aud-mini-svg .icon-art { fill: var(--surface); stroke: var(--text2); stroke-width:6;
+  stroke-linecap:round; stroke-linejoin:round; }
+.aud-mini-svg .icon-fill { fill: var(--text2); }
+.aud-fab:hover .aud-mini-svg .icon-art { stroke: var(--accent); }
+.aud-fab:hover .aud-mini-svg .icon-fill { fill: var(--accent); }
+.aud-fab.playing .aud-mini-svg .icon-art { stroke: var(--accent); }
+.aud-fab-count { position:absolute; top:-4px; right:-4px; min-width:16px; height:16px; padding:0 3px;
+  border-radius:999px; background: var(--accent); color:#000; font-size:.58rem; font-weight:700;
+  display:flex; align-items:center; justify-content:center; }
+@keyframes aud-fab-pulse { 0%,100% { box-shadow: 0 8px 26px rgba(0,0,0,.45), 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  50% { box-shadow: 0 8px 26px rgba(0,0,0,.45), 0 0 0 9px transparent; } }
+.aud-fab.playing { border-color: var(--accent); animation: aud-fab-pulse 1.6s ease-out infinite; }
+
+/* Minimise/restore: the machine tucks itself into the corner button and
+   unfolds back out of it. */
+@keyframes aud-tuck { to { transform: translate(38%, 65%) scale(.05); opacity: 0; } }
+.aud-machine.closing { animation: aud-tuck .24s ease-in forwards; transform-origin: 92% 100%; pointer-events:none; }
+@keyframes aud-bar-fade { to { opacity: 0; } }
+.aud-bar.closing { animation: aud-bar-fade .2s ease-in forwards; pointer-events:none; }
+/* Expanding: the machine rolls in from the right (no scaling), while the
+   shadow pool fades up from the bottom on its own — it never rides the
+   machine's movement. */
+@keyframes aud-roll-in { from { transform: translateX(16%); opacity: 0; }
+  60% { opacity: 1; } to { transform: none; opacity: 1; } }
+.aud-machine.unfold .aud-svg { animation: aud-roll-in .34s cubic-bezier(.2, .75, .3, 1.04); }
+@keyframes aud-grad-rise { from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; } }
+.aud-machine.unfold::before { animation: aud-grad-rise .45s ease-out; }
+@keyframes aud-fab-pop { from { transform: scale(.25); opacity: 0; }
+  70% { transform: scale(1.14); opacity: 1; } to { transform: scale(1); opacity: 1; } }
+.aud-fab.pop { animation: aud-fab-pop .26s ease-out; }
+.aud-fab.pop.playing { animation: aud-fab-pop .26s ease-out, aud-fab-pulse 1.6s ease-out .3s infinite; }
+@keyframes aud-fab-close { to { transform: scale(.25); opacity: 0; } }
+.aud-fab.closing { animation: aud-fab-close .15s ease-in forwards !important; pointer-events:none; }
+@media (prefers-reduced-motion: reduce) {
+  .aud-fab.playing, .aud-fab.pop, .aud-fab.closing,
+  .aud-machine.closing, .aud-machine.unfold .aud-svg,
+  .aud-machine.unfold::before, .aud-bar.closing { animation:none !important; }
+}
+@media (max-width:900px) { .aud-machine { height:110px; } .aud-well-hint { display:none; } }
+
+/* View-level share buttons (synth / engine / composition). */
+.share-view-btn { padding:5px 12px; border:1px solid color-mix(in srgb, var(--accent) 45%, var(--border2));
+  border-radius:999px; background:none; color: var(--accent2); font-family:inherit; font-size:.72rem;
+  font-weight:600; cursor:pointer; white-space:nowrap; transition: background .15s ease, color .15s ease; }
+.share-view-btn:hover { background: var(--accent); color:#000; }
+
+/* ─── Profile pages ─── */
+.profile-page { max-width:920px; margin:0 auto; padding:26px 22px 60px; }
+.profile-back { margin-bottom:14px; }
+.profile-header { display:flex; align-items:flex-start; gap:20px; padding:20px;
+  background: var(--surface); border:1px solid var(--border2); border-radius:12px; margin-bottom:26px; }
+.profile-avatar { flex:none; width:96px; height:96px; border-radius:50%; overflow:hidden;
+  background: var(--surface2); border:1px solid var(--border2);
+  display:flex; align-items:center; justify-content:center; }
+.profile-avatar img { width:100%; height:100%; object-fit:cover; }
+.profile-avatar span { font-size:2.2rem; font-weight:700; color: var(--text3); }
+.profile-id { flex:1; min-width:0; }
+.profile-id h1 { margin:0; font-size:1.5rem; }
+.profile-handle { color: var(--text3); font-size:.86rem; }
+.profile-bio { margin:9px 0 0; color: var(--text2); font-size:.9rem; line-height:1.5; max-width:52ch; }
+.profile-stats { display:flex; gap:16px; margin-top:12px; color: var(--text3); font-size:.76rem; }
+.profile-stats b { color: var(--text); }
+.profile-actions { display:flex; flex-direction:column; gap:8px; align-items:stretch; }
+/* Avatar picker inside the Edit profile form. */
+.prof-edit-avatar { display:flex; align-items:center; gap:12px; }
+.profile-avatar.sm { width:52px; height:52px; }
+.profile-avatar.sm span { font-size:1.2rem; }
+.prof-edit-avatar-btn { cursor:pointer; white-space:nowrap; }
+.profile-page section { margin-bottom:30px; }
+.profile-page section h2 { font-size:.82rem; text-transform:uppercase; letter-spacing:.1em;
+  color: var(--text3); margin:0 0 12px; }
+
+.comp-row { display:flex; align-items:center; gap:13px; padding:12px 14px; margin-bottom:8px;
+  background: var(--surface); border:1px solid var(--border); border-radius:10px; }
+.comp-play { flex:none; width:42px; height:42px; border-radius:50%; border:1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent);
+  font-size:1rem; cursor:pointer; }
+.comp-play:hover { background: var(--accent); color:#000; }
+.comp-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.comp-head { display:flex; align-items:center; gap:12px; }
+.comp-head b { font-size:.92rem; color: var(--text); }
+.comp-progress { height:5px; border-radius:999px; background: var(--display); overflow:hidden; }
+.comp-progress-fill { height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--accent2)); }
+.comp-time { flex:none; color: var(--text3); font-size:.72rem; font-family: var(--mono); }
+.cmty-tag.edit { border-style:dashed; }
+
+/* Space stage: percussion is view-only here — this toggles its emphasis. */
+.sp-showperc { position:absolute; left:10px; bottom:8px; display:flex; align-items:center; gap:5px;
+  color: var(--text3); font-size:.68rem; cursor:pointer; user-select:none; }
+.sp-showperc:hover { color: var(--text2); }
+.stage-pos { position:relative; }
+/* Per-hit position pad in the percussion panel rows. */
+.perc-lyr-ctls .layer-minipad { flex:none; cursor:grab; }
+.perc-lyr-ctls .layer-minipad:active { cursor:grabbing; }
+/* Composition rows span the whole grid inside the community overlay. */
+.cmty-grid .comp-row { grid-column: 1 / -1; margin-bottom:0; }
+.comp-head .cmty-author { margin-right:auto; }
+@media (max-width:640px) { .profile-header { flex-direction:column; } }
+
+/* ═══ Unified top bar (audit 2026-07-14) ══════════════════════════════════
+   One structural grammar for every view's top strip, left to right:
+   brand · view nav · (space) · transport · (space) · utilities · primary
+   action · account. The Explore bar (.tb-explore) and the Producer bar
+   (.daw-transport.tb-producer) share the surface, the round transport
+   language, a gold primary at the right edge, and the account pill LAST —
+   the welcome copy sends people to the top-right for their profile.
+   Appended at the end of the sheet so it wins the earlier era layers. */
+
+/* One control height governs the whole bar so the row reads as a single
+   even band (round audit found five different heights: 24/26/32/34/36). */
+.app-topbar {
+  --tb-h: 32px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 0 10px;
+  background: linear-gradient(180deg, rgba(15,22,31,0.84), rgba(7,11,17,0.66));
+  border: 1px solid rgba(58,75,92,0.72);
+  border-radius: 7px;
+  /* The account + File dropdowns hang below the strip — never clip them. */
+  overflow: visible;
+}
+/* Nothing in the bar shrinks or wraps — the round audit's core bug was the
+   Producer control wrapping to two lines and the seed value truncating to
+   "10". Width pressure is handled by hiding labels (progressive disclosure
+   below), never by squeezing a control. */
+.app-topbar > * { flex: none; min-width: 0; }
+.tb-explore { grid-column: 1 / -1; grid-row: 1; }
+.tb-spacer { flex: 1 1 0 !important; min-width: 8px; }
+
+/* Icons: one 24-grid SVG language, sized by context, inheriting text colour. */
+.tb-ico { width: 16px; height: 16px; display: block; flex: none; pointer-events: none; }
+.tb-ico.acct-caret { width: 13px; height: 13px; opacity: 0.66; margin-left: 1px; }
+
+.tb-brand { display: inline-flex; align-items: center; gap: 7px; margin: 0; min-width: 0; flex: none; font-size: 0.72rem; white-space: nowrap; }
+.tb-home { display: inline-flex; align-items: center; gap: 7px; color: inherit; text-decoration: none; border-radius: 6px; }
+.tb-home:focus { outline: none; }
+.tb-home:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tb-brand .app-name {
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: linear-gradient(180deg, #f0f2f5, #b8c4d0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.tb-home:hover { filter: brightness(1.25); }
+.tb-brand .build-tag { color: rgba(154,160,171,0.62); font-weight: 500; white-space: nowrap; }
+
+/* Text pills — Producer, Save, Share. A real pill: fixed height, icon + label,
+   never underlined (it used to be an <a> inheriting link underline), never
+   wrapped. */
+.app-topbar .tb-pill {
+  height: var(--tb-h);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.app-topbar .tb-pill .tb-label { white-space: nowrap; }
+
+/* Workspace tabs, seed, transport, account all snap to the same height. */
+.app-topbar .workspace-tabs { height: var(--tb-h); }
+.app-topbar .transport-round { width: var(--tb-h); height: var(--tb-h); }
+.app-topbar .transport-play { width: var(--tb-h); height: var(--tb-h); }
+.app-topbar .transport-round .tb-ico { width: 15px; height: 15px; }
+.app-topbar .transport-cluster { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.app-topbar .seed-box {
+  height: var(--tb-h);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 5px 0 11px;
+  border-radius: 7px;
+}
+.app-topbar .seed-box #seedBtn { flex: none; white-space: nowrap; padding: 3px 8px; }
+.app-topbar .seed-box .tb-label { color: var(--text3); font-size: 0.6rem; letter-spacing: 0.09em; text-transform: uppercase; }
+.app-topbar .account-bar .acct-pill { height: var(--tb-h); }
+
+/* Theme accents that used to be scoped to the old .transport-card. */
+.app-topbar .transport-round,
+.app-topbar .btn,
+.app-topbar .seed-box,
+.app-topbar .top-rating-row { border-color: rgba(62, 79, 96, 0.84); }
+.app-topbar .seed-box,
+.app-topbar .top-rating-row { background: rgba(11, 16, 23, 0.68); }
+.app-topbar .producer-pill {
+  background: rgba(245,166,35,0.09);
+  border: 1px solid rgba(245,166,35,0.62);
+  color: #ffd79a;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.app-topbar .producer-pill:hover { background: rgba(245,166,35,0.16); color: #ffe6bf; }
+.app-topbar .btn-primary { border-color: var(--accent); }
+/* A quiet divider sets off the identity zone at the far right. */
+.app-topbar .account-bar { flex: none; margin-left: 2px; padding-left: 10px; border-left: 1px solid rgba(58,75,92,0.55); }
+
+/* Producer parity: the daw bar is denser (File, name, transport, tempo, edit,
+   MIDI, Share, account), so its rounds run one notch smaller but share the
+   icon language and the gold primary. */
+.daw-transport.app-topbar { border-radius: 7px; }
+/* High enough specificity to unify play with its siblings (base .transport-play
+   is 36px): in both bars the play button is the SAME size as restart/stop/loop,
+   emphasised only by its green ring — size stays consistent. */
+.daw-transport .transport-cluster .transport-round,
+.daw-transport .transport-cluster .transport-play { width: 32px !important; height: 32px !important; font-size: 0; }
+.daw-transport .transport-round .tb-ico { width: 15px; height: 15px; }
+.daw-transport .transport-cluster { gap: 5px; }
+/* Keep the studio's divider before the identity zone (both bars match). */
+.daw-transport .account-bar { margin-left: 2px; }
+/* Round loop keeps its lit state (the old rule targeted the ghost button). */
+#arrLoop.loop-on { color: #5fd4c8; border-color: #2c5b56; background: rgba(95,212,200,0.08); box-shadow: 0 0 0 2px rgba(95,212,200,0.10); }
+
+/* Progressive disclosure — drop decoration before function as the row tightens.
+   Order: build tag → wordmark + seed label → Producer/Save text (icon stays)
+   + the optional tour button. The transport, seed VALUE and account never go. */
+@media (max-width: 1280px) { .tb-brand .build-tag { display: none; } }
+@media (max-width: 1120px) {
+  .tb-explore .app-name { display: none; }
+  .tb-explore .seed-box .tb-label { display: none; }
+}
+@media (max-width: 1000px) {
+  .tb-explore .producer-pill .tb-label,
+  .tb-explore .top-save-btn .tb-label { display: none; }
+  .tb-explore .producer-pill,
+  .tb-explore .top-save-btn { padding: 0 9px; }
+  .tb-explore .studio-tour-btn { display: none; }
+}
+
+/* ── Report a problem dialog + early-access lock notice ─────────────────── */
+.feedback-dialog .app-dialog-input { margin-bottom: 10px; }
+.feedback-dialog .fb-text { resize: vertical; min-height: 96px; }
+.feedback-dialog .fb-sub { margin: 0 0 12px; }
+.feedback-dialog .fb-shot { display: block; font-size: .78rem; color: var(--text2); }
+.feedback-dialog .fb-shot input { display: block; margin-top: 4px; font-size: .78rem; color: var(--text2); }
+.feedback-dialog .fb-msg { margin: 10px 0 0; min-height: 1.1em; font-size: .8rem; color: var(--text2); }
+.landing-lock { margin-top: 6px; font-size: .82rem; color: var(--accent, #f5a623); }
+/* Landing hero uses the square mark at heading scale. */
+.app-icon.lg { width: 44px; height: 44px; }
+.landing-header h1 .app-icon { vertical-align: -6px; margin-right: 4px; }
+
+/* ═══ Producer bar rebuild (audit round 2, 2026-07-14) ════════════════════
+   The Producer top bar now follows the SAME grammar as the studio bar:
+   brand-first identity, bare transport (no backing box → no nested outlines),
+   one compact readout, ungrouped single-purpose tools, gold primary + account
+   last. Functional zones are set off by whitespace + the two flex spacers,
+   never by filled group boxes. Every control is one height (32px) and the bar
+   matches the studio's 46px. */
+
+.tb-producer { flex-wrap: nowrap; gap: 7px; min-height: 46px; }
+
+/* Identity: dim breadcrumb root (Producer, links back to studio) → bright
+   editable title (the arrangement) → borderless File menu trigger. */
+.tb-producer .daw-brand { flex: none; gap: 6px; }
+.tb-producer .daw-brand .app-name {
+  font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+  font-weight: 700; color: var(--text3);
+  -webkit-text-fill-color: currentColor; background: none;
+}
+.tb-producer .daw-brand:hover .app-name { color: var(--text2); }
+.tb-producer .daw-crumb-sep { flex: none; color: var(--text3); opacity: 0.45; font-size: 0.95rem; }
+.tb-producer .daw-arr-name {
+  flex: none; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.9rem; font-weight: 600; color: #f0f2f5;
+  padding: 3px 5px; border-radius: 5px; cursor: text;
+}
+.tb-producer .daw-arr-name:hover { background: rgba(255,255,255,0.05); }
+
+/* File reads as a menu, not a button: no border, visible caret, hover fill. */
+.tb-producer .daw-file-wrap { flex: none; position: relative; }
+.tb-producer .daw-file-button {
+  display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 9px;
+  background: none; border: 0; border-radius: 6px;
+  color: var(--text2); font: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.tb-producer .daw-file-button:hover,
+.tb-producer .daw-file-button[aria-expanded="true"] { background: rgba(255,255,255,0.07); color: var(--text); }
+.tb-producer .daw-file-caret { width: 14px; height: 14px; opacity: 0.85; margin: 0; }
+
+/* Position + tempo: one compact readout; the two cells share label-row and
+   value-row baselines (they were ~3px out and 45px tall). */
+.tb-producer .daw-readout {
+  flex: none; display: flex; align-items: stretch; height: 32px;
+  border: 1px solid var(--border2); border-radius: 7px;
+  background: rgba(7,11,16,0.55); overflow: hidden;
+}
+.tb-producer .daw-cell {
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 0 11px; min-width: 0; margin: 0; height: auto;
+}
+.tb-producer .daw-cell + .daw-cell { border-left: 1px solid var(--border); }
+.tb-producer .daw-cell-label {
+  font-size: 0.5rem; letter-spacing: 0.11em; text-transform: uppercase;
+  color: var(--text3); line-height: 1;
+}
+.tb-producer .daw-cell-val {
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font-family: var(--mono); font-size: 0.82rem; color: var(--text);
+  line-height: 1; font-variant-numeric: tabular-nums;
+}
+.tb-producer .daw-pos {
+  min-height: 0; min-width: 0; height: auto; display: inline; align-items: initial; justify-content: initial;
+  background: none; border: 0; border-radius: 0; padding: 0; margin: 0; cursor: pointer;
+  color: var(--accent2); font: inherit; font-family: var(--mono); font-weight: 600; line-height: 1;
+}
+.tb-producer .daw-pos:hover { color: var(--accent); }
+.tb-producer .daw-tempo-cell .daw-cell-val input {
+  width: 3ch; background: none; border: 0; padding: 0; margin: 0;
+  color: var(--text); font: inherit; font-family: var(--mono); text-align: right; line-height: 1;
+  -moz-appearance: textfield;
+}
+.tb-producer .daw-tempo-cell .daw-cell-val input::-webkit-outer-spin-button,
+.tb-producer .daw-tempo-cell .daw-cell-val input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tb-producer .daw-tempo-cell .daw-cell-val i { font-style: normal; font-size: 0.55rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Single-purpose utility buttons (undo, zoom ±, MIDI): one height, one look. */
+.tb-producer .tb-util-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; flex: none;
+  background: rgba(11,16,23,0.5); border: 1px solid var(--border2); border-radius: 7px;
+  color: var(--text2); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.tb-producer .tb-util-btn:hover { border-color: var(--accent); color: var(--text); }
+.tb-producer .tb-util-btn.tb-icon-only { width: 32px; padding: 0; justify-content: center; }
+.tb-producer .tb-util-btn .tb-ico { width: 16px; height: 16px; }
+/* Zoom's two buttons read as one control (shared context) without a group box. */
+.tb-producer .daw-zoom { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+
+/* Empty status/saved spans must not reserve width (the dead gap). */
+.tb-producer .daw-saved:empty, .tb-producer .toolbar-hint:empty { display: none; }
+.tb-producer .daw-saved, .tb-producer .toolbar-hint { flex: none; }
+
+/* Producer progressive disclosure — like the studio bar, drop decoration
+   before function as the (denser) bar tightens. Order: breadcrumb wordmark →
+   separator + MIDI label → Share label. Transport, readout, account never go. */
+@media (max-width: 1180px) {
+  .tb-producer .daw-brand .app-name { display: none; }
+  .tb-producer .daw-arr-name { max-width: 190px; }
+}
+@media (max-width: 1040px) {
+  .tb-producer .daw-crumb-sep { display: none; }
+  .tb-producer #midiBtn .tb-label { display: none; }
+  .tb-producer #midiBtn { width: 32px; padding: 0; justify-content: center; }
+  .tb-producer .daw-arr-name { max-width: 150px; }
+}
+@media (max-width: 940px) {
+  .tb-producer .top-save-btn .tb-label,
+  .tb-producer #shareCompBtn .tb-label { display: none; }
+  .tb-producer #shareCompBtn { padding: 0 10px; }
+}

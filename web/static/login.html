@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Resona — Sign in</title>
+<title>Soundinator — Sign in</title>
+<link rel="icon" type="image/svg+xml" href="/app-icon.svg"/>
 <style>
   :root{
     --bg:#16181d; --surface:#1c1f25; --surface2:#24272e; --border:#2b2f37;
@@ -18,8 +19,9 @@
     color:var(--text);font-family:var(--font);padding:24px}
   .card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);
     border-radius:var(--radius);padding:28px 26px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
-  .brand{font-size:1.5rem;font-weight:700;letter-spacing:.5px;margin:0 0 2px}
-  .brand span{color:var(--accent)}
+  /* Rounded type to match the icon's fat round line-caps. */
+  .brand{font-family:ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN","Quicksand","Comfortaa",var(--font);
+    font-size:1.5rem;font-weight:800;letter-spacing:.02em;margin:0 0 2px}
   .tagline{color:var(--text3);font-size:.82rem;margin:0 0 22px}
   .tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--border);
     border-radius:var(--radius-sm);padding:4px;margin-bottom:20px}
@@ -40,11 +42,16 @@
   .msg.ok{color:var(--green)}
   .hint{margin-top:16px;font-size:.72rem;color:var(--text3);line-height:1.5}
   .hidden{display:none}
+  .brand-row{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+  .brand-icon{width:36px;height:36px;border-radius:10px;flex-shrink:0}
 </style>
 </head>
 <body>
 <div class="card">
-  <h1 class="brand">Reson<span>a</span></h1>
+  <div class="brand-row">
+    <img class="brand-icon" src="/app-icon.svg" alt="Soundinator"/>
+    <h1 class="brand">Soundinator</h1>
+  </div>
   <p class="tagline">Sign in to your studio</p>
 
   <div class="tabs" role="tablist">
@@ -93,8 +100,9 @@
     $("invite").required = reg && !openSignup;
     $("password").autocomplete = reg ? "new-password" : "current-password";
     $("submit").textContent = reg ? "Create account" : "Sign in";
+    const pwNote = "Your password is never stored or visible to anyone — not even us. It's protected with the same industry-standard hashing used by major web frameworks.";
     $("hint").textContent = reg
-      ? (openSignup ? "" : "Registration is invite-only. Ask the owner for a code.")
+      ? (openSignup ? pwNote : "Registration is invite-only. No invite code, or yours isn't working? Email marcus.b.anderson@gmail.com and I'll sort you out. " + pwNote)
       : "";
     setMsg("");
   }

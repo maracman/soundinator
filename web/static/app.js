@@ -86,6 +86,21 @@ const BUILD_TAG = (() => {
 })();
 const EVENT_SCHEMA_VERSION = "explore-event-1.0";
 const SESSION_ID = crypto.randomUUID(); // fresh per page visit
+
+// Rolling capture of uncaught errors so "Report a problem" can attach what
+// actually went wrong without asking the user to open devtools.
+const capturedErrors = [];
+function captureError(message) {
+  capturedErrors.push(`${new Date().toISOString()} ${String(message).slice(0, 500)}`);
+  if (capturedErrors.length > 30) capturedErrors.shift();
+}
+window.addEventListener("error", (e) => {
+  captureError(`${e.message}${e.filename ? ` (${e.filename.split("/").pop()}:${e.lineno})` : ""}`);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const r = e.reason;
+  captureError(`unhandled rejection: ${(r && (r.stack || r.message)) || r}`);
+});
 const CONSENT_KEY = "phase0.consent.v1";
 const INSTRUMENTS_KEY = "phase0.instruments.v1";
 const MIDI_MAPPING_KEY = "phase0.midiMapping.v1";
@@ -310,6 +325,103 @@ function notationIconHTML(parts, { compact = false, title = "" } = {}) {
     ${CAPTURE_PARTS.map(part => `<i class="saem-part saem-${part}${active.has(part) ? " active" : ""}" aria-hidden="true"></i>`).join("")}
   </span>`;
 }
+
+// The Soundinator marks (Marcus's artwork, 2026-07-15): the street organ as a
+// square icon for tight corners and a wide lockup where there's room. Both
+// are inline SVG so they take the theme's ink (see .app-mark-* CSS); the
+// favicon file (/app-icon.svg) is the same square art on the amber tile.
+function appIconHTML(size = "") {
+  return `<svg class="app-icon${size ? " " + size : ""}" viewBox="0 0 512 512" role="img" aria-label="Soundinator">
+    <g transform="translate(18, 50)">
+      <rect x="180" y="30" width="160" height="60" rx="16" class="app-mark-bg"/>
+      <line x1="200" y1="50" x2="320" y2="50" class="app-mark-detail" stroke-dasharray="12 16"/>
+      <line x1="200" y1="70" x2="320" y2="70" class="app-mark-detail" stroke-dasharray="16 12"/>
+      <rect x="150" y="90" width="220" height="240" rx="20" class="app-mark-art"/>
+      <rect x="140" y="80" width="240" height="24" rx="8" class="app-mark-art"/>
+      <path d="M 190 300 L 190 160 A 35 35 0 0 1 260 160 L 260 300 Z" class="app-mark-bg"/>
+      <rect x="200" y="170" width="14" height="110" rx="6" class="app-mark-detail"/>
+      <rect x="220" y="150" width="14" height="130" rx="6" class="app-mark-detail"/>
+      <rect x="240" y="190" width="14" height="90" rx="6" class="app-mark-detail"/>
+      <circle cx="80" cy="220" r="70" class="app-mark-bg"/>
+      <line x1="80" y1="150" x2="80" y2="290" class="app-mark-art"/>
+      <line x1="10" y1="220" x2="150" y2="220" class="app-mark-art"/>
+      <circle cx="80" cy="220" r="24" class="app-mark-art"/>
+      <rect x="70" y="90" width="20" height="130" rx="10" class="app-mark-fill"/>
+      <circle cx="80" cy="90" r="24" class="app-mark-bg"/>
+      <rect x="370" y="190" width="20" height="60" rx="6" class="app-mark-art"/>
+      <path d="M 390 220 C 420 220, 440 100, 480 60 L 480 380 C 440 340, 420 220, 390 220 Z" class="app-mark-bg"/>
+      <path d="M 405 220 C 430 220, 450 150, 470 130" class="app-mark-detail"/>
+      <path d="M 405 220 C 430 220, 450 290, 470 310" class="app-mark-detail"/>
+      <ellipse cx="480" cy="220" rx="24" ry="160" class="app-mark-bg"/>
+      <ellipse cx="465" cy="220" rx="12" ry="130" class="app-mark-fill"/>
+    </g>
+  </svg>`;
+}
+
+function appLogoHTML(size = "") {
+  return `<svg class="app-logo${size ? " " + size : ""}" viewBox="0 0 400 140" role="img" aria-label="Soundinator">
+    <rect x="140" y="10" width="120" height="30" rx="6" class="app-mark-bg"/>
+    <line x1="150" y1="20" x2="250" y2="20" class="app-mark-detail" stroke-dasharray="6 8"/>
+    <line x1="150" y1="30" x2="250" y2="30" class="app-mark-detail" stroke-dasharray="8 6"/>
+    <rect x="120" y="40" width="160" height="90" rx="8" class="app-mark-art"/>
+    <rect x="115" y="35" width="170" height="12" rx="4" class="app-mark-art"/>
+    <path d="M 125 130 L 135 130 L 140 138 L 120 138 Z" class="app-mark-fill"/>
+    <path d="M 275 130 L 265 130 L 260 138 L 280 138 Z" class="app-mark-fill"/>
+    <path d="M 140 120 L 140 70 A 20 20 0 0 1 180 70 L 180 120 Z" class="app-mark-bg"/>
+    <rect x="145" y="75" width="8" height="40" rx="2" class="app-mark-detail"/>
+    <rect x="157" y="65" width="8" height="50" rx="2" class="app-mark-detail"/>
+    <rect x="169" y="80" width="8" height="35" rx="2" class="app-mark-detail"/>
+    <path d="M 50 135 L 50 85 L 65 85 L 65 135 Z" class="app-mark-art"/>
+    <line x1="65" y1="85" x2="120" y2="85" class="app-mark-art"/>
+    <circle cx="55" cy="85" r="30" class="app-mark-bg"/>
+    <circle cx="55" cy="85" r="10" class="app-mark-art"/>
+    <line x1="55" y1="55" x2="55" y2="115" class="app-mark-art"/>
+    <line x1="25" y1="85" x2="85" y2="85" class="app-mark-art"/>
+    <rect x="51" y="40" width="8" height="45" rx="4" class="app-mark-fill"/>
+    <circle cx="55" cy="40" r="10" class="app-mark-bg"/>
+    <rect x="280" y="70" width="15" height="25" rx="2" class="app-mark-art"/>
+    <path d="M 295 82 C 325 82, 345 40, 380 25 L 380 140 C 345 125, 325 82, 295 82 Z" class="app-mark-bg"/>
+    <path d="M 305 82 C 325 82, 345 60, 375 50" class="app-mark-detail"/>
+    <path d="M 305 82 C 325 82, 345 105, 375 115" class="app-mark-detail"/>
+    <ellipse cx="380" cy="82.5" rx="16" ry="57.5" class="app-mark-bg"/>
+    <ellipse cx="372" cy="82.5" rx="10" ry="47.5" class="app-mark-fill"/>
+  </svg>`;
+}
+
+// Top-bar icon set (header audit round 2, 2026-07-14). The old header used bare
+// text glyphs (▦ ↻ ◇ ⤓ ✦ ▾ ⏮ ⟳) which macOS/Windows render as inconsistent,
+// sometimes coloured emoji — the Producer "▦" in particular came out as a filled
+// square that wrapped its label. These are crisp 24-grid SVGs that inherit
+// `currentColor`, so every control in both bars shares one visual language.
+// `filled` icons (play/stop) paint with fill; the rest are 2px strokes.
+const TB_ICONS = {
+  play:    `<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/>`,
+  stop:    `<rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/>`,
+  pause:   `<rect x="7" y="6" width="3.4" height="12" rx="1.2" fill="currentColor" stroke="none"/><rect x="13.6" y="6" width="3.4" height="12" rx="1.2" fill="currentColor" stroke="none"/>`,
+  rewind:  `<path d="M7 6v12"/><path d="M19 6.5v11l-9-5.5z" fill="currentColor" stroke="none"/>`,
+  restart: `<path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4v4h-4"/>`,
+  dice:    `<rect x="4.5" y="4.5" width="15" height="15" rx="3.5"/><circle cx="9" cy="9" r="1.15" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.15" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.15" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.15" fill="currentColor" stroke="none"/>`,
+  loop:    `<path d="M4 9a5 5 0 0 1 5-5h6"/><path d="M13 1.5 16.5 4 13 6.5"/><path d="M20 15a5 5 0 0 1-5 5H9"/><path d="M11 22.5 7.5 20 11 17.5"/>`,
+  save:    `<path d="M12 3v11"/><path d="M8 10.5 12 14.5 16 10.5"/><path d="M5 20h14"/>`,
+  sparkle: `<path d="M12 3.5c.6 3.7 1.8 4.9 5.5 5.5-3.7.6-4.9 1.8-5.5 5.5-.6-3.7-1.8-4.9-5.5-5.5 3.7-.6 4.9-1.8 5.5-5.5z" fill="currentColor" stroke="none"/><path d="M18 15c.3 1.6.8 2.1 2.4 2.4-1.6.3-2.1.8-2.4 2.4-.3-1.6-.8-2.1-2.4-2.4 1.6-.3 2.1-.8 2.4-2.4z" fill="currentColor" stroke="none"/>`,
+  caret:   `<path d="M6 9.5 12 15l6-5.5"/>`,
+  producer:`<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9 9.5v10"/>`,
+  upload:  `<path d="M12 21V10"/><path d="M8 13.5 12 9.5 16 13.5"/><path d="M5 4h14"/>`,
+  undo:    `<path d="M8 8 4 12l4 4"/><path d="M4 12h11a5 5 0 0 1 0 10"/>`,
+  zoomOut: `<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.7-4.7"/><path d="M7.5 10.5h6"/>`,
+  zoomIn:  `<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.7-4.7"/><path d="M7.5 10.5h6M10.5 7.5v6"/>`,
+  midi:    `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="7" r="1.15" fill="currentColor" stroke="none"/><circle cx="7.4" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.6" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="8.8" cy="15" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="15" r="1.15" fill="currentColor" stroke="none"/>`,
+};
+
+// Inline SVG for a top-bar control. `mods` adds extra classes (e.g. an icon
+// that should sit tighter). Filled shapes carry their own fill; the shared
+// stroke defaults give every outline icon the same 2px weight and round joins.
+function tbIcon(name, mods = "") {
+  const body = TB_ICONS[name] || "";
+  return `<svg class="tb-ico${mods ? " " + mods : ""}" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+}
+// Swap a live button's icon (play↔stop etc.) without disturbing its classes.
+function setTbIcon(btn, name) { if (btn) btn.innerHTML = tbIcon(name); }
 
 function capturePartSelectorHTML(available, selected) {
   return `<div class="saem-selector" role="group" aria-label="Parts to save">
@@ -680,6 +792,8 @@ const DEFAULTS = {
   // sitting between BODY and SPACE. Each entry {uid,type,enabled,wet,params}.
   effectsChain: [],
   stageEffectsOn: true,   // whole-stage bypass toggle (rail power button)
+  baseLayerGain: 1,       // base source mix, parallel to each extra layer's gain
+  baseLayerSolo: false,   // base participates in the same solo set as extra layers
   layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
   layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own means kept)
   layerEnvProb: 0.5,       // Q7: the shared variation chance when layerEnvOverride is on
@@ -849,6 +963,8 @@ const PARAM_DESC = {
   spaceOwnHead: "Keep this patch's own ear span and head density even when the producer's global space is active (normally the global listener overrides them)",
   degreeTuning: "Each degree's true pitch centre, in cents off the equal grid — how just intonation, maqamat and other tuning traditions place their notes. Drag a node around the scale circle to set it by hand",
   layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
+  baseLayerGain: "The base layer's level relative to the rest of the sound stack",
+  baseLayerSolo: "Solo the base layer; other layers are silent unless they are soloed too",
   layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
   layerEnvProb: "How often the shared variation trigger fires (per note) when synchronisation is on",
   layerEnvAttackSd: "The shared attack variation magnitude — applied to the base and every layer while synchronised",
@@ -1406,10 +1522,41 @@ async function api(path, opts = {}) {
 
 function navigate(hash) { location.hash = hash; }
 
+let profilePlayback = null; // inline profile player: { itemId, prevArrangement, raf, totalBeats }
+// Auth/community state — declared here (not with the account code at the file
+// tail) because the boot route() call below reads it via experimentsEnabled().
+let authState = { user: null, authRequired: false, openSignup: false, features: { experiments: false, community: true } };
+
+// Locked deployment (RESONA_AUTH_REQUIRED) + no session: the server serves the
+// app shell so visitors see the welcome screen, but every view past it — and
+// every data API server-side — needs an account.
+function lockedOut() {
+  return authState.authRequired && !authState.user;
+}
+
+function showInviteGateDialog() {
+  showAppDialog({
+    title: "Early access",
+    message: "Sorry — Soundinator will eventually be free to try without an account, "
+      + "but at this early stage of development only testers with an invite code can "
+      + "use the app. If you have an invite code, create an account to get started.",
+    confirmLabel: "I have an invite code",
+    onConfirm: () => { location.href = "/login"; },
+  });
+}
+
 function route() {
   synth.stop();
+  stopProfilePlayback(); // an inline profile player never outlives its page
   cancelAnimationFrame(animFrame);
   const h = location.hash.replace(/^#\/?/, "") || "";
+  if (lockedOut()) {
+    // Visitors only ever see the welcome screen; deep links explain why.
+    renderLanding();
+    if (h && h !== "home") showInviteGateDialog();
+    return;
+  }
+  if (h.startsWith("study/") && !experimentsEnabled()) return renderExplore();
   if (h === "study/consent")       return renderStudyConsent();
   if (h === "study/demographics")  return renderStudyDemographics();
   if (h === "study/headphones")    return renderStudyHeadphones();
@@ -1419,6 +1566,7 @@ function route() {
   if (h === "study/debrief")       return renderStudyDebrief();
   if (h === "home")                return renderLanding();
   if (h === "produce")             return renderProduce();
+  if (h.startsWith("user/"))       return renderProfilePage(decodeURIComponent(h.slice(5)));
   if (h === "explore" || h === "") return renderExplore();
   return renderExplore();
 }
@@ -1525,7 +1673,6 @@ let paletteTarget = null;    // { paletteId, half: "subnote"|"macro" } awaiting 
 let rollNoteSel = -1;      // selected note index in the roll
 let _rollAddMode = false;  // Q9 D2: pencil mode — click an empty cell adds a note
 let selectedRegions = new Set(); // Q9 B2: multi-selected region ids (⇧click / rubber band)
-let _spTrackPopover = null; // Q9 C: trackId whose space mini-controls are open
 let _rollHits = [];        // hit rects from the last roll draw
 let _rollGeom = null;      // geometry from the last roll draw
 
@@ -1546,6 +1693,19 @@ function normaliseArrangement(a) {
   if (!Array.isArray(a.palette)) a.palette = [];
   if (!a.lengthBeats) a.lengthBeats = 64;
   if (!a.id) a.id = crypto.randomUUID();
+  // Legacy producer tracks used a stereo pan value. Preserve its audible
+  // intent once as a real spatial bearing, then retire pan so the binaural
+  // target is the only placement model.
+  for (const track of a.tracks || []) {
+    if (!Number.isFinite(track.pan)) continue;
+    if (!track.space) {
+      track.space = {
+        angle: clamp(track.pan * 90, -90, 90),
+        dist: track.instrumentParams?.spaceDistance ?? 2.5,
+      };
+    }
+    delete track.pan;
+  }
   return migrateArrangement(a);
 }
 
@@ -1653,8 +1813,20 @@ function switchArrangement(id) {
   renderProduce();
 }
 
-// Everything the browser can offer: factory presets, user presets, and
-// saved instruments — each convertible into a full voice for the palette.
+// Community items the user explicitly added to their browser. The server-side
+// library (/api/community/library) is the source of truth so it roams across
+// devices; this localStorage cache keeps the browser instant and offline-safe.
+const COMMUNITY_LIBRARY_KEY = "phase0.communityLibrary.v1";
+function loadCommunityLibraryCache() {
+  try { return JSON.parse(localStorage.getItem(COMMUNITY_LIBRARY_KEY) || "[]"); } catch { return []; }
+}
+function saveCommunityLibraryCache() {
+  try { localStorage.setItem(COMMUNITY_LIBRARY_KEY, JSON.stringify(communityLibrary)); } catch {}
+}
+let communityLibrary = loadCommunityLibraryCache();
+
+// Everything the browser can offer: factory presets, user presets, saved
+// instruments, and added community items — each convertible into a full voice.
 function browserItems() {
   const items = [];
   for (const f of FACTORY_PRESETS) {
@@ -1682,6 +1854,24 @@ function browserItems() {
       cat: "instrument", kindLabel: "Instrument",
       description: "", section: "instrument", params: inst.parameters,
       captureParts: capturePartsFor(inst.parameters, "instrument", inst.captureParts),
+    });
+  }
+  for (const c of communityLibrary) {
+    const params = (c.data && c.data.parameters) || {};
+    // Section is a palette-targeting hint: synths belong to the sub-note half
+    // ("sound" family), note engines to the macro half ("melody" family).
+    const section = c.kind === "synth" ? "sound" : c.kind === "engine" ? "melody" : (c.section || "full");
+    items.push({
+      id: `community:${c.id}`, name: c.name || "Untitled",
+      cat: "community",
+      kindLabel: c.kind === "synth" ? "Community synth"
+        : c.kind === "engine" ? "Community engine" : "Community",
+      description: c.description || "",
+      section, params,
+      captureParts: capturePartsFor(params, section, c.data && c.data.captureParts),
+      author: c.author || null,
+      avgStars: c.avg_stars, ratingCount: c.rating_count, myRating: c.my_rating,
+      communityId: c.id, kind: c.kind,
     });
   }
   return items;
@@ -2021,7 +2211,10 @@ function sessionBarControlsHTML() {
   const ctx = arrangement.context;
   // Owner 2026-07-09: no project root-pitch control — each patch keeps its own
   // pitch; there's no global transpose of everything.
-  return `<label class="daw-tempo-readout"><span>Tempo</span><input type="number" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/><b>BPM</b></label>`;
+  // Tempo cell of the producer's position/tempo readout — same .daw-cell
+  // structure as the Bar·Beat cell so their label and value rows share a
+  // baseline (header audit 2: they were misaligned by ~3px).
+  return `<label class="daw-cell daw-tempo-cell"><span class="daw-cell-label">Tempo</span><span class="daw-cell-val"><input type="number" data-ctx="tempo" min="50" max="180" step="1" value="${ctx.tempo}"/><i>bpm</i></span></label>`;
 }
 
 // Total sound layers = the base (Layer 1) plus any stacked layers.
@@ -2048,7 +2241,7 @@ function browserPropertyTagsHTML(part) {
   return "";
 }
 function browserFiltersHTML() {
-  const chips = [["all", "All"], ["starter", "Starters"], ["instrument", "Instruments"], ["mine", "Mine"], ["section", "Sections"]]
+  const chips = [["all", "All"], ["starter", "Starters"], ["instrument", "Instruments"], ["mine", "Mine"], ["section", "Sections"], ["community", "Community"]]
     .map(([k, label]) => `<button class="filter-chip${browserFilter === k ? " active" : ""}" data-browser-filter="${k}">${label}</button>`).join("");
   return chips + browserPropertyTagsHTML(producerBrowserTarget?.part || null);
 }
@@ -2071,7 +2264,8 @@ function renderBrowserCards(v) {
   container.innerHTML = items.length ? items.map(item => `
     <div class="browser-row" data-browser-item="${esc(item.id)}" title="${esc(item.description || item.name)} — double-click or drag to add it to the palette">
       ${notationIconHTML(item.captureParts, { compact: true })}
-      <span class="br-name">${esc(item.name)}</span>
+      <span class="br-name">${esc(item.name)}${item.author ? `
+        <span class="br-author">@${esc(item.author.handle)}${item.avgStars ? ` · ★${item.avgStars}` : ""}</span>` : ""}</span>
       <span class="br-kind">${esc(item.kindLabel)}</span>
       <button class="br-btn${browserPreviewId === item.id ? " on" : ""}" data-browser-preview="${esc(item.id)}" title="Hear it in the session context">${browserPreviewId === item.id ? "■" : "▶"}</button>
     </div>`).join("") : '<div class="empty-state">No presets match.</div>';
@@ -2147,11 +2341,23 @@ function renderBrowserCards(v) {
       if (e.target.closest(".br-btn, .pal-btn")) return;
       addOrFill(findItem(card.dataset.browserItem));
     };
+    card.oncontextmenu = (e) => {
+      const item = findItem(card.dataset.browserItem);
+      if (!item) return;
+      const entries = browserContextEntries(item, () => renderBrowserCards(v));
+      if (!entries.length) return;
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, entries);
+    };
   });
 }
 
 function wireBrowserPalette(v) {
   renderBrowserCards(v);
+  const communityBtn = v.querySelector("#communityOpen");
+  if (communityBtn) communityBtn.onclick = () => openCommunityOverlay();
+  const shareComp = v.querySelector("#shareCompBtn");
+  if (shareComp) shareComp.onclick = () => openShareCompositionDialog();
   v.querySelectorAll("[data-browser-part]").forEach(btn => {
     btn.onclick = () => {
       const part = btn.dataset.browserPart;
@@ -2464,7 +2670,6 @@ function producerVoice(track) {
     producerVoices.set(track.id, voice);
   }
   voice.setMasterVolume(_trackVol(track.gain, 1));
-  voice.setPan(track.pan ?? 0);
   return voice;
 }
 
@@ -2541,8 +2746,7 @@ function playArrangement(fromBeat = 0) {
     }
     if (!lr && b > arrPlay.lastBeat) {
       stopArrangement(true); // natural end: the last notes ring out
-      const btn = document.querySelector("#arrPlayBtn");
-      if (btn) btn.textContent = "▶";
+      setTbIcon(document.querySelector("#arrPlayBtn"), "play");
       return;
     }
     // smooth-beat bookkeeping for the space visualisers (curPlayBeat)
@@ -2684,7 +2888,6 @@ async function mixdownArrangement(statusEl, btn) {
       const voice = new SynthEngine();
       voice.init(off, off.destination);
       voice.setMasterVolume(_trackVol(track.gain, region.gain));
-      voice.setPan(track.pan ?? 0);
       if (region.type === "baked" && Array.isArray(region.notes)) {
         voice.renderNotesSpan(regionPlayParams(track, region), region.notes,
           region.startBeat * beatSec + 0.05, regionLen(region), region.loopSourceBeats || regionLen(region), region.percStrikes);
@@ -2870,7 +3073,7 @@ function harmonicGuideChoices() {
 function harmonicGuidePickerHTML() {
   const current = _gsScaleAt(0);
   return `<div class="hg-picker">
-    <button class="hg-browser-route${producerBrowserTarget?.kind === "harmonic" ? " active" : ""}" data-browser-route-harmonic title="Choose scale and harmony from the Browser">
+    <button class="hg-browser-route${producerBrowserTarget?.kind === "harmonic" ? " active" : ""}" data-browser-route-harmonic title="Choose scale and harmony from the Library">
       ${notationIconHTML(["clef"], { compact: true })}<span>Choose from Browser</span>
     </button>
     <span class="hg-current">${esc(current?.label || `${_gsDivCount()} divisions`)}</span>
@@ -3075,14 +3278,17 @@ function _spHue(i) { return _SP_HUES[i % _SP_HUES.length]; }
 // the constellation centroid (centered) or the listener centre (additive).
 function _spTrackPos(track, beat) {
   const sp = arrangement.space || {};
-  const res = trackSpaceAt(sp.tracks?.[track.id], beat) || sp.static?.[track.id] || null;
+  const res = sp.enabled ? (trackSpaceAt(sp.tracks?.[track.id], beat) || sp.static?.[track.id] || null) : null;
   const vp = _spTrackVoiceParams(track, beat);
+  const own = track.space && (Number.isFinite(track.space.angle) || Number.isFinite(track.space.dist))
+    ? { angle: track.space.angle ?? vp.spaceAzimuth ?? 0, dist: track.space.dist ?? vp.spaceDistance ?? 2.5 }
+    : null;
   if (_spIsMulti(vp)) {
     if (res) return res;
-    return _spCentroid(_spTrackSources(vp));
+    return own || _spCentroid(_spTrackSources(vp));
   }
   const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
-  return res || base;
+  return res || own || base;
 }
 
 // The transformed constellation a multi-layer track is ACTUALLY playing
@@ -4024,7 +4230,7 @@ function finishMidiRecording() {
 function midiToolbarHTML() {
   if (!("requestMIDIAccess" in navigator)) return "";
   if (!_midi.access) {
-    return `<button class="btn btn-ghost btn-sm" id="midiBtn" title="Connect a MIDI keyboard — arm a track with its ● button, play, and stop the arm to bake the take">⌨ MIDI</button>`;
+    return `<button class="tb-util-btn" id="midiBtn" title="Connect a MIDI keyboard — arm a track with its ● button, play, and stop the arm to bake the take">${tbIcon("midi")}<span class="tb-label">MIDI</span></button>`;
   }
   const inputs = [..._midi.access.inputs.values()];
   return `
@@ -4203,18 +4409,12 @@ function produceTimelineHTML() {
     }).join("");
     const gain = t.gain ?? 1;
     const gainDbTrack = 20 * Math.log10(Math.max(0.02, gain));
-    const spacePop = _spTrackPopover === t.id ? `
-      <div class="tl2-space-pop">
-        <label class="sp-ctl">Angle <input type="range" data-track-space-angle="${t.id}" min="-180" max="180" step="1" value="${t.space?.angle ?? 0}"/></label>
-        <label class="sp-ctl">Distance <input type="range" data-track-space-dist="${t.id}" min="0.3" max="30" step="0.1" value="${t.space?.dist ?? 2.5}"/></label>
-        <button class="pal-btn" data-track-space-clear="${t.id}" title="Back to the patch's own position">reset</button>
-      </div>` : "";
     // Owner 07-07: the head is TWO rows so its controls never spill onto
     // the lanes — identity on top, mix controls underneath.
     return `<div class="tl2-row">
       <div class="tl2-head tl2-track-head${trackAudible(t) ? "" : " inaudible"}${_spOpen && _spSelTrack === t.id ? " sp-sel" : ""}" data-track-head="${t.id}" style="--track-h:${hue}">
         <div class="tl2-head-top">
-          <span class="tl2-hue" data-track-space="${t.id}" style="background:hsl(${hue},70%,55%)" title="This track's colour (matches its global-space thread). Click for the track's own space position — drag the header to reorder tracks."></span>
+          <span class="tl2-hue" style="background:hsl(${hue},70%,55%)" title="This track's colour (matches its global-space thread)"></span>
           <span class="tl2-name" title="${esc(t.name)} — click to select for the global space; drag to reorder">${esc(t.name)}</span>
           <span class="tl2-db" title="Track level">${gainDbTrack >= 0 ? "+" : ""}${gainDbTrack.toFixed(1)}dB</span>
           <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
@@ -4227,7 +4427,6 @@ function produceTimelineHTML() {
           <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
           <canvas class="tl-space-dot" data-track-space-dot="${t.id}" width="28" height="28" title="Spatial position — drag: left/right rotates around you, up/down changes distance"></canvas>
         </div>
-        ${spacePop}
       </div>
       <div class="tl2-lane" data-lane="${t.id}" style="width:${laneW}px">${regions}</div>
     </div>`;
@@ -4256,7 +4455,7 @@ function produceTimelineHTML() {
         <div class="tl2-head tl2-corner"></div>
         <div class="tl2-empty-guide" style="width:${laneW}px">
           <div class="tl2-guide-steps">
-            <span class="tl2-guide-step"><b>1</b> Pick a sound in the Browser</span>
+            <span class="tl2-guide-step"><b>1</b> Pick a sound in the Library</span>
             <span class="tl2-guide-arrow">→</span>
             <span class="tl2-guide-step"><b>2</b> ＋ Add it to your Palette</span>
             <span class="tl2-guide-arrow">→</span>
@@ -4361,7 +4560,7 @@ function engineModuleOptions(selected) {
 function patchSpatialSources(p) {
   const angle = p.spaceAzimuth ?? 0, dist = p.spaceDistance ?? 2.5;
   return [
-    { id: "base", label: "Layer 1", kind: "base", num: "1", hue: 36, angle, dist, color: "gold", mute: false },
+    { id: "base", label: "Layer 1", kind: "base", num: "1", hue: 36, angle, dist, color: "gold", mute: false, solo: !!p.baseLayerSolo },
     ...(p.layers || []).map((l, i) => ({ id: l.id, label: `Layer ${i + 2}`, kind: "layer", num: String(i + 2), hue: l.hue ?? (36 + i * 70) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "blue", mute: !!l.mute, solo: !!l.solo })),
     ...(p.percLayers || []).map((l, i) => ({ id: `perc:${l.id}`, label: l.sound?.name || l.sound?.key || `Hit ${i + 1}`, kind: "percussion", num: `P${i + 1}`, hue: (32 + i * 47) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "pink", mute: !!l.mute })),
   ];
@@ -4509,18 +4708,22 @@ function patchLayerStripHTML(p) {
   const row = (id, tag, hue, name, badge, gainInput, angle, dist, buttons, muted, extraCls = "") => `
     <div class="patch-lyr${muted ? " muted" : ""}${_patchStageSel === id ? " sel" : ""}${extraCls ? " " + extraCls : ""}" data-patch-lyr="${id}" style="--layer-hue:${hue}">
       <span class="patch-lyr-tag">${tag}</span>
+      <span class="space-target-control patch-space-target">
+        <canvas class="compact-space-target" data-patch-space-target="${id}" width="40" height="40"></canvas>
+        <span data-space-target-readout>${compactSpaceTargetText({ angle, dist })}</span>
+      </span>
       <div class="patch-lyr-body">
         <div class="patch-lyr-name">${esc(name)}${badge}</div>
         <div class="patch-lyr-ctls">
           ${gainInput}
-          <label class="sp-ctl">Angle <input type="range" data-patch-lyr-angle="${id}" min="-180" max="180" step="1" value="${angle}"/></label>
-          <label class="sp-ctl">Dist <input type="range" data-patch-lyr-dist="${id}" min="0.3" max="30" step="0.1" value="${dist}"/></label>
           ${buttons}
         </div>
       </div>
     </div>`;
-  const baseRow = row("base", "1", 36, "Layer 1", ` <span class="patch-lyr-badge">MAIN</span>`, "",
-    p.spaceAzimuth ?? 0, p.spaceDistance ?? 2.5, "", false);
+  const baseRow = row("base", "1", 36, "Layer 1", ` <span class="patch-lyr-badge">MAIN</span>`,
+    `<label class="sp-ctl">Vol <input type="range" data-patch-base-gain min="0" max="1.5" step="0.01" value="${p.baseLayerGain ?? 1}"/></label>`,
+    p.spaceAzimuth ?? 0, p.spaceDistance ?? 2.5,
+    `<button class="pal-btn patch-lyr-solo${p.baseLayerSolo ? " on" : ""}" data-patch-base-solo title="Solo base layer">S</button>`, false);
   const rows = layers.map((l, i) => row(
     l.id, String(i + 2), l.hue ?? (36 + i * 70) % 360, l.name || `Layer ${i + 2}`, "",
     `<label class="sp-ctl">Vol <input type="range" data-patch-lyr-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}"/></label>`,
@@ -4586,23 +4789,23 @@ function producerPatchInspectorHTML(subject) {
   return `<div class="patch-inspector" data-patch-inspector>
     <header class="patch-inspector-titlebar"><div><span>Inspecting ${subject.regionScoped ? "region" : "patch"}</span><h3>${esc(subject.label)}</h3></div><div class="patch-inspector-badges"><i>${esc(badges.scaleLabel)}</i><i>${badges.splits} splits</i><i>grid ${badges.grid}</i><i class="patch-local-badge">${context}</i></div><div class="patch-title-actions">${patchSaveHTML(subject, p)}${editorSwitcherHTML()}<button class="patch-close" data-patch-close title="Close inspector">×</button></div></header>
     <div class="patch-inspector-grid">
-      <section class="patch-pane patch-pane-subnote" data-patch-drop="notes"><header><button class="saem-route${producerBrowserTarget?.part === "notes" ? " active" : ""}" data-browser-route="notes" title="Choose sound from the Browser">${notationIconHTML(["notes"], { compact: true })}</button><span>Sub-note</span><small class="patch-pane-name editable-name" data-module-name="notes" title="Double-click to rename">${esc(subnoteName)}</small><div><button data-patch-clear="notes" title="Clear sub-note">×</button><button data-patch-edit="subnote" title="Edit sub-note">✎</button></div></header>
+      <section class="patch-pane patch-pane-subnote" data-patch-drop="notes"><header><button class="saem-route${producerBrowserTarget?.part === "notes" ? " active" : ""}" data-browser-route="notes" title="Choose sound from the Library">${notationIconHTML(["notes"], { compact: true })}</button><span>Sub-note</span><small class="patch-pane-name editable-name" data-module-name="notes" title="Double-click to rename">${esc(subnoteName)}</small><div><button data-patch-clear="notes" title="Clear sub-note">×</button><button data-patch-edit="subnote" title="Edit sub-note">✎</button></div></header>
         <div class="patch-sound-meta">Sound &amp; layers <span>${esc(SPECTRAL_PROFILES[p.spectralProfile]?.label || p.spectralProfile || "Custom source")}</span></div>
         <div class="patch-layer-list" data-patch-layer-list>${patchLayerStripHTML(p)}</div>
         <div class="patch-drop-hint" data-patch-drophint="subnote">Drag a sound preset here to swap the sub-note</div>
       </section>
-      <section class="patch-pane patch-pane-space" data-patch-drop="space"><header><button class="saem-route${producerBrowserTarget?.part === "space" ? " active" : ""}" data-browser-route="space" title="Choose space from the Browser">${notationIconHTML(["space"], { compact: true })}</button><span>Patch space</span><small class="patch-pane-name editable-name" data-module-name="space" title="Double-click to rename">${esc(spaceName)}</small></header>
+      <section class="patch-pane patch-pane-space" data-patch-drop="space"><header><button class="saem-route${producerBrowserTarget?.part === "space" ? " active" : ""}" data-browser-route="space" title="Choose space from the Library">${notationIconHTML(["space"], { compact: true })}</button><span>Patch space</span><small class="patch-pane-name editable-name" data-module-name="space" title="Double-click to rename">${esc(spaceName)}</small></header>
         <div class="patch-stage-wrap"><canvas id="patchStage" title="Drag a dot to place that source around the listener — front is up, rings are metres. Muted sources dim; soloed sources ring gold."></canvas></div>
         <div class="patch-stage-readout" id="patchStageReadout"></div>
         <div class="patch-movement-control"><span>Global movement</span><select data-patch-movement><option value="centered"${movement === "centered" ? " selected" : ""}>Centered</option><option value="additive"${movement === "additive" ? " selected" : ""}>Additive</option></select></div>
         <p>The track thread moves these saved positions. Drag a dot to set a source's own place without touching the global space.</p>
       </section>
-      <section class="patch-pane patch-pane-macro" data-patch-drop="stave"><header><button class="saem-route${producerBrowserTarget?.part === "stave" ? " active" : ""}" data-browser-route="stave" title="Choose note behaviour from the Browser">${notationIconHTML(["stave"], { compact: true })}</button><span>Macro &amp; harmony</span><small class="patch-pane-name editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small><div><button data-patch-clear="stave" title="Clear note behaviour">×</button><button data-patch-edit="macro" title="Edit macro">✎</button></div></header>
+      <section class="patch-pane patch-pane-macro" data-patch-drop="stave"><header><button class="saem-route${producerBrowserTarget?.part === "stave" ? " active" : ""}" data-browser-route="stave" title="Choose note behaviour from the Library">${notationIconHTML(["stave"], { compact: true })}</button><span>Macro &amp; harmony</span><small class="patch-pane-name editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small><div><button data-patch-clear="stave" title="Clear note behaviour">×</button><button data-patch-edit="macro" title="Edit macro">✎</button></div></header>
         <div class="patch-macro-2col">
-          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="percussion" title="Choose percussion from the Browser">${notationIconHTML(["percussion"], { compact: true })}</button><b>Percussion</b><label class="patch-perc-toggle"><input type="checkbox" data-patch-perc${percOn ? " checked" : ""}/> On</label><button data-patch-edit="percussion" title="Edit percussion">✎</button></div><small class="editable-name" data-module-name="percussion" title="Double-click to rename">${esc(percussionName)}</small></div>
-          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="stave" title="Choose note behaviour from the Browser">${notationIconHTML(["stave"], { compact: true })}</button><b>Note engine</b><span>grid ${p.beatDivisions ?? 1}</span></div><small class="editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small></div>
+          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="percussion" title="Choose percussion from the Library">${notationIconHTML(["percussion"], { compact: true })}</button><b>Percussion</b><label class="patch-perc-toggle"><input type="checkbox" data-patch-perc${percOn ? " checked" : ""}/> On</label><button data-patch-edit="percussion" title="Edit percussion">✎</button></div><small class="editable-name" data-module-name="percussion" title="Double-click to rename">${esc(percussionName)}</small></div>
+          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="stave" title="Choose note behaviour from the Library">${notationIconHTML(["stave"], { compact: true })}</button><b>Note engine</b><span>grid ${p.beatDivisions ?? 1}</span></div><small class="editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small></div>
         </div>
-        <div class="patch-module-card patch-scale-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="clef" title="Choose scale and harmony from the Browser">${notationIconHTML(["clef"], { compact: true })}</button><b>Scale &amp; harmony</b><small class="editable-name" data-module-name="clef" title="Double-click to rename">${esc(scaleName)}</small></div>${patchScaleHTML(p, parts, subject.regionScoped)}<button class="patch-text-action" data-patch-edit="scale">✎ Edit scale</button></div>
+        <div class="patch-module-card patch-scale-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="clef" title="Choose scale and harmony from the Library">${notationIconHTML(["clef"], { compact: true })}</button><b>Scale &amp; harmony</b><small class="editable-name" data-module-name="clef" title="Double-click to rename">${esc(scaleName)}</small></div>${patchScaleHTML(p, parts, subject.regionScoped)}<button class="patch-text-action" data-patch-edit="scale">✎ Edit scale</button></div>
         <div class="patch-drop-hint" data-patch-drophint="macro">Drag a macro / behaviour preset here to swap the macro</div>
       </section>
     </div>
@@ -4783,10 +4986,7 @@ function bindPatchInspector(v) {
   // ── Draggable space stage + sub-note-style layer strip (owner 2026-07-10) ──
   const layerById = (id) => (params.layers || []).find(l => l.id === id);
   const percById = (id) => (params.percLayers || []).find(l => l.id === id);
-  const mirrorSliders = (id, az, dist) => {
-    const a = panel.querySelector(`[data-patch-lyr-angle="${id}"]`); if (a) a.value = az;
-    const d = panel.querySelector(`[data-patch-lyr-dist="${id}"]`); if (d) d.value = dist;
-  };
+  const patchTargetHandles = new Map();
   const syncLayerRowSel = () => panel.querySelectorAll("[data-patch-lyr]").forEach(r =>
     r.classList.toggle("sel", r.dataset.patchLyr === _patchStageSel));
   const updateReadout = () => {
@@ -4802,9 +5002,10 @@ function bindPatchInspector(v) {
     selected: () => _patchStageSel,
     onSelect: (s) => { _patchStageSel = s.id; syncLayerRowSel(); updateReadout(); },
     onMove: (s, az, dist) => {
-      if (s.kind === "base") { params.spaceAzimuth = az; params.spaceDistance = dist; mirrorSliders("base", az, dist); }
-      else if (s.kind === "percussion") { const l = percById(s.id.slice(5)); if (l) l.space = { angle: az, dist }; mirrorSliders(s.id, az, dist); }
-      else { const l = layerById(s.id); if (l) l.space = { angle: az, dist }; mirrorSliders(s.id, az, dist); }
+      if (s.kind === "base") { params.spaceAzimuth = az; params.spaceDistance = dist; }
+      else if (s.kind === "percussion") { const l = percById(s.id.slice(5)); if (l) l.space = { angle: az, dist }; }
+      else { const l = layerById(s.id); if (l) l.space = { angle: az, dist }; }
+      patchTargetHandles.get(s.id)?.redraw();
       persist("patch source position"); updateReadout();
     },
   });
@@ -4813,23 +5014,33 @@ function bindPatchInspector(v) {
   panel.querySelectorAll("[data-patch-lyr-gain]").forEach(el => {
     el.oninput = () => { const l = layerById(el.dataset.patchLyrGain); if (!l) return; l.gain = parseFloat(el.value); if (l.mute && l.gain > 0) l.mute = false; persist("layer level"); };
   });
-  // Angle/Dist sliders route by id: "base", a "perc:<id>" hit, or a melodic layer.
+  const baseGain = panel.querySelector("[data-patch-base-gain]");
+  if (baseGain) baseGain.oninput = () => { params.baseLayerGain = parseFloat(baseGain.value); persist("base layer level"); };
+  const baseSolo = panel.querySelector("[data-patch-base-solo]");
+  if (baseSolo) baseSolo.onclick = () => {
+    params.baseLayerSolo = !params.baseLayerSolo;
+    baseSolo.classList.toggle("on", params.baseLayerSolo);
+    persist("solo base layer"); redrawStage();
+  };
+  // Every row uses the same compact spatial target as a track header.
   const spaceTargetFor = (id) => id.startsWith("perc:") ? percById(id.slice(5)) : layerById(id);
-  panel.querySelectorAll("[data-patch-lyr-angle]").forEach(el => {
-    el.oninput = () => {
-      const id = el.dataset.patchLyrAngle, val = parseFloat(el.value);
-      if (id === "base") params.spaceAzimuth = val;
-      else { const l = spaceTargetFor(id); if (l) l.space = { angle: val, dist: l.space?.dist ?? (params.spaceDistance ?? 2.5) }; }
-      persist("layer angle"); redrawStage();
-    };
-  });
-  panel.querySelectorAll("[data-patch-lyr-dist]").forEach(el => {
-    el.oninput = () => {
-      const id = el.dataset.patchLyrDist, val = parseFloat(el.value);
-      if (id === "base") params.spaceDistance = val;
-      else { const l = spaceTargetFor(id); if (l) l.space = { angle: l.space?.angle ?? (params.spaceAzimuth ?? 0), dist: val }; }
-      persist("layer dist"); redrawStage();
-    };
+  panel.querySelectorAll("[data-patch-space-target]").forEach(cv => {
+    const id = cv.dataset.patchSpaceTarget;
+    const source = () => patchSpatialSources(params).find(s => s.id === id)
+      || { angle: params.spaceAzimuth ?? 0, dist: params.spaceDistance ?? 2.5, hue: 36 };
+    const handle = wireCompactSpaceTarget(cv, {
+      get: () => ({ angle: source().angle, dist: source().dist }),
+      hue: () => source().hue,
+      muted: () => !!source().mute,
+      set: (pos) => {
+        _patchStageSel = id; syncLayerRowSel();
+        if (id === "base") { params.spaceAzimuth = pos.angle; params.spaceDistance = pos.dist; }
+        else { const l = spaceTargetFor(id); if (l) l.space = { ...pos }; }
+        persist("patch source position"); updateReadout();
+      },
+      redraw: redrawStage,
+    });
+    patchTargetHandles.set(id, handle);
   });
   panel.querySelectorAll("[data-patch-perc-gain]").forEach(el => {
     el.oninput = () => { const l = percById(el.dataset.patchPercGain); if (!l) return; l.vol = parseFloat(el.value); if (l.mute && l.vol > 0) l.mute = false; persist("percussion hit level"); };
@@ -4845,7 +5056,7 @@ function bindPatchInspector(v) {
   });
   panel.querySelectorAll("[data-patch-lyr]").forEach(row => {
     row.addEventListener("mousedown", (e) => {
-      if (e.target.closest("input,button")) return; // don't steal slider/button clicks
+      if (e.target.closest("input,button,canvas")) return;
       _patchStageSel = row.dataset.patchLyr;
       syncLayerRowSel(); redrawStage();
     });
@@ -5059,7 +5270,9 @@ function drawMixerTrackSpace(cv, track) {
   }
 }
 
-// Master stereo meter: the summed voice levels, split L/R by each track's pan.
+// Master stereo meter: approximate the binaural field's lateral energy from
+// each spatial target. Front/back share laterality; the engine supplies the
+// actual ITD, head-shadow and pinna response.
 function drawMixerMaster(cv) {
   if (!cv) return;
   const g2 = crisp2d(cv);
@@ -5069,9 +5282,10 @@ function drawMixerMaster(cv) {
   for (const t of (arrangement.tracks || [])) {
     if (t.muted) continue;
     const rms = _voiceRms(producerVoices.get(t.id));
-    const pan = Math.max(-1, Math.min(1, t.pan ?? 0));
-    L += rms * Math.cos((pan + 1) * Math.PI / 4);
-    R += rms * Math.sin((pan + 1) * Math.PI / 4);
+    const target = _spTrackPos(t, curPlayBeat());
+    const lateral = Math.sin(clamp(target.angle ?? 0, -180, 180) * Math.PI / 180);
+    L += rms * Math.cos((lateral + 1) * Math.PI / 4);
+    R += rms * Math.sin((lateral + 1) * Math.PI / 4);
   }
   const barW = (w - 6) / 2 - 2;
   const draw = (x, level) => {
@@ -5090,33 +5304,79 @@ let _mixerDrag = null;   // { trackId, pos } while dragging a track's space dot
 let _mixerRaf = null;
 let _threadDrag = null;  // { trackId, pos, moved } while dragging a track-head space target
 
-// Compact spatial "target" for the track head: concentric rings with the
-// listener at centre and a coloured dot at the track thread's (angle, distance).
-// A greyed dot means the track is anchored in the global space (dragging it
-// snaps back — you edit anchors in the cross-section, same rule as the mixer).
-function drawTrackSpaceDot(cv, track) {
+function compactSpaceTargetText(pos) {
+  return `${Number(pos?.dist ?? 2.5).toFixed(1)} m · ${Math.round(pos?.angle ?? 0)}°`;
+}
+
+// Shared compact spatial target. Track headers, layer rows and patch rows all
+// use this one drawing language instead of separate pan/angle/distance widgets.
+function drawCompactSpaceTarget(cv, pos, hue = 205, muted = false) {
   if (!cv) return;
   const g2 = crisp2d(cv);
   const ctx = g2.ctx, w = g2.w, h = g2.h;
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 3;
-  const anchored = !!(arrangement.space?.tracks?.[track.id] || []).length;
-  ctx.strokeStyle = "rgba(120,140,160,0.30)";
-  ctx.lineWidth = 1;
+  ctx.fillStyle = "rgba(60,72,88,0.16)";
+  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(120,140,160,0.30)"; ctx.lineWidth = 1;
   for (const frac of [0.5, 1]) { ctx.beginPath(); ctx.arc(cx, cy, rMax * frac, 0, 2 * Math.PI); ctx.stroke(); }
   ctx.strokeStyle = "rgba(120,140,160,0.16)";
   ctx.beginPath(); ctx.moveTo(cx - rMax, cy); ctx.lineTo(cx + rMax, cy); ctx.moveTo(cx, cy - rMax); ctx.lineTo(cx, cy + rMax); ctx.stroke();
-  ctx.fillStyle = "rgba(205,218,232,0.7)";
+  ctx.fillStyle = "rgba(205,218,232,0.72)";
   ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI); ctx.fill();
+  const rad = ((pos?.angle ?? 0) - 90) * Math.PI / 180;
+  const r = _spaceDistToR(clamp(pos?.dist ?? 2.5, SPACE_DMIN, SPACE_DMAX), rMax);
+  const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+  ctx.fillStyle = muted ? "hsla(215,12%,58%,0.9)" : `hsla(${hue},78%,64%,1)`;
+  ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = muted ? 0 : 5;
+  ctx.beginPath(); ctx.arc(x, y, Math.max(2.7, Math.min(3.6, rMax * 0.24)), 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
+  cv.title = `Spatial target — drag left/right to rotate, up/down for distance · ${compactSpaceTargetText(pos)}`;
+  const readout = cv.parentElement?.querySelector("[data-space-target-readout]");
+  if (readout) readout.textContent = compactSpaceTargetText(pos);
+}
+
+function wireCompactSpaceTarget(cv, cfg) {
+  if (!cv) return;
+  const paint = () => {
+    const hue = typeof cfg.hue === "function" ? cfg.hue() : (cfg.hue ?? 205);
+    const muted = typeof cfg.muted === "function" ? cfg.muted() : !!cfg.muted;
+    drawCompactSpaceTarget(cv, cfg.get(), hue, muted);
+  };
+  paint();
+  cv.onmousedown = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const sx = e.clientX, sy = e.clientY, base = { ...cfg.get() };
+    let moved = false;
+    const move = (ev) => {
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (Math.abs(dx) + Math.abs(dy) > 1) moved = true;
+      let angle = (base.angle ?? 0) + dx * 0.9;
+      angle = ((angle + 180) % 360 + 360) % 360 - 180;
+      const dist = clamp((base.dist ?? 2.5) * Math.exp(-dy * 0.012), SPACE_DMIN, SPACE_DMAX);
+      cfg.set({ angle, dist: Number(dist.toFixed(2)) }, false);
+      paint(); cfg.redraw?.();
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
+      if (moved) cfg.commit?.(cfg.get());
+      paint(); cfg.redraw?.();
+    };
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+  };
+  return { redraw: paint };
+}
+
+// Compact spatial "target" for the track head: concentric rings with the
+// listener at centre and a coloured dot at the track thread's (angle, distance).
+// A greyed dot means the track is anchored in the global space (dragging it
+// snaps back — you edit anchors in the cross-section, same rule as the mixer).
+function drawTrackSpaceDot(cv, track) {
+  const anchored = !!(arrangement.space?.tracks?.[track.id] || []).length;
   const hue = track.hue ?? _spHue(arrangement.tracks.indexOf(track));
   const drag = _threadDrag && _threadDrag.trackId === track.id ? _threadDrag.pos : null;
   const pos = drag || _spTrackPos(track, curPlayBeat());
-  const rad = ((pos.angle ?? 0) - 90) * Math.PI / 180;
-  const r = _spaceDistToR(Math.max(SPACE_DMIN, Math.min(SPACE_DMAX, pos.dist ?? 2.5)), rMax);
-  const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
-  ctx.fillStyle = anchored ? "hsla(215,12%,58%,0.9)" : `hsla(${hue},78%,64%,1)`;
-  ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = anchored ? 0 : 5;
-  ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
+  drawCompactSpaceTarget(cv, pos, hue, anchored);
+  cv.title += anchored ? " · edit its anchor in Global space" : " · double-click to inherit the patch position";
 }
 
 function _sizeMasterFader() {
@@ -6351,7 +6611,7 @@ function maybeShowProducerTour() {
 // time from the ✦ Tour button next to the workspace tabs.
 const STUDIO_TOUR_KEY = "phase0.studioTour.v1";
 const STUDIO_TOUR_STEPS = [
-  [".transport-card", "Hear something first",
+  [".transport-cluster", "Hear something first",
    "▶ Play starts a continuous stream generated from the current settings — nothing is pre-recorded. Randomise reshuffles every behaviour at once, and the Seed makes any take repeatable."],
   ["#workspaceTabs", "Three workshops",
    "Macro shapes how the instrument plays: melody, rhythm, dynamics, surprise. Sub-note designs what a single note sounds like (excitor → resonator → body → space). Scale Lab is the tuning workshop."],
@@ -6361,8 +6621,14 @@ const STUDIO_TOUR_STEPS = [
    "This display is the engine thinking out loud: each lane is one behaviour, and the moving beam is the note being chosen right now. The lanes redraw as you move any control."],
   ["#m2Lib", "The browser",
    "Ready-made sounds live in this strip. Click one to load it, ♥ to keep favourites, or ▴ Browse all for the full factory, saved and community library."],
+  // Research surface: this row only exists in experiments mode, and the tour
+  // skips any step whose target isn't on the page.
   [".top-rating-row", "Rate what you hear",
    "The 1–7 rating is how the research learns what sounds good. If you opted in to sharing it is sent anonymously; either way it tags the presets you save."],
+  // The account control has no id — it is class-only markup from
+  // accountBarHTML(); an id selector here made the tour skip this step.
+  [".account-bar", "Your profile & the community",
+   "Create a profile (invite code needed) to keep patches in the cloud and share your work. In the Producer's Library, ☄ Community is where you find, rate, and audition what other people have made — anything you add joins your own library."],
   [".producer-pill", "When you're ready: the Producer",
    "The Producer arranges your instruments on a multitrack timeline — regions, seeds, baking takes into editable notes. It has its own short tour the first time you open it."],
 ];
@@ -6781,7 +7047,7 @@ function loadFactorySession(id) {
     const trackId = crypto.randomUUID();
     const track = {
       id: trackId, name: spec.name || patch.name, sourceKind: "factory", instrumentParams: { ...params },
-      gain: spec.gain ?? 1, pan: spec.pan ?? 0, useGlobalScale: !!spec.useHarmonicGuide,
+      gain: spec.gain ?? 1, useGlobalScale: !!spec.useHarmonicGuide,
       regions: (spec.regions || []).map(r => ({ id: crypto.randomUUID(), paletteId, startBeat: r.startBeat, lengthBeats: r.lengthBeats, seed: r.seed })),
     };
     next.tracks.push(track);
@@ -6890,12 +7156,17 @@ function renderProduce() {
     : 0;
   const v = mount(`
     <div class="daw">
-      <div class="daw-transport">
-        <div class="daw-cluster daw-cluster-arrangement" aria-label="Arrangement">
-          <a class="btn btn-ghost btn-sm" href="#explore" title="Back to the Studio">←</a>
-          <div class="daw-file-wrap">
-            <button class="btn btn-ghost btn-sm daw-file-button" id="arrFileToggle" aria-expanded="false">File <span>▾</span></button>
-            <div class="daw-file-pop" id="arrFilePop" hidden>
+      <div class="daw-transport app-topbar tb-producer">
+        <!-- Identity (audit r2): brand-first like the studio bar. The mark +
+             "Producer" is the back-to-studio link and dim breadcrumb root; the
+             arrangement name is the one prominent, editable title; File is a
+             borderless menu trigger, not a button. -->
+        <a class="tb-brand tb-home daw-brand" href="#explore" title="Back to the Studio">${appIconHTML("sm")}<span class="app-name">Producer</span></a>
+        <span class="daw-crumb-sep" aria-hidden="true">/</span>
+        <span class="daw-arr-name" id="arrName" title="Double-click to rename this arrangement" tabindex="0">${esc(arrangement.name || "Untitled")}</span>
+        <div class="daw-file-wrap">
+          <button class="daw-file-button" id="arrFileToggle" aria-expanded="false" aria-haspopup="menu" title="Arrangement file menu">File ${tbIcon("caret", "daw-file-caret")}</button>
+          <div class="daw-file-pop" id="arrFilePop" hidden>
               <button data-file-action="new"><b>New arrangement</b><span>Start with an empty session</span></button>
               <button class="danger" data-file-action="delete"><b>Delete arrangement</b><span>Remove the current session</span></button>
               <div class="daw-file-divider"></div>
@@ -6909,39 +7180,59 @@ function renderProduce() {
               </div>
               <div class="daw-file-sub">
                 <button class="daw-file-subtrigger" aria-haspopup="true"><b>Import / Export</b><span class="daw-file-arrow">▸</span></button>
-                <div class="daw-file-flyout"><button data-file-action="wav"><b>Export WAV</b></button><button data-file-action="json-export"><b>Export arrangement</b></button><button data-file-action="json-import"><b>Import arrangement</b></button></div>
+                <div class="daw-file-flyout"><button data-file-action="wav"><b>Export WAV</b></button><button data-file-action="json-export"><b>Export arrangement</b></button><button data-file-action="json-import"><b>Import arrangement</b></button><button data-file-action="share-composition"><b>Share to my profile</b><span>Inline player, up to 5 minutes</span></button></div>
               </div>
             </div>
           </div>
-          <span class="daw-title">Producer <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></span>
-          <span class="daw-arr-name" id="arrName" title="Double-click to rename this arrangement" tabindex="0">${esc(arrangement.name || "Untitled")}</span>
+
+        <div class="tb-spacer"></div>
+
+        <!-- Transport: bare rounds like the studio (no backing box → no nested
+             outlines). Play is the one green-ringed circle. -->
+        <div class="transport-cluster" aria-label="Transport">
+          <button class="transport-round transport-icon" id="arrRTZ" title="Return to bar 1 (Return)">${tbIcon("rewind")}</button>
+          <button class="transport-round transport-play" id="arrPlayBtn" title="Play / pause (Space)">${tbIcon("play")}</button>
+          <button class="transport-round transport-icon transport-stop" id="prodStop" title="Stop (returns to the start marker)">${tbIcon("stop")}</button>
+          <button class="transport-round transport-icon${arrangement.loopOn ? " loop-on" : ""}" id="arrLoop" title="Cycle the loop range (drag the ruler's top half to set it)">${tbIcon("loop")}</button>
         </div>
-        <div class="daw-cluster daw-cluster-playback" aria-label="Transport">
-          <button class="btn btn-ghost btn-sm" id="arrRTZ" title="Return to bar 1 (Return)">⏮</button>
-          <button class="btn btn-primary btn-sm" id="arrPlayBtn" title="Play / pause (Space)">▶</button>
-          <button class="btn btn-secondary btn-sm" id="prodStop" title="Stop (returns to the start marker)">■</button>
-          <button class="btn btn-ghost btn-sm${arrangement.loopOn ? " loop-on" : ""}" id="arrLoop" title="Cycle the loop range (drag the ruler's top half to set it)">⟳</button>
-          <div class="daw-transport-display"><label><span>Bar · beat</span><button class="daw-pos" id="arrPos" title="Position bar.beat — click to locate">${Math.floor(playheadBeat / BEATS_PER_BAR) + 1}.${(Math.floor(playheadBeat) % BEATS_PER_BAR) + 1}</button></label>${sessionBarControlsHTML()}</div>
-          <span class="daw-saved" id="arrSaved"></span>
+        <!-- Position + tempo: one compact readout; both cells share the same
+             label-row / value-row baselines (were misaligned by ~3px). -->
+        <div class="daw-readout">
+          <div class="daw-cell">
+            <span class="daw-cell-label">Bar·Beat</span>
+            <button class="daw-cell-val daw-pos" id="arrPos" title="Position — click to locate">${Math.floor(playheadBeat / BEATS_PER_BAR) + 1}.${(Math.floor(playheadBeat) % BEATS_PER_BAR) + 1}</button>
+          </div>
+          ${sessionBarControlsHTML()}
         </div>
-        <div class="daw-cluster daw-cluster-edit" aria-label="Grid and edit">
-          <button class="btn btn-ghost btn-sm" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">↩</button>
-          <button class="btn btn-ghost btn-sm" id="zoomOut" title="Zoom out">−</button>
-          <button class="btn btn-ghost btn-sm" id="zoomIn" title="Zoom in">＋</button>
+
+        <div class="tb-spacer"></div>
+
+        <!-- Tools: each stands alone (undo is history, zoom is view — they are
+             no longer boxed together). Zoom reads as zoom via magnifier ± icons. -->
+        <button class="tb-util-btn tb-icon-only" id="undoBtn" title="Undo the last change (⌘Z; press again to redo)">${tbIcon("undo")}</button>
+        <div class="daw-zoom" role="group" aria-label="Zoom the timeline">
+          <button class="tb-util-btn tb-icon-only" id="zoomOut" title="Zoom out">${tbIcon("zoomOut")}</button>
+          <button class="tb-util-btn tb-icon-only" id="zoomIn" title="Zoom in">${tbIcon("zoomIn")}</button>
         </div>
-        <div class="daw-cluster daw-cluster-io" aria-label="File and MIDI">
-          <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
-          ${midiToolbarHTML()}
-          <span class="toolbar-hint" id="mixStatus"></span>
-        </div>
+        <input type="file" id="arrImportFile" accept="application/json" style="display:none"/>
+        ${midiToolbarHTML()}
+        <span class="toolbar-hint" id="mixStatus"></span>
+        <span class="daw-saved" id="arrSaved"></span>
+
+        <!-- Gold primary + account, mirroring the studio bar's Save + account. -->
+        <button class="btn btn-primary btn-sm tb-pill" id="shareCompBtn" title="Share this composition to your community profile (up to 5 minutes, plays inline)">${tbIcon("upload")}<span class="tb-label">Share</span></button>
+        ${accountBarHTML()}
       </div>
       <div class="daw-main" style="grid-template-columns:${dawLayout.leftOpen ? dawLayout.leftW : 22}px 6px 1fr">
         <div class="daw-left${dawLayout.leftOpen ? "" : " collapsed"}">
           <button class="daw-collapse" id="leftCollapse" title="${dawLayout.leftOpen ? "Collapse" : "Expand"} the library panel">${dawLayout.leftOpen ? "◂" : "▸"}</button>
           <div class="daw-left-content${dawLayout.leftOpen ? "" : " hidden"}">
             <div class="daw-browser" style="flex:${dawLayout.browserFrac} 1 0">
-              <div class="section-label">Browser</div>
-              <div class="saem-browser-facets" aria-label="Filter Browser by saved part">
+              <div class="section-label section-label-row">
+                <span class="section-label-title">Library</span>
+                <button class="pal-btn community-open" id="communityOpen" title="Browse synths, note engines and compositions shared by the community — add them to your library">☄ Community</button>
+              </div>
+              <div class="saem-browser-facets" aria-label="Filter the Library by saved part">
                 <button data-browser-part="all" class="${producerBrowserTarget ? "" : "active"}">All</button>
                 ${CAPTURE_PARTS.map(part => `<button data-browser-part="${part}" class="${producerBrowserTarget?.part === part ? "active" : ""}" title="Show ${CAPTURE_PART_LABELS[part]}">${notationIconHTML([part], { compact: true })}</button>`).join("")}
               </div>
@@ -6953,7 +7244,7 @@ function renderProduce() {
               <div class="section-label section-label-row">
                 <button class="pal-collapse pal-info${dawLayout.paletteMin ? "" : " on"}" data-palette-collapse title="${dawLayout.paletteMin ? "Show each patch's details" : "Hide details"}" aria-pressed="${dawLayout.paletteMin ? "false" : "true"}">ⓘ</button>
                 <span class="section-label-title">Palette</span>
-                <button class="pal-btn" data-palette-new title="Create an empty patch and add parts from the Browser">＋</button>
+                <button class="pal-btn" data-palette-new title="Create an empty patch and add parts from the Library">＋</button>
               </div>
               <div class="palette-rack" id="paletteRack">${producerPaletteHTML()}</div>
             </div>
@@ -6977,7 +7268,7 @@ function renderProduce() {
     </div>
   `);
   document.body.classList.add("explore-mode");
-  document.title = "Resona — Producer";
+  document.title = "Soundinator — Producer";
   wireDawLayout(v);
   wireProduce(v);
   maybeShowProducerTour(); // Q9 F: three-step first-visit tour
@@ -7198,34 +7489,9 @@ function wireProduce(v) {
     };
   });
 
-  // Q9 C: track-head extras — hue swatch opens the track's own space
-  // mini-controls; dragging the header vertically reorders tracks.
-  v.querySelectorAll("[data-track-space]").forEach(sw => {
-    sw.onclick = (e) => {
-      e.stopPropagation();
-      _spTrackPopover = _spTrackPopover === sw.dataset.trackSpace ? null : sw.dataset.trackSpace;
-      renderProduce();
-    };
-  });
-  const bindTrackSpace = (attr, key) => v.querySelectorAll(`[${attr}]`).forEach(sl => {
-    sl.oninput = () => {
-      const t = arrangement.tracks.find(t => t.id === sl.getAttribute(attr));
-      if (!t) return;
-      t.space = { angle: t.space?.angle ?? 0, dist: t.space?.dist ?? 2.5, [key]: Number(sl.value) };
-    };
-    sl.onchange = () => { saveArrangement("track space"); };
-  });
-  bindTrackSpace("data-track-space-angle", "angle");
-  bindTrackSpace("data-track-space-dist", "dist");
-  v.querySelectorAll("[data-track-space-clear]").forEach(btn => {
-    btn.onclick = () => {
-      const t = arrangement.tracks.find(t => t.id === btn.dataset.trackSpaceClear);
-      if (t) { delete t.space; _spTrackPopover = null; saveArrangement("track space reset"); renderProduce(); }
-    };
-  });
   v.querySelectorAll("[data-track-head]").forEach(head => {
     head.onmousedown = (e) => {
-      if (e.target.closest("button, input, .tl2-hue, .tl2-space-pop")) return;
+      if (e.target.closest("button, input, canvas, .tl2-hue")) return;
       e.preventDefault();
       const id = head.dataset.trackHead;
       let baseY = e.clientY;
@@ -7686,6 +7952,11 @@ function wireProduce(v) {
         const drag = _threadDrag; _threadDrag = null;
         if (!drag?.moved) { drawTrackSpaceDot(cv, track); return; }
         const sp = ensureGlobalSpace();
+        if (!sp.enabled) {
+          track.space = { ...drag.pos };
+          saveArrangement("move track spatial target"); renderProduce();
+          return;
+        }
         const anchors = sp.tracks[track.id];
         const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < 0.26);
         if (a) { a.angle = drag.pos.angle; a.dist = drag.pos.dist; saveArrangement("move space anchor"); renderProduce(); }
@@ -7694,6 +7965,19 @@ function wireProduce(v) {
       };
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
+    };
+    cv.ondblclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const track = arrangement.tracks.find(t => t.id === cv.dataset.trackSpaceDot);
+      if (!track) return;
+      const sp = ensureGlobalSpace();
+      if (sp.enabled) {
+        if (sp.tracks?.[track.id]?.length) return;
+        if (sp.static) delete sp.static[track.id];
+      } else {
+        delete track.space;
+      }
+      saveArrangement("reset track spatial target"); renderProduce();
     };
   });
 
@@ -7757,10 +8041,10 @@ function wireProduce(v) {
   if (arrPlayBtn) arrPlayBtn.onclick = () => {
     if (arrPlay) {
       pauseArrangement();               // pause keeps the resume point
-      arrPlayBtn.textContent = "▶";
+      setTbIcon(arrPlayBtn, "play");
     } else {
       playArrangement(playheadBeat);
-      arrPlayBtn.textContent = "⏸";
+      setTbIcon(arrPlayBtn, "pause");
     }
   };
 
@@ -7907,6 +8191,7 @@ function wireProduce(v) {
     if (action.startsWith("recent:")) { switchArrangement(action.slice(7)); return; }
     if (action.startsWith("starter:")) { if (loadFactorySession(action.slice(8))) renderProduce(); return; }
     if (action === "wav") mixdownArrangement(v.querySelector("#mixStatus"), item);
+    if (action === "share-composition") openShareCompositionDialog();
     if (action === "json-export") exportArrangement();
     if (action === "json-import") v.querySelector("#arrImportFile")?.click();
   });
@@ -7927,18 +8212,22 @@ function wireProduce(v) {
 // ─── Landing ────────────────────────────────────────────────
 
 function renderLanding() {
+  const withStudy = experimentsEnabled();
   const v = mount(`
     <div class="landing-header">
-      <h1>Sound Preferences</h1>
-      <p>A research experiment exploring how people hear and enjoy algorithmically generated sound.</p>
+      <div class="landing-acct">${accountBarHTML()}</div>
+      <h1>${appIconHTML("lg")} Soundinator</h1>
+      <p>Design sounds, build patches, and share them with an invite-only community of sound makers.</p>
+      ${lockedOut() ? `<p class="landing-lock">Early testing — an invite code is needed to enter the studio.</p>` : ""}
     </div>
     <div class="landing-cards">
+      ${withStudy ? `
       <a class="landing-card" id="goStudy">
         <span class="icon">&#x1F3AF;</span>
         <h2>Take the Study</h2>
         <p>Structured listening tasks that map your sound preferences. Your data helps design future experiments.</p>
         <span class="badge">~10 minutes</span>
-      </a>
+      </a>` : ""}
       <a class="landing-card" id="goExplore">
         <span class="icon">&#x1F3B9;</span>
         <h2>Explore Sounds</h2>
@@ -7947,8 +8236,9 @@ function renderLanding() {
       </a>
     </div>
   `);
-  v.querySelector("#goStudy").onclick = () => navigate("study/consent");
-  v.querySelector("#goExplore").onclick = () => navigate("explore");
+  const study = v.querySelector("#goStudy");
+  if (study) study.onclick = () => lockedOut() ? showInviteGateDialog() : navigate("study/consent");
+  v.querySelector("#goExplore").onclick = () => lockedOut() ? showInviteGateDialog() : navigate("explore");
 }
 
 // ─── Study: Consent ─────────────────────────────────────────
@@ -8361,9 +8651,9 @@ function renderStudyDebrief() {
     </div>
     <div class="card mb-3">
       <h3 class="mb-1">Want to explore more?</h3>
-      <p class="text-sm mb-2">Resona lets you play freely with the same synthesis
+      <p class="text-sm mb-2">Soundinator lets you play freely with the same synthesis
       engine used in the study. Discover what you like and save your favourites.</p>
-      <button class="btn btn-primary" id="goExplore">Open Resona</button>
+      <button class="btn btn-primary" id="goExplore">Open Soundinator</button>
     </div>
     <div class="text-center mt-3">
       <button class="btn btn-ghost btn-sm" id="goHome">Return to start</button>
@@ -8403,70 +8693,54 @@ function renderExplore() {
   const v = mount(`
     <div class="explore-dashboard${workspaceTab === 'subnote' ? ' subnote-workspace-mode' : ''}${workspaceTab === 'scalelab' ? ' scalelab-workspace-mode' : ''}${workspaceTab === 'explore' ? ' macro2-workspace-mode' : ''}" style="--dash-c1:${_studioPanels.dashC1}px">
       <div class="dash-vsplit" id="dashVSplit" title="Drag to resize the left column"></div>
-    <div class="explore-top">
-      <div class="explore-title">
-        <h1>Resona <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span></h1>
-        <div class="studio-subtitle">Probabilistic Synthesiser</div>
+    <!-- Unified top bar (audit 2026-07-14): ONE full-width strip shared
+         structurally with the Producer — brand · view nav · transport ·
+         utilities · primary action · account, left to right. The account
+         control lives at the far right in every view (the welcome copy
+         points there), and the play cluster is the same round component
+         in both bars. -->
+    <div class="app-topbar tb-explore">
+      <h1 class="tb-brand">
+        <a class="tb-home" id="backHome" href="#home" title="Soundinator — back to the welcome page">${appIconHTML("sm")}<span class="app-name">Soundinator</span></a>
+        <span class="build-tag" title="App version · asset build (bumps with every change)">${BUILD_TAG}</span>
+      </h1>
+      <div class="workspace-tabs" id="workspaceTabs">
+        <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore" title="The behaviour half: melody, rhythm, dynamics, sequence & surprise — how the instrument plays">Macro</button>
+        <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
+        <button class="workspace-tab${workspaceTab === 'scalelab' ? ' active' : ''}" data-workspace-tab="scalelab" title="The tuning workshop: the scale wheel, N-EDO systems, world tunings, per-degree cents and Scala import/export">Scale Lab</button>
       </div>
-    </div>
-
-    ${paletteEditBannerHTML()}
-    ${welcomeCardHTML()}
-
-    <!-- Transport -->
-    <div class="card transport-card">
-      <div class="transport">
-        <div class="workspace-tabs" id="workspaceTabs">
-          <button class="workspace-tab${workspaceTab === 'explore' ? ' active' : ''}" data-workspace-tab="explore" title="The behaviour half: melody, rhythm, dynamics, sequence & surprise — how the instrument plays">Macro</button>
-          <button class="workspace-tab${workspaceTab === 'subnote' ? ' active' : ''}" data-workspace-tab="subnote" title="The instrument designer: excitor, resonator, body and space — what one note sounds like">Sub-note</button>
-          <button class="workspace-tab${workspaceTab === 'scalelab' ? ' active' : ''}" data-workspace-tab="scalelab" title="The tuning workshop: the scale wheel, N-EDO systems, world tunings, per-degree cents and Scala import/export">Scale Lab</button>
-        </div>
-        <a class="producer-pill" href="#produce" title="Producer: arrange your instruments on a timeline">▦ Producer</a>
-        <!-- One play/stop toggle: it already stopped when playing, so the old
-             separate ■ Stop button was redundant (owner 2026-07-10). Restart and
-             Randomise are icon buttons to save the header's width. -->
-        <div class="transport-cluster">
-          <button class="transport-round transport-play${synth.isPlaying ? ' is-playing' : ''}" id="playBtn" title="Play / Stop">${synth.isPlaying ? "■" : "▶"}</button>
-          <button class="transport-round transport-icon" id="regenBtn" title="Restart the sequence from the top with the current settings">↻</button>
-          <button class="transport-round transport-icon rand-icon" id="randBtn" title="Randomise every behaviour and roll a fresh seed">◇</button>
-        </div>
-        <div class="seed-box">
-          <span>Seed</span>
-          <button class="btn btn-ghost btn-sm" id="seedBtn">${p.seed}</button>
-        </div>
+      <a class="producer-pill tb-pill" href="#produce" title="Producer: arrange your instruments on a timeline">${tbIcon("producer")}<span class="tb-label">Producer</span></a>
+      <div class="tb-spacer"></div>
+      <!-- One play/stop toggle: it already stopped when playing, so the old
+           separate ■ Stop button was redundant (owner 2026-07-10). Restart and
+           Randomise are icon buttons to save the header's width. -->
+      <div class="transport-cluster">
+        <button class="transport-round transport-play${synth.isPlaying ? ' is-playing' : ''}" id="playBtn" title="Play / Stop">${tbIcon(synth.isPlaying ? "stop" : "play")}</button>
+        <button class="transport-round transport-icon" id="regenBtn" title="Restart the sequence from the top with the current settings">${tbIcon("restart")}</button>
+        <button class="transport-round transport-icon rand-icon" id="randBtn" title="Randomise every behaviour and roll a fresh seed">${tbIcon("dice")}</button>
       </div>
-      <div class="tc-spacer"></div>
-      ${workspaceTab === 'explore' ? '' : `
-      <!-- Save collapses into a popover so the name field + scope don't eat the
-           header's width (owner 2026-07-10). -->
-      <div class="top-save" id="topSave">
-        <button class="btn btn-primary btn-sm top-save-toggle" id="saveToggle" title="Save the current sound as a preset">Save<span class="caret">▾</span></button>
-        <div class="save-pop" id="savePop" hidden>
-          <label class="save-pop-row"><span>Name</span>
-            <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
-          </label>
-          <label class="save-pop-row"><span>Capture</span>
-            <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
-              <option value="full">Everything</option>
-              ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
-            </select>
-          </label>
-          <button class="btn btn-primary btn-sm" id="saveBtn">Save preset</button>
-        </div>
-      </div>`}
+      <div class="seed-box">
+        <span class="tb-label">Seed</span>
+        <button class="btn btn-ghost btn-sm" id="seedBtn">${p.seed}</button>
+      </div>
+      <div class="tb-spacer"></div>
+      ${experimentsEnabled() ? `
       <div class="top-rating-row">
         <span class="label">Rating</span>
         <input type="range" id="ratingSlider" min="1" max="7" step="1" value="${exploreRating}"/>
         <output id="ratingOut">${exploreRating}/7</output>
-      </div>
-      <button class="transport-round transport-icon studio-tour-btn" id="studioTourBtn" title="Replay the guided tour of the studio">✦</button>
-      <div class="controls-grid tempo-grid">
-        ${controlRow("tempo", "Tempo", p.tempo, 50, 180, 1)}
-      </div>
-      <!-- V2.2 (owner): presets no longer open from the top bar — the
-           browser strip at the bottom of the macro workspace is the one
-           preset surface (expandable for the full library). -->
+      </div>` : ""}
+      <button class="transport-round transport-icon studio-tour-btn" id="studioTourBtn" title="Replay the guided tour of the studio">${tbIcon("sparkle")}</button>
+      <!-- ONE save per page (owner 2026-07-15): opens the name/tag overlay with
+           a share-to-community option. Quick untagged saves live in each
+           panel's preset bar; this is the front door. -->
+      <button class="btn btn-primary btn-sm top-save-btn tb-pill" id="openSaveBtn"
+        title="Save this ${SAVE_CONTEXTS[workspaceTab]?.label || "sound"} to your library — name it, tag it, optionally share it to the community">${tbIcon("save")}<span class="tb-label">Save</span></button>
+      ${accountBarHTML()}
     </div>
+
+    ${paletteEditBannerHTML()}
+    ${welcomeCardHTML()}
 
     <!-- V2: the hero visualiser lives INSIDE the macro workspace now (its
          centre display); the other workspaces never showed it anyway. -->
@@ -8531,7 +8805,7 @@ function renderExplore() {
     </div>
   `);
   document.body.classList.add("explore-mode");
-  document.title = "Resona";
+  document.title = "Soundinator";
 
   // ── Wire up ──
 
@@ -8568,20 +8842,21 @@ function renderExplore() {
     visModeSwitch.onclick = (e) => {
       const tog = e.target.closest("[data-vistoggle]");
       if (tog) {
-        // spectrum overlay: on/off, drawn faintly behind the active view
+        // spectrum underlay: on/off, drawn faintly behind the active view
         _visSpecOverlay = !_visSpecOverlay;
         tog.classList.toggle("active", _visSpecOverlay);
+        tog.setAttribute("aria-checked", String(_visSpecOverlay));
         if (!synth.isPlaying) drawStaticVis();
         return;
       }
       const btn = e.target.closest("[data-vismode]");
       if (!btn || btn.dataset.vismode === visMode) return;
-      const prevMode = visMode;
       visMode = btn.dataset.vismode;
-      // The Layers view is HTML, not a canvas render — swap needs a re-render.
-      if (visMode === "layers" || prevMode === "layers") { renderExplore(); if (synth.isPlaying) startVisualiser(); return; }
-      visModeSwitch.querySelectorAll(".vis-mode-btn").forEach(b =>
-        b.classList.toggle("active", b.dataset.vismode === visMode));
+      visModeSwitch.querySelectorAll(".vis-mode-btn").forEach(b => {
+        const on = b.dataset.vismode === visMode;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-checked", String(on));
+      });
       // Resize canvas + relabel the status header
       const wrap = canvas.closest(".visualiser-wrap");
       if (wrap) wrap.className = `visualiser-wrap vis-mode-${visMode}`;
@@ -8616,8 +8891,8 @@ function renderExplore() {
   const playBtn = v.querySelector("#playBtn");
   const syncPlayButton = () => {
     if (!playBtn) return;
-    // one toggle: ▶ when idle, ■ when playing (clicking it stops)
-    playBtn.textContent = synth.isPlaying ? "■" : "▶";
+    // one toggle: play when idle, stop when playing (clicking it stops)
+    setTbIcon(playBtn, synth.isPlaying ? "stop" : "play");
     playBtn.classList.toggle("is-playing", synth.isPlaying);
   };
   const clearPreviewBadge = () => {
@@ -9377,20 +9652,27 @@ function renderExplore() {
   // Percussion (v2): enable toggle + editable layer list + smart-combo sounds
   wirePercussionPanel(v);
 
-  // Rating
+  // Rating (research surface — absent for the community launch)
   const ratingSlider = v.querySelector("#ratingSlider");
   const ratingOut = v.querySelector("#ratingOut");
-  ratingSlider.oninput = () => {
-    exploreRating = Number(ratingSlider.value);
-    ratingOut.textContent = `${exploreRating}/7`;
-  };
-  // Log the committed rating (on release, not every tick) against the
-  // stimulus most recently heard, with how long after play-start it landed.
-  ratingSlider.onchange = () => {
-    trackEngagement("rate", {
-      rating_latency_ms: lastPlayStartedAt ? Date.now() - lastPlayStartedAt : null,
-    });
-  };
+  if (ratingSlider) {
+    ratingSlider.oninput = () => {
+      exploreRating = Number(ratingSlider.value);
+      ratingOut.textContent = `${exploreRating}/7`;
+    };
+    // Log the committed rating (on release, not every tick) against the
+    // stimulus most recently heard, with how long after play-start it landed.
+    ratingSlider.onchange = () => {
+      trackEngagement("rate", {
+        rating_latency_ms: lastPlayStartedAt ? Date.now() - lastPlayStartedAt : null,
+      });
+    };
+  }
+
+  // ONE save per page: the overlay handles name/tags and optional community
+  // sharing (owner 2026-07-15). Quick untagged saves stay in the panel bars.
+  const openSave = v.querySelector("#openSaveBtn");
+  if (openSave) openSave.onclick = () => openSaveOverlay();
 
   // Welcome / research opt-in card
   wireWelcomeCard(v);
@@ -9404,46 +9686,8 @@ function renderExplore() {
   // Per-panel section preset bars
   wirePanelPresetBars(v);
 
-  // Save preset (full rig or a single section). The name field + scope live in
-  // a popover toggled by #saveToggle so the header stays compact.
-  const saveToggle = v.querySelector("#saveToggle");
-  const savePop = v.querySelector("#savePop");
-  if (saveToggle && savePop) {
-    saveToggle.onclick = (e) => {
-      e.stopPropagation();
-      savePop.hidden = !savePop.hidden;
-      if (!savePop.hidden) {
-        const n = v.querySelector("#presetName"); if (n) n.focus();
-        if (window._savePopDoc) document.removeEventListener("click", window._savePopDoc, true);
-        window._savePopDoc = (ev) => {
-          if (!ev.target.closest("#topSave")) { savePop.hidden = true; document.removeEventListener("click", window._savePopDoc, true); }
-        };
-        document.addEventListener("click", window._savePopDoc, true);
-      }
-    };
-  }
-  const saveBtn = v.querySelector("#saveBtn");
-  if (saveBtn) saveBtn.onclick = () => {
-    const name = v.querySelector("#presetName").value.trim() || `Preset ${new Date().toLocaleTimeString()}`;
-    const scope = v.querySelector("#presetScope")?.value || "full";
-    const entry = {
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-      name,
-      section: scope,
-      rating: exploreRating,
-      parameters: scope === "full" ? { ...exploreParams } : extractSectionParams(exploreParams, scope),
-      ...(scope === "full" ? { stimulus_id: stimulusIdFor(exploreParams) } : {}),
-      app_version: APP_VERSION,
-    };
-    const list = loadPresets();
-    list.unshift(entry);
-    savePresets(list);
-    renderPresetList(v.querySelector("#myPresets"), loadPresets(), "my");
-    trackEngagement("save");
-    if (savePop) savePop.hidden = true;
-    maybeShowContribute(v);
-  };
+  // (The old top-save popover and its capture-scope select are gone — the
+  // single ⤓ Save button above opens the save overlay instead.)
 
   // Library tabs
   const tabStarters = v.querySelector("#tabStarters");
@@ -9666,8 +9910,10 @@ function m2InspectorHTML(p) {
 }
 
 function m2ChipsHTML(p) {
-  // spectrum/motif retired as modes — normalize any stale state to lanes
-  if (visMode !== "lanes" && visMode !== "pianoroll" && visMode !== "layers") visMode = "lanes";
+  // Two views only on the macro page (owner 2026-07-15): Lanes ⇄ Roll. The
+  // Layers editor lives in the sub-note workshop and the producer, not here.
+  // Spectrum/motif/layers as modes are retired — normalize stale state.
+  if (visMode !== "lanes" && visMode !== "pianoroll") visMode = "lanes";
   const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
   const scaleName = p.scaleMode === "edo"
     ? `${(p.customDegrees || []).length}/${div} degrees`
@@ -9681,10 +9927,15 @@ function m2ChipsHTML(p) {
       <span class="m2-chip">${div}-EDO</span>
       <button class="m2-chip m2-chip-link" id="m2OpenScaleLab" title="Open the tuning workshop">Open Scale Lab ↗</button>
       <div class="vis-mode-switch" id="visModeSwitch">
-        <button class="vis-mode-btn${visMode === "lanes" ? " active" : ""}" data-vismode="lanes" title="Behaviour timeline — history and the possible future field (motif structure lives here too)">Lanes</button>
-        <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll" title="Scrolling piano roll of the realized notes">Roll</button>
-        <button class="vis-mode-btn${visMode === "layers" ? " active" : ""}" data-vismode="layers" title="Position each layer in space, set its level, and dress it with effects — the room and head stay in the sub-note SPACE stage">Layers</button>
-        <button class="vis-mode-btn vis-spec-toggle${_visSpecOverlay ? " active" : ""}" data-vistoggle="spec" title="Overlay the live frequency response faintly behind the current view — no information lost to a separate mode">Spec</button>
+        <!-- Lanes⇄Roll is a SWITCH (one is always on); Spec is a separate
+             on/off toggle that underlays the chosen view. -->
+        <span class="vis-seg" role="radiogroup" aria-label="Visualiser view">
+          <button class="vis-mode-btn${visMode === "lanes" ? " active" : ""}" data-vismode="lanes" role="radio" aria-checked="${visMode === "lanes"}" title="Behaviour timeline — history and the possible future field (motif structure lives here too)">Lanes</button>
+          <button class="vis-mode-btn${visMode === "pianoroll" ? " active" : ""}" data-vismode="pianoroll" role="radio" aria-checked="${visMode === "pianoroll"}" title="Scrolling piano roll of the realized notes">Roll</button>
+        </span>
+        <button class="vis-spec-toggle${_visSpecOverlay ? " active" : ""}" data-vistoggle="spec" role="switch" aria-checked="${_visSpecOverlay}" title="Underlay the live frequency response faintly behind the view — flicks on and off">
+          <i class="vis-spec-dot"></i>Spec
+        </button>
       </div>
     </div>`;
 }
@@ -9707,7 +9958,8 @@ function m2LibEntries() {
     return loadPresets().map(e => ({
       id: `m:${e.id}`, name: e.name, section: e.section || "full",
       family: e.family || null, tags: e.tags || [], roles: e.roles || [],
-      rating: e.rating ?? null, parameters: e.parameters, desc: e.description || "",
+      rating: e.rating ?? null, parameters: e.parameters, captureParts: e.captureParts || null,
+      desc: e.description || "", mine: true,
     }));
   }
   if (_m2Lib.tab === "community") {
@@ -9742,7 +9994,17 @@ function m2LibFiltered() {
         ...m2LibEntries(),
       ]
     : m2LibEntries();
+  // Each page's browser only offers what applies to that page (owner
+  // 2026-07-15): the Sub-note page shows presets with sound/space content,
+  // the Macro page shows presets with behaviour/scale/percussion content.
+  const pageParts = soundMode ? ["notes", "space"] : ["stave", "clef", "percussion"];
+  const appliesHere = (e) => {
+    if (!e.parameters) return true; // recipes and factory stubs
+    const parts = capturePartsFor(e.parameters, e.section || "full", e.captureParts);
+    return pageParts.some(part => parts[part]);
+  };
   const rows = entries.filter(e =>
+    appliesHere(e) &&
     (soundMode || _m2Lib.fam === "all" || e.family === _m2Lib.fam || e.section === _m2Lib.fam) &&
     (!_m2Lib.favOnly || favs.has(e.id)) &&
     (!q || [e.name, e.desc, e.family, ...(e.tags || []), ...(e.roles || [])]
@@ -9825,15 +10087,8 @@ function m2PresetStripHTML(withSave = true) {
         <input type="search" id="m2LibSearch" class="m2-lib-search" placeholder="Search…" value="${esc(_m2Lib.search)}"/>` : ""}
         ${soundMode ? "" : `${famChip("all", "All")}${famChip("percussive", "Percussive")}${famChip("bass", "Bass")}${famChip("atmos", "Atmos")}${famChip("melody", "Melody")}${famChip("vocal", "Vocal")}${famChip("experimental", "Experimental")}`}
         <button class="m2-lib-chip m2-lib-fav${_m2Lib.favOnly ? " active" : ""}" id="m2LibFavOnly" title="Only favourites">♥</button>
-        ${withSave ? `
-        <span class="m2-lib-save">
-          <input type="text" id="presetName" placeholder="Preset name" maxlength="80"/>
-          <select id="presetScope" title="What the preset captures: the whole rig, or just one section to mix and match">
-            <option value="full">Everything</option>
-            ${Object.entries(PRESET_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join("")}
-          </select>
-          <button class="btn btn-primary btn-sm" id="saveBtn">Save</button>
-        </span>` : ""}
+        <!-- The inline save + capture-scope select is gone (owner 2026-07-15):
+             the transport's single ⤓ Save button opens the save overlay. -->
       </div>
       ${_m2Lib.open
         ? `<div class="m2-lib-list" id="m2LibList">${m2LibRowsHTML()}</div>`
@@ -9896,7 +10151,7 @@ function loadSoundModuleById(id) {
     const params = m2PresetParamsById(id);
     if (!params) return;
     const sound = extractSectionParams(migrateToneParams({ ...params }), "sound");
-    for (const k of Object.keys(sound)) if (k.startsWith("layer")) delete sound[k];
+    for (const k of Object.keys(sound)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete sound[k];
     if (!Object.keys(sound).length) return;
     Object.assign(exploreParams, sound);
     if (!Object.prototype.hasOwnProperty.call(sound, "spectralProfileName")) delete exploreParams.spectralProfileName;
@@ -9923,7 +10178,7 @@ function resolveSoundHalf(id) {
   const params = m2PresetParamsById(id);
   if (!params) return null;
   const sound = extractSectionParams(migrateToneParams({ ...params }), "sound");
-  for (const k of Object.keys(sound)) if (k.startsWith("layer")) delete sound[k];
+  for (const k of Object.keys(sound)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete sound[k];
   return Object.keys(sound).length ? sound : null;
 }
 
@@ -9963,7 +10218,7 @@ function addPresetAsLayers(params) {
   if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
   const pushLayer = (sourceParams, space, gain) => {
     const subnote = { ...sourceParams };
-    for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k];
+    for (const k of Object.keys(subnote)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete subnote[k];
     if (!Object.keys(subnote).length) return false;
     exploreParams.layers.push({
       id: crypto.randomUUID(),
@@ -10089,6 +10344,29 @@ function wireM2LibList(v) {
   v.querySelectorAll("[data-m2-sound]").forEach(btn => {
     btn.onclick = () => toggleSubnotePreview(btn.dataset.m2Sound);
   });
+  // Your own presets (m: ids) are deletable from any browser that shows them.
+  const wireDelete = (el, rawId, name) => {
+    el.oncontextmenu = (e) => {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, [{
+        label: `Delete “${name}” from your library`, danger: true,
+        onClick: () => showAppDialog({
+          title: "Delete preset",
+          message: `Remove “${name}” from your library? This can't be undone.`,
+          confirmLabel: "Delete", danger: true,
+          onConfirm: () => { deleteLocalPreset(rawId); renderExplore(); },
+        }),
+      }]);
+    };
+  };
+  v.querySelectorAll(".m2-lib-row[data-m2-drag^='m:']").forEach(row => {
+    const id = row.dataset.m2Drag.slice(2);
+    wireDelete(row, id, row.querySelector(".m2-lib-name")?.textContent || "preset");
+  });
+  v.querySelectorAll("[data-m2-sound^='m:']").forEach(card => {
+    const id = card.dataset.m2Sound.slice(2);
+    wireDelete(card, id, card.querySelector(".m2-preset-name")?.textContent || "preset");
+  });
 }
 
 // Behaviour signature (owner 07-08): one melodic contour line per preset,
@@ -10207,8 +10485,10 @@ function producerPercRowHTML(p) {
       <span class="prod-layer-tag">P</span>
       <span class="prod-layer-name">Percussion</span>
       <div class="prod-layer-ctls">
-        <label class="prod-ctl">Angle<input type="range" data-prod-angle="perc" min="-180" max="180" step="1" value="${angle}"/></label>
-        <label class="prod-ctl">Dist<input type="range" data-prod-dist="perc" min="0.3" max="30" step="0.1" value="${dist}"/></label>
+        <span class="space-target-control">
+          <canvas class="compact-space-target" data-prod-space-target="perc" width="40" height="40"></canvas>
+          <span data-space-target-readout>${compactSpaceTargetText({ angle, dist })}</span>
+        </span>
       </div>
       <div class="prod-layer-fx">
         <span class="prod-fx-none">${active ? "sound &amp; mix on the macro page" : "silent — add hits on the macro page"}</span>
@@ -10229,8 +10509,10 @@ function producerLayersRowHTML(l, i, p) {
       <span class="prod-layer-name">Layer ${i + 2}</span>
       <div class="prod-layer-ctls">
         <label class="prod-ctl">Vol<input type="range" data-prod-gain="${id}" min="0" max="1.5" step="0.01" value="${gain}"/></label>
-        <label class="prod-ctl">Angle<input type="range" data-prod-angle="${id}" min="-180" max="180" step="1" value="${angle}"/></label>
-        <label class="prod-ctl">Dist<input type="range" data-prod-dist="${id}" min="0.3" max="30" step="0.1" value="${dist}"/></label>
+        <span class="space-target-control">
+          <canvas class="compact-space-target" data-prod-space-target="${id}" width="40" height="40"></canvas>
+          <span data-space-target-readout>${compactSpaceTargetText({ angle, dist })}</span>
+        </span>
       </div>
       <div class="prod-layer-fx">
         ${prodFxTagsHTML(id, chain)}
@@ -10284,21 +10566,24 @@ function bindProducerLayers(v, target = exploreParams, hooks = {}) {
   panel.querySelectorAll("[data-prod-gain]").forEach(el => {
     el.oninput = () => { const l = layerById(el.dataset.prodGain); if (l) { l.gain = parseFloat(el.value); applyLive(); } };
   });
-  panel.querySelectorAll("[data-prod-angle]").forEach(el => {
-    el.oninput = () => {
-      const id = el.dataset.prodAngle, val = parseFloat(el.value);
-      if (id === "perc") { target.percAzimuth = val; applyLive(); applyReverb(); return; }
-      const l = layerById(id); if (l) l.space = { angle: val, dist: l.space?.dist ?? target.spaceDistance ?? 2.5 };
-      applyLive();
-    };
-  });
-  panel.querySelectorAll("[data-prod-dist]").forEach(el => {
-    el.oninput = () => {
-      const id = el.dataset.prodDist, val = parseFloat(el.value);
-      if (id === "perc") { target.percDistance = val; applyLive(); applyReverb(); return; }
-      const l = layerById(id); if (l) l.space = { angle: l.space?.angle ?? target.spaceAzimuth ?? 0, dist: val };
-      applyLive();
-    };
+  panel.querySelectorAll("[data-prod-space-target]").forEach(cv => {
+    const id = cv.dataset.prodSpaceTarget;
+    const get = () => id === "perc"
+      ? { angle: Number.isFinite(target.percAzimuth) ? target.percAzimuth : (target.spaceAzimuth ?? 0), dist: Number.isFinite(target.percDistance) ? target.percDistance : (target.spaceDistance ?? 2.5) }
+      : { angle: layerById(id)?.space?.angle ?? target.spaceAzimuth ?? 0, dist: layerById(id)?.space?.dist ?? target.spaceDistance ?? 2.5 };
+    wireCompactSpaceTarget(cv, {
+      get,
+      hue: () => id === "perc" ? 32 : (layerById(id)?.hue ?? 205),
+      set: (pos) => {
+        if (id === "perc") {
+          target.percAzimuth = pos.angle; target.percDistance = pos.dist;
+          applyLive(); applyReverb();
+        } else {
+          const l = layerById(id); if (l) l.space = { ...pos };
+          applyLive();
+        }
+      },
+    });
   });
 
   // ── Effects: add / toggle / wet / remove ──
@@ -10351,7 +10636,6 @@ function macroWorkspaceHTML(p) {
           ${m2ChipsHTML(p)}
           <div class="visualiser-wrap vis-mode-${visMode} m2-visual">
             <canvas id="vis" width="980" height="210"></canvas>
-            ${visMode === "layers" ? producerLayersPanelHTML(p) : ""}
             ${visMode === "lanes" ? `
             <div class="m2-lane-heads" id="m2LaneHeads">
               ${LANE_DEFS.map(d => `
@@ -10608,7 +10892,7 @@ function percResolveSound(value) {
   const preset = [...FACTORY_PRESETS, ...loadPresets()].find(x => String(x.id) === key);
   if (!preset || !preset.parameters) return { kind: "sample", key: "click" };
   const subnote = extractSectionParams(migrateToneParams({ ...preset.parameters }), "sound");
-  for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k]; // never nest layers
+  for (const k of Object.keys(subnote)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete subnote[k]; // never nest layer-stack controls
   return { kind: "instrument", name: preset.name || key, presetId: key, pitchHz: 220, subnote };
 }
 function percSoundComboHTML(l) {
@@ -10636,6 +10920,8 @@ function percLayerRowHTML(l, i) {
       </div>
       <div class="perc-lyr-sound">${percSoundComboHTML(l)}</div>
       <div class="perc-lyr-ctls">
+        <canvas class="layer-minipad compact-space-target" data-perc-pad="${l.id}" width="40" height="40"
+          title="Where this hit sits in the room — drag ↔ for angle, ↕ for distance (the Space stage shows it, this is where it's set)"></canvas>
         <label class="sp-ctl">Vol <input type="range" data-perc-vol="${l.id}" min="0" max="1" step="0.01" value="${l.vol ?? 0}"/></label>
         ${l.role === "downbeat" ? `<label class="sp-ctl">Every <input type="range" data-perc-every="${l.id}" min="1" max="16" step="1" value="${l.every ?? 4}"/></label>` : ""}
         ${isInst ? `<label class="sp-ctl" title="Fixed pitch of the instrument hit (does not track the key)">Pitch <input type="range" data-perc-pitch="${l.id}" min="60" max="880" step="1" value="${l.sound.pitchHz ?? 220}"/></label>` : ""}
@@ -10694,6 +10980,31 @@ function wirePercussionPanel(v) {
     ? exploreParams.percLayers
     : (exploreParams.percLayers = ensurePercLayers(exploreParams));
   const byId = (id) => (exploreParams.percLayers || []).find(l => l.id === id);
+
+  // Per-drum-track position (owner 2026-07-15): each hit is placed HERE, with
+  // the same compact target pad the producer's track heads use. The Space
+  // stage only shows (and can highlight) the result.
+  v.querySelectorAll("[data-perc-pad]").forEach(cv => {
+    const id = cv.dataset.percPad;
+    wireCompactSpaceTarget(cv, {
+      get: () => {
+        const l = byId(id);
+        return {
+          angle: l?.space?.angle ?? percGroupAngle(exploreParams),
+          dist: l?.space?.dist ?? (Number.isFinite(exploreParams.percDistance)
+            ? exploreParams.percDistance : (exploreParams.spaceDistance ?? 2.5)),
+        };
+      },
+      hue: () => percLayerHue((exploreParams.percLayers || []).findIndex(l => l.id === id)),
+      set: (pos) => {
+        const l = byId(id);
+        if (!l) return;
+        l.space = { angle: Math.round(pos.angle), dist: pos.dist };
+        applyPerc();
+        drawStageBig(); // live echo on the Space stage if it's on screen
+      },
+    });
+  });
 
   const enableEl = v.querySelector("[data-perc-enable]");
   if (enableEl) enableEl.onchange = () => {
@@ -10849,15 +11160,18 @@ function layerStripHTML(p, compact = false) {
   const baseRow = `
     <div class="layer-row base-row${baseSel ? " sel" : ""}" data-layer-row="base" style="--layer-hue:210" title="The base sound — the foundation every layer sits on. Click to edit it in the stages above (always present).">
       <span class="layer-row-tag">1</span>
-      <canvas class="layer-minipad" data-layer-pad="base" width="40" height="40" title="Where the base sound sits around your head (set on the SPACE stage)"></canvas>
+      <span class="space-target-control layer-space-target">
+        <canvas class="layer-minipad compact-space-target" data-layer-pad="base" width="40" height="40"></canvas>
+        <span data-space-target-readout>${compactSpaceTargetText({ angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5 })}</span>
+      </span>
       <div class="layer-row-lines">
         <div class="layer-name-row">
           <span class="layer-name" data-layer-name="base" title="Double-click to rename the base sound">${esc(baseName)}</span>
           <span class="layer-base-badge">BASE</span>
         </div>
         <div class="layer-row-space">
-          <label class="sp-ctl">Angle <input type="range" data-layer-angle="base" min="-180" max="180" step="1" value="${p.spaceAzimuth ?? 0}" title="Where the base sound sits around you"/></label>
-          <label class="sp-ctl">Dist <input type="range" data-layer-dist="base" min="0.3" max="30" step="0.1" value="${p.spaceDistance ?? 2.5}" title="How far the base sound stands"/></label>
+          <label class="sp-ctl">Vol <input type="range" data-base-layer-gain min="0" max="1.5" step="0.01" value="${p.baseLayerGain ?? 1}" title="${esc(PARAM_DESC.baseLayerGain)}"/></label>
+          <button class="pal-btn layer-solo${p.baseLayerSolo ? " on" : ""}" data-base-layer-solo title="${esc(PARAM_DESC.baseLayerSolo)}">S</button>
         </div>
         ${fxTagsHTML("base", p.effectsChain, p.stageEffectsOn === false)}
       </div>
@@ -10867,15 +11181,16 @@ function layerStripHTML(p, compact = false) {
     return `
     <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}" title="Click to load this layer's sound into the editor above (click again, or Done, to return to the base)">
       <span class="layer-row-tag">${i + 2}</span>
-      <canvas class="layer-minipad" data-layer-pad="${l.id}" width="40" height="40" title="Where this layer sits around your head — set it with the Angle and Dist sliders (shaded half = behind you)"></canvas>
+      <span class="space-target-control layer-space-target">
+        <canvas class="layer-minipad compact-space-target" data-layer-pad="${l.id}" width="40" height="40"></canvas>
+        <span data-space-target-readout>${compactSpaceTargetText({ angle: l.space?.angle ?? (p.spaceAzimuth ?? 0), dist: l.space?.dist ?? (p.spaceDistance ?? 2.5) })}</span>
+      </span>
       <div class="layer-row-lines">
         <div class="layer-name-row">
           <span class="layer-name" data-layer-name="${l.id}" title="Double-click to rename this layer">${esc(layerTitle(l, i))}</span>
         </div>
         <div class="layer-row-space">
           <label class="sp-ctl">Vol <input type="range" data-layer-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}" title="This layer's level relative to the base sound"/></label>
-          <label class="sp-ctl">Angle <input type="range" data-layer-angle="${l.id}" min="-180" max="180" step="1" value="${l.space?.angle ?? (p.spaceAzimuth ?? 0)}" title="Where this layer sits around you"/></label>
-          <label class="sp-ctl">Dist <input type="range" data-layer-dist="${l.id}" min="0.3" max="30" step="0.1" value="${l.space?.dist ?? (p.spaceDistance ?? 2.5)}" title="How far away this layer stands"/></label>
           <button class="pal-btn layer-solo${l.solo ? " on" : ""}" data-layer-solo="${l.id}" title="Solo this layer — hear it alone (the base and other unsoloed layers go quiet)">S</button>
           <button class="pal-btn" data-layer-recapture="${l.id}" title="Re-capture the CURRENT sound half into this layer (a layer is a snapshot — reshape the sound above, then update the layer)">⟳</button>
           <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
@@ -10921,22 +11236,9 @@ function drawLayerMiniPads() {
   pads.forEach(l => {
     const cv = document.querySelector(`[data-layer-pad="${l.id}"]`);
     if (!cv) return;
-    const ctx = cv.getContext("2d");
-    const w = cv.width, h = cv.height;
-    ctx.clearRect(0, 0, w, h);
-    const cx = w / 2, cy = h / 2, rMax = Math.min(w, h) / 2 - 3;
-    ctx.fillStyle = "rgba(60,72,88,0.22)";
-    ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "rgba(90,110,130,0.4)";
-    ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, 2 * Math.PI); ctx.stroke();
-    ctx.fillStyle = "rgba(200,215,230,0.9)";
-    ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, 2 * Math.PI); ctx.fill();
     const angle = l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0);
     const dist = l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5);
-    const r = _spaceDistToR(clamp(dist, SPACE_DMIN, SPACE_DMAX), rMax);
-    const rad = (angle - 90) * Math.PI / 180;
-    ctx.fillStyle = `hsl(${l.hue ?? 36}, 70%, 62%)`;
-    ctx.beginPath(); ctx.arc(cx + Math.cos(rad) * r, cy + Math.sin(rad) * r, 3, 0, 2 * Math.PI); ctx.fill();
+    drawCompactSpaceTarget(cv, { angle, dist }, l.hue ?? 36, !!l.mute);
   });
 }
 
@@ -11014,7 +11316,10 @@ function subnoteWorkspaceHTML(p) {
                      column stacked vertically (owner 2026-07-10), so this column
                      is purely the placement view. -->
                 <div class="ch-field-pos stage-pos">
-                  <canvas id="cvStageBig" title="The stage around your head, seen from above — front is up, the shaded half is behind you. Drag a numbered dot to place that source; rings are metres away. Double-click the P dot to position individual percussion layers."></canvas>
+                  <canvas id="cvStageBig" title="The stage around your head, seen from above — front is up, the shaded half is behind you. Drag a numbered dot to place that source; rings are metres away. Percussion is placed from the note engine's percussion panel — here it can only be highlighted."></canvas>
+                  <label class="sp-showperc" title="Emphasise where the percussion hits sit — position them from the percussion panel on the Macro page">
+                    <input type="checkbox" id="spShowPercChk"${_spShowPerc ? " checked" : ""}/> Highlight percussion
+                  </label>
                 </div>
                 ${stageReadoutsHTML(p)}` : `
                 <div class="ch-focus-row" id="chFocus">
@@ -11840,7 +12145,7 @@ function slExportScl(p) {
   const degs = (p.customDegrees || []).filter(d => d > 0).sort((a, b) => a - b);
   const lines = [
     "! sound-studio.scl", "!",
-    `Resona scale — ${degs.length + 1} notes from ${div}-EDO`,
+    `Soundinator scale — ${degs.length + 1} notes from ${div}-EDO`,
     ` ${degs.length + 1}`, "!",
     ...degs.map(d => ` ${_slCents(p, d).toFixed(5)}`),
     " 2/1", "",
@@ -15120,7 +15425,7 @@ function cloneFxChain(chain) {
 
 function _soundHalf(params) {
   const half = extractSectionParams(params, "sound");
-  for (const k of Object.keys(half)) if (k.startsWith("layer")) delete half[k];
+  for (const k of Object.keys(half)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete half[k];
   if ("effectsChain" in half) half.effectsChain = cloneFxChain(half.effectsChain);
   return half;
 }
@@ -15173,7 +15478,7 @@ function wireLayerStrip(v) {
     if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
     const subnote = extractSectionParams(exploreParams, "sound");
     // a layer never nests layers or carries the shared-sync settings
-    for (const k of Object.keys(subnote)) if (k.startsWith("layer")) delete subnote[k];
+    for (const k of Object.keys(subnote)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete subnote[k];
     subnote.effectsChain = cloneFxChain(subnote.effectsChain); // own the chain, don't alias the base's
     const layer = {
       id: crypto.randomUUID(),
@@ -15250,6 +15555,17 @@ function wireLayerStrip(v) {
     };
   });
   bindSlider("data-layer-gain", (l, val) => { l.gain = val; });
+  const baseGain = v.querySelector("[data-base-layer-gain]");
+  if (baseGain) baseGain.oninput = () => {
+    exploreParams.baseLayerGain = Number(baseGain.value);
+    applyLive();
+  };
+  const baseSolo = v.querySelector("[data-base-layer-solo]");
+  if (baseSolo) baseSolo.onclick = () => {
+    exploreParams.baseLayerSolo = !exploreParams.baseLayerSolo;
+    baseSolo.classList.toggle("on", exploreParams.baseLayerSolo);
+    applyLive();
+  };
   const syncEditedSpace = (l) => {
     // if this layer is loaded in the editor, the SPACE pad mirrors the move
     if (_chLayerEdit?.layerId === l.id) {
@@ -15259,30 +15575,29 @@ function wireLayerStrip(v) {
       synth.updateReverb({ ...exploreParams });
     }
   };
-  bindSlider("data-layer-angle", (l, val) => {
-    l.space = { angle: val, dist: l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5) };
-    syncEditedSpace(l);
-    drawStageBig(); updateStageReadouts(); // the stage mirrors the strip live (V2.2)
+  v.querySelectorAll("[data-layer-pad]").forEach(cv => {
+    const id = cv.dataset.layerPad;
+    const get = () => id === "base"
+      ? { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 }
+      : { angle: layerOf(id)?.space?.angle ?? exploreParams.spaceAzimuth ?? 0, dist: layerOf(id)?.space?.dist ?? exploreParams.spaceDistance ?? 2.5 };
+    wireCompactSpaceTarget(cv, {
+      get,
+      hue: () => id === "base" ? 210 : (layerOf(id)?.hue ?? 36),
+      muted: () => id !== "base" && !!layerOf(id)?.mute,
+      set: (pos) => {
+        _stageSel = id;
+        if (id === "base") {
+          exploreParams.spaceAzimuth = pos.angle;
+          exploreParams.spaceDistance = pos.dist;
+        } else {
+          const l = layerOf(id);
+          if (l) { l.space = { ...pos }; syncEditedSpace(l); }
+        }
+        applyLive(); synth.updateReverb({ ...exploreParams });
+      },
+      redraw: () => { drawSpacePad(); drawStageBig(); updateStageReadouts(); },
+    });
   });
-  bindSlider("data-layer-dist", (l, val) => {
-    l.space = { angle: l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0), dist: val };
-    syncEditedSpace(l);
-    drawStageBig(); updateStageReadouts();
-  });
-  // The base row's Angle/Dist drive the patch's own position (there is no
-  // layer object — the base IS exploreParams).
-  const baseAngle = v.querySelector('[data-layer-angle="base"]');
-  if (baseAngle) baseAngle.oninput = () => {
-    exploreParams.spaceAzimuth = Number(baseAngle.value);
-    applyLive(); synth.updateReverb({ ...exploreParams });
-    drawLayerMiniPads(); drawSpacePad(); drawStageBig(); updateStageReadouts();
-  };
-  const baseDist = v.querySelector('[data-layer-dist="base"]');
-  if (baseDist) baseDist.oninput = () => {
-    exploreParams.spaceDistance = Number(baseDist.value);
-    applyLive(); synth.updateReverb({ ...exploreParams });
-    drawLayerMiniPads(); drawSpacePad(); drawStageBig(); updateStageReadouts();
-  };
   // Owner 07-07: solo a layer to hear it alone (base + unsoloed layers
   // silent); multiple solos combine like track solos
   v.querySelectorAll("[data-layer-solo]").forEach(el => {
@@ -15361,6 +15676,9 @@ function wireLayerStrip(v) {
 // only per-layer property is position, so the only per-source edit here
 // is dragging a dot. The binaural strip below follows the selection.
 let _stageSel = "base";
+// The stage can't MOVE percussion (that lives in the note engine's percussion
+// panel) — this only emphasises where the hits sit.
+let _spShowPerc = false;
 let _stageViewPos = null; // non-base selection: {angle, dist} the ear view follows
 // Percussion focus sub-mode: double-clicking the aggregate "P" dot swaps the
 // stage to show each percussion LAYER as its own draggable dot (owner spec).
@@ -15531,12 +15849,26 @@ function drawStageBig() {
     const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
     const col = `hsl(${s.hue}, 70%, 62%)`;
     if (s.isPercGroup) {
-      // dashed halo marks the double-click-to-edit percussion handle (it can
-      // sit on top of the base dot when percussion inherits the base position)
+      // dashed halo marks the percussion handle (view-only here — hits are
+      // positioned from the note engine's percussion panel; it can sit on top
+      // of the base dot when percussion inherits the base position)
       ctx.save();
       ctx.strokeStyle = col; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.1;
       ctx.setLineDash([2, 3]);
       ctx.beginPath(); ctx.arc(x, y, 15, 0, 2 * Math.PI); ctx.stroke();
+      ctx.restore();
+    }
+    // "Highlight percussion": a warm glow + label on every percussion source,
+    // so you can see where the hits sit without being able to move them here.
+    if (_spShowPerc && (s.isPercGroup || s.kind === "percussion" || String(s.id).startsWith("perc"))) {
+      ctx.save();
+      ctx.strokeStyle = col;
+      ctx.shadowColor = col; ctx.shadowBlur = 12;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, 2 * Math.PI); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = col;
+      ctx.fillText(s.label || "percussion", x, y - 16);
       ctx.restore();
     }
     if (s.id === _stageSel) {
@@ -15561,6 +15893,8 @@ function drawStageBig() {
 function wireStageBig(v) {
   const cv = v.querySelector("#cvStageBig");
   if (!cv) return;
+  const showPerc = v.querySelector("#spShowPercChk");
+  if (showPerc) showPerc.onchange = () => { _spShowPerc = showPerc.checked; drawStageBig(); };
   // Redraw the stage + ear-response on any container resize so the browser
   // never shows a stretched bitmap (window resize or inspector-splitter drag).
   if (_spaceResizeObserver) { _spaceResizeObserver.disconnect(); _spaceResizeObserver = null; }
@@ -15610,22 +15944,12 @@ function wireStageBig(v) {
       exploreParams.spaceDistance = dist;
       synth.updateReverb({ ...exploreParams });
       drawChThumbs();
-    } else if (s.percLayer) {
-      // focus mode: reposition ONE percussion layer
-      s.percLayer.space = { angle: az, dist };
-      applyPerc();
-    } else if (s.isPercGroup) {
-      // normal mode: move the whole percussion kit (per-layer fallback anchor)
-      exploreParams.percAzimuth = az;
-      exploreParams.percDistance = dist;
-      applyPerc();
+    } else if (s.percLayer || s.isPercGroup) {
+      // Percussion is positioned from the note engine's percussion panel
+      // (owner 2026-07-15) — the stage only SHOWS where the hits sit.
+      return;
     } else if (s.layer) {
       s.layer.space = { angle: az, dist };
-      // mirror to the layer strip's sliders so the two stay one control
-      const aSl = document.querySelector(`[data-layer-angle="${s.id}"]`);
-      if (aSl) aSl.value = az;
-      const dSl = document.querySelector(`[data-layer-dist="${s.id}"]`);
-      if (dSl) dSl.value = dist;
       if (_chLayerEdit?.layerId === s.id) {
         exploreParams.spaceAzimuth = az;
         exploreParams.spaceDistance = dist;
@@ -16775,8 +17099,8 @@ function welcomeCardHTML() {
   return `
     <div class="card welcome-card" id="welcomeCard">
       <div class="welcome-hero">
-        <span class="welcome-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-        <h2>Resona</h2>
+        ${appLogoHTML("lg")}
+        <h2>Soundinator</h2>
       </div>
       <div class="welcome-rule"><i></i></div>
       <p class="welcome-tagline">Welcome! Choose how you&rsquo;d like to get started.</p>
@@ -16792,6 +17116,7 @@ function welcomeCardHTML() {
             <p>Start exploring sounds immediately.</p>
             <button class="welcome-cta cta-amber" id="welcomeOptOut">Just Play</button>
           </div>
+          ${experimentsEnabled() ? `
           <div class="welcome-choice welcome-choice-featured">
             <span class="welcome-choice-icon wc-green">◈</span>
             <h3>Share Ratings</h3>
@@ -16800,7 +17125,13 @@ function welcomeCardHTML() {
               `<span class="${n === 4 ? "on" : ""}">${n}</span>`).join("")}</div>
             <div class="welcome-scale-ends"><span>1 = Dislike</span><span>7 = Love</span></div>
             <button class="welcome-cta cta-green" id="welcomeShareOpen">Share Ratings</button>
-          </div>
+          </div>` : `
+          <div class="welcome-choice welcome-choice-featured">
+            <span class="welcome-choice-icon wc-green">◈</span>
+            <h3>Join the Community</h3>
+            <p>Create a profile to save patches to the cloud, share your sounds, and rate what others make.</p>
+            <button class="welcome-cta cta-green" id="welcomeProfile">Create Profile</button>
+          </div>`}
           <div class="welcome-choice">
             <span class="welcome-choice-icon wc-purple">≣</span>
             <h3>Load Demo</h3>
@@ -16809,6 +17140,7 @@ function welcomeCardHTML() {
           </div>
         </div>
       </div>
+      ${experimentsEnabled() ? `
       <div class="welcome-share-step" hidden>
         <p>Sharing is anonymous and for adults (18+): the settings you explore and
         the ratings you give go to the researchers studying why music sounds good —
@@ -16836,7 +17168,10 @@ function welcomeCardHTML() {
       </div>
       <p class="welcome-anon">🛡 No account. Anonymous if shared.</p>
       <p class="welcome-smallprint">You can change your choice any time from the note
-      at the bottom of the page.</p>
+      at the bottom of the page.</p>` : `
+      <p class="welcome-anon">🛡 No account needed to play — everything stays in your browser until you choose to share.</p>
+      <p class="welcome-smallprint">Profiles are invite-only. You can create one any time
+      from the top-right of the screen.</p>`}
     </div>`;
 }
 
@@ -16887,22 +17222,43 @@ function wireWelcomeCard(v) {
       loadDemoArrangement();
       navigate("produce");
     };
-    const main = card.querySelector(".welcome-main");
-    const share = card.querySelector(".welcome-share-step");
-    card.querySelector("#welcomeShareOpen").onclick = () => { main.hidden = true; share.hidden = false; };
-    card.querySelector("#welcomeShareBack").onclick = () => { share.hidden = true; main.hidden = false; };
-    card.querySelector("#welcomeOptIn").onclick = () => {
-      const demographics = {
-        age_band: card.querySelector("#welcomeAge").value || null,
-        musical_training: card.querySelector("#welcomeTraining").value || null,
-      };
-      dismiss({
-        status: "granted",
-        consent_version: CONSENT_VERSION,
-        decided_at: new Date().toISOString(),
-        demographics,
+    // Community launch: the featured choice opens the in-app profile overlay.
+    // Either way (created or dismissed) the welcome card is done — nothing
+    // research-related is recorded, the consent stays "declined".
+    const profileBtn = card.querySelector("#welcomeProfile");
+    if (profileBtn) profileBtn.onclick = () => {
+      if (auditioning && synth.isPlaying) { synth.stop(); auditioning = false; }
+      openAuthOverlay("signup", {
+        onDone: (user) => {
+          if (!user) return; // cancelled — the welcome card stays for another pick
+          dismiss({
+            status: "declined",
+            consent_version: CONSENT_VERSION,
+            decided_at: new Date().toISOString(),
+          });
+        },
       });
     };
+    // Research share step (experiments mode only — these elements don't
+    // render for the community launch).
+    const main = card.querySelector(".welcome-main");
+    const share = card.querySelector(".welcome-share-step");
+    if (share) {
+      card.querySelector("#welcomeShareOpen").onclick = () => { main.hidden = true; share.hidden = false; };
+      card.querySelector("#welcomeShareBack").onclick = () => { share.hidden = true; main.hidden = false; };
+      card.querySelector("#welcomeOptIn").onclick = () => {
+        const demographics = {
+          age_band: card.querySelector("#welcomeAge").value || null,
+          musical_training: card.querySelector("#welcomeTraining").value || null,
+        };
+        dismiss({
+          status: "granted",
+          consent_version: CONSENT_VERSION,
+          decided_at: new Date().toISOString(),
+          demographics,
+        });
+      };
+    }
   }
   updateResearchNote(v);
 }
@@ -16910,6 +17266,9 @@ function wireWelcomeCard(v) {
 function updateResearchNote(v) {
   const note = v.querySelector("#researchNote");
   if (!note) return;
+  // Community launch: no research note — the opt-in flow only exists in
+  // experiments mode.
+  if (!experimentsEnabled()) { note.innerHTML = ""; return; }
   if (!loadConsent()) { note.innerHTML = ""; return; }
   const on = researchOptedIn();
   note.innerHTML = `Anonymous research sharing is <strong>${on ? "on" : "off"}</strong>${on ? " — thank you for helping" : ""}. <button class="link-btn" id="researchChangeBtn">Change</button>`;
@@ -16922,6 +17281,9 @@ function updateResearchNote(v) {
 function maybeShowContribute(v) {
   const area = v.querySelector("#contributeArea");
   if (!area) return;
+  // The anonymous contribute endpoint is 404 outside experiments mode; the
+  // community share flow (right-click → Share to community…) replaces it.
+  if (!experimentsEnabled()) { area.innerHTML = ""; return; }
   const e = exploreEngagement;
   const elapsed = e.startedAt ? (Date.now() - e.startedAt) / 60000 : 0;
   const qualified = (e.plays >= 5 && e.saves >= 2) || elapsed > 10;
@@ -19224,6 +19586,18 @@ function progressBar(fraction) {
 
 // ─── Init ───────────────────────────────────────────────────
 
+// ONE save surface per page (owner 2026-07-15): the Save button on the Macro,
+// Sub-note and Scale Lab pages opens this overlay — name it, tag it, and keep
+// it in your library or put it on your profile too. (The per-panel preset
+// bars stay as quick untagged local saves; compositions share from Producer.)
+// Declared before the boot route() call below: renderExplore reads it, and a
+// const later in the file is still in its temporal dead zone at boot.
+const SAVE_CONTEXTS = {
+  subnote:  { kind: "synth",  label: "synth",       parts: { notes: true, space: true } },
+  explore:  { kind: "engine", label: "note engine", parts: { stave: true, clef: true, percussion: true } },
+  scalelab: { kind: "engine", label: "scale",       parts: { clef: true } },
+};
+
 el = document.getElementById("app");
 window.addEventListener("hashchange", route);
 
@@ -19242,7 +19616,8 @@ route();
 // this code — they're bounced to /login. Signed-in users get private, per-account
 // "cloud patches" backed by /api/patches (see src/synthesiser/web/accounts.py).
 
-let authState = { user: null, authRequired: false, openSignup: false };
+// (authState is declared beside the router — experimentsEnabled() runs inside
+// the boot route() call, long before this block executes.)
 
 async function refreshAuth() {
   try {
@@ -19252,59 +19627,2077 @@ async function refreshAuth() {
       user: d.user || null,
       authRequired: !!d.auth_required,
       openSignup: !!d.open_signup,
+      features: d.features || { experiments: false, community: true },
     };
   } catch {
-    authState = { user: null, authRequired: false, openSignup: false };
+    authState = { user: null, authRequired: false, openSignup: false, features: { experiments: false, community: true } };
   }
   renderAccountBar();
+  if (authState.user) syncCommunityLibrary();
+  // Boot rendered a view before auth state arrived; a locked-out visitor
+  // gets swapped to the welcome screen (the only view they can see).
+  if (lockedOut()) route();
+}
+
+// The research/study surfaces are hidden for the community launch but kept in
+// the codebase: enable server-side with RESONA_EXPERIMENTS=1, or locally with
+// ?experiments=1 / localStorage phase0.devExperiments.v1.
+function experimentsEnabled() {
+  if (authState.features && authState.features.experiments) return true;
+  try {
+    if (new URLSearchParams(location.search).get("experiments") === "1") return true;
+    if (localStorage.getItem("phase0.devExperiments.v1") === "1") return true;
+  } catch {}
+  return false;
+}
+
+// The account control is EMBEDDED in each view's top panel (explore header,
+// producer toolbar, profile page, landing) rather than floating over the UI.
+// Views drop `${accountBarHTML()}` into their template; a single delegated
+// click listener (installed in initAccountUI) drives every instance, so
+// re-rendering a view never needs re-wiring.
+
+function accountBarHTML() {
+  const u = authState.user;
+  // Signed out on an open deployment: the app is fully usable from
+  // localStorage; one button opens the create-profile / log-in screen.
+  if (!u) {
+    return `<div class="account-bar">
+      <button class="acct-pill signin primary" data-acct="auth">Create profile / Log in</button>
+    </div>`;
+  }
+  const label = u.handle || u.email;
+  return `<div class="account-bar">
+    <button class="acct-pill" data-acct="menu" title="${esc(u.email)}">
+      <img class="acct-avatar" src="/api/users/${u.id}/avatar?t=${authState.avatarStamp || 0}" alt=""
+        onerror="this.classList.add('none')"/>
+      <span class="acct-dot"></span><span class="acct-name">${esc(label)}</span>${tbIcon("caret", "acct-caret")}
+    </button>
+    <div class="acct-menu" hidden>
+      <div class="acct-who"><b>${esc(label)}</b><span>${esc(u.email)}</span></div>
+      <button data-acct="profile">☺ My profile</button>
+      <button data-acct="patches">☁︎ My cloud patches</button>
+      <button data-acct="feedback">⚑ Report a problem</button>
+      <button data-acct="signout">Sign out</button>
+    </div>
+  </div>`;
+}
+
+// Re-render every embedded instance in place (auth state changed).
+function renderAccountBar() {
+  document.querySelectorAll(".account-bar").forEach(bar => { bar.outerHTML = accountBarHTML(); });
 }
 
 function initAccountUI() {
-  if (!document.getElementById("accountBar")) {
-    const bar = document.createElement("div");
-    bar.id = "accountBar";
-    document.body.appendChild(bar);
-  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-acct]");
+    const openMenu = document.querySelector(".account-bar .acct-menu:not([hidden])");
+    if (!btn) { if (openMenu) openMenu.hidden = true; return; }
+    const bar = btn.closest(".account-bar");
+    const menu = bar?.querySelector(".acct-menu");
+    switch (btn.dataset.acct) {
+      case "auth": openAuthOverlay("signup"); break;
+      case "menu": if (menu) { const open = menu.hidden; if (openMenu) openMenu.hidden = true; menu.hidden = !open; } break;
+      case "profile": if (menu) menu.hidden = true; navigate("user/" + encodeURIComponent(authState.user?.handle || "")); break;
+      case "patches": if (menu) menu.hidden = true; openCloudPatches(); break;
+      case "feedback": if (menu) menu.hidden = true; showFeedbackDialog(); break;
+      case "signout": if (menu) menu.hidden = true; signOut(); break;
+    }
+  });
   refreshAuth();
 }
 
-function renderAccountBar() {
-  const bar = document.getElementById("accountBar");
-  if (!bar) return;
-  const u = authState.user;
-  // Locked deployments never render the app for signed-out users; if somehow
-  // signed-out and open, offer a discreet sign-in link. Otherwise hide.
-  if (!u) {
-    bar.innerHTML = authState.authRequired
-      ? ""
-      : `<button class="acct-pill signin" id="acctSignin">Sign in</button>`;
-    const s = document.getElementById("acctSignin");
-    if (s) s.onclick = () => { location.href = "/login?next=" + encodeURIComponent(location.pathname + location.hash); };
-    return;
+// ── Report a problem ─────────────────────────────────────────────────────────
+// Description + category, the captured-error ring buffer, and an optional
+// screenshot (downscaled client-side to fit the server's upload cap) posted to
+// /api/feedback.
+
+async function feedbackImageB64(file) {
+  if (!file) return null;
+  const MAX_BYTES = 600_000;
+  if (file.size <= MAX_BYTES) {
+    const buf = await file.arrayBuffer();
+    let bin = "";
+    new Uint8Array(buf).forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin);
   }
-  const label = u.handle || u.email;
-  bar.innerHTML = `
-    <button class="acct-pill" id="acctPill" title="${esc(u.email)}">
-      <span class="acct-dot"></span>${esc(label)} ▾
-    </button>
-    <div class="acct-menu" id="acctMenu" hidden>
-      <div class="acct-who"><b>${esc(label)}</b><span>${esc(u.email)}</span></div>
-      <button id="acctPatches">☁︎ My cloud patches</button>
-      <button id="acctSignout">Sign out</button>
-    </div>`;
-  const pill = document.getElementById("acctPill");
-  const menu = document.getElementById("acctMenu");
-  pill.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; };
-  document.addEventListener("click", () => { if (menu) menu.hidden = true; }, { once: true });
-  document.getElementById("acctPatches").onclick = () => { menu.hidden = true; openCloudPatches(); };
-  document.getElementById("acctSignout").onclick = signOut;
+  // Too big as-is: draw onto a bounded canvas and re-encode as JPEG.
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("could not read that image"));
+      i.src = url;
+    });
+    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.85, 0.7, 0.5]) {
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      if (b64.length * 0.75 <= MAX_BYTES) return b64;
+    }
+    throw new Error("screenshot is too large even after downscaling");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function showFeedbackDialog() {
+  document.getElementById("feedbackDialog")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "feedbackDialog";
+  overlay.className = "app-dialog-overlay";
+  overlay.innerHTML = `<div class="app-dialog feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="fbTitle">
+    <h2 id="fbTitle">⚑ Report a problem</h2>
+    <p class="fb-sub">What went wrong, or what should work better? Recent error logs from this session are attached automatically.</p>
+    <select class="app-dialog-input" id="fbCategory" aria-label="Category">
+      <option value="bug">Something broke</option>
+      <option value="audio">Sound is wrong</option>
+      <option value="ui">Confusing interface</option>
+      <option value="idea">Suggestion</option>
+    </select>
+    <textarea class="app-dialog-input fb-text" id="fbText" rows="5" maxlength="4000"
+      placeholder="What happened? What did you expect to happen?"></textarea>
+    <label class="fb-shot">Screenshot (optional)
+      <input type="file" id="fbShot" accept="image/png,image/jpeg,image/webp"/>
+    </label>
+    <div class="app-dialog-actions">
+      <button class="btn btn-ghost" data-dialog-cancel>Cancel</button>
+      <button class="btn btn-primary" data-dialog-confirm>Send report</button>
+    </div>
+    <p class="fb-msg" id="fbMsg" aria-live="polite"></p>
+  </div>`;
+  document.body.appendChild(overlay);
+  const msg = overlay.querySelector("#fbMsg");
+  const sendBtn = overlay.querySelector("[data-dialog-confirm]");
+  const close = () => overlay.remove();
+  overlay.querySelector("[data-dialog-cancel]").onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  overlay.onkeydown = (e) => { if (e.key === "Escape") close(); };
+  sendBtn.onclick = async () => {
+    const description = overlay.querySelector("#fbText").value.trim();
+    if (!description) { msg.textContent = "Please describe the problem first."; return; }
+    sendBtn.disabled = true;
+    msg.textContent = "Sending…";
+    try {
+      const image_base64 = await feedbackImageB64(overlay.querySelector("#fbShot").files[0]);
+      const r = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description,
+          category: overlay.querySelector("#fbCategory").value,
+          route: location.hash || "/",
+          app_version: APP_VERSION,
+          errors: capturedErrors.slice(),
+          image_base64,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      msg.textContent = "Thank you — report sent.";
+      setTimeout(close, 1200);
+    } catch (err) {
+      msg.textContent = err.message || "Could not send the report.";
+      sendBtn.disabled = false;
+    }
+  };
+  overlay.querySelector("#fbText").focus();
+}
+
+// ── Auth overlay: create profile / log in without leaving the app ────────────
+// The community launch keeps the app open to play (localStorage only); the
+// moment someone saves or shares, this overlay creates their invite-gated
+// profile in place so no work is lost to a page navigation.
+
+function requireAuth(actionLabel) {
+  if (authState.user) return Promise.resolve(authState.user);
+  return new Promise((resolve) => openAuthOverlay("signup", { reason: actionLabel, onDone: resolve }));
+}
+
+function openAuthOverlay(mode = "signup", { reason = "", onDone = null } = {}) {
+  let overlay = document.getElementById("authOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "authOverlay";
+    overlay.className = "cloud-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+  let settled = false;
+  const finish = (user) => {
+    if (settled) return;
+    settled = true;
+    overlay.hidden = true;
+    if (onDone) onDone(user);
+  };
+  const render = (m) => {
+    const signup = m === "signup";
+    overlay.innerHTML = `
+      <div class="cloud-modal auth-modal" role="dialog" aria-label="${signup ? "Create profile" : "Log in"}">
+        <header><h3>${appIconHTML("sm")} Soundinator</h3><button class="x" id="authClose" title="Close">×</button></header>
+        <div class="auth-tabs" role="tablist">
+          <button class="${signup ? "active" : ""}" id="authTabSignup" role="tab">Create profile</button>
+          <button class="${signup ? "" : "active"}" id="authTabLogin" role="tab">Log in</button>
+        </div>
+        ${reason ? `<p class="auth-reason">${esc(reason)}</p>` : ""}
+        <form id="authForm" class="auth-form">
+          <label>Email<input type="email" id="authEmail" required autocomplete="email"></label>
+          <label>Password<input type="password" id="authPassword" required minlength="8"
+            autocomplete="${signup ? "new-password" : "current-password"}"></label>
+          ${signup ? `
+          <label>Handle <span class="auth-hint">(optional — how others find you)</span>
+            <input type="text" id="authHandle" pattern="[a-zA-Z0-9_.\\-]{2,40}" autocomplete="username"></label>
+          ${authState.openSignup ? "" : `
+          <label>Invite code<input type="text" id="authInvite" required autocomplete="off"></label>
+          <p class="auth-hint">No invite code, or yours isn't working? Email
+            <b>marcus.b.anderson@gmail.com</b> and I'll sort you out.</p>`}` : ""}
+          <div class="auth-error" id="authError" hidden></div>
+          <button class="primary" type="submit">${signup ? "Create profile" : "Log in"}</button>
+        </form>
+      </div>`;
+    overlay.onclick = (e) => { if (e.target === overlay) finish(null); };
+    overlay.querySelector("#authClose").onclick = () => finish(null);
+    overlay.querySelector("#authTabSignup").onclick = () => { if (!signup) render("signup"); };
+    overlay.querySelector("#authTabLogin").onclick = () => { if (signup) render("login"); };
+    overlay.querySelector("#authForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const errEl = overlay.querySelector("#authError");
+      errEl.hidden = true;
+      const body = {
+        email: overlay.querySelector("#authEmail").value.trim(),
+        password: overlay.querySelector("#authPassword").value,
+      };
+      if (signup) {
+        const handle = overlay.querySelector("#authHandle").value.trim();
+        if (handle) body.handle = handle;
+        const invite = overlay.querySelector("#authInvite");
+        if (invite) body.invite_code = invite.value.trim();
+      }
+      try {
+        const d = await api(signup ? "/api/auth/register" : "/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        authState.user = d.user;
+        renderAccountBar();
+        syncCommunityLibrary();
+        trackEngagement(signup ? "profile_created" : "signed_in");
+        finish(d.user);
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.hidden = false;
+      }
+    };
+    overlay.querySelector("#authEmail").focus();
+  };
+  render(mode);
 }
 
 async function signOut() {
   try { await fetch("/api/auth/logout", { method: "POST" }); } catch {}
   if (authState.authRequired) { location.href = "/login"; return; }
   authState.user = null;
+  try { localStorage.removeItem(COMMUNITY_LIBRARY_KEY); } catch {}
+  communityLibrary = [];
   renderAccountBar();
+}
+
+// ── Community: sharing, ratings, and the per-user library ────────────────────
+// Items live server-side (/api/community/*); communityLibrary (declared with
+// the other browser sources) caches the user's added items for instant loads.
+
+async function syncCommunityLibrary() {
+  if (!authState.user) return;
+  try {
+    const d = await api("/api/community/library");
+    communityLibrary = d.items || [];
+    saveCommunityLibraryCache();
+    if (document.getElementById("browserCards")) renderBrowserCards(document);
+  } catch {}
+}
+
+async function addCommunityItemToLibrary(itemId) {
+  const d = await api("/api/community/library", {
+    method: "POST",
+    body: JSON.stringify({ item_id: itemId }),
+  });
+  communityLibrary = communityLibrary.filter(c => c.id !== itemId).concat([d.item]);
+  saveCommunityLibraryCache();
+  if (document.getElementById("browserCards")) renderBrowserCards(document);
+  trackEngagement("community_add");
+  return d.item;
+}
+
+async function removeCommunityItemFromLibrary(itemId) {
+  try { await api("/api/community/library/" + encodeURIComponent(itemId), { method: "DELETE" }); } catch {}
+  communityLibrary = communityLibrary.filter(c => c.id !== itemId);
+  saveCommunityLibraryCache();
+  if (document.getElementById("browserCards")) renderBrowserCards(document);
+}
+
+// Generic right-click menu. One at a time; dismissed by click, Escape, or scroll.
+function showContextMenu(x, y, entries) {
+  document.getElementById("ctxMenu")?.remove();
+  const menu = document.createElement("ul");
+  menu.id = "ctxMenu";
+  menu.className = "ctx-menu";
+  menu.innerHTML = entries.map((entry, i) =>
+    `<li><button data-ctx="${i}"${entry.danger ? ' class="danger"' : ""}>${esc(entry.label)}</button></li>`
+  ).join("");
+  document.body.appendChild(menu);
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.min(x, window.innerWidth - rect.width - 8)}px`;
+  menu.style.top = `${Math.min(y, window.innerHeight - rect.height - 8)}px`;
+  const close = () => {
+    menu.remove();
+    document.removeEventListener("click", close, true);
+    document.removeEventListener("keydown", onKey, true);
+    document.removeEventListener("scroll", close, true);
+  };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  setTimeout(() => {
+    document.addEventListener("click", close, true);
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("scroll", close, true);
+  }, 0);
+  menu.querySelectorAll("[data-ctx]").forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      close();
+      entries[Number(btn.dataset.ctx)].onClick();
+    };
+  });
+}
+
+// Right-click entries for a local-browser item, by tier. Sharing no longer
+// lives here — each of the three main views has its own share button (synth
+// from the Sub-note workshop, note engine from Macro, composition from the
+// Producer).
+function browserContextEntries(item, rerender) {
+  if (item.id.startsWith("community:")) {
+    return [
+      { label: "Rate…", onClick: () => showRateDialog(item, rerender) },
+      { label: `View @${item.author?.handle || "author"}'s profile`, onClick: () => navigate("user/" + encodeURIComponent(item.author?.handle || "")) },
+      { label: "Remove from my library", danger: true, onClick: async () => { await removeCommunityItemFromLibrary(item.communityId); } },
+    ];
+  }
+  if (item.id.startsWith("user:")) {
+    return [{
+      label: `Delete “${item.name}” from your library`, danger: true,
+      onClick: () => showAppDialog({
+        title: "Delete preset",
+        message: `Remove “${item.name}” from your library? This can't be undone.`,
+        confirmLabel: "Delete", danger: true,
+        onConfirm: () => { deleteLocalPreset(item.id.slice(5)); rerender?.(); },
+      }),
+    }];
+  }
+  return [];
+}
+
+const SHARE_KIND_LABELS = { synth: "synth", engine: "note engine", composition: "composition" };
+
+function saveLocalPreset({ name, parts, tags = [], kindLabel = "" }) {
+  const entry = {
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+    name,
+    section: "full",
+    tags,
+    rating: exploreRating,
+    savedKind: kindLabel,
+    parameters: extractCaptureParams(exploreParams, parts),
+    captureParts: { ...parts },
+    app_version: APP_VERSION,
+  };
+  const list = loadPresets();
+  list.unshift(entry);
+  savePresets(list);
+  trackEngagement("save");
+  return entry;
+}
+
+function deleteLocalPreset(id) {
+  savePresets(loadPresets().filter(e => e.id !== id));
+}
+
+function openSaveOverlay() {
+  const ctx = SAVE_CONTEXTS[workspaceTab] || SAVE_CONTEXTS.explore;
+  let overlay = document.getElementById("saveOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "saveOverlay";
+    overlay.className = "cloud-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="cloud-modal auth-modal" role="dialog" aria-label="Save ${esc(ctx.label)}">
+      <header><h3>Save this ${esc(ctx.label)}</h3><button class="x" id="saveOvClose" title="Close">×</button></header>
+      <form id="saveOvForm" class="auth-form">
+        <label>Name<input type="text" id="saveOvName" required maxlength="120" value="" placeholder="Untitled ${esc(ctx.label)}"></label>
+        <label>Tags <span class="auth-hint">(comma-separated, up to 8 — searchable in your library and the community)</span>
+          <input type="text" id="saveOvTags" placeholder="bass, warm, slow"></label>
+        <label id="saveOvDescRow" hidden>Description <span class="auth-hint">(140 characters, no links — shown on your profile)</span>
+          <textarea id="saveOvDesc" maxlength="140" rows="2"></textarea></label>
+        <label class="save-share-row" title="Also put it on your profile — it surfaces in community search once five people rate it">
+          <input type="checkbox" id="saveOvShare"> Share to the community too
+        </label>
+        <div class="auth-error" id="saveOvError" hidden></div>
+        <button class="primary" type="submit" id="saveOvSubmit">Save to library</button>
+      </form>
+    </div>`;
+  const finish = () => { overlay.hidden = true; };
+  overlay.onclick = (e) => { if (e.target === overlay) finish(); };
+  overlay.querySelector("#saveOvClose").onclick = finish;
+  const shareChk = overlay.querySelector("#saveOvShare");
+  const submit = overlay.querySelector("#saveOvSubmit");
+  shareChk.onchange = () => {
+    overlay.querySelector("#saveOvDescRow").hidden = !shareChk.checked;
+    submit.textContent = shareChk.checked ? "Save & share" : "Save to library";
+  };
+  overlay.querySelector("#saveOvForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = overlay.querySelector("#saveOvError");
+    errEl.hidden = true;
+    const name = overlay.querySelector("#saveOvName").value.trim() || `Untitled ${ctx.label}`;
+    const tags = overlay.querySelector("#saveOvTags").value
+      .split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+    const entry = saveLocalPreset({ name, parts: ctx.parts, tags, kindLabel: ctx.label });
+    if (!shareChk.checked) {
+      finish();
+      showAppDialog({ title: "Saved", message: `“${name}” is in your library.`, confirmLabel: "OK" });
+      return;
+    }
+    const user = await requireAuth(`Create a profile to share your ${ctx.label} with the community.`);
+    if (!user) { finish(); return; }
+    try {
+      await api("/api/community/share", {
+        method: "POST",
+        body: JSON.stringify({
+          kind: ctx.kind,
+          name,
+          description: overlay.querySelector("#saveOvDesc").value.trim(),
+          data: { parameters: entry.parameters, captureParts: entry.captureParts },
+          tags,
+          source_id: `${ctx.kind}:${entry.id}`,
+        }),
+      });
+      trackEngagement("community_share");
+      finish();
+      showAppDialog({
+        title: "Saved & shared",
+        message: `“${name}” is in your library and live on your profile. It surfaces in community search once five people rate it.`,
+        confirmLabel: "OK",
+      });
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    }
+  };
+  overlay.querySelector("#saveOvName").focus();
+}
+
+// 1–5 star widget. Editable stars post to /api/community/rate on click.
+function starsHTML(item, { editable = false } = {}) {
+  const my = item.myRating ?? item.my_rating ?? null;
+  const avg = item.avgStars ?? item.avg_stars ?? null;
+  const count = item.ratingCount ?? item.rating_count ?? 0;
+  const shown = editable && my ? my : (avg || 0);
+  const stars = [1, 2, 3, 4, 5].map(n =>
+    `<span class="star${n <= Math.round(shown) ? " on" : ""}"${editable ? ` data-star="${n}"` : ""}>★</span>`
+  ).join("");
+  const label = avg !== null
+    ? `${avg} (${count})`
+    : (count ? `${count} rating${count === 1 ? "" : "s"} so far` : "no ratings yet");
+  return `<span class="stars${editable ? " editable" : ""}" data-stars-item="${esc(item.communityId || item.id || "")}"
+    title="${editable ? "Click to rate" : esc(label)}">${stars}<span class="stars-label">${esc(label)}</span></span>`;
+}
+
+function wireStars(root, itemsById, onRated) {
+  root.querySelectorAll(".stars.editable [data-star]").forEach(star => {
+    star.onclick = async (e) => {
+      e.stopPropagation();
+      const holder = star.closest("[data-stars-item]");
+      const itemId = holder?.dataset.starsItem;
+      if (!itemId) return;
+      try {
+        const d = await api("/api/community/rate", {
+          method: "POST",
+          body: JSON.stringify({ item_id: itemId, stars: Number(star.dataset.star) }),
+        });
+        const cached = communityLibrary.find(c => c.id === itemId);
+        if (cached) {
+          cached.my_rating = d.my_rating;
+          cached.avg_stars = d.avg_stars;
+          cached.rating_count = d.rating_count;
+          saveCommunityLibraryCache();
+        }
+        const item = itemsById?.[itemId];
+        if (item) {
+          item.my_rating = d.my_rating;
+          item.avg_stars = d.avg_stars;
+          item.rating_count = d.rating_count;
+        }
+        if (onRated) onRated(itemId, d);
+      } catch (err) {
+        alert("Could not rate: " + err.message);
+      }
+    };
+  });
+}
+
+function showRateDialog(item, onDone) {
+  let overlay = document.getElementById("rateOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "rateOverlay";
+    overlay.className = "cloud-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="cloud-modal auth-modal rate-modal" role="dialog" aria-label="Rate">
+      <header><h3>Rate “${esc(item.name)}”</h3><button class="x" id="rateClose" title="Close">×</button></header>
+      <div class="rate-body">
+        <p class="auth-hint">by @${esc(item.author?.handle || "unknown")} — one rating per person; you can change yours later.</p>
+        ${starsHTML(item, { editable: true })}
+      </div>
+    </div>`;
+  const finish = () => { overlay.hidden = true; if (onDone) onDone(); };
+  overlay.onclick = (e) => { if (e.target === overlay) finish(); };
+  overlay.querySelector("#rateClose").onclick = finish;
+  wireStars(overlay, null, () => finish());
+}
+
+// ── Community browser overlay ────────────────────────────────────────────────
+// Opened from the producer's Browser header. Search shared items (name/tags or
+// by user), see top users, manage your own shared items, and audition modules
+// in the auditioner strip without touching your loaded patches.
+
+let communityState = {
+  tab: "search", q: "", userQ: "", byUser: false, kind: "", section: "", sort: "top",
+  results: [], topUsers: [], mine: [], loading: false, previewId: null,
+};
+let _communitySearchTimer = null;
+
+function communityPreviewStop() {
+  if (communityState.previewId) {
+    synth.stop();
+    communityState.previewId = null;
+  }
+}
+
+// Auditioning ALWAYS goes through the machine: pressing ▶ on a synth or note
+// engine loads it into its slot and cranks the machine (even minimised — the
+// corner button pulses). There is no way to hear community work outside it.
+// Compositions are the exception: they play through the inline profile player.
+async function toggleCommunityPreview(entry, cardEl = null) {
+  if (entry.kind === "composition") {
+    await toggleCompositionPlayback(entry, cardEl || document.body);
+    return;
+  }
+  const slot = auditionerSlotFor(entry);
+  if (!slot) return;
+  if (auditionerPlaying && auditionerSlots[slot]?.id === entry.id) {
+    auditionerStop();
+    return;
+  }
+  await placeInAuditioner(entry); // hot-swaps (and keeps playing) if already cranking
+  if (!auditionerPlaying) auditionerPlay();
+}
+
+// Is this entry the one currently sounding? (drives the ▶/■ on cards)
+function communityEntryPlaying(entry) {
+  if (entry.kind === "composition") return profilePlayback?.itemId === entry.id;
+  const slot = auditionerSlotFor(entry);
+  return !!(slot && auditionerPlaying && auditionerSlots[slot]?.id === entry.id);
+}
+
+async function openCommunityOverlay() {
+  const user = await requireAuth("Create a profile to browse and rate community patches.");
+  if (!user) return;
+  let overlay = document.getElementById("communityOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "communityOverlay";
+    overlay.className = "cloud-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+  renderCommunityOverlay();
+  communityFetch();
+}
+
+function closeCommunityOverlay() {
+  const overlay = document.getElementById("communityOverlay");
+  if (overlay) overlay.hidden = true;
+  communityPreviewStop();
+  if (auditionerPlaying) auditionerStop(); // restores master volume + ticker
+  if (document.getElementById("browserCards")) renderBrowserCards(document);
+}
+
+async function communityFetch() {
+  const s = communityState;
+  s.loading = true;
+  renderCommunityResults();
+  try {
+    if (s.tab === "search") {
+      const params = new URLSearchParams();
+      if (s.byUser && s.q) params.set("user", s.q);
+      else if (s.q) params.set("q", s.q);
+      if (s.kind) params.set("kind", s.kind);
+      params.set("sort", s.sort);
+      params.set("limit", "60");
+      s.results = (await api("/api/community/browse?" + params)).items || [];
+    } else if (s.tab === "top") {
+      s.topUsers = (await api("/api/community/top-users?limit=20")).users || [];
+    } else if (s.tab === "mine") {
+      s.mine = (await api("/api/community/users/" + encodeURIComponent(authState.user.id) + "/items")).items || [];
+    }
+  } catch (err) {
+    s.error = err.message;
+  }
+  s.loading = false;
+  renderCommunityResults();
+}
+
+function communityCardHTML(entry) {
+  const inLibrary = communityLibrary.some(c => c.id === entry.id);
+  const parts = entry.data && entry.data.captureParts
+    ? entry.data.captureParts
+    : capturePartsFor({}, entry.section || "full", null);
+  return `
+    <div class="cmty-card" data-cmty-item="${esc(entry.id)}">
+      <div class="cmty-card-head">
+        ${notationIconHTML(parts, { compact: true })}
+        <div class="cmty-card-title">
+          <b>${esc(entry.name)}</b>
+          <button class="cmty-author" data-cmty-author="${esc(entry.author.handle)}">@${esc(entry.author.handle)}</button>
+        </div>
+        <span class="cmty-kind">${esc(SHARE_KIND_LABELS[entry.kind] || entry.kind)}</span>
+      </div>
+      ${entry.description ? `<p class="cmty-desc">${esc(entry.description)}</p>` : ""}
+      <div class="cmty-tags">${(entry.tags || []).map(t => `<button class="cmty-tag" data-cmty-tag="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <div class="cmty-card-foot">
+        ${starsHTML(entry, { editable: !entry.mine })}
+        <span class="cmty-spacer"></span>
+        <button class="br-btn${communityEntryPlaying(entry) ? " on" : ""}" data-cmty-preview="${esc(entry.id)}"
+          title="${entry.kind === "composition" ? "Play inline" : "Load it into the machine and crank"}">${communityEntryPlaying(entry) ? "■" : "▶"}</button>
+        ${entry.mine
+          ? `<span class="cmty-yours">yours</span>`
+          : `<button class="cmty-add${inLibrary ? " added" : ""}" data-cmty-add="${esc(entry.id)}"
+              ${inLibrary ? "disabled" : ""}>${inLibrary ? "✓ In your library" : "+ Add"}</button>`}
+      </div>
+    </div>`;
+}
+
+function renderCommunityOverlay() {
+  const overlay = document.getElementById("communityOverlay");
+  if (!overlay || overlay.hidden) return;
+  const s = communityState;
+  overlay.innerHTML = `
+    <div class="cloud-modal cmty-modal" role="dialog" aria-label="Community browser">
+      <header>
+        <h3>☄ Community</h3>
+        <nav class="cmty-tabs">
+          <button class="${s.tab === "search" ? "active" : ""}" data-cmty-tab="search">Search</button>
+          <button class="${s.tab === "top" ? "active" : ""}" data-cmty-tab="top">Top users</button>
+          <button class="${s.tab === "mine" ? "active" : ""}" data-cmty-tab="mine">My shared</button>
+        </nav>
+        <button class="x" id="cmtyClose" title="Close">×</button>
+      </header>
+      ${s.tab === "search" ? `
+      <div class="cmty-controls">
+        <input type="search" id="cmtySearch" placeholder="${s.byUser ? "Search makers by name…" : "Search synths, note engines, compositions, tags…"}" value="${esc(s.q)}">
+        <label class="cmty-byuser"><input type="checkbox" id="cmtyByUser"${s.byUser ? " checked" : ""}> makers</label>
+        <select id="cmtyKind" title="Kind">
+          <option value="">Everything</option>
+          <option value="synth"${s.kind === "synth" ? " selected" : ""}>Synths</option>
+          <option value="engine"${s.kind === "engine" ? " selected" : ""}>Note engines</option>
+          <option value="composition"${s.kind === "composition" ? " selected" : ""}>Compositions</option>
+        </select>
+        <select id="cmtySort" title="Sort">
+          <option value="top"${s.sort === "top" ? " selected" : ""}>Top rated</option>
+          <option value="new"${s.sort === "new" ? " selected" : ""}>Newest</option>
+        </select>
+      </div>` : ""}
+      <div class="cmty-results" id="cmtyResults"></div>
+      <div class="cmty-auditioner${auditionerMin ? " min" : ""}" id="cmtyAuditioner">${auditionerHTML()}</div>
+    </div>`;
+  overlay.onclick = (e) => { if (e.target === overlay) closeCommunityOverlay(); };
+  overlay.querySelector("#cmtyClose").onclick = closeCommunityOverlay;
+  overlay.onkeydown = (e) => { if (e.key === "Escape") closeCommunityOverlay(); };
+  overlay.querySelectorAll("[data-cmty-tab]").forEach(btn => {
+    btn.onclick = () => { s.tab = btn.dataset.cmtyTab; renderCommunityOverlay(); communityFetch(); };
+  });
+  const search = overlay.querySelector("#cmtySearch");
+  if (search) {
+    search.oninput = () => {
+      s.q = search.value;
+      clearTimeout(_communitySearchTimer);
+      _communitySearchTimer = setTimeout(communityFetch, 250);
+    };
+    search.onkeydown = (e) => e.stopPropagation();
+  }
+  const byUser = overlay.querySelector("#cmtyByUser");
+  if (byUser) byUser.onchange = () => { s.byUser = byUser.checked; renderCommunityOverlay(); communityFetch(); };
+  for (const [id, key] of [["cmtyKind", "kind"], ["cmtySort", "sort"]]) {
+    const sel = overlay.querySelector("#" + id);
+    if (sel) sel.onchange = () => { s[key] = sel.value; communityFetch(); };
+  }
+  renderCommunityResults();
+  wireAuditioner();
+}
+
+function renderCommunityResults() {
+  const box = document.getElementById("cmtyResults");
+  if (!box) return;
+  const s = communityState;
+  if (s.loading) {
+    box.innerHTML = `<div class="cmty-grid">${`<div class="cmty-skel"></div>`.repeat(6)}</div>`;
+    return;
+  }
+  if (s.error) { box.innerHTML = `<div class="cmty-empty">${esc(s.error)}</div>`; s.error = null; return; }
+
+  if (s.tab === "top") {
+    box.innerHTML = s.topUsers.length ? `<ol class="cmty-toplist">${s.topUsers.map(t => `
+      <li>
+        <button class="cmty-author big" data-cmty-author="${esc(t.user.handle)}">
+          ${esc(t.user.display_name)} <span>@${esc(t.user.handle)}</span>
+        </button>
+        <span class="cmty-topscore" title="Smoothed rating across their best items">★ ${t.score.toFixed(2)}</span>
+        <span class="cmty-topitems">${t.top_items.map(it => esc(it.name)).join(" · ")}</span>
+      </li>`).join("")}</ol>`
+      : `<div class="cmty-empty">${auditionerMiniSVG()}
+          <span>No one has passed the five-rating mark yet.<br>Rate what you find and this list fills itself.</span></div>`;
+  } else {
+    const entries = s.tab === "mine" ? s.mine : s.results;
+    // Compositions don't apply to the machine — they render as full-width
+    // track rows with the inline player; synths and engines stay cards.
+    box.innerHTML = entries.length
+      ? `<div class="cmty-grid">${entries.map(entry =>
+          entry.kind === "composition"
+            ? profileCompositionRowHTML(entry, { showAuthor: true })
+            : communityCardHTML(entry)).join("")}</div>`
+      : `<div class="cmty-empty">${auditionerMiniSVG()}
+          <span>${s.tab === "mine"
+            ? "Nothing shared yet — hit ⤓ Save on the Sub-note or Macro page and tick “Share to the community too”, or share a composition from the Producer."
+            : "Nothing surfaced for that yet — work appears in search once five people rate it. Try Top users, or wander through profiles."}</span></div>`;
+  }
+
+  const entriesById = {};
+  for (const entry of (s.tab === "mine" ? s.mine : s.results)) entriesById[entry.id] = entry;
+  wireCommunityCards(box, entriesById, {
+    rerender: renderCommunityResults,
+    onAuthor: (handle) => { closeCommunityOverlay(); navigate("user/" + encodeURIComponent(handle)); },
+    onTag: (tag) => {
+      communityState.tab = "search";
+      communityState.byUser = false;
+      communityState.q = tag;
+      renderCommunityOverlay();
+      communityFetch();
+    },
+  });
+  // Composition rows: the inline track player, same as on profiles. No
+  // re-render — the row updates its own button and progress bar while playing.
+  box.querySelectorAll("[data-comp-play]").forEach(btn => {
+    btn.onclick = () => {
+      const entry = entriesById[btn.dataset.compPlay];
+      const row = btn.closest(".comp-row");
+      if (entry && row) toggleCompositionPlayback(entry, row);
+    };
+  });
+  wireAuditionerDragSources(box, entriesById);
+}
+
+// Shared wiring for community item cards (overlay results + profile pages).
+function wireCommunityCards(box, entriesById, { rerender, onAuthor, onTag } = {}) {
+  box.querySelectorAll("[data-cmty-preview]").forEach(btn => {
+    btn.onclick = async () => {
+      const entry = entriesById[btn.dataset.cmtyPreview];
+      if (entry) { await toggleCommunityPreview(entry, btn.closest(".cmty-card")); rerender?.(); }
+    };
+  });
+  box.querySelectorAll("[data-cmty-add]").forEach(btn => {
+    btn.onclick = async () => {
+      try { await addCommunityItemToLibrary(btn.dataset.cmtyAdd); rerender?.(); }
+      catch (err) { alert("Could not add: " + err.message); }
+    };
+  });
+  box.querySelectorAll("[data-cmty-author]").forEach(btn => {
+    btn.onclick = () => onAuthor?.(btn.dataset.cmtyAuthor);
+  });
+  box.querySelectorAll("[data-cmty-tag]").forEach(btn => {
+    btn.onclick = () => onTag?.(btn.dataset.cmtyTag);
+  });
+  wireStars(box, entriesById, () => rerender?.());
+}
+
+// ── Auditioner: the community overlay's try-before-you-add rack ──────────────
+// Seven section slots mirroring the composer structure. Whole modules only:
+// dropping a module whose coverage intersects an existing one evicts that
+// module entirely; a full patch encompasses (fills) every slot it covers.
+// Completely separate state from exploreParams/arrangement — closing the
+// overlay leaves the user's loaded patches untouched.
+
+// Two slots (owner 2026-07-14): a SYNTH (instrument + space) and a NOTE
+// ENGINE (behaviour + scale + percussion) — matching the three shareable
+// kinds. The machine itself is the interface: the synth inhabits the cabinet
+// and horn, the engine inhabits the crank, roll, dial, lever and drums.
+const AUDITIONER_SLOTS = ["synth", "engine"];
+let auditionerSlots = { synth: null, engine: null };
+let auditionerPlaying = false;
+let auditionerMin = false;  // strip collapsed to the floating machine button
+// Live machine controls, applied on top of the loaded modules' parameters.
+let auditionerCtl = {
+  tempoOverride: null,  // spinner dial (null = the engine's own tempo)
+  reverbOff: false,     // pipes clicked
+  percMuted: false,     // drums clicked
+  hornScale: 1,         // horn size ↔ master volume
+  ff: false,            // crank-flick fast-forward in flight
+  ffTargetUnits: null,  // motif count where the fast-forward lands
+  ffStartedAt: 0,
+  tickTimer: null,      // motif ticker poll
+  reelRate: 1,          // live dial multiplier over the rendered tape speed
+  renderedTempo: 104,   // tempo the animation durations were baked at
+  // Cumulative performance counters (the synth's timeline is a ring buffer,
+  // so the ticker ingests fresh events and accumulates here).
+  lastSeenWhen: 0,
+  unitsGone: 0,         // motif renditions played so far
+  variantsSeen: new Set(),
+};
+
+function auditionerSlotFor(entry) {
+  if (entry.kind === "synth") return "synth";
+  if (entry.kind === "engine") return "engine";
+  return null; // compositions play on profiles, not in the machine
+}
+
+function auditionerEngineParams() {
+  return (auditionerSlots.engine?.data?.parameters) || {};
+}
+
+// Percussion is ALWAYS the engine's domain (owner 2026-07-15): synths never
+// carry drums, and any perc params riding along on synth data are scrubbed at
+// merge time. Mirrors synth._normalizePercLayers's audibility rule.
+function auditionerSynthParams() {
+  const params = { ...((auditionerSlots.synth?.data?.parameters) || {}) };
+  for (const key of Object.keys(params)) if (key.startsWith("perc")) delete params[key];
+  return params;
+}
+
+function auditionerHasPercussion() {
+  const p = auditionerEngineParams();
+  if (typeof p.percEnabled === "boolean" && !p.percEnabled) return false;
+  if (Array.isArray(p.percLayers)) return p.percLayers.some(l => (Number(l.vol) || 0) > 0);
+  return (Number(p.percBeatVol) || 0) > 0 || (Number(p.percMotifVol) || 0) > 0
+      || (Number(p.percDownbeatVol) || 0) > 0;
+}
+
+function auditionerBaseTempo() {
+  const t = auditionerEngineParams().tempo;
+  return typeof t === "number" && isFinite(t) ? Math.min(400, Math.max(20, t)) : DEFAULTS.tempo || 104;
+}
+
+function auditionerTempo() {
+  return auditionerCtl.tempoOverride ?? auditionerBaseTempo();
+}
+
+function auditionerVolume() {
+  // Horn size ↔ loudness, clamped so the horn can neither vanish nor eat the UI.
+  return Math.min(1.5, Math.max(0.12, Math.pow(auditionerCtl.hornScale, 1.7)));
+}
+
+async function placeInAuditioner(entry) {
+  const slot = auditionerSlotFor(entry);
+  if (!slot) {
+    alert("Compositions play inline on profiles — the machine takes synths and note engines.");
+    return;
+  }
+  if (!entry.data) {
+    try {
+      const d = await api("/api/community/items/" + encodeURIComponent(entry.id));
+      entry.data = d.item.data;
+    } catch (err) {
+      alert("Could not load this: " + err.message);
+      return;
+    }
+  }
+  auditionerSlots[slot] = {
+    uid: crypto.randomUUID(),
+    id: entry.id,
+    kind: entry.kind,
+    name: entry.name,
+    author: entry.author || null,
+    avg_stars: entry.avg_stars ?? entry.avgStars ?? null,
+    rating_count: entry.rating_count ?? entry.ratingCount ?? 0,
+    data: entry.data,
+  };
+  if (slot === "engine") auditionerCtl.percMuted = false; // fresh engine, fresh drums
+  if (auditionerPlaying) auditionerPlay(); // hot-swap while listening
+  renderAuditioner();
+}
+
+function removeFromAuditioner(slot) {
+  auditionerSlots[slot] = null;
+  if (auditionerPlaying) {
+    if (auditionerSlots.synth || auditionerSlots.engine) auditionerPlay();
+    else auditionerStop();
+  }
+  renderAuditioner();
+}
+
+function auditionParams() {
+  const params = {
+    ...DEFAULTS,
+    ...auditionerSynthParams(), // perc-scrubbed: drums only come from the engine
+    ...auditionerEngineParams(),
+  };
+  params.tempo = auditionerTempo();
+  if (auditionerCtl.reverbOff) params.reverbWet = 0;
+  // Muting must silence BOTH percussion paths: explicit layer lists and the
+  // legacy per-role volume kit (percEnabled false kills the latter).
+  if (auditionerCtl.percMuted) { params.percLayers = []; params.percEnabled = false; }
+  return params;
+}
+
+function auditionerPlay() {
+  synth.stop();
+  stopArrangement();
+  stopProfilePlayback(); // one thing sounds at a time
+  communityState.previewId = null;
+  auditionerFastForwardEnd(true);
+  auditionerResetCounters(); // a fresh performance counts from zero
+  synth.play({ ...auditionParams(), seed: 20260703 });
+  synth.setMasterVolume(auditionerVolume());
+  auditionerPlaying = true;
+  auditionerTickerStart();
+  renderAuditioner();
+}
+
+function auditionerStop() {
+  auditionerFastForwardEnd(true);
+  synth.stop();
+  synth.setMasterVolume(1); // never let the horn's volume leak into the studio
+  auditionerPlaying = false;
+  auditionerTickerStop();
+  renderAuditioner();
+}
+
+// Crank flick → mechanical fast-forward: the piece races ahead ~6× with the
+// output ducked until a set number of NEW motifs have gone past. Flick again
+// mid-flight to reboost (another span into the future); click the crank to
+// brake early. Watch the plaque count up while it whirrs.
+const AUD_FF_MOTIF_SPAN = 6;
+
+// Pull any events the ring buffer gained since last look and accumulate the
+// real counts: motifs GONE BY = motif renditions started (one motifNoteIndex 0
+// per unit — a repeated motif counts every time it plays), variations = the
+// distinct variant shapes heard so far.
+function auditionerIngestTimeline() {
+  const tl = synth.getNoteTimeline ? synth.getNoteTimeline() : null;
+  if (!tl || !tl.events) return;
+  for (const e of tl.events) {
+    if (!(e.when > auditionerCtl.lastSeenWhen)) continue;
+    auditionerCtl.lastSeenWhen = e.when;
+    if (e.motifNoteIndex === 0) auditionerCtl.unitsGone += 1;
+    if (e.isVariant && Number.isFinite(e.motifIndex)) auditionerCtl.variantsSeen.add(e.motifIndex);
+  }
+}
+
+function auditionerResetCounters() {
+  auditionerCtl.lastSeenWhen = 0;
+  auditionerCtl.unitsGone = 0;
+  auditionerCtl.variantsSeen = new Set();
+}
+
+// The visual side of the fast-forward drives the drive-train's CSS animations
+// through their playbackRate (Marcus's reference implementation): the crank
+// and spools whirl up quickly, then coast back down with a cubic ease-out —
+// a slow lazy settle after a natural landing, a firmer one under the brake.
+let _audRateRaf = null;
+
+// Ease every drive animation toward `mult` × its resting rate (crank rests at
+// 1, the tempo group rests at the dial's reelRate), cubic ease-out.
+function rampMachineRate(mult, duration) {
+  if (_audRateRaf) cancelAnimationFrame(_audRateRaf);
+  const targets = [
+    ...auditionerCrankAnims().map(anim => [anim, anim.playbackRate || 1, mult]),
+    ...auditionerTempoAnims().map(anim => [anim, anim.playbackRate || 1, mult * auditionerCtl.reelRate]),
+  ];
+  if (!targets.length) return;
+  const t0 = performance.now();
+  const step = (now) => {
+    const progress = Math.min(1, (now - t0) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    for (const [anim, start, target] of targets) {
+      anim.playbackRate = start + (target - start) * eased;
+    }
+    if (progress < 1) _audRateRaf = requestAnimationFrame(step);
+    else _audRateRaf = null;
+  };
+  _audRateRaf = requestAnimationFrame(step);
+}
+
+function auditionerFastForward() {
+  if (!auditionerPlaying) return;
+  // Reboost: each flick pushes the landing point another span ahead.
+  auditionerIngestTimeline();
+  auditionerCtl.ffTargetUnits = auditionerCtl.unitsGone + AUD_FF_MOTIF_SPAN;
+  auditionerCtl.ffStartedAt = performance.now();
+  rampMachineRate(8, 600); // whirl up (again) even mid-flight
+  if (!auditionerCtl.ff) {
+    auditionerCtl.ff = true;
+    synth.updateGenerationParams({ tempo: Math.min(400, auditionerTempo() * 6) });
+    synth.setMasterVolume(auditionerVolume() * 0.22);
+    document.getElementById("audMachine")?.classList.add("ff");
+  }
+}
+
+function auditionerFastForwardEnd(silent = false) {
+  if (!auditionerCtl.ff) return;
+  const braked = !silent && auditionerCtl.unitsGone < (auditionerCtl.ffTargetUnits ?? 0);
+  auditionerCtl.ff = false;
+  auditionerCtl.ffTargetUnits = null;
+  document.getElementById("audMachine")?.classList.remove("ff");
+  if (silent) {
+    if (_audRateRaf) cancelAnimationFrame(_audRateRaf);
+    for (const anim of auditionerCrankAnims()) anim.playbackRate = 1;
+    auditionerApplyReelRate();
+    return;
+  }
+  rampMachineRate(1, braked ? 500 : 1600); // brake bites, a landing coasts
+  if (auditionerPlaying) {
+    synth.updateGenerationParams({ tempo: auditionerTempo() });
+    synth.setMasterVolume(auditionerVolume());
+  }
+}
+
+// The plaque under the lever counts the piece as it unfolds — motifs gone by
+// and distinct variations tried — and lands the fast-forward once its target
+// motif count arrives.
+function auditionerTickerStart() {
+  auditionerTickerStop();
+  const tick = () => {
+    auditionerIngestTimeline();
+    const varEl = document.getElementById("audTickVar");
+    const unitEl = document.getElementById("audTickUnit");
+    if (varEl) varEl.textContent = String(auditionerCtl.variantsSeen.size);
+    if (unitEl) unitEl.textContent = String(auditionerCtl.unitsGone);
+    if (auditionerCtl.ff) {
+      const overdue = performance.now() - (auditionerCtl.ffStartedAt || 0) > 20000;
+      if (auditionerCtl.unitsGone >= auditionerCtl.ffTargetUnits || overdue) auditionerFastForwardEnd();
+    }
+  };
+  tick();
+  auditionerCtl.tickTimer = setInterval(tick, 350);
+}
+
+function auditionerTickerStop() {
+  if (auditionerCtl.tickTimer) { clearInterval(auditionerCtl.tickTimer); auditionerCtl.tickTimer = null; }
+}
+
+async function auditionerRandomise() {
+  for (const slot of AUDITIONER_SLOTS) {
+    if (auditionerSlots[slot]) continue;
+    let entry = null;
+    try {
+      const d = await api(`/api/community/random?kind=${slot}&count=1`);
+      entry = (d.items || [])[0] || null;
+    } catch {}
+    if (!entry) {
+      // Cold-start fallback: carve the right half out of a random factory patch.
+      const fulls = FACTORY_PRESETS.filter(f => f.section === "full");
+      const f = fulls[Math.floor(Math.random() * fulls.length)];
+      if (f) {
+        const parts = slot === "synth"
+          ? { notes: true, space: true }
+          : { stave: true, clef: true, percussion: true };
+        entry = {
+          id: `factory:${f.id}:${slot}`, kind: slot,
+          name: `${f.name} (${slot === "synth" ? "sound" : "engine"})`,
+          author: { handle: "soundinator", display_name: "Soundinator factory" },
+          data: { parameters: extractCaptureParams(f.parameters, parts), captureParts: parts },
+        };
+      }
+    }
+    if (entry) await placeInAuditioner(entry);
+  }
+}
+
+// The auditioner is drawn as a hand-cranked street organ: crank (rhythm)
+// drives a music box (sound) with a control panel (dynamics, surprise), a
+// pianola reel (melody) turns on top, a gramophone horn (space) sings out the
+// side, and a one-man-band drum-and-cymbal rig (percussion) stands beside it.
+// Every part wears its notation icon so you know what goes where; parts light
+// up when a module lands on them and the whole contraption animates while
+// playing.
+
+// The moving parts pace themselves from the loaded music: crank, roll and
+// mallet at the engine's tempo (dial overrides included), the spinner disc by
+// how much surprise the engine carries, the lever by its dynamics range.
+function auditionerSpeedVars() {
+  const clamp = (lo, hi, v) => Math.min(hi, Math.max(lo, v));
+  const p = auditionerEngineParams();
+  const num = (v, fb) => (typeof v === "number" && isFinite(v) ? v : fb);
+  const tempo = clamp(30, 400, auditionerTempo());
+  const dynRange = clamp(0.05, 1, num(p.loudnessRange, num(p.dynamicsRange, 0.4)));
+  // The crank turns at its own steady pace (you crank it, it doesn't chase
+  // the dial); the tempo wheel, reel/tape and mallet all follow the tempo.
+  return `--roll-dur:${(120 / tempo).toFixed(2)}s;` +
+         `--tap-dur:${(120 / tempo).toFixed(2)}s;` +
+         `--spin-dur:${(340 / tempo).toFixed(2)}s;` +
+         `--lever-dur:${clamp(1.1, 4, 1.1 / dynRange).toFixed(2)}s;`;
+}
+
+// Live tempo changes drive the tape via WAAPI playbackRate — never by
+// rewriting animation durations mid-flight (a running CSS animation keeps its
+// elapsed time when its duration changes, so every rewrite jumps the phase
+// and the reel reads as stutter instead of speed). Durations are baked from
+// auditionerSpeedVars() at render; the dial scales rates on top of them.
+function auditionerCrankAnims() {
+  return [...document.querySelectorAll("#audMachine .anim-crank")].flatMap(el => el.getAnimations());
+}
+
+// Everything that follows the tempo: the tempo wheel itself, the spools, the
+// paper, and the mallet arm.
+function auditionerTempoAnims() {
+  return [...document.querySelectorAll(
+    "#audMachine .anim-spinner, #audMachine .anim-gear-fwd, #audMachine .anim-gear-rev," +
+    "#audMachine .anim-roll-1, #audMachine .anim-roll-2, #audMachine .anim-roll-3," +
+    "#audMachine .anim-mallet, #audMachine .anim-cymbal"
+  )].flatMap(el => el.getAnimations());
+}
+
+function auditionerApplyReelRate() {
+  if (auditionerCtl.ff) return; // the fast-forward ramp owns the rates
+  for (const anim of auditionerTempoAnims()) anim.playbackRate = auditionerCtl.reelRate;
+}
+
+// Marcus's target artwork (2026-07): an INTERACTIVE street organ. The synth
+// inhabits the cabinet + horn; the note engine inhabits the crank, roll,
+// dial, lever and drum rig. Moving pieces carry their animation permanently
+// but PAUSED — a part only runs when its slot is filled and the machine is
+// playing. Controls: crank click = play/stop, crank flick-right =
+// fast-forward, dial pointer = tempo, pipes = reverb on/off, drums =
+// percussion on/off, horn drag ↕ = volume. The plaque counts motif units and
+// variations as the piece unfolds.
+function auditionerMachineSVG() {
+  const on = (slot) => (auditionerSlots[slot] ? " on" : "");
+  // Two distinct drum states: an engine WITHOUT percussion greys the rig out
+  // entirely; muting an engine that has percussion just stills the mallet.
+  const drumState = !auditionerHasPercussion() ? " no-perc" : auditionerCtl.percMuted ? " muted" : "";
+  // Durations bake the current tempo (dial override included); the live dial
+  // then scales playbackRate relative to this baked speed.
+  auditionerCtl.renderedTempo = auditionerTempo();
+  auditionerCtl.reelRate = 1;
+  return `
+  <svg class="aud-svg" viewBox="0 0 980 172" preserveAspectRatio="xMidYMid meet" style="${auditionerSpeedVars()}">
+    <g class="aud-part${on("synth")}" data-aud-slot="synth" id="audCabinet">
+      <rect x="120" y="55" width="320" height="110" rx="8" class="line-art"/>
+      <rect x="115" y="50" width="330" height="10" rx="3" class="line-art"/>
+      <path d="M 130 165 L 140 165 L 145 170 L 125 170 Z" class="filled"/>
+      <path d="M 430 165 L 420 165 L 415 170 L 435 170 Z" class="filled"/>
+      <circle cx="130" cy="70" r="1.5" class="filled"/>
+      <circle cx="430" cy="70" r="1.5" class="filled"/>
+      <circle cx="130" cy="155" r="1.5" class="filled"/>
+      <circle cx="430" cy="155" r="1.5" class="filled"/>
+      <path d="M 135 145 L 135 85 A 25 25 0 0 1 185 85 L 185 145 Z" class="line-art bg-fill"/>
+      <g id="audSteam"${auditionerCtl.reverbOff ? ' style="display:none"' : ""}>
+        <g transform="translate(145, 90)">
+          <circle cx="0" cy="-5" r="3" class="steam-bubble" style="animation-delay:0s"/>
+          <circle cx="4" cy="-10" r="2.5" class="steam-bubble" style="animation-delay:.2s;animation-name:audg-steam2"/>
+          <circle cx="-3" cy="-15" r="2.2" class="steam-bubble" style="animation-delay:.6s;animation-name:audg-steam3"/>
+        </g>
+        <g transform="translate(160, 80)">
+          <circle cx="0" cy="-6" r="3" class="steam-bubble" style="animation-delay:.1s;animation-name:audg-steam2"/>
+          <circle cx="5" cy="-12" r="2.8" class="steam-bubble" style="animation-delay:.5s;animation-name:audg-steam4"/>
+          <circle cx="-4" cy="-18" r="2" class="steam-bubble" style="animation-delay:.9s"/>
+          <circle cx="2" cy="-24" r="2.4" class="steam-bubble" style="animation-delay:1.2s;animation-name:audg-steam3"/>
+        </g>
+        <g transform="translate(175, 95)">
+          <circle cx="0" cy="-5" r="2.8" class="steam-bubble" style="animation-delay:0s"/>
+          <circle cx="-4" cy="-10" r="2.4" class="steam-bubble" style="animation-delay:.3s;animation-name:audg-steam3"/>
+          <circle cx="3" cy="-16" r="2" class="steam-bubble" style="animation-delay:.7s;animation-name:audg-steam2"/>
+        </g>
+      </g>
+      <g class="anim-comb${auditionerCtl.reverbOff ? " muted" : ""}">
+        <rect x="140" y="90" width="10" height="55" rx="2" class="detail"/>
+        <rect x="155" y="80" width="10" height="65" rx="2" class="detail"/>
+        <rect x="170" y="95" width="10" height="50" rx="2" class="detail"/>
+        <path d="M 140 120 L 150 115 M 155 110 L 165 105 M 170 125 L 180 120" class="detail"/>
+      </g>
+      <rect id="audPipesHit" x="130" y="55" width="60" height="90" fill="transparent" class="aud-hit">
+        <title>${auditionerCtl.reverbOff ? "Reverb is off — click the pipes to let the room back in" : "Click the pipes to switch the reverb off"}</title>
+      </rect>
+    </g>
+
+    <g class="aud-part${on("engine")}" data-aud-slot="engine" id="audSpinner">
+      <circle cx="240" cy="105" r="35" class="line-art"/>
+      <g class="anim-spinner">
+        <circle cx="240" cy="105" r="30" class="line-art bg-fill"/>
+        <path d="M 240 105 L 240 75 A 30 30 0 0 1 266 90 Z" class="filled"/>
+        <path d="M 240 105 L 266 120 A 30 30 0 0 1 240 135 Z" class="filled"/>
+        <path d="M 240 105 L 214 120 A 30 30 0 0 1 214 90 Z" class="filled"/>
+      </g>
+      <g id="audDial" class="aud-hit" style="transform-origin:240px 105px">
+        <polygon points="240,65 233,53 247,53" class="line-art bg-fill"/>
+        <circle cx="240" cy="105" r="5" class="line-art bg-fill"/>
+        <title>Drag the pointer — right speeds the tempo up, left slows it down</title>
+      </g>
+    </g>
+
+    <g class="aud-part${on("engine")}" data-aud-slot="engine" id="audLeverPart">
+      <path d="M 310 80 A 60 60 0 0 1 410 80 L 405 90 A 50 50 0 0 0 315 90 Z" class="line-art"/>
+      <path d="M 320 85 A 55 55 0 0 1 400 85" class="detail"/>
+      <line x1="320" y1="85" x2="315" y2="80" class="detail"/>
+      <line x1="340" y1="71" x2="336" y2="65" class="detail"/>
+      <line x1="360" y1="65" x2="360" y2="59" class="detail"/>
+      <line x1="380" y1="71" x2="384" y2="65" class="detail"/>
+      <line x1="400" y1="85" x2="405" y2="80" class="detail"/>
+      <g class="anim-lever" id="audLever">
+        <polygon points="356,130 364,130 362,65 358,65" class="line-art bg-fill"/>
+        <circle cx="360" cy="65" r="9" class="line-art bg-fill"/>
+      </g>
+      <path d="M 348 130 L 372 130 L 368 145 L 352 145 Z" class="line-art"/>
+      <circle cx="360" cy="130" r="3" class="filled"/>
+      <g id="audPlaque">
+        <title>motifs gone by · variations tried</title>
+        <rect x="318" y="146" width="84" height="24" rx="2" class="line-art bg-fill"/>
+        <circle cx="323" cy="158" r="1.5" class="filled"/>
+        <circle cx="397" cy="158" r="1.5" class="filled"/>
+        <rect x="328" y="150" width="64" height="16" rx="1" class="detail"/>
+        <text id="audTickUnit" x="345" y="162" text-anchor="middle" class="aud-tick num">0</text>
+        <text x="360" y="161" text-anchor="middle" class="aud-tick sep">·</text>
+        <text id="audTickVar" x="375" y="162" text-anchor="middle" class="aud-tick num">0</text>
+      </g>
+    </g>
+
+    <g class="aud-part${on("engine")}" data-aud-slot="engine" id="audRoll">
+      <rect x="190" y="15" width="20" height="40" rx="3" class="line-art"/>
+      <rect x="350" y="15" width="20" height="40" rx="3" class="line-art"/>
+      <rect x="200" y="20" width="160" height="30" class="line-art bg-fill"/>
+      <line x1="200" y1="20" x2="200" y2="50" class="detail"/>
+      <line x1="360" y1="20" x2="360" y2="50" class="detail"/>
+      <g id="audReelHoles">
+        <line x1="210" y1="27" x2="350" y2="27" class="detail anim-roll-1" stroke-width="3"/>
+        <line x1="210" y1="35" x2="350" y2="35" class="detail anim-roll-2" stroke-width="3"/>
+        <line x1="210" y1="43" x2="350" y2="43" class="detail anim-roll-3" stroke-width="3"/>
+      </g>
+      <g class="anim-gear-fwd">
+        <circle cx="200" cy="35" r="12" class="line-art bg-fill"/>
+        <line x1="188" y1="35" x2="212" y2="35" class="detail"/>
+        <line x1="200" y1="23" x2="200" y2="47" class="detail"/>
+      </g>
+      <g class="anim-gear-rev">
+        <circle cx="360" cy="35" r="12" class="line-art bg-fill"/>
+        <line x1="348" y1="35" x2="372" y2="35" class="detail"/>
+        <line x1="360" y1="23" x2="360" y2="47" class="detail"/>
+      </g>
+    </g>
+
+    <g class="aud-part${on("engine")}" data-aud-slot="engine" id="audCrank">
+      <path d="M 55 165 L 55 100 L 75 100 L 75 165 Z" class="line-art"/>
+      <path d="M 40 165 L 90 165 L 85 155 L 45 155 Z" class="line-art"/>
+      <rect x="75" y="90" width="45" height="15" class="line-art"/>
+      <rect x="100" y="85" width="10" height="25" class="line-art"/>
+      <g class="anim-crank" id="audCrankArm">
+        <circle cx="65" cy="100" r="35" class="line-art bg-fill"/>
+        <line x1="65" y1="65" x2="65" y2="135" class="detail"/>
+        <line x1="30" y1="100" x2="100" y2="100" class="detail"/>
+        <circle cx="65" cy="100" r="12" class="line-art"/>
+        <rect x="61" y="45" width="8" height="55" rx="4" class="filled"/>
+        <circle cx="65" cy="45" r="9" class="line-art bg-fill"/>
+        <circle cx="65" cy="100" r="3" class="bg-fill"/>
+      </g>
+      <rect id="audCrankHit" x="25" y="40" width="85" height="125" fill="transparent" class="aud-hit">
+        <title>Click to ${auditionerPlaying ? "stop" : "play"} · flick right to fast-forward through variations</title>
+      </rect>
+    </g>
+
+    <g class="aud-part${on("synth")}" data-aud-slot="synth" id="audHorn">
+      <rect x="440" y="90" width="20" height="30" rx="2" class="line-art"/>
+      <g id="audHornScale" style="transform-origin:460px 105px;transform:scale(${auditionerCtl.hornScale.toFixed(3)})">
+        <g class="anim-horn">
+          <path d="M 460 95 C 500 95, 540 45, 620 25 L 620 145 C 540 125, 500 115, 460 115 Z" class="line-art bg-fill"/>
+          <path d="M 470 100 C 510 100, 550 60, 615 45" class="detail"/>
+          <path d="M 470 105 C 510 105, 550 85, 615 85" class="detail"/>
+          <path d="M 470 110 C 510 110, 550 110, 615 125" class="detail"/>
+          <ellipse cx="620" cy="85" rx="30" ry="60" class="line-art bg-fill"/>
+          <ellipse cx="613" cy="85" rx="20" ry="50" class="filled"/>
+        </g>
+      </g>
+      <rect id="audHornHit" x="455" y="15" width="215" height="145" fill="transparent" class="aud-hit-ns">
+        <title>Drag the horn up for louder, down for quieter</title>
+      </rect>
+    </g>
+
+    <g class="aud-part${on("engine")}${drumState}" data-aud-slot="engine" id="audPerc">
+      <path d="M 825 165 L 840 145 L 855 165" class="detail"/>
+      <line x1="840" y1="145" x2="840" y2="100" class="line-art"/>
+      <circle cx="835" cy="95" r="48" class="filled"/>
+      <circle cx="840" cy="90" r="48" class="line-art bg-fill"/>
+      <circle cx="840" cy="90" r="38" class="detail"/>
+      <polygon points="840,58 848,74 866,78 853,90 856,108 840,100 824,108 827,90 814,78 832,74" class="detail"/>
+      <path d="M 840 42 L 840 48 M 840 132 L 840 138 M 792 90 L 798 90 M 882 90 L 888 90 M 806 56 L 810 60 M 870 120 L 874 124 M 874 56 L 870 60 M 810 124 L 806 120" class="line-art"/>
+      <line x1="840" y1="42" x2="840" y2="20" class="line-art"/>
+      <g class="anim-cymbal" id="audCymbal">
+        <path d="M 810 20 Q 840 5 870 20 Q 840 25 810 20 Z" class="line-art bg-fill"/>
+        <circle cx="840" cy="18" r="4" class="line-art bg-fill"/>
+      </g>
+      <rect x="735" y="130" width="25" height="20" rx="3" class="line-art"/>
+      <g class="anim-mallet" id="audMallet">
+        <line x1="750" y1="140" x2="795" y2="90" class="line-art"/>
+        <circle cx="795" cy="90" r="10" class="line-art bg-fill"/>
+        <polyline points="750,140 760,130 755,125 765,115 760,110" class="detail"/>
+        <circle cx="750" cy="140" r="4" class="filled"/>
+      </g>
+      <rect id="audPercHit" x="720" y="8" width="185" height="160" fill="transparent" class="aud-hit">
+        <title>${!auditionerHasPercussion() ? "This engine has no percussion" : auditionerCtl.percMuted ? "Percussion is off — click the drums to bring it back" : "Click the drums to switch percussion off"}</title>
+      </rect>
+    </g>
+  </svg>`;
+}
+
+// Compact machine glyph for the minimised state (Marcus's icon artwork):
+// box, roll, crank and horn in a square frame that reads inside a circle.
+function auditionerMiniSVG() {
+  return `
+  <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true" class="aud-mini-svg">
+    <rect x="30" y="30" width="40" height="40" rx="6" class="icon-art"/>
+    <rect x="35" y="18" width="30" height="12" rx="4" class="icon-art"/>
+    <circle cx="15" cy="50" r="10" class="icon-art"/>
+    <line x1="15" y1="40" x2="15" y2="60" class="icon-art"/>
+    <circle cx="15" cy="40" r="4" class="icon-fill"/>
+    <line x1="25" y1="50" x2="30" y2="50" class="icon-art"/>
+    <path d="M 70 50 Q 80 50 85 30 L 85 70 Q 80 50 70 50" class="icon-art"/>
+    <ellipse cx="85" cy="50" rx="6" ry="20" class="icon-art"/>
+  </svg>`;
+}
+
+function auditionerSlotWellHTML(slot) {
+  const occ = auditionerSlots[slot];
+  const label = slot === "synth" ? "SYNTH" : "NOTE ENGINE";
+  const hint = slot === "synth" ? "drop a synth here" : "drop a note engine here";
+  // The label only earns its space while the slot is empty; a loaded slot is
+  // self-describing (name · author · stars).
+  return `
+    <div class="aud-well${occ ? " on" : ""}" data-aud-slot="${slot}"${occ ? ` title="${label.toLowerCase()}"` : ""}>
+      ${occ ? `
+        <b>${esc(occ.name)}</b>
+        <button class="cmty-author" data-cmty-author="${esc(occ.author?.handle || "")}">@${esc(occ.author?.handle || "?")}</button>
+        ${occ.avg_stars ? `<span class="aud-occ-stars">★${occ.avg_stars}</span>` : ""}
+        <button class="aud-occ-x" data-aud-remove="${slot}" title="Take it off the machine">×</button>`
+      : `<span class="aud-well-label">${label}</span><span class="aud-well-hint">${hint}</span>`}
+    </div>`;
+}
+
+function auditionerHTML() {
+  if (auditionerMin) {
+    const filled = AUDITIONER_SLOTS.filter(s => auditionerSlots[s]).length;
+    const pop = auditionerCtl.popNext ? " pop" : "";
+    auditionerCtl.popNext = false;
+    return `
+      <button class="aud-fab${auditionerPlaying ? " playing" : ""}${pop}" id="audRestore"
+        title="Open the auditioner${filled ? ` — ${filled} of 2 slots loaded${auditionerPlaying ? ", playing" : ""}` : ""}">
+        ${auditionerMiniSVG()}
+        ${filled ? `<span class="aud-fab-count">${filled}</span>` : ""}
+      </button>`;
+  }
+  const unfold = auditionerCtl.unfoldNext ? " unfold" : "";
+  auditionerCtl.unfoldNext = false;
+  return `
+    <div class="aud-machine${auditionerPlaying ? " playing" : ""}${unfold}" id="audMachine">
+      ${auditionerMachineSVG()}
+    </div>
+    <div class="aud-bar">
+      <span class="aud-title" title="Drop a synth and a note engine on the machine, then crank it. The machine IS the controls: crank plays (flick right to fast-forward), the dial sets tempo, the pipes toggle reverb, the drums toggle percussion, the horn drags louder and quieter.">AUDITIONER</span>
+      <button class="aud-btn primary" id="audPlay" title="${auditionerPlaying ? "Stop" : "Crank the machine"}">${auditionerPlaying ? "■" : "▶"}</button>
+      <button class="aud-btn" id="audRandom" title="Fill the empty slots with random community work (factory when the community is quiet)">◇ Randomise</button>
+      <button class="aud-btn" id="audClear" title="Empty the machine">Clear</button>
+      <button class="aud-btn aud-btn-icon" id="audMin" title="Tuck the machine away into a corner button">${auditionerMiniSVG()}</button>
+      <button class="aud-btn" id="audTourBtn" title="How the machine works — a quick walk around its controls">ⓘ</button>
+      ${auditionerSlotWellHTML("synth")}
+      ${auditionerSlotWellHTML("engine")}
+    </div>`;
+}
+
+// A short walk around the machine's controls, one bubble per part.
+const MACHINE_TOUR_STEPS = [
+  ["#audCrankHit", "The crank",
+   "Click it to start and stop the machine. Flick it to the right and the piece fast-forwards through the next six motifs — flick again mid-flight to keep going, click once to brake."],
+  ["#audPlaque", "The counter",
+   "Two numbers: motifs gone by, then distinct variations the engine has tried. Watch them climb while you fast-forward."],
+  ["#audDial", "The tempo dial",
+   "Drag the pointer — right of twelve runs faster, left runs slower, from half to double the engine's own tempo."],
+  ["#audPipesHit", "The pipes",
+   "Click to switch the reverb off and on. The steam is the reverb — no steam, no room."],
+  ["#audPercHit", "The drums",
+   "Click to mute the percussion. They sit dark on their own when the loaded engine has none."],
+  ["#audHornHit", "The horn",
+   "Drag it up for louder, down for quieter. It grows and shrinks with the volume — within reason."],
+  ['.aud-well[data-aud-slot="synth"]', "The two slots",
+   "A synth and a note engine make the machine sing. Press ▶ on any community card and it loads in here — everything you audition plays through the machine."],
+];
+
+function startMachineTour() {
+  document.getElementById("audTour")?.remove();
+  const steps = MACHINE_TOUR_STEPS.filter(([sel]) => document.querySelector(sel));
+  if (!steps.length) return;
+  let i = 0;
+  const el = document.createElement("div");
+  el.id = "audTour";
+  el.innerHTML = `<div class="tour-ring"></div><div class="tour-pop"></div>`;
+  document.body.appendChild(el);
+  const ring = el.querySelector(".tour-ring");
+  const pop = el.querySelector(".tour-pop");
+  const target = () => document.querySelector(steps[i]?.[0]);
+  const place = () => {
+    const t = target();
+    if (!t) return;
+    const r = t.getBoundingClientRect();
+    const pad = 6;
+    Object.assign(ring.style, {
+      left: `${r.left - pad}px`, top: `${r.top - pad}px`,
+      width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px`,
+    });
+    const popW = pop.offsetWidth || 320;
+    const popH = pop.offsetHeight || 150;
+    const below = r.bottom + pad + 10;
+    const top = below + popH + 12 > innerHeight ? Math.max(12, r.top - pad - popH - 10) : below;
+    const left = Math.min(Math.max(12, r.left), innerWidth - popW - 12);
+    Object.assign(pop.style, { left: `${left}px`, top: `${top}px` });
+  };
+  const done = () => { window.removeEventListener("resize", place); el.remove(); };
+  const draw = () => {
+    const t = target();
+    if (!t) { if (++i >= steps.length) done(); else draw(); return; }
+    const [, title, body] = steps[i];
+    pop.innerHTML = `
+      <div class="section-label">${esc(title)} <span class="shortcut-close">${i + 1}/${steps.length}</span></div>
+      <p>${esc(body)}</p>
+      <div class="tour-actions">
+        <button class="btn btn-ghost btn-sm" id="audTourSkip">Close</button>
+        ${i ? `<button class="btn btn-secondary btn-sm" id="audTourBack">Back</button>` : ""}
+        <button class="btn btn-primary btn-sm" id="audTourNext">${i === steps.length - 1 ? "Done" : "Next"}</button>
+      </div>`;
+    pop.querySelector("#audTourSkip").onclick = done;
+    const back = pop.querySelector("#audTourBack");
+    if (back) back.onclick = () => { i--; draw(); };
+    pop.querySelector("#audTourNext").onclick = () => { if (++i >= steps.length) done(); else draw(); };
+    requestAnimationFrame(place);
+  };
+  window.addEventListener("resize", place);
+  draw();
+}
+
+function renderAuditioner() {
+  const box = document.getElementById("cmtyAuditioner");
+  if (!box) return;
+  box.classList.toggle("min", auditionerMin);
+  box.innerHTML = auditionerHTML();
+  wireAuditioner();
+}
+
+function wireAuditioner() {
+  const box = document.getElementById("cmtyAuditioner");
+  if (!box) return;
+  box.classList.toggle("min", auditionerMin);
+  // Minimise/restore play a short tuck/unfold before the state swap: the
+  // machine shrinks toward the corner button, the corner button pops open
+  // back into the machine.
+  const minBtn = box.querySelector("#audMin");
+  if (minBtn) minBtn.onclick = () => {
+    const machine = document.getElementById("audMachine");
+    if (machine?.classList.contains("closing")) return; // mid-tuck already
+    machine?.classList.add("closing");
+    box.querySelector(".aud-bar")?.classList.add("closing");
+    auditionerCtl.popNext = true;
+    setTimeout(() => { auditionerMin = true; renderAuditioner(); }, 230);
+  };
+  const restore = box.querySelector("#audRestore");
+  if (restore) restore.onclick = () => {
+    if (restore.classList.contains("closing")) return;
+    restore.classList.add("closing");
+    auditionerCtl.unfoldNext = true;
+    setTimeout(() => { auditionerMin = false; renderAuditioner(); }, 150);
+  };
+  const toggle = () => (auditionerPlaying ? auditionerStop() : auditionerPlay());
+  const play = box.querySelector("#audPlay");
+  if (play) play.onclick = toggle;
+  const rand = box.querySelector("#audRandom");
+  if (rand) rand.onclick = () => auditionerRandomise();
+  const tourBtn = box.querySelector("#audTourBtn");
+  if (tourBtn) tourBtn.onclick = () => startMachineTour();
+  const clear = box.querySelector("#audClear");
+  if (clear) clear.onclick = () => {
+    auditionerSlots = { synth: null, engine: null };
+    auditionerCtl.tempoOverride = null;
+    auditionerCtl.reverbOff = false;
+    auditionerCtl.percMuted = false;
+    if (auditionerPlaying) auditionerStop(); else renderAuditioner();
+  };
+  box.querySelectorAll("[data-aud-remove]").forEach(btn => {
+    btn.onclick = () => removeFromAuditioner(btn.dataset.audRemove);
+  });
+  box.querySelectorAll("[data-cmty-author]").forEach(btn => {
+    btn.onclick = () => { closeCommunityOverlay(); navigate("user/" + encodeURIComponent(btn.dataset.cmtyAuthor)); };
+  });
+  wireAuditionerMachine(box);
+}
+
+// The machine's own controls (crank / dial / pipes / drums / horn). Wired on
+// every render; drag state lives in the closures of each pointerdown.
+function wireAuditionerMachine(box) {
+  const svg = box.querySelector(".aud-svg");
+  if (!svg) return;
+
+  const svgPoint = (e) => {
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  };
+
+  // Crank: click toggles play — except mid-fast-forward, where a click is the
+  // brake. A quick rightward flick fast-forwards (and reboosts if already
+  // flying), so you can keep cycling into the future and stop when you like.
+  const crankHit = box.querySelector("#audCrankHit");
+  if (crankHit) crankHit.onpointerdown = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const startX = e.clientX, startY = e.clientY, startAt = performance.now();
+    const up = (ev) => {
+      document.removeEventListener("pointerup", up);
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) {
+        if (auditionerCtl.ff) auditionerFastForwardEnd();
+        else if (auditionerPlaying) auditionerStop();
+        else auditionerPlay();
+      } else if (dx > 40 && performance.now() - startAt < 600) {
+        auditionerFastForward();
+      }
+    };
+    document.addEventListener("pointerup", up);
+  };
+
+  // Dial pointer: drag around the wheel → tempo. Right of twelve = faster,
+  // left = slower, spanning ×0.5 … ×2 of the engine's own tempo.
+  const dial = box.querySelector("#audDial");
+  if (dial) dial.onpointerdown = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const move = (ev) => {
+      const p = svgPoint(ev);
+      let rot = Math.atan2(p.y - 105, p.x - 240) * 180 / Math.PI + 90;
+      if (rot > 180) rot -= 360;
+      rot = Math.max(-135, Math.min(135, rot));
+      dial.style.transform = `rotate(${rot}deg)`;
+      auditionerCtl.tempoOverride = Math.round(
+        Math.min(400, Math.max(20, auditionerBaseTempo() * Math.pow(2, rot / 135))));
+      if (auditionerPlaying && !auditionerCtl.ff) {
+        synth.updateGenerationParams({ tempo: auditionerCtl.tempoOverride });
+      }
+      // The tape follows the dial smoothly: scale the running animations'
+      // playbackRate relative to the tempo their durations were baked at.
+      auditionerCtl.reelRate = auditionerCtl.tempoOverride / auditionerCtl.renderedTempo;
+      auditionerApplyReelRate();
+      dial.querySelector("title").textContent = `Tempo: ${auditionerCtl.tempoOverride} bpm (drag; the engine's own is ${auditionerBaseTempo()})`;
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  };
+
+  // Pipes: toggle the reverb (the steam is the reverb made visible). Mutated
+  // in place — a full re-render would reset every running animation.
+  const pipes = box.querySelector("#audPipesHit");
+  if (pipes) pipes.onclick = (e) => {
+    e.stopPropagation();
+    auditionerCtl.reverbOff = !auditionerCtl.reverbOff;
+    if (auditionerPlaying) synth.updateReverb(auditionParams());
+    const steam = box.querySelector("#audSteam");
+    if (steam) steam.style.display = auditionerCtl.reverbOff ? "none" : "";
+    box.querySelector(".anim-comb")?.classList.toggle("muted", auditionerCtl.reverbOff);
+    const title = pipes.querySelector("title");
+    if (title) title.textContent = auditionerCtl.reverbOff
+      ? "Reverb is off — click the pipes to let the room back in"
+      : "Click the pipes to switch the reverb off";
+  };
+
+  // Drums: toggle percussion in place. Dead (greyed) when the engine has none.
+  const drums = box.querySelector("#audPercHit");
+  if (drums) drums.onclick = (e) => {
+    e.stopPropagation();
+    if (!auditionerHasPercussion()) return;
+    auditionerCtl.percMuted = !auditionerCtl.percMuted;
+    if (auditionerPlaying) {
+      // Full params, not a cherry-picked subset — the legacy volume-based kit
+      // rebuilds from percBeatVol/percMotifVol/etc when unmuting.
+      synth.updatePercLayers(auditionParams());
+    }
+    box.querySelector("#audPerc")?.classList.toggle("muted", auditionerCtl.percMuted);
+    const title = drums.querySelector("title");
+    if (title) title.textContent = auditionerCtl.percMuted
+      ? "Percussion is off — click the drums to bring it back"
+      : "Click the drums to switch percussion off";
+  };
+
+  // Horn: drag up/down for volume; the horn grows and shrinks with it
+  // (clamped so it never swallows the machine or vanishes).
+  const hornHit = box.querySelector("#audHornHit");
+  const hornScaleEl = box.querySelector("#audHornScale");
+  if (hornHit && hornScaleEl) hornHit.onpointerdown = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    let lastY = e.clientY;
+    const move = (ev) => {
+      auditionerCtl.hornScale = Math.max(0.55, Math.min(1.4, auditionerCtl.hornScale - (ev.clientY - lastY) * 0.004));
+      lastY = ev.clientY;
+      hornScaleEl.style.transform = `scale(${auditionerCtl.hornScale.toFixed(3)})`;
+      if (auditionerPlaying && !auditionerCtl.ff) synth.setMasterVolume(auditionerVolume());
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  };
+}
+
+// Overlay-local drag: community cards → the machine. A synth lights the
+// cabinet + horn while it hovers; a note engine lights the crank, roll, dial,
+// lever and drums. Compositions aren't draggable — they play on profiles.
+function wireAuditionerDragSources(box, entriesById) {
+  box.querySelectorAll(".cmty-card").forEach(card => {
+    const entryKind = entriesById[card.dataset.cmtyItem]?.kind;
+    if (entryKind !== "synth" && entryKind !== "engine") return;
+    card.onpointerdown = (e) => {
+      if (e.button !== 0 || e.target.closest("button, input, .stars")) return;
+      const entry = entriesById[card.dataset.cmtyItem];
+      if (!entry) return;
+      const startX = e.clientX, startY = e.clientY;
+      const slot = auditionerSlotFor(entry);
+      const clearHighlights = () => document.querySelectorAll("#cmtyAuditioner .drop-target")
+        .forEach(s => s.classList.remove("drop-target"));
+      let ghost = null;
+      const move = (ev) => {
+        if (!ghost) {
+          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return;
+          ghost = document.createElement("div");
+          ghost.className = "drag-ghost";
+          ghost.textContent = entry.name;
+          document.body.appendChild(ghost);
+        }
+        ghost.style.left = `${ev.clientX + 12}px`;
+        ghost.style.top = `${ev.clientY + 10}px`;
+        clearHighlights();
+        if (slot && document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#cmtyAuditioner")) {
+          document.querySelectorAll(`#cmtyAuditioner [data-aud-slot="${slot}"]`)
+            .forEach(s => s.classList.add("drop-target"));
+        }
+      };
+      const up = (ev) => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        clearHighlights();
+        const dropped = !!ghost;
+        ghost?.remove();
+        if (!dropped) return;
+        const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#cmtyAuditioner");
+        if (target) placeInAuditioner(entry);
+      };
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up);
+    };
+    card.ondblclick = (e) => {
+      if (e.target.closest("button, input, .stars")) return;
+      const entry = entriesById[card.dataset.cmtyItem];
+      if (entry) placeInAuditioner(entry);
+    };
+  });
+}
+
+// ── Profile pages (#user/<handle>) + inline composition player ───────────────
+// Compositions play SoundCloud-style: the shared arrangement JSON runs through
+// the real producer transport against a private copy — the module-level
+// `arrangement` is swapped in for playback and restored on stop, and nothing
+// is ever saved, so the listener's own work is untouched.
+
+// (profilePlayback state is declared beside the router — route() touches it
+// during the boot call, long before this block executes.)
+
+function stopProfilePlayback() {
+  if (!profilePlayback) return;
+  const pb = profilePlayback;
+  profilePlayback = null;
+  cancelAnimationFrame(pb.raf);
+  stopArrangement();
+  arrangement = pb.prevArrangement;
+  document.querySelectorAll("[data-comp-play]").forEach(b => { b.textContent = "▶"; });
+  document.querySelectorAll(".comp-progress-fill").forEach(f => { f.style.width = "0%"; });
+}
+
+function compositionBeats(data) {
+  let end = Number(data.lengthBeats) || 0;
+  for (const track of data.tracks || []) {
+    for (const region of track.regions || []) {
+      end = Math.max(end, (Number(region.startBeat) || 0) + (Number(region.lengthBeats) || 0));
+    }
+  }
+  return end;
+}
+
+function compositionSeconds(data) {
+  const tempo = Math.min(400, Math.max(20, Number(data?.context?.tempo) || 96));
+  return compositionBeats(data) * 60 / tempo;
+}
+
+function formatDuration(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+async function toggleCompositionPlayback(entry, row) {
+  if (profilePlayback?.itemId === entry.id) { stopProfilePlayback(); return; }
+  stopProfilePlayback();
+  communityPreviewStop();
+  if (auditionerPlaying) auditionerStop(); // one thing sounds at a time
+  if (!entry.data) {
+    try {
+      const d = await api("/api/community/items/" + encodeURIComponent(entry.id));
+      entry.data = d.item.data;
+    } catch (err) { alert("Could not load this composition: " + err.message); return; }
+  }
+  const restored = normaliseArrangement({
+    ...entry.data,
+    id: crypto.randomUUID(),
+    name: entry.name || "Shared composition",
+  });
+  profilePlayback = {
+    itemId: entry.id,
+    prevArrangement: arrangement,
+    totalBeats: Math.max(1, compositionBeats(entry.data)),
+    raf: null,
+  };
+  arrangement = restored;
+  playArrangement(0);
+  const btn = row.querySelector("[data-comp-play]");
+  if (btn) btn.textContent = "■";
+  const fill = row.querySelector(".comp-progress-fill");
+  const timeEl = row.querySelector(".comp-time");
+  const total = compositionSeconds(entry.data);
+  const tick = () => {
+    if (!profilePlayback || profilePlayback.itemId !== entry.id) return;
+    if (!arrPlay) { stopProfilePlayback(); return; } // natural end — restore
+    const frac = Math.min(1, curPlayBeat() / profilePlayback.totalBeats);
+    if (fill) fill.style.width = `${(frac * 100).toFixed(2)}%`;
+    if (timeEl) timeEl.textContent = `${formatDuration(frac * total)} / ${formatDuration(total)}`;
+    profilePlayback.raf = requestAnimationFrame(tick);
+  };
+  profilePlayback.raf = requestAnimationFrame(tick);
+}
+
+function profileCompositionRowHTML(entry, { showAuthor = false } = {}) {
+  const dur = entry.duration_s != null ? formatDuration(entry.duration_s) : "—";
+  return `
+    <div class="comp-row" data-comp-item="${esc(entry.id)}">
+      <button class="comp-play" data-comp-play="${esc(entry.id)}" title="Play inline">${profilePlayback?.itemId === entry.id ? "■" : "▶"}</button>
+      <div class="comp-main">
+        <div class="comp-head"><b>${esc(entry.name)}</b>
+          ${showAuthor && entry.author ? `<button class="cmty-author" data-cmty-author="${esc(entry.author.handle)}">@${esc(entry.author.handle)}</button>` : ""}
+          ${starsHTML(entry, { editable: !entry.mine })}</div>
+        ${entry.description ? `<p class="cmty-desc">${esc(entry.description)}</p>` : ""}
+        <div class="comp-progress"><div class="comp-progress-fill"></div></div>
+      </div>
+      <span class="comp-time">${dur}</span>
+    </div>`;
+}
+
+async function renderProfilePage(handle) {
+  stopProfilePlayback();
+  document.body.classList.remove("explore-mode");
+  const v = mount(`<div class="profile-page"><div class="cmty-empty">Loading profile…</div></div>`);
+  let profile, items;
+  try {
+    profile = await api("/api/users/" + encodeURIComponent(handle));
+    items = (await api("/api/community/users/" + encodeURIComponent(handle) + "/items")).items || [];
+  } catch (err) {
+    const needsLogin = /authentication/i.test(err.message);
+    v.innerHTML = `<div class="profile-page"><div class="cmty-empty">
+      ${needsLogin ? "Profiles are part of the invite-only community — create a profile or log in to view them." : esc(err.message)}
+    </div><div class="profile-back"><button class="btn btn-ghost" id="profBack">← Back to the studio</button></div></div>`;
+    v.querySelector("#profBack").onclick = () => navigate("explore");
+    if (needsLogin) {
+      const user = await requireAuth("Log in to view community profiles.");
+      if (user) return renderProfilePage(handle);
+    }
+    return;
+  }
+  const mine = authState.user && authState.user.id === profile.id;
+  const modules = items.filter(i => i.kind !== "composition");
+  const compositions = items.filter(i => i.kind === "composition");
+  const stats = profile.stats || {};
+  v.innerHTML = `
+    <div class="profile-page">
+      <div class="profile-back"><button class="btn btn-ghost" id="profBack">← Back to the studio</button>${accountBarHTML()}</div>
+      <header class="profile-header">
+        <div class="profile-avatar">${profile.has_avatar
+          ? `<img src="/api/users/${profile.id}/avatar?t=${Date.now()}" alt="">`
+          : `<span>${esc((profile.display_name || profile.handle).slice(0, 1).toUpperCase())}</span>`}</div>
+        <div class="profile-id">
+          <h1>${esc(profile.display_name)}</h1>
+          <span class="profile-handle">@${esc(profile.handle)}</span>
+          <p class="profile-bio">${esc(profile.bio || "")}</p>
+          <div class="profile-stats">
+            <span><b>${stats.items ?? 0}</b> shared</span>
+            <span><b>${stats.ratings_received ?? 0}</b> ratings received</span>
+            ${stats.avg_stars ? `<span><b>★ ${stats.avg_stars}</b> average</span>` : ""}
+          </div>
+        </div>
+        ${mine ? `<div class="profile-actions">
+          <button class="btn btn-ghost" id="profEdit">Edit profile</button>
+        </div>` : ""}
+      </header>
+      <section>
+        <h2>Patches & modules</h2>
+        <div id="profItems">${modules.length
+          ? `<div class="cmty-grid">${modules.map(communityCardHTML).join("")}</div>`
+          : `<div class="cmty-empty">Nothing shared yet.</div>`}</div>
+      </section>
+      <section>
+        <h2>Compositions</h2>
+        <div id="profComps">${compositions.length
+          ? compositions.map(profileCompositionRowHTML).join("")
+          : `<div class="cmty-empty">No compositions shared${mine ? " — share one from the Producer's file menu (up to 5 minutes)" : ""}.</div>`}</div>
+      </section>
+    </div>`;
+  v.querySelector("#profBack").onclick = () => { stopProfilePlayback(); navigate("explore"); };
+
+  const entriesById = {};
+  for (const entry of items) entriesById[entry.id] = entry;
+  wireCommunityCards(v, entriesById, {
+    rerender: () => renderProfilePage(handle),
+    onAuthor: (h) => { if (h !== handle) navigate("user/" + encodeURIComponent(h)); },
+  });
+  v.querySelectorAll("[data-comp-play]").forEach(btn => {
+    btn.onclick = () => {
+      const row = btn.closest(".comp-row");
+      const entry = entriesById[btn.dataset.compPlay];
+      if (entry && row) toggleCompositionPlayback(entry, row);
+    };
+  });
+  if (mine) {
+    // Owners edit tags in place; everyone else just reads them.
+    v.querySelectorAll(".cmty-card").forEach(card => {
+      const entry = entriesById[card.dataset.cmtyItem];
+      if (!entry) return;
+      const tags = card.querySelector(".cmty-tags");
+      if (tags) tags.insertAdjacentHTML("beforeend",
+        `<button class="cmty-tag edit" data-edit-tags="${esc(entry.id)}" title="Edit this item's searchable tags">✎ tags</button>`);
+    });
+    v.querySelectorAll("[data-edit-tags]").forEach(btn => {
+      btn.onclick = () => {
+        const entry = entriesById[btn.dataset.editTags];
+        showAppDialog({
+          title: "Edit tags",
+          message: "Comma-separated, up to 8. Lowercase letters, numbers, spaces, hyphens.",
+          value: (entry.tags || []).join(", "),
+          input: true,
+          confirmLabel: "Save tags",
+          onConfirm: async (value) => {
+            const tags = value.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+            try {
+              await api("/api/community/tags", { method: "POST", body: JSON.stringify({ item_id: entry.id, tags }) });
+              renderProfilePage(handle);
+            } catch (err) { alert("Could not save tags: " + err.message); }
+          },
+        });
+      };
+    });
+    const edit = v.querySelector("#profEdit");
+    if (edit) edit.onclick = () => openProfileEditDialog(profile, () => renderProfilePage(handle));
+  }
+}
+
+function openProfileEditDialog(profile, onSaved) {
+  let overlay = document.getElementById("profileEditOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "profileEditOverlay";
+    overlay.className = "cloud-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="cloud-modal auth-modal" role="dialog" aria-label="Edit profile">
+      <header><h3>Edit profile</h3><button class="x" id="profEditClose" title="Close">×</button></header>
+      <form id="profEditForm" class="auth-form">
+        <div class="prof-edit-avatar">
+          <span class="profile-avatar sm" id="profEditAvatarPreview">${profile.has_avatar
+            ? `<img src="/api/users/${profile.id}/avatar?t=${authState.avatarStamp || 0}" alt="">`
+            : `<span>${esc((profile.display_name || profile.handle || "?").slice(0, 1).toUpperCase())}</span>`}</span>
+          <label class="btn btn-ghost prof-edit-avatar-btn">Choose image…
+            <input type="file" id="profEditAvatarFile" accept="image/png,image/jpeg,image/webp" hidden>
+          </label>
+          <span class="auth-hint" id="profEditAvatarName">square-cropped, uploaded when you save</span>
+        </div>
+        <label>Display name<input type="text" id="profName" maxlength="40" value="${esc(profile.display_name || "")}"></label>
+        <label>About you <span class="auth-hint">(140 characters, no links)</span>
+          <textarea id="profBio" maxlength="140" rows="3">${esc(profile.bio || "")}</textarea></label>
+        <div class="auth-error" id="profEditError" hidden></div>
+        <button class="primary" type="submit">Save</button>
+      </form>
+    </div>`;
+  const finish = () => { overlay.hidden = true; };
+  overlay.onclick = (e) => { if (e.target === overlay) finish(); };
+  overlay.querySelector("#profEditClose").onclick = finish;
+  // The picture is part of the profile form (owner 2026-07-15): pick a file
+  // here, see it previewed, and it uploads together with the Save.
+  let pendingAvatar = null;
+  const fileInput = overlay.querySelector("#profEditAvatarFile");
+  fileInput.onchange = () => {
+    pendingAvatar = fileInput.files && fileInput.files[0] || null;
+    if (pendingAvatar) {
+      overlay.querySelector("#profEditAvatarName").textContent = pendingAvatar.name;
+      const preview = overlay.querySelector("#profEditAvatarPreview");
+      preview.innerHTML = `<img src="${URL.createObjectURL(pendingAvatar)}" alt="">`;
+    }
+  };
+  overlay.querySelector("#profEditForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const errEl = overlay.querySelector("#profEditError");
+    errEl.hidden = true;
+    try {
+      await api("/api/profile", {
+        method: "POST",
+        body: JSON.stringify({
+          display_name: overlay.querySelector("#profName").value.trim(),
+          bio: overlay.querySelector("#profBio").value.trim(),
+        }),
+      });
+      if (pendingAvatar) {
+        await new Promise((resolve) => uploadAvatar(pendingAvatar, resolve));
+      }
+      finish();
+      onSaved?.();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    }
+  };
+}
+
+// Client-side avatar pipeline: crop to a 256×256 square on a canvas, encode as
+// PNG base64. The server re-validates magic bytes and size (≤128KB).
+function uploadAvatar(file, onDone) {
+  const img = new Image();
+  img.onload = async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const g = canvas.getContext("2d");
+    const side = Math.min(img.width, img.height);
+    g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+    URL.revokeObjectURL(img.src);
+    const dataUrl = canvas.toDataURL("image/png");
+    try {
+      await api("/api/profile/avatar", {
+        method: "POST",
+        body: JSON.stringify({ image_base64: dataUrl.split(",", 2)[1] }),
+      });
+      authState.avatarStamp = Date.now(); // busts the pill's avatar cache
+      renderAccountBar();
+      onDone?.();
+    } catch (err) {
+      alert("Could not upload the image: " + err.message);
+      onDone?.(); // callers await this — never leave them hanging
+    }
+  };
+  img.onerror = () => alert("That file doesn't look like an image.");
+  img.src = URL.createObjectURL(file);
+}
+
+// ── Share the current arrangement as a composition (producer file menu) ──────
+
+function openShareCompositionDialog() {
+  requireAuth("Create a profile to share compositions.").then((user) => {
+    if (!user || !arrangement) return;
+    const data = JSON.parse(JSON.stringify({
+      format: "phase0-arrangement-1.0",
+      app_version: APP_VERSION,
+      ...arrangement,
+    }));
+    const seconds = compositionSeconds(data);
+    if (seconds > 300) {
+      showAppDialog({
+        title: "Too long to share",
+        message: `Compositions on profiles are capped at 5 minutes; this one runs ${formatDuration(seconds)}. Trim the arrangement and try again.`,
+        confirmLabel: "OK",
+      });
+      return;
+    }
+    let overlay = document.getElementById("shareCompOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "shareCompOverlay";
+      overlay.className = "cloud-overlay";
+      document.body.appendChild(overlay);
+    }
+    overlay.hidden = false;
+    overlay.innerHTML = `
+      <div class="cloud-modal auth-modal" role="dialog" aria-label="Share composition">
+        <header><h3>Share composition</h3><button class="x" id="shareCompClose" title="Close">×</button></header>
+        <form id="shareCompForm" class="auth-form">
+          <label>Title<input type="text" id="shareCompName" required maxlength="120" value="${esc(arrangement.name || "Untitled")}"></label>
+          <label>Description <span class="auth-hint">(140 characters, no links)</span>
+            <textarea id="shareCompDesc" maxlength="140" rows="2"></textarea></label>
+          <label>Tags <span class="auth-hint">(comma-separated, up to 8)</span>
+            <input type="text" id="shareCompTags" placeholder="ambient, slow, strings"></label>
+          <p class="auth-hint">Runs ${formatDuration(seconds)}. It plays inline on your profile with all its patches embedded.</p>
+          <div class="auth-error" id="shareCompError" hidden></div>
+          <button class="primary" type="submit">Share to my profile</button>
+        </form>
+      </div>`;
+    const finish = () => { overlay.hidden = true; };
+    overlay.onclick = (e) => { if (e.target === overlay) finish(); };
+    overlay.querySelector("#shareCompClose").onclick = finish;
+    overlay.querySelector("#shareCompForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const errEl = overlay.querySelector("#shareCompError");
+      errEl.hidden = true;
+      const tags = overlay.querySelector("#shareCompTags").value
+        .split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+      try {
+        await api("/api/community/share", {
+          method: "POST",
+          body: JSON.stringify({
+            kind: "composition",
+            name: overlay.querySelector("#shareCompName").value.trim(),
+            description: overlay.querySelector("#shareCompDesc").value.trim(),
+            data,
+            tags,
+            source_id: "arrangement:" + arrangement.id,
+          }),
+        });
+        trackEngagement("composition_share");
+        finish();
+        showAppDialog({
+          title: "Shared",
+          message: "Your composition is live on your profile with an inline player.",
+          confirmLabel: "OK",
+        });
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.hidden = false;
+      }
+    };
+  });
 }
 
 // ── Cloud patches: private, per-account saved sounds ──────────
@@ -19335,7 +21728,10 @@ function currentSoundEntry(name) {
 }
 
 async function openCloudPatches() {
-  if (!authState.user) { location.href = "/login"; return; }
+  if (!authState.user) {
+    const user = await requireAuth("Create a profile to keep patches in your cloud library.");
+    if (!user) return;
+  }
   let overlay = document.getElementById("cloudOverlay");
   if (!overlay) {
     overlay = document.createElement("div");

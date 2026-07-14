@@ -10,6 +10,8 @@ ready for analysis, with full parameter and metric provenance per row:
   parameters in the synthesiser reproduces the stimulus exactly.
 - ``study_trials.csv`` – Arm 1 study sessions, one row per trial response
 - ``presets.csv``   – shared community preset library
+- ``feedback.csv``  – in-app problem reports (description, captured errors,
+  screenshot filename)
 
 Nested dicts are flattened with prefixes (``param_*``, ``metric_*``,
 ``demo_*``); records are schema-tolerant: missing fields become empty cells,
@@ -170,7 +172,11 @@ def rows_to_csv(rows: list[dict[str, Any]], lead: list[str] | None = None) -> st
     return buf.getvalue()
 
 
-TABLES = ("events", "ratings", "stimuli", "study_trials", "presets")
+def export_feedback(reports: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{k: _scalar(v) for k, v in r.items()} for r in reports]
+
+
+TABLES = ("events", "ratings", "stimuli", "study_trials", "presets", "feedback")
 
 
 def build_table(name: str, data_dir: Path) -> str:
@@ -189,6 +195,13 @@ def build_table(name: str, data_dir: Path) -> str:
         path = data_dir / "global_presets.json"
         presets = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
         return rows_to_csv(export_presets(presets), lead=["id", "created_at", "preset_name", "favourite_rating", "stimulus_id"])
+    if name == "feedback":
+        reports = _read_jsonl(data_dir / "feedback.jsonl")
+        return rows_to_csv(
+            export_feedback(reports),
+            lead=["id", "created_at", "user_handle", "category", "route",
+                  "app_version", "description", "errors", "screenshot"],
+        )
     raise ValueError(f"unknown table: {name!r} (expected one of {', '.join(TABLES)})")
 
 

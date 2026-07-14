@@ -35,6 +35,26 @@ export class SeededRNG {
   }
 }
 
+/**
+ * Resolve the audible members of a sub-note layer stack. The base voice is a
+ * first-class layer: it has its own level and joins the same additive solo set
+ * as the captured layers. Kept pure so UI and audio behaviour can be verified
+ * without constructing a Web Audio graph.
+ */
+export function layerMixPlan(params = {}, layerRenders = []) {
+  const rawGain = Number(params.baseLayerGain ?? 1);
+  const baseGain = Math.max(0, Math.min(2, Number.isFinite(rawGain) ? rawGain : 1));
+  const baseSolo = !!params.baseLayerSolo;
+  const layers = Array.isArray(layerRenders) ? layerRenders : [];
+  const soloLayers = layers.filter(layer => !!layer?.solo);
+  const anySolo = baseSolo || soloLayers.length > 0;
+  return {
+    baseGain,
+    baseAudible: baseGain > 0 && (!anySolo || baseSolo),
+    layers: anySolo ? soloLayers : layers,
+  };
+}
+
 // ─── Formant presets (approximate adult male formant frequencies) ─
 //
 // F1-F3 from the classic Peterson & Barney measurements; F4/F5 and the
@@ -4186,8 +4206,8 @@ export class SynthEngine {
     // Q7 layered subnotes: every layer renders the SAME note through its own
     // fingerprint into its own spatial chain, inheriting the base space and
     // the listener's head (owner 07-07: the head is a patch/space-level
-    // choice now, never per-layer). Solo: when any layer is soloed, only
-    // the soloed layers sound — the base and the rest go quiet.
+    // choice now, never per-layer). The base has the same level + additive
+    // solo behaviour as the captured layers.
     // EFFECTS stage: the base voice's chain lives on the sound-half params
     // (remembered as _spaceP by _configureSpace); each layer carries its own.
     // stageEffectsOn:false bypasses the whole stack. Applied per-note so live
@@ -4195,9 +4215,9 @@ export class SynthEngine {
     const bp = this._spaceP || {};
     if (this._baseFxHost) this._baseFxHost.update(sanitizeChain(bp.effectsChain), bp.stageEffectsOn !== false);
     const lrs = (Array.isArray(note.layerRenders) && this._dryGain) ? note.layerRenders : [];
-    const soloed = lrs.filter(lr => lr.solo);
-    if (!soloed.length) dispatch(note); // the base plays unless something is soloed
-    for (const lr of (soloed.length ? soloed : lrs)) {
+    const mix = layerMixPlan(this._engine?.p || bp, lrs);
+    if (mix.baseAudible) dispatch({ ...note, velocity: note.velocity * mix.baseGain, layerRenders: null });
+    for (const lr of mix.layers) {
       const ln = {
         ...note,
         ...lr.note,

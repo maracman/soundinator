@@ -68,18 +68,34 @@ Create `/home/resona/resona.env` (owned by `resona`, `chmod 600`):
 HOST=127.0.0.1
 PORT=8765
 PHASE0_DATA_DIR=/home/resona/data
-RESONA_AUTH_REQUIRED=1      # LOCK the app: sign-in required for every page
 RESONA_COOKIE_SECURE=1      # session cookie only sent over HTTPS (nginx terminates TLS)
 PHASE0_ADMIN_TOKEN=<long-random-string>   # optional: enables /api/export.csv
+# RESONA_AUTH_REQUIRED=1    # optional: lock EVERY page behind /login (see below)
 # RESONA_OPEN_SIGNUP=1      # leave UNSET — keeps registration invite-only
+# RESONA_EXPERIMENTS=1      # leave UNSET — hides the old study/research surfaces
 ```
 
-The two flags that create the behaviour you asked for:
+The community-launch posture is **open to try, invite-gated to participate**:
 
-- **`RESONA_AUTH_REQUIRED=1`** — every page load is gated; logged-out visitors are
-  bounced to `/login`, and data APIs return 401 without a session.
-- Registration is **invite-only by default** — a valid invite code is required to
-  create an account unless you explicitly set `RESONA_OPEN_SIGNUP=1`.
+- With `RESONA_AUTH_REQUIRED` unset, anyone with the link can play the synth
+  (their work lives in their browser's localStorage). Everything under
+  `/api/community/*`, `/api/profile*`, `/api/users/*`, and `/api/patches`
+  still requires a signed-in session — saving or sharing pops the in-app
+  create-profile overlay, and registration needs an invite code.
+- Set `RESONA_AUTH_REQUIRED=1` only if you want the fully locked behaviour.
+  The welcome screen (`/`) stays visible so visitors see what they're being
+  invited to; the client shows an "early access — invite only" notice when
+  they try to enter the studio, and every data API returns 401 without a
+  session.
+- Users can send bug reports from the account menu ("⚑ Report a problem");
+  they land in `feedback.jsonl` under the data dir (screenshots in
+  `feedback_shots/`) and export via
+  `/api/export.csv?table=feedback&token=$PHASE0_ADMIN_TOKEN`.
+- Registration is **invite-only by default** — a valid invite code is required
+  to create an account unless you explicitly set `RESONA_OPEN_SIGNUP=1`.
+- `RESONA_EXPERIMENTS` stays unset in production: the legacy study routes and
+  the anonymous preset-contribute endpoints return 404, and the study cards
+  disappear from the landing page.
 
 ## 5. Bootstrap the first admin + invite codes
 
@@ -96,6 +112,10 @@ PYTHONPATH=src python3 -m synthesiser.web.accounts create-admin \
 
 # mint invite codes to hand out (one single-use code shown per line)
 PYTHONPATH=src python3 -m synthesiser.web.accounts create-invite --count 10 --note "beta wave 1"
+
+# the launch pattern: ONE code on listentomarcus, good for 50 sign-ups —
+# swap it for a fresh one when it fills so the studio never gets overwhelmed
+PYTHONPATH=src python3 -m synthesiser.web.accounts create-invite --max-uses 50 --note "launch wave 1"
 
 # a reusable code for a small group, expiring in 14 days:
 PYTHONPATH=src python3 -m synthesiser.web.accounts create-invite --max-uses 25 --expires-days 14 --note "class"
@@ -142,6 +162,7 @@ Create `/etc/nginx/sites-available/resona`:
 ```nginx
 server {
     server_name studio.yourdomain.com;
+    client_max_body_size 2m;   # shared compositions + avatar uploads are ~1 MB JSON bodies
     location / {
         proxy_pass http://127.0.0.1:8765;
         proxy_set_header Host $host;
@@ -164,11 +185,60 @@ connection.
 
 ## 8. Verify
 
-- Visit `https://studio.yourdomain.com` → you should be redirected to **/login**.
-- Sign in with the owner account from step 5 → you land in the studio with the
-  account pill (top-right) → **My cloud patches** and **Sign out**.
-- **Save current sound** stores a private patch tied to your account; sign in from
-  another browser and it's there, isolated per user.
+- Visit `https://studio.yourdomain.com` → the studio loads and plays without an
+  account; the top-right shows **Create profile / Log in**.
+- **Create profile** (with an invite code from step 5) works in place — no page
+  navigation, current sound untouched.
+- Signed in: the account pill (top-right) → **My profile**, **My cloud patches**,
+  **Sign out**. In the Producer, the Browser header's **☄ Community** button opens
+  the community browser; right-clicking one of your presets offers
+  **Share to community…**.
+- `https://studio.yourdomain.com/#study/consent` falls through to the studio
+  (experiments hidden) unless `RESONA_EXPERIMENTS=1`.
+
+---
+
+## 9. Updating the deployed version
+
+Deploys are **pull-based**: the VPS has a normal git clone, so shipping an
+update is "push to GitHub, then tell the server to catch up". No CI/CD needed
+at this scale — [`scripts/vps_update.sh`](../scripts/vps_update.sh) makes it
+one command and refuses to leave the server half-updated.
+
+One-time setup — let the `resona` user restart its own service (as root):
+
+```bash
+echo 'resona ALL=(root) NOPASSWD: /usr/bin/systemctl restart resona' \
+    > /etc/sudoers.d/resona-restart && chmod 440 /etc/sudoers.d/resona-restart
+```
+
+Then every update, from your own machine:
+
+```bash
+git push                                            # your normal push to GitHub
+ssh resona@<vps> 'resona-app/scripts/vps_update.sh' # pull + deps + restart + health check
+```
+
+The script fast-forwards to `origin/main` (it aborts if the server checkout
+has diverged, rather than merging), reinstalls `requirements.txt` (a no-op
+when unchanged), restarts systemd, and curls `/api/health`. If the health
+check fails it prints the exact one-line rollback (`git reset --hard <old>` +
+restart) so a bad deploy is a 30-second incident.
+
+Notes:
+
+- **User data is never touched** — everything lives in `PHASE0_DATA_DIR`
+  outside the repo, so pulls and rollbacks can't harm accounts or patches.
+- A restart drops no sessions (they're in SQLite); users don't notice beyond
+  a ~2-second blip. Deploying the session-hashing change signs everyone out
+  once.
+- **Remember the cache-buster**: when `app.js` / `styles.css` change, bump the
+  `?v=` in `web/static/index.html` in the same commit, or returning browsers
+  keep the old bundle.
+- Skip auto-deploy-on-push (GitHub Actions) for now: at beta scale it mostly
+  adds a way for an untested commit to take the site down. Revisit if pushes
+  become frequent enough that the ssh line feels like friction — and gate it
+  on the test suite if you do.
 
 ---
 
@@ -178,9 +248,9 @@ Everything lives in `PHASE0_DATA_DIR` (`/home/resona/data`):
 
 | File | Contents | Sensitivity |
 |---|---|---|
-| `accounts.db` | users (salted+hashed passwords), invites, sessions, private patches | **high — never commit or share** |
+| `accounts.db` | users (salted+hashed passwords), invites, sessions, private patches, **and all community data** (profiles, avatars, shared items, ratings, tags, libraries) | **high — never commit or share** |
 | `study_sessions.jsonl`, `explore_events.jsonl` | anonymous research data | consented research data |
-| `global_presets.json` | shared preset library | public |
+| `global_presets.json` | legacy shared preset library (only served when `RESONA_EXPERIMENTS=1`) | public |
 
 `accounts.db` is a single SQLite file — back it up with a nightly cron:
 

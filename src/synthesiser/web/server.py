@@ -13,6 +13,7 @@ via the Python synth is still available for validation and the preset library.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import mimetypes
@@ -20,6 +21,7 @@ import os
 import tempfile
 import threading
 import time
+import traceback
 
 try:
     import fcntl
@@ -40,6 +42,11 @@ from synthesiser.web.accounts import (
     AccountError,
     AccountStore,
 )
+from synthesiser.web.community import (
+    CommunityRateLimited,
+    CommunityRoutes,
+    CommunityStore,
+)
 from synthesiser.web.phase0 import (
     PHASE0_SCHEMA_VERSION,
     SYNTH_VERSION_HASH,
@@ -57,6 +64,34 @@ SESSION_COOKIE = "resona_session"
 
 # Sentinel so current_user() can cache a None result for the request's lifetime.
 _UNSET = object()
+
+# Feedback ("report a problem") limits: keep the JSONL rows bounded and the
+# optional screenshot comfortably under the 1 MB request-body cap once
+# base64-decoded.
+FEEDBACK_MAX_DESCRIPTION = 4000
+FEEDBACK_MAX_ERRORS = 30
+FEEDBACK_MAX_ERROR_CHARS = 600
+FEEDBACK_MAX_IMAGE_BYTES = 600_000
+
+# Login backoff: after this many failed attempts for the same (IP, email)
+# within the window, sign-in is refused until the window slides past.
+LOGIN_MAX_FAILURES = 5
+LOGIN_FAILURE_WINDOW_S = 900.0
+
+# Screenshot formats accepted by /api/feedback, sniffed from decoded bytes.
+_IMAGE_MAGIC = (
+    (b"\x89PNG\r\n\x1a\n", ".png"),
+    (b"\xff\xd8\xff", ".jpg"),
+)
+
+
+def _sniff_image_ext(blob: bytes) -> str:
+    for magic, ext in _IMAGE_MAGIC:
+        if blob.startswith(magic):
+            return ext
+    if blob[:4] == b"RIFF" and blob[8:12] == b"WEBP":
+        return ".webp"
+    raise ValueError("screenshot must be a PNG, JPEG, or WebP image")
 
 
 def _env_flag(name: str) -> bool:
@@ -116,7 +151,7 @@ def write_json_atomic(path: Path, data: Any) -> None:
     Path(temp_name).replace(path)
 
 
-class Phase0RequestHandler(BaseHTTPRequestHandler):
+class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
     server_version = "Phase0/0.2"
 
     @property
@@ -139,6 +174,10 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
                 "user": self.current_user(),
                 "auth_required": bool(getattr(self.server, "auth_required", False)),
                 "open_signup": bool(getattr(self.server, "open_signup", False)),
+                "features": {
+                    "experiments": bool(getattr(self.server, "experiments", False)),
+                    "community": True,
+                },
             })
             return
 
@@ -152,6 +191,18 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/patches":
             self.handle_patches_list()
+            return
+
+        # Community: profiles, shared items, ratings, per-user libraries.
+        # The gate above guarantees a signed-in user on every one of these.
+        try:
+            if self.handle_community_get(path, parse_qs(parsed.query)):
+                return
+        except CommunityRateLimited as exc:
+            self.send_error_json(HTTPStatus.TOO_MANY_REQUESTS, str(exc))
+            return
+        except ValueError as exc:
+            self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
             return
 
         if path == "/api/health":
@@ -170,7 +221,12 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             })
             return
 
-        if path == "/api/presets/global":
+        # Legacy anonymous preset library (superseded by the community layer);
+        # only served when the experiment surfaces are enabled.
+        if path in ("/api/presets/global", "/api/global-presets"):
+            if not getattr(self.server, "experiments", False):
+                self.send_error_json(HTTPStatus.NOT_FOUND, "unknown endpoint")
+                return
             self.send_json(read_json_file(self.roots["library"], []))
             return
 
@@ -178,11 +234,6 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         # Requires PHASE0_ADMIN_TOKEN to be set server-side; disabled otherwise.
         if path == "/api/export.csv":
             self.handle_export(parse_qs(parsed.query))
-            return
-
-        # Legacy alias
-        if path == "/api/global-presets":
-            self.send_json(read_json_file(self.roots["library"], []))
             return
 
         if path.startswith("/api/cache/"):
@@ -235,16 +286,27 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
                 self.handle_patch_save(payload)
                 return
 
-            if parsed.path == "/api/study/submit":
-                self.handle_study_submit(payload)
+            if parsed.path == "/api/feedback":
+                self.handle_feedback(payload)
+                return
+
+            if self.handle_community_post(parsed.path, payload):
+                return
+
+            # Legacy study submission + anonymous preset contribution: only
+            # accepted while the experiment surfaces are enabled.
+            if parsed.path in ("/api/study/submit", "/api/presets/contribute", "/api/global-presets"):
+                if not getattr(self.server, "experiments", False):
+                    self.send_error_json(HTTPStatus.NOT_FOUND, "unknown endpoint")
+                    return
+                if parsed.path == "/api/study/submit":
+                    self.handle_study_submit(payload)
+                else:
+                    self.handle_contribute(payload)
                 return
 
             if parsed.path == "/api/render":
                 self.handle_render(payload)
-                return
-
-            if parsed.path in ("/api/presets/contribute", "/api/global-presets"):
-                self.handle_contribute(payload)
                 return
 
             if parsed.path in ("/api/explore/event", "/api/session-events"):
@@ -252,10 +314,15 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
                 return
 
             self.send_error_json(HTTPStatus.NOT_FOUND, "unknown endpoint")
+        except CommunityRateLimited as exc:
+            self.send_error_json(HTTPStatus.TOO_MANY_REQUESTS, str(exc))
         except ValueError as exc:
             self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
-        except Exception as exc:
-            self.send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, f"server error: {exc}")
+        except Exception:
+            # Never echo internals to the client; the traceback goes to the
+            # server log where it belongs.
+            print(f"  ! unhandled error on POST {parsed.path}\n{traceback.format_exc()}")
+            self.send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "internal server error")
 
     # ── DELETE routes ───────────────────────────────────────
 
@@ -264,8 +331,14 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         if self._api_requires_auth(path) and not self.current_user():
             self.send_error_json(HTTPStatus.UNAUTHORIZED, "authentication required")
             return
-        if path.startswith("/api/patches/"):
-            self.handle_patch_delete(unquote(path.removeprefix("/api/patches/")))
+        try:
+            if path.startswith("/api/patches/"):
+                self.handle_patch_delete(unquote(path.removeprefix("/api/patches/")))
+                return
+            if self.handle_community_delete(path):
+                return
+        except ValueError as exc:
+            self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
             return
         self.send_error_json(HTTPStatus.NOT_FOUND, "unknown endpoint")
 
@@ -299,21 +372,28 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         return user
 
     def _page_requires_login(self, path: str) -> bool:
-        """True when an unauthenticated page load should bounce to /login."""
+        """True when an unauthenticated page load should bounce to /login.
+
+        The app shell ("/") stays viewable even on a locked deployment so
+        visitors land on the welcome screen; the client shows the invite-only
+        notice when they try to enter the studio, and every data API below is
+        still session-gated.
+        """
         if not getattr(self.server, "auth_required", False):
             return False
-        if path in ("/login", "/login.html"):
+        if path in ("/", "/index.html", "/login", "/login.html"):
             return False
-        return path in ("/", "/index.html") or path.endswith(".html")
+        return path.endswith(".html")
 
     def _api_requires_auth(self, path: str) -> bool:
         """True when an API call must carry a valid session.
 
-        Patch endpoints always require a signed-in owner; every other API
-        requires auth only when the whole app is locked (RESONA_AUTH_REQUIRED).
-        Health and the auth endpoints themselves are always open.
+        Patch, community, and profile endpoints always require a signed-in
+        owner (the community is invite-only even on an open deployment); every
+        other API requires auth only when the whole app is locked
+        (RESONA_AUTH_REQUIRED). Health and the auth endpoints stay open.
         """
-        if path.startswith("/api/patches"):
+        if path.startswith(("/api/patches", "/api/community", "/api/profile", "/api/users")):
             return True
         if not getattr(self.server, "auth_required", False):
             return False
@@ -357,12 +437,49 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             cookies=[self._cookie_header(token, SESSION_TTL_DAYS * 86400)],
         )
 
+    def _login_backoff_key(self, email: str) -> str:
+        return f"{self.client_address[0]}|{(email or '').strip().lower()}"
+
+    def _login_blocked(self, email: str) -> bool:
+        """Sliding-window failure counter per (IP, email).
+
+        The global POST rate limit still allows thousands of guesses a day, so
+        credential attempts get their own much tighter budget.
+        """
+        server = self.server
+        now = time.monotonic()
+        with server.rate_lock:  # type: ignore[attr-defined]
+            window = server.login_failures.setdefault(self._login_backoff_key(email), [])  # type: ignore[attr-defined]
+            cutoff = now - LOGIN_FAILURE_WINDOW_S
+            while window and window[0] < cutoff:
+                window.pop(0)
+            return len(window) >= LOGIN_MAX_FAILURES
+
+    def _login_note_failure(self, email: str) -> None:
+        server = self.server
+        with server.rate_lock:  # type: ignore[attr-defined]
+            server.login_failures.setdefault(self._login_backoff_key(email), []).append(time.monotonic())  # type: ignore[attr-defined]
+
+    def _login_clear_failures(self, email: str) -> None:
+        server = self.server
+        with server.rate_lock:  # type: ignore[attr-defined]
+            server.login_failures.pop(self._login_backoff_key(email), None)  # type: ignore[attr-defined]
+
     def handle_login(self, payload: dict[str, Any]) -> None:
         store = self._accounts()
-        user = store.authenticate(payload.get("email", ""), payload.get("password", ""))
+        email = payload.get("email", "")
+        if self._login_blocked(email):
+            self.send_error_json(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                "too many failed sign-in attempts — try again in a few minutes",
+            )
+            return
+        user = store.authenticate(email, payload.get("password", ""))
         if not user:
+            self._login_note_failure(email)
             self.send_error_json(HTTPStatus.UNAUTHORIZED, "invalid email or password")
             return
+        self._login_clear_failures(email)
         token = store.create_session(user["id"])
         self.send_json(
             {"ok": True, "user": user},
@@ -406,6 +523,60 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             self.send_error_json(HTTPStatus.NOT_FOUND, "patch not found")
             return
         self.send_json({"ok": True})
+
+    # ── Feedback / bug reports ──────────────────────────────
+
+    def handle_feedback(self, payload: dict[str, Any]) -> None:
+        """Store one problem report: description, captured errors, optional screenshot.
+
+        Appended to feedback.jsonl (exportable via /api/export.csv?table=feedback);
+        the screenshot, if any, lands in data/feedback_shots/<id>.<ext>.
+        """
+        description = truncate_text(payload.get("description"), FEEDBACK_MAX_DESCRIPTION)
+        if not description:
+            raise ValueError("a description is required")
+
+        errors_raw = payload.get("errors")
+        errors = [
+            truncate_text(e, FEEDBACK_MAX_ERROR_CHARS)
+            for e in (errors_raw if isinstance(errors_raw, list) else [])[:FEEDBACK_MAX_ERRORS]
+        ]
+
+        report_id = uuid4().hex
+        screenshot = None
+        image_b64 = payload.get("image_base64")
+        if image_b64:
+            try:
+                blob = base64.b64decode(str(image_b64), validate=True)
+            except (ValueError, TypeError):
+                raise ValueError("screenshot is not valid base64")
+            if len(blob) > FEEDBACK_MAX_IMAGE_BYTES:
+                raise ValueError("screenshot is too large (max ~600 KB)")
+            ext = _sniff_image_ext(blob)
+            shots_dir = self.roots["feedback"].parent / "feedback_shots"
+            shots_dir.mkdir(parents=True, exist_ok=True)
+            screenshot = f"{report_id}{ext}"
+            (shots_dir / screenshot).write_bytes(blob)
+
+        user = self.current_user()
+        entry = {
+            "id": report_id,
+            "schema_version": "feedback-1.0",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "user_id": user["id"] if user else None,
+            "user_handle": user["handle"] if user else None,
+            "category": truncate_text(payload.get("category"), 40),
+            "description": description,
+            "route": truncate_text(payload.get("route"), 200),
+            "app_version": truncate_text(payload.get("app_version"), 40),
+            "user_agent": truncate_text(self.headers.get("User-Agent"), 300),
+            "errors": errors,
+            "screenshot": screenshot,
+        }
+        append_jsonl(self.roots["feedback"], entry)
+        print(f"  Feedback received: {entry['category'] or 'general'} "
+              f"from {entry['user_handle'] or 'anonymous'} ({report_id})")
+        self.send_json({"ok": True, "id": report_id}, status=HTTPStatus.CREATED)
 
     # ── Arm 1: Study data collection ────────────────────────
 
@@ -544,6 +715,25 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
 
     # ── File serving ────────────────────────────────────────
 
+    # Everything is same-origin and self-contained (no CDNs, fonts, or
+    # analytics). 'unsafe-inline' for scripts/styles is required by the inline
+    # boot script and the app's inline handlers; external script/frame/object
+    # sources stay blocked.
+    _HTML_CSP = (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "media-src 'self' blob: data:; font-src 'self' data:; "
+        "connect-src 'self'; object-src 'none'; frame-ancestors 'none'; "
+        "base-uri 'self'; form-action 'self'"
+    )
+
+    def _send_security_headers(self, *, html: bool) -> None:
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if html:
+            self.send_header("Content-Security-Policy", self._HTML_CSP)
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "same-origin")
+
     def serve_file(self, path: Path) -> None:
         try:
             resolved = path.resolve()
@@ -569,6 +759,7 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-cache")
+            self._send_security_headers(html=resolved.suffix in (".html", ".htm"))
             self.end_headers()
             self.wfile.write(data)
         except BrokenPipeError:
@@ -598,7 +789,9 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0") or 0)
         if length <= 0:
             return {}
-        if length > 512_000:
+        # 1 MB: shared compositions embed whole arrangements (patches + baked
+        # notes); everything else stays far below this.
+        if length > 1_048_576:
             raise ValueError("request body too large")
         raw = self.rfile.read(length).decode("utf-8")
         data = json.loads(raw)
@@ -616,6 +809,7 @@ class Phase0RequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("X-Content-Type-Options", "nosniff")
         # Credentialed (cookie-bearing) responses can't use a wildcard origin;
         # auth is same-origin, so only advertise open CORS for cookieless JSON.
         if not cookies:
@@ -652,6 +846,7 @@ def build_server(
         "library": data / "global_presets.json",
         "events": data / "explore_events.jsonl",
         "study_data": data / "study_sessions.jsonl",
+        "feedback": data / "feedback.jsonl",
     }
     roots["cache"].mkdir(parents=True, exist_ok=True)
     data.mkdir(parents=True, exist_ok=True)
@@ -664,13 +859,16 @@ def build_server(
     server.rate_limit_per_minute = rate_limit_per_minute  # type: ignore[attr-defined]
     server.rate_state = {}  # type: ignore[attr-defined]
     server.rate_lock = threading.Lock()  # type: ignore[attr-defined]
+    server.login_failures = {}  # type: ignore[attr-defined]
     server.admin_token = os.environ.get("PHASE0_ADMIN_TOKEN", "")  # type: ignore[attr-defined]
     # Accounts / invite gate. The store is always available (so profiles work
     # locally), but sign-in is only *enforced* when RESONA_AUTH_REQUIRED is set.
     server.accounts = AccountStore(data / "accounts.db")  # type: ignore[attr-defined]
+    server.community = CommunityStore(data / "accounts.db")  # type: ignore[attr-defined]
     server.auth_required = _env_flag("RESONA_AUTH_REQUIRED")  # type: ignore[attr-defined]
     server.open_signup = _env_flag("RESONA_OPEN_SIGNUP")  # type: ignore[attr-defined]
     server.cookie_secure = _env_flag("RESONA_COOKIE_SECURE")  # type: ignore[attr-defined]
+    server.experiments = _env_flag("RESONA_EXPERIMENTS")  # type: ignore[attr-defined]
     return server
 
 

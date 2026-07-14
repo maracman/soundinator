@@ -1,0 +1,2313 @@
+[
+  {
+    "kind": "module",
+    "name": "Flute Foundation",
+    "section": "sound",
+    "description": "Measured open, breath-led flute.",
+    "tags": [
+      "wind",
+      "measured",
+      "airy"
+    ],
+    "source_id": "seed:factory-sub-flute-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "flute",
+        "spectralMix": 0.9,
+        "excitationType": "blow",
+        "excitationPosition": 0.28,
+        "excitationHardness": 0.35,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.06,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Clarinet Foundation",
+    "section": "sound",
+    "description": "Measured odd-harmonic reed voice.",
+    "tags": [
+      "reed",
+      "measured",
+      "dark"
+    ],
+    "source_id": "seed:factory-sub-clarinet-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "clarinet",
+        "spectralMix": 0.9,
+        "excitationType": "blow",
+        "excitationPosition": 0.21,
+        "excitationHardness": 0.45,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.06,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Violin Foundation",
+    "section": "sound",
+    "description": "Measured bowed string voice.",
+    "tags": [
+      "string",
+      "measured",
+      "bowed"
+    ],
+    "source_id": "seed:factory-sub-violin-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "violin",
+        "spectralMix": 0.9,
+        "excitationType": "bow",
+        "excitationPosition": 0.13,
+        "excitationHardness": 0.6,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.06,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Cello Foundation",
+    "section": "sound",
+    "description": "Measured low bowed string voice.",
+    "tags": [
+      "string",
+      "measured",
+      "warm"
+    ],
+    "source_id": "seed:factory-sub-cello-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "cello",
+        "spectralMix": 0.9,
+        "excitationType": "bow",
+        "excitationPosition": 0.13,
+        "excitationHardness": 0.52,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.06,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Trumpet Foundation",
+    "section": "sound",
+    "description": "Measured brass projection with lip transient.",
+    "tags": [
+      "brass",
+      "measured",
+      "bright"
+    ],
+    "source_id": "seed:factory-sub-trumpet-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "trumpet",
+        "spectralMix": 0.9,
+        "excitationType": "blow",
+        "excitationPosition": 0.18,
+        "excitationHardness": 0.72,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.06,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Trombone Foundation",
+    "section": "sound",
+    "description": "Measured broad, low brass body.",
+    "tags": [
+      "brass",
+      "measured",
+      "broad"
+    ],
+    "source_id": "seed:factory-sub-trombone-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "trombone",
+        "spectralMix": 0.9,
+        "excitationType": "blow",
+        "excitationPosition": 0.22,
+        "excitationHardness": 0.52,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.06,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Piano Foundation",
+    "section": "sound",
+    "description": "Measured struck, inharmonic piano body.",
+    "tags": [
+      "keys",
+      "measured",
+      "struck"
+    ],
+    "source_id": "seed:factory-sub-piano-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "piano",
+        "spectralMix": 0.9,
+        "excitationType": "strike",
+        "excitationPosition": 0.12,
+        "excitationHardness": 0.62,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.006,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Vocal Foundation",
+    "section": "sound",
+    "description": "A balanced articulated vowel voice.",
+    "tags": [
+      "vocal",
+      "formant",
+      "expressive"
+    ],
+    "source_id": "seed:factory-sub-vocal-natural",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "vocal",
+        "spectralMix": 0.9,
+        "excitationType": "blow",
+        "excitationPosition": 0.28,
+        "excitationHardness": 0.42,
+        "excitationHuman": 0.35,
+        "envelopeAttack": 0.06,
+        "envelopeRelease": 0.28
+      },
+      "section": "sound"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Grounded Major",
+    "section": "melody",
+    "description": "Root-led major motion for dependable starts.",
+    "tags": [
+      "major",
+      "grounded"
+    ],
+    "source_id": "seed:factory-melody-grounded-major",
+    "data": {
+      "parameters": {
+        "scaleMode": "12tone",
+        "scalePreset": "major",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": 0,
+        "registerWidth": 5,
+        "intervalPeakedness": 3.5,
+        "intervalRange": 2,
+        "momentum": 0.18,
+        "rootPullStrength": 0.7,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1
+      },
+      "section": "melody"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Grounded Minor",
+    "section": "melody",
+    "description": "Low, stepwise natural-minor movement.",
+    "tags": [
+      "minor",
+      "bass"
+    ],
+    "source_id": "seed:factory-melody-grounded-minor",
+    "data": {
+      "parameters": {
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1
+      },
+      "section": "melody"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Pentatonic Roam",
+    "section": "melody",
+    "description": "Wide but forgiving pentatonic exploration.",
+    "tags": [
+      "pentatonic",
+      "wide"
+    ],
+    "source_id": "seed:factory-melody-pentatonic-roam",
+    "data": {
+      "parameters": {
+        "scaleMode": "12tone",
+        "scalePreset": "pent_major",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": 1,
+        "registerWidth": 14,
+        "intervalPeakedness": 1.7,
+        "intervalRange": 7,
+        "momentum": 0.55,
+        "rootPullStrength": 0.25,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1
+      },
+      "section": "melody"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Minor Roam",
+    "section": "melody",
+    "description": "A mobile minor walk with room for leaps.",
+    "tags": [
+      "minor",
+      "wide"
+    ],
+    "source_id": "seed:factory-melody-minor-roam",
+    "data": {
+      "parameters": {
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": 0,
+        "registerWidth": 12,
+        "intervalPeakedness": 1.9,
+        "intervalRange": 6,
+        "momentum": 0.5,
+        "rootPullStrength": 0.2,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1
+      },
+      "section": "melody"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Dorian Climb",
+    "section": "melody",
+    "description": "Upward modal travel with moderate momentum.",
+    "tags": [
+      "dorian",
+      "rising"
+    ],
+    "source_id": "seed:factory-melody-dorian-climb",
+    "data": {
+      "parameters": {
+        "scaleMode": "12tone",
+        "scalePreset": "dorian",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": 3,
+        "registerWidth": 10,
+        "intervalPeakedness": 2.3,
+        "intervalRange": 5,
+        "momentum": 0.68,
+        "rootPullStrength": 0.25,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1
+      },
+      "section": "melody"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Slow Steps",
+    "section": "rhythm",
+    "description": "A reusable rhythm and rest behaviour.",
+    "tags": [
+      "slow",
+      "steady"
+    ],
+    "source_id": "seed:factory-rhythm-slow-steps",
+    "data": {
+      "parameters": {
+        "tempo": 68,
+        "beatDivisions": 1,
+        "onBeatProb": 0.82,
+        "offBeatProb": 0.08,
+        "sameLengthProb": 0.76,
+        "restMotifStartRatio": 0.18,
+        "restOnMeterRatio": 0.08,
+        "restOffMeterRatio": 0.055999999999999994,
+        "gapProb": 0.25,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18
+      },
+      "section": "rhythm"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Walking Eighths",
+    "section": "rhythm",
+    "description": "A reusable rhythm and rest behaviour.",
+    "tags": [
+      "walking",
+      "eighths"
+    ],
+    "source_id": "seed:factory-rhythm-walking-eighths",
+    "data": {
+      "parameters": {
+        "tempo": 102,
+        "beatDivisions": 2,
+        "onBeatProb": 0.88,
+        "offBeatProb": 0.18,
+        "sameLengthProb": 0.72,
+        "restMotifStartRatio": 0.12,
+        "restOnMeterRatio": 0.04,
+        "restOffMeterRatio": 0.027999999999999997,
+        "gapProb": 0.16,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18
+      },
+      "section": "rhythm"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Clock Grid",
+    "section": "rhythm",
+    "description": "A reusable rhythm and rest behaviour.",
+    "tags": [
+      "precise",
+      "grid"
+    ],
+    "source_id": "seed:factory-rhythm-clock-grid",
+    "data": {
+      "parameters": {
+        "tempo": 124,
+        "beatDivisions": 4,
+        "onBeatProb": 0.94,
+        "offBeatProb": 0.06,
+        "sameLengthProb": 0.88,
+        "restMotifStartRatio": 0.02,
+        "restOnMeterRatio": 0.02,
+        "restOffMeterRatio": 0.013999999999999999,
+        "gapProb": 0.05,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18
+      },
+      "section": "rhythm"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Broken Pulse",
+    "section": "rhythm",
+    "description": "A reusable rhythm and rest behaviour.",
+    "tags": [
+      "broken",
+      "syncopated"
+    ],
+    "source_id": "seed:factory-rhythm-broken-pulse",
+    "data": {
+      "parameters": {
+        "tempo": 96,
+        "beatDivisions": 4,
+        "onBeatProb": 0.58,
+        "offBeatProb": 0.42,
+        "sameLengthProb": 0.38,
+        "restMotifStartRatio": 0.16,
+        "restOnMeterRatio": 0.16,
+        "restOffMeterRatio": 0.11199999999999999,
+        "gapProb": 0.45,
+        "gapMin": 0.35,
+        "gapMax": 0.8,
+        "phraseGap": 0.48
+      },
+      "section": "rhythm"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Even Bed",
+    "section": "dynamics",
+    "description": "A reusable velocity and loudness behaviour.",
+    "tags": [
+      "even",
+      "support"
+    ],
+    "source_id": "seed:factory-dynamics-even-bed",
+    "data": {
+      "parameters": {
+        "dynamicsLevel": 0.52,
+        "loudnessRange": 0.25,
+        "dynamicsPrecision": 0.88,
+        "dynamicsRange": 0.1
+      },
+      "section": "dynamics"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Gentle",
+    "section": "dynamics",
+    "description": "A reusable velocity and loudness behaviour.",
+    "tags": [
+      "gentle",
+      "soft"
+    ],
+    "source_id": "seed:factory-dynamics-gentle",
+    "data": {
+      "parameters": {
+        "dynamicsLevel": 0.38,
+        "loudnessRange": 0.32,
+        "dynamicsPrecision": 0.82,
+        "dynamicsRange": 0.14
+      },
+      "section": "dynamics"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Accented",
+    "section": "dynamics",
+    "description": "A reusable velocity and loudness behaviour.",
+    "tags": [
+      "accented",
+      "present"
+    ],
+    "source_id": "seed:factory-dynamics-accented",
+    "data": {
+      "parameters": {
+        "dynamicsLevel": 0.68,
+        "loudnessRange": 0.7,
+        "dynamicsPrecision": 0.54,
+        "dynamicsRange": 0.3
+      },
+      "section": "dynamics"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Still Loop",
+    "section": "surprise",
+    "description": "A reusable sequence and novelty behaviour.",
+    "tags": [
+      "stable",
+      "repeat"
+    ],
+    "source_id": "seed:factory-surprise-still",
+    "data": {
+      "parameters": {
+        "surpriseProb": 0,
+        "incorporationRate": 0,
+        "sequenceProb": 0.92,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.94,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": false,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false
+      },
+      "section": "surprise"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Light Pitch Surprise",
+    "section": "surprise",
+    "description": "A reusable sequence and novelty behaviour.",
+    "tags": [
+      "pitch",
+      "light"
+    ],
+    "source_id": "seed:factory-surprise-light-pitch",
+    "data": {
+      "parameters": {
+        "surpriseProb": 0.05,
+        "incorporationRate": 0.18,
+        "sequenceProb": 0.9,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.9,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": true,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false
+      },
+      "section": "surprise"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Melodic Turn",
+    "section": "surprise",
+    "description": "A reusable sequence and novelty behaviour.",
+    "tags": [
+      "pitch",
+      "evolving"
+    ],
+    "source_id": "seed:factory-surprise-melodic-turn",
+    "data": {
+      "parameters": {
+        "surpriseProb": 0.12,
+        "incorporationRate": 0.42,
+        "sequenceProb": 0.82,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.84,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": true,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false
+      },
+      "section": "surprise"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Minimal Click Kit",
+    "section": "percussion",
+    "description": "Expandable percussion layers; swap or add hits in the percussion panel.",
+    "tags": [
+      "minimal",
+      "click"
+    ],
+    "source_id": "seed:factory-percussion-minimal-click",
+    "data": {
+      "parameters": {
+        "percLayers": [
+          {
+            "id": "min-click",
+            "role": "beat",
+            "vol": 0.3,
+            "sound": {
+              "kind": "sample",
+              "key": "click"
+            },
+            "space": null
+          }
+        ]
+      },
+      "section": "percussion"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Wood Pulse Kit",
+    "section": "percussion",
+    "description": "Expandable percussion layers; swap or add hits in the percussion panel.",
+    "tags": [
+      "wood",
+      "pulse"
+    ],
+    "source_id": "seed:factory-percussion-wood-pulse",
+    "data": {
+      "parameters": {
+        "percLayers": [
+          {
+            "id": "wood-beat",
+            "role": "beat",
+            "vol": 0.44,
+            "sound": {
+              "kind": "instrument",
+              "name": "Wood Hit",
+              "presetId": "factory-sub-hit-wood",
+              "pitchHz": 180,
+              "subnote": {
+                "voiceMode": "fourier",
+                "spectralProfile": "cello",
+                "spectralMix": 0.82,
+                "excitationType": "strike",
+                "excitationPosition": 0.12,
+                "excitationHardness": 0.58,
+                "partialMaterial": 0.82,
+                "envelopeAttack": 0.002,
+                "envelopeDecay": 0.035,
+                "envelopeSustain": 0.04,
+                "envelopeRelease": 0.07,
+                "attackNoiseLevel": 1.4
+              }
+            },
+            "space": null
+          },
+          {
+            "id": "wood-down",
+            "role": "downbeat",
+            "vol": 0.54,
+            "sound": {
+              "kind": "sample",
+              "key": "wood"
+            },
+            "space": null,
+            "every": 4
+          }
+        ]
+      },
+      "section": "percussion"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Glass Clock Kit",
+    "section": "percussion",
+    "description": "Expandable percussion layers; swap or add hits in the percussion panel.",
+    "tags": [
+      "glass",
+      "clock"
+    ],
+    "source_id": "seed:factory-percussion-glass-clock",
+    "data": {
+      "parameters": {
+        "percLayers": [
+          {
+            "id": "glass-beat",
+            "role": "beat",
+            "vol": 0.32,
+            "sound": {
+              "kind": "instrument",
+              "name": "Glass Hit",
+              "presetId": "factory-sub-hit-glass",
+              "pitchHz": 720,
+              "subnote": {
+                "voiceMode": "fourier",
+                "spectralProfile": "piano",
+                "spectralMix": 0.82,
+                "excitationType": "strike",
+                "excitationPosition": 0.12,
+                "excitationHardness": 0.9,
+                "partialMaterial": 0.12,
+                "envelopeAttack": 0.002,
+                "envelopeDecay": 0.035,
+                "envelopeSustain": 0.04,
+                "envelopeRelease": 0.07,
+                "attackNoiseLevel": 1.4
+              }
+            },
+            "space": null
+          },
+          {
+            "id": "glass-down",
+            "role": "downbeat",
+            "vol": 0.35,
+            "sound": {
+              "kind": "sample",
+              "key": "tick"
+            },
+            "space": null,
+            "every": 4
+          }
+        ]
+      },
+      "section": "percussion"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Low Tom Kit",
+    "section": "percussion",
+    "description": "Expandable percussion layers; swap or add hits in the percussion panel.",
+    "tags": [
+      "tom",
+      "low"
+    ],
+    "source_id": "seed:factory-percussion-low-tom",
+    "data": {
+      "parameters": {
+        "percLayers": [
+          {
+            "id": "tom-beat",
+            "role": "beat",
+            "vol": 0.5,
+            "sound": {
+              "kind": "instrument",
+              "name": "Tom Hit",
+              "presetId": "factory-sub-hit-tom",
+              "pitchHz": 110,
+              "subnote": {
+                "voiceMode": "fourier",
+                "spectralProfile": "trombone",
+                "spectralMix": 0.82,
+                "excitationType": "strike",
+                "excitationPosition": 0.12,
+                "excitationHardness": 0.44,
+                "partialMaterial": 0.48,
+                "envelopeAttack": 0.002,
+                "envelopeDecay": 0.035,
+                "envelopeSustain": 0.04,
+                "envelopeRelease": 0.07,
+                "attackNoiseLevel": 1.4
+              }
+            },
+            "space": null
+          },
+          {
+            "id": "tom-motif",
+            "role": "motif",
+            "vol": 0.3,
+            "sound": {
+              "kind": "sample",
+              "key": "pop"
+            },
+            "space": null
+          }
+        ]
+      },
+      "section": "percussion"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Dry Close",
+    "section": "space",
+    "description": "Close, almost dry studio placement.",
+    "tags": [
+      "dry",
+      "close"
+    ],
+    "source_id": "seed:factory-space-dry-close",
+    "data": {
+      "parameters": {
+        "reverbType": "studio",
+        "reverbWet": 0.04,
+        "reverbDecay": 0.7,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 1.1,
+        "spaceAzimuth": 0
+      },
+      "section": "space"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Booth",
+    "section": "space",
+    "description": "Small controlled booth with clear attacks.",
+    "tags": [
+      "studio",
+      "controlled"
+    ],
+    "source_id": "seed:factory-space-booth",
+    "data": {
+      "parameters": {
+        "reverbType": "studio",
+        "reverbWet": 0.12,
+        "reverbDecay": 0.8,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 1.4,
+        "spaceAzimuth": -12
+      },
+      "section": "space"
+    }
+  },
+  {
+    "kind": "module",
+    "name": "Living Room",
+    "section": "space",
+    "description": "Warm near room placement.",
+    "tags": [
+      "room",
+      "warm"
+    ],
+    "source_id": "seed:factory-space-living-room",
+    "data": {
+      "parameters": {
+        "reverbType": "room",
+        "reverbWet": 0.18,
+        "reverbDecay": 1.2,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 2.2,
+        "spaceAzimuth": 18
+      },
+      "section": "space"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Deep Walker",
+    "section": "full",
+    "description": "Low, patient minor bass with room for a small accent.",
+    "tags": [
+      "bass",
+      "string",
+      "warm",
+      "minor",
+      "slow",
+      "steady"
+    ],
+    "source_id": "seed:factory-patch-deep-walker",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "cello",
+        "spectralMix": 0.88,
+        "excitationType": "bow",
+        "excitationPosition": 0.16,
+        "excitationHardness": 0.6,
+        "excitationHuman": 0.45,
+        "partialTilt": -0.48,
+        "partialComb": 0,
+        "partialCombFreq": 5,
+        "partialMaterial": 0.62,
+        "envelopeAttack": 0.035,
+        "envelopeRelease": 0.45,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1,
+        "tempo": 68,
+        "beatDivisions": 1,
+        "onBeatProb": 0.82,
+        "offBeatProb": 0.08,
+        "sameLengthProb": 0.76,
+        "restMotifStartRatio": 0.18,
+        "restOnMeterRatio": 0.08,
+        "restOffMeterRatio": 0.055999999999999994,
+        "gapProb": 0.25,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18,
+        "dynamicsLevel": 0.52,
+        "loudnessRange": 0.25,
+        "dynamicsPrecision": 0.88,
+        "dynamicsRange": 0.1,
+        "surpriseProb": 0.05,
+        "incorporationRate": 0.18,
+        "sequenceProb": 0.9,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.9,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": true,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false,
+        "reverbType": "room",
+        "reverbWet": 0.18,
+        "reverbDecay": 1.2,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 2.2,
+        "spaceAzimuth": 18
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Felt Root",
+    "section": "full",
+    "description": "Soft piano bass that stays close to its root.",
+    "tags": [
+      "bass",
+      "keys",
+      "soft",
+      "percussive",
+      "minor",
+      "long"
+    ],
+    "source_id": "seed:factory-patch-felt-root",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "piano",
+        "spectralMix": 0.9,
+        "excitationType": "strike",
+        "excitationPosition": 0.2,
+        "excitationHardness": 0.25,
+        "excitationHuman": 0.35,
+        "partialTilt": -0.48,
+        "partialMaterial": 0.82,
+        "envelopeAttack": 0.004,
+        "envelopeRelease": 0.2,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1,
+        "tempo": 72,
+        "beatDivisions": 1,
+        "onBeatProb": 0.74,
+        "offBeatProb": 0.06,
+        "sameLengthProb": 0.88,
+        "restMotifStartRatio": 0.12,
+        "restOnMeterRatio": 0.1,
+        "restOffMeterRatio": 0.06999999999999999,
+        "gapProb": 0.42,
+        "gapMin": 0.35,
+        "gapMax": 0.8,
+        "phraseGap": 0.48,
+        "dynamicsLevel": 0.38,
+        "loudnessRange": 0.32,
+        "dynamicsPrecision": 0.82,
+        "dynamicsRange": 0.14,
+        "surpriseProb": 0,
+        "incorporationRate": 0,
+        "sequenceProb": 0.92,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.94,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": false,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false,
+        "reverbType": "studio",
+        "reverbWet": 0.04,
+        "reverbDecay": 0.7,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 1.1,
+        "spaceAzimuth": 0
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Reed Floor",
+    "section": "full",
+    "description": "A dark, narrow clarinet foundation.",
+    "tags": [
+      "bass",
+      "reed",
+      "dark",
+      "soft",
+      "minor",
+      "half-time"
+    ],
+    "source_id": "seed:factory-patch-reed-floor",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "clarinet",
+        "spectralMix": 0.9,
+        "excitationType": "blow",
+        "excitationPosition": 0.2,
+        "excitationHardness": 0.22,
+        "excitationHuman": 0.35,
+        "partialTilt": -0.3,
+        "partialMaterial": 0.58,
+        "envelopeAttack": 0.045,
+        "envelopeRelease": 0.3,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1,
+        "tempo": 84,
+        "beatDivisions": 2,
+        "onBeatProb": 0.78,
+        "offBeatProb": 0.1,
+        "sameLengthProb": 0.7,
+        "restMotifStartRatio": 0.2,
+        "restOnMeterRatio": 0.1,
+        "restOffMeterRatio": 0.06999999999999999,
+        "gapProb": 0.3,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18,
+        "dynamicsLevel": 0.52,
+        "loudnessRange": 0.25,
+        "dynamicsPrecision": 0.88,
+        "dynamicsRange": 0.1,
+        "surpriseProb": 0,
+        "incorporationRate": 0,
+        "sequenceProb": 0.92,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.94,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": false,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false,
+        "reverbType": "studio",
+        "reverbWet": 0.12,
+        "reverbDecay": 0.8,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 1.4,
+        "spaceAzimuth": -12
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Brass Cellar",
+    "section": "full",
+    "description": "Wide low brass with deliberately slow motion.",
+    "tags": [
+      "bass",
+      "brass",
+      "low",
+      "warm",
+      "minor",
+      "long"
+    ],
+    "source_id": "seed:factory-patch-brass-cellar",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "trombone",
+        "spectralMix": 0.9,
+        "excitationType": "blow",
+        "excitationPosition": 0.2,
+        "excitationHardness": 0.34,
+        "excitationHuman": 0.35,
+        "partialTilt": -0.3,
+        "partialMaterial": 0.6,
+        "envelopeAttack": 0.045,
+        "envelopeRelease": 0.3,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1,
+        "tempo": 72,
+        "beatDivisions": 1,
+        "onBeatProb": 0.74,
+        "offBeatProb": 0.06,
+        "sameLengthProb": 0.88,
+        "restMotifStartRatio": 0.12,
+        "restOnMeterRatio": 0.1,
+        "restOffMeterRatio": 0.06999999999999999,
+        "gapProb": 0.42,
+        "gapMin": 0.35,
+        "gapMax": 0.8,
+        "phraseGap": 0.48,
+        "dynamicsLevel": 0.38,
+        "loudnessRange": 0.32,
+        "dynamicsPrecision": 0.82,
+        "dynamicsRange": 0.14,
+        "surpriseProb": 0.09,
+        "incorporationRate": 0.12,
+        "sequenceProb": 0.9,
+        "motifCount": 6,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.88,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": false,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": true,
+        "reverbType": "chamber",
+        "reverbWet": 0.26,
+        "reverbDecay": 2,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 3.2,
+        "spaceAzimuth": 24
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Wooden Pulse",
+    "section": "full",
+    "description": "A plucked low part dressed by wood hits.",
+    "tags": [
+      "bass",
+      "wood",
+      "pluck",
+      "warm",
+      "minor",
+      "walking"
+    ],
+    "source_id": "seed:factory-patch-wooden-pulse",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "cello",
+        "spectralMix": 0.86,
+        "excitationType": "strike",
+        "excitationPosition": 0.16,
+        "excitationHardness": 0.25,
+        "partialTilt": 0.52,
+        "partialOddEven": 0,
+        "partialMaterial": 0.82,
+        "spectralStretchCents": 0,
+        "envelopeAttack": 0.008,
+        "envelopeDecay": 0.12,
+        "envelopeSustain": 0.28,
+        "envelopeRelease": 0.32,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1,
+        "tempo": 102,
+        "beatDivisions": 2,
+        "onBeatProb": 0.88,
+        "offBeatProb": 0.18,
+        "sameLengthProb": 0.72,
+        "restMotifStartRatio": 0.12,
+        "restOnMeterRatio": 0.04,
+        "restOffMeterRatio": 0.027999999999999997,
+        "gapProb": 0.16,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18,
+        "dynamicsLevel": 0.56,
+        "loudnessRange": 0.64,
+        "dynamicsPrecision": 0.52,
+        "dynamicsRange": 0.34,
+        "surpriseProb": 0.05,
+        "incorporationRate": 0.18,
+        "sequenceProb": 0.9,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.9,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": true,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false,
+        "percLayers": [
+          {
+            "id": "wood-beat",
+            "role": "beat",
+            "vol": 0.44,
+            "sound": {
+              "kind": "instrument",
+              "name": "Wood Hit",
+              "presetId": "factory-sub-hit-wood",
+              "pitchHz": 180,
+              "subnote": {
+                "voiceMode": "fourier",
+                "spectralProfile": "cello",
+                "spectralMix": 0.82,
+                "excitationType": "strike",
+                "excitationPosition": 0.12,
+                "excitationHardness": 0.58,
+                "partialMaterial": 0.82,
+                "envelopeAttack": 0.002,
+                "envelopeDecay": 0.035,
+                "envelopeSustain": 0.04,
+                "envelopeRelease": 0.07,
+                "attackNoiseLevel": 1.4
+              }
+            },
+            "space": null
+          },
+          {
+            "id": "wood-down",
+            "role": "downbeat",
+            "vol": 0.54,
+            "sound": {
+              "kind": "sample",
+              "key": "wood"
+            },
+            "space": null,
+            "every": 4
+          }
+        ],
+        "reverbType": "studio",
+        "reverbWet": 0.04,
+        "reverbDecay": 0.7,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 1.1,
+        "spaceAzimuth": 0
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Tube Anchor",
+    "section": "full",
+    "description": "Closed-tube-style low line with a hard rhythmic edge.",
+    "tags": [
+      "bass",
+      "tube",
+      "hollow",
+      "dark",
+      "minor",
+      "precise"
+    ],
+    "source_id": "seed:factory-patch-tube-anchor",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "clarinet",
+        "spectralMix": 0.86,
+        "excitationType": "strike",
+        "excitationPosition": 0.16,
+        "excitationHardness": 0.32,
+        "partialTilt": -0.22,
+        "partialOddEven": 0.45,
+        "partialMaterial": 0.48,
+        "spectralStretchCents": 0,
+        "envelopeAttack": 0.008,
+        "envelopeDecay": 0.12,
+        "envelopeSustain": 0.28,
+        "envelopeRelease": 0.32,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1,
+        "tempo": 124,
+        "beatDivisions": 4,
+        "onBeatProb": 0.94,
+        "offBeatProb": 0.06,
+        "sameLengthProb": 0.88,
+        "restMotifStartRatio": 0.02,
+        "restOnMeterRatio": 0.02,
+        "restOffMeterRatio": 0.013999999999999999,
+        "gapProb": 0.05,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18,
+        "dynamicsLevel": 0.68,
+        "loudnessRange": 0.7,
+        "dynamicsPrecision": 0.54,
+        "dynamicsRange": 0.3,
+        "surpriseProb": 0,
+        "incorporationRate": 0,
+        "sequenceProb": 0.92,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.94,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": false,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false,
+        "percLayers": [
+          {
+            "id": "min-click",
+            "role": "beat",
+            "vol": 0.3,
+            "sound": {
+              "kind": "sample",
+              "key": "click"
+            },
+            "space": null
+          }
+        ],
+        "reverbType": "studio",
+        "reverbWet": 0.12,
+        "reverbDecay": 0.8,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 1.4,
+        "spaceAzimuth": -12
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Amber Ostinato",
+    "section": "full",
+    "description": "Warm repeated low arpeggio.",
+    "tags": [
+      "bass",
+      "string",
+      "warm",
+      "ambient",
+      "minor",
+      "arpeggio"
+    ],
+    "source_id": "seed:factory-patch-amber-ostinato",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "cello",
+        "spectralMix": 0.86,
+        "excitationType": "strike",
+        "excitationPosition": 0.16,
+        "excitationHardness": 0.4,
+        "partialTilt": -0.18,
+        "partialOddEven": 0,
+        "partialMaterial": 0.42,
+        "spectralStretchCents": 0,
+        "envelopeAttack": 0.008,
+        "envelopeDecay": 0.12,
+        "envelopeSustain": 0.28,
+        "envelopeRelease": 0.32,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -3,
+        "registerWidth": 10,
+        "intervalPeakedness": 2,
+        "intervalRange": 5,
+        "momentum": 0,
+        "rootPullStrength": 0.5,
+        "rootPullShape": 0.7,
+        "melodyPattern": "arpUpDown",
+        "arpStep": 2,
+        "arpOctaves": 2,
+        "tempo": 102,
+        "beatDivisions": 2,
+        "onBeatProb": 0.88,
+        "offBeatProb": 0.18,
+        "sameLengthProb": 0.72,
+        "restMotifStartRatio": 0.12,
+        "restOnMeterRatio": 0.04,
+        "restOffMeterRatio": 0.027999999999999997,
+        "gapProb": 0.16,
+        "gapMin": 0.12,
+        "gapMax": 0.25,
+        "phraseGap": 0.18,
+        "dynamicsLevel": 0.52,
+        "loudnessRange": 0.25,
+        "dynamicsPrecision": 0.88,
+        "dynamicsRange": 0.1,
+        "surpriseProb": 0,
+        "incorporationRate": 0,
+        "sequenceProb": 0.92,
+        "motifCount": 4,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.94,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": false,
+        "surpriseTuningEnabled": false,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false,
+        "reverbType": "room",
+        "reverbWet": 0.18,
+        "reverbDecay": 1.2,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 2.2,
+        "spaceAzimuth": 18
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "patch",
+    "name": "Smoke Drift",
+    "section": "full",
+    "description": "Sparse, very dark brass bass atmosphere.",
+    "tags": [
+      "bass",
+      "brass",
+      "dark",
+      "ambient",
+      "minor",
+      "drone"
+    ],
+    "source_id": "seed:factory-patch-smoke-drift",
+    "data": {
+      "parameters": {
+        "voiceMode": "fourier",
+        "spectralProfile": "trombone",
+        "spectralMix": 0.88,
+        "excitationType": "bow",
+        "excitationPosition": 0.16,
+        "excitationHardness": 0.6,
+        "excitationHuman": 0.45,
+        "partialTilt": -0.42,
+        "partialComb": 0,
+        "partialCombFreq": 5,
+        "partialMaterial": 0.65,
+        "envelopeAttack": 0.035,
+        "envelopeRelease": 0.45,
+        "scaleMode": "12tone",
+        "scalePreset": "minor",
+        "customDegrees": null,
+        "rootNotes": [
+          0
+        ],
+        "registerCenter": -10,
+        "registerWidth": 4,
+        "intervalPeakedness": 3.8,
+        "intervalRange": 2,
+        "momentum": 0.24,
+        "rootPullStrength": 0.8,
+        "rootPullShape": 0.7,
+        "melodyPattern": "walk",
+        "arpStep": 2,
+        "arpOctaves": 1,
+        "tempo": 54,
+        "beatDivisions": 1,
+        "onBeatProb": 0.52,
+        "offBeatProb": 0.03,
+        "sameLengthProb": 0.94,
+        "restMotifStartRatio": 0.46,
+        "restOnMeterRatio": 0.34,
+        "restOffMeterRatio": 0.238,
+        "gapProb": 0.62,
+        "gapMin": 0.35,
+        "gapMax": 0.8,
+        "phraseGap": 0.48,
+        "dynamicsLevel": 0.3,
+        "loudnessRange": 0.5,
+        "dynamicsPrecision": 0.55,
+        "dynamicsRange": 0.26,
+        "surpriseProb": 0.08,
+        "incorporationRate": 0.2,
+        "sequenceProb": 0.9,
+        "motifCount": 6,
+        "motifLengthBeats": 4,
+        "motifSurpriseProb": 0.88,
+        "surpriseAllowMultiple": false,
+        "surprisePitchEnabled": false,
+        "surpriseTuningEnabled": true,
+        "surpriseRhythmEnabled": false,
+        "surpriseFormantEnabled": false,
+        "surpriseDynamicsEnabled": false,
+        "surpriseRestEnabled": false,
+        "reverbType": "cave",
+        "reverbWet": 0.36,
+        "reverbDecay": 4.1,
+        "reverbTone": 0.6,
+        "reverbPreDelay": 0.015,
+        "spaceDistance": 7.5,
+        "spaceAzimuth": 74
+      },
+      "section": "full"
+    }
+  },
+  {
+    "kind": "composition",
+    "name": "Dawn Sketch",
+    "section": "",
+    "description": "Two patches trading phrases at sunrise pace.",
+    "tags": [
+      "seed",
+      "demo"
+    ],
+    "source_id": "seed:arrangement:Dawn Sketch",
+    "data": {
+      "format": "phase0-arrangement-1.0",
+      "name": "Dawn Sketch",
+      "lengthBeats": 48,
+      "palette": [
+        {
+          "id": "seedpal-dawn-sketch-0",
+          "name": "Deep Walker",
+          "params": {
+            "voiceMode": "fourier",
+            "spectralProfile": "cello",
+            "spectralMix": 0.88,
+            "excitationType": "bow",
+            "excitationPosition": 0.16,
+            "excitationHardness": 0.6,
+            "excitationHuman": 0.45,
+            "partialTilt": -0.48,
+            "partialComb": 0,
+            "partialCombFreq": 5,
+            "partialMaterial": 0.62,
+            "envelopeAttack": 0.035,
+            "envelopeRelease": 0.45,
+            "scaleMode": "12tone",
+            "scalePreset": "minor",
+            "customDegrees": null,
+            "rootNotes": [
+              0
+            ],
+            "registerCenter": -10,
+            "registerWidth": 4,
+            "intervalPeakedness": 3.8,
+            "intervalRange": 2,
+            "momentum": 0.24,
+            "rootPullStrength": 0.8,
+            "rootPullShape": 0.7,
+            "melodyPattern": "walk",
+            "arpStep": 2,
+            "arpOctaves": 1,
+            "tempo": 68,
+            "beatDivisions": 1,
+            "onBeatProb": 0.82,
+            "offBeatProb": 0.08,
+            "sameLengthProb": 0.76,
+            "restMotifStartRatio": 0.18,
+            "restOnMeterRatio": 0.08,
+            "restOffMeterRatio": 0.055999999999999994,
+            "gapProb": 0.25,
+            "gapMin": 0.12,
+            "gapMax": 0.25,
+            "phraseGap": 0.18,
+            "dynamicsLevel": 0.52,
+            "loudnessRange": 0.25,
+            "dynamicsPrecision": 0.88,
+            "dynamicsRange": 0.1,
+            "surpriseProb": 0.05,
+            "incorporationRate": 0.18,
+            "sequenceProb": 0.9,
+            "motifCount": 4,
+            "motifLengthBeats": 4,
+            "motifSurpriseProb": 0.9,
+            "surpriseAllowMultiple": false,
+            "surprisePitchEnabled": true,
+            "surpriseTuningEnabled": false,
+            "surpriseRhythmEnabled": false,
+            "surpriseFormantEnabled": false,
+            "surpriseDynamicsEnabled": false,
+            "surpriseRestEnabled": false,
+            "reverbType": "room",
+            "reverbWet": 0.18,
+            "reverbDecay": 1.2,
+            "reverbTone": 0.6,
+            "reverbPreDelay": 0.015,
+            "spaceDistance": 2.2,
+            "spaceAzimuth": 18
+          },
+          "captureParts": {
+            "notes": true,
+            "stave": true,
+            "space": true,
+            "clef": true,
+            "percussion": false
+          }
+        },
+        {
+          "id": "seedpal-dawn-sketch-1",
+          "name": "Felt Root",
+          "params": {
+            "voiceMode": "fourier",
+            "spectralProfile": "piano",
+            "spectralMix": 0.9,
+            "excitationType": "strike",
+            "excitationPosition": 0.2,
+            "excitationHardness": 0.25,
+            "excitationHuman": 0.35,
+            "partialTilt": -0.48,
+            "partialMaterial": 0.82,
+            "envelopeAttack": 0.004,
+            "envelopeRelease": 0.2,
+            "scaleMode": "12tone",
+            "scalePreset": "minor",
+            "customDegrees": null,
+            "rootNotes": [
+              0
+            ],
+            "registerCenter": -10,
+            "registerWidth": 4,
+            "intervalPeakedness": 3.8,
+            "intervalRange": 2,
+            "momentum": 0.24,
+            "rootPullStrength": 0.8,
+            "rootPullShape": 0.7,
+            "melodyPattern": "walk",
+            "arpStep": 2,
+            "arpOctaves": 1,
+            "tempo": 72,
+            "beatDivisions": 1,
+            "onBeatProb": 0.74,
+            "offBeatProb": 0.06,
+            "sameLengthProb": 0.88,
+            "restMotifStartRatio": 0.12,
+            "restOnMeterRatio": 0.1,
+            "restOffMeterRatio": 0.06999999999999999,
+            "gapProb": 0.42,
+            "gapMin": 0.35,
+            "gapMax": 0.8,
+            "phraseGap": 0.48,
+            "dynamicsLevel": 0.38,
+            "loudnessRange": 0.32,
+            "dynamicsPrecision": 0.82,
+            "dynamicsRange": 0.14,
+            "surpriseProb": 0,
+            "incorporationRate": 0,
+            "sequenceProb": 0.92,
+            "motifCount": 4,
+            "motifLengthBeats": 4,
+            "motifSurpriseProb": 0.94,
+            "surpriseAllowMultiple": false,
+            "surprisePitchEnabled": false,
+            "surpriseTuningEnabled": false,
+            "surpriseRhythmEnabled": false,
+            "surpriseFormantEnabled": false,
+            "surpriseDynamicsEnabled": false,
+            "surpriseRestEnabled": false,
+            "reverbType": "studio",
+            "reverbWet": 0.04,
+            "reverbDecay": 0.7,
+            "reverbTone": 0.6,
+            "reverbPreDelay": 0.015,
+            "spaceDistance": 1.1,
+            "spaceAzimuth": 0
+          },
+          "captureParts": {
+            "notes": true,
+            "stave": true,
+            "space": true,
+            "clef": true,
+            "percussion": false
+          }
+        }
+      ],
+      "tracks": [
+        {
+          "id": "seedtrack-0",
+          "name": "Deep Walker",
+          "gain": 0.8,
+          "pan": 0,
+          "muted": false,
+          "regions": [
+            {
+              "id": "seedregion-0",
+              "paletteId": "seedpal-dawn-sketch-0",
+              "startBeat": 0,
+              "lengthBeats": 48,
+              "seed": 701101
+            }
+          ]
+        },
+        {
+          "id": "seedtrack-1",
+          "name": "Felt Root",
+          "gain": 0.8,
+          "pan": 0,
+          "muted": false,
+          "regions": [
+            {
+              "id": "seedregion-1",
+              "paletteId": "seedpal-dawn-sketch-1",
+              "startBeat": 8,
+              "lengthBeats": 40,
+              "seed": 701102
+            }
+          ]
+        }
+      ],
+      "context": {
+        "tempo": 84,
+        "scaleMode": "12tone",
+        "scalePreset": "major",
+        "rootNotes": [
+          0
+        ]
+      }
+    }
+  },
+  {
+    "kind": "composition",
+    "name": "Corridor Steps",
+    "section": "",
+    "description": "A walking bass under glass percussion.",
+    "tags": [
+      "seed",
+      "demo"
+    ],
+    "source_id": "seed:arrangement:Corridor Steps",
+    "data": {
+      "format": "phase0-arrangement-1.0",
+      "name": "Corridor Steps",
+      "lengthBeats": 64,
+      "palette": [
+        {
+          "id": "seedpal-corridor-steps-0",
+          "name": "Reed Floor",
+          "params": {
+            "voiceMode": "fourier",
+            "spectralProfile": "clarinet",
+            "spectralMix": 0.9,
+            "excitationType": "blow",
+            "excitationPosition": 0.2,
+            "excitationHardness": 0.22,
+            "excitationHuman": 0.35,
+            "partialTilt": -0.3,
+            "partialMaterial": 0.58,
+            "envelopeAttack": 0.045,
+            "envelopeRelease": 0.3,
+            "scaleMode": "12tone",
+            "scalePreset": "minor",
+            "customDegrees": null,
+            "rootNotes": [
+              0
+            ],
+            "registerCenter": -10,
+            "registerWidth": 4,
+            "intervalPeakedness": 3.8,
+            "intervalRange": 2,
+            "momentum": 0.24,
+            "rootPullStrength": 0.8,
+            "rootPullShape": 0.7,
+            "melodyPattern": "walk",
+            "arpStep": 2,
+            "arpOctaves": 1,
+            "tempo": 84,
+            "beatDivisions": 2,
+            "onBeatProb": 0.78,
+            "offBeatProb": 0.1,
+            "sameLengthProb": 0.7,
+            "restMotifStartRatio": 0.2,
+            "restOnMeterRatio": 0.1,
+            "restOffMeterRatio": 0.06999999999999999,
+            "gapProb": 0.3,
+            "gapMin": 0.12,
+            "gapMax": 0.25,
+            "phraseGap": 0.18,
+            "dynamicsLevel": 0.52,
+            "loudnessRange": 0.25,
+            "dynamicsPrecision": 0.88,
+            "dynamicsRange": 0.1,
+            "surpriseProb": 0,
+            "incorporationRate": 0,
+            "sequenceProb": 0.92,
+            "motifCount": 4,
+            "motifLengthBeats": 4,
+            "motifSurpriseProb": 0.94,
+            "surpriseAllowMultiple": false,
+            "surprisePitchEnabled": false,
+            "surpriseTuningEnabled": false,
+            "surpriseRhythmEnabled": false,
+            "surpriseFormantEnabled": false,
+            "surpriseDynamicsEnabled": false,
+            "surpriseRestEnabled": false,
+            "reverbType": "studio",
+            "reverbWet": 0.12,
+            "reverbDecay": 0.8,
+            "reverbTone": 0.6,
+            "reverbPreDelay": 0.015,
+            "spaceDistance": 1.4,
+            "spaceAzimuth": -12
+          },
+          "captureParts": {
+            "notes": true,
+            "stave": true,
+            "space": true,
+            "clef": true,
+            "percussion": false
+          }
+        },
+        {
+          "id": "seedpal-corridor-steps-1",
+          "name": "Brass Cellar",
+          "params": {
+            "voiceMode": "fourier",
+            "spectralProfile": "trombone",
+            "spectralMix": 0.9,
+            "excitationType": "blow",
+            "excitationPosition": 0.2,
+            "excitationHardness": 0.34,
+            "excitationHuman": 0.35,
+            "partialTilt": -0.3,
+            "partialMaterial": 0.6,
+            "envelopeAttack": 0.045,
+            "envelopeRelease": 0.3,
+            "scaleMode": "12tone",
+            "scalePreset": "minor",
+            "customDegrees": null,
+            "rootNotes": [
+              0
+            ],
+            "registerCenter": -10,
+            "registerWidth": 4,
+            "intervalPeakedness": 3.8,
+            "intervalRange": 2,
+            "momentum": 0.24,
+            "rootPullStrength": 0.8,
+            "rootPullShape": 0.7,
+            "melodyPattern": "walk",
+            "arpStep": 2,
+            "arpOctaves": 1,
+            "tempo": 72,
+            "beatDivisions": 1,
+            "onBeatProb": 0.74,
+            "offBeatProb": 0.06,
+            "sameLengthProb": 0.88,
+            "restMotifStartRatio": 0.12,
+            "restOnMeterRatio": 0.1,
+            "restOffMeterRatio": 0.06999999999999999,
+            "gapProb": 0.42,
+            "gapMin": 0.35,
+            "gapMax": 0.8,
+            "phraseGap": 0.48,
+            "dynamicsLevel": 0.38,
+            "loudnessRange": 0.32,
+            "dynamicsPrecision": 0.82,
+            "dynamicsRange": 0.14,
+            "surpriseProb": 0.09,
+            "incorporationRate": 0.12,
+            "sequenceProb": 0.9,
+            "motifCount": 6,
+            "motifLengthBeats": 4,
+            "motifSurpriseProb": 0.88,
+            "surpriseAllowMultiple": false,
+            "surprisePitchEnabled": false,
+            "surpriseTuningEnabled": false,
+            "surpriseRhythmEnabled": false,
+            "surpriseFormantEnabled": false,
+            "surpriseDynamicsEnabled": false,
+            "surpriseRestEnabled": true,
+            "reverbType": "chamber",
+            "reverbWet": 0.26,
+            "reverbDecay": 2,
+            "reverbTone": 0.6,
+            "reverbPreDelay": 0.015,
+            "spaceDistance": 3.2,
+            "spaceAzimuth": 24
+          },
+          "captureParts": {
+            "notes": true,
+            "stave": true,
+            "space": true,
+            "clef": true,
+            "percussion": false
+          }
+        },
+        {
+          "id": "seedpal-corridor-steps-2",
+          "name": "Wooden Pulse",
+          "params": {
+            "voiceMode": "fourier",
+            "spectralProfile": "cello",
+            "spectralMix": 0.86,
+            "excitationType": "strike",
+            "excitationPosition": 0.16,
+            "excitationHardness": 0.25,
+            "partialTilt": 0.52,
+            "partialOddEven": 0,
+            "partialMaterial": 0.82,
+            "spectralStretchCents": 0,
+            "envelopeAttack": 0.008,
+            "envelopeDecay": 0.12,
+            "envelopeSustain": 0.28,
+            "envelopeRelease": 0.32,
+            "scaleMode": "12tone",
+            "scalePreset": "minor",
+            "customDegrees": null,
+            "rootNotes": [
+              0
+            ],
+            "registerCenter": -10,
+            "registerWidth": 4,
+            "intervalPeakedness": 3.8,
+            "intervalRange": 2,
+            "momentum": 0.24,
+            "rootPullStrength": 0.8,
+            "rootPullShape": 0.7,
+            "melodyPattern": "walk",
+            "arpStep": 2,
+            "arpOctaves": 1,
+            "tempo": 102,
+            "beatDivisions": 2,
+            "onBeatProb": 0.88,
+            "offBeatProb": 0.18,
+            "sameLengthProb": 0.72,
+            "restMotifStartRatio": 0.12,
+            "restOnMeterRatio": 0.04,
+            "restOffMeterRatio": 0.027999999999999997,
+            "gapProb": 0.16,
+            "gapMin": 0.12,
+            "gapMax": 0.25,
+            "phraseGap": 0.18,
+            "dynamicsLevel": 0.56,
+            "loudnessRange": 0.64,
+            "dynamicsPrecision": 0.52,
+            "dynamicsRange": 0.34,
+            "surpriseProb": 0.05,
+            "incorporationRate": 0.18,
+            "sequenceProb": 0.9,
+            "motifCount": 4,
+            "motifLengthBeats": 4,
+            "motifSurpriseProb": 0.9,
+            "surpriseAllowMultiple": false,
+            "surprisePitchEnabled": true,
+            "surpriseTuningEnabled": false,
+            "surpriseRhythmEnabled": false,
+            "surpriseFormantEnabled": false,
+            "surpriseDynamicsEnabled": false,
+            "surpriseRestEnabled": false,
+            "percLayers": [
+              {
+                "id": "wood-beat",
+                "role": "beat",
+                "vol": 0.44,
+                "sound": {
+                  "kind": "instrument",
+                  "name": "Wood Hit",
+                  "presetId": "factory-sub-hit-wood",
+                  "pitchHz": 180,
+                  "subnote": {
+                    "voiceMode": "fourier",
+                    "spectralProfile": "cello",
+                    "spectralMix": 0.82,
+                    "excitationType": "strike",
+                    "excitationPosition": 0.12,
+                    "excitationHardness": 0.58,
+                    "partialMaterial": 0.82,
+                    "envelopeAttack": 0.002,
+                    "envelopeDecay": 0.035,
+                    "envelopeSustain": 0.04,
+                    "envelopeRelease": 0.07,
+                    "attackNoiseLevel": 1.4
+                  }
+                },
+                "space": null
+              },
+              {
+                "id": "wood-down",
+                "role": "downbeat",
+                "vol": 0.54,
+                "sound": {
+                  "kind": "sample",
+                  "key": "wood"
+                },
+                "space": null,
+                "every": 4
+              }
+            ],
+            "reverbType": "studio",
+            "reverbWet": 0.04,
+            "reverbDecay": 0.7,
+            "reverbTone": 0.6,
+            "reverbPreDelay": 0.015,
+            "spaceDistance": 1.1,
+            "spaceAzimuth": 0
+          },
+          "captureParts": {
+            "notes": true,
+            "stave": true,
+            "space": true,
+            "clef": true,
+            "percussion": false
+          }
+        }
+      ],
+      "tracks": [
+        {
+          "id": "seedtrack-0",
+          "name": "Reed Floor",
+          "gain": 0.8,
+          "pan": 0,
+          "muted": false,
+          "regions": [
+            {
+              "id": "seedregion-0",
+              "paletteId": "seedpal-corridor-steps-0",
+              "startBeat": 0,
+              "lengthBeats": 64,
+              "seed": 701101
+            }
+          ]
+        },
+        {
+          "id": "seedtrack-1",
+          "name": "Brass Cellar",
+          "gain": 0.8,
+          "pan": 0,
+          "muted": false,
+          "regions": [
+            {
+              "id": "seedregion-1",
+              "paletteId": "seedpal-corridor-steps-1",
+              "startBeat": 8,
+              "lengthBeats": 56,
+              "seed": 701102
+            }
+          ]
+        },
+        {
+          "id": "seedtrack-2",
+          "name": "Wooden Pulse",
+          "gain": 0.8,
+          "pan": 0,
+          "muted": false,
+          "regions": [
+            {
+              "id": "seedregion-2",
+              "paletteId": "seedpal-corridor-steps-2",
+              "startBeat": 16,
+              "lengthBeats": 48,
+              "seed": 701103
+            }
+          ]
+        }
+      ],
+      "context": {
+        "tempo": 104,
+        "scaleMode": "12tone",
+        "scalePreset": "major",
+        "rootNotes": [
+          0
+        ]
+      }
+    }
+  },
+  {
+    "kind": "composition",
+    "name": "Slow Signal",
+    "section": "",
+    "description": "One patient patch, left to breathe.",
+    "tags": [
+      "seed",
+      "demo"
+    ],
+    "source_id": "seed:arrangement:Slow Signal",
+    "data": {
+      "format": "phase0-arrangement-1.0",
+      "name": "Slow Signal",
+      "lengthBeats": 32,
+      "palette": [
+        {
+          "id": "seedpal-slow-signal-0",
+          "name": "Tube Anchor",
+          "params": {
+            "voiceMode": "fourier",
+            "spectralProfile": "clarinet",
+            "spectralMix": 0.86,
+            "excitationType": "strike",
+            "excitationPosition": 0.16,
+            "excitationHardness": 0.32,
+            "partialTilt": -0.22,
+            "partialOddEven": 0.45,
+            "partialMaterial": 0.48,
+            "spectralStretchCents": 0,
+            "envelopeAttack": 0.008,
+            "envelopeDecay": 0.12,
+            "envelopeSustain": 0.28,
+            "envelopeRelease": 0.32,
+            "scaleMode": "12tone",
+            "scalePreset": "minor",
+            "customDegrees": null,
+            "rootNotes": [
+              0
+            ],
+            "registerCenter": -10,
+            "registerWidth": 4,
+            "intervalPeakedness": 3.8,
+            "intervalRange": 2,
+            "momentum": 0.24,
+            "rootPullStrength": 0.8,
+            "rootPullShape": 0.7,
+            "melodyPattern": "walk",
+            "arpStep": 2,
+            "arpOctaves": 1,
+            "tempo": 124,
+            "beatDivisions": 4,
+            "onBeatProb": 0.94,
+            "offBeatProb": 0.06,
+            "sameLengthProb": 0.88,
+            "restMotifStartRatio": 0.02,
+            "restOnMeterRatio": 0.02,
+            "restOffMeterRatio": 0.013999999999999999,
+            "gapProb": 0.05,
+            "gapMin": 0.12,
+            "gapMax": 0.25,
+            "phraseGap": 0.18,
+            "dynamicsLevel": 0.68,
+            "loudnessRange": 0.7,
+            "dynamicsPrecision": 0.54,
+            "dynamicsRange": 0.3,
+            "surpriseProb": 0,
+            "incorporationRate": 0,
+            "sequenceProb": 0.92,
+            "motifCount": 4,
+            "motifLengthBeats": 4,
+            "motifSurpriseProb": 0.94,
+            "surpriseAllowMultiple": false,
+            "surprisePitchEnabled": false,
+            "surpriseTuningEnabled": false,
+            "surpriseRhythmEnabled": false,
+            "surpriseFormantEnabled": false,
+            "surpriseDynamicsEnabled": false,
+            "surpriseRestEnabled": false,
+            "percLayers": [
+              {
+                "id": "min-click",
+                "role": "beat",
+                "vol": 0.3,
+                "sound": {
+                  "kind": "sample",
+                  "key": "click"
+                },
+                "space": null
+              }
+            ],
+            "reverbType": "studio",
+            "reverbWet": 0.12,
+            "reverbDecay": 0.8,
+            "reverbTone": 0.6,
+            "reverbPreDelay": 0.015,
+            "spaceDistance": 1.4,
+            "spaceAzimuth": -12
+          },
+          "captureParts": {
+            "notes": true,
+            "stave": true,
+            "space": true,
+            "clef": true,
+            "percussion": false
+          }
+        }
+      ],
+      "tracks": [
+        {
+          "id": "seedtrack-0",
+          "name": "Tube Anchor",
+          "gain": 0.8,
+          "pan": 0,
+          "muted": false,
+          "regions": [
+            {
+              "id": "seedregion-0",
+              "paletteId": "seedpal-slow-signal-0",
+              "startBeat": 0,
+              "lengthBeats": 32,
+              "seed": 701101
+            }
+          ]
+        }
+      ],
+      "context": {
+        "tempo": 66,
+        "scaleMode": "12tone",
+        "scalePreset": "major",
+        "rootNotes": [
+          0
+        ]
+      }
+    }
+  }
+]

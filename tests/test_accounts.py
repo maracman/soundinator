@@ -169,8 +169,12 @@ def test_locked_server_full_flow(tmp_path) -> None:
         # Pre-mint an invite through the same store the server uses.
         code = server.accounts.create_invite(note="test")["code"]
 
-        # 1. Locked: GET / redirects to /login.
+        # 1. Locked: the app shell stays public (the client shows the
+        # invite-only welcome screen); other pages still bounce to /login.
         status, _, resp = _req(opener, base, "GET", "/")
+        assert status == 200
+        (tmp_path / "web" / "static" / "other.html").write_text("x", encoding="utf-8")
+        status, _, resp = _req(opener, base, "GET", "/other.html")
         assert status == 302
         assert resp.headers["Location"] == "/login"
 

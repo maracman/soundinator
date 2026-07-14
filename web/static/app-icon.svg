@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Soundinator app icon (Marcus's artwork, 2026-07-15): the street organ
+       on the brand's amber tile so it reads on light and dark tabs alike. -->
+  <defs>
+    <style>
+      .icon-bg { fill: #FAFAFA; stroke: #1A1A1A; stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-art { fill: #E5E5E5; stroke: #1A1A1A; stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-detail { fill: none; stroke: #1A1A1A; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-fill { fill: #1A1A1A; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="#f5a623"/>
+
+  <!-- The art spans wider than the tile, so it's scaled to sit inside with
+       even margins (art bounds ≈ x 28–522, y 80–430 → centred at 0.75×). -->
+  <g transform="translate(49.75, 64.75) scale(0.75)">
+  <g transform="translate(18, 50)">
+    <!-- Player Roll -->
+    <rect x="180" y="30" width="160" height="60" rx="16" class="icon-bg" />
+    <line x1="200" y1="50" x2="320" y2="50" class="icon-detail" stroke-dasharray="12 16" />
+    <line x1="200" y1="70" x2="320" y2="70" class="icon-detail" stroke-dasharray="16 12" />
+
+    <!-- Cabinet -->
+    <rect x="150" y="90" width="220" height="240" rx="20" class="icon-art" />
+    <rect x="140" y="80" width="240" height="24" rx="8" class="icon-art" />
+
+    <!-- Pipes/Comb Window -->
+    <path d="M 190 300 L 190 160 A 35 35 0 0 1 260 160 L 260 300 Z" class="icon-bg" />
+    <rect x="200" y="170" width="14" height="110" rx="6" class="icon-detail" />
+    <rect x="220" y="150" width="14" height="130" rx="6" class="icon-detail" />
+    <rect x="240" y="190" width="14" height="90" rx="6" class="icon-detail" />
+
+    <!-- Crank Wheel -->
+    <circle cx="80" cy="220" r="70" class="icon-bg" />
+    <line x1="80" y1="150" x2="80" y2="290" class="icon-art" />
+    <line x1="10" y1="220" x2="150" y2="220" class="icon-art" />
+    <circle cx="80" cy="220" r="24" class="icon-art" />
+
+    <!-- Crank Handle -->
+    <rect x="70" y="90" width="20" height="130" rx="10" class="icon-fill" />
+    <circle cx="80" cy="90" r="24" class="icon-bg" />
+
+    <!-- Horn Base & Bell -->
+    <rect x="370" y="190" width="20" height="60" rx="6" class="icon-art" />
+    <path d="M 390 220 C 420 220, 440 100, 480 60 L 480 380 C 440 340, 420 220, 390 220 Z" class="icon-bg" />
+
+    <!-- Horn Details -->
+    <path d="M 405 220 C 430 220, 450 150, 470 130" class="icon-detail" />
+    <path d="M 405 220 C 430 220, 450 290, 470 310" class="icon-detail" />
+    <ellipse cx="480" cy="220" rx="24" ry="160" class="icon-bg" />
+    <ellipse cx="465" cy="220" rx="12" ry="130" class="icon-fill" />
+  </g>
+  </g>
+</svg>
