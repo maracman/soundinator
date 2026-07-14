@@ -1,6 +1,6 @@
 # Hostinger Deployment — invite-only, self-hosted profiles
 
-This runbook stands up Resona on Hostinger with **user accounts locked behind an
+This runbook stands up Soundinator on Hostinger with **user accounts locked behind an
 invite-code system**, all on one box. It complements the platform-agnostic
 [`DEPLOYMENT.md`](DEPLOYMENT.md); the account layer itself is documented in the
 code at [`src/synthesiser/web/accounts.py`](../src/synthesiser/web/accounts.py).
@@ -10,11 +10,17 @@ standard library** (no external database, no Supabase, no monthly service bill).
 Turn it on with one env var; leave it off and the server behaves exactly as it
 did before (open, anonymous research mode).
 
+> **Production status (2026-07-14):** this runbook has been executed —
+> Soundinator is live at [thesoundinator.com](https://thesoundinator.com)
+> (Hostinger KVM 1, fully locked: `RESONA_AUTH_REQUIRED=1`,
+> `RESONA_COOKIE_SECURE=1`; DNS at Hover). Ship updates with
+> `scripts/vps_update.sh` — see §9.
+
 ---
 
 ## 0. Which Hostinger plan — read this first
 
-**You need a Hostinger VPS.** Resona's backend is a long-running Python process,
+**You need a Hostinger VPS.** Soundinator's backend is a long-running Python process,
 and only the VPS tier can run that:
 
 | Hostinger tier | Runs the Python server? | Why |
@@ -134,7 +140,7 @@ Create `/etc/systemd/system/resona.service` (as root):
 
 ```ini
 [Unit]
-Description=Resona studio
+Description=Soundinator studio
 After=network.target
 
 [Service]

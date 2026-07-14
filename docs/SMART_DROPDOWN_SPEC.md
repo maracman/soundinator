@@ -2,7 +2,7 @@
 
 A small, framework-free component for choosing one value from a (possibly long,
 grouped) list. It is the standard control for **preset / patch / enum pickers**
-across Resona. Use it instead of a bare `<select>` whenever the option set is
+across Soundinator. Use it instead of a bare `<select>` whenever the option set is
 long enough to want a search box, benefits from group headers, or needs richer
 option rows (a name plus a secondary note).
 

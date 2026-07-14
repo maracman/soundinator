@@ -9,7 +9,7 @@ code needs to wire it up unchanged.
 
 A **hand-cranked street organ / music box contraption** with a **one-man-band
 percussion rig** standing beside it. It is the "try before you add" machine:
-each physical part of the machine is one of Resona's seven module sections,
+each physical part of the machine is one of Soundinator's seven module sections,
 and dropping a community module onto the machine lights up the part it powers.
 Whimsical, mechanical, slightly Victorian — think patent-drawing or tin-toy,
 not skeuomorphic photo-realism.

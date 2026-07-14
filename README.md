@@ -1,20 +1,18 @@
-# Resona
+# Soundinator
 
 **A probabilistic, physically-modelled music studio — for playing with, and researching, why music sounds good.**
 
-Resona generates music from probability distributions across several musical
-timescales, plays it through a physical-modelling synthesis engine, and lets you
-arrange it on a full producer timeline. It doubles as a research instrument:
-every sound is reproducible from a seed, and (only after a plain-language
-opt-in) what listeners explore and how they rate it can be logged for studying
-the aesthetics and mechanistic origins of music.
+Soundinator generates music from probability distributions across several
+musical timescales, plays it through a physical-modelling synthesis engine, and
+lets you arrange it on a full producer timeline. It doubles as a research
+instrument: every sound is reproducible from a seed, and (only after a
+plain-language opt-in) what listeners explore and how they rate it can be
+logged for studying the aesthetics and mechanistic origins of music.
 
-The name nods to *stochastic resonance* — structure emerging from a
-probabilistic process — which is exactly what the engine does: it turns weighted
-distributions (melody, rhythm, surprise, timbre) into resonant, physically
-modelled sound.
+**Live at [thesoundinator.com](https://thesoundinator.com)** — early access,
+invite-only while the first testing wave shakes it down.
 
-![Resona — the generative studio](docs/screenshots/01-studio.png)
+![Soundinator — the generative studio](docs/screenshots/01-studio.png)
 
 ---
 
