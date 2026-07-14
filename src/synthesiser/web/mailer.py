@@ -51,6 +51,9 @@ def _send_now(to: str, subject: str, text: str) -> bool:
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            # Resend's API is fronted by Cloudflare, which 403s (error 1010)
+            # the default "Python-urllib/x.y" agent. Identify as the app.
+            "User-Agent": "Soundinator/1.0 (+https://thesoundinator.com)",
         },
         method="POST",
     )
