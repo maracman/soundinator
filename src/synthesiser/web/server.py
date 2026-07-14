@@ -298,6 +298,9 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
             if parsed.path == "/api/auth/resend-verification":
                 self.handle_resend_verification()
                 return
+            if parsed.path == "/api/auth/change-password":
+                self.handle_change_password(payload)
+                return
             if parsed.path == "/api/auth/request-reset":
                 self.handle_request_reset(payload)
                 return
@@ -520,6 +523,32 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
         if store is not None:
             store.delete_session(self._session_token())
         self.send_json({"ok": True}, cookies=[self._clear_cookie_header()])
+
+    def handle_change_password(self, payload: dict[str, Any]) -> None:
+        """Logged-in password change: verify the current password, set the new
+        one, and re-issue this device's session (revoking all others)."""
+        user = self.current_user()
+        if not user:
+            self.send_error_json(HTTPStatus.UNAUTHORIZED, "authentication required")
+            return
+        store = self._accounts()
+        if not store.authenticate(user["email"], payload.get("current_password", "")):
+            self.send_error_json(HTTPStatus.UNAUTHORIZED, "current password is incorrect")
+            return
+        try:
+            # set_password revokes every session (including this one)...
+            store.set_password(user["id"], payload.get("new_password", ""))
+        except AccountError as exc:
+            self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
+            return
+        # ...so mint a fresh one to keep this device signed in; other devices
+        # are logged out, which is the point of a password change.
+        token = store.create_session(user["id"])
+        print(f"  Password changed for user #{user['id']}")
+        self.send_json(
+            {"ok": True},
+            cookies=[self._cookie_header(token, SESSION_TTL_DAYS * 86400)],
+        )
 
     # ── Email verification + password reset ─────────────────
 

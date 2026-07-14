@@ -360,3 +360,45 @@ def test_password_reset_flow_over_http(tmp_path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_change_password_flow_over_http(tmp_path) -> None:
+    _make_static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.open_signup = True
+    base = _serve(server)
+    alice, _ = _opener()
+    other, _ = _opener()
+    try:
+        _req(alice, base, "POST", "/api/auth/register",
+             {"email": "alice@x.com", "password": "oldpassword1"})
+        # A second device logs into the same account.
+        assert _req(other, base, "POST", "/api/auth/login",
+                    {"email": "alice@x.com", "password": "oldpassword1"})[0] == 200
+
+        # Wrong current password is rejected.
+        assert _req(alice, base, "POST", "/api/auth/change-password",
+                    {"current_password": "nope", "new_password": "newpassword1"})[0] == 401
+        # Too-short new password is rejected.
+        assert _req(alice, base, "POST", "/api/auth/change-password",
+                    {"current_password": "oldpassword1", "new_password": "short"})[0] == 400
+
+        # Correct change succeeds and keeps THIS device signed in.
+        assert _req(alice, base, "POST", "/api/auth/change-password",
+                    {"current_password": "oldpassword1", "new_password": "newpassword1"})[0] == 200
+        assert _req(alice, base, "GET", "/api/patches")[0] == 200
+        # The other device was logged out by the password change.
+        assert _req(other, base, "GET", "/api/patches")[0] == 401
+        # Old password no longer works; new one does.
+        assert _req(other, base, "POST", "/api/auth/login",
+                    {"email": "alice@x.com", "password": "oldpassword1"})[0] == 401
+        assert _req(other, base, "POST", "/api/auth/login",
+                    {"email": "alice@x.com", "password": "newpassword1"})[0] == 200
+
+        # Signed-out callers can't change a password.
+        anon, _ = _opener()
+        assert _req(anon, base, "POST", "/api/auth/change-password",
+                    {"current_password": "newpassword1", "new_password": "another1x"})[0] == 401
+    finally:
+        server.shutdown()
+        server.server_close()

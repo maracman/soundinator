@@ -11401,7 +11401,7 @@ function subnoteWorkspaceHTML(p) {
               <div class="td-side td-side-ears">
                 <div class="ears-head"><span class="ears-head-title">EARS</span><span class="ears-head-sum">what reaches each ear · <b>L</b> blue · <b>R</b> amber</span></div>
                 <div class="ears-slot">
-                  <canvas id="cvSpaceField" title="Top — WHEN IT ARRIVES: the direct hit then the room's tail (the inset zooms the sub-millisecond gap between your ears). Bottom — HOW IT'S COLOURED: each ear's frequency response from head shadow, pinna, air and proximity."></canvas>
+                  <canvas id="cvSpaceField" title="WHEN IT ARRIVES: the direct hit then the room's tail. BETWEEN YOUR EARS: the sub-millisecond gap between the ears. HOW IT'S COLOURED: each ear's frequency response from head shadow, pinna, air and proximity."></canvas>
                 </div>
               </div>` : `
               <div class="td-side${fourierDisabled}" data-sound-path="fourier" aria-disabled="${formantMode}">
@@ -15842,6 +15842,40 @@ function _stageGeom(w, h) {
   return { cx, cy, rMax };
 }
 
+// A map-style location pin whose TIP marks the exact point. The body rotates
+// about that tip, so a cluster of pins can fan out without moving where each
+// one actually points. Used to mark where percussion hits sit on the stage.
+function _drawPercPin(ctx, x, y, hue, label, rot = 0) {
+  const col = `hsl(${hue}, 72%, 62%)`;
+  const d = 19, r = 7.5;                         // tip→head distance, head radius
+  const theta = Math.acos(r / d);               // tangent half-angle from the tip
+  const a1 = Math.PI / 2 - theta, a2 = Math.PI / 2 + theta;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  // teardrop: tip at (0,0), round head centred at (0,-d)
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(Math.cos(a1) * r, -d + Math.sin(a1) * r);
+  ctx.arc(0, -d, r, a1, a2, true);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(13,16,21,0.92)";
+  ctx.shadowColor = col; ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 1.6; ctx.strokeStyle = col; ctx.stroke();
+  // a dot at the exact point the pin marks
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(0, 0, 1.6, 0, 2 * Math.PI); ctx.fill();
+  // label inside the head, kept upright even when the pin is fanned
+  ctx.translate(0, -d);
+  ctx.rotate(-rot);
+  ctx.font = "600 9px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(label, 0, 3);
+  ctx.restore();
+}
+
 function drawStageBig() {
   const cv = document.getElementById("cvStageBig");
   if (!cv) return;
@@ -15917,9 +15951,10 @@ function drawStageBig() {
       ctx.beginPath(); ctx.arc(x, y, 15, 0, 2 * Math.PI); ctx.stroke();
       ctx.restore();
     }
-    // "Highlight percussion": a warm glow + label on every percussion source,
-    // so you can see where the hits sit without being able to move them here.
-    if (_spShowPerc && (s.isPercGroup || s.kind === "percussion" || String(s.id).startsWith("perc"))) {
+    // "Highlight percussion" in focus mode: a warm glow + label on each
+    // percussion LAYER dot. In normal mode the aggregate dot is not ringed —
+    // per-layer location pins (below) mark where the hits actually sit.
+    if (_spShowPerc && s.percLayer) {
       ctx.save();
       ctx.strokeStyle = col;
       ctx.shadowColor = col; ctx.shadowBlur = 12;
@@ -15945,6 +15980,33 @@ function drawStageBig() {
     ctx.font = "10px ui-monospace, monospace";
     ctx.fillStyle = TXT;
     ctx.fillText(`${s.dist.toFixed(1)} m`, x, y + 24);
+  }
+
+  // "Highlight percussion" (normal mode): drop a location pin for every
+  // percussion layer where its hit sits in space — its own position, or the
+  // kit position it inherits. Coincident pins fan around their shared tip so a
+  // stack still reads as several sources rather than one ring. Placement is
+  // read-only here; hits are positioned from the note engine's percussion panel.
+  if (_spShowPerc && !_percSpaceMode && resolvePercEnabled(exploreParams)) {
+    const pp = exploreParams;
+    const layers = (Array.isArray(pp.percLayers) && pp.percLayers.length) ? pp.percLayers : ensurePercLayers(pp);
+    const pins = layers.map((l, i) => {
+      const rad = (clamp(l.space?.angle ?? percGroupAngle(pp), -180, 180) - 90) * Math.PI / 180;
+      const r = _spaceDistToR(clamp(l.space?.dist ?? percGroupDist(pp), SPACE_DMIN, SPACE_DMAX), rMax);
+      return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r, hue: percLayerHue(i), label: `P${i + 1}` };
+    });
+    const clusters = new Map();
+    for (const pin of pins) {
+      const key = `${Math.round(pin.x / 6)}:${Math.round(pin.y / 6)}`;
+      if (!clusters.has(key)) clusters.set(key, []);
+      clusters.get(key).push(pin);
+    }
+    for (const grp of clusters.values()) {
+      grp.forEach((pin, k) => {
+        const rot = grp.length > 1 ? (k - (grp.length - 1) / 2) * 20 * Math.PI / 180 : 0;
+        _drawPercPin(ctx, pin.x, pin.y, pin.hue, pin.label, rot);
+      });
+    }
   }
   ctx.textAlign = "left";
 }
@@ -16156,9 +16218,13 @@ function drawSpaceField() {
   ctx.font = "10px ui-monospace, monospace";
 
   // ── top panel: WHEN it arrives (direct hit + room tail) ──────────
-  // Two panels stacked vertically; each spans the full width of the column.
-  const PADX = 12, TOPY = 22, GAPY = 30, FOOTY = 40;
-  const panelH = Math.max(70, (h - TOPY - GAPY - FOOTY) / 2);
+  // Three bands stacked vertically, each in its OWN row so nothing overlaps:
+  // the arrival timeline, the sub-ms ITD gap "between your ears", then the
+  // per-ear colouring. (The ITD used to be an inset floating over this top
+  // panel, which crowded the arrival graph — owner 2026-07-15.)
+  const PADX = 12, TOPY = 22, GAPY = 26, FOOTY = 40;
+  const ITD_H = 58;                                   // the "between your ears" band
+  const panelH = Math.max(64, (h - TOPY - GAPY * 2 - ITD_H - FOOTY) / 2);
   const L = { x: PADX, y: TOPY, w: w - PADX * 2, h: panelH };
   ctx.fillStyle = TXT; ctx.textAlign = "left";
   ctx.fillText("WHEN IT ARRIVES", L.x, L.y - 6);
@@ -16223,27 +16289,25 @@ function drawSpaceField() {
   ctx.fillText(`direct ${(t0 * 1000).toFixed(1)}ms · ${distDb.toFixed(1)}dB`, xT(t0) + 6, L.y + 14);
   if (wet > 0.001) ctx.fillText(`room tail · ${decay.toFixed(1)}s`, xT(tail0 + decay * 0.12), base - wet * (L.h - 26) * 0.5);
 
-  // inset: the sub-millisecond gap between the ears (Woodworth ITD) — sized to
-  // the narrow panel, tucked into its bottom-right corner
-  const iw = Math.min(L.w - 10, 190), ih = Math.min(74, L.h - 20);
-  const I = { x: L.x + L.w - iw - 4, y: L.y + L.h - ih - 6, w: iw, h: ih };
+  // ── middle band: BETWEEN YOUR EARS (the sub-millisecond Woodworth ITD) ──
+  // Its own row now, full width, so it never sits on top of the arrival graph.
+  const I = { x: PADX, y: L.y + L.h + GAPY, w: w - PADX * 2, h: ITD_H };
+  ctx.fillStyle = TXT; ctx.textAlign = "left";
+  ctx.fillText("BETWEEN YOUR EARS", I.x, I.y - 6);
   ctx.fillStyle = "rgba(10,14,20,0.88)";
   ctx.fillRect(I.x, I.y, I.w, I.h);
   ctx.strokeStyle = "rgba(90,110,130,0.45)";
   ctx.strokeRect(I.x + 0.5, I.y + 0.5, I.w, I.h);
-  ctx.fillStyle = TXT;
-  ctx.fillText("between your ears", I.x + 8, I.y + 14);
   const itdMs = itd * 1000;
   const span = Math.max(0.9, Math.abs(itdMs) * 1.6); // ±span ms window
-  const xI = (ms) => I.x + I.w / 2 + (ms / span) * (I.w / 2 - 14);
-  const iBase = I.y + I.h - 18;
+  const xI = (ms) => I.x + I.w / 2 + (ms / span) * (I.w / 2 - 16);
+  const iBase = I.y + I.h - 16;
   // near ear at 0, far ear offset by |ITD|; heights show the level gap
-  const ampFor = (db) => clamp((db + 24) / 30, 0.12, 1) * (I.h - 44);
-  const ears = [
+  const ampFor = (db) => clamp((db + 24) / 30, 0.12, 1) * (I.h - 30);
+  for (const e of [
     { ms: Math.max(0, itdMs), col: COL_L, db: shadowL, lbl: "L" },
     { ms: Math.max(0, -itdMs), col: COL_R, db: shadowR, lbl: "R" },
-  ];
-  for (const e of ears) {
+  ]) {
     ctx.strokeStyle = e.col;
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(xI(e.ms), iBase); ctx.lineTo(xI(e.ms), iBase - ampFor(e.db)); ctx.stroke();
@@ -16253,13 +16317,14 @@ function drawSpaceField() {
     ctx.fillText(e.lbl, xI(e.ms), iBase - ampFor(e.db) - 5);
   }
   ctx.fillStyle = TXT;
+  ctx.textAlign = "center";
   ctx.fillText(
     Math.abs(itdMs) < 0.005 ? "dead centre — no gap"
       : `${itdMs > 0 ? "left" : "right"} ear ${Math.abs(itdMs).toFixed(2)}ms later`,
-    I.x + I.w / 2, I.y + I.h - 5);
+    I.x + I.w / 2, I.y + I.h - 4);
 
   // ── bottom panel: HOW it's coloured (per-ear frequency response) ───
-  const R = { x: PADX, y: L.y + L.h + GAPY, w: w - PADX * 2, h: panelH };
+  const R = { x: PADX, y: I.y + I.h + GAPY, w: w - PADX * 2, h: panelH };
   ctx.textAlign = "left";
   ctx.fillStyle = TXT;
   ctx.fillText("HOW IT'S COLOURED", R.x, R.y - 6);
@@ -19737,6 +19802,7 @@ function accountBarHTML() {
       <button data-acct="profile">☺ My profile</button>
       <button data-acct="patches">☁︎ My cloud patches</button>
       ${u.email_verified === false ? `<button data-acct="verify">✉ Verify email</button>` : ""}
+      <button data-acct="password">🔑 Change password</button>
       <button data-acct="feedback">⚑ Report a problem</button>
       <button data-acct="signout">Sign out</button>
     </div>
@@ -19762,6 +19828,7 @@ function initAccountUI() {
       case "patches": if (menu) menu.hidden = true; openCloudPatches(); break;
       case "feedback": if (menu) menu.hidden = true; showFeedbackDialog(); break;
       case "verify": if (menu) menu.hidden = true; resendVerification(); break;
+      case "password": if (menu) menu.hidden = true; showChangePasswordDialog(); break;
       case "signout": if (menu) menu.hidden = true; signOut(); break;
     }
   });
@@ -19803,6 +19870,63 @@ async function resendVerification() {
   } catch (err) {
     showAppDialog({ title: "Verify your email", message: err.message || "Could not send just now — try again in a minute.", confirmLabel: "OK" });
   }
+}
+
+// In-app password change for a signed-in user. Verifies the current password
+// server-side and re-issues this device's session; other devices are logged
+// out. (Forgotten passwords use the emailed reset flow at /login instead.)
+function showChangePasswordDialog() {
+  document.getElementById("changePwDialog")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "changePwDialog";
+  overlay.className = "app-dialog-overlay";
+  overlay.innerHTML = `<div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="cpwTitle">
+    <h2 id="cpwTitle">🔑 Change password</h2>
+    <p>Changing your password signs you out on every other device.</p>
+    <input class="app-dialog-input" id="cpwCurrent" type="password" autocomplete="current-password"
+      placeholder="Current password" aria-label="Current password"/>
+    <input class="app-dialog-input" id="cpwNew" type="password" autocomplete="new-password" minlength="8"
+      placeholder="New password (min 8 characters)" aria-label="New password" style="margin-top:8px"/>
+    <input class="app-dialog-input" id="cpwConfirm" type="password" autocomplete="new-password" minlength="8"
+      placeholder="Repeat new password" aria-label="Repeat new password" style="margin-top:8px"/>
+    <div class="app-dialog-actions">
+      <button class="btn btn-ghost" data-dialog-cancel>Cancel</button>
+      <button class="btn btn-primary" data-dialog-confirm>Update password</button>
+    </div>
+    <p class="fb-msg" id="cpwMsg" aria-live="polite" style="margin:10px 0 0;min-height:1.1em;font-size:.8rem;color:var(--text2)"></p>
+  </div>`;
+  document.body.appendChild(overlay);
+  const msg = overlay.querySelector("#cpwMsg");
+  const save = overlay.querySelector("[data-dialog-confirm]");
+  const close = () => overlay.remove();
+  overlay.querySelector("[data-dialog-cancel]").onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  overlay.onkeydown = (e) => { if (e.key === "Escape") close(); };
+  save.onclick = async () => {
+    const current = overlay.querySelector("#cpwCurrent").value;
+    const next = overlay.querySelector("#cpwNew").value;
+    const confirm = overlay.querySelector("#cpwConfirm").value;
+    if (!current || !next) { msg.textContent = "Fill in every field."; return; }
+    if (next.length < 8) { msg.textContent = "New password must be at least 8 characters."; return; }
+    if (next !== confirm) { msg.textContent = "The new passwords don't match."; return; }
+    save.disabled = true;
+    msg.textContent = "Saving…";
+    try {
+      const r = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_password: current, new_password: next }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      msg.textContent = "Password updated.";
+      setTimeout(close, 1000);
+    } catch (err) {
+      msg.textContent = err.message || "Could not update — try again.";
+      save.disabled = false;
+    }
+  };
+  overlay.querySelector("#cpwCurrent").focus();
 }
 
 // ── Report a problem ─────────────────────────────────────────────────────────
