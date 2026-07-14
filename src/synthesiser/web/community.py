@@ -30,6 +30,7 @@ from typing import Any, Iterator, Optional
 from urllib.parse import unquote
 from uuid import uuid4
 
+from synthesiser.web import mailer
 from synthesiser.web.accounts import AccountError
 
 # ── Tunables ────────────────────────────────────────────────────────────────
@@ -1029,6 +1030,18 @@ class CommunityRoutes:
             return True
 
         if path == "/api/community/share":
+            # Sharing is the one public-content action, so it demands a
+            # confirmed inbox — the anti-abuse anchor once invites loosen.
+            # Only enforced while email sending is configured: without a mail
+            # provider nobody could complete verification, and the invite gate
+            # is already doing the real access control.
+            if mailer.email_configured() and not user.get("email_verified", True):
+                self.send_error_json(  # type: ignore[attr-defined]
+                    HTTPStatus.FORBIDDEN,
+                    "please verify your email address first — check your inbox, "
+                    "or resend the link from the account menu",
+                )
+                return True
             item = store.share_item(
                 user["id"],
                 kind=str(payload.get("kind", "")),

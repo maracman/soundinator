@@ -6,12 +6,12 @@
 <title>Soundinator</title>
 <link rel="icon" type="image/svg+xml" href="/app-icon.svg"/>
 <link rel="apple-touch-icon" href="/app-icon.svg"/>
-<link rel="stylesheet" href="/styles.css?v=287"/>
+<link rel="stylesheet" href="/styles.css?v=289"/>
 </head>
 <body>
 <div id="app" role="main"></div>
 <script type="module">
-  import("/app.js?v=287").catch((err) => {
+  import("/app.js?v=289").catch((err) => {
     const app = document.getElementById("app");
     if (app) app.textContent = err && err.stack ? err.stack : String(err);
     console.error(err);

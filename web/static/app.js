@@ -1534,15 +1534,37 @@ function lockedOut() {
   return authState.authRequired && !authState.user;
 }
 
+// The early-access "stopper": a purpose-built, polished overlay (not the
+// generic app dialog) shown when a signed-out visitor tries to enter the
+// studio while the build is invite-locked.
 function showInviteGateDialog() {
-  showAppDialog({
-    title: "Early access",
-    message: "Sorry — Soundinator will eventually be free to try without an account, "
-      + "but at this early stage of development only testers with an invite code can "
-      + "use the app. If you have an invite code, create an account to get started.",
-    confirmLabel: "I have an invite code",
-    onConfirm: () => { location.href = "/login"; },
-  });
+  document.querySelector("#inviteGate")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "inviteGate";
+  overlay.className = "gate-overlay";
+  overlay.innerHTML = `
+    <div class="gate-card" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+      <div class="gate-glow" aria-hidden="true"></div>
+      <span class="gate-badge">Early access</span>
+      <img class="gate-icon" src="/app-icon.svg" alt=""/>
+      <h2 id="gateTitle">Invite-only preview</h2>
+      <p>Soundinator is still in early development. For now, only testers with an
+         invite code can step into the studio — it&rsquo;ll open up to everyone soon.</p>
+      <div class="gate-actions">
+        <button class="gate-primary" data-gate="login">I have an invite code</button>
+        <button class="gate-secondary" data-gate="close">Maybe later</button>
+      </div>
+      <p class="gate-foot">No code, or yours isn&rsquo;t working? Email
+        <b>marcus.b.anderson@gmail.com</b> and I&rsquo;ll sort you out.</p>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('[data-gate="login"]').onclick = () => { location.href = "/login"; };
+  overlay.querySelector('[data-gate="close"]').onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  overlay.onkeydown = (e) => { if (e.key === "Escape") close(); };
+  requestAnimationFrame(() => overlay.classList.add("in"));
+  overlay.querySelector('[data-gate="login"]').focus();
 }
 
 function route() {
@@ -3070,13 +3092,27 @@ function harmonicGuideChoices() {
   _hgChoices = new Map(out.map(c => [c.id, c]));
   return out;
 }
+// A readable name for the scale that seeds the guide. Prefer the label stored
+// when it was dropped; otherwise derive it from the tuning so older
+// arrangements (and double-click change points) still read sensibly.
+function _gsMarkerLabel(m) {
+  if (!m) return "";
+  if (m.label) return m.label;
+  if (m.scaleMode === "edo") return `${m.edoDivisions || 12}-EDO`;
+  const sig = JSON.stringify([...(m.degrees || [])].sort((a, b) => a - b));
+  for (const [, spec] of Object.entries(SCALE_PRESETS)) {
+    if (JSON.stringify([...spec.degrees].sort((a, b) => a - b)) === sig) return spec.label;
+  }
+  return "Custom scale";
+}
 function harmonicGuidePickerHTML() {
-  const current = _gsScaleAt(0);
+  const marker = globalScaleAt({ ...(arrangement.globalScale || {}), enabled: true }, 0);
+  const name = _gsMarkerLabel(marker);
   return `<div class="hg-picker">
-    <button class="hg-browser-route${producerBrowserTarget?.kind === "harmonic" ? " active" : ""}" data-browser-route-harmonic title="Choose scale and harmony from the Library">
-      ${notationIconHTML(["clef"], { compact: true })}<span>Choose from Browser</span>
-    </button>
-    <span class="hg-current">${esc(current?.label || `${_gsDivCount()} divisions`)}</span>
+    ${name
+      ? `<span class="hg-current" title="Drop a scale or scale-bearing patch onto this row to change it">${esc(name)}</span>`
+      : `<span class="hg-current hg-empty" title="Drag a scale or scale-bearing patch from the Library onto this row">Drop a scale here</span>`}
+    <span class="hg-divs">${_gsDivCount()} divisions</span>
   </div>`;
 }
 
@@ -3086,7 +3122,7 @@ function setHarmonicGuideFromParams(params, sourceLabel = "this module") {
   const gs = ensureGlobalScale();
   const hasExistingGuide = globalScaleActive() && (gs.markers || []).length > 0;
   if (hasExistingGuide && !confirm(`This Harmonic guide already has markers used by HG tracks. Loading ${sourceLabel}'s scale will overwrite the existing guide. Continue?`)) return false;
-  gs.markers = [{ atBeat: 0, scaleMode: choice.scaleMode, edoDivisions: choice.edoDivisions, degrees: [...choice.degrees], subScaleNotes: [...choice.subScaleNotes], rootNotes: [...choice.rootNotes] }];
+  gs.markers = [{ atBeat: 0, label: choice.label, scaleMode: choice.scaleMode, edoDivisions: choice.edoDivisions, degrees: [...choice.degrees], subScaleNotes: [...choice.subScaleNotes], rootNotes: [...choice.rootNotes] }];
   gs.enabled = true;
   _gsSelMarker = 0;
   saveArrangement("set Harmonic guide scale");
@@ -7278,13 +7314,8 @@ function renderProduce() {
 function wireGlobalScale(v) {
   const gsToggle = v.querySelector("#gsToggle");
   if (gsToggle) gsToggle.onclick = () => { _gsOpen = !_gsOpen; renderProduce(); };
-  const browserRoute = v.querySelector("[data-browser-route-harmonic]");
-  if (browserRoute) browserRoute.onclick = () => {
-    producerBrowserTarget = { kind: "harmonic", part: "clef" };
-    browserFilter = "all";
-    if (dawLayout) { dawLayout.leftOpen = true; saveDawLayout(); }
-    renderProduce();
-  };
+  // The scale is set by dropping a scale-bearing module/patch anywhere on this
+  // row (see harmonicGuideAtPoint) — no separate "choose from browser" button.
   // No enable checkbox — Harmonic guide is active whenever a track's HG is on.
   const hgSearch = v.querySelector("#hgScaleSearch");
   if (hgSearch) hgSearch.oninput = () => {
@@ -8213,6 +8244,37 @@ function wireProduce(v) {
 
 function renderLanding() {
   const withStudy = experimentsEnabled();
+  // Three balanced entry points (2026-07-14): a single card read as unfinished.
+  // Research build swaps the demo card for the study; the community card
+  // (create profile / log in) is always present — it's the way in when locked.
+  const exploreCard = `
+      <a class="landing-card" id="goExplore">
+        <span class="icon">&#x1F3B9;</span>
+        <h2>Explore Sounds</h2>
+        <p>Play freely with the synthesiser. Shape a note from scratch and discover what you like.</p>
+        <span class="badge">Open-ended</span>
+      </a>`;
+  const demoCard = `
+      <a class="landing-card" id="goDemo">
+        <span class="icon">&#x1F39B;&#xFE0F;</span>
+        <h2>Load a Demo</h2>
+        <p>Drop into a finished arrangement and hear what the studio can do, ready to remix.</p>
+        <span class="badge">~1 min</span>
+      </a>`;
+  const studyCard = `
+      <a class="landing-card" id="goStudy">
+        <span class="icon">&#x1F3AF;</span>
+        <h2>Take the Study</h2>
+        <p>Structured listening tasks that map your sound preferences. Your data helps design future experiments.</p>
+        <span class="badge">~10 minutes</span>
+      </a>`;
+  const communityCard = `
+      <a class="landing-card landing-card-featured" id="goJoin">
+        <span class="icon">&#x2604;&#xFE0F;</span>
+        <h2>Join the Community</h2>
+        <p>Create a profile to save patches to the cloud, share your sounds, and rate what others make.</p>
+        <span class="badge">${lockedOut() ? "Invite-only" : "Save &amp; share"}</span>
+      </a>`;
   const v = mount(`
     <div class="landing-header">
       <div class="landing-acct">${accountBarHTML()}</div>
@@ -8220,25 +8282,22 @@ function renderLanding() {
       <p>Design sounds, build patches, and share them with an invite-only community of sound makers.</p>
       ${lockedOut() ? `<p class="landing-lock">Early testing — an invite code is needed to enter the studio.</p>` : ""}
     </div>
-    <div class="landing-cards">
-      ${withStudy ? `
-      <a class="landing-card" id="goStudy">
-        <span class="icon">&#x1F3AF;</span>
-        <h2>Take the Study</h2>
-        <p>Structured listening tasks that map your sound preferences. Your data helps design future experiments.</p>
-        <span class="badge">~10 minutes</span>
-      </a>` : ""}
-      <a class="landing-card" id="goExplore">
-        <span class="icon">&#x1F3B9;</span>
-        <h2>Explore Sounds</h2>
-        <p>Play freely with the synthesiser. Discover what you like. Save and share your favourites.</p>
-        <span class="badge">Open-ended</span>
-      </a>
+    <div class="landing-cards landing-cards-3">
+      ${exploreCard}
+      ${withStudy ? studyCard : demoCard}
+      ${communityCard}
     </div>
   `);
+  v.querySelector("#goExplore").onclick = () => lockedOut() ? showInviteGateDialog() : navigate("explore");
   const study = v.querySelector("#goStudy");
   if (study) study.onclick = () => lockedOut() ? showInviteGateDialog() : navigate("study/consent");
-  v.querySelector("#goExplore").onclick = () => lockedOut() ? showInviteGateDialog() : navigate("explore");
+  const demo = v.querySelector("#goDemo");
+  if (demo) demo.onclick = () => {
+    if (lockedOut()) { showInviteGateDialog(); return; }
+    loadDemoArrangement();
+    navigate("produce");
+  };
+  v.querySelector("#goJoin").onclick = () => openAuthOverlay("signup");
 }
 
 // ─── Study: Consent ─────────────────────────────────────────
@@ -19677,6 +19736,7 @@ function accountBarHTML() {
       <div class="acct-who"><b>${esc(label)}</b><span>${esc(u.email)}</span></div>
       <button data-acct="profile">☺ My profile</button>
       <button data-acct="patches">☁︎ My cloud patches</button>
+      ${u.email_verified === false ? `<button data-acct="verify">✉ Verify email</button>` : ""}
       <button data-acct="feedback">⚑ Report a problem</button>
       <button data-acct="signout">Sign out</button>
     </div>
@@ -19701,10 +19761,48 @@ function initAccountUI() {
       case "profile": if (menu) menu.hidden = true; navigate("user/" + encodeURIComponent(authState.user?.handle || "")); break;
       case "patches": if (menu) menu.hidden = true; openCloudPatches(); break;
       case "feedback": if (menu) menu.hidden = true; showFeedbackDialog(); break;
+      case "verify": if (menu) menu.hidden = true; resendVerification(); break;
       case "signout": if (menu) menu.hidden = true; signOut(); break;
     }
   });
   refreshAuth();
+
+  // Arriving from an emailed verification link: the server redirected here
+  // with ?verified=… — acknowledge it once and clean the URL.
+  const verified = new URLSearchParams(location.search).get("verified");
+  if (verified) {
+    history.replaceState(null, "", location.pathname + location.hash);
+    showAppDialog({
+      title: verified === "1" ? "Email verified ✓" : "Link expired",
+      message: verified === "1"
+        ? "Thanks — your email address is confirmed. Sharing to the community is now unlocked."
+        : "That verification link has expired or was already used. Request a fresh one from the account menu (✉ Verify email).",
+      confirmLabel: "OK",
+    });
+  }
+}
+
+async function resendVerification() {
+  try {
+    const r = await fetch("/api/auth/resend-verification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    showAppDialog({
+      title: "Verify your email",
+      message: d.already_verified
+        ? "You're already verified — nothing to do."
+        : d.email_sent
+          ? `A fresh verification link is on its way to ${authState.user?.email || "your inbox"}. The link lasts 48 hours.`
+          : "Email sending isn't switched on for this server yet — ask Marcus to verify you manually.",
+      confirmLabel: "OK",
+    });
+  } catch (err) {
+    showAppDialog({ title: "Verify your email", message: err.message || "Could not send just now — try again in a minute.", confirmLabel: "OK" });
+  }
 }
 
 // ── Report a problem ─────────────────────────────────────────────────────────
@@ -19837,12 +19935,23 @@ function openAuthOverlay(mode = "signup", { reason = "", onDone = null } = {}) {
   };
   const render = (m) => {
     const signup = m === "signup";
+    // Same card design as the standalone /login page (auth unify 2026-07-14):
+    // amber-tiled mark, a tagline, login-first segmented tabs, uppercase field
+    // labels, one gold action. The `.auth-entry` class scopes this look so the
+    // shared save / profile / share modals (also `.auth-modal`) are untouched.
     overlay.innerHTML = `
-      <div class="cloud-modal auth-modal" role="dialog" aria-label="${signup ? "Create profile" : "Log in"}">
-        <header><h3>${appIconHTML("sm")} Soundinator</h3><button class="x" id="authClose" title="Close">×</button></header>
+      <div class="cloud-modal auth-modal auth-entry" role="dialog" aria-label="${signup ? "Create profile" : "Log in"}">
+        <button class="auth-x" id="authClose" title="Close" aria-label="Close">×</button>
+        <div class="auth-brand">
+          <img class="auth-brand-icon" src="/app-icon.svg" alt=""/>
+          <div class="auth-brand-text">
+            <h3>Soundinator</h3>
+            <p class="auth-sub">${signup ? "Create your studio profile" : "Sign in to your studio"}</p>
+          </div>
+        </div>
         <div class="auth-tabs" role="tablist">
-          <button class="${signup ? "active" : ""}" id="authTabSignup" role="tab">Create profile</button>
           <button class="${signup ? "" : "active"}" id="authTabLogin" role="tab">Log in</button>
+          <button class="${signup ? "active" : ""}" id="authTabSignup" role="tab">Create profile</button>
         </div>
         ${reason ? `<p class="auth-reason">${esc(reason)}</p>` : ""}
         <form id="authForm" class="auth-form">

@@ -123,7 +123,18 @@ p  { color: var(--text2); }
   display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
   max-width: 640px; margin: 0 auto;
 }
+/* Three balanced entry points read as a complete row rather than one lonely
+   card floating on the left. */
+.landing-cards-3 {
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 960px;
+}
+@media (max-width: 860px) { .landing-cards-3 { grid-template-columns: 1fr; max-width: 420px; } }
 @media (max-width: 580px) { .landing-cards { grid-template-columns: 1fr; } }
+
+/* The community card is the way in when locked — give it a quiet accent edge. */
+.landing-card-featured { border-color: rgba(245,166,35,0.35); }
+.landing-card-featured .badge { color: #000; background: var(--accent); border-color: var(--accent); }
 
 .landing-card {
   background: var(--surface);
@@ -10224,13 +10235,10 @@ body.explore-mode .view {
 
 .gs-chevron { display:flex; align-items:center; gap:5px; }
 .gs-chevron .saem-icon { background:transparent; }
-.hg-browser-route {
-  display:flex; align-items:center; gap:7px; min-height:32px; padding:2px 8px 2px 3px;
-  border:1px solid var(--border); border-radius:6px; background:var(--surface2);
-  color:var(--text2); cursor:pointer;
-}
-.hg-browser-route:hover,.hg-browser-route.active { border-color:#4b91cf; color:var(--text); background:rgba(41,88,133,.18); }
-.hg-current { color:var(--text3); font-size:.62rem; }
+.hg-current { color:var(--text); font-size:.78rem; font-weight:600; min-height:24px; display:flex; align-items:center; }
+.hg-current.hg-empty { color:var(--text3); font-weight:400; font-style:italic; }
+.hg-divs { color:var(--text3); font-size:.62rem; }
+.hg-divs::before { content:"·"; margin-right:6px; color:var(--text3); }
 
 .patch-save-wrap { position:relative; }
 .patch-save-toggle.dirty { box-shadow:0 0 0 1px rgba(75,145,207,.4); }
@@ -10387,6 +10395,37 @@ body.explore-mode .view {
   color: var(--text2); font-size:.82rem; cursor:pointer; }
 .top-save-btn { white-space:nowrap; }
 .auth-form textarea:focus { border-color: var(--accent); outline:none; }
+
+/* ─── Auth ENTRY card (create profile / log in) — shared design with the
+   standalone /login page. Scoped to .auth-entry so the save / profile /
+   share modals keep their plain header + title-case labels. ─── */
+.auth-entry { max-width: 400px; position: relative; padding-bottom: 4px; }
+.auth-entry .auth-x {
+  position: absolute; top: 12px; right: 14px; z-index: 2;
+  background: none; border: none; color: var(--text3);
+  font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 2px 7px; border-radius: 6px;
+}
+.auth-entry .auth-x:hover { color: var(--text); background: var(--surface2); }
+.auth-brand { display: flex; align-items: center; gap: 12px; padding: 24px 24px 2px; }
+.auth-brand-icon { width: 44px; height: 44px; border-radius: 11px; flex: none; box-shadow: 0 2px 10px rgba(0,0,0,0.35); }
+.auth-brand-text h3 {
+  margin: 0; font-family: var(--brand-font); font-size: 1.45rem; font-weight: 800;
+  letter-spacing: 0.01em; color: var(--text); line-height: 1.1;
+}
+.auth-sub { margin: 2px 0 0; color: var(--text3); font-size: 0.82rem; }
+.auth-entry .auth-tabs { margin: 20px 24px 0; padding: 4px; }
+.auth-entry .auth-tabs button { padding: 9px 0; font-size: 0.85rem; }
+.auth-entry .auth-tabs button.active { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03); }
+.auth-entry .auth-reason { margin: 14px 24px 0; }
+.auth-entry .auth-form { padding: 20px 24px 24px; gap: 14px; }
+.auth-entry .auth-form > label {
+  text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.66rem;
+  font-weight: 700; color: var(--text3); gap: 7px;
+}
+.auth-entry .auth-form > label .auth-hint { text-transform: none; letter-spacing: normal; font-weight: 400; }
+.auth-entry .auth-form input { padding: 11px 12px; font-size: 0.92rem; background: var(--bg); }
+.auth-entry .auth-form > .auth-hint { margin-top: -4px; }
+.auth-entry .auth-form button.primary { margin-top: 8px; padding: 12px; font-size: 0.95rem; }
 
 /* ─── Community: context menu, stars, browser tier ─── */
 .ctx-menu { position:fixed; z-index:5200; min-width:190px; margin:0; padding:5px; list-style:none;
@@ -11010,3 +11049,68 @@ body.explore-mode .view {
   .tb-producer #shareCompBtn .tb-label { display: none; }
   .tb-producer #shareCompBtn { padding: 0 10px; }
 }
+
+/* ═══ Early-access invite gate ("preview stopper") ═══════════════════════════
+   A purpose-built overlay shown when a signed-out visitor tries to enter the
+   studio in an invite-locked build. Warm, centred, and unmistakably on-brand. */
+.gate-overlay {
+  position: fixed; inset: 0; z-index: 5200;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: radial-gradient(900px 500px at 50% -5%, rgba(245,166,35,0.10), rgba(6,8,12,0.72));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity 0.28s ease;
+}
+.gate-overlay.in { opacity: 1; }
+.gate-card {
+  position: relative; overflow: hidden;
+  width: 100%; max-width: 430px; padding: 34px 32px 26px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
+  border: 1px solid var(--border2); border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04);
+  transform: translateY(10px) scale(0.985); transition: transform 0.28s cubic-bezier(0.2,0.7,0.2,1);
+}
+.gate-overlay.in .gate-card { transform: none; }
+/* A soft amber wash behind the icon. */
+.gate-glow {
+  position: absolute; top: -70px; left: 50%; width: 260px; height: 200px;
+  transform: translateX(-50%); pointer-events: none;
+  background: radial-gradient(closest-side, rgba(245,166,35,0.28), transparent 70%);
+  filter: blur(6px);
+}
+.gate-badge {
+  position: relative; display: inline-block; margin-bottom: 18px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--accent2);
+  background: rgba(245,166,35,0.10); border: 1px solid rgba(245,166,35,0.34);
+}
+.gate-icon {
+  position: relative; display: block; width: 60px; height: 60px; margin: 0 auto 18px;
+  border-radius: 15px; box-shadow: 0 8px 26px rgba(245,166,35,0.28);
+}
+.gate-card h2 {
+  position: relative; margin: 0 0 10px;
+  font-family: var(--brand-font); font-size: 1.5rem; font-weight: 800; letter-spacing: 0.01em;
+  color: var(--text);
+}
+.gate-card > p {
+  position: relative; margin: 0 auto; max-width: 34ch;
+  color: var(--text2); font-size: 0.92rem; line-height: 1.6;
+}
+.gate-actions { position: relative; display: flex; flex-direction: column; gap: 9px; margin: 24px 0 4px; }
+.gate-primary {
+  padding: 12px 16px; border: 1px solid var(--accent); border-radius: 9px;
+  background: linear-gradient(180deg, var(--accent2), var(--accent));
+  color: #1a1204; font-family: inherit; font-size: 0.95rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(245,166,35,0.26); transition: filter 0.15s ease, transform 0.05s ease;
+}
+.gate-primary:hover { filter: brightness(1.06); }
+.gate-primary:active { transform: translateY(1px); }
+.gate-secondary {
+  padding: 9px; border: none; background: none; border-radius: 8px;
+  color: var(--text3); font-family: inherit; font-size: 0.86rem; font-weight: 500; cursor: pointer;
+}
+.gate-secondary:hover { color: var(--text2); }
+.gate-foot { position: relative; margin: 16px 0 0; font-size: 0.74rem; color: var(--text3); line-height: 1.5; }
+.gate-foot b { color: var(--text2); font-weight: 600; }

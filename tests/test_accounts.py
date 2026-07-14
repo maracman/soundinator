@@ -247,3 +247,116 @@ def test_open_server_preserves_anonymous_access(tmp_path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ── Email verification + password reset ──────────────────────────────────────
+
+def test_email_token_roundtrip_and_single_use(tmp_path) -> None:
+    store = AccountStore(tmp_path / "accounts.db")
+    user = store.register("v@x.com", "password1", invite_code=None, require_invite=False)
+    assert user["email_verified"] is False
+
+    token = store.create_email_token(user["id"], "verify")
+    # Wrong kind, wrong token: no redemption.
+    assert store.consume_email_token(token, "reset") is None
+    assert store.consume_email_token("nonsense", "verify") is None
+    # Right token redeems exactly once.
+    assert store.consume_email_token(token, "verify") == user["id"]
+    assert store.consume_email_token(token, "verify") is None
+
+    store.mark_email_verified(user["id"])
+    assert store.get_user(user["id"])["email_verified"] is True
+
+    # Re-requesting a token invalidates the previous one.
+    first = store.create_email_token(user["id"], "reset")
+    second = store.create_email_token(user["id"], "reset")
+    assert store.consume_email_token(first, "reset") is None
+    assert store.consume_email_token(second, "reset") == user["id"]
+
+
+def test_cli_created_accounts_are_preverified(tmp_path) -> None:
+    store = AccountStore(tmp_path / "accounts.db")
+    user = store.register(
+        "owner@x.com", "password1", invite_code=None, require_invite=False, mark_verified=True
+    )
+    assert user["email_verified"] is True
+
+
+def test_verify_link_flow_over_http(tmp_path) -> None:
+    _make_static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.open_signup = True
+    base = _serve(server)
+    opener, _ = _opener()
+    try:
+        status, raw, _ = _req(opener, base, "POST", "/api/auth/register",
+                              {"email": "new@x.com", "password": "password1"})
+        assert status == 201
+        user = json.loads(raw)["user"]
+        assert user["email_verified"] is False
+        me = json.loads(_req(opener, base, "GET", "/api/auth/me")[1])
+        assert me["user"]["email_verified"] is False
+
+        # Expired/garbage token bounces without verifying.
+        status, _, resp = _req(opener, base, "GET", "/verify?token=garbage")
+        assert status == 302 and resp.headers["Location"] == "/?verified=expired"
+
+        # A real token (as the emailed link would carry) verifies the account.
+        token = server.accounts.create_email_token(user["id"], "verify")
+        status, _, resp = _req(opener, base, "GET", f"/verify?token={token}")
+        assert status == 302 and resp.headers["Location"] == "/?verified=1"
+        me = json.loads(_req(opener, base, "GET", "/api/auth/me")[1])
+        assert me["user"]["email_verified"] is True
+
+        # Resend endpoint acknowledges the already-verified state.
+        status, raw, _ = _req(opener, base, "POST", "/api/auth/resend-verification", {})
+        assert status == 200 and json.loads(raw).get("already_verified") is True
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_password_reset_flow_over_http(tmp_path) -> None:
+    _make_static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.open_signup = True
+    base = _serve(server)
+    opener, _ = _opener()
+    try:
+        _req(opener, base, "POST", "/api/auth/register",
+             {"email": "resetme@x.com", "password": "oldpassword1"})
+
+        # Unknown addresses get the same 200 as known ones (no enumeration).
+        assert _req(opener, base, "POST", "/api/auth/request-reset",
+                    {"email": "nobody@x.com"})[0] == 200
+        assert _req(opener, base, "POST", "/api/auth/request-reset",
+                    {"email": "resetme@x.com"})[0] == 200
+
+        user = server.accounts.user_by_email("resetme@x.com")
+        token = server.accounts.create_email_token(user["id"], "reset")
+
+        # A too-short password is rejected BEFORE the token is consumed, so
+        # the emailed link survives the typo and the retry succeeds.
+        status, raw, _ = _req(opener, base, "POST", "/api/auth/reset",
+                              {"token": token, "password": "short"})
+        assert status == 400
+        status, raw, _ = _req(opener, base, "POST", "/api/auth/reset",
+                              {"token": token, "password": "newpassword1"})
+        assert status == 200
+
+        # The old session died with the reset; the old password no longer works.
+        assert _req(opener, base, "GET", "/api/patches")[0] == 401
+        assert _req(opener, base, "POST", "/api/auth/login",
+                    {"email": "resetme@x.com", "password": "oldpassword1"})[0] == 401
+        status, raw, _ = _req(opener, base, "POST", "/api/auth/login",
+                              {"email": "resetme@x.com", "password": "newpassword1"})
+        assert status == 200
+        # Completing a reset proves inbox ownership → verified.
+        assert json.loads(raw)["user"]["email_verified"] is True
+
+        # A consumed reset token can't be replayed.
+        assert _req(opener, base, "POST", "/api/auth/reset",
+                    {"token": token, "password": "anotherpass1"})[0] == 400
+    finally:
+        server.shutdown()
+        server.server_close()

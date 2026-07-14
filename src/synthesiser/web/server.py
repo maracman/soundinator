@@ -38,6 +38,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from uuid import uuid4
 
 from synthesiser.web.accounts import (
+    MIN_PASSWORD_LENGTH,
     SESSION_TTL_DAYS,
     AccountError,
     AccountStore,
@@ -47,6 +48,7 @@ from synthesiser.web.community import (
     CommunityRoutes,
     CommunityStore,
 )
+from synthesiser.web import mailer
 from synthesiser.web.phase0 import (
     PHASE0_SCHEMA_VERSION,
     SYNTH_VERSION_HASH,
@@ -169,6 +171,23 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
             self.serve_file(self.roots["static"] / "login.html")
             return
 
+        if path == "/reset":
+            self.serve_file(self.roots["static"] / "reset.html")
+            return
+
+        # Email-verification landing: consume the token, bounce to the app.
+        if path == "/verify":
+            token = (parse_qs(parsed.query).get("token") or [""])[0]
+            store = self._accounts()
+            user_id = store.consume_email_token(token, "verify")
+            if user_id is None:
+                self.redirect("/?verified=expired")
+                return
+            store.mark_email_verified(user_id)
+            print(f"  Email verified for user #{user_id}")
+            self.redirect("/?verified=1")
+            return
+
         if path == "/api/auth/me":
             self.send_json({
                 "user": self.current_user(),
@@ -275,6 +294,15 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/auth/logout":
                 self.handle_logout()
+                return
+            if parsed.path == "/api/auth/resend-verification":
+                self.handle_resend_verification()
+                return
+            if parsed.path == "/api/auth/request-reset":
+                self.handle_request_reset(payload)
+                return
+            if parsed.path == "/api/auth/reset":
+                self.handle_password_reset(payload)
                 return
 
             # ── Access gate for every other POST endpoint ──
@@ -430,6 +458,7 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
         except AccountError as exc:
             self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
             return
+        self._send_verification_email(user)
         token = store.create_session(user["id"])
         self.send_json(
             {"ok": True, "user": user},
@@ -491,6 +520,87 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
         if store is not None:
             store.delete_session(self._session_token())
         self.send_json({"ok": True}, cookies=[self._clear_cookie_header()])
+
+    # ── Email verification + password reset ─────────────────
+
+    def _send_verification_email(self, user: dict[str, Any]) -> None:
+        """Mail a fresh verify link; log it instead when email isn't set up."""
+        token = self._accounts().create_email_token(user["id"], "verify")
+        link = f"{mailer.public_url()}/verify?token={token}"
+        sent = mailer.send_email(
+            user["email"],
+            "Confirm your Soundinator email",
+            f"Hi {user['handle']},\n\n"
+            "Click the link below to confirm this email address for your "
+            "Soundinator account:\n\n"
+            f"  {link}\n\n"
+            "The link is valid for 48 hours. If you didn't create this "
+            "account, you can ignore this email.\n",
+        )
+        if not sent:
+            print(f"  Email not configured — verification link for {user['email']}: {link}")
+
+    def handle_resend_verification(self) -> None:
+        user = self.current_user()
+        if not user:
+            self.send_error_json(HTTPStatus.UNAUTHORIZED, "authentication required")
+            return
+        if user.get("email_verified"):
+            self.send_json({"ok": True, "already_verified": True})
+            return
+        self._send_verification_email(user)
+        self.send_json({"ok": True, "email_sent": mailer.email_configured()})
+
+    def handle_request_reset(self, payload: dict[str, Any]) -> None:
+        """Start a password reset. Responds identically whether or not the
+        address has an account, so the endpoint can't enumerate users."""
+        store = self._accounts()
+        user = store.user_by_email(str(payload.get("email", "")))
+        if user is not None:
+            token = store.create_email_token(user["id"], "reset")
+            link = f"{mailer.public_url()}/reset?token={token}"
+            sent = mailer.send_email(
+                user["email"],
+                "Reset your Soundinator password",
+                f"Hi {user['handle']},\n\n"
+                "Someone (hopefully you) asked to reset the password for this "
+                "Soundinator account. Set a new one here:\n\n"
+                f"  {link}\n\n"
+                "The link is valid for 2 hours and works once. If this wasn't "
+                "you, ignore this email — your password is unchanged.\n",
+            )
+            if not sent:
+                print(f"  Email not configured — reset link for {user['email']}: {link}")
+        self.send_json({"ok": True})
+
+    def handle_password_reset(self, payload: dict[str, Any]) -> None:
+        store = self._accounts()
+        # Validate the new password BEFORE consuming the single-use token, so
+        # a typo doesn't burn the emailed link.
+        password = payload.get("password", "")
+        if not isinstance(password, str) or len(password) < MIN_PASSWORD_LENGTH:
+            self.send_error_json(
+                HTTPStatus.BAD_REQUEST,
+                f"password must be at least {MIN_PASSWORD_LENGTH} characters",
+            )
+            return
+        user_id = store.consume_email_token(
+            truncate_text(payload.get("token"), 120), "reset"
+        )
+        if user_id is None:
+            self.send_error_json(
+                HTTPStatus.BAD_REQUEST, "this reset link has expired or was already used"
+            )
+            return
+        try:
+            store.set_password(user_id, password)
+        except AccountError as exc:
+            self.send_error_json(HTTPStatus.BAD_REQUEST, str(exc))
+            return
+        # Completing a reset proves control of the inbox on file.
+        store.mark_email_verified(user_id)
+        print(f"  Password reset completed for user #{user_id}")
+        self.send_json({"ok": True})
 
     def handle_patches_list(self) -> None:
         store = self._accounts()

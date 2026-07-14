@@ -6,81 +6,97 @@
 <title>Soundinator — Sign in</title>
 <link rel="icon" type="image/svg+xml" href="/app-icon.svg"/>
 <style>
+  /* This standalone gate mirrors the in-app auth overlay (.auth-entry in
+     styles.css) exactly, so the two never diverge visually. Kept self-
+     contained (no styles.css dependency) so the gate loads instantly even if
+     the app bundle fails. */
   :root{
     --bg:#16181d; --surface:#1c1f25; --surface2:#24272e; --border:#2b2f37;
     --border2:#363b45; --text:#e8eaee; --text2:#9aa0ab; --text3:#5d636e;
     --accent:#f5a623; --accent2:#ffc768; --red:#ef4444; --green:#22c55e;
-    --radius:10px; --radius-sm:6px;
+    --radius:14px; --radius-sm:8px;
     --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+    --brand-font:ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN","Quicksand","Comfortaa",var(--font);
   }
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(1200px 600px at 50% -10%,#20242c,var(--bg));
     color:var(--text);font-family:var(--font);padding:24px}
-  .card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);
-    border-radius:var(--radius);padding:28px 26px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
-  /* Rounded type to match the icon's fat round line-caps. */
-  .brand{font-family:ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN","Quicksand","Comfortaa",var(--font);
-    font-size:1.5rem;font-weight:800;letter-spacing:.02em;margin:0 0 2px}
-  .tagline{color:var(--text3);font-size:.82rem;margin:0 0 22px}
-  .tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--border);
-    border-radius:var(--radius-sm);padding:4px;margin-bottom:20px}
-  .tab{flex:1;text-align:center;padding:8px 0;font-size:.85rem;font-weight:600;
-    color:var(--text2);border-radius:5px;cursor:pointer;user-select:none;border:none;background:none}
-  .tab.active{background:var(--surface2);color:var(--text)}
-  label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;
-    color:var(--text3);margin:14px 0 5px}
-  input{width:100%;padding:10px 12px;background:var(--bg);color:var(--text);
-    border:1px solid var(--border2);border-radius:var(--radius-sm);font-family:inherit;font-size:.92rem}
+
+  .card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border2);
+    border-radius:var(--radius);box-shadow:0 24px 70px rgba(0,0,0,.55);overflow:hidden}
+
+  /* Brand: amber-tiled mark + wordmark + tagline (matches .auth-brand). */
+  .auth-brand{display:flex;align-items:center;gap:12px;padding:24px 24px 2px}
+  .auth-brand-icon{width:44px;height:44px;border-radius:11px;flex:none;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .auth-brand-text h1{margin:0;font-family:var(--brand-font);font-size:1.45rem;font-weight:800;
+    letter-spacing:.01em;color:var(--text);line-height:1.1}
+  .auth-sub{margin:2px 0 0;color:var(--text3);font-size:.82rem}
+
+  /* Segmented tabs (matches .auth-tabs). */
+  .tabs{display:flex;gap:4px;margin:20px 24px 0;padding:4px;background:#0d0f13;
+    border:1px solid var(--border);border-radius:var(--radius-sm)}
+  .tab{flex:1;text-align:center;padding:9px 0;font-size:.85rem;font-weight:600;
+    color:var(--text3);border-radius:5px;cursor:pointer;user-select:none;border:none;background:none;
+    font-family:inherit}
+  .tab.active{background:var(--surface2);color:var(--text);box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+  .tab:hover:not(.active){color:var(--text)}
+
+  form{display:flex;flex-direction:column;gap:14px;padding:20px 24px 24px}
+  label{display:flex;flex-direction:column;gap:7px;text-transform:uppercase;letter-spacing:.07em;
+    font-size:.66rem;font-weight:700;color:var(--text3)}
+  label .sub{text-transform:none;letter-spacing:normal;font-weight:400;color:var(--text3)}
+  input{width:100%;padding:11px 12px;background:var(--bg);color:var(--text);
+    border:1px solid var(--border2);border-radius:7px;font-family:inherit;font-size:.92rem}
   input:focus{outline:none;border-color:var(--accent)}
-  .btn{width:100%;margin-top:20px;padding:11px;border:none;border-radius:var(--radius-sm);
-    background:var(--accent);color:#000;font-family:inherit;font-weight:700;font-size:.92rem;cursor:pointer}
-  .btn:hover:not(:disabled){background:var(--accent2)}
+  .btn{margin-top:8px;padding:12px;border:1px solid var(--accent);border-radius:7px;
+    background:var(--accent);color:#000;font-family:inherit;font-weight:700;font-size:.95rem;cursor:pointer}
+  .btn:hover:not(:disabled){filter:brightness(1.08)}
   .btn:disabled{opacity:.55;cursor:default}
-  .msg{margin-top:14px;font-size:.82rem;min-height:1.1em}
+  .msg{font-size:.82rem;min-height:1.1em;margin-top:-4px}
   .msg.error{color:var(--red)}
   .msg.ok{color:var(--green)}
-  .hint{margin-top:16px;font-size:.72rem;color:var(--text3);line-height:1.5}
+  .hint{margin:-4px 0 0;font-size:.72rem;color:var(--text3);line-height:1.55}
+  .hint b{color:var(--text2)}
   .hidden{display:none}
-  .brand-row{display:flex;align-items:center;gap:10px;margin-bottom:2px}
-  .brand-icon{width:36px;height:36px;border-radius:10px;flex-shrink:0}
 </style>
 </head>
 <body>
 <div class="card">
-  <div class="brand-row">
-    <img class="brand-icon" src="/app-icon.svg" alt="Soundinator"/>
-    <h1 class="brand">Soundinator</h1>
+  <div class="auth-brand">
+    <img class="auth-brand-icon" src="/app-icon.svg" alt=""/>
+    <div class="auth-brand-text">
+      <h1>Soundinator</h1>
+      <p class="auth-sub" id="sub">Sign in to your studio</p>
+    </div>
   </div>
-  <p class="tagline">Sign in to your studio</p>
 
   <div class="tabs" role="tablist">
-    <button class="tab active" id="tabLogin" role="tab">Sign in</button>
-    <button class="tab" id="tabRegister" role="tab">Create account</button>
+    <button class="tab active" id="tabLogin" role="tab">Log in</button>
+    <button class="tab" id="tabRegister" role="tab">Create profile</button>
   </div>
 
   <form id="form" autocomplete="on">
-    <div id="handleRow" class="hidden">
-      <label for="handle">Display name <span style="text-transform:none;color:var(--text3)">(optional)</span></label>
+    <label for="email">Email
+      <input id="email" name="email" type="email" autocomplete="email" required/>
+    </label>
+
+    <label for="password" id="passwordRow">Password
+      <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8"/>
+    </label>
+
+    <label for="handle" id="handleRow" class="hidden">Handle <span class="sub">(optional — how others find you)</span>
       <input id="handle" name="handle" type="text" autocomplete="nickname" maxlength="40"/>
-    </div>
+    </label>
 
-    <label for="email">Email</label>
-    <input id="email" name="email" type="email" autocomplete="email" required/>
-
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8"/>
-
-    <div id="inviteRow" class="hidden">
-      <label for="invite">Invite code</label>
+    <label for="invite" id="inviteRow" class="hidden">Invite code
       <input id="invite" name="invite" type="text" autocomplete="off"/>
-    </div>
+    </label>
 
-    <button class="btn" id="submit" type="submit">Sign in</button>
+    <button class="btn" id="submit" type="submit">Log in</button>
     <div class="msg" id="msg"></div>
+    <p class="hint" id="hint"></p>
   </form>
-
-  <p class="hint" id="hint"></p>
 </div>
 
 <script>
@@ -93,17 +109,27 @@
   function setMode(m) {
     mode = m;
     const reg = m === "register";
+    const forgot = m === "forgot";
     $("tabLogin").classList.toggle("active", !reg);
     $("tabRegister").classList.toggle("active", reg);
     $("handleRow").classList.toggle("hidden", !reg);
     $("inviteRow").classList.toggle("hidden", !reg || openSignup);
+    $("passwordRow").classList.toggle("hidden", forgot);
+    $("password").required = !forgot;
     $("invite").required = reg && !openSignup;
     $("password").autocomplete = reg ? "new-password" : "current-password";
-    $("submit").textContent = reg ? "Create account" : "Sign in";
+    $("submit").textContent = reg ? "Create profile" : forgot ? "Email me a reset link" : "Log in";
+    $("sub").textContent = reg ? "Create your studio profile"
+      : forgot ? "Reset your password" : "Sign in to your studio";
     const pwNote = "Your password is never stored or visible to anyone — not even us. It's protected with the same industry-standard hashing used by major web frameworks.";
-    $("hint").textContent = reg
-      ? (openSignup ? pwNote : "Registration is invite-only. No invite code, or yours isn't working? Email marcus.b.anderson@gmail.com and I'll sort you out. " + pwNote)
-      : "";
+    $("hint").innerHTML = reg
+      ? (openSignup ? pwNote : "Registration is invite-only. No invite code, or yours isn't working? Email <b>marcus.b.anderson@gmail.com</b> and I'll sort you out. " + pwNote)
+      : forgot ? 'Enter the account email and we\'ll send a single-use reset link. <a href="#" id="backLink">Back to sign in</a>'
+      : '<a href="#" id="forgotLink">Forgot password?</a>';
+    const forgotLink = $("forgotLink");
+    if (forgotLink) forgotLink.onclick = (e) => { e.preventDefault(); setMode("forgot"); };
+    const backLink = $("backLink");
+    if (backLink) backLink.onclick = (e) => { e.preventDefault(); setMode("login"); };
     setMsg("");
   }
   function setMsg(text, kind) {
@@ -126,7 +152,22 @@
     e.preventDefault();
     const submit = $("submit");
     submit.disabled = true;
-    setMsg(mode === "register" ? "Creating account…" : "Signing in…");
+    if (mode === "forgot") {
+      setMsg("Sending…");
+      try {
+        await fetch("/api/auth/request-reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: $("email").value.trim() }),
+        });
+        setMsg("If that address has an account, a reset link is on its way.", "ok");
+      } catch {
+        setMsg("Couldn't reach the server — try again in a moment.", "error");
+      }
+      submit.disabled = false;
+      return;
+    }
+    setMsg(mode === "register" ? "Creating profile…" : "Signing in…");
     const body = { email: $("email").value.trim(), password: $("password").value };
     let path = "/api/auth/login";
     if (mode === "register") {

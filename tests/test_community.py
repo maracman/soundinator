@@ -447,3 +447,37 @@ def test_data_fetch_cap_maps_to_http_429(tmp_path, monkeypatch) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_share_requires_verified_email(tmp_path, monkeypatch) -> None:
+    # The verified-email gate only arms once a mail provider is configured —
+    # without one, nobody could complete verification.
+    from synthesiser.web import mailer
+    monkeypatch.setattr(mailer, "email_configured", lambda: True)
+
+    _make_static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.open_signup = True
+    base = _serve(server)
+    try:
+        maker, _ = _opener()
+        _req(maker, base, "POST", "/api/auth/register",
+             {"email": "unverified@x.com", "password": "password1"})
+
+        # Unverified: sharing is refused; everything else still works.
+        status, raw, _ = _req(maker, base, "POST", "/api/community/share",
+                              {"kind": "synth", "name": "Blocked", "section": "sound", "data": {}})
+        assert status == 403
+        assert "verify your email" in _json(raw)["error"]
+        assert _req(maker, base, "GET", "/api/community/browse")[0] == 200
+        assert _req(maker, base, "POST", "/api/patches",
+                    {"name": "private ok", "data": {}})[0] == 201
+
+        # Verified: the same share goes through.
+        user = server.accounts.user_by_email("unverified@x.com")
+        server.accounts.mark_email_verified(user["id"])
+        assert _req(maker, base, "POST", "/api/community/share",
+                    {"kind": "synth", "name": "Allowed", "section": "sound", "data": {}})[0] == 201
+    finally:
+        server.shutdown()
+        server.server_close()

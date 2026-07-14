@@ -43,6 +43,8 @@ PBKDF2_ITERATIONS = 600_000
 SESSION_TTL_DAYS = 30
 MAX_PATCHES_PER_USER = 500
 MIN_PASSWORD_LENGTH = 8
+VERIFY_TOKEN_TTL_HOURS = 48
+RESET_TOKEN_TTL_HOURS = 2
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _HANDLE_RE = re.compile(r"^[a-zA-Z0-9_.-]{2,40}$")
@@ -95,13 +97,14 @@ def default_db_path() -> Path:
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    handle        TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT NOT NULL,
-    is_admin      INTEGER NOT NULL DEFAULT 0,
-    invite_code   TEXT,
-    created_at    REAL NOT NULL
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    email          TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    handle         TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash  TEXT NOT NULL,
+    is_admin       INTEGER NOT NULL DEFAULT 0,
+    email_verified INTEGER NOT NULL DEFAULT 0,
+    invite_code    TEXT,
+    created_at     REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS invites (
@@ -122,6 +125,17 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at REAL NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Single-use, hashed email tokens: account verification and password reset.
+CREATE TABLE IF NOT EXISTS email_tokens (
+    token      TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    kind       TEXT NOT NULL CHECK (kind IN ('verify', 'reset')),
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_tokens(user_id);
 
 CREATE TABLE IF NOT EXISTS patches (
     id         TEXT PRIMARY KEY,
@@ -163,6 +177,16 @@ class AccountStore:
     def init_db(self) -> None:
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
+            # Migration: the email_verified flag arrived after launch. Accounts
+            # that predate it are grandfathered as verified — they were all
+            # created under the invite gate, and retroactively locking them out
+            # of sharing would punish the first testers.
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+            if "email_verified" not in columns:
+                conn.execute(
+                    "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0"
+                )
+                conn.execute("UPDATE users SET email_verified = 1")
 
     # ── Users ───────────────────────────────────────────────────────────────
 
@@ -170,11 +194,13 @@ class AccountStore:
     def _user_public(row: sqlite3.Row | None) -> Optional[dict[str, Any]]:
         if row is None:
             return None
+        keys = row.keys()
         return {
             "id": row["id"],
             "email": row["email"],
             "handle": row["handle"],
             "is_admin": bool(row["is_admin"]),
+            "email_verified": bool(row["email_verified"]) if "email_verified" in keys else True,
             "created_at": row["created_at"],
         }
 
@@ -200,6 +226,7 @@ class AccountStore:
         handle: str | None = None,
         require_invite: bool = True,
         is_admin: bool = False,
+        mark_verified: bool = False,
     ) -> dict[str, Any]:
         """Create a user, redeeming an invite atomically when required."""
         email = (email or "").strip().lower()
@@ -244,9 +271,11 @@ class AccountStore:
                 raise AccountError("that handle is already taken")
 
             cur = conn.execute(
-                "INSERT INTO users (email, handle, password_hash, is_admin, invite_code, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (email, resolved_handle, password_hash, int(is_admin), code, now),
+                "INSERT INTO users (email, handle, password_hash, is_admin,"
+                " email_verified, invite_code, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (email, resolved_handle, password_hash, int(is_admin),
+                 int(mark_verified), code, now),
             )
             row = conn.execute(
                 "SELECT * FROM users WHERE id = ?", (cur.lastrowid,)
@@ -349,6 +378,69 @@ class AccountStore:
         with self._connect() as conn:
             cur = conn.execute("DELETE FROM sessions WHERE expires_at < ?", (time.time(),))
             return cur.rowcount
+
+    # ── Email tokens: verification + password reset ──────────────────────────
+
+    def create_email_token(self, user_id: int, kind: str) -> str:
+        """Mint a single-use token; only its SHA-256 digest is stored."""
+        if kind not in ("verify", "reset"):
+            raise AccountError("unknown token kind")
+        ttl_hours = VERIFY_TOKEN_TTL_HOURS if kind == "verify" else RESET_TOKEN_TTL_HOURS
+        token = secrets.token_urlsafe(32)
+        now = time.time()
+        with self._connect() as conn:
+            # One live token per (user, kind): a re-request invalidates any
+            # earlier email, so a stale link in an old inbox can't be replayed.
+            conn.execute(
+                "DELETE FROM email_tokens WHERE user_id = ? AND kind = ?", (user_id, kind)
+            )
+            conn.execute(
+                "INSERT INTO email_tokens (token, user_id, kind, created_at, expires_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (hash_session_token(token), user_id, kind, now, now + ttl_hours * 3600),
+            )
+        return token
+
+    def consume_email_token(self, token: str | None, kind: str) -> Optional[int]:
+        """Redeem a token exactly once; returns the user id, or None."""
+        if not token:
+            return None
+        now = time.time()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT user_id FROM email_tokens WHERE token = ? AND kind = ?"
+                " AND expires_at > ?",
+                (hash_session_token(token), kind, now),
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                "DELETE FROM email_tokens WHERE token = ?", (hash_session_token(token),)
+            )
+            return row["user_id"]
+
+    def mark_email_verified(self, user_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute("UPDATE users SET email_verified = 1 WHERE id = ?", (user_id,))
+
+    def set_password(self, user_id: int, password: str) -> None:
+        """Set a new password and revoke every live session for the account."""
+        password_hash = hash_password(password)  # validates length, may raise
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id)
+            )
+            conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+    def user_by_email(self, email: str) -> Optional[dict[str, Any]]:
+        email = (email or "").strip().lower()
+        if not email:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE email = ? COLLATE NOCASE", (email,)
+            ).fetchone()
+        return self._user_public(row)
 
     # ── Patches (private per-user saved presets/arrangements) ────────────────
 
@@ -483,6 +575,7 @@ def main(argv: list[str] | None = None) -> None:
             handle=args.handle,
             require_invite=False,
             is_admin=(args.command == "create-admin"),
+            mark_verified=True,  # owner-seeded accounts skip the email loop
         )
         role = "admin" if user["is_admin"] else "user"
         print(f"  created {role}: {user['email']}  (handle={user['handle']}, id={user['id']})")
