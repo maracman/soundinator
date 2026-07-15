@@ -8,7 +8,8 @@ import pytest
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, validate_corpus_contract, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
-from scripts.tone_match.iterate import _floor_evidence, _reference_variability
+from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
+from scripts.tone_match.iterate import _floor_evidence, _params, _reference_set_id, _reference_variability
 from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time, compare_features, weights_for_instrument
 
 
@@ -44,6 +45,31 @@ def test_inaudible_attack_residual_has_no_phantom_frequency_penalty():
     reference.note.attack_noise = {"level": .01, "freq": 6000}
     rendered.note.attack_noise = {"level": .01, "freq": 3000}
     assert compare_features(reference, rendered)["features"]["noise"] == 1
+
+
+def test_requested_parameter_order_is_preserved_for_construction_first_fits():
+    manifest = {
+        "continuous": [
+            {"key": "excitationPosition", "min": 0, "max": 1, "default": .2},
+            {"key": "dynamicBlare", "min": 0, "max": 1.5, "default": 0},
+            {"key": "partialTilt", "min": -1, "max": 1, "default": 0},
+        ]
+    }
+    resolved = _params(
+        manifest,
+        {"excitationType": "blow", "dynamicBlare": .25},
+        ["dynamicBlare", "partialTilt", "excitationPosition", "dynamicBlare"],
+    )
+    assert [row.key for row in resolved] == ["dynamicBlare", "partialTilt", "excitationPosition"]
+    assert resolved[0].default == .25
+
+
+def test_reference_set_id_changes_when_the_scored_manifest_changes():
+    base = [{"path": "/tmp/a.wav", "midi": 60, "velocity": .2}]
+    assert _reference_set_id(base) == _reference_set_id([dict(base[0])])
+    assert _reference_set_id(base) != _reference_set_id(base + [
+        {"path": "/tmp/b.wav", "midi": 60, "velocity": .2}
+    ])
 
 
 def _bundle(*, f0=220.0, partials=None, percussive=False, B=0.0002):
@@ -194,3 +220,14 @@ def test_corpus_sidecar_filename_classification():
     assert _vowel("m3_long_straight_u.wav") == "u"
     assert _vowel("AltoSax.NoVib.ff.C4B4.aiff") is None
     assert vowel_from_filename("vocalset.m3.long.m3_long_straight_i.wav") == "i"
+
+
+def test_blown_campaign_matrix_has_three_registers_and_two_dynamics():
+    assert set(CAMPAIGNS) == {"flute", "clarinet", "alto-sax", "trumpet", "french-horn"}
+    for instrument, rows in CAMPAIGNS.items():
+        assert {row["register"] for row in rows} == {"low", "mid", "high"}
+        assert all({"pp", "ff", "midi"}.issubset(row) for row in rows)
+        expected = "string" if instrument == "flute" else "closedTube" if instrument == "clarinet" else "conicalTube"
+        assert RESONATOR[instrument] == expected
+    assert len(PHILHARMONIA_WOODWIND_ALTERNATES["clarinet"]) == 6
+    assert len(PHILHARMONIA_WOODWIND_ALTERNATES["alto-sax"]) == 4
