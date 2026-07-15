@@ -40,7 +40,7 @@ ALIASES = {
 }
 
 FAMILY = {
-    "clarinet": "blown", "alto-sax": "blown", "tenor-sax": "blown",
+    "flute": "blown", "clarinet": "blown", "alto-sax": "blown", "tenor-sax": "blown",
     "trumpet": "blown", "french-horn": "blown",
     "violin": "bowed", "cello": "bowed",
     "piano": "struck-plucked", "guitar": "struck-plucked",
@@ -173,13 +173,13 @@ def _param(params: dict[str, Any], key: str) -> Any:
 def _topology_assertions(instrument: str, params: dict[str, Any], strict: bool) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     expected_excitation = {
-        "violin": "bow", "cello": "bow", "piano": "strike", "guitar": "pluck",
+        "violin": "bow", "cello": "bow", "piano": "strike", "guitar": "pluck", "flute": "blow",
         "clarinet": "blow", "alto-sax": "blow", "tenor-sax": "blow",
         "trumpet": "blow", "french-horn": "blow", "tenor": "blow",
         "contrabass": "blow", "mezzo-soprano": "blow", "boy-soprano": "blow",
     }.get(instrument)
     expected_resonator = {
-        "violin": "string", "cello": "string", "piano": "string", "guitar": "string",
+        "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "string",
         "clarinet": "closedTube", "alto-sax": "conicalTube", "tenor-sax": "conicalTube",
         "trumpet": "conicalTube", "french-horn": "conicalTube",
     }.get(instrument)
@@ -242,7 +242,7 @@ def evaluate_construction(
                             percussive_fraction, "at most 1/3 of notes classified percussive", strict_evidence=strict_evidence))
 
     brightness_slope, brightness_count = _dynamic_slope(sample_list, _spectral_index)
-    if name in {"clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn", "piano", "guitar"}:
+    if name in {"flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn", "piano", "guitar"}:
         rows.append(_result(f"{name}.dynamic-brightening", "Upper-partial energy rises with playing intensity",
                             None if brightness_slope is None else brightness_slope > .15,
                             {"slope": brightness_slope, "samples": brightness_count}, "partial-index slope > 0.15 per unit velocity",

@@ -34,6 +34,10 @@ That supports SG2 fixed-Hz `bodyBands`, not register-shifted formants.
 - **Sustained classification.** Normal bowing is continuously driven. At least
   two thirds of the campaign notes must analyse as sustained; a percussive
   majority indicates the wrong excitor/envelope.
+- **Continuous drive, not free decay.** While the bow remains in contact it
+  replenishes string-mode energy. The renderer must not apply a piano/guitar
+  free-decay envelope to upper partials during the held portion of a bowed
+  note; ordinary release still follows the note envelope.
 - **Near harmonic, slightly stiff strings.** Real string modes are close to
   harmonic but stiffness stretches upper modes. The gate accepts measured
   `B` from 0 through 0.003; the §3 factor-of-1.5 reference match remains the
@@ -98,9 +102,9 @@ peak pattern.
 | G1 register-dependent spectra | **Confirmed.** Moving harmonics intersect fixed body/bridge response differently, and strings/source conditions vary with register. | Violin and cello require three-register tables; a single mid-table cannot freeze. |
 | G3 nonlinear dynamic brightening | **Amended.** A bounded edge response is justified, but brass-style unbounded “blare” is not the bowed-string law. | `dynamicBlare` may be fitted only where references show high-force enrichment; the audio gate merely forbids systematic darkening. |
 | G5 attack stagger | **Confirmed as landed.** Bow establishment and residual noise are band-dependent. | Retain measured `bandT90ms`; no new engine change. |
+| Renderer audit: free decay under continuous drive | **Rejected.** A struck-string decay law is not valid while the bow is still driving the string. | Gate material free decay to strike/pluck excitation; use the sustained-envelope and spectral gates to prevent recurrence. |
 | Missing gap: explicit friction regime | **Rejected for the present steady-note scope.** Full stick–slip simulation would add controls and failure modes not demanded by the dry reference campaign. | File only if residuals show the current position/edge law cannot reproduce ordinary attacks without corrupting steady spectra. |
 | Missing gap: residual bow noise | **Already representable.** Existing attack/breath-noise paths and scorer noise feature can carry it. | Fit separately from partials; promote to an engine gap only if sustained residual noise cannot be expressed without side effects. |
 
 Verdict: G1 is structurally necessary; G3 is valid only as a bounded,
 evidence-driven edge term. The existing neutral defaults remain correct.
-

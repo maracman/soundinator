@@ -3,7 +3,7 @@
 Status: research verdict complete; checklist implemented in
 `scripts/tone_match/assertions.py` (checklist version 1).
 
-Scope: B-flat clarinet, alto/tenor saxophone, trumpet, and French horn. The
+Scope: concert flute, B-flat clarinet, alto/tenor saxophone, trumpet, and French horn. The
 word *conical* below describes an acoustic mode-series abstraction when it is
 used as an SG2 enum. It must not be read as a claim that every centimetre of a
 modern brass bore is a cone.
@@ -12,6 +12,7 @@ modern brass bore is a cone.
 
 | Instrument | EXCITOR | RESONATOR | BODY / radiation | Additive approximation and audible risk |
 |---|---|---|---|---|
+| Concert flute | Air jet oscillating at the embouchure edge; blowing pressure and jet delay control register and brightness | Approximately open cylindrical bore with a complete harmonic ladder | Open holes and embouchure radiation create a frequency-dependent cutoff and breath component | `blow` + SG2 `string` mode ratios, whose UI label is “String / open tube”. The ratio law is correct for the open-pipe abstraction; breath noise and register-dependent spectra remain separately fitted. |
 | Clarinet | Pressure-controlled single reed; reed-flow nonlinearity creates harmonics | Approximately closed cylindrical bore; low modes favour 1:3:5… and the second register is reached at the twelfth | Tone-hole lattice, bell and radiation cutoff shape the envelope | `blow` + `closedTube`. A single harmonic table cannot cover chalumeau and clarino; register tables are mandatory. Attack/tonguing and player-tract coupling are reduced to transient/noise controls. |
 | Alto/tenor sax | Pressure-controlled single reed | Truncated, approximately conical bore with an octave register relation and a full mode series | Large cone/bell radiates high frequencies efficiently; tone holes change the effective bore | `blow` + `conicalTube`. This is structurally distinct from clarinet. Additive modes approximate reed/bore locking but not altissimo tract coupling; the shipped range must remain inside the reference evidence. |
 | Trumpet | Self-oscillating lip reed driven by mouth pressure | Compound mouthpiece–leadpipe–mostly narrow tube–bell system; playable resonances approximate a full harmonic ladder over the normal range | Bell radiation and high-amplitude nonlinear propagation strongly affect brightness | `blow` + SG2 `conicalTube` as the available **full-series** abstraction, not a literal geometry label. The missing lip-valve feedback is audible in attacks and extreme forte, so those residuals may not be buried in a partial table. |
@@ -25,6 +26,10 @@ cylinder ([measured impedance comparison](https://phys.unsw.edu.au/jw/acoustic-i
 saxophone bore is approximately conical and its first two resonances are close
 to 2:1, whereas the clarinet's are near 3:1
 ([UNSW cutoff comparison](https://www.phys.unsw.edu.au/jw/cutoff.html)).
+For flute, the open-bore resonances approximate integer multiples while the
+air jet supplies the self-sustaining nonlinear excitor; the measured spectrum
+changes substantially with blowing pressure and register
+([UNSW flute acoustics](https://newt.phys.unsw.edu.au/jw/fluteacoustics.html)).
 
 Modern brass is compound rather than ideal-conical. UNSW describes trumpet,
 trombone and horn as long narrow tubing plus flare and shows why their usable
@@ -66,6 +71,11 @@ G2's frequency law is useful for brass, but the enum name is an abstraction.
   perfectly harmonic ([UNSW harmonics](https://phys.unsw.edu.au/jw/harmonics.html)).
   The scorer checks output f0 against the paired reference rather than fitting
   passive impedance inharmonicity as string `B`.
+- **Continuous drive, not free decay.** A held air jet, reed or lip valve keeps
+  supplying energy throughout the note. The renderer must therefore retain
+  its driven upper modes during sustain; frequency-dependent free-decay laws
+  apply to impulse-driven strike/pluck notes, not to a held wind tone. The
+  sustained/full-series/dynamic gates jointly catch this construction error.
 - **Acceptance values not redefined here.** Partial, mel, attack, vibrato and
   resource limits remain the per-register §3 tripwires. This dossier adds
   topology and cross-register/dynamic gates; it does not weaken those limits.
@@ -121,8 +131,8 @@ acoustic blocker because its implemented frequency law is the required one.
 | G2 conical bore class | **Confirmed for sax; amended for brass.** Full-series behaviour is correct, but modern trumpet/horn are compound bores, not ideal cones. | Keep the full-series law. Treat `conicalTube` as an acoustic abstraction for brass and do not cite it as literal geometry. Clarinet must remain `closedTube`. |
 | G3 nonlinear dynamic brightening | **Confirmed.** Brass nonlinear propagation produces upper-spectrum enrichment with level. | `dynamicBlare > 0` plus measured dynamic brightening are hard gates for trumpet/horn and the sax interim fits. |
 | G5 attack stagger | **Confirmed as already landed.** Tonguing/reed and lip attacks are frequency-dependent and cannot be replaced by one gain ramp. | Measure and retain transient-band timing; no new engine work from WP-R. |
+| Renderer audit: free decay under continuous drive | **Rejected.** Applying the struck/plucked material-decay envelope during a held wind note extinguishes upper modes despite ongoing excitation. | Gate material free decay to impulse-driven excitation; retain the normal note-release envelope for wind notes. |
 | Missing gap | **No new pre-fit engine gap.** Full reed/lip–bore feedback and sax altissimo tract coupling are real, but the present campaign covers dry, standard-range sustained notes. | If residuals localise to attack instability or altissimo rather than fitted params, file a bounded model gap; do not widen the optimiser to disguise it. |
 
 Verdict: the existing G2/G3 laws are justified, with the stated semantic
 amendment. WP-5 may begin once WP-3 produces strict register/dynamic manifests.
-
