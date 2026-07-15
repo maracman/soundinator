@@ -28,7 +28,7 @@ const macro = (section, id, name, description, tags, parameters) =>
 const space = (id, name, description, tags, parameters) =>
   preset({ id, name, section: "space", description, tags, roles: ["space"], parameters });
 
-// ── 55 Sub-note modules ───────────────────────────────────────────────────
+// ── 56 Sub-note modules ───────────────────────────────────────────────────
 
 const profileSounds = [
   ["flute-natural", "Flute Foundation", "Measured open, breath-led flute.", "flute", "blow", 0.28, 0.35, ["wind", "measured", "airy"]],
@@ -46,6 +46,31 @@ const profileSounds = [
     envelopeAttack: excitationType === "strike" ? 0.006 : 0.06,
     envelopeRelease: excitationType === "strike" ? 0.28 : 0.28,
   }));
+
+// WP-5 interim instrument: automated construction gates passed and the
+// available same-note/dynamic groups reached the measured variability floor.
+const fittedSounds = [
+  sound("factory-sub-alto-sax-sg2", "Alto Sax — SG2 Interim",
+    "A fitted classical alto sax stepping stone for the tenor-sax campaign.",
+    ["reed", "saxophone", "measured", "fitted", "interim"], {
+      seed: 7331, sg2Family: "blown", voiceMode: "fourier",
+      spectralProfile: "alto-sax", spectralMix: 1, spectralPartials: 64,
+      excitationType: "blow", resonatorClass: "conicalTube", bodyType: "auto",
+      partialB: 0, partialMaterial: 0.29,
+      attackNoiseLevel: 1.3814721066344928, attackNoiseFreq: 1688,
+      attackNoiseQ: 0.89, attackNoiseDecay: 0.121,
+      envelopeAttack: 0.0898, envelopeDecay: 0.0125,
+      envelopeSustain: 0.8692, envelopeRelease: 0.3043, vibratoProb: 0,
+      excitationPosition: 0.1605073321079179,
+      excitationHuman: 0.6004405719544454,
+      toneBreath: 0.3626897744941535,
+      breathNoiseColor: 0.41555903348218937,
+      partialTransfer: 0.23606797749978972, partialTilt: 0,
+      spectralResonanceAmount: 0.35, spectralDynamicAmount: 0.8,
+      spectralCullThreshold: 0.002,
+      dynamicBlare: 1.0294720710325107,
+    }),
+];
 
 const acousticSounds = [
   ["cello-moss", "Moss Cello", "Soft bow pressure and a shaded upper register.", "cello", "bow", 0.38, -0.35, 0.72, ["string", "soft", "low"]],
@@ -142,7 +167,7 @@ const characterSounds = [
     envelopeAttack: 0.035, envelopeRelease: 0.45,
   }));
 
-const SOUND_MODULES = [...profileSounds, ...acousticSounds, ...resonatorSounds, ...vocalSounds, ...hitSounds, ...characterSounds];
+const SOUND_MODULES = [...profileSounds, ...fittedSounds, ...acousticSounds, ...resonatorSounds, ...vocalSounds, ...hitSounds, ...characterSounds];
 
 // ── 65 Macro and percussion modules ───────────────────────────────────────
 
@@ -362,5 +387,5 @@ const FULL_PATCHES = [
   patch("experimental", "broken-keys", "Broken Keys", "Unstable piano cells with puncturing rim accents.", ["factory-sub-broken-key", "factory-melody-chromatic-thread", "factory-rhythm-restless-grid", "factory-dynamics-unstable", "factory-surprise-restless", "factory-percussion-rim-grid", "factory-space-spring-near"]),
 ];
 
-export const FACTORY_CATALOG_TARGETS = Object.freeze({ sound: 55, macro: 65, space: 12, full: 48, total: 180 });
+export const FACTORY_CATALOG_TARGETS = Object.freeze({ sound: 56, macro: 65, space: 12, full: 48, total: 181 });
 export const FACTORY_PRESETS = Object.freeze([...MODULES, ...FULL_PATCHES]);

@@ -11,6 +11,7 @@ import {
   setSoundParam,
 } from "../../web/static/params.js";
 import { GenerationEngine, layerMixPlan } from "../../web/static/synth.js";
+import { FACTORY_PRESETS } from "../../web/static/factory-presets.js";
 
 const project = note => ({
   degree: note.degree,
@@ -86,4 +87,13 @@ test("layer mix plan dual-reads gain and solo", () => {
   const unified = migrateParamsShape({ ...DEFAULTS, baseLayerGain: 0.6 });
   const renders = [{ id: "x", gain: 0.8, solo: true }];
   assert.deepEqual(layerMixPlan(unified, renders), layerMixPlan(legacy, renders));
+});
+
+test("converged alto sax is frozen as an interim factory sound", () => {
+  const preset = FACTORY_PRESETS.find(row => row.id === "factory-sub-alto-sax-sg2");
+  assert.ok(preset);
+  assert.equal(preset.section, "sound");
+  assert.equal(preset.parameters.resonatorClass, "conicalTube");
+  assert.equal(preset.parameters.dynamicBlare, 1.0294720710325107);
+  assert.ok(preset.tags.includes("interim"));
 });
