@@ -1003,13 +1003,27 @@ export function resonatorRatio(className, n) {
   return t[t.length - 1] * Math.pow(step, n - t.length);
 }
 
+/**
+ * Ratio of a radiated output partial, as distinct from a passive bore mode.
+ *
+ * A closed cylindrical pipe has passive resonances near 1:3:5…, but a
+ * clarinet's nonlinear reed drives a harmonic output spectrum that includes
+ * even partials (especially above the register break).  Measured amplitude
+ * tables carry that register-dependent odd/even balance, so their indices
+ * must remain integer output harmonics rather than being remapped onto the
+ * passive resonance sequence.
+ */
+export function outputPartialRatio(className, n) {
+  return className === "closedTube" ? n : resonatorRatio(className, n);
+}
+
 // True stiff-string inharmonicity, anchored so mode 1 stays at the played
 // pitch: f_n = ratio_n · f0 · sqrt((1 + B·n²) / (1 + B)). B is a physical
 // constant (piano bass ≈ 1e-4, treble ≈ 1e-3) and gives the same
 // frequencies regardless of how many partials are rendered (audit A4).
 export function partialFrequency(n, f0, B = 0, className = "string") {
   const b = Math.max(0, B || 0);
-  return resonatorRatio(className, n) * f0 * Math.sqrt((1 + b * n * n) / (1 + b));
+  return outputPartialRatio(className, n) * f0 * Math.sqrt((1 + b * n * n) / (1 + b));
 }
 
 /** Interpolate measured amplitude/B tables in log-frequency register space. */

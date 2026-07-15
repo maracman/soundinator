@@ -6,6 +6,7 @@
 import {
   RESONATOR_CLASSES,
   resonatorRatio,
+  outputPartialRatio,
   partialFrequency,
   legacyStretchToB,
   materialT60,
@@ -123,6 +124,9 @@ console.log("Resonator ratio tables");
 {
   check("string is the harmonic series", [1, 2, 3, 12].every(n => resonatorRatio("string", n) === n));
   check("closed tube is odd harmonics", [1, 3, 5, 7].every((v, i) => resonatorRatio("closedTube", i + 1) === v));
+  check("closed-tube radiated output retains integer harmonics",
+    [1, 2, 3, 8].every(n => outputPartialRatio("closedTube", n) === n)
+    && [1, 2, 3, 8].every(n => partialFrequency(n, 220, 0, "closedTube") === n * 220));
   check("membrane starts at Bessel ratios", near(resonatorRatio("membrane", 2), 1.594, 1e-9));
   const m12 = resonatorRatio("membrane", 12), m13 = resonatorRatio("membrane", 13), m14 = resonatorRatio("membrane", 14);
   check("membrane tail extends monotonically", m12 < m13 && m13 < m14);
