@@ -35,8 +35,9 @@ File-name conventions understood:
   * "vib" (and not nonvib/novib) → used for vibrato analysis only, when a
     nonvib sibling exists.  If an instrument has no such split (e.g. arco
     strings, piano) every file feeds every analysis.
-Optionally place a `provenance.json` ({"source":…, "licence":…}) in each
-instrument directory; it is copied into the output.
+Place the corpus-contract sidecars `PROVENANCE.json` and `COVERAGE.md` in
+each instrument directory. `PROVENANCE.json` is copied into the output. The
+legacy lowercase `provenance.json` remains readable outside strict mode.
 
 OUTPUT
     JSON keyed by instrument, with fields named to match the engine:
@@ -991,6 +992,44 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
 AUDIO_EXT = (".aif", ".aiff", ".wav", ".flac", ".ogg", ".mp3")
 
 
+def validate_corpus_contract(samples_dir: str, only: set[str] | None = None) -> list[str]:
+    """Require complete acquisition sidecars before analysing any audio.
+
+    Acquisition may write folders over several minutes.  This preflight makes
+    the hand-off atomic from the fitter's perspective and prevents a partial
+    directory from becoming a seemingly valid measured profile.
+    """
+    ready: list[str] = []
+    errors: list[str] = []
+    for instrument in sorted(os.listdir(samples_dir)):
+        inst_dir = os.path.join(samples_dir, instrument)
+        if not os.path.isdir(inst_dir) or (only and instrument not in only):
+            continue
+        audio = [name for name in os.listdir(inst_dir) if name.lower().endswith(AUDIO_EXT)]
+        if not audio:
+            continue
+        provenance = os.path.join(inst_dir, "PROVENANCE.json")
+        coverage = os.path.join(inst_dir, "COVERAGE.md")
+        if not os.path.isfile(provenance):
+            errors.append(f"{instrument}: missing PROVENANCE.json")
+        else:
+            try:
+                with open(provenance, encoding="utf-8") as handle:
+                    payload = json.load(handle)
+                if not isinstance(payload, dict) or not payload:
+                    errors.append(f"{instrument}: PROVENANCE.json must be a non-empty object")
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"{instrument}: invalid PROVENANCE.json ({exc})")
+        if not os.path.isfile(coverage) or os.path.getsize(coverage) == 0:
+            errors.append(f"{instrument}: missing or empty COVERAGE.md")
+        ready.append(instrument)
+    if not ready:
+        errors.append("no instrument folders containing audio")
+    if errors:
+        raise ValueError("corpus contract is incomplete:\n  " + "\n  ".join(errors))
+    return ready
+
+
 def is_nonvib_name(name: str) -> bool:
     low = name.lower()
     return "nonvib" in low or "novib" in low or "non-vib" in low or "non_vib" in low
@@ -1042,8 +1081,10 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
     if not notes:
         return None
     agg = aggregate_instrument(notes, vib_notes, n_partials)
-    # provenance sidecar
-    prov_path = os.path.join(inst_dir, "provenance.json")
+    # Corpus contract uses uppercase; retain lowercase as a legacy fallback.
+    prov_path = os.path.join(inst_dir, "PROVENANCE.json")
+    if not os.path.exists(prov_path):
+        prov_path = os.path.join(inst_dir, "provenance.json")
     prov = {}
     if os.path.exists(prov_path):
         with open(prov_path) as fh:
@@ -1063,9 +1104,16 @@ def main(argv=None):
     ap.add_argument("--only", default=None,
                     help="comma-separated instrument names to (re)analyse")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--require-contract", action="store_true",
+                    help="refuse to run unless every selected audio folder has PROVENANCE.json and COVERAGE.md")
     args = ap.parse_args(argv)
 
     only = set(args.only.split(",")) if args.only else None
+    if args.require_contract:
+        try:
+            validate_corpus_contract(args.samples, only)
+        except ValueError as exc:
+            ap.error(str(exc))
     out = {}
     for inst in sorted(os.listdir(args.samples)):
         inst_dir = os.path.join(args.samples, inst)

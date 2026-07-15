@@ -11,13 +11,16 @@ Reconstruct the corpus as:
 ```text
 /private/tmp/sg2/samples/
   <instrument>/
-    provenance.json
+    PROVENANCE.json
+    COVERAGE.md
     <pitch>-<dynamic>[-vib|-nonvib].wav
 ```
 
-Each `provenance.json` records source, direct URL, licence, performer (when
+Each `PROVENANCE.json` records source, direct URL, licence, performer (when
 known), download date, pitch, dynamic and any conversion. Do not copy source
-audio into this repository.
+audio into this repository. `COVERAGE.md` records the landed register,
+dynamic, vibrato and gap coverage. Campaign analysis always uses the strict
+contract flag so a partially written acquisition folder cannot be fitted.
 
 ## Commands
 
@@ -25,7 +28,7 @@ audio into this repository.
 # Fit measured/pinned parameters.
 python3 scripts/fit_profiles_from_samples.py \
   --samples /private/tmp/sg2/samples \
-  --out web/static/measured_profiles.json --partials 64
+  --out web/static/measured_profiles.json --partials 64 --require-contract
 python3 scripts/gen_measured_profiles_module.py
 
 # Render exactly one browser-engine note with neutral space.

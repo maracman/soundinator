@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import numpy as np
+import json
 
-from scripts.fit_profiles_from_samples import NoteAnalysis
+import numpy as np
+import pytest
+
+from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_contract
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time
 
@@ -73,3 +76,14 @@ def test_boy_morphology_requires_scaled_formants_to_reach_body_stage():
     result_without_bands = evaluate_construction("boy soprano", samples, params={**params, "bodyBands": []})
     by_id = {row["id"]: row for row in result_without_bands["assertions"]}
     assert by_id["boy-soprano.formant-scaling"]["status"] == "fail"
+
+
+def test_corpus_contract_requires_both_uppercase_sidecars(tmp_path):
+    folder = tmp_path / "clarinet"
+    folder.mkdir()
+    (folder / "C4-mf.wav").touch()
+    with pytest.raises(ValueError, match="missing PROVENANCE.json"):
+        validate_corpus_contract(str(tmp_path))
+    (folder / "PROVENANCE.json").write_text(json.dumps({"source": "public corpus"}))
+    (folder / "COVERAGE.md").write_text("# Coverage\n\nlow/mf\n")
+    assert validate_corpus_contract(str(tmp_path)) == ["clarinet"]
