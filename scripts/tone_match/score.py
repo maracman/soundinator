@@ -173,8 +173,19 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
     number = lambda value, fallback=0.0: float(value) if isinstance(value, (int, float)) and np.isfinite(value) else fallback
     vibrato = _vibrato_distance(ref.note, render.note)
     nr, ns = ref.note.attack_noise or {}, render.note.attack_noise or {}
-    level_db = abs(20 * math.log10(max(number(ns.get("level"), 1e-5), 1e-5) / max(number(nr.get("level"), 1e-5), 1e-5))) / 3
-    freq_oct = abs(math.log2(max(number(ns.get("freq"), 1), 1) / max(number(nr.get("freq"), 1), 1)))
+    # Below a 0.1% attack/sustain ratio the residual centre is not a
+    # perceptually stable feature: the detector may return no burst at all,
+    # or a harmonic/noise-bin peak. Compare floored level, but only compare
+    # frequency when both transients clear that audibility floor.
+    noise_floor = 1e-3
+    ref_noise_level = max(0, number(nr.get("level"), 0))
+    render_noise_level = max(0, number(ns.get("level"), 0))
+    level_db = abs(20 * math.log10(max(render_noise_level, noise_floor) /
+                                   max(ref_noise_level, noise_floor))) / 3
+    freq_oct = 0.0
+    if ref_noise_level >= noise_floor and render_noise_level >= noise_floor:
+        freq_oct = abs(math.log2(max(number(ns.get("freq"), 1), 1) /
+                                 max(number(nr.get("freq"), 1), 1)))
     noise = level_db + freq_oct
     values = {
         "partials_db": partial_db, "log_mel_db": mel_db,

@@ -35,6 +35,17 @@ def test_nonvibrato_estimator_peaks_do_not_count_as_vibrato_distance():
     assert compare_features(reference, rendered)["features"]["vibrato"] == 0
 
 
+def test_inaudible_attack_residual_has_no_phantom_frequency_penalty():
+    reference = _bundle()
+    rendered = _bundle()
+    reference.note.attack_noise = {"level": .0001, "freq": 6000}
+    rendered.note.attack_noise = {}
+    assert compare_features(reference, rendered)["features"]["noise"] == 0
+    reference.note.attack_noise = {"level": .01, "freq": 6000}
+    rendered.note.attack_noise = {"level": .01, "freq": 3000}
+    assert compare_features(reference, rendered)["features"]["noise"] == 1
+
+
 def _bundle(*, f0=220.0, partials=None, percussive=False, B=0.0002):
     partials = np.asarray(partials or [1, .3, .7, .2, .5, .15, .35, .1], dtype=float)
     note = NoteAnalysis("test", f0, "A3", 1.0, partials, f0 * np.arange(1, len(partials) + 1),
@@ -164,3 +175,4 @@ def test_corpus_sidecar_filename_classification():
     assert _vowel("m3_long_straight_u.wav") == "u"
     assert _vowel("AltoSax.NoVib.ff.C4B4.aiff") is None
     assert vowel_from_filename("vocalset.m3.long.m3_long_straight_i.wav") == "i"
+
