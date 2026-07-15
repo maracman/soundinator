@@ -52,6 +52,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Windows/Linux parity (owner 2026-07-15): macOS draws overlay scrollbars
+   (zero width), but Windows Chrome gives every unstyled scroller a classic
+   ~16px bar that SUBTRACTS from content width — panels reflowed, clipped, or
+   grew stray horizontal bars there. Give every scroller a slim themed bar by
+   default; the narrowly-scoped ::-webkit-scrollbar rules elsewhere still win.
+   (Deliberately NOT scrollbar-width/scrollbar-color: in current Chrome those
+   would override and disable all the existing webkit scrollbar styling.) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(120,130,150,0.30);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(120,130,150,0.5); }
+::-webkit-scrollbar-corner { background: transparent; }
+
 /* ── Layout ──────────────────────────────────────────────── */
 
 #app {
@@ -995,6 +1013,35 @@ body.explore-mode .view {
   z-index: 3;
 }
 .ch-vsplit:hover { background: rgba(245,166,35,0.18); }
+/* Horizontal divider above the LAYERS/BROWSER strip — drag to resize that
+   panel's height (owner 2026-07-15). A centred grip hints it's draggable. */
+.ch-hsplit {
+  flex: none;
+  height: 8px;
+  margin: -2px 0;
+  cursor: row-resize;
+  border-radius: 3px;
+  z-index: 3;
+  position: relative;
+}
+.ch-hsplit::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 34px; height: 3px; border-radius: 2px;
+  background: rgba(120,130,150,0.32);
+}
+.ch-hsplit:hover::before { background: rgba(245,166,35,0.5); }
+/* Content-sized by default; an inline height (set by the divider drag) makes it
+   fixed, and it scrolls if the strips need more room than that. */
+.chorda-bottom {
+  flex: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow-y: auto;
+}
 
 .explore-dashboard .card {
   min-height: 0;
@@ -6895,7 +6942,7 @@ body.dragging { cursor: grabbing; user-select: none; }
 }
 .fxs-stage.fxs-expanded::after {
   content: ""; position: fixed; inset: 0; z-index: 399;
-  background: rgba(10,11,14,0.55); backdrop-filter: blur(1px);
+  background: rgba(10,11,14,0.55); backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px);
 }
 
 /* ── Right column: Envelope / Modulation panel ── */
@@ -6957,12 +7004,16 @@ body.dragging { cursor: grabbing; user-select: none; }
 
 /* SPACE editor: the right column carries the ear response (arrival + colouring
    stacked vertically) instead of Envelope/Modulation (owner 2026-07-10) */
-.td-side-ears { overflow: hidden; }
-.ears-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+/* Scrolls like the inspector and field columns do — in a short window the
+   three ear bands stay reachable instead of being clipped (owner 2026-07-15). */
+.td-side-ears { overflow-y: auto; }
+.ears-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex: none; }
 .ears-head-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; color: var(--text); }
 .ears-head-sum { font-size: 0.56rem; color: var(--text3); }
 .ears-head-sum b { color: var(--text2); font-weight: 700; }
-.td-side-ears > .ears-slot { flex: 1 1 auto; min-height: 300px; position: relative; }
+/* min-height keeps all three bands legible; the column scrolls when the
+   window can't give them that much height. */
+.td-side-ears > .ears-slot { flex: 1 1 auto; min-height: 340px; position: relative; }
 .td-side-ears canvas#cvSpaceField { width: 100%; height: 100%; display: block; }
 
 /* ── V2 Spatial Stage (render phase-04) ── */
@@ -7363,26 +7414,6 @@ body.dragging { cursor: grabbing; user-select: none; }
   padding: 6px 12px; cursor: pointer;
 }
 .perc-add:hover { color: var(--text); border-color: var(--gen); }
-
-/* percussion focus mode — chrome overlaid on the SPACE stage */
-.perc-mode-chrome {
-  position: absolute; inset: 0; z-index: 5; display: none; pointer-events: none;
-  align-items: flex-start; justify-content: space-between; padding: 8px 10px;
-  border: 1.5px solid hsl(32 75% 55% / 0.55); border-radius: 10px;
-  background: hsl(32 75% 50% / 0.07);
-}
-.perc-mode-badge {
-  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.14em;
-  color: hsl(32 80% 70%); background: hsl(32 55% 20% / 0.9);
-  border: 1px solid hsl(32 70% 50% / 0.5); border-radius: 5px; padding: 3px 8px;
-}
-.perc-mode-exit {
-  pointer-events: auto; cursor: pointer; width: 24px; height: 24px; line-height: 1;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem; color: var(--text); background: rgba(20, 26, 34, 0.92);
-  border: 1px solid var(--border2); border-radius: 6px;
-}
-.perc-mode-exit:hover { border-color: hsl(32 70% 55%); color: hsl(32 80% 72%); }
 
 .m2-center { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .m2-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -10296,11 +10327,24 @@ body.explore-mode .view {
 .explore-top { display:flex; align-items:flex-start; }
 .landing-header { position:relative; }
 .landing-acct { position:absolute; top:14px; right:16px; }
+/* The way back when the welcome page is reopened from inside the app via the
+   logo — without it the landing page was a dead end (owner 2026-07-15). */
+.landing-back {
+  position: absolute; top: 14px; left: 16px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.landing-back:hover { color: var(--text); border-color: var(--text2); }
 .profile-back { display:flex; align-items:center; }
 .daw-transport .account-bar { margin-left:auto; }
 
 /* App-owned dialogs and Producer file menu. */
-.app-dialog-overlay { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(4,7,11,.72); backdrop-filter:blur(5px); }
+.app-dialog-overlay { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(4,7,11,.72); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
 .app-dialog { width:min(440px,100%); padding:20px; border:1px solid var(--border2); border-radius:12px; background:var(--surface); box-shadow:0 24px 80px rgba(0,0,0,.58); }
 .app-dialog h2 { margin:0 0 8px; font-size:1.05rem; }.app-dialog p { margin:0 0 14px; color:var(--text2); font-size:.82rem; }
 .app-dialog-input { width:100%; padding:9px 10px; border:1px solid var(--border2); border-radius:7px; background:var(--display); color:var(--text); font:inherit; }

@@ -3354,10 +3354,27 @@ export class SynthEngine {
     for (let i = 0; i < sr; i++) nd[i] = Math.random() * 2 - 1;
   }
 
+  // A suspended context's clock is frozen, and some audio backends (notably
+  // Windows) take much longer than mac to leave "suspended" — starting a
+  // performance right away can swallow its first attack in the hardware
+  // spin-up. Defer the actual start until the context is running; `playing`
+  // flips immediately so the UI reads the intent, and a stop() (or a newer
+  // play) before resume completes cancels the pending start.
+  _startWhenRunning(startFn) {
+    if (this.ctx.state !== "suspended") { startFn(); return; }
+    const token = (this._resumeToken = (this._resumeToken || 0) + 1);
+    this.playing = true;
+    const go = () => { if (this._resumeToken === token && this.playing) startFn(); };
+    this.ctx.resume().then(go, go);
+  }
+
   /** Start playing with the given parameters. Resets the engine. */
   play(params) {
     this.init();
-    if (this.ctx.state === "suspended") this.ctx.resume();
+    this._startWhenRunning(() => this._playNow(params));
+  }
+
+  _playNow(params) {
     this.stop();
     // stop() fades the master out; bring it back for the new performance.
     if (this._masterOut) {
@@ -3574,15 +3591,16 @@ export class SynthEngine {
   /** Live playback of a baked note list (all scheduled upfront). */
   playNotes(params, notes, totalBeats = null, loopBeats = null, percStrikes = null) {
     this.init();
-    if (this.ctx.state === "suspended") this.ctx.resume();
-    this.stop();
-    if (this._masterOut) {
-      const now = this.ctx.currentTime;
-      this._masterOut.gain.cancelScheduledValues(now);
-      this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
-    }
-    this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05, totalBeats, loopBeats, percStrikes);
-    this.playing = true;
+    this._startWhenRunning(() => {
+      this.stop();
+      if (this._masterOut) {
+        const now = this.ctx.currentTime;
+        this._masterOut.gain.cancelScheduledValues(now);
+        this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
+      }
+      this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05, totalBeats, loopBeats, percStrikes);
+      this.playing = true;
+    });
   }
 
   _configureReverb(params = {}) {

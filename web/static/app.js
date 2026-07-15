@@ -1198,9 +1198,11 @@ let layersFilter = "all";     // smart tag: filter sound presets by layer count
 const STUDIO_PANELS_KEY = "phase0.studioPanels.v1";
 let _studioPanels = (() => {
   // chW default 320 (owner 07-07: the left panel should be wider — the
-  // envelope now sits beside the excitor knobs and needs the room)
-  try { return { chW: 320, dashC1: 260, ...(JSON.parse(localStorage.getItem(STUDIO_PANELS_KEY) || "{}")) }; }
-  catch { return { chW: 320, dashC1: 260 }; }
+  // envelope now sits beside the excitor knobs and needs the room).
+  // chordaBottomH: null = size the LAYERS/BROWSER strip to its content (the
+  // original look) until the user drags its divider (owner 2026-07-15).
+  try { return { chW: 320, dashC1: 260, chordaBottomH: null, ...(JSON.parse(localStorage.getItem(STUDIO_PANELS_KEY) || "{}")) }; }
+  catch { return { chW: 320, dashC1: 260, chordaBottomH: null }; }
 })();
 function saveStudioPanels() { localStorage.setItem(STUDIO_PANELS_KEY, JSON.stringify(_studioPanels)); }
 // In-context preset preview (Tonalic cue): audition a preset merged into the
@@ -1522,6 +1524,11 @@ async function api(path, opts = {}) {
 
 function navigate(hash) { location.hash = hash; }
 
+// Where the landing page's "back to the studio" control returns to. Set by
+// route() whenever an in-app view renders, so clicking the logo (→ #home)
+// is reversible instead of stranding the user on the welcome screen.
+let _lastAppHash = null;
+
 let profilePlayback = null; // inline profile player: { itemId, prevArrangement, raf, totalBeats }
 // Auth/community state — declared here (not with the account code at the file
 // tail) because the boot route() call below reads it via experimentsEnabled().
@@ -1578,6 +1585,7 @@ function route() {
     if (h && h !== "home") showInviteGateDialog();
     return;
   }
+  if (h !== "home") _lastAppHash = h || "explore";
   if (h.startsWith("study/") && !experimentsEnabled()) return renderExplore();
   if (h === "study/consent")       return renderStudyConsent();
   if (h === "study/demographics")  return renderStudyDemographics();
@@ -1921,7 +1929,22 @@ function setPaletteEditState(state) {
 function commitPaletteEdit() {
   const state = paletteEditState();
   if (!state) return false;
+  // A layer-edit in progress means exploreParams currently holds ONE layer's
+  // sound, not the whole patch — fold it back into its layer first, so the
+  // commit below captures the complete patch and not a half-swapped state.
+  if (_chLayerEdit) exitLayerEdit(false);
   arrangement = arrangement || loadArrangement();
+  // Region-scoped edit: the take's own paramsOverride is what plays, so that
+  // is what the round-trip writes back to. The shared palette item is left
+  // alone — other regions using the same patch keep their sound.
+  if (state.regionId) {
+    const track = (arrangement.tracks || []).find(t => t.id === state.trackId);
+    const region = track?.regions.find(r => r.id === state.regionId);
+    if (!region) return false;
+    region.paramsOverride = extractInstrumentParams(exploreParams);
+    saveArrangement("edit region patch");
+    return true;
+  }
   const pl = (arrangement.palette || []).find(x => x.id === state.paletteId);
   if (!pl) return false;
   pl.params = extractInstrumentParams(exploreParams);
@@ -2027,14 +2050,17 @@ function applyItemToPalettePatch(pl, item, half = null) {
   return true;
 }
 
-function applyItemCapturePart(pl, item, part) {
+function applyItemCapturePart(pl, item, part, { regionScoped = false } = {}) {
   if (!pl || !item || !CAPTURE_PARTS.includes(part) || !item.captureParts?.[part]) return false;
+  // Regions play from paramsOverride, palette items from params — write the
+  // swapped-in module into whichever store this subject actually plays.
+  const store = regionScoped ? "paramsOverride" : "params";
   const incoming = voiceParamsFor(item);
-  const next = { ...(pl.params || {}) };
+  const next = { ...(pl[store] || {}) };
   for (const key of Object.keys(next)) if (capturePartForParam(key) === part) delete next[key];
   for (const [key, value] of Object.entries(incoming)) if (capturePartForParam(key) === part) next[key] = value;
-  pl.params = next;
-  pl.captureParts = { ...capturePartsFor(pl.params, "full", pl.captureParts), [part]: true };
+  pl[store] = next;
+  pl.captureParts = { ...capturePartsFor(pl[store], "full", pl.captureParts), [part]: true };
   pl.parts = pl.parts || {};
   const moduleName = moduleNameFromItem(item, part);
   if (part === "notes") {
@@ -2044,8 +2070,11 @@ function applyItemCapturePart(pl, item, part) {
   } else {
     pl.parts[part] = item.id; pl.parts[CAPTURE_PART_NAME_KEYS[part]] = moduleName;
   }
-  pl.name = paletteDisplayName(pl);
-  pl.kindLabel = paletteIsPlayable(pl) ? "Patch" : "Module draft";
+  if (!regionScoped) {
+    // Palette-item identity fields — meaningless (and wrong) on a region.
+    pl.name = paletteDisplayName(pl);
+    pl.kindLabel = paletteIsPlayable(pl) ? "Patch" : "Module draft";
+  }
   saveArrangement(`replace ${CAPTURE_PART_LABELS[part]}`);
   return true;
 }
@@ -2305,7 +2334,7 @@ function renderBrowserCards(v) {
     }
     if (producerBrowserTarget?.kind === "patch") {
       const subject = editorPatchSubject();
-      if (subject && applyItemCapturePart(subject.patch, item, producerBrowserTarget.part)) {
+      if (subject && applyItemCapturePart(subject.patch, item, producerBrowserTarget.part, { regionScoped: subject.regionScoped })) {
         patchDirty = true;
         producerBrowserTarget = null;
         palettePreviewId = subject.regionScoped ? palettePreviewId : subject.patch.id;
@@ -2817,9 +2846,16 @@ function playArrangement(fromBeat = 0) {
     }
     updatePlayhead(b);
     arrPlay.beat = b + 1;
-    arrPlay.timer = setTimeout(step, beatMs);
+    // Drift-corrected scheduling: aim each beat at an absolute clock target
+    // instead of chaining raw setTimeout(beatMs). Timer rounding/coalescing
+    // (notably coarser on Windows Chrome than on mac) otherwise accumulates
+    // into audible tempo drift and late region entries after a few bars.
+    arrPlay.beatsDone = (arrPlay.beatsDone || 0) + 1;
+    const nextAt = arrPlay.clock0 + arrPlay.beatsDone * beatMs;
+    arrPlay.timer = setTimeout(step, Math.max(0, nextAt - performance.now()));
   };
   arrPlay.startAt = arrPlay.beat; // regions already sounding at the start beat begin here
+  arrPlay.clock0 = performance.now();
   step();
   startRollTransportPlayhead();
 }
@@ -4811,7 +4847,8 @@ function patchSaveHTML(subject, p) {
   </div>`;
 }
 function producerPatchInspectorHTML(subject) {
-  const p = subject.patch.params || {};
+  // Same store the wiring edits and playback reads: override for regions.
+  const p = (subject.regionScoped ? subject.patch.paramsOverride : subject.patch.params) || {};
   const parts = subject.patch.parts || {};
   const movement = p.spaceMovement === "additive" ? "additive" : "centered";
   const percOn = Array.isArray(p.percLayers) && p.percLayers.some(l => (Number(l.vol) || 0) > 0);
@@ -4917,7 +4954,12 @@ function bindPatchInspector(v) {
   const subject = editorPatchSubject();
   if (!panel || !subject) return;
   const patch = subject.patch;
-  const params = patch.params || (patch.params = {});
+  // A region-scoped subject PLAYS from its paramsOverride (created by
+  // editorPatchSubject → ensureRegionPatchOverride) — the inspector must edit
+  // that same object. region.params was a dead store nothing ever played.
+  const params = subject.regionScoped
+    ? (patch.paramsOverride || (patch.paramsOverride = {}))
+    : (patch.params || (patch.params = {}));
   const persist = (label = "patch inspector") => {
     patchDirty = true;
     patch.captureParts = capturePartsFor(params, "full");
@@ -5003,10 +5045,15 @@ function bindPatchInspector(v) {
   });
   panel.querySelectorAll("[data-patch-edit]").forEach(btn => {
     btn.onclick = () => {
-      exploreParams = migrateToneParams({ ...DEFAULTS, ...params });
-      const paletteId = subject.regionScoped ? subject.region?.paletteId : subject.patch.id;
-      const palettePatch = (arrangement.palette || []).find(item => item.id === paletteId);
-      if (palettePatch) setPaletteEditState({ paletteId, name: palettePatch.name });
+      exploreParams = migrateToneParams({ ...DEFAULTS, ...(arrangement.context || {}), ...params });
+      // ALWAYS record what is being edited — the state drives the "editing …"
+      // banner in the studio and the commit on return. Region-scoped edits
+      // are keyed by region+track so they write back to the take's override.
+      if (subject.regionScoped) {
+        setPaletteEditState({ regionId: subject.region.id, trackId: subject.track.id, name: subject.label });
+      } else {
+        setPaletteEditState({ paletteId: subject.patch.id, name: subject.patch.name || subject.label });
+      }
       if (btn.dataset.patchEdit === "subnote") workspaceTab = "subnote";
       else {
         workspaceTab = "explore";
@@ -5993,9 +6040,15 @@ function wireRoll(v) {
   if (!cv || !region) return;
   drawRoll(region);
   cv.addEventListener("wheel", (e) => {
-    const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-    if (e.metaKey) {
-      const delta = horizontal ? e.deltaX : e.deltaY;
+    // Windows/Linux parity: a mouse wheel reports LINE deltas (±1–3) where a
+    // mac trackpad reports pixels (±~100) — normalise to pixels so panning
+    // moves at the same speed everywhere, and accept Ctrl (the PC modifier)
+    // as well as Command for the zoom gesture.
+    const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 120 : 1);
+    const dX = e.deltaX * unit, dY = e.deltaY * unit;
+    const horizontal = Math.abs(dX) > Math.abs(dY);
+    if (e.metaKey || e.ctrlKey) {
+      const delta = horizontal ? dX : dY;
       if (Math.abs(delta) < 0.1) return;
       e.preventDefault();
       const key = horizontal ? "x" : "y";
@@ -6010,8 +6063,8 @@ function wireRoll(v) {
         : (_rollGeom.maxDeg - _rollGeom.minDeg) < (_rollGeom.allMaxDeg - _rollGeom.allMinDeg);
       if (!canPan) return;
       e.preventDefault();
-      if (horizontal) rollPan.x += e.deltaX * _rollGeom.viewDivs / Math.max(1, _rollGeom.plotW);
-      else rollPan.y -= e.deltaY / Math.max(10, _rollGeom.rowH * 2);
+      if (horizontal) rollPan.x += dX * _rollGeom.viewDivs / Math.max(1, _rollGeom.plotW);
+      else rollPan.y -= dY / Math.max(10, _rollGeom.rowH * 2);
     } else return;
     drawRoll(region);
   }, { passive: false });
@@ -6977,7 +7030,7 @@ function pointerDragUp(e) {
     const dz = patchDropZoneAtPoint(e.clientX, e.clientY);
     if (dz) {
       const subject = editorPatchSubject();
-      if (subject && applyItemCapturePart(subject.patch, item, dz.part)) {
+      if (subject && applyItemCapturePart(subject.patch, item, dz.part, { regionScoped: subject.regionScoped })) {
         patchDirty = true;
         if (subject.regionScoped) {
           const voice = producerVoices.get(subject.track.id);
@@ -8095,15 +8148,20 @@ function wireProduce(v) {
   if (zoomOut) zoomOut.onclick = () => setZoom((dawLayout.pxPerBeat || 14) - 3);
   const trackArea = v.querySelector("#timelineGrid");
   if (trackArea) trackArea.addEventListener("wheel", (e) => {
-    // Command + two-finger horizontal gesture zooms the arrangement only.
-    // Ordinary scrolling, and vertical Command gestures, retain their normal
-    // browser/timeline behaviour.
-    if (!e.metaKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || Math.abs(e.deltaX) < 0.1) return;
+    // Command/Ctrl + wheel zooms the arrangement; ordinary scrolling keeps its
+    // normal timeline behaviour. Uses whichever axis dominates so it works for
+    // a mac two-finger horizontal gesture AND a PC mouse's vertical-only
+    // wheel, and normalises line-mode deltas (Windows mice) to pixels.
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 120 : 1);
+    const dX = e.deltaX * unit, dY = e.deltaY * unit;
+    const delta = Math.abs(dX) > Math.abs(dY) ? dX : dY;
+    if (Math.abs(delta) < 0.1) return;
     e.preventDefault();
     const rect = trackArea.getBoundingClientRect();
     const offsetPx = Math.max(0, Math.min(trackArea.clientWidth, e.clientX - rect.left));
     const anchorBeat = (trackArea.scrollLeft + offsetPx) / Math.max(1, pxPerBeat);
-    const factor = e.deltaX > 0 ? 1.08 : 1 / 1.08;
+    const factor = delta > 0 ? 1.08 : 1 / 1.08;
     setZoom((dawLayout.pxPerBeat || 14) * factor, { beat: anchorBeat, offsetPx });
   }, { passive: false });
   // Arrangement registry controls (v2.1 U11)
@@ -8275,8 +8333,12 @@ function renderLanding() {
         <p>Create a profile to save patches to the cloud, share your sounds, and rate what others make.</p>
         <span class="badge">${lockedOut() ? "Invite-only" : "Save &amp; share"}</span>
       </a>`;
+  // Reached from inside the app (logo click)? Offer the way back — the
+  // landing page is otherwise a dead end with only the three entry cards.
+  const returnHash = lockedOut() ? null : _lastAppHash;
   const v = mount(`
     <div class="landing-header">
+      ${returnHash ? `<button class="landing-back" id="landingBack" title="Close the welcome page and return to where you were">&larr; Back to the studio</button>` : ""}
       <div class="landing-acct">${accountBarHTML()}</div>
       <h1>${appIconHTML("lg")} Soundinator</h1>
       <p>Design sounds, build patches, and share them with an invite-only community of sound makers.</p>
@@ -8298,7 +8360,19 @@ function renderLanding() {
     navigate("produce");
   };
   v.querySelector("#goJoin").onclick = () => openAuthOverlay("signup");
+  const back = v.querySelector("#landingBack");
+  if (back) back.onclick = () => navigate(returnHash);
 }
+
+// Escape on the landing page = the back button (only when there is somewhere
+// to go back to, and no overlay is open to claim the key first).
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (location.hash.replace(/^#\/?/, "") !== "home") return;
+  if (lockedOut() || !_lastAppHash) return;
+  if (document.querySelector("#inviteGate, #authOverlay")) return;
+  navigate(_lastAppHash);
+});
 
 // ─── Study: Consent ─────────────────────────────────────────
 
@@ -11341,7 +11415,7 @@ function subnoteWorkspaceHTML(p) {
                 <h2 class="ch-preset-title" id="chPresetTitle" title="Double-click to rename this sound">${esc(title)}</h2>
                 ${_chLayerEdit ? `<span class="layer-edit-tag">editing layer ${((p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 2) || ""}</span>` : ""}
               </div>
-              ${_chLayerEdit ? `<button class="btn btn-primary btn-sm" id="layerEditDone" title="Save this sound back into the layer and return to the base sound">Done — back to base</button>` : ""}
+              ${_chLayerEdit ? `<button class="btn btn-primary btn-sm" id="layerEditDone" title="Save this sound back into the layer and return to Layer 1 (the base sound)">Done — back to Layer 1</button>` : ""}
               <!-- Owner 07-08: no preset dropdown or mix slider here — the
                    instrument cards below are the one place a recipe is
                    chosen, and spectralMix is a legacy blend (in the fourier
@@ -11411,8 +11485,11 @@ function subnoteWorkspaceHTML(p) {
             <div class="ch-status">${_chStage === "space"
               ? `<span>curves follow the pad and knobs live · <b>L</b> ear blue · <b>R</b> ear amber</span><span class="ch-status-right">binaural laws: Woodworth · Brown-Duda · Shaw</span>`
               : `<span><b>drag</b> a stem = level · <b>click</b> = pin readout · <b>brush</b> the lens to focus · knobs drag vertically, double-click resets</span><span class="ch-status-right">display = engine truth · log-f axis</span>`}</div>`}
-            ${layerStripHTML(p) /* V2.2: full rows on every stage — the space rows ARE the source list */}
-            ${m2PresetStripHTML(false) /* owner 07-08: ONE browser is the whole selection surface — sound modules + recipes to click or drag onto LAYERS; save lives in the top bar */}
+            <div class="ch-hsplit" id="chHSplit" title="Drag up/down to resize the layers & browser panel"></div>
+            <div class="chorda-bottom" id="chordaBottom"${_studioPanels.chordaBottomH ? ` style="height:${_studioPanels.chordaBottomH}px"` : ""}>
+              ${layerStripHTML(p) /* V2.2: full rows on every stage — the space rows ARE the source list */}
+              ${m2PresetStripHTML(false) /* owner 07-08: ONE browser is the whole selection surface — sound modules + recipes to click or drag onto LAYERS; save lives in the top bar */}
+            </div>
           </div>
         `}
 
@@ -15167,7 +15244,6 @@ function wireTonePrint(v) {
     card.onclick = () => {
       if (_chStage === card.dataset.chStage) return;
       _chStage = card.dataset.chStage;
-      _percSpaceMode = false; // leaving the stage exits percussion focus mode
       renderExplore();
     };
   });
@@ -15468,6 +15544,20 @@ function wireStudioPanels(v) {
     // bitmap tracks the new size instead of stretching
     try { drawStageBig(); drawSpaceField(); } catch {}
   }, saveStudioPanels);
+  // Horizontal divider over the LAYERS/BROWSER strip: drag it up to give that
+  // panel more room, down to hand the height back to the stage. The panel's
+  // bottom edge is pinned to the stage bottom, so height = that edge − cursor.
+  const chordaBottom = v.querySelector("#chordaBottom");
+  const chStage = v.querySelector(".harmonic-stage.chorda");
+  dragX(v.querySelector("#chHSplit"), (ev) => {
+    if (!chordaBottom || !chStage) return;
+    const anchor = chordaBottom.getBoundingClientRect().bottom;
+    const maxH = Math.max(120, chStage.getBoundingClientRect().height - 220);
+    _studioPanels.chordaBottomH = Math.round(Math.max(72, Math.min(maxH, anchor - ev.clientY)));
+    chordaBottom.style.height = `${_studioPanels.chordaBottomH}px`;
+    // stage/field width is unchanged, but its height shrank — redraw the canvases
+    try { drawStageBig(); drawSpaceField(); } catch {}
+  }, saveStudioPanels);
 }
 
 // Owner 07-07: clicking a layer row LOADS that layer's sound into the
@@ -15735,42 +15825,42 @@ function wireLayerStrip(v) {
 // only per-layer property is position, so the only per-source edit here
 // is dragging a dot. The binaural strip below follows the selection.
 let _stageSel = "base";
-// The stage can't MOVE percussion (that lives in the note engine's percussion
-// panel) — this only emphasises where the hits sit.
+// "Highlight percussion": shows each drum's location pin plus the kit's
+// draggable group reference. Individual drums are positioned from the note
+// engine's percussion panel (macro page); the reference moves the whole kit.
 let _spShowPerc = false;
 let _stageViewPos = null; // non-base selection: {angle, dist} the ear view follows
-// Percussion focus sub-mode: double-clicking the aggregate "P" dot swaps the
-// stage to show each percussion LAYER as its own draggable dot (owner spec).
-let _percSpaceMode = false;
 // SPACE-stage canvases are drawn in CSS-pixel space (crisp2d), so a container
 // size change — window resize OR dragging the inspector splitter — leaves the
 // old bitmap stretched until the next redraw. Observe the canvases and redraw
 // on any resize (owner 2026-07-10).
 let _spaceResizeObserver = null;
 
-function percRoleLabel(role) { const r = PERC_ROLES.find(x => x[0] === role); return r ? r[1] : role; }
 function percGroupAngle(p) { return Number.isFinite(p.percAzimuth) ? p.percAzimuth : (p.spaceAzimuth ?? 0); }
 function percGroupDist(p) { return Number.isFinite(p.percDistance) ? p.percDistance : (p.spaceDistance ?? 2.5); }
 
-function stageSourceList(p) {
-  // Materialise the layer list (stable ids) whenever percussion is in play, so
-  // the focus-mode dots keep their identity across redraws.
-  const percOn = resolvePercEnabled(p) || _percSpaceMode;
-  const pl = percOn
-    ? ((Array.isArray(p.percLayers) && p.percLayers.length) ? p.percLayers : (p.percLayers = ensurePercLayers(p)))
-    : null;
-
-  if (_percSpaceMode) {
-    return (pl || []).map((l, i) => ({
-      id: `perc:${l.id}`, num: `P${i + 1}`,
-      label: `${percRoleLabel(l.role)} · ${percSoundLabel(l.sound)}`,
-      hue: percLayerHue(i),
-      angle: l.space?.angle ?? percGroupAngle(p),
-      dist: l.space?.dist ?? percGroupDist(p),
-      percLayer: l,
-    }));
+// Pixel positions for every stage dot, shared by the renderer and the hit
+// tests so they always agree. The aggregate percussion dot inherits the base
+// position until the kit is moved, which used to paint its "P" straight over
+// the base's "1" — when it lands on another dot, nudge it tangentially so
+// both stay readable and grabbable (owner 2026-07-15).
+function stageDotXYs(p, cx, cy, rMax) {
+  const out = stageSourceList(p).map((s) => {
+    const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
+    const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
+    return { s, x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r, rad };
+  });
+  const grp = out.find((d) => d.s.isPercGroup);
+  if (grp && out.some((d) => d !== grp && Math.hypot(d.x - grp.x, d.y - grp.y) < 16)) {
+    grp.homeX = grp.x; grp.homeY = grp.y;
+    grp.x += Math.cos(grp.rad + Math.PI / 2) * 26;
+    grp.y += Math.sin(grp.rad + Math.PI / 2) * 26;
+    grp.nudged = true;
   }
+  return out;
+}
 
+function stageSourceList(p) {
   const list = [{
     id: "base", num: "1", label: "Layer 1", hue: 36,
     angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5,
@@ -15782,14 +15872,23 @@ function stageSourceList(p) {
     dist: l.space?.dist ?? (p.spaceDistance ?? 2.5),
     layer: l,
   }));
-  // Aggregate percussion dot — drag to move the whole kit; double-click to
-  // position individual percussion layers (focus mode).
-  if (resolvePercEnabled(p) && pl && pl.length) {
-    list.push({
-      id: "perc", num: "P", label: "Percussion", hue: 32,
-      angle: percGroupAngle(p), dist: percGroupDist(p),
-      isPercGroup: true,
-    });
+  // The percussion kit's group REFERENCE — only while "Highlight percussion"
+  // is on. Dragging it moves the whole kit, each drum keeping its relative
+  // placement; individual drums are positioned on the macro page. The first
+  // time it shows it materialises its own percAzimuth/percDistance (seeded
+  // from wherever the kit was effectively sounding), so it is anchored
+  // independently — moving Layer 1 never drags the kit (owner 2026-07-15).
+  if (_spShowPerc && resolvePercEnabled(p)) {
+    const pl = (Array.isArray(p.percLayers) && p.percLayers.length) ? p.percLayers : (p.percLayers = ensurePercLayers(p));
+    if (pl && pl.length) {
+      if (!Number.isFinite(p.percAzimuth)) p.percAzimuth = p.spaceAzimuth ?? 0;
+      if (!Number.isFinite(p.percDistance)) p.percDistance = p.spaceDistance ?? 2.5;
+      list.push({
+        id: "perc", num: "P", label: "Percussion", hue: 32,
+        angle: p.percAzimuth, dist: p.percDistance,
+        isPercGroup: true,
+      });
+    }
   }
   return list;
 }
@@ -15825,15 +15924,15 @@ function updateStageReadouts() {
   set("stageRoTof", `${(spaceArrivalDelay(s.dist) * 1000).toFixed(1)} ms`);
   set("stageRoLvl", `${(20 * Math.log10(spaceDistanceGain(s.dist))).toFixed(1)} dB`);
   // stage selection ↔ layer rows: the picked dot highlights its row as the
-  // active layer (base clears it) — one selection, two views (V2.2). In the
-  // percussion focus sub-mode the selection is a percussion layer, which owns
-  // no tonal layer row, so leave the tonal-layer selection untouched.
-  if (!_percSpaceMode) {
+  // active layer (base clears it) — one selection, two views (V2.2). The
+  // percussion group reference owns no tonal layer row, so selecting it
+  // leaves the tonal-layer selection untouched.
+  if (s.id !== "perc") {
     _chLayerSel = s.id === "base" ? null : s.id;
     document.querySelectorAll("[data-layer-row]").forEach(row =>
       row.classList.toggle("sel", row.dataset.layerRow === _stageSel));
   }
-  _stageViewPos = (s.id === "base" && !_percSpaceMode) ? null : { angle: s.angle, dist: s.dist };
+  _stageViewPos = s.id === "base" ? null : { angle: s.angle, dist: s.dist };
 }
 
 function _stageGeom(w, h) {
@@ -15936,33 +16035,20 @@ function drawStageBig() {
 
   // sources — the base sound and each layer, drag targets
   ctx.textAlign = "center";
-  for (const s of stageSourceList(exploreParams)) {
-    const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
-    const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
-    const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+  for (const { s, x, y, nudged, homeX, homeY } of stageDotXYs(exploreParams, cx, cy, rMax)) {
     const col = `hsl(${s.hue}, 70%, 62%)`;
     if (s.isPercGroup) {
-      // dashed halo marks the percussion handle (view-only here — hits are
-      // positioned from the note engine's percussion panel; it can sit on top
-      // of the base dot when percussion inherits the base position)
+      // dashed halo marks the kit's group reference — drag it to move every
+      // drum together. When it happens to coincide with another dot it is
+      // drawn nudged aside, with a tether back to the spot it actually
+      // occupies, so the other dot's number stays readable.
       ctx.save();
       ctx.strokeStyle = col; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.1;
       ctx.setLineDash([2, 3]);
+      if (nudged) {
+        ctx.beginPath(); ctx.moveTo(homeX, homeY); ctx.lineTo(x, y); ctx.stroke();
+      }
       ctx.beginPath(); ctx.arc(x, y, 15, 0, 2 * Math.PI); ctx.stroke();
-      ctx.restore();
-    }
-    // "Highlight percussion" in focus mode: a warm glow + label on each
-    // percussion LAYER dot. In normal mode the aggregate dot is not ringed —
-    // per-layer location pins (below) mark where the hits actually sit.
-    if (_spShowPerc && s.percLayer) {
-      ctx.save();
-      ctx.strokeStyle = col;
-      ctx.shadowColor = col; ctx.shadowBlur = 12;
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, 11, 0, 2 * Math.PI); ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = col;
-      ctx.fillText(s.label || "percussion", x, y - 16);
       ctx.restore();
     }
     if (s.id === _stageSel) {
@@ -15987,7 +16073,7 @@ function drawStageBig() {
   // kit position it inherits. Coincident pins fan around their shared tip so a
   // stack still reads as several sources rather than one ring. Placement is
   // read-only here; hits are positioned from the note engine's percussion panel.
-  if (_spShowPerc && !_percSpaceMode && resolvePercEnabled(exploreParams)) {
+  if (_spShowPerc && resolvePercEnabled(exploreParams)) {
     const pp = exploreParams;
     const layers = (Array.isArray(pp.percLayers) && pp.percLayers.length) ? pp.percLayers : ensurePercLayers(pp);
     const pins = layers.map((l, i) => {
@@ -16015,7 +16101,13 @@ function wireStageBig(v) {
   const cv = v.querySelector("#cvStageBig");
   if (!cv) return;
   const showPerc = v.querySelector("#spShowPercChk");
-  if (showPerc) showPerc.onchange = () => { _spShowPerc = showPerc.checked; drawStageBig(); };
+  if (showPerc) showPerc.onchange = () => {
+    _spShowPerc = showPerc.checked;
+    // the kit's group reference dot lives behind this toggle — don't leave it
+    // selected (and the ear view following it) once it's hidden
+    if (!_spShowPerc && _stageSel === "perc") { _stageSel = "base"; updateStageReadouts(); drawSpaceField(); }
+    drawStageBig();
+  };
   // Redraw the stage + ear-response on any container resize so the browser
   // never shows a stretched bitmap (window resize or inspector-splitter drag).
   if (_spaceResizeObserver) { _spaceResizeObserver.disconnect(); _spaceResizeObserver = null; }
@@ -16033,10 +16125,8 @@ function wireStageBig(v) {
     const h = cv._cssH || cv.getBoundingClientRect().height;
     const { cx, cy, rMax } = _stageGeom(w, h);
     let best = null, bestD = 18;
-    for (const s of stageSourceList(exploreParams)) {
-      const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
-      const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
-      const d = Math.hypot(cx + Math.cos(rad) * r - x, cy + Math.sin(rad) * r - y);
+    for (const { s, x: sx, y: sy } of stageDotXYs(exploreParams, cx, cy, rMax)) {
+      const d = Math.hypot(sx - x, sy - y);
       // ties go to the already-selected source, so when dots stack the
       // chips decide which one a grab picks up
       if (d < bestD || (best && s.id === _stageSel && d < 18)) { best = s; bestD = Math.min(d, bestD); }
@@ -16065,10 +16155,21 @@ function wireStageBig(v) {
       exploreParams.spaceDistance = dist;
       synth.updateReverb({ ...exploreParams });
       drawChThumbs();
-    } else if (s.percLayer || s.isPercGroup) {
-      // Percussion is positioned from the note engine's percussion panel
-      // (owner 2026-07-15) — the stage only SHOWS where the hits sit.
-      return;
+    } else if (s.isPercGroup) {
+      // Drag the kit's group reference: every drum keeps its offset from the
+      // reference — rotate by the angle change, shift by the distance change.
+      // Individual drum positions are still edited on the macro page.
+      const dA = az - (exploreParams.percAzimuth ?? 0);
+      const dD = dist - (exploreParams.percDistance ?? 2.5);
+      exploreParams.percAzimuth = az;
+      exploreParams.percDistance = dist;
+      for (const l of (exploreParams.percLayers || [])) {
+        if (!l.space) continue; // drums with no own position ride the reference already
+        l.space.angle = ((l.space.angle + dA + 540) % 360) - 180;
+        l.space.dist = clamp(l.space.dist + dD, SPACE_DMIN, SPACE_DMAX);
+      }
+      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateReverb({ ...exploreParams });
     } else if (s.layer) {
       s.layer.space = { angle: az, dist };
       if (_chLayerEdit?.layerId === s.id) {
@@ -16099,23 +16200,6 @@ function wireStageBig(v) {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
-  // Double-clicking the aggregate "P" dot drops into percussion focus mode.
-  // The P dot is drawn on top and can sit exactly over the base dot (default
-  // percussion position inherits the base), where srcAt would prefer base — so
-  // test the percussion-group dot's position directly rather than via srcAt.
-  cv.ondblclick = (e) => {
-    e.preventDefault();
-    if (_percSpaceMode) return;
-    const { x, y, w, h } = toLocal(e);
-    const { cx, cy, rMax } = _stageGeom(w, h);
-    const grp = stageSourceList(exploreParams).find(s => s.isPercGroup);
-    if (!grp) return;
-    const rad = (clamp(grp.angle, -180, 180) - 90) * Math.PI / 180;
-    const r = _spaceDistToR(clamp(grp.dist, SPACE_DMIN, SPACE_DMAX), rMax);
-    if (Math.hypot(cx + Math.cos(rad) * r - x, cy + Math.sin(rad) * r - y) < 18) {
-      enterPercSpaceMode(v);
-    }
-  };
   v.querySelectorAll("[data-stage-src]").forEach(chip => {
     chip.onclick = (e) => {
       if (e.target.closest("button")) return; // solo stays solo
@@ -16126,49 +16210,8 @@ function wireStageBig(v) {
       drawSpaceField();
     };
   });
-  ensurePercModeChrome(v);
   updateStageReadouts();
   drawStageBig();
-}
-
-// The percussion focus mode's on-stage chrome: a tinted border, a "PERCUSSION"
-// badge, and an × to return to the normal layer view. Created once per stage,
-// shown only while _percSpaceMode is on.
-function ensurePercModeChrome(v) {
-  const host = v.querySelector(".ch-field-pos.stage-pos");
-  if (!host) return null;
-  let chrome = host.querySelector(".perc-mode-chrome");
-  if (!chrome) {
-    if (!host.style.position) host.style.position = "relative";
-    chrome = document.createElement("div");
-    chrome.className = "perc-mode-chrome";
-    chrome.innerHTML =
-      `<span class="perc-mode-badge">PERCUSSION</span>`
-      + `<button type="button" class="perc-mode-exit" title="Back to layers">×</button>`;
-    host.appendChild(chrome);
-    chrome.querySelector(".perc-mode-exit").onclick = () => exitPercSpaceMode(v);
-  }
-  chrome.style.display = _percSpaceMode ? "flex" : "none";
-  return chrome;
-}
-
-function enterPercSpaceMode(v) {
-  _percSpaceMode = true;
-  const first = stageSourceList(exploreParams)[0];
-  _stageSel = first ? first.id : "base";
-  ensurePercModeChrome(v);
-  updateStageReadouts();
-  drawStageBig();
-  drawSpaceField();
-}
-
-function exitPercSpaceMode(v) {
-  _percSpaceMode = false;
-  _stageSel = "base";
-  ensurePercModeChrome(v);
-  updateStageReadouts();
-  drawStageBig();
-  drawSpaceField();
 }
 
 // Owner 07-07 round 2: the SPACE stage's field is the BINAURAL RESPONSE —
@@ -17190,9 +17233,10 @@ function trackEngagement(type, extra = {}) {
 function paletteEditBannerHTML() {
   const state = paletteEditState();
   if (!state) return "";
+  const what = state.regionId ? "this region's patch" : "palette patch";
   return `
     <div class="card palette-edit-banner">
-      <span>Editing palette patch <strong>${esc(state.name)}</strong> · changes apply automatically</span>
+      <span>Editing ${what} <strong>${esc(state.name)}</strong> · <b>▶ play</b> auditions this patch · changes apply automatically</span>
       <span class="peb-actions">
         <a class="btn btn-primary btn-sm" id="palBackProducer" href="#produce" title="Apply the current patch and return to its arrangement">← Back to Producer</a>
       </span>
