@@ -7764,7 +7764,9 @@ body.dragging { cursor: grabbing; user-select: none; }
 
 /* ── Producer audit pass 2026-07-08: professional production surface ── */
 .daw {
-  height: 100dvh;
+  /* -14px leaves a slim lane at the very bottom for the persistent .app-credit
+     watermark, so the producer box's border doesn't sit under it (2026-07-15). */
+  height: calc(100dvh - 14px);
   gap: 6px;
   background: #11141a;
   /* Never grow past the viewport — wide content (timeline, mixer) scrolls in
