@@ -90,7 +90,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.11.0"; // measured KEMAR HRIR convolution ear model (route 2) alongside the parametric fit
+const APP_VERSION = "sound-studio-0.12.0"; // Sound Generator 2.0 excitor/resonator/body laws (neutral until a preset opts in)
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -642,10 +642,19 @@ const PARAM_DESC = {
   excitationType: "How energy enters the resonator: bow (continuous drive), pluck (displacement release), strike (force impulse), blow (air jet). Sets the physical drive spectrum",
   excitationPosition: "Where the string/tube/membrane is excited (0.02 near the edge to 0.5 the middle). Modes with a node at this point go silent — 0.5 kills every even partial, 0.33 every third. Applied relative to the instrument's natural position",
   excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
+  velocityHardnessCoupling: "How strongly playing velocity changes contact hardness. At 0 the selected hardness is fixed; higher values make forceful piano/guitar attacks brighter and soft attacks darker",
+  breathNoiseColor: "Spectral colour of the sustained air noise for blown sounds: negative is darker/turbulent, positive is brighter/hissier",
+  dynamicBlare: "Nonlinear forte brightening: upper partials enrich increasingly above the normal dynamic pivot, modelling brass blare and high-force bowed edge. 0 preserves the ordinary law",
+  decaySecondStage: "Amount of double decay after the first 18 dB: 0 uses one T60; higher values reveal a slower aftersound for piano strings and plucked bodies",
+  decaySecondRatio: "Late-to-early T60 ratio for double decay. Has no effect while Second stage is 0",
+  glottalTilt: "Vocal glottal-source spectral tilt. Positive values darken upper harmonics as a softer/less pressed glottal source would; 0 is neutral",
+  singerFormantAmount: "Adds the clustered vocal radiation band around 3 kHz associated with carrying singer presence",
+  voiceBreathSync: "Makes vocal breath noise pulse at the sung fundamental, coupling breathiness to glottal cycles instead of using only steady noise",
   excitationHuman: "The player: one seeded fluctuation per note wobbles bow pressure / breath support, moving the whole spectrum together (brighter when pushed), with bow slips or breath bursts. Struck/plucked notes get per-note velocity and hardness jitter instead. 0 = machine",
   partialTransfer: "Sympathetic resonance: energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Inharmonicity detunes pairs out of resonance, weakening the transfer — exactly like real sympathetic strings",
   bodyType: "The box around the resonator: a set of fixed-Hz resonance bands. Auto keeps the instrument's own measured body; vowels are bodies too (F1–F5 bands). With vibrato, partials on body slopes shimmer in amplitude — real FM→AM",
   partialB: "Stiff-string inharmonicity: partials sharpen as f·n·√(1+Bn²). Piano bass ≈ 1e-4, treble ≈ 1e-3; 0 = perfectly harmonic. Rising B detunes partial pairs out of sympathetic resonance, weakening Transfer",
+  resonatorClass: "Physical mode series: strings, open/conical tubes use the full harmonic series; a closed cylindrical tube uses odd modes; membranes and bars use their measured inharmonic mode ratios",
   spaceDistance: "How far the instrument stands from you (0.3–30 m). Distance delays the sound's arrival (~3 ms/m), rolls off the highs (air absorption), lowers the direct level against the room, and inside ~1 m adds the proximity bass lift",
   spaceAzimuth: "The instrument's bearing, all the way around you (−180°…180°): per-ear arrival times, far-ear head shadow, and a pinna cue that makes sounds behind you duller than in front — real binaural physics, not simple panning",
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences AND head shadowing from lower frequencies (the shadow corner is c/2πa)",
@@ -8907,7 +8916,8 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType","partialB","attackNoiseLevel",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","partialTransfer","bodyType","partialB","attackNoiseLevel",
+    "dynamicBlare","decaySecondStage","decaySecondRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF1Level","formantF2Level","formantF3Level","formantF4Level","formantF5Level","formantBandwidth","bodyArticulation",
@@ -14222,6 +14232,13 @@ function chInspectorHTML(p) {
           ${knobHTML("attackNoiseLevel", "Onset noise", p.attackNoiseLevel ?? 1, 0, 2, 0.01, { def: 1 })}
         </div>
       </div>
+      <details class="ch-perf formant-detail">
+        <summary>Advanced excitation</summary>
+        <div class="controls-grid">
+          ${controlRow("velocityHardnessCoupling", "Velocity → hardness", p.velocityHardnessCoupling ?? 0, 0, 1, 0.01)}
+          ${controlRow("breathNoiseColor", "Air-noise colour", p.breathNoiseColor ?? 0, -1, 1, 0.01)}
+        </div>
+      </details>
       <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
       <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field. Envelope &amp; modulation live in the right panel →</div>`;
   }
@@ -14250,7 +14267,15 @@ function chInspectorHTML(p) {
       </div>
       <details class="ch-perf formant-detail">
         <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery.">Advanced shaping</summary>
+        <label class="control-row" title="${esc(PARAM_DESC.resonatorClass || "Physical resonator mode series")}"><span>Resonator class</span>
+          <select data-param-select="resonatorClass" class="param-select">
+            ${[["string","String / open tube"],["closedTube","Closed tube"],["conicalTube","Conical tube"],["membrane","Membrane"],["bar","Bar / plate"]].map(([value,label]) => `<option value="${value}"${(p.resonatorClass || "string") === value ? " selected" : ""}>${label}</option>`).join("")}
+          </select>
+        </label>
         <div class="controls-grid">
+          ${controlRow("dynamicBlare", "Forte curvature", p.dynamicBlare ?? 0, 0, 1.5, 0.01)}
+          ${controlRow("decaySecondStage", "Second decay", p.decaySecondStage ?? 0, 0, 1, 0.01)}
+          ${controlRow("decaySecondRatio", "Late T60 ratio", p.decaySecondRatio ?? 1, 1, 8, 0.1)}
           ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
           ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
           ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
@@ -14291,6 +14316,14 @@ function chInspectorHTML(p) {
             ${knobHTML("formantBandwidth", "Band width", p.formantBandwidth, 0.4, 2.5, 0.01, { def: 1, cool: true })}
           </div>
         </div>` : `<canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>`}
+      <details class="ch-perf formant-detail">
+        <summary>Advanced vocal body</summary>
+        <div class="controls-grid">
+          ${controlRow("glottalTilt", "Glottal tilt", p.glottalTilt ?? 0, -1, 1, 0.01)}
+          ${controlRow("singerFormantAmount", "Singer formant", p.singerFormantAmount ?? 0, 0, 1.5, 0.01)}
+          ${controlRow("voiceBreathSync", "Cyclic breath", p.voiceBreathSync ?? 0, 0, 1, 0.01)}
+        </div>
+      </details>
       <div class="ch-caption">${(p.bodyArticulation ?? 0) > 0
         ? "ARTICULATION rides on the selected body: the vowel EQ layers over its bands at the chosen depth — a violin body can sing. Click a band chip to see and reshape its EQ in the field"
         : "the body is a PRESET you can edit: click a band chip to see its EQ curve in the field and drag the Band gain knob to make it more or less extreme"}</div>`;
