@@ -6,12 +6,13 @@
 <title>Soundinator</title>
 <link rel="icon" type="image/svg+xml" href="/app-icon.svg"/>
 <link rel="apple-touch-icon" href="/app-icon.svg"/>
-<link rel="stylesheet" href="/styles.css?v=295"/>
+<link rel="stylesheet" href="/styles.css?v=297"/>
 </head>
 <body>
 <div id="app" role="main"></div>
+<div class="app-credit" aria-hidden="true">Software by Marcus Anderson &middot; &copy; 2026</div>
 <script type="module">
-  import("/app.js?v=295").catch((err) => {
+  import("/app.js?v=297").catch((err) => {
     const app = document.getElementById("app");
     if (app) app.textContent = err && err.stack ? err.stack : String(err);
     console.error(err);

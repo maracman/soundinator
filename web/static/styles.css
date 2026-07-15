@@ -78,6 +78,28 @@ body {
   padding: 2rem 1.5rem 4rem;
 }
 
+/* Persistent authorship credit — a faint watermark pinned to the very bottom
+   of the viewport, present on every view. pointer-events:none so it never
+   blocks the UI beneath it (owner 2026-07-15). */
+.app-credit {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  z-index: 2147483000;
+  text-align: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  /* The app is always dark-themed (bg ~#050810) regardless of OS preference,
+     so this stays a light, faint watermark. */
+  color: rgba(158, 170, 186, 0.34);
+  pointer-events: none;
+  user-select: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
 .view { animation: fadeIn 0.25s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
