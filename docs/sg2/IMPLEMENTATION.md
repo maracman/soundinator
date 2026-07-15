@@ -1,0 +1,67 @@
+# Sound Generator 2.0 implementation workflow
+
+This directory records the executable portion of
+`docs/SOUND_GENERATOR_2_PLAN.md`. Public reference-corpus downloads and
+optimization artifacts remain outside git under `/private/tmp/sg2/`.
+
+## Reference layout
+
+Reconstruct the corpus as:
+
+```text
+/private/tmp/sg2/samples/
+  <instrument>/
+    provenance.json
+    <pitch>-<dynamic>[-vib|-nonvib].wav
+```
+
+Each `provenance.json` records source, direct URL, licence, performer (when
+known), download date, pitch, dynamic and any conversion. Do not copy source
+audio into this repository.
+
+## Commands
+
+```bash
+# Fit measured/pinned parameters.
+python3 scripts/fit_profiles_from_samples.py \
+  --samples /private/tmp/sg2/samples \
+  --out web/static/measured_profiles.json --partials 64
+python3 scripts/gen_measured_profiles_module.py
+
+# Render exactly one browser-engine note with neutral space.
+node scripts/render_note.mjs --params preset.json --midi 60 --out note.wav
+
+# Compare a render and reference and write the HTML report.
+python3 -m scripts.tone_match.score --ref reference.wav --render note.wav \
+  --json score.json --report report.html
+
+# Optimize the free-tier manifest and append best-so-far ledger evidence.
+python3 -m scripts.tone_match.iterate --instrument clarinet \
+  --initial clarinet.json --references clarinet-references.json
+
+# Verify ledger-approved family morphs and derive a playback-density variant.
+python3 -m scripts.tone_match.verify_morph --manifest morphs.json --out morph-results.json
+python3 -m scripts.tone_match.compress_preset --params fitted.json \
+  --references references.json --out shipping.json
+
+# Build the one-file capstone listening kit.
+python3 -m scripts.tone_match.audition --manifest audition.json --out audition.html
+```
+
+Install the optional analysis/test dependencies with
+`pip install -e '.[audio,dev]'`. The renderer also requires `npm install` and
+Playwright Chromium.
+
+## Campaign gates
+
+The fitting campaigns are fully automated: every candidate must pass the §3
+feature tripwires plus its dossier construction assertions. Refinement follows
+§2.5 and continues until the run report demonstrates the reference-variability
+floor, or the session records a measurable improvement or a named limiting
+factor with a concrete follow-up work item. Human A/B/X audition is deferred to
+the capstone and does not block fitting or preset freezing.
+
+The reference recordings are public corpus inputs (Iowa MIS, Philharmonia and
+VocalSet) stored outside git. Tenor sax uses the approved modelling-synth gap
+path; boy soprano uses a found reference or the dossier's approved morphology
+construction. Audio is never committed.
