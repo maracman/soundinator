@@ -9,7 +9,7 @@ from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_cont
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.iterate import _floor_evidence, _reference_variability
-from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time
+from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time, compare_features
 
 
 def test_mel_bank_is_nonnegative_and_has_requested_shape():
@@ -25,6 +25,14 @@ def test_time_resampling_is_stable_at_endpoints():
     assert result.shape == (1, 9)
     assert result[0, 0] == 1.0
     assert result[0, -1] == 4.0
+
+
+def test_nonvibrato_estimator_peaks_do_not_count_as_vibrato_distance():
+    reference = _bundle()
+    rendered = _bundle()
+    reference.note.vibrato = {"present": False, "rate": 7.6, "depth": .5}
+    rendered.note.vibrato = {"present": False, "rate": 3.1, "depth": .1}
+    assert compare_features(reference, rendered)["features"]["vibrato"] == 0
 
 
 def _bundle(*, f0=220.0, partials=None, percussive=False, B=0.0002):
@@ -136,3 +144,4 @@ def test_corpus_sidecar_filename_classification():
     assert _vowel("m3_long_straight_u.wav") == "u"
     assert _vowel("AltoSax.NoVib.ff.C4B4.aiff") is None
     assert vowel_from_filename("vocalset.m3.long.m3_long_straight_i.wav") == "i"
+

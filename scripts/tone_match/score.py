@@ -116,6 +116,27 @@ def _decay_distance(ref: NoteAnalysis, render: NoteAnalysis) -> float:
     return float(np.mean(values)) if values else 0.0
 
 
+def _vibrato_distance(ref: NoteAnalysis, render: NoteAnalysis) -> float:
+    """Compare rate/depth only after the detector says vibrato is present.
+
+    The estimator still emits a peak rate and depth for straight tones.  Those
+    values describe low-level drift or analysis noise, not vibrato, and must
+    not steer a fit toward adding modulation to a non-vibrato reference.
+    """
+    vr, vs = ref.vibrato or {}, render.vibrato or {}
+    ref_present, render_present = bool(vr.get("present")), bool(vs.get("present"))
+    if not ref_present and not render_present:
+        return 0.0
+    if ref_present != render_present:
+        return 1.0
+    number = lambda value, fallback=0.0: float(value) if isinstance(value, (int, float)) and np.isfinite(value) else fallback
+    ref_rate, render_rate = number(vr.get("rate")), number(vs.get("rate"))
+    ref_depth, render_depth = number(vr.get("depth")), number(vs.get("depth"))
+    distance = abs(ref_rate - render_rate) / .3
+    distance += abs(ref_depth - render_depth) / max(5, .3 * (ref_depth or 1))
+    return distance
+
+
 def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[str, float] | None = None) -> dict[str, Any]:
     weights = {**DEFAULT_WEIGHTS, **(weights or {})}
     audible = np.maximum(ref.partial_db, render.partial_db) > -66
@@ -128,12 +149,8 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
     decay = _decay_distance(ref.note, render.note)
     b_ref, b_render = ref.note.B or 0, render.note.B or 0
     b_distance = abs(math.log(max(b_render, 1e-8) / max(b_ref, 1e-8))) if b_ref or b_render else 0.0
-    vr, vs = ref.note.vibrato or {}, render.note.vibrato or {}
     number = lambda value, fallback=0.0: float(value) if isinstance(value, (int, float)) and np.isfinite(value) else fallback
-    vr_rate, vs_rate = number(vr.get("rate")), number(vs.get("rate"))
-    vr_depth, vs_depth = number(vr.get("depth")), number(vs.get("depth"))
-    vibrato = abs(vr_rate - vs_rate) / .3
-    vibrato += abs(vr_depth - vs_depth) / max(5, .3 * (vr_depth or 1))
+    vibrato = _vibrato_distance(ref.note, render.note)
     nr, ns = ref.note.attack_noise or {}, render.note.attack_noise or {}
     level_db = abs(20 * math.log10(max(number(ns.get("level"), 1e-5), 1e-5) / max(number(nr.get("level"), 1e-5), 1e-5))) / 3
     freq_oct = abs(math.log2(max(number(ns.get("freq"), 1), 1) / max(number(nr.get("freq"), 1), 1)))
