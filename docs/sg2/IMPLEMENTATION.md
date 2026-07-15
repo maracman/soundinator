@@ -88,3 +88,16 @@ The reference recordings are public corpus inputs (Iowa MIS, Philharmonia and
 VocalSet) stored outside git. Tenor sax uses the approved modelling-synth gap
 path; boy soprano uses a found reference or the dossier's approved morphology
 construction. Audio is never committed.
+
+## Corrected-objective audit
+
+The blown-family objective was corrected to give stiff-string `B` zero weight
+and to ignore sub-audible transient-centre errors. Presets frozen before that
+change must be re-audited; an old green report is not grandfathered.
+
+The 2026-07-15 audit reopened clarinet and trumpet. Their construction
+checklists still pass, but the clarinet MIDI-72 `pp` group is 1.3618× its
+alternate-take floor and the trumpet MIDI-72 `pp` group is 1.1385×. Corrected
+audit artifacts and filed fixes live beside the external runs under
+`/private/tmp/sg2/<instrument>/`; neither preset is considered frozen until a
+current-engine render demonstrates every available group at or below floor.
