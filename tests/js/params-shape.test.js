@@ -97,3 +97,13 @@ test("converged alto sax is frozen as an interim factory sound", () => {
   assert.equal(preset.parameters.dynamicBlare, 1.0294720710325107);
   assert.ok(preset.tags.includes("interim"));
 });
+
+test("converged clarinet is frozen as a fitted factory sound", () => {
+  const preset = FACTORY_PRESETS.find(row => row.id === "factory-sub-clarinet-sg2");
+  assert.ok(preset);
+  assert.equal(preset.section, "sound");
+  assert.equal(preset.parameters.resonatorClass, "closedTube");
+  assert.equal(preset.parameters.excitationHuman, 0.5);
+  assert.equal(preset.parameters.partialTransfer, 0.05);
+  assert.ok(preset.tags.includes("fitted"));
+});

@@ -47,7 +47,7 @@ const profileSounds = [
     envelopeRelease: excitationType === "strike" ? 0.28 : 0.28,
   }));
 
-// WP-5 interim instrument: automated construction gates passed and the
+// WP-5 fitted instruments: automated construction gates passed and the
 // available same-note/dynamic groups reached the measured variability floor.
 const fittedSounds = [
   sound("factory-sub-alto-sax-sg2", "Alto Sax — SG2 Interim",
@@ -69,6 +69,23 @@ const fittedSounds = [
       spectralResonanceAmount: 0.35, spectralDynamicAmount: 0.8,
       spectralCullThreshold: 0.002,
       dynamicBlare: 1.0294720710325107,
+    }),
+  sound("factory-sub-clarinet-sg2", "Clarinet — SG2 Fitted",
+    "A fitted B-flat clarinet spanning chalumeau through clarino registers.",
+    ["reed", "clarinet", "measured", "fitted"], {
+      seed: 7331, sg2Family: "blown", voiceMode: "fourier",
+      spectralProfile: "clarinet", spectralMix: 1, spectralPartials: 64,
+      excitationType: "blow", resonatorClass: "closedTube", bodyType: "auto",
+      partialB: 0, partialMaterial: 0.35,
+      attackNoiseLevel: 1, attackNoiseFreq: 2006,
+      attackNoiseQ: 1.01, attackNoiseDecay: 0.11,
+      envelopeAttack: 0.1696, envelopeDecay: 0,
+      envelopeSustain: 0.9699, envelopeRelease: 0.0798, vibratoProb: 0,
+      excitationPosition: 0.15, excitationHuman: 0.5,
+      toneBreath: 0.03, breathNoiseColor: 0,
+      partialTransfer: 0.05, partialTilt: 0,
+      spectralResonanceAmount: 0.35, spectralDynamicAmount: 0.8,
+      dynamicBlare: 0,
     }),
 ];
 
