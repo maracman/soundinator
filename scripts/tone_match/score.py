@@ -31,6 +31,27 @@ DEFAULT_WEIGHTS = {
     "noise": 1.0,
 }
 
+_BLOWN_INSTRUMENTS = {
+    "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
+}
+
+
+def weights_for_instrument(instrument: str | None,
+                           overrides: dict[str, float] | None = None) -> dict[str, float]:
+    """Return the physical scoring policy for an instrument family.
+
+    Reed, lip and air-jet oscillators lock their radiated steady output to a
+    harmonic series. Their passive bore impedance is not the stiff-string B
+    fitted by the analyser, so that diagnostic remains visible but must not
+    steer blown-instrument presets.
+    """
+    weights = dict(DEFAULT_WEIGHTS)
+    if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
+        weights["inharmonicity_log_ratio"] = 0.0
+    if overrides:
+        weights.update(overrides)
+    return weights
+
 # One score unit is approximately one just-actionable mismatch.  The absolute
 # values remain in the emitted feature table; these scales only make the
 # uniformly weighted composite interpretable.
@@ -179,7 +200,7 @@ def score_files(
 ) -> dict[str, Any]:
     ref = extract_features(ref_path)
     render = extract_features(render_path)
-    result = compare_features(ref, render, weights)
+    result = compare_features(ref, render, weights_for_instrument(instrument, weights))
     if instrument:
         # Local import avoids an import cycle: assertions operates on the
         # FeatureBundle defined by this module.

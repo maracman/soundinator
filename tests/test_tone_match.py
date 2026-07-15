@@ -9,7 +9,7 @@ from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_cont
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.iterate import _floor_evidence, _reference_variability
-from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time, compare_features
+from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time, compare_features, weights_for_instrument
 
 
 def test_mel_bank_is_nonnegative_and_has_requested_shape():
@@ -135,6 +135,14 @@ def test_reference_variability_floor_requires_alternate_takes():
     assert result["status"] == "insufficient-evidence"
 
 
+def test_blown_scoring_does_not_fit_stiff_string_inharmonicity():
+    blown = weights_for_instrument("french-horn")
+    string = weights_for_instrument("violin")
+    assert blown["inharmonicity_log_ratio"] == 0
+    assert string["inharmonicity_log_ratio"] == 1
+    assert weights_for_instrument("trumpet", {"noise": .5})["noise"] == .5
+
+
 def test_corpus_sidecar_filename_classification():
     assert _dynamics("AltoSax.NoVib.ff.C4B4.aiff") == "ff"
     assert _dynamics("vocalset.m3.scales.slow_piano.m3_scales_c_slow_piano_a.wav") == "p"
@@ -144,4 +152,3 @@ def test_corpus_sidecar_filename_classification():
     assert _vowel("m3_long_straight_u.wav") == "u"
     assert _vowel("AltoSax.NoVib.ff.C4B4.aiff") is None
     assert vowel_from_filename("vocalset.m3.long.m3_long_straight_i.wav") == "i"
-

@@ -29,7 +29,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
-from .score import compare_features, extract_features, score_files, write_report
+from .score import compare_features, extract_features, score_files, weights_for_instrument, write_report
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
@@ -60,7 +60,8 @@ def _floor_group(reference: dict[str, Any]) -> str:
     ))
 
 
-def _reference_variability(references: list[dict[str, Any]], feature_loader=extract_features) -> dict[str, Any]:
+def _reference_variability(references: list[dict[str, Any]], feature_loader=extract_features,
+                           weights: dict[str, float] | None = None) -> dict[str, Any]:
     """Measure same-note/same-dynamic take-to-take feature distance."""
     groups: dict[str, list[int]] = {}
     for index, reference in enumerate(references):
@@ -76,7 +77,7 @@ def _reference_variability(references: list[dict[str, Any]], feature_loader=extr
         pairs = []
         for offset, left in enumerate(indices):
             for right in indices[offset + 1:]:
-                result = compare_features(cache[left], cache[right])
+                result = compare_features(cache[left], cache[right], weights)
                 pairs.append({"left": left, "right": right, "composite": result["composite"],
                               "features": result["features"], "normalized": result["normalized"]})
         feature_keys = pairs[0]["features"]
@@ -259,9 +260,10 @@ def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
     return rows
 
 
-def _reference_set_id(references: list[dict[str, Any]]) -> str:
+def _reference_set_id(references: list[dict[str, Any]], instrument: str | None = None) -> str:
     """Identify the scored objective so unlike manifests are never ranked."""
-    canonical = json.dumps(references, sort_keys=True, separators=(",", ":"))
+    objective = {"references": references, "weights": weights_for_instrument(instrument)}
+    canonical = json.dumps(objective, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
@@ -319,7 +321,8 @@ def main(argv: list[str] | None = None) -> int:
     initial, references, manifest = _load(args.initial), _load(args.references), _load(args.manifest)
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
-    variability = _reference_variability(references)
+    scoring_weights = weights_for_instrument(args.instrument)
+    variability = _reference_variability(references, weights=scoring_weights)
     only = list(dict.fromkeys(key.strip() for key in args.keys.split(",") if key.strip())) if args.keys else None
     free = _params(manifest, initial, only)
     if not free:
@@ -343,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
     sensitivity = {} if args.skip_sensitivity else _sensitivity(matcher, best)
     best = matcher.best or best
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
-    reference_set = _reference_set_id(references)
+    reference_set = _reference_set_id(references, args.instrument)
     improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
     if improved:
         _append_ledger(args.instrument, run_dir, best, sensitivity)
