@@ -502,6 +502,24 @@ export const SPECTRAL_PROFILES = {
   },
 };
 
+// WP-3 catalogue entries whose spectral tables are replaced below by the
+// measured corpus.  The seed supplies only the existing continuous dynamic
+// law until WP-5/7/8 freeze per-instrument presets; it is not presented as a
+// fitted fingerprint.
+for (const [key, label, seed] of [
+  ["alto-sax", "Alto saxophone", "clarinet"],
+  ["french-horn", "French horn", "trombone"],
+  ["guitar", "Acoustic guitar", "piano"],
+  ["voice-tenor", "Tenor voice", "vocal"],
+  ["voice-bass", "Bass voice", "vocal"],
+  ["voice-mezzo", "Mezzo-soprano voice", "vocal"],
+]) {
+  SPECTRAL_PROFILES[key] = {
+    label,
+    partials: SPECTRAL_PROFILES[seed].partials.map(partial => ({ ...partial })),
+  };
+}
+
 export function spectralDefaultRegisterSensitivity(index, count = 20) {
   const t = count <= 1 ? 0 : index / (count - 1);
   return Math.pow(t, 0.85) * 1.45 - 0.35;
@@ -550,6 +568,13 @@ const SPECTRAL_RESONANCES = {
   ],
 };
 
+for (const [key, seed] of Object.entries({
+  "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
+  "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
+})) {
+  SPECTRAL_RESONANCES[key] = SPECTRAL_RESONANCES[seed].map(band => ({ ...band }));
+}
+
 for (const [profileKey, resonances] of Object.entries(SPECTRAL_RESONANCES)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].resonances = resonances;
 }
@@ -580,6 +605,26 @@ export const BODY_PRESETS = (() => {
         width: Math.max(0.1, ((f.bw && f.bw[i]) || 90) / freq * 1.9),
       })),
     };
+  }
+  // WP-3 vowel-conditioned F1-F5 fits.  These coexist with the generic
+  // vowel bodies so old saved presets retain their exact lookup keys.
+  for (const [profileKey, measured] of Object.entries(MEASURED_PROFILES)) {
+    if (!profileKey.startsWith("voice-") || !measured?.vowelFormants) continue;
+    for (const [vowel, fit] of Object.entries(measured.vowelFormants)) {
+      const freqs = Array.isArray(fit?.formantsHz) ? fit.formantsHz : [];
+      const bandwidths = Array.isArray(fit?.bandwidthsHz) ? fit.bandwidthsHz : [];
+      if (freqs.length < 5) continue;
+      presets[`${profileKey}-${vowel}`] = {
+        label: `${SPECTRAL_PROFILES[profileKey]?.label || profileKey} /${vowel}/`,
+        vocal: true,
+        measured: true,
+        bands: freqs.slice(0, 5).map((freq, i) => ({
+          freq,
+          gain: vowelGains[i],
+          width: Math.max(0.1, (bandwidths[i] || 90) / freq * 1.9),
+        })),
+      };
+    }
   }
   return presets;
 })();
@@ -864,6 +909,17 @@ const SPECTRAL_PERFORMANCE = {
   },
 };
 
+for (const [key, seed] of Object.entries({
+  "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
+  "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
+})) {
+  SPECTRAL_PERFORMANCE[key] = {
+    ...SPECTRAL_PERFORMANCE[seed],
+    attackNoise: { ...SPECTRAL_PERFORMANCE[seed].attackNoise },
+    excitation: { ...SPECTRAL_PERFORMANCE[seed].excitation },
+  };
+}
+
 for (const [profileKey, performance] of Object.entries(SPECTRAL_PERFORMANCE)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].performance = performance;
 }
@@ -906,13 +962,19 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
     perf.attackNoise = { level: m.attackNoise.level, freq: m.attackNoise.freq, q: m.attackNoise.q, decay: m.attackNoise.decay };
   }
   const mp = m.performance || {};
-  for (const key of ["vibratoRate", "vibratoRateSd", "vibratoDepthSd"]) {
+  for (const key of ["vibratoRate", "vibratoRateSd", "vibratoDepthSd",
+    "lowToHighStaggerMs", "microDriftCentsSd", "microDriftCentsRange",
+    "microDriftCentsPerSecond"]) {
     if (Number.isFinite(mp[key])) perf[key] = mp[key];
   }
   if (Number.isFinite(mp.vibratoDepth) && Number.isFinite(perf.vibratoDepth)) {
     perf.vibratoDepth = +((perf.vibratoDepth + mp.vibratoDepth) / 2).toFixed(1);
   }
-  prof.measured = { source: m.source || "" };
+  prof.measured = {
+    source: m.source || "",
+    notesAnalysed: m.notesAnalysed || 0,
+    vowelFormants: m.vowelFormants || null,
+  };
 }
 
 // ── Tone model v2: resonator core (docs/TONE_MODEL_V2_DESIGN.md §3.2) ──

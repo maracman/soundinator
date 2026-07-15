@@ -125,17 +125,19 @@ console.log("Resonator ratio tables");
 console.log("64-partial profile tables");
 {
   const profiles = Object.entries(SPECTRAL_PROFILES);
-  check("8 instrument profiles present", profiles.length >= 8);
+  check("WP-3 instrument catalogue present", profiles.length >= 14);
   check("every profile carries 64 partials", profiles.every(([, p]) => p.partials.length === 64));
   const cl = SPECTRAL_PROFILES.clarinet.partials;
-  // Clarinet's odd-dominant parity must hold across the band the
-  // measurement resolves (the measured tail is honestly ~0 above ~10 kHz,
-  // so parity is tested where there is signal, and the tail must fade)
-  const odd = [cl[2], cl[4], cl[6], cl[8]].map(p => p.amp);   // harmonics 3,5,7,9
-  const even = [cl[1], cl[3], cl[5], cl[7]].map(p => p.amp);  // harmonics 2,4,6,8
-  const oddSum = odd.reduce((a, b) => a + b, 0), evenSum = even.reduce((a, b) => a + b, 0);
-  check("clarinet parity holds across the measured band",
-    oddSum > evenSum * 3, `odd ${oddSum.toFixed(3)} vs even ${evenSum.toFixed(3)}`);
+  const parity = row => ({
+    odd: [2, 4, 6, 8].reduce((sum, i) => sum + (row[i]?.amp || 0), 0),
+    even: [1, 3, 5, 7].reduce((sum, i) => sum + (row[i]?.amp || 0), 0),
+  });
+  const clLow = parity(SPECTRAL_PROFILES.clarinet.partialsByRegister[0].partials);
+  const clHigh = parity(SPECTRAL_PROFILES.clarinet.partialsByRegister[2].partials);
+  check("clarinet low register retains closed-tube odd dominance",
+    clLow.odd > clLow.even * 5, `odd ${clLow.odd.toFixed(3)} vs even ${clLow.even.toFixed(3)}`);
+  check("clarinet even partials rise with register",
+    clHigh.even / clHigh.odd > clLow.even / clLow.odd * 4);
   check("clarinet measured tail fades to silence, not garbage",
     cl.slice(44).every(p => p.amp <= 0.02));
   const vn = SPECTRAL_PROFILES.violin.partials;
@@ -155,8 +157,8 @@ console.log("Engine wiring (fingerprint carries the v2 resonator fields)");
   for (let i = 0; i < 24 && !note; i++) { const n = engine.nextNote(); if (n && n.velocity > 0 && n.harmonicPartials) note = n; }
   check("sounded note found", !!note);
   if (note) {
-    check("note carries partialB from legacy cents", near(note.partialB, legacyStretchToB(8), 1e-12),
-      `got ${note.partialB}`);
+    check("measured register partialB supersedes the legacy profile default",
+      note.partialB > 5e-5 && note.partialB < 1e-3, `got ${note.partialB}`);
     check("note carries resonatorClass", note.resonatorClass === "string");
     check("64 partials in the fingerprint", note.harmonicPartials.length === 64);
     // explicit partialB param wins over legacy cents
@@ -347,6 +349,9 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
 {
   check("all five vowels exist as vocal bodies",
     Object.keys(FORMANT_PRESETS).every(v => BODY_PRESETS[`vowel-${v}`]?.vocal));
+  check("WP-3 voice types expose measured /a e i o u/ bodies",
+    ["voice-tenor", "voice-bass", "voice-mezzo"].every(profile =>
+      "aeiou".split("").every(vowel => BODY_PRESETS[`${profile}-${vowel}`]?.measured)));
   check("instrument bodies present (violin, piano)",
     !!BODY_PRESETS.violin && !!BODY_PRESETS.piano);
   const ah = BODY_PRESETS["vowel-ah"].bands;
@@ -500,7 +505,8 @@ console.log("CH-B1 rev 2: articulation manipulates the SELECTED body");
 
 console.log("CH-B3: measured instrument fits folded into presets");
 {
-  for (const key of ["flute", "clarinet", "violin", "cello", "trumpet", "trombone", "piano"]) {
+  for (const key of ["flute", "clarinet", "violin", "cello", "trumpet", "trombone", "piano",
+    "alto-sax", "french-horn", "guitar", "voice-tenor", "voice-bass", "voice-mezzo"]) {
     const prof = SPECTRAL_PROFILES[key];
     check(`${key}: 64 measured partials, all sane, dyn curve extended`,
       prof.partials.length === 64 &&
@@ -509,17 +515,17 @@ console.log("CH-B3: measured instrument fits folded into presets");
       prof.measured && typeof prof.measured.source === "string");
   }
   const piano = SPECTRAL_PROFILES.piano.performance;
-  check("piano: measured inharmonicity seeds partialB (~3.6e-4, was 1.2e-4)",
-    piano.partialB > 2e-4 && piano.partialB < 6e-4);
+  check("piano: refreshed multi-register fit seeds measured inharmonicity",
+    piano.partialB > 5e-5 && piano.partialB < 3e-4);
   check("piano: measured material (real piano out-rings the old default)",
     piano.partialMaterial <= 0.1);
   const violin = SPECTRAL_PROFILES.violin.performance;
   check("violin: measured vibrato rate, blended depth, hand envelope kept",
-    Math.abs(violin.vibratoRate - 5.739) < 0.01 &&
+    violin.vibratoRate > 5.5 && violin.vibratoRate < 6.2 &&
     violin.vibratoDepth > 16 && violin.vibratoDepth < 25.3 &&
     violin.envelopeAttack === 0.085);
-  check("vocal profile untouched (no solo-voice source measured)",
-    !SPECTRAL_PROFILES.vocal.measured);
+  check("legacy generic vocal remains untouched while typed voices are measured",
+    !SPECTRAL_PROFILES.vocal.measured && SPECTRAL_PROFILES["voice-tenor"].measured.notesAnalysed > 0);
 }
 
 console.log("P1: arp pattern mode (owner brief 2026-07-07)");

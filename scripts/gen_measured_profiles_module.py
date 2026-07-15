@@ -17,6 +17,7 @@ PERF_KEYS = [
     "envelopeAttack", "envelopeAttackSd", "envelopeDecay", "envelopeSustain",
     "envelopeRelease", "vibratoProb", "vibratoRate", "vibratoRateSd",
     "vibratoDepth", "vibratoDepthSd",
+    "microDriftCentsSd", "microDriftCentsRange", "microDriftCentsPerSecond",
     # Q8 attack stagger: measured low-to-high partial onset spread; flows to
     # the renderer when a future fit run provides it (hand defaults apply
     # until then — the current measured_profiles.json predates the fitter's
@@ -33,14 +34,25 @@ def main():
             continue
         perf = {k: round(v["performance"][k], 4) for k in PERF_KEYS
                 if isinstance(v["performance"].get(k), (int, float))}
+        stagger = (v.get("attack") or {}).get("lowToHighStaggerMs")
+        if isinstance(stagger, (int, float)):
+            perf["lowToHighStaggerMs"] = round(stagger, 4)
+        provenance_files = (v.get("provenance", {}) or {}).get("files", [])
+        source_classes = sorted({row.get("sourceClass") for row in provenance_files
+                                 if isinstance(row, dict) and row.get("sourceClass")})
+        legacy_source = (v.get("provenance", {}) or {}).get("source", "")
         entry = {
             "partials": [{"amp": round(p["amp"], 5), "spread": round(p["spread"], 3)}
                          for p in v["partials"]],
             "partialB": v.get("partialB"),
             "material": round(v["material"]["suggestedMaterial"], 3),
             "performance": perf,
-            "source": (v.get("provenance", {}) or {}).get("source", ""),
+            "source": ", ".join(source_classes) or legacy_source,
+            "notesAnalysed": len(v.get("notesAnalysed", [])),
         }
+        vowel_formants = v.get("vowelFormants")
+        if isinstance(vowel_formants, dict) and vowel_formants:
+            entry["vowelFormants"] = vowel_formants
         registers = v.get("partialsByRegister")
         if isinstance(registers, list) and registers:
             entry["partialsByRegister"] = [{
