@@ -558,6 +558,7 @@ const PARAM_DESC = {
   attackNoiseLevel: "Scales the instrument's onset transient (bow scratch, breath chiff, hammer thump): 0 = removed, 1 = as measured/designed, 2 = exaggerated",
   attackNoiseDirect: "Lets the measured onset transient use its own fast envelope instead of being suppressed by the sustained note ADSR; 0 preserves legacy routing, 1 is fully independent",
   attackNoiseVelocityExponent: "Shapes onset-noise response to velocity: 1 is the legacy linear law, lower values retain more measured transient at soft dynamics",
+  attackNoiseByRegister: "Pinned measured onset frequency, Q, decay, and level scaling across register; empty preserves the instrument profile's single transient",
   melodyPattern: "How the melody chooses notes: Walk = the probabilistic interval walk shaped by the dials below; Arp = a deterministic cycle over a fixed set of in-scale notes (up, down, or up-and-down) — rhythm, rests, dynamics and surprise still apply on top",
   arpStep: "Arp stride in scale steps: 2 = every other scale note (thirds, triad-like), 3 = wider voicings, 1 = a scale run",
   arpOctaves: "How many octaves the arp cycle spans before it wraps",

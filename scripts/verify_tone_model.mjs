@@ -22,6 +22,7 @@ import {
   twoStageDecayPlan,
   attackNoiseRouting,
   attackNoiseVelocityGain,
+  registerAttackNoiseAt,
   resolveAttackNoise,
   registerProfileAt,
   humanFluctuationTrace,
@@ -650,6 +651,17 @@ console.log("CH-B2: onset-noise level scaling");
   check("explicit pinned transient fields reach the renderer without losing metadata",
     pinned.freq === 620 && pinned.q === 1.25 && pinned.decay === .23 &&
     Math.abs(pinned.level - .15) < 1e-12 && pinned.bandT90ms === measured.bandT90ms);
+  const anchors = [
+    { f0: 60, levelScale: .05, freq: 7000, q: 2.3, decay: .12 },
+    { f0: 240, levelScale: 1, freq: 400, q: 1.0, decay: .2 },
+  ];
+  const low = resolveAttackNoise(measured, { attackNoiseByRegister: anchors }, 60);
+  const mid = registerAttackNoiseAt(anchors, 120);
+  check("register onset anchors are neutral when absent and exact at an anchor",
+    resolveAttackNoise(measured, {}, 60).level === measured.level &&
+    low.freq === 7000 && Math.abs(low.level - measured.level * .05) < 1e-12);
+  check("register onset anchors interpolate continuously in log-f0 space",
+    Math.abs(mid.levelScale - .525) < 1e-12 && Math.abs(mid.freq - 3700) < 1e-9);
 }
 
 console.log("P3: note connection — glide vs ring on overlap");

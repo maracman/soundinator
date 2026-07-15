@@ -351,6 +351,7 @@ export const DEFAULTS = {
   attackNoiseLevel: 1,
   attackNoiseDirect: 0,
   attackNoiseVelocityExponent: 1,
+  attackNoiseByRegister: [],
   arpStep: 2,
   arpOctaves: 1,
   intervalRange: 7,

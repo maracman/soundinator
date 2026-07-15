@@ -1172,19 +1172,51 @@ export function attackNoiseVelocityGain(velocity, exponent = 1) {
   return Math.pow(v, e);
 }
 
+/** Interpolate measured onset shape anchors continuously in log-f0 space. */
+export function registerAttackNoiseAt(anchors, fundamentalHz) {
+  if (!Array.isArray(anchors) || anchors.length === 0) return null;
+  const rows = anchors.filter(row => row && Number.isFinite(row.f0) && row.f0 > 0)
+    .slice().sort((a, b) => a.f0 - b.f0);
+  if (!rows.length) return null;
+  const f0 = Math.max(1, Number(fundamentalHz) || rows[0].f0);
+  if (rows.length === 1 || f0 <= rows[0].f0) return { ...rows[0] };
+  if (f0 >= rows[rows.length - 1].f0) return { ...rows[rows.length - 1] };
+  let hi = 1;
+  while (hi < rows.length && rows[hi].f0 < f0) hi++;
+  const lo = rows[hi - 1], upper = rows[hi];
+  const t = (Math.log(f0) - Math.log(lo.f0)) / (Math.log(upper.f0) - Math.log(lo.f0));
+  const result = { f0 };
+  for (const key of ["levelScale", "freq", "q", "decay"]) {
+    const a = lo[key], b = upper[key];
+    if (Number.isFinite(a) && Number.isFinite(b)) result[key] = a + (b - a) * t;
+    else if (Number.isFinite(a)) result[key] = a;
+    else if (Number.isFinite(b)) result[key] = b;
+  }
+  return result;
+}
+
 /** Resolve a measured onset transient. Explicit pinned fields win; absent
  * fields preserve the profile exactly, so existing presets are unchanged. */
-export function resolveAttackNoise(profileNoise, params = {}) {
+export function resolveAttackNoise(profileNoise, params = {}, fundamentalHz = null) {
   if (!profileNoise) return null;
   const levelScale = Math.max(0, Math.min(2,
     Number.isFinite(params.attackNoiseLevel) ? params.attackNoiseLevel : 1));
-  return {
+  const resolved = {
     ...profileNoise,
     freq: Number.isFinite(params.attackNoiseFreq) ? params.attackNoiseFreq : profileNoise.freq,
     q: Number.isFinite(params.attackNoiseQ) ? params.attackNoiseQ : profileNoise.q,
     decay: Number.isFinite(params.attackNoiseDecay) ? params.attackNoiseDecay : profileNoise.decay,
     level: profileNoise.level * levelScale,
   };
+  const register = registerAttackNoiseAt(params.attackNoiseByRegister, fundamentalHz);
+  if (!register) return resolved;
+  if (Number.isFinite(register.freq)) resolved.freq = register.freq;
+  if (Number.isFinite(register.q)) resolved.q = register.q;
+  if (Number.isFinite(register.decay)) resolved.decay = register.decay;
+  if (Number.isFinite(register.levelScale)) {
+    resolved.level *= Math.max(0, register.levelScale);
+  }
+  return resolved;
 }
 
 // ── Tone model v2: the Human dial (T3, §3.1) ──
@@ -2505,7 +2537,7 @@ export class GenerationEngine {
       harmonicPartials: partials,
       // Shape/frequency/decay are pinned by the measurement campaign. The
       // profile remains the exact fallback for legacy presets.
-      attackNoise: resolveAttackNoise(profile.performance?.attackNoise, this.p),
+      attackNoise: resolveAttackNoise(profile.performance?.attackNoise, this.p, fundamentalHz),
       attackNoiseDirect: this._clamp(this.p.attackNoiseDirect ?? 0, 0, 1),
       attackNoiseVelocityExponent: this._clamp(this.p.attackNoiseVelocityExponent ?? 1, 0, 2),
       // Q8 attack stagger: measured low→high onset spread when the profile
