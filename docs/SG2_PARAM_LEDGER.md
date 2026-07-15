@@ -55,3 +55,11 @@ This run also corrected the construction mapping that preceded fitting:
 radiated partial tables are indexed on integer output harmonics. That change
 made the dossier-required high-register even-partial rise possible instead of
 misplacing every measured table entry after the fundamental.
+
+WP-P resource flag: the full-fidelity preset benchmarks at 34 oscillators and
+340 automation events/note against current-factory medians of 20/190. The
+first scalar cull that passes the 1.25× resource gate (`0.00121`, 23/230) adds
+`0.5070 dB` mean mel distance and reopens middle-register `pp` to `1.0227×`
+its reference floor, so it is rejected. The external work item specifies a
+scorer-guided per-partial shipping mask; the converged research fit remains
+frozen and is not regressed to satisfy the later compression pass.
