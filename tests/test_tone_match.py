@@ -9,7 +9,7 @@ from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
-from scripts.tone_match.iterate import _floor_evidence, _params, _reference_set_id, _reference_variability
+from scripts.tone_match.iterate import _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
 from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time, compare_features, weights_for_instrument
 
 
@@ -70,6 +70,14 @@ def test_reference_set_id_changes_when_the_scored_manifest_changes():
     assert _reference_set_id(base) != _reference_set_id(base + [
         {"path": "/tmp/b.wav", "midi": 60, "velocity": .2}
     ])
+
+
+def test_dominant_residual_ignores_zero_weight_diagnostics():
+    best = {"scores": [{
+        "normalized": {"partials_db": 2.0, "inharmonicity_log_ratio": 99.0},
+        "weights": {"partials_db": 1.0, "inharmonicity_log_ratio": 0.0},
+    }]}
+    assert _dominant_residual(best)["feature"] == "partials_db"
 
 
 def _bundle(*, f0=220.0, partials=None, percussive=False, B=0.0002):

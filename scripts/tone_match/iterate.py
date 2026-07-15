@@ -118,7 +118,13 @@ def _dominant_residual(best: dict[str, Any]) -> dict[str, Any] | None:
     if not scores:
         return None
     keys = scores[0].get("normalized", {})
-    means = {key: float(np.mean([score["normalized"][key] for score in scores])) for key in keys}
+    means = {}
+    for key in keys:
+        weighted = [score["normalized"][key] * score.get("weights", {}).get(key, 1)
+                    for score in scores
+                    if score.get("weights", {}).get(key, 1) > 0]
+        if weighted:
+            means[key] = float(np.mean(weighted))
     if not means:
         return None
     key = max(means, key=means.get)
