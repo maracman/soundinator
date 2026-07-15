@@ -115,5 +115,6 @@ test("converged trumpet is frozen as a fitted factory sound", () => {
   assert.equal(preset.parameters.resonatorClass, "conicalTube");
   assert.equal(preset.parameters.excitationHuman, 0.8);
   assert.equal(preset.parameters.partialTilt, -0.1);
+  assert.equal(preset.parameters.spectralCullThreshold, 0.0006);
   assert.ok(preset.parameters.dynamicBlare > 0);
 });

@@ -102,6 +102,7 @@ const fittedSounds = [
       toneBreath: 0.03, breathNoiseColor: 0,
       partialTransfer: 0.1, partialTilt: -0.1,
       spectralResonanceAmount: 0.35, spectralDynamicAmount: 1.2,
+      spectralCullThreshold: 0.0006,
       dynamicBlare: 0.25,
     }),
 ];
