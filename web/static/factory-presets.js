@@ -87,6 +87,23 @@ const fittedSounds = [
       spectralResonanceAmount: 0.35, spectralDynamicAmount: 0.8,
       dynamicBlare: 0,
     }),
+  sound("factory-sub-trumpet-sg2", "Trumpet — SG2 Fitted",
+    "A fitted unmuted trumpet spanning low through high registers.",
+    ["brass", "trumpet", "measured", "fitted"], {
+      seed: 7331, sg2Family: "blown", voiceMode: "fourier",
+      spectralProfile: "trumpet", spectralMix: 1, spectralPartials: 64,
+      excitationType: "blow", resonatorClass: "conicalTube", bodyType: "auto",
+      partialB: 0.00000004, partialMaterial: 0.27,
+      attackNoiseLevel: 1, attackNoiseFreq: 1405,
+      attackNoiseQ: 1.66, attackNoiseDecay: 0.123,
+      envelopeAttack: 0.1896, envelopeDecay: 0,
+      envelopeSustain: 0.9375, envelopeRelease: 0.1796, vibratoProb: 0,
+      excitationPosition: 0.3, excitationHuman: 0.8,
+      toneBreath: 0.03, breathNoiseColor: 0,
+      partialTransfer: 0.1, partialTilt: -0.1,
+      spectralResonanceAmount: 0.35, spectralDynamicAmount: 1.2,
+      dynamicBlare: 0.25,
+    }),
 ];
 
 const acousticSounds = [

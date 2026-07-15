@@ -107,3 +107,13 @@ test("converged clarinet is frozen as a fitted factory sound", () => {
   assert.equal(preset.parameters.partialTransfer, 0.05);
   assert.ok(preset.tags.includes("fitted"));
 });
+
+test("converged trumpet is frozen as a fitted factory sound", () => {
+  const preset = FACTORY_PRESETS.find(row => row.id === "factory-sub-trumpet-sg2");
+  assert.ok(preset);
+  assert.equal(preset.section, "sound");
+  assert.equal(preset.parameters.resonatorClass, "conicalTube");
+  assert.equal(preset.parameters.excitationHuman, 0.8);
+  assert.equal(preset.parameters.partialTilt, -0.1);
+  assert.ok(preset.parameters.dynamicBlare > 0);
+});
