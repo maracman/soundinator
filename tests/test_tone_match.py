@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_contract
+from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.iterate import _floor_evidence, _reference_variability
 from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time
@@ -124,3 +125,11 @@ def test_reference_variability_floor_requires_alternate_takes():
         lambda _: _bundle(),
     )
     assert result["status"] == "insufficient-evidence"
+
+
+def test_corpus_sidecar_filename_classification():
+    assert _dynamics("AltoSax.NoVib.ff.C4B4.aiff") == "ff"
+    assert _dynamics("vocalset.m3.scales.slow_piano.m3_scales_c_slow_piano_a.wav") == "p"
+    assert _vibrato("phil.violin_A4_mezzo-piano_non-vibrato.mp3") == "nonvib"
+    assert _vibrato("vocalset.m3.scales.vibrato.m3_scales_vibrato_a.wav") == "vib"
+    assert _note_span("BbClar.mf.D3B3.aiff") == "D3–B3"
