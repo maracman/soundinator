@@ -14,6 +14,7 @@ evaluation is retained in the run directory for resumability/auditability.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import subprocess
@@ -21,6 +22,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -257,19 +259,34 @@ def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
     return rows
 
 
-def _update_leaderboard(instrument: str, run_dir: Path, best: dict) -> tuple[bool, float | None]:
+def _reference_set_id(references: list[dict[str, Any]]) -> str:
+    """Identify the scored objective so unlike manifests are never ranked."""
+    canonical = json.dumps(references, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
+                        reference_set: str) -> tuple[bool, float | None]:
     board_path = DEFAULT_RUN_ROOT / instrument / "leaderboard.json"
     board_path.parent.mkdir(parents=True, exist_ok=True)
     board = _load(board_path) if board_path.exists() else {"instrument": instrument, "runs": []}
-    previous = board.get("best")
+    comparable = [row for row in board.get("runs", [])
+                  if row.get("referenceSet") == reference_set]
+    previous = min(comparable, key=lambda row: (row.get("constructionFailures", 0), row["loss"])) \
+        if comparable else None
     previous_loss = float(previous["loss"]) if previous and "loss" in previous else None
     entry = {"run": run_dir.name, "loss": best["loss"], "params": best["params"], "time": time.time(),
+             "referenceSet": reference_set,
              "constructionPassed": bool(best.get("construction", {}).get("passed")),
              "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0))}
     board["runs"].append(entry)
-    board["runs"].sort(key=lambda row: (row.get("constructionFailures", 0), row["loss"]))
-    improved = board["runs"][0]["run"] == run_dir.name
-    board["best"] = board["runs"][0]
+    board["runs"].sort(key=lambda row: (row.get("referenceSet", ""),
+                                        row.get("constructionFailures", 0), row["loss"]))
+    current = min((row for row in board["runs"] if row.get("referenceSet") == reference_set),
+                  key=lambda row: (row.get("constructionFailures", 0), row["loss"]))
+    improved = current["run"] == run_dir.name
+    board.setdefault("bestByReferenceSet", {})[reference_set] = current
+    board["best"] = current
     board_path.write_text(json.dumps(board, indent=2) + "\n")
     return improved, previous_loss
 
@@ -315,13 +332,19 @@ def main(argv: list[str] | None = None) -> int:
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
     baseline = matcher.evaluations[0]["loss"]
-    result = minimize(matcher.evaluate, x0, method="Powell", bounds=bounds,
-                      options={"maxfev": max(1, args.budget - 1), "ftol": .01, "xtol": .002})
+    baseline_floor = _floor_evidence(variability, matcher.best or matcher.evaluations[0])
+    if baseline_floor["status"] == "demonstrated":
+        result = SimpleNamespace(success=True,
+                                 message="baseline is at the reference-variability floor")
+    else:
+        result = minimize(matcher.evaluate, x0, method="Powell", bounds=bounds,
+                          options={"maxfev": max(1, args.budget - 1), "ftol": .01, "xtol": .002})
     best = matcher.best or {"loss": baseline, "params": initial}
     sensitivity = {} if args.skip_sensitivity else _sensitivity(matcher, best)
     best = matcher.best or best
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
-    improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best)
+    reference_set = _reference_set_id(references)
+    improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
     if improved:
         _append_ledger(args.instrument, run_dir, best, sensitivity)
     floor = _floor_evidence(variability, best)
@@ -341,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
                "baselineLoss": baseline, "bestLoss": best["loss"], "improvement": baseline - best["loss"],
                "evaluations": len(matcher.evaluations), "optimizer": {"success": bool(result.success), "message": str(result.message)},
                "leaderboardImproved": improved, "previousBestLoss": previous_best_loss,
+               "referenceSet": reference_set,
                "constructionPassed": bool(best.get("construction", {}).get("passed")),
                "referenceVariabilityFloor": floor, "dominantResidual": _dominant_residual(best),
                "sessionOutcome": outcome}
