@@ -3187,7 +3187,7 @@ function globalScaleStripHTML(laneW) {
   return `
       <div class="tl2-row tl2-gs-row${_gsOpen ? " open" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Harmonic guide — choose a starting scale, then add and edit timeline change points. It applies to tracks with HG on.">${notationIconHTML(["clef"], { compact: true })}${_gsOpen ? "▾" : "▸"} Harmonic guide${active ? ` <span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}</button>
+          <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Harmonic guide — choose a starting scale, then add and edit timeline change points. It applies to tracks with HG on.">${notationIconHTML(["clef"], { compact: true })}<span class="gs-head-label">Harmonic guide</span>${active ? `<span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}<span class="gs-caret">${_gsOpen ? "▾" : "▸"}</span></button>
         </div>
         ${_gsOpen ? `<div class="gs-strip${active ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><div class="hg-head">${harmonicGuidePickerHTML()}</div><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The Harmonic guide over time — rows are note divisions, colours are roles (lit = scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
       </div>${editorRow}`;
@@ -3431,8 +3431,8 @@ function globalSpaceStripHTML(laneW) {
   return `
       <div class="tl2-row tl2-sp-row${enabled && !_spOpen ? " sp-collapsed-row" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron sp-toggle${enabled ? " sp-active" : ""}" id="spToggle" title="Global space — click to turn it ${enabled ? "OFF" : "ON"}. Positions every instrument around the listener along the timeline (asks how to initialise on first use).">${notationIconHTML(["space"], { compact: true })}Global space${enabled ? ` <span class="sp-onpip" title="Active — instruments are placed by the global space">●</span>` : ""}</button>
-          ${enabled ? `<button class="gs-chevron sp-expand" id="spExpand" title="${_spOpen ? "Collapse to the slim view" : "Expand — cross-section + full cylinder"}">${_spOpen ? "▾" : "▸"}</button>` : ""}
+          <button class="gs-chevron sp-toggle${enabled ? " sp-active" : ""}" id="spToggle" title="Global space — click to turn it ${enabled ? "OFF" : "ON"}. Positions every instrument around the listener along the timeline (asks how to initialise on first use).">${notationIconHTML(["space"], { compact: true })}<span class="gs-head-label">Global space</span>${enabled ? `<span class="sp-onpip" title="Active — instruments are placed by the global space">●</span>` : ""}</button>
+          ${enabled ? `<button class="gs-chevron gs-caret sp-expand" id="spExpand" title="${_spOpen ? "Collapse to the slim view" : "Expand — cross-section + full cylinder"}">${_spOpen ? "▾" : "▸"}</button>` : ""}
         </div>
         ${enabled && !_spOpen ? `<div class="sp-cyl-wrap sp-cyl-collapsed" style="width:${laneW}px;height:${collapsedH}px"><canvas id="spCylinder" width="${laneW}" height="${collapsedH}" style="width:${laneW}px;height:${collapsedH}px" title="Global space over time (slim view) — one thread per instrument. Expand for the cross-section and full cylinder."></canvas></div>` : ""}
       </div>${fullPanel}`;
@@ -9012,7 +9012,7 @@ function renderExplore() {
     workspaceTab = btn.dataset.workspaceTab;
     renderExplore();
     if (wasPlaying) {
-      synth.play({ ...exploreParams });
+      synth.play(enginePlayParams());
       startVisualiser();
     }
   };
@@ -9047,7 +9047,7 @@ function renderExplore() {
       return;
     }
     lastSurpriseCount = 0;
-    synth.play({ ...exploreParams });
+    synth.play(enginePlayParams());
     startVisualiser();
     syncPlayButton();
     trackEngagement("play");
@@ -9061,7 +9061,7 @@ function renderExplore() {
     if (synth.isPlaying) {
       synth.regenerate({ ...exploreParams });
     } else {
-      synth.play({ ...exploreParams });
+      synth.play(enginePlayParams());
       startVisualiser();
       syncPlayButton();
     }
@@ -9071,7 +9071,7 @@ function renderExplore() {
     randomiseParams();
     renderExplore();
     if (wasPlaying) {
-      synth.play({ ...exploreParams });
+      synth.play(enginePlayParams());
       startVisualiser();
     }
   };
@@ -9213,11 +9213,11 @@ function renderExplore() {
       if (harmonicParams.has(key)) syncHarmonicWorkspace(v);
       if (distParams.has(key)) drawDistributions();
       if (liveReverbParams.has(key)) {
-        synth.updateReverb({ ...exploreParams });
+        synth.updateReverb(enginePlayParams());
         return;
       }
       if (liveSubnoteParams.has(key)) {
-        synth.updateGenerationParams({ ...exploreParams });
+        synth.updateGenerationParams(enginePlayParams());
         if (key.startsWith("layerEnv")) refreshLayerEnvLines(); // rows mirror the shared panel live
         return;
       }
@@ -9254,7 +9254,7 @@ function renderExplore() {
       if (harmonicParams.has(key)) syncHarmonicWorkspace(v);
       drawDistributions();
       if (key === "reverbType") {
-        synth.updateReverb({ ...exploreParams });
+        synth.updateReverb(enginePlayParams());
         return;
       }
       if (key === "spectralProfile" || key === "bodyType") {
@@ -9264,14 +9264,14 @@ function renderExplore() {
           delete exploreParams.bodyBands;
           _chBodySel = null;
         }
-        synth.updateGenerationParams({ ...exploreParams });
+        synth.updateGenerationParams(enginePlayParams());
         // Profile changes re-seat performance defaults; bodyType swaps the
         // BODY inspector between static and articulated layouts.
         renderExplore();
         return;
       }
       if (liveSubnoteParams.has(key)) {
-        synth.updateGenerationParams({ ...exploreParams });
+        synth.updateGenerationParams(enginePlayParams());
         return;
       }
       debouncedReplay();
@@ -9294,7 +9294,7 @@ function renderExplore() {
       const out = v.querySelector(`[data-harmonic-out="${kind}-${idx}"]`);
       if (out) out.textContent = harmonicValueLabel(kind, value);
       drawDistributions();
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
     };
   }
 
@@ -9312,7 +9312,7 @@ function renderExplore() {
   const octShift = (dir) => {
     const div = exploreParams.scaleMode === "edo" ? (exploreParams.edoDivisions || 12) : 12;
     exploreParams.registerCenter = Math.max(-48, Math.min(48, (exploreParams.registerCenter || 0) + dir * div));
-    synth.updateGenerationParams({ ...exploreParams });
+    synth.updateGenerationParams(enginePlayParams());
     renderExplore();
   };
   const octDown = v.querySelector("#octDown");
@@ -9338,18 +9338,18 @@ function renderExplore() {
       printEmphasis(key);
       drawDistributions();
       if (key === "bodyArticulation") {
-        synth.updateGenerationParams({ ...exploreParams });
+        synth.updateGenerationParams(enginePlayParams());
         const block = v.querySelector(".ch-artic");
         if ((val > 0) !== !!block) { renderExplore(); return; } // vowel controls appear/disappear at 0
         drawTonePrint();
         return;
       }
       if (liveReverbParams.has(key)) {
-        synth.updateReverb({ ...exploreParams });
+        synth.updateReverb(enginePlayParams());
         drawSpaceField(); // the SPACE ear-response view rides these live
         return;
       }
-      if (liveSubnoteParams.has(key)) { synth.updateGenerationParams({ ...exploreParams }); return; }
+      if (liveSubnoteParams.has(key)) { synth.updateGenerationParams(enginePlayParams()); return; }
       debouncedReplay();
     };
     cell.onmousedown = (e) => {
@@ -9394,7 +9394,7 @@ function renderExplore() {
     const out = v.querySelector("#bodyBandOut");
     if (out) out.textContent = _chBodySel.kind === "artic" ? `×${val.toFixed(2)}` : `${val >= 0 ? "+" : ""}${val.toFixed(2)}`;
     printEmphasis("spectralResonanceAmount");
-    synth.updateGenerationParams({ ...exploreParams });
+    synth.updateGenerationParams(enginePlayParams());
     drawTonePrint();
     drawBodyRidge();
   };
@@ -9445,7 +9445,7 @@ function renderExplore() {
           if (sl) { sl.value = exploreParams[key]; updateSliderFill(sl); }
         }
         drawEnvelopeDist();
-        synth.updateGenerationParams({ ...exploreParams });
+        synth.updateGenerationParams(enginePlayParams());
       };
       const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
       window.addEventListener("mousemove", move);
@@ -9460,7 +9460,7 @@ function renderExplore() {
     noteParamChange("bodyBands", "edited", "preset");
     delete exploreParams.bodyBands;
     _chBodySel = null;
-    synth.updateGenerationParams({ ...exploreParams });
+    synth.updateGenerationParams(enginePlayParams());
     renderExplore();
   };
 
@@ -9471,7 +9471,7 @@ function renderExplore() {
       if ((exploreParams.melodyPattern || "walk") === val) return;
       noteParamChange("melodyPattern", exploreParams.melodyPattern, val);
       exploreParams.melodyPattern = val;
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
       renderExplore(); // walk dials ↔ arp dials swap
     };
   });
@@ -9483,7 +9483,7 @@ function renderExplore() {
       if ((exploreParams.noteConnection || "glide") === val) return;
       noteParamChange("noteConnection", exploreParams.noteConnection, val);
       exploreParams.noteConnection = val;
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
       renderExplore(); // slide-speed dial appears only for glide
     };
   });
@@ -9498,7 +9498,7 @@ function renderExplore() {
       v.querySelectorAll("[data-exc-type]").forEach(b => b.classList.toggle("active", b === btn));
       printEmphasis("excitationType");
       drawDistributions();
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
     };
   });
 
@@ -9520,8 +9520,8 @@ function renderExplore() {
       const before = exploreParams[key];
       toggleStagePower(exploreParams, stage);
       noteParamChange(key, before, exploreParams[key]);
-      if (stage === "space") synth.updateReverb({ ...exploreParams });
-      else synth.updateGenerationParams({ ...exploreParams });
+      if (stage === "space") synth.updateReverb(enginePlayParams());
+      else synth.updateGenerationParams(enginePlayParams());
       renderExplore();
     };
     el.onclick = fire;
@@ -9555,7 +9555,7 @@ function renderExplore() {
       const wasPlaying = synth.isPlaying;
       exploreParams = mergedPresetParams({ parameters: { ...f.parameters }, section: "full" });
       renderExplore();
-      if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+      if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
     };
   });
   drawM2PresetArt();
@@ -9587,13 +9587,13 @@ function renderExplore() {
       if ((key.startsWith("surprise") && key.endsWith("Enabled")) || key === "formantEditAll") {
         renderExplore();
         if (wasPlaying) {
-          synth.play({ ...exploreParams });
+          synth.play(enginePlayParams());
           startVisualiser();
         }
         return;
       }
       drawDistributions();
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
     };
   });
 
@@ -9613,7 +9613,7 @@ function renderExplore() {
     }
     exploreParams.subScaleNotes = [];
     renderExplore();
-    if (synth.isPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+    if (synth.isPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
   };
 
   // Preset dropdown (12-tone mode)
@@ -9669,7 +9669,7 @@ function renderExplore() {
           exploreParams.degreeTuning = s.tuning ? { ...s.tuning } : null;
           _scaleComboWorld = key;
         }
-        synth.updateGenerationParams({ ...exploreParams });
+        synth.updateGenerationParams(enginePlayParams());
         renderExplore();
         debouncedReplay();
       };
@@ -9705,7 +9705,7 @@ function renderExplore() {
       if (!cell) return;
       handleNoteGridClick(cell);
       syncRootNotesWithScale(v);
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
     };
   }
 
@@ -9748,7 +9748,7 @@ function renderExplore() {
       if (out) out.textContent = `${Math.round(Number(sl.value) * 100)}%`;
       updateFormantWeightCircle(v);
       drawDistributions();
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
     };
   });
   updateFormantWeightCircle(v);
@@ -9762,7 +9762,7 @@ function renderExplore() {
       const out = v.querySelector(`[data-formant-scope-out="${param}"]`);
       if (out) out.textContent = fmtOutput(param, value);
       drawDistributions();
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
     };
   });
 
@@ -9776,7 +9776,7 @@ function renderExplore() {
       exploreParams.voiceMode = normaliseVoiceMode(btn.dataset.vmode);
       renderExplore();
       if (wasPlaying) {
-        synth.play({ ...exploreParams });
+        synth.play(enginePlayParams());
         startVisualiser();
       }
     };
@@ -10293,7 +10293,7 @@ function loadSoundModuleById(id) {
       _chBodySel = null;
     }
   }
-  synth.updateGenerationParams({ ...exploreParams });
+  synth.updateGenerationParams(enginePlayParams());
   renderExplore();
 }
 
@@ -10336,7 +10336,7 @@ function stopSubnotePreview(rerender = true) {
   if (_subnotePreviewId === null) return;
   const wasPlaying = _subnotePreviewWasPlaying;
   _subnotePreviewId = null;
-  if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+  if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
   else synth.stop();
   if (rerender) renderExplore();
 }
@@ -10379,7 +10379,7 @@ function addPresetAsLayers(params) {
   }
   if (!added) return false;
   _chLayerSel = exploreParams.layers[exploreParams.layers.length - 1].id;
-  synth.updateGenerationParams({ ...exploreParams });
+  synth.updateGenerationParams(enginePlayParams());
   renderExplore();
   return true;
 }
@@ -10469,7 +10469,7 @@ function wireM2LibList(v) {
       const wasPlaying = synth.isPlaying;
       exploreParams = mergedPresetParams({ parameters: { ...entry.parameters }, section: entry.section || "full" });
       renderExplore();
-      if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+      if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
     };
   });
   // Sub-note mode: clicking a sound card PREVIEWS it (owner 2026-07-09) —
@@ -10676,9 +10676,9 @@ function producerLayersPanelHTML(p) {
 function bindProducerLayers(v, target = exploreParams, hooks = {}) {
   const panel = v.querySelector("#m2LayersPanel");
   if (!panel) return;
-  const applyLive = hooks.applyLive || (() => synth.updateGenerationParams({ ...target }));
-  const applyReverb = hooks.applyReverb || (() => synth.updateReverb({ ...target }));
-  const applyEffects = hooks.applyEffects || (() => synth.updateEffects(target));
+  const applyLive = hooks.applyLive || (() => synth.updateGenerationParams(target === exploreParams ? enginePlayParams() : { ...target }));
+  const applyReverb = hooks.applyReverb || (() => synth.updateReverb(target === exploreParams ? enginePlayParams() : { ...target }));
+  const applyEffects = hooks.applyEffects || (() => synth.updateEffects(target === exploreParams ? enginePlayParams() : target));
   const rerender = hooks.rerender || (() => renderExplore());
   const layerById = (id) => (target.layers || []).find(l => l.id === id);
   const prodChain = (id, create = false) => {
@@ -11291,7 +11291,7 @@ function layerStripHTML(p, compact = false) {
   const baseName = (p.spectralProfileName || "").trim() || "Untitled";
   const baseSel = !_chLayerEdit && !_chLayerSel;
   const baseRow = `
-    <div class="layer-row base-row${baseSel ? " sel" : ""}" data-layer-row="base" style="--layer-hue:210" title="The base sound — the foundation every layer sits on. Click to edit it in the stages above (always present).">
+    <div class="layer-row base-row${baseSel ? " sel" : ""}" data-layer-row="base" style="--layer-hue:210" title="Layer 1 — always present. Click to edit it in the stages above.">
       <span class="layer-row-tag">1</span>
       <span class="space-target-control layer-space-target">
         <canvas class="layer-minipad compact-space-target" data-layer-pad="base" width="40" height="40"></canvas>
@@ -11312,7 +11312,7 @@ function layerStripHTML(p, compact = false) {
   const rows = baseRow + layers.map((l, i) => {
     const envStr = layerEnvLineText(l, p);
     return `
-    <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}" title="Click to load this layer's sound into the editor above (click again, or Done, to return to the base)">
+    <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}" title="Click to edit this layer in the stages above — edits save to the row automatically; click row 1 to go back to Layer 1">
       <span class="layer-row-tag">${i + 2}</span>
       <span class="space-target-control layer-space-target">
         <canvas class="layer-minipad compact-space-target" data-layer-pad="${l.id}" width="40" height="40"></canvas>
@@ -11413,9 +11413,8 @@ function subnoteWorkspaceHTML(p) {
             <div class="ch-head">
               <div class="ch-title-block">
                 <h2 class="ch-preset-title" id="chPresetTitle" title="Double-click to rename this sound">${esc(title)}</h2>
-                ${_chLayerEdit ? `<span class="layer-edit-tag">editing layer ${((p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 2) || ""}</span>` : ""}
+                <span class="layer-edit-tag" title="The stages above edit this layer — click another LAYERS row below to switch; edits save to the row automatically">editing ${_chLayerEdit ? `Layer ${((p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 2) || ""}` : "Layer 1"}</span>
               </div>
-              ${_chLayerEdit ? `<button class="btn btn-primary btn-sm" id="layerEditDone" title="Save this sound back into the layer and return to Layer 1 (the base sound)">Done — back to Layer 1</button>` : ""}
               <!-- Owner 07-08: no preset dropdown or mix slider here — the
                    instrument cards below are the one place a recipe is
                    chosen, and spectralMix is a legacy blend (in the fourier
@@ -14240,8 +14239,8 @@ function activeFxChain(p) {
 // (needed for structural edits); param/wet drags pass false to keep the live
 // face and slider intact.
 function commitFx(rerender = true) {
-  synth.updateGenerationParams({ ...exploreParams });
-  synth.updateEffects(exploreParams);
+  synth.updateGenerationParams(enginePlayParams());
+  synth.updateEffects(enginePlayParams());
   if (rerender) renderExplore();
 }
 
@@ -14366,8 +14365,8 @@ function mountFxFace(v) {
     get params() { return entry.params; },
     setParam(k, val) {
       entry.params[k] = val;
-      synth.updateEffects(exploreParams);        // live, click-free DSP
-      synth.updateGenerationParams({ ...exploreParams }); // keep next-note in sync
+      synth.updateEffects(enginePlayParams());        // live, click-free DSP
+      synth.updateGenerationParams(enginePlayParams()); // keep next-note in sync
     },
     get expanded() { return _fxExpanded; },
     analyser: null, // per-effect analyser tap: not wired yet (contract allows null)
@@ -14479,8 +14478,8 @@ function bindEffectsStage(v) {
       fx.wet = parseFloat(el.value);
       const out = v.querySelector(`[data-fx-wetv="${fx.uid}"]`);
       if (out) out.textContent = `${Math.round(fx.wet * 100)}%`;
-      synth.updateEffects(exploreParams); // live, no rebuild (keep the slider)
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateEffects(enginePlayParams()); // live, no rebuild (keep the slider)
+      synth.updateGenerationParams(enginePlayParams());
     };
   });
   const clearBtn = v.querySelector("[data-fx-clear]");
@@ -14752,7 +14751,7 @@ function wireEarRoom(v) {
     exploreParams.earDistance = m.earDistance;
     exploreParams.headDensity = m.headDensity;
     exploreParams.pinnaScale = m.pinnaScale;
-    synth.updateReverb({ ...exploreParams });
+    synth.updateReverb(enginePlayParams());
     renderExplore();
   };
   // V2: the head-model list rows (the select's replacement)
@@ -14765,7 +14764,7 @@ function wireEarRoom(v) {
       exploreParams.earDistance = m.earDistance;
       exploreParams.headDensity = m.headDensity;
       exploreParams.pinnaScale = m.pinnaScale;
-      synth.updateReverb({ ...exploreParams });
+      synth.updateReverb(enginePlayParams());
       renderExplore();
     };
   });
@@ -14779,7 +14778,7 @@ function wireEarRoom(v) {
       exploreParams.reverbSize = null;
       exploreParams.reverbDamping = null;
       exploreParams.reverbDiffusion = null;
-      synth.updateReverb({ ...exploreParams });
+      synth.updateReverb(enginePlayParams());
       renderExplore();
     };
   });
@@ -14793,7 +14792,7 @@ function wireEarRoom(v) {
     exploreParams.reverbSize = null;
     exploreParams.reverbDamping = null;
     exploreParams.reverbDiffusion = null;
-    synth.updateReverb({ ...exploreParams });
+    synth.updateReverb(enginePlayParams());
     renderExplore();
   };
   drawRoomTiles();
@@ -15290,7 +15289,7 @@ function wireTonePrint(v) {
     if (nn) chPinShow(nn);
   };
   const endDrag = () => {
-    if (drag && drag.moved) synth.updateGenerationParams({ ...exploreParams });
+    if (drag && drag.moved) synth.updateGenerationParams(enginePlayParams());
     drag = null;
   };
   cv.onmouseup = endDrag;
@@ -15352,7 +15351,7 @@ function wireTonePrint(v) {
       const out = sl.parentElement.querySelector("output");
       if (out) out.textContent = newDb.toFixed(1);
       drawTonePrint();
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
     };
   }
 
@@ -15579,6 +15578,25 @@ function _soundHalf(params) {
   return half;
 }
 
+// The engine must always hear the TRUE stack. During a layer edit the
+// top-level sound-half is the edited layer's live sound and the real base
+// sits in the stash — rebuild that truth for every engine update, so what
+// plays during an edit is exactly what the patch sounds like after it.
+// (Previously the engine received the swapped state: the edited layer sounded
+// twice — live as the base voice plus its stale stored copy — and the actual
+// base was missing from the mix.)
+function enginePlayParams() {
+  if (!_chLayerEdit) return { ...exploreParams };
+  const live = _soundHalf(exploreParams); // the edited layer's current sound
+  const p = { ...exploreParams, ...(_chLayerEdit.baseStash || {}) };
+  p.spaceAzimuth = _chLayerEdit.baseSpace?.angle ?? p.spaceAzimuth;
+  p.spaceDistance = _chLayerEdit.baseSpace?.dist ?? p.spaceDistance;
+  p.layers = (exploreParams.layers || []).map(l => l.id === _chLayerEdit.layerId
+    ? { ...l, subnote: live, space: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 } }
+    : l);
+  return p;
+}
+
 function enterLayerEdit(layer) {
   if (_chLayerEdit) exitLayerEdit(false);
   // Owner 07-07: location in space is SEPARATE per layer — editing a layer
@@ -15592,7 +15610,7 @@ function enterLayerEdit(layer) {
   exploreParams.spaceAzimuth = layer.space?.angle ?? _chLayerEdit.baseSpace.angle;
   exploreParams.spaceDistance = layer.space?.dist ?? _chLayerEdit.baseSpace.dist;
   _chLayerSel = layer.id;
-  synth.updateGenerationParams({ ...exploreParams });
+  synth.updateGenerationParams(enginePlayParams());
   renderExplore();
 }
 
@@ -15611,16 +15629,14 @@ function exitLayerEdit(rerender = true) {
   exploreParams.spaceDistance = _chLayerEdit.baseSpace.dist;
   _chLayerEdit = null;
   _chLayerSel = null;
-  synth.updateGenerationParams({ ...exploreParams });
+  synth.updateGenerationParams(enginePlayParams());
   if (rerender) renderExplore();
 }
 
 // Q7: layer strip interactions. Layer edits apply live through
 // updateGenerationParams — the next generated note carries them.
 function wireLayerStrip(v) {
-  const applyLive = () => synth.updateGenerationParams({ ...exploreParams });
-  const doneBtn = v.querySelector("#layerEditDone");
-  if (doneBtn) doneBtn.onclick = () => exitLayerEdit();
+  const applyLive = () => synth.updateGenerationParams(enginePlayParams());
   const add = v.querySelector("#layerAdd");
   if (add) add.onclick = () => {
     exitLayerEdit(false); // a new layer captures the BASE sound, not an edit in progress
@@ -15639,9 +15655,10 @@ function wireLayerStrip(v) {
       gain: 0.8,
     };
     exploreParams.layers.push(layer);
-    _chLayerSel = layer.id;
-    applyLive();
-    renderExplore();
+    // highlight = editing (unified model 2026-07-15): adding a layer starts
+    // editing it, so the row highlight, the "editing Layer N" tag and the
+    // stages above all agree on what the knobs change.
+    enterLayerEdit(layer);
   };
 
   // Drop targets for browser presets: the strip itself, the rows area, and
@@ -15721,7 +15738,7 @@ function wireLayerStrip(v) {
       exploreParams.spaceAzimuth = l.space.angle;
       exploreParams.spaceDistance = l.space.dist;
       drawSpacePad();
-      synth.updateReverb({ ...exploreParams });
+      synth.updateReverb(enginePlayParams());
     }
   };
   v.querySelectorAll("[data-layer-pad]").forEach(cv => {
@@ -15742,7 +15759,7 @@ function wireLayerStrip(v) {
           const l = layerOf(id);
           if (l) { l.space = { ...pos }; syncEditedSpace(l); }
         }
-        applyLive(); synth.updateReverb({ ...exploreParams });
+        applyLive(); synth.updateReverb(enginePlayParams());
       },
       redraw: () => { drawSpacePad(); drawStageBig(); updateStageReadouts(); },
     });
@@ -15796,7 +15813,7 @@ function wireLayerStrip(v) {
       if (!fx) return;
       fx.enabled = fx.enabled === false;
       applyLive();
-      synth.updateEffects(exploreParams);
+      synth.updateEffects(enginePlayParams());
       renderExplore();
     };
   });
@@ -15807,7 +15824,7 @@ function wireLayerStrip(v) {
       fx.wet = parseFloat(el.value);
       el.closest(".layer-fx-tag")?.style.setProperty("--wet", `${Math.round(fx.wet * 100)}%`);
       applyLive();
-      synth.updateEffects(exploreParams); // live, no rebuild
+      synth.updateEffects(enginePlayParams()); // live, no rebuild
     };
   });
   const sync = v.querySelector("#layerEnvSync");
@@ -16153,7 +16170,7 @@ function wireStageBig(v) {
     if (s.id === "base") {
       exploreParams.spaceAzimuth = az;
       exploreParams.spaceDistance = dist;
-      synth.updateReverb({ ...exploreParams });
+      synth.updateReverb(enginePlayParams());
       drawChThumbs();
     } else if (s.isPercGroup) {
       // Drag the kit's group reference: every drum keeps its offset from the
@@ -16168,16 +16185,16 @@ function wireStageBig(v) {
         l.space.angle = ((l.space.angle + dA + 540) % 360) - 180;
         l.space.dist = clamp(l.space.dist + dD, SPACE_DMIN, SPACE_DMAX);
       }
-      synth.updateGenerationParams({ ...exploreParams });
-      synth.updateReverb({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
+      synth.updateReverb(enginePlayParams());
     } else if (s.layer) {
       s.layer.space = { angle: az, dist };
       if (_chLayerEdit?.layerId === s.id) {
         exploreParams.spaceAzimuth = az;
         exploreParams.spaceDistance = dist;
-        synth.updateReverb({ ...exploreParams });
+        synth.updateReverb(enginePlayParams());
       }
-      synth.updateGenerationParams({ ...exploreParams });
+      synth.updateGenerationParams(enginePlayParams());
       drawLayerMiniPads();
     }
     updateStageReadouts();
@@ -16468,7 +16485,7 @@ function wireSpacePad(v) {
     drawSpacePad();
     drawSpaceField();
     drawChThumbs();
-    synth.updateReverb({ ...exploreParams });
+    synth.updateReverb(enginePlayParams());
   };
   cv.onmousedown = (e) => {
     e.preventDefault();
@@ -16988,7 +17005,7 @@ function debouncedReplay() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     if (synth.isPlaying) {
-      synth.play({ ...exploreParams });
+      synth.play(enginePlayParams());
       startVisualiser();
     }
   }, 180);
@@ -17357,7 +17374,7 @@ function wireWelcomeCard(v) {
         audBtn.textContent = "▶";
         return;
       }
-      synth.play({ ...exploreParams });
+      synth.play(enginePlayParams());
       auditioning = true;
       audBtn.textContent = "❚❚";
     };
@@ -17700,7 +17717,7 @@ function applyMacroPanelPreset(panel, value) {
   syncSurpriseFeatureParams(exploreParams);
   _macroPresetUi[panel] = { selectedId: value, name: entry.name, originalName: entry.name, dirty: false };
   renderExplore();
-  if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+  if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
 }
 
 function wirePanelPresetBars(v) {
@@ -17867,7 +17884,7 @@ function endPresetPreview() {
   const { wasPlaying } = presetPreview;
   presetPreview = null;
   if (wasPlaying) {
-    synth.play({ ...exploreParams });
+    synth.play(enginePlayParams());
     startVisualiser();
   } else {
     synth.stop();
@@ -17953,7 +17970,7 @@ function renderPresetList(container, presets, source) {
         section,
       });
       renderExplore();
-      if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+      if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
     };
   });
   container.querySelectorAll("[data-remove]").forEach(btn => {
@@ -22080,7 +22097,7 @@ function cloudLoadPatch(patch) {
   if (overlay) overlay.hidden = true;
   const onExplore = (location.hash.replace(/^#\/?/, "") || "explore") === "explore";
   if (onExplore) renderExplore(); else location.hash = "#explore";
-  if (wasPlaying) { synth.play({ ...exploreParams }); startVisualiser(); }
+  if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
   trackEngagement("cloud_load");
 }
 
