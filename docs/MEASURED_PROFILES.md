@@ -4,7 +4,9 @@
 `web/static/measured_profiles.js` is the engine-facing projection. No source
 audio ships in this repository. The July 2026 WP-3 refresh analysed 11 covered
 instruments; the earlier flute and trombone fits remain for saved-preset
-compatibility, giving 13 measured catalogue entries in total.
+compatibility, giving 13 measured catalogue entries in total. A subsequent
+owner-requested addition promoted flute into the same refreshed corpus, so 12
+entries now use the current WP-3 contract and only trombone remains legacy.
 
 ## Reproduce the fit
 
@@ -33,7 +35,7 @@ strict handoff contracts. Audio stays under `/private/tmp/sg2`.
 
 | Source | Instruments | Terms used by this project |
 |---|---|---|
-| [University of Iowa Musical Instrument Samples](https://theremin.music.uiowa.edu/MIS.html) | violin, cello, piano, guitar, clarinet, alto saxophone, trumpet, French horn | Public downloads; Iowa permits use in projects. Only derived parameters are committed. |
+| [University of Iowa Musical Instrument Samples](https://theremin.music.uiowa.edu/MIS.html) | flute, violin, cello, piano, guitar, clarinet, alto saxophone, trumpet, French horn | Public downloads; Iowa permits use in projects. Only derived parameters are committed. |
 | [Philharmonia Orchestra sound samples](https://philharmonia.co.uk/resources/sound-samples/) | alternate string, guitar, and horn takes | Free project use under Philharmonia's sample terms; raw samples are not redistributed. |
 | [VocalSet, Zenodo record 1193957](https://zenodo.org/records/1193957) | adult voice measurements | CC BY 4.0. The dataset paper describes 20 professional singers and the recording/technique design. |
 
@@ -64,7 +66,7 @@ guitar and piano it is a free-decay estimate.
 | alto saxophone | 96 | 139–856 | 0 | 0.174 / −0.465 | 4.71 / 6.43 | 1.08 | −10.0 |
 | cello | 142 | 65–1505 | 0 | 4.504 / 0.377 | 4.10 / 11.05 | 0.11 | −13.1 |
 | clarinet | 126 | 146–1924 | 0 | 0.180 / −0.220 | 3.41 / 3.74 | 0.45 | −8.2 |
-| French horn | 38 | 56–597 | 3.4e−7 | 0.539 / −0.160 | 3.55 / 11.09 | 1.49 | −9.7 |
+| French horn | 110 | 56–699 | 2.0e−8 | 0.467 / −0.236 | 4.33 / 5.67 | 1.03 | −9.3 |
 | acoustic guitar | 25 | 59–1424 | 5.83e−5 | 4.849 / 0.827 | — | 2.20 | −9.2 |
 | piano | 23 | 66–1104 | 1.16e−4 | 16.211 / 0.637 | — | 0.03 | −11.3 |
 | trumpet | 107 | 164–1254 | 4.0e−8 | 0.325 / −0.231 | 4.81 / 6.18 | 1.30 | −14.9 |
@@ -72,7 +74,7 @@ guitar and piano it is a free-decay estimate.
 | bass-voice proxy | 27 | 127–841 | 0 | 0.471 / −0.292 | 5.38 / 82.12 | 11.80 | −14.0 |
 | mezzo-voice proxy | 28 | 257–637 | 0 | 4.167 / 0.492 | 3.01 / 84.11 | 5.47 | −5.1 |
 | tenor-voice proxy | 57 | 127–556 | 0 | 0.438 / −0.084 | 5.80 / 77.36 | 4.90 | −10.6 |
-| flute (legacy retained) | 13 | 248–497 | 0 | 0.153 / −0.346 | 4.70 / 13.48 | — | −13.3 |
+| flute | 109 | 247–2016 | 3.2e−7 | 0.331 / −0.041 | 4.89 / 12.62 | 0.58 | +2.3† |
 | trombone (legacy retained) | 24 | 131–499 | 8.0e−8 | 0.140 / −0.598 | — | — | −26.3 |
 
 ### Per-instrument interpretation
@@ -80,6 +82,11 @@ guitar and piano it is a free-decay estimate.
 - **Alto saxophone:** three dynamics and three register runs produce the
   interim measured conical-reed fingerprint used by WP-5. It is not relabelled
   as tenor saxophone.
+- **Flute:** 18 Iowa runs now cover three registers and pp/mf/ff with and
+  without vibrato. The positive aggregate tail diagnostic is dominated by
+  sparse, near-noise-floor high partial detections in the upper register; it
+  is not used as a damping law. The per-register tables and measured attack,
+  breath, and vibrato fields remain valid campaign inputs.
 - **Clarinet:** the low anchor is strongly odd-dominant, while even energy
   rises sharply in the upper anchor. This directly exercises the G1
   register-dependent tables and the closed-tube construction assertion.
@@ -129,3 +136,5 @@ factory preset probability/depth without the WP-8 optimiser.
 5. Quantitative tripwires are ship minimums. Campaign completion still requires
    the run report's per-group reference-variability-floor evidence or a named
    limiting factor and filed fix.
+
+† Diagnostic only; see the flute note above.

@@ -359,7 +359,8 @@ class NoteAnalysis:
     percussive: bool = False
 
 
-def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64):
+def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
+                 min_detected_partials: int = 5):
     f0 = estimate_f0(seg, sr)
     if f0 is None or not (40 < f0 < 2500):
         return None
@@ -443,7 +444,7 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64):
             B_fit = B2
     # sanity: a real note must show its fundamental or 2nd partial plus a
     # few more — otherwise this segment is noise that fooled the f0 tracker
-    if not (ok[0] or ok[1]) or ok.sum() < 5:
+    if not (ok[0] or ok[1]) or ok.sum() < min_detected_partials:
         return None
     if amps.max() > 0:
         note.partial_amps = amps / amps.max()
@@ -1161,7 +1162,12 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
         for fn in file_list:
             path = os.path.join(inst_dir, fn)
             x, sr = load_mono(path)
-            segs = segment_notes(x, sr)
+            # The Iowa horn chromatic runs use shorter inter-note gaps than
+            # the other MIS sets; 250 ms merges entire scales into one note.
+            # Keep the conservative gate elsewhere so vibrato/bow dips are
+            # not split into false notes.
+            merge_gap = 0.12 if fn.lower().startswith("horn.") else 0.25
+            segs = segment_notes(x, sr, merge_gap_s=merge_gap)
             # drop segments > 20 dB quieter than the file's loudest segment
             # (page-turn thumps, resonance tails re-triggering the gate)
             if segs:
