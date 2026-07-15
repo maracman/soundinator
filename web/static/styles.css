@@ -8169,11 +8169,16 @@ body.dragging { cursor: grabbing; user-select: none; }
 /* Global scale/space active indicators (owner 2026-07-09) */
 .gs-chevron.gs-active { color: #f3f5f7; }
 .gs-onpip { color: var(--acc); font-size: 0.72em; margin-left: 4px; vertical-align: 1px; }
+/* Harmonic-guide + Global-space headers share one layout: icon → label → pip
+   on the left, the collapse caret pinned to the right edge, so the two rows
+   line up (owner 2026-07-15). */
+.gs-head-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-caret { margin-left: auto; flex: none; padding: 0 4px 0 6px; text-align: right; }
 /* Global space is a toggle button that GLOWS when on */
 .sp-toggle { flex: 1 1 auto; width: auto; }
 .sp-toggle.sp-active { color: #eaf6ff; text-shadow: 0 0 10px rgba(56,189,248,0.6); }
 .sp-onpip { color: #38bdf8; font-size: 0.72em; margin-left: 4px; vertical-align: 1px; text-shadow: 0 0 8px rgba(56,189,248,0.9); }
-.sp-expand { flex: 0 0 auto; width: auto !important; padding: 0 6px; text-align: center; }
+.sp-expand { flex: 0 0 auto; width: auto !important; padding: 0 4px 0 6px; text-align: right; }
 /* Collapsed slim cylinder — sits in the button row, top aligned with it. The
    box must shrink to the slim canvas (override .sp-cyl-wrap's 105px floor). */
 .tl2-sp-row.sp-collapsed-row { align-items: flex-start; }

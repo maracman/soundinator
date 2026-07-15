@@ -56,6 +56,21 @@ import {
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 import { FACTORY_SESSIONS } from "./factory-sessions.js";
+import {
+  DEFAULTS,
+  migrateParamsShape,
+  serializeParams,
+  enginePlayParams as buildEnginePlayParams,
+  sectionForParam,
+  extractSectionParams,
+  CAPTURE_PARTS,
+  capturePartForParam,
+  capturePartsFor,
+  extractInstrumentParams,
+  ensurePercLayers,
+  resolvePercEnabled,
+  cloneFxChain,
+} from "./params.js";
 // EFFECTS stage (docs/EFFECTS_CONTRACT.md) — browser/stack/faces are driven
 // from this registry. Importing also registers the whole effect roster.
 import {
@@ -133,53 +148,6 @@ const PRESET_SECTIONS = {
   space:      { label: "Space" },
 };
 
-const _MELODY_PARAMS = new Set([
-  "scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz",
-  "degreeTuning",
-  "subScaleNotes", "subScaleWeight", "rootNotes", "rootPullStrength",
-  "rootPullShape", "intervalPeakedness", "intervalRange", "momentum",
-  "registerCenter", "registerWidth", "registerSkew", "precision",
-  "precisionRange", "motifHitProb", "motifHitRange",
-  // Arpeggiator controls govern degree selection, so they belong to the
-  // melody module rather than leaking into the sub-note sound half.
-  "melodyPattern", "arpStep", "arpOctaves",
-]);
-const _RHYTHM_PARAMS = new Set([
-  "tempo", "beatDivisions", "onBeatProb", "offBeatProb", "sameLengthProb",
-  "restMotifStartRatio", "restOnMeterRatio", "restOffMeterRatio",
-  "gapProb", "gapMin", "gapMax", "gapDistanceSlope", "gapTimingRange",
-  "phraseGap", "slideSpeed",
-]);
-const _SURPRISE_EXTRAS = new Set([
-  "motifCount", "motifLengthBeats", "motifLength", "sequenceProb",
-  "motifSurpriseProb", "incorporationRate",
-  "melSurpriseAmount", "tunSurpriseAmount", "durSurpriseAmount", "dynSurpriseAmount",
-]);
-
-function sectionForParam(key) {
-  if (key === "seed") return null;
-  if (key.startsWith("reverb") || key.startsWith("space")) return "space";
-  if (key === "pinnaScale" || key === "earModel") return "space";
-  if (key.startsWith("perc")) return "percussion";
-  if (key.startsWith("surprise") || _SURPRISE_EXTRAS.has(key)) return "surprise";
-  if (key.startsWith("dynamics") || key === "loudnessRange") return "dynamics";
-  if (_RHYTHM_PARAMS.has(key)) return "rhythm";
-  if (_MELODY_PARAMS.has(key)) return "melody";
-  return "sound"; // voiceMode, formant*, tone*, spectral*, vibrato*, envelope*…
-}
-
-function extractSectionParams(params, section) {
-  const out = {};
-  for (const [k, val] of Object.entries(params)) {
-    if (sectionForParam(k) === section) out[k] = val;
-  }
-  return out;
-}
-
-// Five-part notation vocabulary used throughout Producer. The supplied PNGs
-// are independent alpha layers; CSS places them into one compact badge and
-// colours every layer according to whether that attribute is present.
-const CAPTURE_PARTS = ["notes", "space", "stave", "clef", "percussion"];
 const CAPTURE_PART_LABELS = {
   notes: "Sound",
   space: "Space",
@@ -187,49 +155,6 @@ const CAPTURE_PART_LABELS = {
   clef: "Scale and harmony",
   percussion: "Percussion",
 };
-const _SCALE_CAPTURE_KEYS = new Set([
-  "scaleMode", "scalePreset", "customDegrees", "edoDivisions", "tonicHz",
-  "degreeTuning", "subScaleNotes", "subScaleWeight", "rootNotes",
-  "rootPullStrength", "rootPullShape",
-]);
-
-function capturePartForParam(key) {
-  if (_SCALE_CAPTURE_KEYS.has(key)) return "clef";
-  const section = sectionForParam(key);
-  if (section === "sound") return "notes";
-  if (section === "space") return "space";
-  if (section === "percussion") return "percussion";
-  if (["melody", "rhythm", "dynamics", "surprise"].includes(section)) return "stave";
-  return null;
-}
-
-function hasAssignedPercussion(params = {}) {
-  if (Array.isArray(params.percLayers) && params.percLayers.some(layer => layer?.sound)) return true;
-  return Object.entries(params).some(([key, value]) =>
-    key.startsWith("perc") && key !== "percLayers" && value != null && value !== false && value !== 0 && value !== "");
-}
-
-function capturePartsFor(params = {}, section = "full", explicit = null) {
-  const out = Object.fromEntries(CAPTURE_PARTS.map(part => [part, false]));
-  for (const key of Object.keys(params || {})) {
-    const part = capturePartForParam(key);
-    if (part) out[part] = true;
-  }
-  // V1 metadata had four parts and folded Space into Notes. Preserve its
-  // explicit choices while deriving the newly introduced Slur/Space part.
-  if (explicit) {
-    for (const part of CAPTURE_PARTS) if (part in explicit) out[part] = !!explicit[part];
-  }
-  // Old single-section saves carry trustworthy provenance even when a value
-  // happens to equal a default and therefore looks semantically empty.
-  if (section === "sound") out.notes = true;
-  if (section === "space") out.space = true;
-  if (["rhythm", "dynamics", "surprise"].includes(section)) out.stave = true;
-  if (section === "melody") { out.stave = true; out.clef = true; }
-  if (section === "percussion") out.percussion = true;
-  if (!hasAssignedPercussion(params)) out.percussion = false;
-  return out;
-}
 
 const CAPTURE_PART_NAME_KEYS = {
   notes: "subnoteName",
@@ -311,7 +236,16 @@ function capturePartList(parts) { return CAPTURE_PARTS.filter(part => parts?.[pa
 
 function extractCaptureParams(params, selected) {
   const out = {};
-  for (const [key, value] of Object.entries(params || {})) {
+  const serialized = serializeParams(params || {});
+  const selectedLayer = params?.layers?.find(layer => layer.id === params.selectedLayerId) || params?.layers?.[0];
+  const source = { ...serialized };
+  if (selected?.notes && selectedLayer) {
+    for (const key of Object.keys(source)) {
+      if (capturePartForParam(key) === "notes") delete source[key];
+    }
+    Object.assign(source, selectedLayer.sound || selectedLayer.subnote || {});
+  }
+  for (const [key, value] of Object.entries(source)) {
     const part = capturePartForParam(key);
     if (part && selected?.[part]) out[key] = value;
   }
@@ -445,20 +379,6 @@ function percLayerId() {
   return (typeof crypto !== "undefined" && crypto.randomUUID)
     ? crypto.randomUUID() : `perc_${Math.random().toString(36).slice(2)}`;
 }
-function ensurePercLayers(p) {
-  if (Array.isArray(p.percLayers) && p.percLayers.length) return p.percLayers;
-  // Legacy → array: one sample layer per fixed role, so old patches look
-  // unchanged (three rows) and fresh patches open with a sensible starter set.
-  return [
-    { id: percLayerId(), role: "beat", vol: Number(p.percBeatVol) || 0,
-      sound: { kind: "sample", key: p.percBeatSound || "click" }, space: null },
-    { id: percLayerId(), role: "motif", vol: Number(p.percMotifVol) || 0,
-      sound: { kind: "sample", key: p.percMotifSound || "bell" }, space: null },
-    { id: percLayerId(), role: "downbeat", vol: Number(p.percDownbeatVol) || 0,
-      sound: { kind: "sample", key: p.percDownbeatSound || "wood" }, space: null,
-      every: p.percDownbeatEvery || 4 },
-  ];
-}
 function percHasAudible(p) {
   if (Array.isArray(p.percLayers)) return p.percLayers.some(l => (Number(l.vol) || 0) > 0);
   return (Number(p.percBeatVol) || 0) > 0 || (Number(p.percMotifVol) || 0) > 0
@@ -466,9 +386,6 @@ function percHasAudible(p) {
 }
 // undefined → infer from audible content (legacy patches stay ON); a stored
 // boolean always wins. Fresh patches are silent, so they resolve to OFF.
-function resolvePercEnabled(p) {
-  return typeof p.percEnabled === "boolean" ? p.percEnabled : percHasAudible(p);
-}
 
 // ── Smart dropdown (reusable component) — docs/SMART_DROPDOWN_SPEC.md ────
 // A searchable popover picker generalised from the one-off scale combo. Unlike
@@ -606,13 +523,6 @@ const SESSION_CONTEXT_PARAMS = new Set([
   // lack the keys and inherit the arrangement context defaults as before.
 ]);
 
-function extractInstrumentParams(params) {
-  const out = {};
-  for (const [k, val] of Object.entries(params)) {
-    if (!SESSION_CONTEXT_PARAMS.has(k)) out[k] = val;
-  }
-  return out;
-}
 
 // ── Q1: patch transparency badges + module halves ───────────
 // Badge row summarising what a patch will do in the arrangement —
@@ -640,221 +550,6 @@ function saveInstruments(list) {
   localStorage.setItem(INSTRUMENTS_KEY, JSON.stringify(list.slice(0, 100)));
 }
 
-const DEFAULTS = {
-  tempo: 104,
-  seed: 1001,
-  voiceMode: "fourier",
-  scaleMode: "12tone",
-  scalePreset: "major",
-  edoDivisions: 12,
-  customDegrees: null,
-  degreeTuning: null, // per-degree cent offsets from the EDO grid (world tunings / hand-tuned)
-  subScaleNotes: [0, 4, 7],
-  subScaleWeight: 0.7,
-  tonicHz: 261.63,
-  intervalPeakedness: 2.0,
-  melodyPattern: "walk",
-  attackNoiseLevel: 1,
-  arpStep: 2,
-  arpOctaves: 1,
-  intervalRange: 7,
-  momentum: 0,
-  motifHitProb: 0.92,
-  motifHitRange: 2,
-  precision: 0.9,
-  precisionRange: 12,
-  surpriseProb: 0.08,
-  surpriseDimensions: ["pitch"],
-  surprisePitchEnabled: true,
-  surpriseTuningEnabled: false,
-  surpriseRhythmEnabled: false,
-  surpriseFormantEnabled: false,
-  surpriseDynamicsEnabled: false,
-  surpriseRestEnabled: false,
-  surprisePitchWeight: 1,
-  surpriseTuningWeight: 0.45,
-  surpriseRhythmWeight: 0.45,
-  surpriseFormantWeight: 0.45,
-  surpriseDynamicsWeight: 0.35,
-  surpriseRestWeight: 0.2,
-  melSurpriseAmount: 0.5,
-  tunSurpriseAmount: 0.5,
-  durSurpriseAmount: 0.5,
-  dynSurpriseAmount: 0.5,
-  dynamicsHitRange: 22,
-  surprisePitchDistance: 1,
-  surpriseTuningDistance: 0.9,
-  surpriseRhythmDistance: 0.8,
-  surpriseFormantDistance: 0.85,
-  surpriseDynamicsDistance: 0.85,
-  surpriseAllowMultiple: false,
-  incorporationRate: 0.4,
-  surpriseMaxBaked: "Infinity",
-  activeFormants: ["ah"],
-  formantWeights: null,
-  formantChangeProb: 0.05,
-  formantFocus: "ah",
-  formantEditAll: true,
-  formantAccuracy: 0.85,
-  formantAccuracyRange: 1,
-  formantAccuracyByFormant: null,
-  formantRangeByFormant: null,
-  surpriseFormantDistanceByFormant: null,
-  dynamicsLevel: 0.62,
-  loudnessRange: 0.6,
-  dynamicsPrecision: 0.75,
-  dynamicsRange: 0.22,
-  motifCount: 3,
-  motifLengthBeats: 4,
-  sequenceProb: 0.8,
-  motifSurpriseProb: 0.1,
-  // Rhythm
-  beatDivisions: 1,
-  onBeatProb: 0.8,
-  offBeatProb: 0.2,
-  sameLengthProb: 0.4,
-  restMotifStartRatio: 0,
-  restOnMeterRatio: 0,
-  restOffMeterRatio: 0,
-  // Root pull
-  rootNotes: [0],
-  rootPullStrength: 0,
-  rootPullShape: 0.7,
-  // Register
-  registerCenter: 0,
-  registerWidth: 12,
-  registerSkew: 0,
-  // Percussion
-  percBeatVol: 0,
-  percBeatSound: "click",
-  percMotifVol: 0,
-  percMotifSound: "bell",
-  percDownbeatVol: 0,
-  percDownbeatSound: "wood",
-  percDownbeatEvery: 4,
-  // Percussion v2 (owner 2026-07-10): a layer list supersedes the fixed
-  // Beat/Motif/Downbeat trio above. null = derive from those legacy fields on
-  // first load (ensurePercLayers). The on/off state is NOT stored here — it is
-  // resolved (resolvePercEnabled): absent → infer from audible content, so
-  // legacy patches with percussion stay ON while fresh patches start silent.
-  percLayers: null,
-  // Percussion is its own sound source in space (producer LAYERS view). null =
-  // sit at the patch's own position (owner 2026-07-09).
-  percAzimuth: null,
-  percDistance: null,
-  // Space
-  reverbType: "room",
-  // A touch of room by default: a completely dry first play sounds clinical
-  // to newcomers, and the space is easy to remove.
-  reverbWet: 0.16,
-  reverbDecay: 1.4,
-  reverbTone: 0.6,
-  reverbPreDelay: 0.015,
-  // Sub-note tone-colour imperfections
-  toneColorProb: 0.25,
-  toneFormantDrift: 0.08,
-  toneResonanceDrift: 0.12,
-  toneBreath: 0.03,
-  vibratoProb: 0.35,
-  vibratoDepth: 18,
-  vibratoDepthSd: 5,
-  vibratoRate: 5.5,
-  vibratoRateSd: 0.7,
-  spectralProfile: "violin",
-  // Tone v2 excitation (T2): how energy enters the resonator. Defaults
-  // match the default profile (violin); choosing a profile re-seats them.
-  excitationType: "bow",
-  excitationPosition: 0.13,
-  excitationHardness: 0.6,
-  excitationHuman: 0.4,
-  partialTransfer: 0.15,
-  bodyType: "auto",
-  bodyArticulation: 0,
-  // null = derive from legacy spectralStretchCents; a finite value wins
-  partialB: null,
-  // SPACE positioning: where the instrument stands relative to the listener
-  spaceDistance: 2.5,
-  spaceAzimuth: 0,
-  // Global-space thread behaviour belongs to the patch/region. Centered makes
-  // the thread the constellation's centre; additive carries the patch's own
-  // offsets along the thread. The global designer owns threads, never this
-  // choice (owner 2026-07-10).
-  spaceMovement: "centered",
-  earDistance: 0.175, // Q4: listener ear-to-ear span in metres (head size IS this)
-  headDensity: 0.5,   // Q4: how hard the head shadows the far ear (0 = transparent)
-  spaceOwnHead: false, // owner 07-07: keep THIS patch's head even when the global space is on
-  earModel: "average",  // owner 07-07 round 3: which EAR_MODELS preset the head params came from
-  pinnaScale: 1,        // Shaw pinna cue scale (ear models; 0 = bare sphere)
-  reverbSize: null,     // room designer — null = the picked room's own character
-  reverbDamping: null,
-  reverbDiffusion: null,
-  // EFFECTS stage (docs/EFFECTS_CONTRACT.md): per-layer ordered effect stack,
-  // sitting between BODY and SPACE. Each entry {uid,type,enabled,wet,params}.
-  effectsChain: [],
-  stageEffectsOn: true,   // whole-stage bypass toggle (rail power button)
-  baseLayerGain: 1,       // base source mix, parallel to each extra layer's gain
-  baseLayerSolo: false,   // base participates in the same solo set as extra layers
-  layers: null,           // Q7: extra subnote modules [{id, hue, subnote, space, gain, independentHead}]
-  layerEnvOverride: false, // Q7: true = ONE variation trigger shared by base + all layers (own means kept)
-  layerEnvProb: 0.5,       // Q7: the shared variation chance when layerEnvOverride is on
-  layerEnvAttackSd: 0.015,  // shared variation SDs — one magnitude per envelope
-  layerEnvDecaySd: 0.04,    // parameter for the base and every layer while
-  layerEnvSustainSd: 0.08,  // synchronisation is on (owner 07-07)
-  layerEnvReleaseSd: 0.05,
-  spectralProb: 1,
-  spectralMix: 0.65,
-  spectralPartials: 20,
-  spectralSpread: 0.45,
-  spectralPartialMeans: null,
-  spectralPartialSds: null,
-  spectralPartialDyns: null,
-  spectralPartialRegs: null,
-  spectralDynamicAmount: 0.8,
-  spectralRegisterAmount: 0.55,
-  spectralResonanceAmount: 0.35,
-  spectralLoudnessNorm: 0.65,
-  // Material damping law: 0 = glass/metal (all partials ring), 1 = wood/felt
-  // (high partials die fast). Per-instrument defaults ride the profile.
-  partialMaterial: 0.45,
-  // Partial macros: transforms over the whole harmonic set (see
-  // docs/PARTIAL_MACROS_DESIGN.md). Tilt = spectral slope; odd/even
-  // balance; comb = movable boost of a related-frequency group; six
-  // octave-group faders (1 | 2 | 3-4 | 5-8 | 9-16 | 17+).
-  partialTilt: 0,
-  partialOddEven: 0,
-  partialComb: 0,
-  partialCombFreq: 4,
-  partialGroup1: 1, partialGroup2: 1, partialGroup3: 1,
-  partialGroup4: 1, partialGroup5: 1, partialGroup6: 1,
-  // 5-formant bank detail (formant mode): F3-F5 trims + bandwidth scale.
-  formantF3Level: 1,
-  formantF4Level: 1,
-  formantF5Level: 1,
-  formantBandwidth: 1,
-  spectralDriftProb: 1,
-  spectralDriftDepth: 0.35,
-  spectralDriftRate: 6,
-  spectralStretchCents: 0,
-  envelopeProb: 0.35,
-  envelopeRange: 0.2,
-  envelopeAttack: 0.008,
-  envelopeAttackSd: 0.006,
-  envelopeDecay: 0.04,
-  envelopeDecaySd: 0.018,
-  envelopeSustain: 0.6,
-  envelopeSustainSd: 0.08,
-  envelopeRelease: 0.12,
-  envelopeReleaseSd: 0.035,
-  // Articulation gaps
-  gapProb: 1,
-  gapMin: 0.15,
-  gapMax: 0.15,
-  gapDistanceSlope: 0,
-  gapTimingRange: 0,
-  slideSpeed: 0.65,
-  noteConnection: "glide",
-  phraseGap: 0.15,
-};
 
 // ─── Setting descriptions ──────────────────────────────────
 
@@ -1162,7 +857,7 @@ let sliderTrajectory = [];
 let headphonePassed = false;
 
 // Explore state
-let exploreParams = { ...DEFAULTS };
+let exploreParams = migrateParamsShape({ ...DEFAULTS });
 let exploreRating = 4;
 let exploreEngagement = loadEngagement();
 const MIDI_MAPPING_DEFAULTS = Object.freeze({ keys: "white", coverage: "packed", anchor: "octave" });
@@ -1723,6 +1418,15 @@ function normaliseArrangement(a) {
   if (!Array.isArray(a.palette)) a.palette = [];
   if (!a.lengthBeats) a.lengthBeats = 64;
   if (!a.id) a.id = crypto.randomUUID();
+  for (const patch of a.palette || []) {
+    if (patch?.params) patch.params = serializeParams(migrateParamsShape(patch.params));
+  }
+  for (const track of a.tracks || []) {
+    if (track?.instrumentParams) track.instrumentParams = serializeParams(migrateParamsShape(track.instrumentParams));
+    for (const region of track?.regions || []) {
+      if (region?.paramsOverride) region.paramsOverride = serializeParams(migrateParamsShape(region.paramsOverride));
+    }
+  }
   // Legacy producer tracks used a stereo pan value. Preserve its audible
   // intent once as a real spatial bearing, then retire pan so the binaural
   // target is the only placement model.
@@ -1911,8 +1615,9 @@ function browserItems() {
 // Tone v2 migration (T6) runs here so saved instruments made on the old
 // tone model translate wherever they are used.
 function voiceParamsFor(item) {
-  if (item.section === "instrument") return migrateToneParams({ ...item.params });
-  return extractInstrumentParams(migrateToneParams({ ...DEFAULTS, ...item.params }));
+  if (item.section === "instrument") return migrateParamsShape(migrateToneParams({ ...item.params }));
+  return migrateParamsShape(extractInstrumentParams(
+    migrateParamsShape(migrateToneParams({ ...DEFAULTS, ...item.params }))));
 }
 
 // Palette edit round-trip (producer v2 P6): the palette item under edit in
@@ -1929,10 +1634,6 @@ function setPaletteEditState(state) {
 function commitPaletteEdit() {
   const state = paletteEditState();
   if (!state) return false;
-  // A layer-edit in progress means exploreParams currently holds ONE layer's
-  // sound, not the whole patch — fold it back into its layer first, so the
-  // commit below captures the complete patch and not a half-swapped state.
-  if (_chLayerEdit) exitLayerEdit(false);
   arrangement = arrangement || loadArrangement();
   // Region-scoped edit: the take's own paramsOverride is what plays, so that
   // is what the round-trip writes back to. The shared palette item is left
@@ -2174,16 +1875,16 @@ function applyMasterToVoices() {
 }
 
 function regionVoiceParams(track, region) {
-  if (region?.paramsOverride) return region.paramsOverride;
+  if (region?.paramsOverride) return migrateParamsShape(region.paramsOverride);
   const pal = (arrangement?.palette || []).find(pl => pl.id === region.paletteId);
-  return pal ? pal.params : (track.instrumentParams || {});
+  return migrateParamsShape(pal ? pal.params : (track.instrumentParams || {}));
 }
 
 function regionPlayParams(track, region, atBeat = null) {
   // Tier 1 session context (owned by the arrangement, inherited live) +
   // Tier 2 instrument (from the palette) + Tier 3 take
   const context = arrangement?.context || defaultArrangementContext();
-  const params = { ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed };
+  const params = migrateParamsShape({ ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed });
   // Percussion-only patches keep the note grid (for percussion timing) but the
   // pitched voice stays silent.
   const srcPatch = (arrangement?.palette || []).find(p => p.id === region.paletteId);
@@ -2270,7 +1971,8 @@ function sessionBarControlsHTML() {
 
 // Total sound layers = the base (Layer 1) plus any stacked layers.
 function layersBucketOf(params) {
-  const n = 1 + (Array.isArray(params?.layers) ? params.layers.length : 0);
+  const count = Array.isArray(params?.layers) ? params.layers.length : 0;
+  const n = params?.layers?.[0]?.sound ? count : 1 + count;
   return n >= 4 ? "4+" : String(n);
 }
 
@@ -2500,7 +2202,7 @@ function wireBrowserPalette(v) {
       synth.stop();
       setPaletteEditState({ paletteId: pl.id, name: pl.name });
       // Load the voice as it sounds in the arrangement: session context + voice
-      exploreParams = migrateToneParams({ ...DEFAULTS, ...arrangement.context, ...pl.params });
+      exploreParams = migrateParamsShape(migrateToneParams({ ...DEFAULTS, ...arrangement.context, ...pl.params }));
       workspaceTab = "subnote";
       navigate("explore");
     };
@@ -3266,6 +2968,17 @@ function _spTrackVoiceParams(track, beat = playheadBeat) {
 // percussion layers. Percussion without an explicit position inherits the
 // base before a thread transforms it, exactly as the renderer does.
 function _spTrackSources(vp) {
+  if (vp?.layers?.[0]?.sound) {
+    const base = vp.layers[0]?.space || { angle: 0, dist: 2.5 };
+    const sources = vp.layers.map(layer => ({
+      angle: layer.space?.angle ?? base.angle,
+      dist: layer.space?.dist ?? base.dist,
+    }));
+    for (const layer of Array.isArray(vp.percLayers) ? vp.percLayers : []) {
+      sources.push({ angle: layer.space?.angle ?? base.angle, dist: layer.space?.dist ?? base.dist });
+    }
+    return sources;
+  }
   const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
   const sources = [base];
   for (const l of Array.isArray(vp.layers) ? vp.layers : []) {
@@ -3324,13 +3037,20 @@ function spApplyThreadToPatch(params, handle) {
   const sources = _spTrackSources(params);
   const mode = params.spaceMovement === "additive" ? "additive" : "centered";
   const out = spTransformSources(sources, handle, mode);
-  params.spaceAzimuth = out[0].angle;
-  params.spaceDistance = Math.max(0.3, out[0].dist);
-  let at = 1;
-  if (Array.isArray(params.layers)) {
+  let at = 0;
+  if (params?.layers?.[0]?.sound) {
     params.layers = params.layers.map(l => ({
       ...l, space: { angle: out[at].angle, dist: Math.max(0.3, out[at++].dist) },
     }));
+  } else {
+    params.spaceAzimuth = out[0].angle;
+    params.spaceDistance = Math.max(0.3, out[0].dist);
+    at = 1;
+    if (Array.isArray(params.layers)) {
+      params.layers = params.layers.map(l => ({
+        ...l, space: { angle: out[at].angle, dist: Math.max(0.3, out[at++].dist) },
+      }));
+    }
   }
   if (Array.isArray(params.percLayers)) {
     params.percLayers = params.percLayers.map(l => ({
@@ -4630,10 +4350,16 @@ function engineModuleOptions(selected) {
   })) }];
 }
 function patchSpatialSources(p) {
-  const angle = p.spaceAzimuth ?? 0, dist = p.spaceDistance ?? 2.5;
+  const unified = p?.layers?.[0]?.sound;
+  const base = unified ? p.layers[0] : null;
+  const angle = base?.space?.angle ?? p.spaceAzimuth ?? 0;
+  const dist = base?.space?.dist ?? p.spaceDistance ?? 2.5;
+  const tonal = unified ? p.layers : [
+    { id: "base", hue: 36, space: { angle, dist }, gain: p.baseLayerGain ?? 1, solo: !!p.baseLayerSolo },
+    ...(p.layers || []),
+  ];
   return [
-    { id: "base", label: "Layer 1", kind: "base", num: "1", hue: 36, angle, dist, color: "gold", mute: false, solo: !!p.baseLayerSolo },
-    ...(p.layers || []).map((l, i) => ({ id: l.id, label: `Layer ${i + 2}`, kind: "layer", num: String(i + 2), hue: l.hue ?? (36 + i * 70) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "blue", mute: !!l.mute, solo: !!l.solo })),
+    ...tonal.map((l, i) => ({ id: l.id, label: `Layer ${i + 1}`, kind: i === 0 ? "base" : "layer", num: String(i + 1), hue: l.hue ?? (36 + i * 70) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: i === 0 ? "gold" : "blue", mute: !!l.mute, solo: !!l.solo })),
     ...(p.percLayers || []).map((l, i) => ({ id: `perc:${l.id}`, label: l.sound?.name || l.sound?.key || `Hit ${i + 1}`, kind: "percussion", num: `P${i + 1}`, hue: (32 + i * 47) % 360, angle: l.space?.angle ?? angle, dist: l.space?.dist ?? dist, color: "pink", mute: !!l.mute })),
   ];
 }
@@ -4792,18 +4518,19 @@ function patchLayerStripHTML(p) {
         </div>
       </div>
     </div>`;
-  const baseRow = row("base", "1", 36, "Layer 1", ` <span class="patch-lyr-badge">MAIN</span>`,
-    `<label class="sp-ctl">Vol <input type="range" data-patch-base-gain min="0" max="1.5" step="0.01" value="${p.baseLayerGain ?? 1}"/></label>`,
-    p.spaceAzimuth ?? 0, p.spaceDistance ?? 2.5,
-    `<button class="pal-btn patch-lyr-solo${p.baseLayerSolo ? " on" : ""}" data-patch-base-solo title="Solo base layer">S</button>`, false);
-  const rows = layers.map((l, i) => row(
-    l.id, String(i + 2), l.hue ?? (36 + i * 70) % 360, l.name || `Layer ${i + 2}`, "",
+  const base = layers[0] || { id: "base", hue: 36, gain: p.baseLayerGain ?? 1, solo: !!p.baseLayerSolo, space: { angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5 } };
+  const baseRow = row(base.id, "1", base.hue ?? 36, base.name || "Layer 1", ` <span class="patch-lyr-badge">MAIN</span>`,
+    `<label class="sp-ctl">Vol <input type="range" data-patch-base-gain min="0" max="1.5" step="0.01" value="${base.gain ?? 1}"/></label>`,
+    base.space?.angle ?? 0, base.space?.dist ?? 2.5,
+    `<button class="pal-btn patch-lyr-solo${base.solo ? " on" : ""}" data-patch-base-solo title="Solo base layer">S</button>`, false);
+  const rows = layers.slice(1).map((l, offset) => { const i = offset + 1; return row(
+    l.id, String(i + 1), l.hue ?? (36 + i * 70) % 360, l.name || `Layer ${i + 1}`, "",
     `<label class="sp-ctl">Vol <input type="range" data-patch-lyr-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}"/></label>`,
     l.space?.angle ?? (p.spaceAzimuth ?? 0), l.space?.dist ?? (p.spaceDistance ?? 2.5),
     `<button class="pal-btn patch-lyr-mute${l.mute ? " on" : ""}" data-patch-layer-mute="${l.id}" title="${l.mute ? "Unmute" : "Mute"} layer">M</button>`
     + `<button class="pal-btn patch-lyr-solo${l.solo ? " on" : ""}" data-patch-layer-solo="${l.id}" title="Solo layer — hear it alone">S</button>`
     + `<button class="pal-btn" data-patch-layer-remove="${l.id}" title="Remove layer">×</button>`,
-    !!l.mute)).join("");
+    !!l.mute); }).join("");
   // Percussion hits are their OWN group — kept visually distinct from the melodic
   // sound layers, each independently positionable + mutable (owner 2026-07-10).
   const percRows = percLayers.length ? (
@@ -4816,7 +4543,7 @@ function patchLayerStripHTML(p) {
       `<button class="pal-btn patch-lyr-mute${l.mute ? " on" : ""}" data-patch-perc-mute="${l.id}" title="${l.mute ? "Unmute" : "Mute"} hit">M</button>`,
       !!l.mute, "patch-lyr-perc")).join("")
   ) : "";
-  const emptyNote = layers.length ? "" : `<div class="patch-lyr-empty">One sound layer. Stack more from the sub-note editor's LAYERS panel, or drag a preset onto this patch.</div>`;
+  const emptyNote = layers.length > 1 ? "" : `<div class="patch-lyr-empty">One sound layer. Stack more from the sub-note editor's LAYERS panel, or drag a preset onto this patch.</div>`;
   return baseRow + rows + emptyNote + percRows;
 }
 function patchScaleHTML(p, parts, regionScoped) {
@@ -5045,7 +4772,7 @@ function bindPatchInspector(v) {
   });
   panel.querySelectorAll("[data-patch-edit]").forEach(btn => {
     btn.onclick = () => {
-      exploreParams = migrateToneParams({ ...DEFAULTS, ...(arrangement.context || {}), ...params });
+      exploreParams = migrateParamsShape(migrateToneParams({ ...DEFAULTS, ...(arrangement.context || {}), ...params }));
       // ALWAYS record what is being edited — the state drives the "editing …"
       // banner in the studio and the commit on return. Region-scoped edits
       // are keyed by region+track so they write back to the take's override.
@@ -5085,7 +4812,7 @@ function bindPatchInspector(v) {
     selected: () => _patchStageSel,
     onSelect: (s) => { _patchStageSel = s.id; syncLayerRowSel(); updateReadout(); },
     onMove: (s, az, dist) => {
-      if (s.kind === "base") { params.spaceAzimuth = az; params.spaceDistance = dist; }
+      if (s.kind === "base") { const l = layerById(s.id); if (l) l.space = { angle: az, dist }; }
       else if (s.kind === "percussion") { const l = percById(s.id.slice(5)); if (l) l.space = { angle: az, dist }; }
       else { const l = layerById(s.id); if (l) l.space = { angle: az, dist }; }
       patchTargetHandles.get(s.id)?.redraw();
@@ -5098,11 +4825,12 @@ function bindPatchInspector(v) {
     el.oninput = () => { const l = layerById(el.dataset.patchLyrGain); if (!l) return; l.gain = parseFloat(el.value); if (l.mute && l.gain > 0) l.mute = false; persist("layer level"); };
   });
   const baseGain = panel.querySelector("[data-patch-base-gain]");
-  if (baseGain) baseGain.oninput = () => { params.baseLayerGain = parseFloat(baseGain.value); persist("base layer level"); };
+  if (baseGain) baseGain.oninput = () => { const l = params.layers?.[0]; if (l) l.gain = parseFloat(baseGain.value); persist("base layer level"); };
   const baseSolo = panel.querySelector("[data-patch-base-solo]");
   if (baseSolo) baseSolo.onclick = () => {
-    params.baseLayerSolo = !params.baseLayerSolo;
-    baseSolo.classList.toggle("on", params.baseLayerSolo);
+    const l = params.layers?.[0]; if (!l) return;
+    l.solo = !l.solo;
+    baseSolo.classList.toggle("on", l.solo);
     persist("solo base layer"); redrawStage();
   };
   // Every row uses the same compact spatial target as a track header.
@@ -5117,7 +4845,7 @@ function bindPatchInspector(v) {
       muted: () => !!source().mute,
       set: (pos) => {
         _patchStageSel = id; syncLayerRowSel();
-        if (id === "base") { params.spaceAzimuth = pos.angle; params.spaceDistance = pos.dist; }
+        if (id === params.layers?.[0]?.id) { const l = params.layers[0]; l.space = { ...pos }; }
         else { const l = spaceTargetFor(id); if (l) l.space = { ...pos }; }
         persist("patch source position"); updateReadout();
       },
@@ -8114,7 +7842,7 @@ function wireProduce(v) {
     if (!track || !region) return;
     stopArrangement();
     synth.stop();
-    exploreParams = { ...regionPlayParams(track, region) };
+    exploreParams = migrateParamsShape({ ...regionPlayParams(track, region) });
     navigate("explore");
   };
 
@@ -10283,7 +10011,8 @@ function loadSoundModuleById(id) {
   } else {
     const params = m2PresetParamsById(id);
     if (!params) return;
-    const sound = extractSectionParams(migrateToneParams({ ...params }), "sound");
+    const migrated = migrateParamsShape(migrateToneParams({ ...params }));
+    const sound = { ...(migrated.layers?.[0]?.sound || {}) };
     for (const k of Object.keys(sound)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete sound[k];
     if (!Object.keys(sound).length) return;
     Object.assign(exploreParams, sound);
@@ -10310,7 +10039,8 @@ function resolveSoundHalf(id) {
   }
   const params = m2PresetParamsById(id);
   if (!params) return null;
-  const sound = extractSectionParams(migrateToneParams({ ...params }), "sound");
+  const migrated = migrateParamsShape(migrateToneParams({ ...params }));
+  const sound = { ...(migrated.layers?.[0]?.sound || {}) };
   for (const k of Object.keys(sound)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete sound[k];
   return Object.keys(sound).length ? sound : null;
 }
@@ -10327,8 +10057,17 @@ function toggleSubnotePreview(id) {
   if (!sound) return;
   if (_subnotePreviewId === null) _subnotePreviewWasPlaying = synth.isPlaying;
   _subnotePreviewId = id;
-  // layers:null mutes existing layers so only the previewed sound is heard.
-  synth.play({ ...exploreParams, ...sound, layers: null });
+  const selected = (exploreParams.layers || []).find(layer => layer.id === exploreParams.selectedLayerId)
+    || exploreParams.layers?.[0];
+  synth.play({
+    ...exploreParams,
+    layers: [{
+      id: "preview", name: "Preview", hue: selected?.hue ?? 36,
+      sound: { ...sound, effectsChain: cloneFxChain(sound.effectsChain) },
+      space: { ...(selected?.space || { angle: 0, dist: 2.5 }) },
+      gain: 1, solo: false,
+    }],
+  });
   startVisualiser();
   renderExplore();
 }
@@ -10347,38 +10086,27 @@ function stopSubnotePreview(rerender = true) {
 // stays the instrument's own.
 function addPresetAsLayers(params) {
   if (!params) return false;
-  exitLayerEdit(false);
-  if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
-  const pushLayer = (sourceParams, space, gain) => {
-    const subnote = { ...sourceParams };
-    for (const k of Object.keys(subnote)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete subnote[k];
-    if (!Object.keys(subnote).length) return false;
-    exploreParams.layers.push({
+  const incoming = migrateParamsShape(migrateToneParams({ ...params }));
+  let added = false;
+  for (const source of incoming.layers || []) {
+    const sound = source.sound || source.subnote || {};
+    if (!Object.keys(sound).length) continue;
+    const layer = {
+      ...source,
       id: crypto.randomUUID(),
       hue: (36 + exploreParams.layers.length * 70) % 360,
-      subnote,
-      space,
-      gain,
-    });
-    return true;
-  };
-  let added = pushLayer(
-    extractSectionParams(params, "sound"),
-    // position is a layer's own space property — take the preset's if saved
-    {
-      angle: params.spaceAzimuth ?? (exploreParams.spaceAzimuth ?? 0),
-      dist: params.spaceDistance ?? (exploreParams.spaceDistance ?? 2.5),
-    },
-    0.8);
-  for (const l of Array.isArray(params.layers) ? params.layers : []) {
-    if (!l || typeof l !== "object" || !l.subnote) continue;
-    added = pushLayer(
-      { ...l.subnote },
-      { angle: l.space?.angle ?? 0, dist: l.space?.dist ?? 2.5 },
-      l.gain ?? 0.8) || added;
+      sound: { ...sound, effectsChain: cloneFxChain(sound.effectsChain) },
+      space: { ...(source.space || { angle: 0, dist: 2.5 }) },
+      gain: source.gain ?? 0.8,
+      solo: false,
+    };
+    exploreParams.layers.push(layer);
+    exploreParams.selectedLayerId = layer.id;
+    added = true;
   }
   if (!added) return false;
-  _chLayerSel = exploreParams.layers[exploreParams.layers.length - 1].id;
+  _chLayerSel = exploreParams.selectedLayerId;
+  _stageSel = exploreParams.selectedLayerId;
   synth.updateGenerationParams(enginePlayParams());
   renderExplore();
   return true;
@@ -10635,11 +10363,11 @@ function producerLayersRowHTML(l, i, p) {
   const gain = l.gain ?? 1;
   const angle = l.space?.angle ?? p.spaceAzimuth ?? 0;
   const dist = l.space?.dist ?? p.spaceDistance ?? 2.5;
-  const chain = l.subnote && l.subnote.effectsChain;
+  const chain = (l.sound || l.subnote || {}).effectsChain;
   return `
     <div class="prod-layer-row" style="--layer-hue:${hue}">
-      <span class="prod-layer-tag">${i + 2}</span>
-      <span class="prod-layer-name">Layer ${i + 2}</span>
+      <span class="prod-layer-tag">${i + 1}</span>
+      <span class="prod-layer-name">${i === 0 ? "Layer 1 · Base" : `Layer ${i + 1}`}</span>
       <div class="prod-layer-ctls">
         <label class="prod-ctl">Vol<input type="range" data-prod-gain="${id}" min="0" max="1.5" step="0.01" value="${gain}"/></label>
         <span class="space-target-control">
@@ -10665,7 +10393,7 @@ function producerLayersPanelHTML(p) {
       <div class="prod-layers-list">
         ${layers.map((l, i) => producerLayersRowHTML(l, i, p)).join("")}
         ${producerPercRowHTML(p)}
-        ${layers.length ? "" : `<div class="prod-layers-empty">No extra layers yet — stack them from the sub-note editor's LAYERS panel. Percussion below can still be placed in space.</div>`}
+        ${layers.length > 1 ? "" : `<div class="prod-layers-empty">No extra layers yet — stack them from the sub-note editor's LAYERS panel. Percussion below can still be placed in space.</div>`}
       </div>
     </div>`;
 }
@@ -10684,9 +10412,9 @@ function bindProducerLayers(v, target = exploreParams, hooks = {}) {
   const prodChain = (id, create = false) => {
     const l = layerById(id);
     if (!l) return null;
-    if (!l.subnote) l.subnote = {};
-    if (!Array.isArray(l.subnote.effectsChain)) { if (!create) return l.subnote.effectsChain || []; l.subnote.effectsChain = []; }
-    return l.subnote.effectsChain;
+    if (!l.sound) l.sound = { ...(l.subnote || {}) };
+    if (!Array.isArray(l.sound.effectsChain)) { if (!create) return l.sound.effectsChain || []; l.sound.effectsChain = []; }
+    return l.sound.effectsChain;
   };
   const fxFromKey = (key) => {
     const [id, uid] = String(key).split("::");
@@ -11209,7 +10937,7 @@ let _chLayerSel = null; // selected layer id (opens its mini panel)
 // the ± magnitudes come from the shared panel (identical on every row);
 // the means stay the layer's own.
 function layerEnvLineText(l, p) {
-  const sn = l.subnote || {};
+  const sn = l.sound || l.subnote || {};
   const syncActive = !!p.layerEnvOverride;
   const prof = SPECTRAL_PROFILES[sn.spectralProfile]?.label || sn.spectralProfile || "custom";
   const v = (k, fb) => sn[k] ?? p[k] ?? fb;
@@ -11256,80 +10984,51 @@ function fxTagsHTML(ownerId, chainSpec, stageOff) {
   </div>`;
 }
 function layerFxTagsHTML(l) {
-  return fxTagsHTML(l.id, l.subnote && l.subnote.effectsChain, l.subnote && l.subnote.stageEffectsOn === false);
+  const sound = l.sound || l.subnote || {};
+  return fxTagsHTML(l.id, sound.effectsChain, sound.stageEffectsOn === false);
 }
 
 // A layer's display title — its own name if set (double-click to rename), else
 // the positional default "Layer N" (base is layer 1, so extras start at 2).
 function layerTitle(l, i) {
-  return (l.name && String(l.name).trim()) || `Layer ${i + 2}`;
+  return (l.name && String(l.name).trim()) || `Layer ${i + 1}`;
 }
 
 function layerStripHTML(p, compact = false) {
   const layers = Array.isArray(p.layers) ? p.layers : [];
-  // V2: on the SPACE stage the big stage IS the layers view (chips +
-  // draggable dots; position is a layer's only space property), so the
-  // strip collapses to its header — add/remove still lives here.
+  const selectedId = p.selectedLayerId || layers[0]?.id;
   if (compact) {
     return `
     <div class="layer-strip" id="layerStrip">
       <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
-      <button class="layer-add" id="layerAdd" title="Add the current sub-note module (sound half) as a new layer underneath">＋</button>
-      <span class="layer-strip-note">${layers.length ? `${layers.length} layer${layers.length > 1 ? "s" : ""} on the stage above — drag the dots to place them; switch to another stage to edit their sound` : "no layers yet — ＋ captures the current sound as a layer, or drag a preset from the browser below"}</span>
+      <button class="layer-add" id="layerAdd" title="Clone the selected sound as a new layer">＋</button>
+      <span class="layer-strip-note">${layers.length} layer${layers.length === 1 ? "" : "s"} on the stage above</span>
     </div>`;
   }
-  // Owner refinement 07-07: each row = mini head diagram + two lines —
-  // space parameters (level/angle/distance + the layer's OWN head when
-  // enabled) on top, the layer's full envelope baseline (variation chance
-  // and every parameter's mean ± SD) underneath. The synchronised-
-  // variation controls live in their own panel to the RIGHT of the rows,
-  // greyed out unless synchronisation is on.
-  // The BASE sound is always the first layer (owner 2026-07-09): it is present
-  // even before any preset is loaded (named "Untitled"), so it can always be
-  // reselected and its effects edited after more layers are stacked. It maps to
-  // exploreParams itself, so "selected" means "not editing any other layer".
-  const baseName = (p.spectralProfileName || "").trim() || "Untitled";
-  const baseSel = !_chLayerEdit && !_chLayerSel;
-  const baseRow = `
-    <div class="layer-row base-row${baseSel ? " sel" : ""}" data-layer-row="base" style="--layer-hue:210" title="Layer 1 — always present. Click to edit it in the stages above.">
-      <span class="layer-row-tag">1</span>
-      <span class="space-target-control layer-space-target">
-        <canvas class="layer-minipad compact-space-target" data-layer-pad="base" width="40" height="40"></canvas>
-        <span data-space-target-readout>${compactSpaceTargetText({ angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5 })}</span>
-      </span>
-      <div class="layer-row-lines">
-        <div class="layer-name-row">
-          <span class="layer-name" data-layer-name="base" title="Double-click to rename the base sound">${esc(baseName)}</span>
-          <span class="layer-base-badge">BASE</span>
-        </div>
-        <div class="layer-row-space">
-          <label class="sp-ctl">Vol <input type="range" data-base-layer-gain min="0" max="1.5" step="0.01" value="${p.baseLayerGain ?? 1}" title="${esc(PARAM_DESC.baseLayerGain)}"/></label>
-          <button class="pal-btn layer-solo${p.baseLayerSolo ? " on" : ""}" data-base-layer-solo title="${esc(PARAM_DESC.baseLayerSolo)}">S</button>
-        </div>
-        ${fxTagsHTML("base", p.effectsChain, p.stageEffectsOn === false)}
-      </div>
-    </div>`;
-  const rows = baseRow + layers.map((l, i) => {
-    const envStr = layerEnvLineText(l, p);
+  const rows = layers.map((layer, index) => {
+    const sound = layer.sound || layer.subnote || {};
+    const envStr = layerEnvLineText({ ...layer, subnote: sound }, p);
+    const title = (layer.name && String(layer.name).trim()) || (index === 0 ? "Untitled" : `Layer ${index + 1}`);
     return `
-    <div class="layer-row${l.id === _chLayerSel ? " sel" : ""}" data-layer-row="${l.id}" style="--layer-hue:${l.hue ?? (36 + i * 70) % 360}" title="Click to edit this layer in the stages above — edits save to the row automatically; click row 1 to go back to Layer 1">
-      <span class="layer-row-tag">${i + 2}</span>
+    <div class="layer-row${index === 0 ? " base-row" : ""}${layer.id === selectedId ? " sel" : ""}" data-layer-row="${layer.id}" style="--layer-hue:${layer.hue ?? (36 + index * 70) % 360}" title="Layer ${index + 1} — click to edit it in the stages above">
+      <span class="layer-row-tag">${index + 1}</span>
       <span class="space-target-control layer-space-target">
-        <canvas class="layer-minipad compact-space-target" data-layer-pad="${l.id}" width="40" height="40"></canvas>
-        <span data-space-target-readout>${compactSpaceTargetText({ angle: l.space?.angle ?? (p.spaceAzimuth ?? 0), dist: l.space?.dist ?? (p.spaceDistance ?? 2.5) })}</span>
+        <canvas class="layer-minipad compact-space-target" data-layer-pad="${layer.id}" width="40" height="40"></canvas>
+        <span data-space-target-readout>${compactSpaceTargetText({ angle: layer.space?.angle ?? 0, dist: layer.space?.dist ?? 2.5 })}</span>
       </span>
       <div class="layer-row-lines">
         <div class="layer-name-row">
-          <span class="layer-name" data-layer-name="${l.id}" title="Double-click to rename this layer">${esc(layerTitle(l, i))}</span>
+          <span class="layer-name" data-layer-name="${layer.id}" title="Double-click to rename this layer">${esc(title)}</span>
+          ${index === 0 ? '<span class="layer-base-badge">BASE</span>' : ""}
         </div>
         <div class="layer-row-space">
-          <label class="sp-ctl">Vol <input type="range" data-layer-gain="${l.id}" min="0" max="1.5" step="0.01" value="${l.gain ?? 1}" title="This layer's level relative to the base sound"/></label>
-          <button class="pal-btn layer-solo${l.solo ? " on" : ""}" data-layer-solo="${l.id}" title="Solo this layer — hear it alone (the base and other unsoloed layers go quiet)">S</button>
-          <button class="pal-btn" data-layer-recapture="${l.id}" title="Re-capture the CURRENT sound half into this layer (a layer is a snapshot — reshape the sound above, then update the layer)">⟳</button>
-          <button class="pal-btn" data-layer-remove="${l.id}" title="Remove this layer">×</button>
+          <label class="sp-ctl">Vol <input type="range" data-layer-gain="${layer.id}" min="0" max="1.5" step="0.01" value="${layer.gain ?? 1}" title="This layer's level"/></label>
+          <button class="pal-btn layer-solo${layer.solo ? " on" : ""}" data-layer-solo="${layer.id}" title="Solo this layer">S</button>
+          ${index === 0 ? "" : `<button class="pal-btn" data-layer-recapture="${layer.id}" title="Copy the selected layer's sound into this layer">⟳</button>
+          <button class="pal-btn" data-layer-remove="${layer.id}" title="Remove this layer">×</button>`}
         </div>
-        <div class="layer-env" title="This layer's envelope baseline: variation chance and each parameter's mean ± magnitude. While synchronised, the chance and the ± magnitudes come from the shared panel (same for every layer); the means stay the layer's own.">${esc(envStr)}</div>
-        ${layerFxTagsHTML(l)}
+        <div class="layer-env" title="This layer's envelope baseline">${esc(envStr)}</div>
+        ${fxTagsHTML(layer.id, sound.effectsChain, sound.stageEffectsOn === false)}
       </div>
     </div>`;
   }).join("");
@@ -11337,12 +11036,11 @@ function layerStripHTML(p, compact = false) {
   return `
     <div class="layer-strip" id="layerStrip">
       <span class="layer-strip-label" title="${esc(PARAM_DESC.layers)}">LAYERS</span>
-      <button class="layer-add" id="layerAdd" title="Capture the current sound as another layer underneath the base">＋</button>
-      <span class="layer-strip-note">${layers.length ? "" : "drag a sound from the browser below to stack it as a layer — the base above is always here"}</span>
+      <button class="layer-add" id="layerAdd" title="Clone the selected sound as another layer">＋</button>
     </div>
     <div class="layer-area">
       <div class="layer-rows">${rows}</div>
-      ${layers.length ? `
+      ${layers.length > 1 ? `
       <div class="layer-sync">
         <div class="subsection-label">Synchronised variation</div>
         <label class="layer-env-sync" title="${esc(PARAM_DESC.layerEnvOverride)}">
@@ -11354,7 +11052,6 @@ function layerStripHTML(p, compact = false) {
           ${controlRow("layerEnvDecaySd", "Decay SD", p.layerEnvDecaySd ?? 0.04, 0, 0.25, 0.001)}
           ${controlRow("layerEnvSustainSd", "Sustain SD", p.layerEnvSustainSd ?? 0.08, 0, 0.45, 0.01)}
           ${controlRow("layerEnvReleaseSd", "Release SD", p.layerEnvReleaseSd ?? 0.05, 0, 0.3, 0.001)}
-          <div class="ch-caption">one roll per note triggers the envelope variation on the base sound and every layer AT ONCE, at these shared magnitudes — each still varies around its own means (shown on its row)</div>
         </div>
       </div>` : ""}
     </div>`;
@@ -11362,15 +11059,12 @@ function layerStripHTML(p, compact = false) {
 
 // The tiny head-relation diagram on each layer row.
 function drawLayerMiniPads() {
-  // The base row is always present (owner 2026-07-09): draw its pad too, from
-  // the patch's own position.
-  const pads = [{ id: "base", space: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 }, hue: 210 },
-                ...(exploreParams.layers || [])];
+  const pads = exploreParams.layers || [];
   pads.forEach(l => {
     const cv = document.querySelector(`[data-layer-pad="${l.id}"]`);
     if (!cv) return;
-    const angle = l.space?.angle ?? (exploreParams.spaceAzimuth ?? 0);
-    const dist = l.space?.dist ?? (exploreParams.spaceDistance ?? 2.5);
+    const angle = l.space?.angle ?? 0;
+    const dist = l.space?.dist ?? 2.5;
     drawCompactSpaceTarget(cv, { angle, dist }, l.hue ?? 36, !!l.mute);
   });
 }
@@ -11413,7 +11107,7 @@ function subnoteWorkspaceHTML(p) {
             <div class="ch-head">
               <div class="ch-title-block">
                 <h2 class="ch-preset-title" id="chPresetTitle" title="Double-click to rename this sound">${esc(title)}</h2>
-                <span class="layer-edit-tag" title="The stages above edit this layer — click another LAYERS row below to switch; edits save to the row automatically">editing ${_chLayerEdit ? `Layer ${((p.layers || []).findIndex(l => l.id === _chLayerEdit.layerId) + 2) || ""}` : "Layer 1"}</span>
+                <span class="layer-edit-tag" title="The stages above edit the selected layer">editing Layer ${Math.max(1, (p.layers || []).findIndex(l => l.id === p.selectedLayerId) + 1)}</span>
               </div>
               <!-- Owner 07-08: no preset dropdown or mix slider here — the
                    instrument cards below are the one place a recipe is
@@ -15559,134 +15253,79 @@ function wireStudioPanels(v) {
   }, saveStudioPanels);
 }
 
-// Owner 07-07: clicking a layer row LOADS that layer's sound into the
-// editor above. The base sound half is stashed; every editor control then
-// shapes (and auditions) the layer; Done — or clicking another row, or the
-// row again — writes the sound back into the layer and restores the base.
-let _chLayerEdit = null; // { layerId, baseStash }
-
-// Deep-copy an effects chain so a captured layer never aliases the base
-// chain's array (or another layer's) — extractSectionParams copies by ref.
-function cloneFxChain(chain) {
-  return Array.isArray(chain) ? chain.map(fx => ({ ...fx, params: { ...fx.params } })) : [];
-}
+// Layer selection is now the editor state. The compatibility accessors installed
+// by migrateParamsShape make all existing controls address the selected sound.
 
 function _soundHalf(params) {
-  const half = extractSectionParams(params, "sound");
-  for (const k of Object.keys(half)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete half[k];
+  const layer = (params.layers || []).find(item => item.id === params.selectedLayerId) || params.layers?.[0];
+  const half = { ...(layer?.sound || {}) };
   if ("effectsChain" in half) half.effectsChain = cloneFxChain(half.effectsChain);
   return half;
 }
 
-// The engine must always hear the TRUE stack. During a layer edit the
-// top-level sound-half is the edited layer's live sound and the real base
-// sits in the stash — rebuild that truth for every engine update, so what
-// plays during an edit is exactly what the patch sounds like after it.
-// (Previously the engine received the swapped state: the edited layer sounded
-// twice — live as the base voice plus its stale stored copy — and the actual
-// base was missing from the mix.)
 function enginePlayParams() {
-  if (!_chLayerEdit) return { ...exploreParams };
-  const live = _soundHalf(exploreParams); // the edited layer's current sound
-  const p = { ...exploreParams, ...(_chLayerEdit.baseStash || {}) };
-  p.spaceAzimuth = _chLayerEdit.baseSpace?.angle ?? p.spaceAzimuth;
-  p.spaceDistance = _chLayerEdit.baseSpace?.dist ?? p.spaceDistance;
-  p.layers = (exploreParams.layers || []).map(l => l.id === _chLayerEdit.layerId
-    ? { ...l, subnote: live, space: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 } }
-    : l);
-  return p;
+  return buildEnginePlayParams(exploreParams);
 }
 
 function enterLayerEdit(layer) {
-  if (_chLayerEdit) exitLayerEdit(false);
-  // Owner 07-07: location in space is SEPARATE per layer — editing a layer
-  // also swaps its position in, so the SPACE stage pad moves THIS layer.
-  _chLayerEdit = {
-    layerId: layer.id,
-    baseStash: _soundHalf(exploreParams),
-    baseSpace: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 },
-  };
-  Object.assign(exploreParams, layer.subnote || {});
-  exploreParams.spaceAzimuth = layer.space?.angle ?? _chLayerEdit.baseSpace.angle;
-  exploreParams.spaceDistance = layer.space?.dist ?? _chLayerEdit.baseSpace.dist;
+  if (!layer) return;
+  exploreParams.selectedLayerId = layer.id;
   _chLayerSel = layer.id;
+  _stageSel = layer.id;
   synth.updateGenerationParams(enginePlayParams());
   renderExplore();
 }
 
 function exitLayerEdit(rerender = true) {
-  if (!_chLayerEdit) return;
-  const layer = (exploreParams.layers || []).find(l => l.id === _chLayerEdit.layerId);
-  if (layer) {
-    layer.subnote = _soundHalf(exploreParams); // save the edit back
-    layer.space = { // ...including where the SPACE pad put this layer
-      angle: exploreParams.spaceAzimuth ?? 0,
-      dist: exploreParams.spaceDistance ?? 2.5,
-    };
-  }
-  Object.assign(exploreParams, _chLayerEdit.baseStash);  // restore the base
-  exploreParams.spaceAzimuth = _chLayerEdit.baseSpace.angle;
-  exploreParams.spaceDistance = _chLayerEdit.baseSpace.dist;
-  _chLayerEdit = null;
-  _chLayerSel = null;
+  const base = exploreParams.layers?.[0];
+  if (!base) return;
+  exploreParams.selectedLayerId = base.id;
+  _chLayerSel = base.id;
+  _stageSel = base.id;
   synth.updateGenerationParams(enginePlayParams());
   if (rerender) renderExplore();
 }
 
-// Q7: layer strip interactions. Layer edits apply live through
-// updateGenerationParams — the next generated note carries them.
 function wireLayerStrip(v) {
   const applyLive = () => synth.updateGenerationParams(enginePlayParams());
+  const layerOf = id => (exploreParams.layers || []).find(layer => layer.id === id);
   const add = v.querySelector("#layerAdd");
   if (add) add.onclick = () => {
-    exitLayerEdit(false); // a new layer captures the BASE sound, not an edit in progress
-    if (!Array.isArray(exploreParams.layers)) exploreParams.layers = [];
-    const subnote = extractSectionParams(exploreParams, "sound");
-    // a layer never nests layers or carries the shared-sync settings
-    for (const k of Object.keys(subnote)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete subnote[k];
-    subnote.effectsChain = cloneFxChain(subnote.effectsChain); // own the chain, don't alias the base's
+    const source = layerOf(exploreParams.selectedLayerId) || exploreParams.layers[0];
+    const index = exploreParams.layers.length;
     const layer = {
       id: crypto.randomUUID(),
-      hue: (36 + exploreParams.layers.length * 70) % 360,
-      subnote,
-      // owner 07-07: every layer's location is its OWN from birth — a copy
-      // of the current position, so moving the base never drags layers
-      space: { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 },
+      name: "",
+      hue: (36 + index * 70) % 360,
+      sound: { ...(source.sound || {}), effectsChain: cloneFxChain(source.sound?.effectsChain) },
+      space: { ...(source.space || { angle: 0, dist: 2.5 }) },
       gain: 0.8,
+      solo: false,
     };
     exploreParams.layers.push(layer);
-    // highlight = editing (unified model 2026-07-15): adding a layer starts
-    // editing it, so the row highlight, the "editing Layer N" tag and the
-    // stages above all agree on what the knobs change.
-    enterLayerEdit(layer);
+    exploreParams.selectedLayerId = layer.id;
+    _chLayerSel = layer.id;
+    _stageSel = layer.id;
+    applyLive();
+    renderExplore();
   };
 
-  // Drop targets for browser presets: the strip itself, the rows area, and
-  // the floating zone that appears while dragging (so a drop target is
-  // always in view even when the expanded library covers the strip).
   [v.querySelector("#layerStrip"), v.querySelector(".layer-area")]
     .filter(Boolean).forEach(bindLayerDropTarget);
 
   v.querySelectorAll("[data-layer-row]").forEach(row => {
-    row.onclick = (e) => {
-      if (e.target.closest("input, button, canvas, [data-layer-name]")) return; // controls + rename title stay put
-      const id = row.dataset.layerRow;
-      if (id === "base") { // the base sound is always here — select/return to it
-        if (_chLayerEdit) exitLayerEdit();
-        else if (_chLayerSel) { _chLayerSel = null; renderExplore(); }
-        return;
-      }
-      if (_chLayerEdit?.layerId === id) { exitLayerEdit(); return; } // same row = done
-      const layer = (exploreParams.layers || []).find(l => l.id === id);
-      if (layer) enterLayerEdit(layer); // exits any other edit first
+    row.onclick = event => {
+      if (event.target.closest("input, button, canvas, [data-layer-name]")) return;
+      const layer = layerOf(row.dataset.layerRow);
+      if (layer) enterLayerEdit(layer);
     };
   });
-  // Double-click a layer title to rename it. Base → spectralProfileName (shared
-  // with the big preset title); a layer → its own layer.name.
+
   v.querySelectorAll("[data-layer-name]").forEach(el => {
-    el.ondblclick = (e) => {
-      e.stopPropagation();
-      const id = el.dataset.layerName;
+    el.ondblclick = event => {
+      event.stopPropagation();
+      const layer = layerOf(el.dataset.layerName);
+      if (!layer) return;
       const input = document.createElement("input");
       input.className = "layer-name-edit";
       input.value = el.textContent;
@@ -15694,118 +15333,94 @@ function wireLayerStrip(v) {
       el.replaceWith(input);
       input.focus(); input.select();
       let done = false;
-      const commit = (save) => {
-        if (done) return; done = true;
+      const commit = save => {
+        if (done) return;
+        done = true;
         if (save) {
           const next = input.value.trim();
-          if (id === "base") {
-            if (next && next !== "Untitled") exploreParams.spectralProfileName = next;
-            else delete exploreParams.spectralProfileName;
-          } else {
-            const l = (exploreParams.layers || []).find(x => x.id === id);
-            if (l) { if (next) l.name = next; else delete l.name; }
-          }
+          if (next && next !== "Untitled") layer.name = next;
+          else delete layer.name;
           applyLive();
         }
         renderExplore();
       };
-      input.onkeydown = (ev) => { if (ev.key === "Enter") commit(true); if (ev.key === "Escape") commit(false); };
+      input.onkeydown = ev => {
+        if (ev.key === "Enter") commit(true);
+        if (ev.key === "Escape") commit(false);
+      };
       input.onblur = () => commit(true);
     };
   });
-  const layerOf = (id) => (exploreParams.layers || []).find(l => l.id === id);
-  const bindSlider = (attr, apply) => v.querySelectorAll(`[${attr}]`).forEach(el => {
+
+  v.querySelectorAll("[data-layer-gain]").forEach(el => {
     el.oninput = () => {
-      const l = layerOf(el.getAttribute(attr));
-      if (l) { apply(l, Number(el.value)); applyLive(); drawLayerMiniPads(); }
+      const layer = layerOf(el.dataset.layerGain);
+      if (!layer) return;
+      layer.gain = Number(el.value);
+      applyLive();
     };
   });
-  bindSlider("data-layer-gain", (l, val) => { l.gain = val; });
-  const baseGain = v.querySelector("[data-base-layer-gain]");
-  if (baseGain) baseGain.oninput = () => {
-    exploreParams.baseLayerGain = Number(baseGain.value);
-    applyLive();
-  };
-  const baseSolo = v.querySelector("[data-base-layer-solo]");
-  if (baseSolo) baseSolo.onclick = () => {
-    exploreParams.baseLayerSolo = !exploreParams.baseLayerSolo;
-    baseSolo.classList.toggle("on", exploreParams.baseLayerSolo);
-    applyLive();
-  };
-  const syncEditedSpace = (l) => {
-    // if this layer is loaded in the editor, the SPACE pad mirrors the move
-    if (_chLayerEdit?.layerId === l.id) {
-      exploreParams.spaceAzimuth = l.space.angle;
-      exploreParams.spaceDistance = l.space.dist;
-      drawSpacePad();
-      synth.updateReverb(enginePlayParams());
-    }
-  };
-  v.querySelectorAll("[data-layer-pad]").forEach(cv => {
-    const id = cv.dataset.layerPad;
-    const get = () => id === "base"
-      ? { angle: exploreParams.spaceAzimuth ?? 0, dist: exploreParams.spaceDistance ?? 2.5 }
-      : { angle: layerOf(id)?.space?.angle ?? exploreParams.spaceAzimuth ?? 0, dist: layerOf(id)?.space?.dist ?? exploreParams.spaceDistance ?? 2.5 };
-    wireCompactSpaceTarget(cv, {
-      get,
-      hue: () => id === "base" ? 210 : (layerOf(id)?.hue ?? 36),
-      muted: () => id !== "base" && !!layerOf(id)?.mute,
-      set: (pos) => {
+
+  v.querySelectorAll("[data-layer-solo]").forEach(el => {
+    el.onclick = () => {
+      const layer = layerOf(el.dataset.layerSolo);
+      if (!layer) return;
+      layer.solo = !layer.solo;
+      applyLive();
+      renderExplore();
+    };
+  });
+
+  v.querySelectorAll("[data-layer-pad]").forEach(canvas => {
+    const id = canvas.dataset.layerPad;
+    wireCompactSpaceTarget(canvas, {
+      get: () => ({ ...(layerOf(id)?.space || { angle: 0, dist: 2.5 }) }),
+      hue: () => layerOf(id)?.hue ?? 36,
+      muted: () => !!layerOf(id)?.mute,
+      set: pos => {
+        const layer = layerOf(id);
+        if (!layer) return;
+        layer.space = { ...pos };
         _stageSel = id;
-        if (id === "base") {
-          exploreParams.spaceAzimuth = pos.angle;
-          exploreParams.spaceDistance = pos.dist;
-        } else {
-          const l = layerOf(id);
-          if (l) { l.space = { ...pos }; syncEditedSpace(l); }
-        }
-        applyLive(); synth.updateReverb(enginePlayParams());
+        applyLive();
+        synth.updateReverb(enginePlayParams());
       },
       redraw: () => { drawSpacePad(); drawStageBig(); updateStageReadouts(); },
     });
   });
-  // Owner 07-07: solo a layer to hear it alone (base + unsoloed layers
-  // silent); multiple solos combine like track solos
-  v.querySelectorAll("[data-layer-solo]").forEach(el => {
-    el.onclick = () => {
-      const l = layerOf(el.dataset.layerSolo);
-      if (!l) return;
-      l.solo = !l.solo;
-      el.classList.toggle("on", l.solo);
-      applyLive();
-    };
-  });
+
   v.querySelectorAll("[data-layer-recapture]").forEach(el => {
     el.onclick = () => {
-      exitLayerEdit(false); // recapture always means "from the BASE sound"
-      const l = layerOf(el.dataset.layerRecapture);
-      if (!l) return;
-      l.subnote = _soundHalf(exploreParams);
+      const target = layerOf(el.dataset.layerRecapture);
+      const source = layerOf(exploreParams.selectedLayerId);
+      if (!target || !source || target === source) return;
+      target.sound = { ...source.sound, effectsChain: cloneFxChain(source.sound?.effectsChain) };
       applyLive();
       renderExplore();
     };
   });
+
   v.querySelectorAll("[data-layer-remove]").forEach(el => {
     el.onclick = () => {
-      exitLayerEdit(false); // restore the base before the layer disappears
-      exploreParams.layers = (exploreParams.layers || []).filter(l => l.id !== el.dataset.layerRemove);
-      if (!exploreParams.layers.length) exploreParams.layers = null;
-      _chLayerSel = null;
+      const index = exploreParams.layers.findIndex(layer => layer.id === el.dataset.layerRemove);
+      if (index <= 0) return;
+      const wasSelected = exploreParams.layers[index].id === exploreParams.selectedLayerId;
+      exploreParams.layers.splice(index, 1);
+      if (wasSelected) {
+        const next = exploreParams.layers[Math.max(0, index - 1)];
+        exploreParams.selectedLayerId = next.id;
+        _chLayerSel = next.id;
+        _stageSel = next.id;
+      }
       applyLive();
       renderExplore();
     };
   });
-  // Per-layer EFFECTS: toggle a tag or drag its wet from the layer row.
-  const fxTagEntry = (key) => {
+
+  const fxTagEntry = key => {
     const [ownerId, uid] = String(key).split("::");
-    let chain = null;
-    if (ownerId === "base") {
-      chain = Array.isArray(exploreParams.effectsChain) ? exploreParams.effectsChain : null;
-    } else {
-      const layer = (exploreParams.layers || []).find(l => l.id === ownerId);
-      chain = layer && layer.subnote && Array.isArray(layer.subnote.effectsChain) ? layer.subnote.effectsChain : null;
-    }
-    return chain ? { chain, fx: chain.find(f => f.uid === uid) } : { chain: null, fx: null };
+    const chain = layerOf(ownerId)?.sound?.effectsChain;
+    return { chain, fx: Array.isArray(chain) ? chain.find(item => item.uid === uid) : null };
   };
   v.querySelectorAll("[data-layer-fx-toggle]").forEach(el => {
     el.ondblclick = () => {
@@ -15821,12 +15436,12 @@ function wireLayerStrip(v) {
     el.oninput = () => {
       const { fx } = fxTagEntry(el.dataset.layerFxWet);
       if (!fx) return;
-      fx.wet = parseFloat(el.value);
-      el.closest(".layer-fx-tag")?.style.setProperty("--wet", `${Math.round(fx.wet * 100)}%`);
+      fx.wet = Number(el.value);
       applyLive();
-      synth.updateEffects(enginePlayParams()); // live, no rebuild
+      synth.updateEffects(enginePlayParams());
     };
   });
+
   const sync = v.querySelector("#layerEnvSync");
   if (sync) sync.onchange = () => {
     exploreParams.layerEnvOverride = sync.checked;
@@ -15878,15 +15493,13 @@ function stageDotXYs(p, cx, cy, rMax) {
 }
 
 function stageSourceList(p) {
-  const list = [{
-    id: "base", num: "1", label: "Layer 1", hue: 36,
-    angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5,
-  }];
-  (p.layers || []).forEach((l, i) => list.push({
-    id: l.id, num: String(i + 2), label: `Layer ${i + 2}`,
+  const layers = p.layers || [];
+  const baseSpace = layers[0]?.space || { angle: 0, dist: 2.5 };
+  const list = layers.map((l, i) => ({
+    id: l.id, num: String(i + 1), label: `Layer ${i + 1}`,
     hue: l.hue ?? (36 + i * 70) % 360,
-    angle: l.space?.angle ?? (p.spaceAzimuth ?? 0),
-    dist: l.space?.dist ?? (p.spaceDistance ?? 2.5),
+    angle: l.space?.angle ?? baseSpace.angle,
+    dist: l.space?.dist ?? baseSpace.dist,
     layer: l,
   }));
   // The percussion kit's group REFERENCE — only while "Highlight percussion"
@@ -15898,8 +15511,8 @@ function stageSourceList(p) {
   if (_spShowPerc && resolvePercEnabled(p)) {
     const pl = (Array.isArray(p.percLayers) && p.percLayers.length) ? p.percLayers : (p.percLayers = ensurePercLayers(p));
     if (pl && pl.length) {
-      if (!Number.isFinite(p.percAzimuth)) p.percAzimuth = p.spaceAzimuth ?? 0;
-      if (!Number.isFinite(p.percDistance)) p.percDistance = p.spaceDistance ?? 2.5;
+      if (!Number.isFinite(p.percAzimuth)) p.percAzimuth = baseSpace.angle ?? 0;
+      if (!Number.isFinite(p.percDistance)) p.percDistance = baseSpace.dist ?? 2.5;
       list.push({
         id: "perc", num: "P", label: "Percussion", hue: 32,
         angle: p.percAzimuth, dist: p.percDistance,
@@ -15918,7 +15531,7 @@ function _stageSelected(p) {
 function stageReadoutsHTML(p) {
   // (V2.2: the chip strip above the stage is gone — the layer rows below
   // are the one source list; selection state still lives in _stageSel)
-  if (!stageSourceList(p).some(s => s.id === _stageSel)) _stageSel = "base";
+  if (!stageSourceList(p).some(s => s.id === _stageSel)) _stageSel = p.layers?.[0]?.id || "base";
   const s = _stageSelected(p);
   const tof = spaceArrivalDelay(s.dist) * 1000;
   const lvl = 20 * Math.log10(spaceDistanceGain(s.dist));
@@ -15945,11 +15558,12 @@ function updateStageReadouts() {
   // percussion group reference owns no tonal layer row, so selecting it
   // leaves the tonal-layer selection untouched.
   if (s.id !== "perc") {
-    _chLayerSel = s.id === "base" ? null : s.id;
+    _chLayerSel = s.id;
+    exploreParams.selectedLayerId = s.id;
     document.querySelectorAll("[data-layer-row]").forEach(row =>
       row.classList.toggle("sel", row.dataset.layerRow === _stageSel));
   }
-  _stageViewPos = s.id === "base" ? null : { angle: s.angle, dist: s.dist };
+  _stageViewPos = s.id === exploreParams.layers?.[0]?.id ? null : { angle: s.angle, dist: s.dist };
 }
 
 function _stageGeom(w, h) {
@@ -16122,7 +15736,7 @@ function wireStageBig(v) {
     _spShowPerc = showPerc.checked;
     // the kit's group reference dot lives behind this toggle — don't leave it
     // selected (and the ear view following it) once it's hidden
-    if (!_spShowPerc && _stageSel === "perc") { _stageSel = "base"; updateStageReadouts(); drawSpaceField(); }
+    if (!_spShowPerc && _stageSel === "perc") { _stageSel = exploreParams.layers?.[0]?.id || "base"; updateStageReadouts(); drawSpaceField(); }
     drawStageBig();
   };
   // Redraw the stage + ear-response on any container resize so the browser
@@ -16167,12 +15781,7 @@ function wireStageBig(v) {
     const az = Math.round(clamp(Math.atan2(x - cx, -(y - cy)) * 180 / Math.PI, -180, 180));
     const dist = Number(_spaceRToDist(Math.hypot(x - cx, y - cy), rMax).toFixed(2));
     const s = _stageSelected(exploreParams);
-    if (s.id === "base") {
-      exploreParams.spaceAzimuth = az;
-      exploreParams.spaceDistance = dist;
-      synth.updateReverb(enginePlayParams());
-      drawChThumbs();
-    } else if (s.isPercGroup) {
+    if (s.isPercGroup) {
       // Drag the kit's group reference: every drum keeps its offset from the
       // reference — rotate by the angle change, shift by the distance change.
       // Individual drum positions are still edited on the macro page.
@@ -16189,12 +15798,9 @@ function wireStageBig(v) {
       synth.updateReverb(enginePlayParams());
     } else if (s.layer) {
       s.layer.space = { angle: az, dist };
-      if (_chLayerEdit?.layerId === s.id) {
-        exploreParams.spaceAzimuth = az;
-        exploreParams.spaceDistance = dist;
-        synth.updateReverb(enginePlayParams());
-      }
       synth.updateGenerationParams(enginePlayParams());
+      synth.updateReverb(enginePlayParams());
+      drawChThumbs();
       drawLayerMiniPads();
     }
     updateStageReadouts();
@@ -17238,7 +16844,7 @@ function trackEngagement(type, extra = {}) {
       stimulus_id: stimulusIdFor(exploreParams),
       app_version: APP_VERSION,
       client_ts: new Date().toISOString(),
-      parameters: { ...exploreParams },
+      parameters: serializeParams(exploreParams),
       rating: exploreRating,
       play_count: exploreEngagement.plays,
       metrics: synth.getPerformanceMetrics?.() || null,
@@ -17505,7 +17111,7 @@ function maybeShowContribute(v) {
           preset_name: "Contributed preset",
           notes: area.querySelector("#contribNotes").value,
           favourite_rating: exploreRating,
-          parameters: { ...exploreParams },
+          parameters: serializeParams(exploreParams),
           stimulus_id: stimulusIdFor(exploreParams),
           session_id: SESSION_ID,
           app_version: APP_VERSION,
@@ -17706,7 +17312,7 @@ function applyMacroPanelPreset(panel, value) {
   const wasPlaying = presetPreview ? presetPreview.wasPlaying : synth.isPlaying;
   presetPreview = null;
   const loaded = migrateToneParams(JSON.parse(JSON.stringify(entry.parameters || {})));
-  exploreParams = { ...exploreParams, ...loaded };
+  exploreParams = migrateParamsShape({ ...exploreParams, ...loaded });
   if (panel === "scale") {
     _scaleComboWorld = value.startsWith("scale:w:") ? value.slice("scale:w:".length) : null;
     if (!Array.isArray(exploreParams.customDegrees) || !exploreParams.customDegrees.length) exploreParams.customDegrees = [0];
@@ -17865,7 +17471,7 @@ function mergedPresetParams(entry) {
     ? { ...exploreParams, ...loaded }
     : { ...DEFAULTS, ...loaded };
   if (!Array.isArray(merged.rootNotes)) merged.rootNotes = [0];
-  return merged;
+  return migrateParamsShape(merged);
 }
 
 function startPresetPreview(entry) {
@@ -20781,9 +20387,9 @@ function auditionerEngineParams() {
 // carry drums, and any perc params riding along on synth data are scrubbed at
 // merge time. Mirrors synth._normalizePercLayers's audibility rule.
 function auditionerSynthParams() {
-  const params = { ...((auditionerSlots.synth?.data?.parameters) || {}) };
+  const params = serializeParams(migrateParamsShape((auditionerSlots.synth?.data?.parameters) || {}));
   for (const key of Object.keys(params)) if (key.startsWith("perc")) delete params[key];
-  return params;
+  return migrateParamsShape(params);
 }
 
 function auditionerHasPercussion() {
@@ -20858,7 +20464,7 @@ function auditionParams() {
   // Muting must silence BOTH percussion paths: explicit layer lists and the
   // legacy per-role volume kit (percEnabled false kills the latter).
   if (auditionerCtl.percMuted) { params.percLayers = []; params.percEnabled = false; }
-  return params;
+  return migrateParamsShape(params);
 }
 
 function auditionerPlay() {
@@ -22015,7 +21621,7 @@ function currentSoundEntry(name) {
     name: (name || "Untitled").slice(0, 80),
     section: "full",
     rating: typeof exploreRating === "number" ? exploreRating : 0,
-    parameters: { ...exploreParams },
+    parameters: serializeParams(exploreParams),
     stimulus_id: stimulusIdFor(exploreParams),
     app_version: APP_VERSION,
   };

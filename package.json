@@ -1,0 +1,13 @@
+{
+  "name": "soundinator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/js/*.test.js",
+    "test:browser": "playwright test",
+    "test:regen": "node tests/js/generate-fixtures.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0"
+  }
+}

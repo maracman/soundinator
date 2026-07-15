@@ -18,13 +18,22 @@ jobs:
         with:
           node-version: "22"
       - name: Install
-        run: pip install -e ".[dev]"
+        run: |
+          pip install -e ".[dev]"
+          npm ci
       - name: JS syntax check
         run: |
           node --check web/static/app.js
           node --check web/static/synth.js
+          node --check web/static/params.js
           node --check web/static/factory-presets.js
       - name: Tone model assertions
         run: node scripts/verify_tone_model.mjs
       - name: Tests
-        run: python -m pytest -q
+        run: |
+          npm test
+          python -m pytest -q
+      - name: Browser smoke
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:browser

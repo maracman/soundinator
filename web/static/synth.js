@@ -18,6 +18,7 @@ import { KEMAR_HRIR, kemarBuffers } from "./kemar-hrir.js";
 // the whole effect roster as a side effect, so createChainHost can resolve
 // every effect type by the time playback starts.
 import { createChainHost, sanitizeChain } from "./effects/index.js";
+import { engineParams } from "./params.js";
 
 export class SeededRNG {
   constructor(seed = 42) { this.s = (seed >>> 0) || 1; }
@@ -42,9 +43,10 @@ export class SeededRNG {
  * without constructing a Web Audio graph.
  */
 export function layerMixPlan(params = {}, layerRenders = []) {
-  const rawGain = Number(params.baseLayerGain ?? 1);
+  const normalized = engineParams(params);
+  const rawGain = Number(normalized.baseLayerGain ?? 1);
   const baseGain = Math.max(0, Math.min(2, Number.isFinite(rawGain) ? rawGain : 1));
-  const baseSolo = !!params.baseLayerSolo;
+  const baseSolo = !!normalized.baseLayerSolo;
   const layers = Array.isArray(layerRenders) ? layerRenders : [];
   const soloLayers = layers.filter(layer => !!layer?.solo);
   const anySolo = baseSolo || soloLayers.length > 0;
@@ -1700,6 +1702,7 @@ class Repertoire {
 
 export class GenerationEngine {
   constructor(params) {
+    params = engineParams(params);
     this.p = params;
     this.rng = new SeededRNG(params.seed || 42);
     // Percussion instrument one-shots draw from a SEPARATE seeded stream, so
@@ -2104,7 +2107,7 @@ export class GenerationEngine {
   // temporarily overlay the engine params so the SAME fingerprint code runs.
   _layerRender(layer, index, velocity, fundamentalHz, degree, formantPos, baseNote, sharedEnv = null) {
     const saved = this.p;
-    this.p = { ...saved, ...(layer.subnote || {}) };
+    this.p = { ...saved, ...(layer.sound || layer.subnote || {}) };
     let fields;
     try {
       fields = {
@@ -2117,7 +2120,7 @@ export class GenerationEngine {
     } finally {
       this.p = saved;
     }
-    const sub = layer.subnote || {};
+    const sub = layer.sound || layer.subnote || {};
     return {
       id: layer.id || `layer${index}`,
       gain: layer.gain ?? 1,
@@ -3375,6 +3378,7 @@ export class SynthEngine {
   }
 
   _playNow(params) {
+    params = engineParams(params);
     this.stop();
     // stop() fades the master out; bring it back for the new performance.
     if (this._masterOut) {
@@ -3410,6 +3414,7 @@ export class SynthEngine {
    */
   renderSpan(params, t0, spanSec, skipBeats = 0) {
     if (!this.ctx) return;
+    params = engineParams(params);
     this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
     this._vibratoActive = false;
     this._vibratoPhase = 0;
@@ -3450,6 +3455,7 @@ export class SynthEngine {
    * later session tempo. Needs no AudioContext.
    */
   captureSpan(params, spanSec) {
+    params = engineParams(params);
     const engine = new GenerationEngine(params);
     engine.initialise();
     const beatDiv = params.beatDivisions || 1;
@@ -3479,6 +3485,7 @@ export class SynthEngine {
    * baked playback then replays (per-strike velocity) instead of regenerating.
    */
   capturePercStrikes(params, notes) {
+    params = engineParams(params);
     const layers = this._normalizePercLayers(params);
     if (!Array.isArray(layers) || !layers.length || !Array.isArray(notes)) return [];
     const strikes = [];
@@ -3516,6 +3523,7 @@ export class SynthEngine {
    */
   renderNotesSpan(params, notes, t0, totalBeats = null, loopBeats = null, percStrikes = null) {
     if (!this.ctx || !Array.isArray(notes)) return;
+    params = engineParams(params);
     // Baked regions carry an explicit, editable strike list; when present it
     // replaces the procedural per-note percussion so edited dynamics play back.
     const useStoredPerc = Array.isArray(percStrikes) && percStrikes.length > 0;
@@ -3636,7 +3644,7 @@ export class SynthEngine {
 
   updateReverb(params = {}) {
     if (!this.ctx) return;
-    this._configureReverb(params);
+    this._configureReverb(engineParams(params));
   }
 
   // SPACE positioning: distance + azimuth → arrival delay, air absorption,
@@ -3784,7 +3792,7 @@ export class SynthEngine {
 
   updateGenerationParams(params = {}) {
     if (!this._engine) return;
-    this._engine.p = { ...this._engine.p, ...params };
+    this._engine.p = engineParams({ ...this._engine.p, ...params });
   }
 
   // Live-apply percussion edits (owner 2026-07-10): rebuild the normalised
@@ -3792,6 +3800,7 @@ export class SynthEngine {
   // enable changes without restarting playback. Group-position fallbacks
   // (percAzimuth/percDistance) are mirrored onto the remembered space params.
   updatePercLayers(params = {}) {
+    params = engineParams(params);
     this._percLayers = this._normalizePercLayers(params);
     if (this._spaceP) {
       this._spaceP.percAzimuth = params.percAzimuth;
@@ -3807,6 +3816,7 @@ export class SynthEngine {
    */
   updateEffects(params = {}) {
     if (!this.ctx) return;
+    params = engineParams(params);
     if (this._spaceP) {
       this._spaceP.effectsChain = params.effectsChain;
       this._spaceP.stageEffectsOn = params.stageEffectsOn;
@@ -3818,7 +3828,7 @@ export class SynthEngine {
       for (const layer of params.layers) {
         const c = this._layerChains.get(layer.id);
         if (!c || !c.fxHost) continue;
-        const sub = layer.subnote || {};
+        const sub = layer.sound || layer.subnote || {};
         c.fxHost.update(sanitizeChain(sub.effectsChain), sub.stageEffectsOn !== false);
       }
     }
@@ -3833,6 +3843,7 @@ export class SynthEngine {
    */
   regenerate(params) {
     if (!this.playing || !this.ctx) return false;
+    params = engineParams(params);
     this._voiceMode = params.voiceMode === "formant" ? "formant" : (params.voiceMode || "fourier");
     this._surpriseCount = 0;
     this._lastSurpriseAt = 0;

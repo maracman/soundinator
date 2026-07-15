@@ -8,6 +8,9 @@ __pycache__/
 venv/
 build/
 dist/
+node_modules/
+test-results/
+playwright-report/
 *.egg-info/
 .claude/
 
