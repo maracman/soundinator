@@ -126,10 +126,12 @@ def select_vocalset(vocalset_root: Path, samples_root: Path) -> dict[str, Any]:
                 if vowel is None:
                     continue
                 # Keep the broad dynamics/register corpus on /a/.  The four
-                # other vowels need only steady held tones for vowel-specific
-                # F1-F5 estimation; copying every scale would multiply WP-3
-                # runtime without adding independent formant evidence.
-                if vowel != "a" and not (technique == "straight" and "long_tones" in source.parts):
+                # other vowels use steady held tones plus straight scales:
+                # high-f0 voices need the scale's lower notes to resolve F1.
+                # Dynamic/vibrato variants would multiply runtime without
+                # adding independent formant evidence.
+                if vowel != "a" and not (technique == "straight" and
+                                          ("long_tones" in source.parts or "scales" in source.parts)):
                     continue
                 relative = source.relative_to(source_root)
                 safe_relative = ".".join(relative.parts[:-1])

@@ -302,7 +302,10 @@ def estimate_formants(seg: np.ndarray, sr: int) -> tuple[list[float], list[float
     y = sig.lfilter([1.0, -0.97], [1.0], y)
     frame = int(0.04 * sr)
     hop = frame // 2
-    order = 18
+    # Five vocal-tract resonances plus the glottal spectral envelope require
+    # more poles than the classic speech-recognition minimum.  Order 26 at
+    # 16 kHz resolves low F1/F2 on high-f0 female voices much more reliably.
+    order = 26
     rows: list[tuple[list[float], list[float]]] = []
     for start in range(0, max(0, len(y) - frame + 1), hop):
         part = y[start:start + frame] * np.hamming(frame)
@@ -1014,6 +1017,10 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         prob = len(present) / len(vib)
         rates = [v["rate"] for v in present]
         depths = [v["depth"] for v in present]
+        # Slow drift/portamento personality comes from the ordinary/straight
+        # pool, not designated vibrato takes whose deliberate oscillation can
+        # leak into the low-pass trend on short notes.
+        drift_pool = [n.vibrato for n in notes if n.vibrato]
         vibrato = dict(
             vibratoProb=float(round(prob, 2)),
             vibratoRate=robust_mean(rates),
@@ -1026,9 +1033,9 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             # not how often the player chooses to vibrate
             vibratoBasis=("designated vibrato takes (prob conditional)"
                           if vib_notes else "ordinary notes"),
-            microDriftCentsSd=robust_mean([v.get("microDriftCentsSd") for v in vib]),
-            microDriftCentsRange=robust_mean([v.get("microDriftCentsRange") for v in vib]),
-            microDriftCentsPerSecond=robust_mean([v.get("microDriftCentsPerSecond") for v in vib]),
+            microDriftCentsSd=robust_mean([v.get("microDriftCentsSd") for v in drift_pool]),
+            microDriftCentsRange=robust_mean([v.get("microDriftCentsRange") for v in drift_pool]),
+            microDriftCentsPerSecond=robust_mean([v.get("microDriftCentsPerSecond") for v in drift_pool]),
         )
 
     # VocalSet files carry an explicit terminal vowel label.  Retain F1-F5
