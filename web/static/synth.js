@@ -955,6 +955,9 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
   if (Array.isArray(m.partialsByRegister) && m.partialsByRegister.length) {
     prof.partialsByRegister = m.partialsByRegister;
   }
+  if (Array.isArray(m.attackByRegister) && m.attackByRegister.length) {
+    prof.attackByRegister = m.attackByRegister;
+  }
   const perf = prof.performance || (prof.performance = {});
   if (Number.isFinite(m.material)) perf.partialMaterial = m.material;
   if (Number.isFinite(m.partialB)) perf.partialB = m.partialB;
@@ -1193,6 +1196,22 @@ export function registerAttackNoiseAt(anchors, fundamentalHz) {
     else if (Number.isFinite(b)) result[key] = b;
   }
   return result;
+}
+
+/** Interpolate the measured low-to-high partial onset spread by register. */
+export function registerAttackStaggerAt(anchors, fundamentalHz) {
+  if (!Array.isArray(anchors) || anchors.length === 0) return null;
+  const rows = anchors.filter(row => row && Number.isFinite(row.f0) && row.f0 > 0 &&
+      Number.isFinite(row.lowToHighStaggerMs)).slice().sort((a, b) => a.f0 - b.f0);
+  if (!rows.length) return null;
+  const f0 = Math.max(1, Number(fundamentalHz) || rows[0].f0);
+  if (rows.length === 1 || f0 <= rows[0].f0) return rows[0].lowToHighStaggerMs;
+  if (f0 >= rows[rows.length - 1].f0) return rows[rows.length - 1].lowToHighStaggerMs;
+  let hi = 1;
+  while (hi < rows.length && rows[hi].f0 < f0) hi++;
+  const lo = rows[hi - 1], upper = rows[hi];
+  const t = (Math.log(f0) - Math.log(lo.f0)) / (Math.log(upper.f0) - Math.log(lo.f0));
+  return lo.lowToHighStaggerMs + (upper.lowToHighStaggerMs - lo.lowToHighStaggerMs) * t;
 }
 
 /** Resolve a measured onset transient. Explicit pinned fields win; absent
@@ -2542,7 +2561,8 @@ export class GenerationEngine {
       attackNoiseVelocityExponent: this._clamp(this.p.attackNoiseVelocityExponent ?? 1, 0, 2),
       // Q8 attack stagger: measured low→high onset spread when the profile
       // carries one (hand defaults per excitation type apply otherwise)
-      attackStaggerMs: profile.performance?.lowToHighStaggerMs ?? null,
+      attackStaggerMs: registerAttackStaggerAt(profile.attackByRegister, fundamentalHz) ??
+        profile.performance?.lowToHighStaggerMs ?? null,
       partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
       decaySecondStage: this._clamp(this.p.decaySecondStage ?? 0, 0, 1),
       decaySecondRatio: this._clamp(this.p.decaySecondRatio ?? 1, 1, 8),

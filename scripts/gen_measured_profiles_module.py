@@ -61,6 +61,15 @@ def main():
                 "partials": [{"amp": round(p["amp"], 5), "spread": round(p["spread"], 3)}
                              for p in row.get("partials", [])],
             } for row in registers if isinstance(row, dict) and row.get("partials")]
+        attack_registers = (v.get("attack") or {}).get("byRegister")
+        if isinstance(attack_registers, list) and attack_registers:
+            entry["attackByRegister"] = [{
+                "f0": row["f0"],
+                "envelopeAttack": row.get("envelopeAttack"),
+                "lowToHighStaggerMs": row.get("lowToHighStaggerMs"),
+                "bandT90ms": row.get("bandT90ms", {}),
+            } for row in attack_registers if isinstance(row, dict) and
+                isinstance(row.get("f0"), (int, float))]
         an = v["performance"].get("attackNoise")
         if isinstance(an, dict):
             entry["attackNoise"] = {k: round(x, 4) for k, x in an.items()

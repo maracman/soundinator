@@ -23,6 +23,7 @@ import {
   attackNoiseRouting,
   attackNoiseVelocityGain,
   registerAttackNoiseAt,
+  registerAttackStaggerAt,
   resolveAttackNoise,
   registerProfileAt,
   humanFluctuationTrace,
@@ -62,6 +63,23 @@ console.log("Sub-note base layer mixing");
   const additiveSolo = layerMixPlan({ baseLayerSolo: true }, layers);
   check("base and captured solos combine", additiveSolo.baseAudible && additiveSolo.layers.length === 1);
   check("zero base level silences base", !layerMixPlan({ baseLayerGain: 0 }, []).baseAudible);
+}
+
+console.log("WP-3 register attack timing");
+{
+  const anchors = [
+    { f0: 80, lowToHighStaggerMs: 90 },
+    { f0: 320, lowToHighStaggerMs: 120 },
+    { f0: 640, lowToHighStaggerMs: 0 },
+  ];
+  check("register attack stagger clamps below measured range",
+    registerAttackStaggerAt(anchors, 40) === 90);
+  check("register attack stagger interpolates in log-frequency space",
+    near(registerAttackStaggerAt(anchors, 160), 105, 1e-9));
+  check("register attack stagger preserves a measured zero high anchor",
+    registerAttackStaggerAt(anchors, 800) === 0);
+  check("French horn profile carries three measured register timing anchors",
+    SPECTRAL_PROFILES["french-horn"].attackByRegister?.length === 3);
 }
 
 console.log("T-B3: stiff-string inharmonicity law");

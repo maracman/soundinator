@@ -922,12 +922,14 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
     # The engine interpolates these anchors continuously; instruments with
     # fewer than three analysed pitches simply omit the field.
     partials_by_register = []
+    register_groups = []
     if len(spec_notes) >= 3:
         ordered = sorted(spec_notes, key=lambda item: item.f0)
-        for group in np.array_split(np.asarray(ordered, dtype=object), min(3, len(ordered))):
+        register_groups = [list(group) for group in
+                           np.array_split(np.asarray(ordered, dtype=object),
+                                          min(3, len(ordered))) if len(group)]
+        for group in register_groups:
             group = list(group)
-            if not group:
-                continue
             g_amp = np.zeros(n_partials)
             g_spread = []
             for i in range(n_partials):
@@ -989,6 +991,37 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         lows = [band_t90[fc] for fc in fcs[:2]]
         highs = [band_t90[fc] for fc in fcs[-2:]]
         stagger_ms = float((np.mean(highs) - np.mean(lows)) * 1000)
+
+    # WP-3 retains the same onset evidence per log-frequency register as the
+    # partial tables.  A single whole-instrument stagger can hide a real
+    # register transition (especially in brass), so ship the band timing and
+    # ADSR attack at each measured anchor as well as the global diagnostic.
+    attack_by_register = []
+    for group in register_groups:
+        group_bands = sorted({fc for n in group for fc in n.band_t90})
+        group_t90 = {}
+        for fc in group_bands:
+            vals = [n.band_t90[fc]["t90"] for n in group if fc in n.band_t90]
+            if len(vals) >= max(2, len(group) // 3):
+                group_t90[fc] = robust_mean(vals)
+        group_stagger_ms = None
+        if len(group_t90) >= 2:
+            fcs = sorted(group_t90)
+            lows = [group_t90[fc] for fc in fcs[:2]]
+            highs = [group_t90[fc] for fc in fcs[-2:]]
+            group_stagger_ms = float((np.mean(highs) - np.mean(lows)) * 1000)
+        group_attacks = [n.adsr.get("attack") for n in group
+                         if n.adsr.get("attack") is not None]
+        if group_t90 or group_attacks:
+            attack_by_register.append(dict(
+                f0=round(float(np.exp(np.mean(np.log([n.f0 for n in group])))), 3),
+                envelopeAttack=(round(float(robust_mean(group_attacks)), 4)
+                                if group_attacks else None),
+                bandT90ms={str(fc): round(v * 1000, 1)
+                           for fc, v in group_t90.items()},
+                lowToHighStaggerMs=(round(group_stagger_ms, 1)
+                                    if group_stagger_ms is not None else None),
+            ))
 
     # ── attackNoise ───────────────────────────────────────────────────
     an = {}
@@ -1081,7 +1114,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             attackNoise=attack_noise,
         ),
         attack=dict(bandT90ms={str(fc): round(v * 1000, 1) for fc, v in band_t90.items()},
-                    lowToHighStaggerMs=round(stagger_ms, 1) if stagger_ms is not None else None),
+                    lowToHighStaggerMs=round(stagger_ms, 1) if stagger_ms is not None else None,
+                    byRegister=attack_by_register),
         notesAnalysed=[dict(file=os.path.basename(n.file), note=n.note,
                             f0=round(n.f0, 2), percussive=n.percussive,
                             **({"vowel": n.vowel} if n.vowel else {}))
