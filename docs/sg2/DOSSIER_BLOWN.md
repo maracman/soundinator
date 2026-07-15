@@ -70,7 +70,9 @@ G2's frequency law is useful for brass, but the enum name is an abstraction.
   close to a harmonic spectrum even though passive bore resonances are not
   perfectly harmonic ([UNSW harmonics](https://phys.unsw.edu.au/jw/harmonics.html)).
   The scorer checks output f0 against the paired reference rather than fitting
-  passive impedance inharmonicity as string `B`.
+  passive impedance inharmonicity as string `B`. The analyser's estimated B
+  remains in reports for diagnosis but has zero composite weight for the blown
+  family, so noisy B estimates cannot reward nonphysical preset detuning.
 - **Continuous drive, not free decay.** A held air jet, reed or lip valve keeps
   supplying energy throughout the note. The renderer must therefore retain
   its driven upper modes during sustain; frequency-dependent free-decay laws
@@ -138,6 +140,8 @@ acoustic blocker because its implemented frequency law is the required one.
 | Renderer audit: fast onset through sustained ADSR | **Rejected for measured horn attacks.** A transient with its own 5 ms rise and measured decay was attenuated again by the much slower sustained-note ADSR, leaving the paired high-register onsets roughly an order of magnitude too weak. | Add neutral `attackNoiseDirect`; keep `0` bit-compatible and require the horn fit to opt in before its construction gate can pass. |
 | Renderer audit: linear onset-noise velocity | **Amended for horn.** Both Iowa and Philharmonia soft high-register takes retain a clear transient, while the legacy `level × velocity` law removes 80% at the campaign's `pp` point before the onset envelope is applied. | Add neutral `attackNoiseVelocityExponent` (`1` = legacy); require the horn fit to demonstrate a sub-linear soft-onset law rather than overdriving every dynamic with one level. |
 | Renderer audit: pinned transient shape | **Rejected as previously wired.** WP-3 stored measured onset frequency, Q, and decay in each campaign seed, but the renderer silently reloaded the aggregate profile transient and consumed only the free level control. | Make explicit `attackNoiseFreq`, `attackNoiseQ`, and `attackNoiseDecay` win over the profile fallback; absent fields remain exactly legacy. Keep all three pinned during fitting. |
+| Scorer audit: stiff-string B on blown tones | **Rejected.** The generic analyser can estimate a small, unstable B from a wind spectrum, but that number is neither the passive bore impedance nor a valid target for mode-locked radiated output. A horn grid falsely preferred constant B solely by reducing this residual. | Retain the diagnostic, set its composite weight to zero for the blown family, and version the reference-set objective with its weight policy. |
+| WP-3 audit: spectral notes below 100 Hz | **Rejected.** The analyser accepts f0 down to 40 Hz, but aggregation discarded every spectral note below 100 Hz. This removed 26 valid horn observations and left its lowest register anchor at 163 Hz while WP-5 scores B1 near 62 Hz. | Align aggregation with the analyser's 40 Hz validity bound and regenerate affected multi-register fits; never substitute a mid-low table for an evidenced practical low register. |
 | Missing gap | **No new pre-fit engine gap.** Full reed/lip–bore feedback and sax altissimo tract coupling are real, but the present campaign covers dry, standard-range sustained notes. | If residuals localise to attack instability or altissimo rather than fitted params, file a bounded model gap; do not widen the optimiser to disguise it. |
 
 Verdict: the existing G2/G3 laws are justified, with the stated semantic
