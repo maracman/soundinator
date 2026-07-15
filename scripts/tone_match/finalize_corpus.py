@@ -55,6 +55,7 @@ VOCAL_SELECTION = {
 }
 
 NOTE_RE = re.compile(r"([A-Ga-g])([b#s]?)(\d)")
+VOWEL_RE = re.compile(r"_([aeiou])\.wav$", re.IGNORECASE)
 
 
 def _audio_files(folder: Path) -> list[Path]:
@@ -92,6 +93,11 @@ def _note_span(name: str) -> str | None:
     return notes[0] if len(notes) == 1 else f"{notes[0]}–{notes[-1]}"
 
 
+def _vowel(name: str) -> str | None:
+    match = VOWEL_RE.search(name)
+    return match.group(1).lower() if match else None
+
+
 def _load_iowa_manifest(path: Path) -> dict[tuple[str, str], str]:
     result: dict[tuple[str, str], str] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -112,9 +118,18 @@ def select_vocalset(vocalset_root: Path, samples_root: Path) -> dict[str, Any]:
             source_root = vocalset_root / singer
             if not source_root.is_dir():
                 raise FileNotFoundError(f"missing extracted VocalSet singer: {source_root}")
-            for source in sorted(source_root.rglob("*_a.wav")):
+            for source in sorted(source_root.rglob("*.wav")):
                 technique = source.parent.name
                 if technique not in {"slow_piano", "slow_forte", "straight", "vibrato", "pp", "forte"}:
+                    continue
+                vowel = _vowel(source.name)
+                if vowel is None:
+                    continue
+                # Keep the broad dynamics/register corpus on /a/.  The four
+                # other vowels need only steady held tones for vowel-specific
+                # F1-F5 estimation; copying every scale would multiply WP-3
+                # runtime without adding independent formant evidence.
+                if vowel != "a" and not (technique == "straight" and "long_tones" in source.parts):
                     continue
                 relative = source.relative_to(source_root)
                 safe_relative = ".".join(relative.parts[:-1])
@@ -151,6 +166,7 @@ def _entry(instrument: str, path: Path, iowa: dict[tuple[str, str], str],
         "dynamic": _dynamics(name),
         "vibrato": _vibrato(name),
         "noteSpanFromFilename": _note_span(name),
+        "vowel": _vowel(name),
     }
     if selection_basis:
         result["selectionBasis"] = selection_basis
@@ -184,6 +200,7 @@ def write_contract(samples_root: Path, iowa_manifest: Path,
             f"Sources: {', '.join(f'{key} ({value})' for key, value in sorted(sources.items()))}  \n",
             f"Dynamics: {', '.join(f'{key} ({value})' for key, value in sorted(dynamics.items()))}  \n",
             f"Vibrato labels: {', '.join(f'{key} ({value})' for key, value in sorted(vibrato.items()))}  \n",
+            f"Vowels: {', '.join(sorted({row['vowel'] for row in entries if row['vowel']})) or 'not applicable'}  \n",
             f"Filename pitch spans: {', '.join(spans) if spans else 'multi-note VocalSet C/F scales plus held tones'}\n\n",
         ]
         if folder.name in vocal_selection:
@@ -223,4 +240,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

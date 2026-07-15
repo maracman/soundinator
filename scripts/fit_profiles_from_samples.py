@@ -60,9 +60,11 @@ import argparse
 import json
 import math
 import os
+import re
 from dataclasses import dataclass, field
 
 import numpy as np
+from scipy import linalg
 from scipy import signal as sig
 
 try:
@@ -79,6 +81,7 @@ GLASS_T60, FELT_T60 = 7.0, 0.55   # materialT60 anchors at m=0 / m=1
 SLOPE_MIN, SLOPE_SPAN = 0.25, 1.1
 
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+VOWEL_RE = re.compile(r"_([aeiou])\.(?:wav|aif|aiff|flac|ogg|mp3)$", re.IGNORECASE)
 
 
 def engine_t60(freq_hz: float, material: float) -> float:
@@ -273,6 +276,61 @@ def spectrum_peak(freqs: np.ndarray, mag: np.ndarray, f_lo: float, f_hi: float):
     return (freqs[k] + delta * df, math.exp(lb - 0.25 * (la - lc) * delta))
 
 
+def vowel_from_filename(path: str) -> str | None:
+    """Return VocalSet's terminal vowel label without guessing other names."""
+    match = VOWEL_RE.search(os.path.basename(path))
+    return match.group(1).lower() if match else None
+
+
+def estimate_formants(seg: np.ndarray, sr: int) -> tuple[list[float], list[float]] | None:
+    """Estimate F1-F5 and bandwidths from steady-state frames using LPC.
+
+    The estimator is intentionally limited to explicitly vowel-labelled
+    files.  Frame-wise LPC roots are filtered by frequency/bandwidth and
+    combined by medians so a single glottal pulse or pitch harmonic cannot
+    become a voice-type body band.
+    """
+    if len(seg) < int(0.35 * sr):
+        return None
+    target_sr = 16000
+    y = np.asarray(seg[len(seg) // 4: 3 * len(seg) // 4], dtype=float)
+    if sr != target_sr:
+        divisor = math.gcd(sr, target_sr)
+        y = sig.resample_poly(y, target_sr // divisor, sr // divisor)
+        sr = target_sr
+    y = y - np.mean(y)
+    y = sig.lfilter([1.0, -0.97], [1.0], y)
+    frame = int(0.04 * sr)
+    hop = frame // 2
+    order = 18
+    rows: list[tuple[list[float], list[float]]] = []
+    for start in range(0, max(0, len(y) - frame + 1), hop):
+        part = y[start:start + frame] * np.hamming(frame)
+        if np.sqrt(np.mean(part * part)) < 1e-5:
+            continue
+        corr = np.correlate(part, part, mode="full")[frame - 1: frame + order]
+        if corr[0] <= 0:
+            continue
+        corr[0] *= 1.0001  # tiny diagonal loading for breathy/near-periodic frames
+        try:
+            coeff = linalg.solve_toeplitz(corr[:-1], -corr[1:])
+        except linalg.LinAlgError:
+            continue
+        roots = np.roots(np.r_[1.0, coeff])
+        roots = roots[np.imag(roots) >= 0]
+        freqs = np.angle(roots) * sr / (2 * np.pi)
+        bandwidths = -0.5 * sr / np.pi * np.log(np.clip(np.abs(roots), 1e-9, None))
+        candidates = sorted((float(f), float(b)) for f, b in zip(freqs, bandwidths)
+                            if 150 <= f <= 7500 and 25 <= b <= 900)
+        if len(candidates) >= 5:
+            chosen = candidates[:5]
+            rows.append(([f for f, _ in chosen], [b for _, b in chosen]))
+    if len(rows) < 3:
+        return None
+    return ([float(np.median([row[0][i] for row in rows])) for i in range(5)],
+            [float(np.median([row[1][i] for row in rows])) for i in range(5)])
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # Per-note analysis
 # ──────────────────────────────────────────────────────────────────────────
@@ -292,6 +350,9 @@ class NoteAnalysis:
     band_t90: dict = field(default_factory=dict)  # {band_center: t90_s}
     attack_noise: dict = field(default_factory=dict)
     vibrato: dict = field(default_factory=dict)
+    vowel: str | None = None
+    formants: list[float] = field(default_factory=list)
+    formant_bandwidths: list[float] = field(default_factory=list)
     percussive: bool = False
 
 
@@ -323,6 +384,11 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64):
                         partial_freqs=np.full(n_partials, np.nan),
                         partial_snr_ok=np.zeros(n_partials, dtype=bool),
                         percussive=percussive)
+    note.vowel = vowel_from_filename(fname)
+    if note.vowel:
+        formant_fit = estimate_formants(seg, sr)
+        if formant_fit:
+            note.formants, note.formant_bandwidths = formant_fit
 
     # ── partial amplitudes + frequencies ─────────────────────────────
     # Sustained: middle 50 % of the note.  Percussive: a fixed early
@@ -746,7 +812,15 @@ def vibrato_stats(seg: np.ndarray, sr: int, f0: float, amps: np.ndarray):
     # short notes have poor modulation-spectrum resolution, so also accept
     # unambiguous depth without the prominence test
     present = (prominent and depth > 3.0) or depth > 12.0
-    return dict(rate=rate, depth=depth, present=bool(present))
+    half = max(1, w // 2)
+    slow = trend[half:-half] if len(trend) > 2 * half else trend
+    slow_t = tt[half:half + len(slow)] if len(tt) >= half + len(slow) else np.arange(len(slow)) / frame_rate
+    drift_sd = float(np.std(slow)) if len(slow) else 0.0
+    drift_range = float(np.percentile(slow, 95) - np.percentile(slow, 5)) if len(slow) >= 8 else 0.0
+    drift_rate = float(np.polyfit(slow_t, slow, 1)[0]) if len(slow) >= 8 else 0.0
+    return dict(rate=rate, depth=depth, present=bool(present),
+                microDriftCentsSd=drift_sd, microDriftCentsRange=drift_range,
+                microDriftCentsPerSecond=drift_rate)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -952,7 +1026,24 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             # not how often the player chooses to vibrate
             vibratoBasis=("designated vibrato takes (prob conditional)"
                           if vib_notes else "ordinary notes"),
+            microDriftCentsSd=robust_mean([v.get("microDriftCentsSd") for v in vib]),
+            microDriftCentsRange=robust_mean([v.get("microDriftCentsRange") for v in vib]),
+            microDriftCentsPerSecond=robust_mean([v.get("microDriftCentsPerSecond") for v in vib]),
         )
+
+    # VocalSet files carry an explicit terminal vowel label.  Retain F1-F5
+    # per vowel/voice type so the engine can build fixed-Hz body presets.
+    vowel_formants = {}
+    for vowel in "aeiou":
+        pool = [n for n in notes if n.vowel == vowel and len(n.formants) >= 5]
+        if not pool:
+            continue
+        vowel_formants[vowel] = {
+            "formantsHz": [round(robust_mean([n.formants[i] for n in pool]), 1) for i in range(5)],
+            "bandwidthsHz": [round(robust_mean([n.formant_bandwidths[i] for n in pool]), 1) for i in range(5)],
+            "nNotes": len(pool),
+            "method": "steady-state LPC; frame-wise roots, median aggregation",
+        }
 
     r4 = lambda v: (round(float(v), 4) if v is not None and np.isfinite(v) else None)
     if material:
@@ -967,6 +1058,7 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         partialB=round(B_med, 8),
         partialBByNote=B_by_note,
         partialsByRegister=partials_by_register,
+        vowelFormants=vowel_formants,
         tailSlopeDbPerOct=round(tail_db_oct, 1) if tail_db_oct is not None else None,
         material=material,
         performance=dict(
@@ -980,7 +1072,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         attack=dict(bandT90ms={str(fc): round(v * 1000, 1) for fc, v in band_t90.items()},
                     lowToHighStaggerMs=round(stagger_ms, 1) if stagger_ms is not None else None),
         notesAnalysed=[dict(file=os.path.basename(n.file), note=n.note,
-                            f0=round(n.f0, 2), percussive=n.percussive)
+                            f0=round(n.f0, 2), percussive=n.percussive,
+                            **({"vowel": n.vowel} if n.vowel else {}))
                        for n in notes],
     )
 

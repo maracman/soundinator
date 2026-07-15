@@ -5,8 +5,8 @@ import json
 import numpy as np
 import pytest
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_contract
-from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato
+from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_contract, vowel_from_filename
+from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.iterate import _floor_evidence, _reference_variability
 from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time
@@ -133,3 +133,6 @@ def test_corpus_sidecar_filename_classification():
     assert _vibrato("phil.violin_A4_mezzo-piano_non-vibrato.mp3") == "nonvib"
     assert _vibrato("vocalset.m3.scales.vibrato.m3_scales_vibrato_a.wav") == "vib"
     assert _note_span("BbClar.mf.D3B3.aiff") == "D3–B3"
+    assert _vowel("m3_long_straight_u.wav") == "u"
+    assert _vowel("AltoSax.NoVib.ff.C4B4.aiff") is None
+    assert vowel_from_filename("vocalset.m3.long.m3_long_straight_i.wav") == "i"
