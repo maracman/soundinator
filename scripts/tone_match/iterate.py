@@ -299,14 +299,19 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
     return improved, previous_loss
 
 
-def _append_ledger(instrument: str, run_dir: Path, best: dict, sensitivity: dict) -> None:
+def _append_ledger(instrument: str, run_dir: Path, best: dict, sensitivity: dict,
+                   free: list[FreeParam]) -> None:
     ledger = ROOT / "docs" / "SG2_PARAM_LEDGER.md"
     if not ledger.exists():
         ledger.write_text("# Sound Generator 2.0 parameter ledger\n\nDerived by `scripts/tone_match/iterate.py`; lower loss is better.\n\n")
     rows = [f"\n## {instrument} — {run_dir.name}\n\nComposite loss: `{best['loss']:.6f}`\n\n| Parameter | Fitted | ±10% sensitivity |\n|---|---:|---:|\n"]
+    free_keys = {spec.key for spec in free}
     for key, value in sorted(best["params"].items()):
-        if key in sensitivity:
-            rows.append(f"| `{key}` | {value!s} | {sensitivity[key]['increase']:.6f} |\n")
+        if key not in free_keys:
+            continue
+        measured = (f"{sensitivity[key]['increase']:.6f}"
+                    if key in sensitivity else "not run")
+        rows.append(f"| `{key}` | {value!s} | {measured} |\n")
     with ledger.open("a") as handle:
         handle.writelines(rows)
 
@@ -355,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
     reference_set = _reference_set_id(references, args.instrument)
     improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
     if improved:
-        _append_ledger(args.instrument, run_dir, best, sensitivity)
+        _append_ledger(args.instrument, run_dir, best, sensitivity, free)
     floor = _floor_evidence(variability, best)
     measurable_improvement = improved and baseline - best["loss"] > 1e-6
     if floor["status"] == "demonstrated":

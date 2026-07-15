@@ -4,12 +4,13 @@ import json
 
 import numpy as np
 import pytest
+import scripts.tone_match.iterate as iterate_module
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, validate_corpus_contract, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
-from scripts.tone_match.iterate import _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
+from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
 from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time, compare_features, weights_for_instrument
 
 
@@ -78,6 +79,17 @@ def test_dominant_residual_ignores_zero_weight_diagnostics():
         "weights": {"partials_db": 1.0, "inharmonicity_log_ratio": 0.0},
     }]}
     assert _dominant_residual(best)["feature"] == "partials_db"
+
+
+def test_ledger_keeps_fitted_free_values_when_sensitivity_is_skipped(tmp_path, monkeypatch):
+    monkeypatch.setattr(iterate_module, "ROOT", tmp_path)
+    (tmp_path / "docs").mkdir()
+    _append_ledger("flute", tmp_path / "pass2",
+                   {"loss": 1.25, "params": {"attackNoiseDirect": .3, "partialB": 0}},
+                   {}, [FreeParam("attackNoiseDirect", 0, 1, 0)])
+    ledger = (tmp_path / "docs" / "SG2_PARAM_LEDGER.md").read_text()
+    assert "| `attackNoiseDirect` | 0.3 | not run |" in ledger
+    assert "partialB" not in ledger
 
 
 def _bundle(*, f0=220.0, partials=None, percussive=False, B=0.0002):
