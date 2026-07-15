@@ -3232,35 +3232,79 @@ export const MEASURED_PROFILES = {
   "french-horn": {
     "partials": [
       {
-        "amp": 1,
-        "spread": 0.357
+        "amp": 1.0,
+        "spread": 0.402
       },
       {
-        "amp": 0.47933,
+        "amp": 0.50426,
+        "spread": 0.778
+      },
+      {
+        "amp": 0.43017,
         "spread": 0.8
       },
       {
-        "amp": 0.15895,
+        "amp": 0.20341,
         "spread": 0.8
       },
       {
-        "amp": 0.07964,
+        "amp": 0.14741,
         "spread": 0.8
       },
       {
-        "amp": 0.0352,
+        "amp": 0.06832,
         "spread": 0.8
       },
       {
-        "amp": 0.01846,
+        "amp": 0.0518,
         "spread": 0.8
       },
       {
-        "amp": 0.00939,
+        "amp": 0.0272,
         "spread": 0.8
       },
       {
-        "amp": 0.00435,
+        "amp": 0.02525,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01622,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01363,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00648,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01252,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01082,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00787,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00579,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00545,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00401,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00486,
         "spread": 0.8
       },
       {
@@ -3268,91 +3312,67 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.00187,
+        "amp": 0.00291,
         "spread": 0.8
       },
       {
-        "amp": 0.00157,
+        "amp": 0.00352,
         "spread": 0.8
       },
       {
-        "amp": 0.00098,
+        "amp": 0.00267,
         "spread": 0.8
       },
       {
-        "amp": 0.00109,
+        "amp": 0.00213,
         "spread": 0.8
       },
       {
-        "amp": 0.00099,
+        "amp": 0.00131,
         "spread": 0.8
       },
       {
-        "amp": 0.00057,
+        "amp": 0.0022,
         "spread": 0.8
       },
       {
-        "amp": 0.00096,
+        "amp": 0.00123,
         "spread": 0.8
       },
       {
-        "amp": 0.00116,
+        "amp": 0.00165,
         "spread": 0.8
       },
       {
-        "amp": 0.00191,
+        "amp": 0.00135,
         "spread": 0.8
       },
       {
-        "amp": 0.0019,
+        "amp": 0.00184,
         "spread": 0.8
       },
       {
-        "amp": 0.00185,
+        "amp": 0.00103,
         "spread": 0.8
       },
       {
-        "amp": 0.00127,
+        "amp": 0.00082,
         "spread": 0.8
       },
       {
-        "amp": 0.00091,
+        "amp": 0.00066,
         "spread": 0.8
       },
       {
-        "amp": 0.00095,
+        "amp": 0.00054,
         "spread": 0.8
       },
       {
-        "amp": 0.0008,
+        "amp": 0.00042,
         "spread": 0.8
       },
       {
-        "amp": 0.00064,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00069,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00068,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00059,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00087,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00078,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00062,
+        "amp": 0.00073,
         "spread": 0.8
       },
       {
@@ -3360,15 +3380,43 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.00048,
+        "amp": 0.0005,
         "spread": 0.8
       },
       {
-        "amp": 0.00035,
+        "amp": 0.0009,
         "spread": 0.8
       },
       {
-        "amp": 0.00032,
+        "amp": 0.00037,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00031,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00031,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00041,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00056,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00037,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0003,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00031,
         "spread": 0.8
       },
       {
@@ -3376,7 +3424,11 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.00029,
+        "amp": 0.0003,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0003,
         "spread": 0.8
       },
       {
@@ -3384,63 +3436,19 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.00058,
+        "amp": 0.00038,
         "spread": 0.8
       },
       {
-        "amp": 0.00029,
+        "amp": 0.00026,
         "spread": 0.8
       },
       {
-        "amp": 0.00023,
+        "amp": 0.00024,
         "spread": 0.8
       },
       {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00027,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00034,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00027,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.0002,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00023,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00023,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.0002,
+        "amp": 0.00026,
         "spread": 0.8
       },
       {
@@ -3448,27 +3456,11 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.0002,
+        "amp": 0.00015,
         "spread": 0.8
       },
       {
-        "amp": 0.00013,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00011,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00013,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00013,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00013,
+        "amp": 0.00016,
         "spread": 0.8
       },
       {
@@ -3476,24 +3468,32 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.0002,
+        "amp": 0.00017,
         "spread": 0.8
       },
       {
-        "amp": 0.00015,
+        "amp": 0.00024,
         "spread": 0.8
       },
       {
-        "amp": 0.0001,
+        "amp": 0.00026,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00024,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00012,
         "spread": 0.8
       }
     ],
-    "partialB": 2e-08,
+    "partialB": 0.0,
     "material": 0.18,
     "performance": {
       "envelopeAttack": 0.1122,
       "envelopeAttackSd": 0.0693,
-      "envelopeDecay": 0,
+      "envelopeDecay": 0.0,
       "envelopeSustain": 0.8841,
       "envelopeRelease": 0.1048,
       "vibratoProb": 0.31,
@@ -3504,137 +3504,161 @@ export const MEASURED_PROFILES = {
       "microDriftCentsSd": 1.027,
       "microDriftCentsRange": 3.095,
       "microDriftCentsPerSecond": 0.663,
-      "lowToHighStaggerMs": 96
+      "lowToHighStaggerMs": 96.0
     },
     "source": "Iowa MIS, Philharmonia",
     "notesAnalysed": 110,
     "partialsByRegister": [
       {
-        "f0": 163.085,
-        "partialB": 0,
+        "f0": 84.421,
+        "partialB": 0.0,
         "partials": [
           {
-            "amp": 0.31443,
-            "spread": 0.357
+            "amp": 0.19314,
+            "spread": 0.402
           },
           {
-            "amp": 1,
+            "amp": 0.37816,
+            "spread": 0.778
+          },
+          {
+            "amp": 0.76016,
             "spread": 0.8
           },
           {
-            "amp": 0.96232,
+            "amp": 0.97708,
             "spread": 0.8
           },
           {
-            "amp": 0.6078,
+            "amp": 1.0,
             "spread": 0.8
           },
           {
-            "amp": 0.36736,
+            "amp": 0.97363,
             "spread": 0.8
           },
           {
-            "amp": 0.28257,
+            "amp": 0.80806,
             "spread": 0.8
           },
           {
-            "amp": 0.15479,
+            "amp": 0.43412,
             "spread": 0.8
           },
           {
-            "amp": 0.13214,
+            "amp": 0.30063,
             "spread": 0.8
           },
           {
-            "amp": 0.10556,
+            "amp": 0.27779,
             "spread": 0.8
           },
           {
-            "amp": 0.09874,
+            "amp": 0.20201,
             "spread": 0.8
           },
           {
-            "amp": 0.07939,
+            "amp": 0.13649,
             "spread": 0.8
           },
           {
-            "amp": 0.06279,
+            "amp": 0.10837,
             "spread": 0.8
           },
           {
-            "amp": 0.04592,
+            "amp": 0.08073,
             "spread": 0.8
           },
           {
-            "amp": 0.03227,
+            "amp": 0.08351,
             "spread": 0.8
           },
           {
-            "amp": 0.03048,
+            "amp": 0.05912,
             "spread": 0.8
           },
           {
-            "amp": 0.0203,
+            "amp": 0.05329,
             "spread": 0.8
           },
           {
-            "amp": 0.01368,
+            "amp": 0.04221,
             "spread": 0.8
           },
           {
-            "amp": 0.01492,
+            "amp": 0.03253,
             "spread": 0.8
           },
           {
-            "amp": 0.01023,
+            "amp": 0.02787,
             "spread": 0.8
           },
           {
-            "amp": 0.00642,
+            "amp": 0.02092,
             "spread": 0.8
           },
           {
-            "amp": 0.00471,
+            "amp": 0.01441,
             "spread": 0.8
           },
           {
-            "amp": 0.00587,
+            "amp": 0.01015,
             "spread": 0.8
           },
           {
-            "amp": 0.0059,
+            "amp": 0.00856,
             "spread": 0.8
           },
           {
-            "amp": 0.00325,
+            "amp": 0.01086,
             "spread": 0.8
           },
           {
-            "amp": 0.00299,
+            "amp": 0.00874,
             "spread": 0.8
           },
           {
-            "amp": 0.00455,
+            "amp": 0.00538,
             "spread": 0.8
           },
           {
-            "amp": 0.00251,
+            "amp": 0.00466,
             "spread": 0.8
           },
           {
-            "amp": 0.00189,
+            "amp": 0.00403,
             "spread": 0.8
           },
           {
-            "amp": 0.0027,
+            "amp": 0.00695,
             "spread": 0.8
           },
           {
-            "amp": 0.00278,
+            "amp": 0.00588,
             "spread": 0.8
           },
           {
-            "amp": 0.00239,
+            "amp": 0.00318,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00397,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00217,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00218,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00254,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00272,
             "spread": 0.8
           },
           {
@@ -3642,7 +3666,27 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00175,
+            "amp": 0.00195,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00128,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00135,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00204,
             "spread": 0.8
           },
           {
@@ -3654,43 +3698,11 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00144,
+            "amp": 0.00075,
             "spread": 0.8
           },
           {
-            "amp": 0.00151,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00136,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00119,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00109,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00114,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00065,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00058,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00078,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00054,
+            "amp": 0.00094,
             "spread": 0.8
           },
           {
@@ -3698,185 +3710,15 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00037,
+            "amp": 0.00064,
             "spread": 0.8
           },
           {
-            "amp": 0.00036,
+            "amp": 0.00084,
             "spread": 0.8
           },
           {
-            "amp": 0.00031,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00033,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00047,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00043,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00027,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00029,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00027,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00017,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00017,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00015,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00016,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00018,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0002,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00024,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00022,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00012,
-            "spread": 0.8
-          }
-        ]
-      },
-      {
-        "f0": 342.41,
-        "partialB": 0,
-        "partials": [
-          {
-            "amp": 1,
-            "spread": 0.357
-          },
-          {
-            "amp": 0.49201,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.17599,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0513,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.03174,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.01008,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0061,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00158,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0014,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00061,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00035,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00038,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00049,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00035,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00019,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00036,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0004,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00022,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00017,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00022,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00018,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00058,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00072,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00031,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00026,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00053,
+            "amp": 0.00063,
             "spread": 0.8
           },
           {
@@ -3884,15 +3726,31 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00049,
+            "amp": 0.00053,
             "spread": 0.8
           },
           {
-            "amp": 0.00032,
+            "amp": 0.0003,
             "spread": 0.8
           },
           {
-            "amp": 0.0002,
+            "amp": 0.00047,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00037,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00034,
             "spread": 0.8
           },
           {
@@ -3904,157 +3762,121 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00016,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00034,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00013,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0001,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00013,
-            "spread": 0.8
-          },
-          {
-            "amp": 7e-05,
+            "amp": 0.00022,
             "spread": 0.8
           },
           {
             "amp": 0.00017,
             "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0001,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00014,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 2e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 1e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 1e-05,
-            "spread": 0.8
           }
         ]
       },
       {
-        "f0": 570.936,
-        "partialB": 1.4e-07,
+        "f0": 255.548,
+        "partialB": 7e-08,
         "partials": [
           {
-            "amp": 1,
-            "spread": 0.357
+            "amp": 0.78308,
+            "spread": 0.402
           },
           {
-            "amp": 0.13237,
+            "amp": 1.0,
+            "spread": 0.778
+          },
+          {
+            "amp": 0.33382,
             "spread": 0.8
           },
           {
-            "amp": 0.03304,
+            "amp": 0.15866,
             "spread": 0.8
           },
           {
-            "amp": 0.01758,
+            "amp": 0.06837,
             "spread": 0.8
           },
           {
-            "amp": 0.00394,
+            "amp": 0.03371,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01982,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00922,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0073,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00433,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00484,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00377,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00334,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00349,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00374,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00372,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00253,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00303,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00212,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00169,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00243,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00201,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00113,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00114,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00168,
             "spread": 0.8
           },
           {
@@ -4062,7 +3884,51 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00066,
+            "amp": 0.00098,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00104,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00091,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00063,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00056,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00081,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00042,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00047,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0005,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00036,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00052,
             "spread": 0.8
           },
           {
@@ -4070,7 +3936,15 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.0003,
+            "amp": 0.00023,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00023,
             "spread": 0.8
           },
           {
@@ -4078,11 +3952,137 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00018,
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00022,
             "spread": 0.8
           },
           {
             "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 532.974,
+        "partialB": 1.2e-07,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.402
+          },
+          {
+            "amp": 0.16764,
+            "spread": 0.778
+          },
+          {
+            "amp": 0.05571,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02443,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00588,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00217,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00083,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00032,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00039,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00031,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
             "spread": 0.8
           },
           {
@@ -4098,6 +4098,10 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
             "amp": 9e-05,
             "spread": 0.8
           },
@@ -4106,15 +4110,11 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 6e-05,
+            "amp": 8e-05,
             "spread": 0.8
           },
           {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
+            "amp": 5e-05,
             "spread": 0.8
           },
           {
@@ -4130,19 +4130,7 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
+            "amp": 0.0001,
             "spread": 0.8
           },
           {
@@ -4154,7 +4142,63 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
             "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
             "spread": 0.8
           },
           {
@@ -4166,23 +4210,11 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 4e-05,
+            "amp": 5e-05,
             "spread": 0.8
           },
           {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
+            "amp": 6e-05,
             "spread": 0.8
           },
           {
@@ -4190,7 +4222,19 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 4e-05,
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
             "spread": 0.8
           },
           {
@@ -4198,99 +4242,55 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
             "amp": 1e-05,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           }
         ]
@@ -4298,10 +4298,10 @@ export const MEASURED_PROFILES = {
     ],
     "attackNoise": {
       "level": 0.337,
-      "freq": 741,
+      "freq": 741.0,
       "q": 1.24,
       "decay": 0.191,
-      "measuredBandwidthHz": 292,
+      "measuredBandwidthHz": 292.0,
       "measuredLevelRatio": 0.034
     }
   },

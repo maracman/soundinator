@@ -872,8 +872,11 @@ def robust_mean(vals):
 
 
 def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis],
-                         n_partials: int, min_amp_f0: float = 100.0):
+                         n_partials: int, min_amp_f0: float = 40.0):
     """Combine per-note measurements into one engine-shaped record."""
+    # analyse_note already rejects f0 <= 40 Hz.  The historical 100 Hz
+    # spectral cutoff silently removed the practical low register of horn,
+    # cello, bass voice and future contrabass targets from G1 fitting.
     spec_notes = [n for n in notes if n.f0 >= min_amp_f0]
     if not spec_notes:
         spec_notes = notes

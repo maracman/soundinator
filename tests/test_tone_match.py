@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pytest
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_contract, vowel_from_filename
+from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, validate_corpus_contract, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.iterate import _floor_evidence, _reference_variability
@@ -141,6 +141,18 @@ def test_blown_scoring_does_not_fit_stiff_string_inharmonicity():
     assert blown["inharmonicity_log_ratio"] == 0
     assert string["inharmonicity_log_ratio"] == 1
     assert weights_for_instrument("trumpet", {"noise": .5})["noise"] == .5
+
+
+def test_register_fit_retains_valid_notes_below_100_hz():
+    notes = [_bundle(f0=f0, partials=partials).note for f0, partials in (
+        (60, [1, .1, .05, .02, .01, .005, .002, .001]),
+        (80, [1, .2, .08, .03, .01, .005, .002, .001]),
+        (200, [1, .5, .2, .1, .05, .02, .01, .005]),
+    )]
+    fitted = aggregate_instrument(notes, [], 8)
+    anchors = fitted["partialsByRegister"]
+    assert [row["f0"] for row in anchors] == [60.0, 80.0, 200.0]
+    assert anchors[0]["partials"][1]["amp"] == .1
 
 
 def test_corpus_sidecar_filename_classification():

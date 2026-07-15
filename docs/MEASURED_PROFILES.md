@@ -66,7 +66,7 @@ guitar and piano it is a free-decay estimate.
 | alto saxophone | 96 | 139–856 | 0 | 0.174 / −0.465 | 4.71 / 6.43 | 1.08 | −10.0 |
 | cello | 142 | 65–1505 | 0 | 4.504 / 0.377 | 4.10 / 11.05 | 0.11 | −13.1 |
 | clarinet | 126 | 146–1924 | 0 | 0.180 / −0.220 | 3.41 / 3.74 | 0.45 | −8.2 |
-| French horn | 110 | 56–699 | 2.0e−8 | 0.467 / −0.236 | 4.33 / 5.67 | 1.03 | −9.3 |
+| French horn | 110 | 56–699 | 0 | 0.467 / −0.236 | 4.33 / 5.67 | 1.03 | −15.6 |
 | acoustic guitar | 25 | 59–1424 | 5.83e−5 | 4.849 / 0.827 | — | 2.20 | −9.2 |
 | piano | 23 | 66–1104 | 1.16e−4 | 16.211 / 0.637 | — | 0.03 | −11.3 |
 | trumpet | 107 | 164–1254 | 4.0e−8 | 0.325 / −0.231 | 4.81 / 6.18 | 1.30 | −14.9 |
@@ -92,7 +92,11 @@ guitar and piano it is a free-decay estimate.
   register-dependent tables and the closed-tube construction assertion.
 - **Trumpet and French horn:** the profiles retain their measured dynamic and
   register variation; WP-5 must still prove the nonlinear forte-brightening
-  gate rather than assuming it from the aggregate table.
+  gate rather than assuming it from the aggregate table. The horn refit also
+  removed an obsolete 100 Hz aggregation cutoff: all 110 accepted notes now
+  contribute, including 26 observations below 100 Hz. Its register anchors
+  moved from 163/342/571 Hz to 84/256/533 Hz, so the B1 campaign no longer
+  receives a clamped mid-low spectrum.
 - **Violin and cello:** partial spread remains high because adjacent notes
   move through strong fixed-Hz body resonances. Per-register tables reduce,
   but do not eliminate, that source/body confound.

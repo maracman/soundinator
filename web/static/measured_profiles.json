@@ -2171,7 +2171,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -2183,7 +2183,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–Ab5",
+          "noteSpanFromFilename": "C5\u2013Ab5",
           "vowel": null
         },
         {
@@ -2195,7 +2195,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "Db3–B3",
+          "noteSpanFromFilename": "Db3\u2013B3",
           "vowel": null
         },
         {
@@ -2207,7 +2207,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -2219,7 +2219,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–Ab5",
+          "noteSpanFromFilename": "C5\u2013Ab5",
           "vowel": null
         },
         {
@@ -2231,7 +2231,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "Db3–B3",
+          "noteSpanFromFilename": "Db3\u2013B3",
           "vowel": null
         },
         {
@@ -2243,7 +2243,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -2255,7 +2255,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–Ab5",
+          "noteSpanFromFilename": "C5\u2013Ab5",
           "vowel": null
         },
         {
@@ -2267,7 +2267,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "Db3–B3",
+          "noteSpanFromFilename": "Db3\u2013B3",
           "vowel": null
         },
         {
@@ -2279,7 +2279,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -2291,7 +2291,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C5–Ab5",
+          "noteSpanFromFilename": "C5\u2013Ab5",
           "vowel": null
         },
         {
@@ -2303,7 +2303,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "vib",
-          "noteSpanFromFilename": "Db3–B3",
+          "noteSpanFromFilename": "Db3\u2013B3",
           "vowel": null
         },
         {
@@ -2315,7 +2315,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -2327,7 +2327,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C5–Ab5",
+          "noteSpanFromFilename": "C5\u2013Ab5",
           "vowel": null
         },
         {
@@ -2339,7 +2339,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "Db3–B3",
+          "noteSpanFromFilename": "Db3\u2013B3",
           "vowel": null
         },
         {
@@ -2351,7 +2351,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -2363,7 +2363,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C5–Ab5",
+          "noteSpanFromFilename": "C5\u2013Ab5",
           "vowel": null
         },
         {
@@ -2375,7 +2375,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "vib",
-          "noteSpanFromFilename": "Db3–B3",
+          "noteSpanFromFilename": "Db3\u2013B3",
           "vowel": null
         }
       ]
@@ -5059,7 +5059,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -5071,7 +5071,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–Bb5",
+          "noteSpanFromFilename": "C5\u2013Bb5",
           "vowel": null
         },
         {
@@ -5083,7 +5083,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C2–A2",
+          "noteSpanFromFilename": "C2\u2013A2",
           "vowel": null
         },
         {
@@ -5095,7 +5095,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D3–B3",
+          "noteSpanFromFilename": "D3\u2013B3",
           "vowel": null
         },
         {
@@ -5107,7 +5107,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–C5",
+          "noteSpanFromFilename": "C4\u2013C5",
           "vowel": null
         },
         {
@@ -5119,7 +5119,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–Ab5",
+          "noteSpanFromFilename": "C5\u2013Ab5",
           "vowel": null
         },
         {
@@ -5131,7 +5131,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C2–Ab2",
+          "noteSpanFromFilename": "C2\u2013Ab2",
           "vowel": null
         },
         {
@@ -5143,7 +5143,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D3–B3",
+          "noteSpanFromFilename": "D3\u2013B3",
           "vowel": null
         },
         {
@@ -5155,7 +5155,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "B4–Ab5",
+          "noteSpanFromFilename": "B4\u2013Ab5",
           "vowel": null
         },
         {
@@ -5167,7 +5167,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–Bb4",
+          "noteSpanFromFilename": "C4\u2013Bb4",
           "vowel": null
         },
         {
@@ -5179,7 +5179,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C2–Gb2",
+          "noteSpanFromFilename": "C2\u2013Gb2",
           "vowel": null
         },
         {
@@ -5191,7 +5191,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D3–B3",
+          "noteSpanFromFilename": "D3\u2013B3",
           "vowel": null
         },
         {
@@ -7843,7 +7843,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -7855,7 +7855,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -7867,7 +7867,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         },
         {
@@ -7879,7 +7879,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D3–B3",
+          "noteSpanFromFilename": "D3\u2013B3",
           "vowel": null
         },
         {
@@ -7891,7 +7891,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -7903,7 +7903,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -7915,7 +7915,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         },
         {
@@ -7939,7 +7939,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D3–B3",
+          "noteSpanFromFilename": "D3\u2013B3",
           "vowel": null
         },
         {
@@ -7951,7 +7951,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -7963,7 +7963,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -7975,7 +7975,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         },
         {
@@ -7987,7 +7987,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D3–B3",
+          "noteSpanFromFilename": "D3\u2013B3",
           "vowel": null
         }
       ]
@@ -7996,35 +7996,79 @@
   "french-horn": {
     "partials": [
       {
-        "amp": 1,
-        "spread": 0.357
+        "amp": 1.0,
+        "spread": 0.402
       },
       {
-        "amp": 0.47933,
+        "amp": 0.50426,
+        "spread": 0.778
+      },
+      {
+        "amp": 0.43017,
         "spread": 0.8
       },
       {
-        "amp": 0.15895,
+        "amp": 0.20341,
         "spread": 0.8
       },
       {
-        "amp": 0.07964,
+        "amp": 0.14741,
         "spread": 0.8
       },
       {
-        "amp": 0.0352,
+        "amp": 0.06832,
         "spread": 0.8
       },
       {
-        "amp": 0.01846,
+        "amp": 0.0518,
         "spread": 0.8
       },
       {
-        "amp": 0.00939,
+        "amp": 0.0272,
         "spread": 0.8
       },
       {
-        "amp": 0.00435,
+        "amp": 0.02525,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01622,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01363,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00648,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01252,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01082,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00787,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00579,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00545,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00401,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00486,
         "spread": 0.8
       },
       {
@@ -8032,91 +8076,67 @@
         "spread": 0.8
       },
       {
-        "amp": 0.00187,
+        "amp": 0.00291,
         "spread": 0.8
       },
       {
-        "amp": 0.00157,
+        "amp": 0.00352,
         "spread": 0.8
       },
       {
-        "amp": 0.00098,
+        "amp": 0.00267,
         "spread": 0.8
       },
       {
-        "amp": 0.00109,
+        "amp": 0.00213,
         "spread": 0.8
       },
       {
-        "amp": 0.00099,
+        "amp": 0.00131,
         "spread": 0.8
       },
       {
-        "amp": 0.00057,
+        "amp": 0.0022,
         "spread": 0.8
       },
       {
-        "amp": 0.00096,
+        "amp": 0.00123,
         "spread": 0.8
       },
       {
-        "amp": 0.00116,
+        "amp": 0.00165,
         "spread": 0.8
       },
       {
-        "amp": 0.00191,
+        "amp": 0.00135,
         "spread": 0.8
       },
       {
-        "amp": 0.0019,
+        "amp": 0.00184,
         "spread": 0.8
       },
       {
-        "amp": 0.00185,
+        "amp": 0.00103,
         "spread": 0.8
       },
       {
-        "amp": 0.00127,
+        "amp": 0.00082,
         "spread": 0.8
       },
       {
-        "amp": 0.00091,
+        "amp": 0.00066,
         "spread": 0.8
       },
       {
-        "amp": 0.00095,
+        "amp": 0.00054,
         "spread": 0.8
       },
       {
-        "amp": 0.0008,
+        "amp": 0.00042,
         "spread": 0.8
       },
       {
-        "amp": 0.00064,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00069,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00068,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00059,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00087,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00078,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00062,
+        "amp": 0.00073,
         "spread": 0.8
       },
       {
@@ -8124,15 +8144,43 @@
         "spread": 0.8
       },
       {
-        "amp": 0.00048,
+        "amp": 0.0005,
         "spread": 0.8
       },
       {
-        "amp": 0.00035,
+        "amp": 0.0009,
         "spread": 0.8
       },
       {
-        "amp": 0.00032,
+        "amp": 0.00037,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00031,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00031,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00041,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00056,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00037,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0003,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00031,
         "spread": 0.8
       },
       {
@@ -8140,7 +8188,11 @@
         "spread": 0.8
       },
       {
-        "amp": 0.00029,
+        "amp": 0.0003,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0003,
         "spread": 0.8
       },
       {
@@ -8148,63 +8200,19 @@
         "spread": 0.8
       },
       {
-        "amp": 0.00058,
+        "amp": 0.00038,
         "spread": 0.8
       },
       {
-        "amp": 0.00029,
+        "amp": 0.00026,
         "spread": 0.8
       },
       {
-        "amp": 0.00023,
+        "amp": 0.00024,
         "spread": 0.8
       },
       {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00027,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00034,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00027,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.0002,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00023,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00023,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00022,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.0002,
+        "amp": 0.00026,
         "spread": 0.8
       },
       {
@@ -8212,27 +8220,11 @@
         "spread": 0.8
       },
       {
-        "amp": 0.0002,
+        "amp": 0.00015,
         "spread": 0.8
       },
       {
-        "amp": 0.00013,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00011,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00013,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00013,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00013,
+        "amp": 0.00016,
         "spread": 0.8
       },
       {
@@ -8240,19 +8232,27 @@
         "spread": 0.8
       },
       {
-        "amp": 0.0002,
+        "amp": 0.00017,
         "spread": 0.8
       },
       {
-        "amp": 0.00015,
+        "amp": 0.00024,
         "spread": 0.8
       },
       {
-        "amp": 0.0001,
+        "amp": 0.00026,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00024,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00012,
         "spread": 0.8
       }
     ],
-    "partialB": 2e-08,
+    "partialB": 0.0,
     "partialBByNote": [
       {
         "note": "A#1",
@@ -8267,7 +8267,7 @@
       {
         "note": "C2",
         "f0": 64.67,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C#2",
@@ -8287,7 +8287,7 @@
       {
         "note": "F#2",
         "f0": 91.89,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G2",
@@ -8302,17 +8302,17 @@
       {
         "note": "A2",
         "f0": 108.65,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "A#2",
         "f0": 115.68,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "B2",
         "f0": 123.38,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C3",
@@ -8322,12 +8322,12 @@
       {
         "note": "C#3",
         "f0": 138.91,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D3",
         "f0": 148.34,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D#3",
@@ -8337,17 +8337,17 @@
       {
         "note": "E3",
         "f0": 164.95,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "F3",
         "f0": 175.71,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "F#3",
         "f0": 185.96,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G3",
@@ -8377,7 +8377,7 @@
       {
         "note": "D4",
         "f0": 295.18,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D#4",
@@ -8397,12 +8397,12 @@
       {
         "note": "F#4",
         "f0": 375.04,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G4",
         "f0": 395.78,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G#4",
@@ -8412,7 +8412,7 @@
       {
         "note": "A4",
         "f0": 441.2,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "A#4",
@@ -8422,7 +8422,7 @@
       {
         "note": "B4",
         "f0": 494.78,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C5",
@@ -8442,7 +8442,7 @@
       {
         "note": "D#5",
         "f0": 618.44,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "E5",
@@ -8452,32 +8452,32 @@
       {
         "note": "F5",
         "f0": 699.26,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "A#1",
         "f0": 59.55,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "B1",
         "f0": 61.28,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C2",
         "f0": 64.58,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C#2",
         "f0": 67.63,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D2",
         "f0": 71.76,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D#2",
@@ -8487,17 +8487,17 @@
       {
         "note": "E2",
         "f0": 80.68,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "F2",
         "f0": 86.52,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "F#2",
         "f0": 93.09,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G2",
@@ -8517,17 +8517,17 @@
       {
         "note": "A#2",
         "f0": 116.67,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "B2",
         "f0": 123.37,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C4",
         "f0": 261.85,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C#4",
@@ -8542,7 +8542,7 @@
       {
         "note": "D#4",
         "f0": 311.47,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "E4",
@@ -8557,12 +8557,12 @@
       {
         "note": "G4",
         "f0": 393.36,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G#4",
         "f0": 415.93,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "A4",
@@ -8577,7 +8577,7 @@
       {
         "note": "C#5",
         "f0": 548.39,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D5",
@@ -8587,22 +8587,22 @@
       {
         "note": "D#5",
         "f0": 620.77,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "E5",
         "f0": 659.59,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "F5",
         "f0": 698.59,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "A1",
         "f0": 56.43,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "B1",
@@ -8617,22 +8617,22 @@
       {
         "note": "C#4",
         "f0": 277.98,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D4",
         "f0": 294.71,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D#4",
         "f0": 311.35,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "E4",
         "f0": 331.31,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "F4",
@@ -8647,7 +8647,7 @@
       {
         "note": "G4",
         "f0": 393.28,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G#4",
@@ -8672,17 +8672,17 @@
       {
         "note": "C5",
         "f0": 522.07,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C#5",
         "f0": 551.61,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D5",
         "f0": 583.46,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D#5",
@@ -8692,7 +8692,7 @@
       {
         "note": "E5",
         "f0": 655.17,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "F5",
@@ -8712,22 +8712,22 @@
       {
         "note": "B1",
         "f0": 62.98,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C4",
-        "f0": 263,
-        "B": 0
+        "f0": 263.0,
+        "B": 0.0
       },
       {
         "note": "C5",
         "f0": 526.63,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C4",
         "f0": 262.91,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "C5",
@@ -8742,7 +8742,7 @@
       {
         "note": "C5",
         "f0": 517.88,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "D5",
@@ -8757,7 +8757,7 @@
       {
         "note": "E2",
         "f0": 81.81,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "E2",
@@ -8767,12 +8767,12 @@
       {
         "note": "E2",
         "f0": 82.29,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "E3",
         "f0": 167.92,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "E3",
@@ -8797,141 +8797,165 @@
       {
         "note": "G3",
         "f0": 197.1,
-        "B": 0
+        "B": 0.0
       },
       {
         "note": "G3",
         "f0": 195.68,
-        "B": 0
+        "B": 0.0
       }
     ],
     "partialsByRegister": [
       {
-        "f0": 163.085,
-        "partialB": 0,
+        "f0": 84.421,
+        "partialB": 0.0,
         "partials": [
           {
-            "amp": 0.31443,
-            "spread": 0.357
+            "amp": 0.19314,
+            "spread": 0.402
           },
           {
-            "amp": 1,
+            "amp": 0.37816,
+            "spread": 0.778
+          },
+          {
+            "amp": 0.76016,
             "spread": 0.8
           },
           {
-            "amp": 0.96232,
+            "amp": 0.97708,
             "spread": 0.8
           },
           {
-            "amp": 0.6078,
+            "amp": 1.0,
             "spread": 0.8
           },
           {
-            "amp": 0.36736,
+            "amp": 0.97363,
             "spread": 0.8
           },
           {
-            "amp": 0.28257,
+            "amp": 0.80806,
             "spread": 0.8
           },
           {
-            "amp": 0.15479,
+            "amp": 0.43412,
             "spread": 0.8
           },
           {
-            "amp": 0.13214,
+            "amp": 0.30063,
             "spread": 0.8
           },
           {
-            "amp": 0.10556,
+            "amp": 0.27779,
             "spread": 0.8
           },
           {
-            "amp": 0.09874,
+            "amp": 0.20201,
             "spread": 0.8
           },
           {
-            "amp": 0.07939,
+            "amp": 0.13649,
             "spread": 0.8
           },
           {
-            "amp": 0.06279,
+            "amp": 0.10837,
             "spread": 0.8
           },
           {
-            "amp": 0.04592,
+            "amp": 0.08073,
             "spread": 0.8
           },
           {
-            "amp": 0.03227,
+            "amp": 0.08351,
             "spread": 0.8
           },
           {
-            "amp": 0.03048,
+            "amp": 0.05912,
             "spread": 0.8
           },
           {
-            "amp": 0.0203,
+            "amp": 0.05329,
             "spread": 0.8
           },
           {
-            "amp": 0.01368,
+            "amp": 0.04221,
             "spread": 0.8
           },
           {
-            "amp": 0.01492,
+            "amp": 0.03253,
             "spread": 0.8
           },
           {
-            "amp": 0.01023,
+            "amp": 0.02787,
             "spread": 0.8
           },
           {
-            "amp": 0.00642,
+            "amp": 0.02092,
             "spread": 0.8
           },
           {
-            "amp": 0.00471,
+            "amp": 0.01441,
             "spread": 0.8
           },
           {
-            "amp": 0.00587,
+            "amp": 0.01015,
             "spread": 0.8
           },
           {
-            "amp": 0.0059,
+            "amp": 0.00856,
             "spread": 0.8
           },
           {
-            "amp": 0.00325,
+            "amp": 0.01086,
             "spread": 0.8
           },
           {
-            "amp": 0.00299,
+            "amp": 0.00874,
             "spread": 0.8
           },
           {
-            "amp": 0.00455,
+            "amp": 0.00538,
             "spread": 0.8
           },
           {
-            "amp": 0.00251,
+            "amp": 0.00466,
             "spread": 0.8
           },
           {
-            "amp": 0.00189,
+            "amp": 0.00403,
             "spread": 0.8
           },
           {
-            "amp": 0.0027,
+            "amp": 0.00695,
             "spread": 0.8
           },
           {
-            "amp": 0.00278,
+            "amp": 0.00588,
             "spread": 0.8
           },
           {
-            "amp": 0.00239,
+            "amp": 0.00318,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00397,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00217,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00218,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00254,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00272,
             "spread": 0.8
           },
           {
@@ -8939,7 +8963,27 @@
             "spread": 0.8
           },
           {
-            "amp": 0.00175,
+            "amp": 0.00195,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00128,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00135,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00204,
             "spread": 0.8
           },
           {
@@ -8951,43 +8995,11 @@
             "spread": 0.8
           },
           {
-            "amp": 0.00144,
+            "amp": 0.00075,
             "spread": 0.8
           },
           {
-            "amp": 0.00151,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00136,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00119,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00109,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00114,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00065,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00058,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00078,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00054,
+            "amp": 0.00094,
             "spread": 0.8
           },
           {
@@ -8995,185 +9007,15 @@
             "spread": 0.8
           },
           {
-            "amp": 0.00037,
+            "amp": 0.00064,
             "spread": 0.8
           },
           {
-            "amp": 0.00036,
+            "amp": 0.00084,
             "spread": 0.8
           },
           {
-            "amp": 0.00031,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00033,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00047,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00043,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00027,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00029,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00027,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00017,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00017,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00015,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00016,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00018,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0002,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00024,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00022,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00012,
-            "spread": 0.8
-          }
-        ]
-      },
-      {
-        "f0": 342.41,
-        "partialB": 0,
-        "partials": [
-          {
-            "amp": 1,
-            "spread": 0.357
-          },
-          {
-            "amp": 0.49201,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.17599,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0513,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.03174,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.01008,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0061,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00158,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0014,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00061,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00035,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00038,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00049,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00035,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00019,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00036,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0004,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00022,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00017,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00022,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00018,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00058,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00072,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00031,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00026,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00053,
+            "amp": 0.00063,
             "spread": 0.8
           },
           {
@@ -9181,15 +9023,31 @@
             "spread": 0.8
           },
           {
-            "amp": 0.00049,
+            "amp": 0.00053,
             "spread": 0.8
           },
           {
-            "amp": 0.00032,
+            "amp": 0.0003,
             "spread": 0.8
           },
           {
-            "amp": 0.0002,
+            "amp": 0.00047,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00037,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00034,
             "spread": 0.8
           },
           {
@@ -9201,157 +9059,121 @@
             "spread": 0.8
           },
           {
-            "amp": 0.00016,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00034,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00013,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0001,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00013,
-            "spread": 0.8
-          },
-          {
-            "amp": 7e-05,
+            "amp": 0.00022,
             "spread": 0.8
           },
           {
             "amp": 0.00017,
             "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0001,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00014,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 2e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 5e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 1e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 1e-05,
-            "spread": 0.8
           }
         ]
       },
       {
-        "f0": 570.936,
-        "partialB": 1.4e-07,
+        "f0": 255.548,
+        "partialB": 7e-08,
         "partials": [
           {
-            "amp": 1,
-            "spread": 0.357
+            "amp": 0.78308,
+            "spread": 0.402
           },
           {
-            "amp": 0.13237,
+            "amp": 1.0,
+            "spread": 0.778
+          },
+          {
+            "amp": 0.33382,
             "spread": 0.8
           },
           {
-            "amp": 0.03304,
+            "amp": 0.15866,
             "spread": 0.8
           },
           {
-            "amp": 0.01758,
+            "amp": 0.06837,
             "spread": 0.8
           },
           {
-            "amp": 0.00394,
+            "amp": 0.03371,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01982,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00922,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0073,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00433,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00484,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00377,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00334,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00349,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00374,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00372,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00253,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00303,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00212,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00169,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00243,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00201,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00113,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00114,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00168,
             "spread": 0.8
           },
           {
@@ -9359,7 +9181,51 @@
             "spread": 0.8
           },
           {
-            "amp": 0.00066,
+            "amp": 0.00098,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00104,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00091,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00063,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00056,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00081,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00042,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00047,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0005,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00036,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00052,
             "spread": 0.8
           },
           {
@@ -9367,7 +9233,15 @@
             "spread": 0.8
           },
           {
-            "amp": 0.0003,
+            "amp": 0.00023,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00023,
             "spread": 0.8
           },
           {
@@ -9375,11 +9249,137 @@
             "spread": 0.8
           },
           {
-            "amp": 0.00018,
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00022,
             "spread": 0.8
           },
           {
             "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 532.974,
+        "partialB": 1.2e-07,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.402
+          },
+          {
+            "amp": 0.16764,
+            "spread": 0.778
+          },
+          {
+            "amp": 0.05571,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02443,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00588,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00217,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00083,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00032,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00039,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00031,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
             "spread": 0.8
           },
           {
@@ -9395,6 +9395,10 @@
             "spread": 0.8
           },
           {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
             "amp": 9e-05,
             "spread": 0.8
           },
@@ -9403,15 +9407,11 @@
             "spread": 0.8
           },
           {
-            "amp": 6e-05,
+            "amp": 8e-05,
             "spread": 0.8
           },
           {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
+            "amp": 5e-05,
             "spread": 0.8
           },
           {
@@ -9427,19 +9427,7 @@
             "spread": 0.8
           },
           {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 6e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 4e-05,
+            "amp": 0.0001,
             "spread": 0.8
           },
           {
@@ -9451,7 +9439,63 @@
             "spread": 0.8
           },
           {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
             "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
             "spread": 0.8
           },
           {
@@ -9463,23 +9507,11 @@
             "spread": 0.8
           },
           {
-            "amp": 4e-05,
+            "amp": 5e-05,
             "spread": 0.8
           },
           {
-            "amp": 3e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 9e-05,
-            "spread": 0.8
-          },
-          {
-            "amp": 8e-05,
+            "amp": 6e-05,
             "spread": 0.8
           },
           {
@@ -9487,7 +9519,19 @@
             "spread": 0.8
           },
           {
-            "amp": 4e-05,
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
             "spread": 0.8
           },
           {
@@ -9495,106 +9539,62 @@
             "spread": 0.8
           },
           {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
             "amp": 1e-05,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           },
           {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
-            "spread": 0.8
-          },
-          {
-            "amp": 0,
+            "amp": 0.0,
             "spread": 0.8
           }
         ]
       }
     ],
     "vowelFormants": {},
-    "tailSlopeDbPerOct": -9.3,
+    "tailSlopeDbPerOct": -15.6,
     "material": {
       "t60Ref": 0.467,
       "slope": -0.2359,
@@ -9609,7 +9609,7 @@
     "performance": {
       "envelopeAttack": 0.1122,
       "envelopeAttackSd": 0.0693,
-      "envelopeDecay": 0,
+      "envelopeDecay": 0.0,
       "envelopeSustain": 0.8841,
       "envelopeRelease": 0.1048,
       "vibratoProb": 0.31,
@@ -9624,10 +9624,10 @@
       "microDriftCentsPerSecond": 0.663,
       "attackNoise": {
         "level": 0.337,
-        "freq": 741,
+        "freq": 741.0,
         "q": 1.24,
         "decay": 0.191,
-        "measuredBandwidthHz": 292,
+        "measuredBandwidthHz": 292.0,
         "measuredLevelRatio": 0.034
       }
     },
@@ -9641,7 +9641,7 @@
         "4000": 139.7,
         "8000": 195.8
       },
-      "lowToHighStaggerMs": 96
+      "lowToHighStaggerMs": 96.0
     },
     "notesAnalysed": [
       {
@@ -10199,7 +10199,7 @@
       {
         "file": "phil.french-horn_C4_15_fortissimo_normal.mp3",
         "note": "C4",
-        "f0": 263,
+        "f0": 263.0,
         "percussive": false
       },
       {
@@ -10319,7 +10319,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "Bb1–B1",
+          "noteSpanFromFilename": "Bb1\u2013B1",
           "vowel": null
         },
         {
@@ -10331,7 +10331,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C2–B2",
+          "noteSpanFromFilename": "C2\u2013B2",
           "vowel": null
         },
         {
@@ -10343,7 +10343,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C3–B3",
+          "noteSpanFromFilename": "C3\u2013B3",
           "vowel": null
         },
         {
@@ -10355,7 +10355,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -10367,7 +10367,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–F5",
+          "noteSpanFromFilename": "C5\u2013F5",
           "vowel": null
         },
         {
@@ -10379,7 +10379,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "Bb1–B1",
+          "noteSpanFromFilename": "Bb1\u2013B1",
           "vowel": null
         },
         {
@@ -10391,7 +10391,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C2–B2",
+          "noteSpanFromFilename": "C2\u2013B2",
           "vowel": null
         },
         {
@@ -10403,7 +10403,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -10415,7 +10415,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–F5",
+          "noteSpanFromFilename": "C5\u2013F5",
           "vowel": null
         },
         {
@@ -10427,7 +10427,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "Bb1–B1",
+          "noteSpanFromFilename": "Bb1\u2013B1",
           "vowel": null
         },
         {
@@ -10439,7 +10439,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -10451,7 +10451,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–F5",
+          "noteSpanFromFilename": "C5\u2013F5",
           "vowel": null
         },
         {
@@ -12100,7 +12100,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–B2",
+          "noteSpanFromFilename": "E2\u2013B2",
           "vowel": null
         },
         {
@@ -12112,7 +12112,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "G3–B3",
+          "noteSpanFromFilename": "G3\u2013B3",
           "vowel": null
         },
         {
@@ -12124,7 +12124,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–Bb5",
+          "noteSpanFromFilename": "C5\u2013Bb5",
           "vowel": null
         },
         {
@@ -12136,7 +12136,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E4–B4",
+          "noteSpanFromFilename": "E4\u2013B4",
           "vowel": null
         },
         {
@@ -12148,7 +12148,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–B2",
+          "noteSpanFromFilename": "E2\u2013B2",
           "vowel": null
         },
         {
@@ -12160,7 +12160,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "G3–B3",
+          "noteSpanFromFilename": "G3\u2013B3",
           "vowel": null
         },
         {
@@ -12172,7 +12172,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -12184,7 +12184,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E4–B4",
+          "noteSpanFromFilename": "E4\u2013B4",
           "vowel": null
         },
         {
@@ -12196,7 +12196,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–B2",
+          "noteSpanFromFilename": "E2\u2013B2",
           "vowel": null
         },
         {
@@ -12208,7 +12208,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "G3–B3",
+          "noteSpanFromFilename": "G3\u2013B3",
           "vowel": null
         },
         {
@@ -16373,7 +16373,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -16385,7 +16385,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -16397,7 +16397,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C6–Eb6",
+          "noteSpanFromFilename": "C6\u2013Eb6",
           "vowel": null
         },
         {
@@ -16409,7 +16409,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "E3–B3",
+          "noteSpanFromFilename": "E3\u2013B3",
           "vowel": null
         },
         {
@@ -16421,7 +16421,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -16433,7 +16433,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -16445,7 +16445,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C6–D6",
+          "noteSpanFromFilename": "C6\u2013D6",
           "vowel": null
         },
         {
@@ -16457,7 +16457,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "E3–B3",
+          "noteSpanFromFilename": "E3\u2013B3",
           "vowel": null
         },
         {
@@ -16469,7 +16469,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -16481,7 +16481,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -16493,7 +16493,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C6–Eb6",
+          "noteSpanFromFilename": "C6\u2013Eb6",
           "vowel": null
         },
         {
@@ -16505,7 +16505,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "E3–B3",
+          "noteSpanFromFilename": "E3\u2013B3",
           "vowel": null
         },
         {
@@ -16517,7 +16517,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -16529,7 +16529,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         },
         {
@@ -16541,7 +16541,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -16553,7 +16553,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C6–D6",
+          "noteSpanFromFilename": "C6\u2013D6",
           "vowel": null
         },
         {
@@ -16565,7 +16565,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "E3–B3",
+          "noteSpanFromFilename": "E3\u2013B3",
           "vowel": null
         },
         {
@@ -16577,7 +16577,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C4–B4",
+          "noteSpanFromFilename": "C4\u2013B4",
           "vowel": null
         }
       ]
@@ -19052,7 +19052,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–Db6",
+          "noteSpanFromFilename": "C5\u2013Db6",
           "vowel": null
         },
         {
@@ -19064,7 +19064,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D4–B4",
+          "noteSpanFromFilename": "D4\u2013B4",
           "vowel": null
         },
         {
@@ -19076,7 +19076,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C6–Gb7",
+          "noteSpanFromFilename": "C6\u2013Gb7",
           "vowel": null
         },
         {
@@ -19088,7 +19088,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "G3–B3",
+          "noteSpanFromFilename": "G3\u2013B3",
           "vowel": null
         },
         {
@@ -19100,7 +19100,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–C6",
+          "noteSpanFromFilename": "C5\u2013C6",
           "vowel": null
         },
         {
@@ -19112,7 +19112,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D4–A4",
+          "noteSpanFromFilename": "D4\u2013A4",
           "vowel": null
         },
         {
@@ -19124,7 +19124,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C6–Gb7",
+          "noteSpanFromFilename": "C6\u2013Gb7",
           "vowel": null
         },
         {
@@ -19136,7 +19136,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "G3–B3",
+          "noteSpanFromFilename": "G3\u2013B3",
           "vowel": null
         },
         {
@@ -19148,7 +19148,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "C5–A5",
+          "noteSpanFromFilename": "C5\u2013A5",
           "vowel": null
         },
         {
@@ -19160,7 +19160,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "D4–Bb4",
+          "noteSpanFromFilename": "D4\u2013Bb4",
           "vowel": null
         },
         {
@@ -19172,7 +19172,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "Ab6–B7",
+          "noteSpanFromFilename": "Ab6\u2013B7",
           "vowel": null
         },
         {
@@ -19184,7 +19184,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "G3–B3",
+          "noteSpanFromFilename": "G3\u2013B3",
           "vowel": null
         },
         {
@@ -20891,7 +20891,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.long_tones.pp.m1_long_pp_a.wav",
@@ -20904,7 +20904,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.long_tones.straight.m1_long_straight_a.wav",
@@ -20917,7 +20917,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.long_tones.straight.m1_long_straight_e.wav",
@@ -20930,7 +20930,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "e",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.long_tones.straight.m1_long_straight_i.wav",
@@ -20943,7 +20943,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "i",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.long_tones.straight.m1_long_straight_o.wav",
@@ -20956,7 +20956,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "o",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.long_tones.straight.m1_long_straight_u.wav",
@@ -20969,7 +20969,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "u",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.slow_forte.m1_scales_c_slow_forte_a.wav",
@@ -20982,7 +20982,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.slow_forte.m1_scales_f_slow_forte_a.wav",
@@ -20995,7 +20995,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.slow_piano.m1_scales_c_slow_piano_a.wav",
@@ -21008,7 +21008,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.slow_piano.m1_scales_f_slow_piano_a.wav",
@@ -21021,7 +21021,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.straight.m1_scales_straight_a.wav",
@@ -21034,7 +21034,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.straight.m1_scales_straight_e.wav",
@@ -21047,7 +21047,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "e",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.straight.m1_scales_straight_i.wav",
@@ -21060,7 +21060,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "i",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.straight.m1_scales_straight_o.wav",
@@ -21073,7 +21073,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "o",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.straight.m1_straight_tone_scales_u.wav",
@@ -21086,7 +21086,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E1",
           "vowel": "u",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male1.scales.vibrato.m1_scales_vibrato_a.wav",
@@ -21099,7 +21099,7 @@
           "vibrato": "vib",
           "noteSpanFromFilename": "E1",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.long_tones.forte.m5_long_forte_a.wav",
@@ -21112,7 +21112,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.long_tones.pp.m5_long_pp_a.wav",
@@ -21125,7 +21125,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.long_tones.straight.m5_long_straight_a.wav",
@@ -21138,7 +21138,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.long_tones.straight.m5_long_straight_e.wav",
@@ -21151,7 +21151,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "e",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.long_tones.straight.m5_long_straight_i.wav",
@@ -21164,7 +21164,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "i",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.long_tones.straight.m5_long_straight_o.wav",
@@ -21177,7 +21177,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "o",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.long_tones.straight.m5_long_straight_u.wav",
@@ -21190,7 +21190,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "u",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.slow_forte.m5_scales_c_slow_forte_a.wav",
@@ -21203,7 +21203,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.slow_forte.m5_scales_f_slow_forte_a.wav",
@@ -21216,7 +21216,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.slow_piano.m5_scales_c_slow_piano_a.wav",
@@ -21229,7 +21229,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.slow_piano.m5_scales_f_slow_piano_a.wav",
@@ -21242,7 +21242,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.straight.m5_scales_straight_a.wav",
@@ -21255,7 +21255,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.straight.m5_scales_straight_e.wav",
@@ -21268,7 +21268,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "e",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.straight.m5_scales_straight_i.wav",
@@ -21281,7 +21281,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "i",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.straight.m5_scales_straight_o.wav",
@@ -21294,7 +21294,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "o",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.straight.m5_scales_straight_u.wav",
@@ -21307,7 +21307,7 @@
           "vibrato": "ordinary",
           "noteSpanFromFilename": "E5",
           "vowel": "u",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         },
         {
           "file": "vocalset.male5.scales.vibrato.m5_scales_vibrato_a.wav",
@@ -21320,7 +21320,7 @@
           "vibrato": "vib",
           "noteSpanFromFilename": "E5",
           "vowel": "a",
-          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for §9.1"
+          "selectionBasis": "lowest stable male pair; standard-bass stepping stone for \u00a79.1"
         }
       ]
     }
@@ -22868,7 +22868,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "f",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22881,7 +22881,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22894,7 +22894,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22907,7 +22907,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "e",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22920,7 +22920,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "i",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22933,7 +22933,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "o",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22946,7 +22946,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "u",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22959,7 +22959,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "f",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22972,7 +22972,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "f",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22985,7 +22985,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "p",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -22998,7 +22998,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "p",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23011,7 +23011,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23024,7 +23024,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "e",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23037,7 +23037,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "i",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23050,7 +23050,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "o",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23063,7 +23063,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "u",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23076,7 +23076,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "vib",
-          "noteSpanFromFilename": "E2–F2",
+          "noteSpanFromFilename": "E2\u2013F2",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23089,7 +23089,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "f",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23102,7 +23102,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23115,7 +23115,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23128,7 +23128,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "e",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23141,7 +23141,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "i",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23154,7 +23154,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "o",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23167,7 +23167,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "u",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23180,7 +23180,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "f",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23193,7 +23193,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "f",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23206,7 +23206,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "p",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23219,7 +23219,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "p",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23232,7 +23232,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23245,7 +23245,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "e",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23258,7 +23258,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "i",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23271,7 +23271,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "o",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23284,7 +23284,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "ordinary",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "u",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         },
@@ -23297,7 +23297,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "unspecified",
           "vibrato": "vib",
-          "noteSpanFromFilename": "E6–F6",
+          "noteSpanFromFilename": "E6\u2013F6",
           "vowel": "a",
           "selectionBasis": "lower female pair; mezzo-soprano proxy selected from measured usable range"
         }
@@ -27144,7 +27144,7 @@
       }
     ],
     "provenance": {
-      "source": "University of Iowa Electronic Music Studios — Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
+      "source": "University of Iowa Electronic Music Studios \u2014 Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
       "licence": "Free and unrestricted use (as stated on the MIS website)",
       "dynamic": "mf",
       "recording": "anechoic chamber, Neumann KM 84 microphones (per MIS documentation)",
@@ -27158,7 +27158,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "B3–B4",
+          "noteSpanFromFilename": "B3\u2013B4",
           "vowel": null
         },
         {
@@ -27170,7 +27170,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -27182,7 +27182,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         },
         {
@@ -27194,7 +27194,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "B3–B4",
+          "noteSpanFromFilename": "B3\u2013B4",
           "vowel": null
         },
         {
@@ -27206,7 +27206,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -27218,7 +27218,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         },
         {
@@ -27230,7 +27230,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "B3–B4",
+          "noteSpanFromFilename": "B3\u2013B4",
           "vowel": null
         },
         {
@@ -27242,7 +27242,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "B4–Bb5",
+          "noteSpanFromFilename": "B4\u2013Bb5",
           "vowel": null
         },
         {
@@ -27254,7 +27254,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "nonvib",
-          "noteSpanFromFilename": "C6–Bb6",
+          "noteSpanFromFilename": "C6\u2013Bb6",
           "vowel": null
         },
         {
@@ -27266,7 +27266,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "vib",
-          "noteSpanFromFilename": "B3–B4",
+          "noteSpanFromFilename": "B3\u2013B4",
           "vowel": null
         },
         {
@@ -27278,7 +27278,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -27290,7 +27290,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "ff",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         },
         {
@@ -27302,7 +27302,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "B3–B4",
+          "noteSpanFromFilename": "B3\u2013B4",
           "vowel": null
         },
         {
@@ -27314,7 +27314,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -27326,7 +27326,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "mf",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         },
         {
@@ -27338,7 +27338,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "vib",
-          "noteSpanFromFilename": "B3–B4",
+          "noteSpanFromFilename": "B3\u2013B4",
           "vowel": null
         },
         {
@@ -27350,7 +27350,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C5–B5",
+          "noteSpanFromFilename": "C5\u2013B5",
           "vowel": null
         },
         {
@@ -27362,7 +27362,7 @@
           "downloaded": "2026-07-15",
           "dynamic": "pp",
           "vibrato": "vib",
-          "noteSpanFromFilename": "C6–B6",
+          "noteSpanFromFilename": "C6\u2013B6",
           "vowel": null
         }
       ],
@@ -28735,7 +28735,7 @@
       }
     ],
     "provenance": {
-      "source": "University of Iowa Electronic Music Studios — Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
+      "source": "University of Iowa Electronic Music Studios \u2014 Musical Instrument Samples (MIS), theremin.music.uiowa.edu",
       "licence": "Free and unrestricted use (as stated on the MIS website)",
       "dynamic": "mf",
       "recording": "anechoic chamber, Neumann KM 84 microphones (per MIS documentation)",
