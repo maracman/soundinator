@@ -43,7 +43,13 @@ def analyse_audio_samples(
     mono = np.asarray(samples, dtype=float)
     if mono.ndim != 1:
         mono = np.mean(mono, axis=-1)
-    note = analyse_note(_strongest_segment(mono, sample_rate), sample_rate, name, n_partials)
+    # A fitted soft render may intentionally be flute-like or breathy with
+    # only two resolved low partials.  Corpus fitting keeps the stricter
+    # five-partial noise rejection; paired scoring already has a known file,
+    # stable f0 and reference, so accepting two prevents valid candidates
+    # from crashing an optimiser session.
+    note = analyse_note(_strongest_segment(mono, sample_rate), sample_rate, name,
+                        n_partials, min_detected_partials=2)
     if note is None:
         raise ValueError(f"no stable pitched note detected in {name}")
     return note

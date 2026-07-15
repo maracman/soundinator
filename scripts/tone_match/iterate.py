@@ -161,8 +161,9 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("".join(lines), encoding="utf-8")
 
 
-def _params(manifest: dict, initial: dict, only: set[str] | None) -> list[FreeParam]:
-    result = []
+def _params(manifest: dict, initial: dict, only: list[str] | None) -> list[FreeParam]:
+    """Resolve free parameters while retaining an explicit campaign order."""
+    result: dict[str, FreeParam] = {}
     excitation = initial.get("excitationType")
     family = initial.get("sg2Family")
     for row in manifest["continuous"]:
@@ -171,9 +172,11 @@ def _params(manifest: dict, initial: dict, only: set[str] | None) -> list[FreePa
         applies = row.get("appliesTo")
         if applies and excitation not in applies and family not in applies:
             continue
-        result.append(FreeParam(row["key"], float(row["min"]), float(row["max"]),
-                                float(initial.get(row["key"], row["default"]))))
-    return result
+        result[row["key"]] = FreeParam(row["key"], float(row["min"]), float(row["max"]),
+                                       float(initial.get(row["key"], row["default"])))
+    if only:
+        return [result[key] for key in dict.fromkeys(only) if key in result]
+    return list(result.values())
 
 
 class ToneMatcher:
@@ -300,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
     variability = _reference_variability(references)
-    only = set(args.keys.split(",")) if args.keys else None
+    only = list(dict.fromkeys(key.strip() for key in args.keys.split(",") if key.strip())) if args.keys else None
     free = _params(manifest, initial, only)
     if not free:
         raise SystemExit("no applicable free parameters")
