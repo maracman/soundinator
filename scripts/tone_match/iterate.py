@@ -27,7 +27,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
-from .score import extract_features, score_files, write_report
+from .score import compare_features, extract_features, score_files, write_report
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
@@ -43,6 +43,122 @@ class FreeParam:
 
 def _load(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
+
+
+def _floor_group(reference: dict[str, Any]) -> str:
+    """Group alternate takes only when pitch, dynamic and articulation agree."""
+    if reference.get("floorGroup"):
+        return str(reference["floorGroup"])
+    dynamic = reference.get("dynamic")
+    if dynamic is None and reference.get("velocity") is not None:
+        dynamic = round(float(reference["velocity"]), 3)
+    return "|".join(str(value) for value in (
+        reference.get("midi"), dynamic, reference.get("articulation", "normal"),
+        reference.get("vibrato", "ordinary"),
+    ))
+
+
+def _reference_variability(references: list[dict[str, Any]], feature_loader=extract_features) -> dict[str, Any]:
+    """Measure same-note/same-dynamic take-to-take feature distance."""
+    groups: dict[str, list[int]] = {}
+    for index, reference in enumerate(references):
+        groups.setdefault(_floor_group(reference), []).append(index)
+    eligible = {key: indices for key, indices in groups.items() if len(indices) >= 2}
+    if not eligible:
+        return {"status": "insufficient-evidence", "groups": [], "eligibleReferences": 0,
+                "reason": "no same-pitch/same-dynamic group contains at least two takes"}
+    cache = {index: feature_loader(references[index]["path"])
+             for indices in eligible.values() for index in indices}
+    rows = []
+    for key, indices in sorted(eligible.items()):
+        pairs = []
+        for offset, left in enumerate(indices):
+            for right in indices[offset + 1:]:
+                result = compare_features(cache[left], cache[right])
+                pairs.append({"left": left, "right": right, "composite": result["composite"],
+                              "features": result["features"], "normalized": result["normalized"]})
+        feature_keys = pairs[0]["features"]
+        rows.append({
+            "group": key,
+            "referenceIndices": indices,
+            "pairCount": len(pairs),
+            "floorComposite": float(np.median([row["composite"] for row in pairs])),
+            "floorFeatures": {name: float(np.median([row["features"][name] for row in pairs]))
+                              for name in feature_keys},
+            "pairs": pairs,
+        })
+    return {"status": "measured", "groups": rows,
+            "eligibleReferences": sum(len(row["referenceIndices"]) for row in rows)}
+
+
+def _floor_evidence(variability: dict[str, Any], best: dict[str, Any]) -> dict[str, Any]:
+    """Compare the best render against each measured reference-variability group."""
+    if variability["status"] != "measured":
+        return variability
+    groups = []
+    for group in variability["groups"]:
+        render_values = [best["scores"][index]["composite"] for index in group["referenceIndices"]]
+        render_composite = float(np.mean(render_values))
+        floor_composite = float(group["floorComposite"])
+        groups.append({**group, "renderComposite": render_composite,
+                       "ratioToFloor": render_composite / max(floor_composite, 1e-12),
+                       "atOrBelowFloor": render_composite <= floor_composite})
+    construction_passed = bool(best.get("construction", {}).get("passed"))
+    demonstrated = construction_passed and all(row["atOrBelowFloor"] for row in groups)
+    return {"status": "demonstrated" if demonstrated else "above-floor",
+            "constructionPassed": construction_passed, "groups": groups,
+            "eligibleReferences": variability["eligibleReferences"]}
+
+
+def _dominant_residual(best: dict[str, Any]) -> dict[str, Any] | None:
+    scores = best.get("scores", [])
+    if not scores:
+        return None
+    keys = scores[0].get("normalized", {})
+    means = {key: float(np.mean([score["normalized"][key] for score in scores])) for key in keys}
+    if not means:
+        return None
+    key = max(means, key=means.get)
+    return {"feature": key, "meanPerceptualUnits": means[key]}
+
+
+def _file_work_item(instrument: str, run_dir: Path, factor: str, action: str) -> Path:
+    path = DEFAULT_RUN_ROOT / instrument / "work-items.json"
+    payload = _load(path) if path.exists() else {"instrument": instrument, "items": []}
+    payload["items"].append({"run": run_dir.name, "limitingFactor": factor,
+                             "proposedFix": action, "filedAt": time.time(), "status": "open"})
+    path.write_text(json.dumps(payload, indent=2) + "\n")
+    return path
+
+
+def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
+    floor = summary["referenceVariabilityFloor"]
+    lines = [f"# SG2 run report — {summary['instrument']} / {summary['run']}\n\n",
+             f"Session outcome: **{summary['sessionOutcome']['state']}**  \n",
+             f"Baseline loss: `{summary['baselineLoss']:.6f}`  \n",
+             f"Best loss: `{summary['bestLoss']:.6f}`  \n",
+             f"Improvement: `{summary['improvement']:.6f}`  \n",
+             f"Construction gate: `{'pass' if summary['constructionPassed'] else 'fail'}`  \n",
+             f"Reference-variability status: `{floor['status']}`\n\n"]
+    if floor.get("groups"):
+        lines.extend(["## Reference-variability evidence\n\n",
+                      "| Same-note/dynamic group | Take↔take floor | Render↔reference | Ratio | At/below |\n",
+                      "|---|---:|---:|---:|:---:|\n"])
+        for group in floor["groups"]:
+            lines.append(f"| `{group['group']}` | {group['floorComposite']:.4f} | "
+                         f"{group.get('renderComposite', math.nan):.4f} | "
+                         f"{group.get('ratioToFloor', math.nan):.3f} | "
+                         f"{'yes' if group.get('atOrBelowFloor') else 'no'} |\n")
+    if summary.get("dominantResidual"):
+        residual = summary["dominantResidual"]
+        lines.extend(["\n## Dominant residual\n\n",
+                      f"`{residual['feature']}` at `{residual['meanPerceptualUnits']:.4f}` perceptual units.\n"])
+    outcome = summary["sessionOutcome"]
+    if outcome["state"] == "limiting-factor":
+        lines.extend(["\n## Filed limiting factor\n\n",
+                      f"Factor: {outcome['limitingFactor']}\n\n",
+                      f"Fix: {outcome['workItem']}\n"])
+    path.write_text("".join(lines), encoding="utf-8")
 
 
 def _params(manifest: dict, initial: dict, only: set[str] | None) -> list[FreeParam]:
@@ -138,17 +254,21 @@ def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
     return rows
 
 
-def _update_leaderboard(instrument: str, run_dir: Path, best: dict) -> bool:
+def _update_leaderboard(instrument: str, run_dir: Path, best: dict) -> tuple[bool, float | None]:
     board_path = DEFAULT_RUN_ROOT / instrument / "leaderboard.json"
     board_path.parent.mkdir(parents=True, exist_ok=True)
     board = _load(board_path) if board_path.exists() else {"instrument": instrument, "runs": []}
-    entry = {"run": run_dir.name, "loss": best["loss"], "params": best["params"], "time": time.time()}
+    previous = board.get("best")
+    previous_loss = float(previous["loss"]) if previous and "loss" in previous else None
+    entry = {"run": run_dir.name, "loss": best["loss"], "params": best["params"], "time": time.time(),
+             "constructionPassed": bool(best.get("construction", {}).get("passed")),
+             "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0))}
     board["runs"].append(entry)
-    board["runs"].sort(key=lambda row: row["loss"])
+    board["runs"].sort(key=lambda row: (row.get("constructionFailures", 0), row["loss"]))
     improved = board["runs"][0]["run"] == run_dir.name
     board["best"] = board["runs"][0]
     board_path.write_text(json.dumps(board, indent=2) + "\n")
-    return improved
+    return improved, previous_loss
 
 
 def _append_ledger(instrument: str, run_dir: Path, best: dict, sensitivity: dict) -> None:
@@ -173,8 +293,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--budget", type=int, default=200)
     parser.add_argument("--run", default=time.strftime("%Y%m%d-%H%M%S"))
     parser.add_argument("--skip-sensitivity", action="store_true")
+    parser.add_argument("--limiting-factor", help="evidenced plateau cause when this run neither improves nor reaches the floor")
+    parser.add_argument("--work-item", help="concrete fix to file for --limiting-factor")
     args = parser.parse_args(argv)
     initial, references, manifest = _load(args.initial), _load(args.references), _load(args.manifest)
+    if bool(args.limiting_factor) != bool(args.work_item):
+        parser.error("--limiting-factor and --work-item must be supplied together")
+    variability = _reference_variability(references)
     only = set(args.keys.split(",")) if args.keys else None
     free = _params(manifest, initial, only)
     if not free:
@@ -191,16 +316,35 @@ def main(argv: list[str] | None = None) -> int:
                       options={"maxfev": max(1, args.budget - 1), "ftol": .01, "xtol": .002})
     best = matcher.best or {"loss": baseline, "params": initial}
     sensitivity = {} if args.skip_sensitivity else _sensitivity(matcher, best)
+    best = matcher.best or best
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
-    improved = _update_leaderboard(args.instrument, run_dir, best)
+    improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best)
     if improved:
         _append_ledger(args.instrument, run_dir, best, sensitivity)
-    summary = {"baselineLoss": baseline, "bestLoss": best["loss"], "improvement": baseline - best["loss"],
+    floor = _floor_evidence(variability, best)
+    measurable_improvement = improved and baseline - best["loss"] > 1e-6
+    if floor["status"] == "demonstrated":
+        outcome = {"state": "reference-variability-floor"}
+    elif measurable_improvement:
+        outcome = {"state": "improvement"}
+    elif args.limiting_factor and args.work_item:
+        item_path = _file_work_item(args.instrument, run_dir, args.limiting_factor, args.work_item)
+        outcome = {"state": "limiting-factor", "limitingFactor": args.limiting_factor,
+                   "workItem": args.work_item, "workItemFile": str(item_path)}
+    else:
+        outcome = {"state": "invalid-stop",
+                   "reason": "no leaderboard improvement, floor demonstration, or filed limiting factor"}
+    summary = {"instrument": args.instrument, "run": run_dir.name,
+               "baselineLoss": baseline, "bestLoss": best["loss"], "improvement": baseline - best["loss"],
                "evaluations": len(matcher.evaluations), "optimizer": {"success": bool(result.success), "message": str(result.message)},
-               "leaderboardImproved": improved}
+               "leaderboardImproved": improved, "previousBestLoss": previous_best_loss,
+               "constructionPassed": bool(best.get("construction", {}).get("passed")),
+               "referenceVariabilityFloor": floor, "dominantResidual": _dominant_residual(best),
+               "sessionOutcome": outcome}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    _write_run_report(run_dir / "RUN_REPORT.md", summary)
     print(json.dumps({"runDir": str(run_dir), **summary}, indent=2))
-    return 0
+    return 2 if outcome["state"] == "invalid-stop" else 0
 
 
 if __name__ == "__main__":

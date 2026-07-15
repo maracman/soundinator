@@ -7,6 +7,7 @@ import pytest
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, validate_corpus_contract
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
+from scripts.tone_match.iterate import _floor_evidence, _reference_variability
 from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time
 
 
@@ -87,3 +88,39 @@ def test_corpus_contract_requires_both_uppercase_sidecars(tmp_path):
     (folder / "PROVENANCE.json").write_text(json.dumps({"source": "public corpus"}))
     (folder / "COVERAGE.md").write_text("# Coverage\n\nlow/mf\n")
     assert validate_corpus_contract(str(tmp_path)) == ["clarinet"]
+
+
+def test_reference_variability_floor_uses_only_matching_take_groups():
+    bundles = {
+        "take-a": _bundle(partials=[1, .2, .7, .1, .4, .08]),
+        "take-b": _bundle(partials=[1, .3, .6, .16, .35, .1]),
+        "loud": _bundle(partials=[1, .5, .8, .4, .7, .3]),
+    }
+    references = [
+        {"path": "take-a", "midi": 57, "dynamic": "mf"},
+        {"path": "take-b", "midi": 57, "dynamic": "mf"},
+        {"path": "loud", "midi": 57, "dynamic": "f"},
+    ]
+    variability = _reference_variability(references, bundles.__getitem__)
+    assert variability["status"] == "measured"
+    assert len(variability["groups"]) == 1
+    assert variability["groups"][0]["referenceIndices"] == [0, 1]
+    assert variability["groups"][0]["floorComposite"] > 0
+
+    quiet_render = {"scores": [{"composite": 0.0}, {"composite": 0.0}, {"composite": 99.0}],
+                    "construction": {"passed": True}}
+    evidence = _floor_evidence(variability, quiet_render)
+    assert evidence["status"] == "demonstrated"
+    assert evidence["groups"][0]["atOrBelowFloor"]
+
+    bad_render = {"scores": [{"composite": 99.0}, {"composite": 99.0}, {"composite": 0.0}],
+                  "construction": {"passed": True}}
+    assert _floor_evidence(variability, bad_render)["status"] == "above-floor"
+
+
+def test_reference_variability_floor_requires_alternate_takes():
+    result = _reference_variability(
+        [{"path": "only", "midi": 60, "dynamic": "mf"}],
+        lambda _: _bundle(),
+    )
+    assert result["status"] == "insufficient-evidence"

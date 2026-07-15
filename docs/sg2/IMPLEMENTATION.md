@@ -74,6 +74,16 @@ penalty, and best-candidate selection ranks construction failures before raw
 perceptual loss. Reference manifests must label every row with `register` and
 either `dynamic` or `velocity`.
 
+Reference manifests may include multiple takes of the same pitch/dynamic.
+Give them the same optional `floorGroup` (otherwise MIDI, dynamic,
+articulation and vibrato labels define the group). The optimiser writes
+`referenceVariabilityFloor` evidence to `summary.json` and a readable
+`RUN_REPORT.md`. A run may exit successfully only after a leaderboard
+improvement, a per-group render distance at or below the take-to-take floor,
+or an evidenced plateau supplied with both `--limiting-factor` and a concrete
+`--work-item`; the latter is filed in the instrument's external
+`work-items.json`. An unqualified plateau exits nonzero as `invalid-stop`.
+
 The reference recordings are public corpus inputs (Iowa MIS, Philharmonia and
 VocalSet) stored outside git. Tenor sax uses the approved modelling-synth gap
 path; boy soprano uses a found reference or the dossier's approved morphology
