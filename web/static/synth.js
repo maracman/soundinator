@@ -1214,6 +1214,25 @@ export function registerAttackStaggerAt(anchors, fundamentalHz) {
   return lo.lowToHighStaggerMs + (upper.lowToHighStaggerMs - lo.lowToHighStaggerMs) * t;
 }
 
+/** Interpolate an explicitly fitted envelope-attack table by register. */
+export function registerEnvelopeAttackAt(anchors, fundamentalHz) {
+  if (!Array.isArray(anchors) || anchors.length === 0) return null;
+  const rows = anchors.map(row => ({
+    f0: row?.f0,
+    attack: Number.isFinite(row?.attack) ? row.attack : row?.envelopeAttack,
+  })).filter(row => Number.isFinite(row.f0) && row.f0 > 0 && Number.isFinite(row.attack))
+    .sort((a, b) => a.f0 - b.f0);
+  if (!rows.length) return null;
+  const f0 = Math.max(1, Number(fundamentalHz) || rows[0].f0);
+  if (rows.length === 1 || f0 <= rows[0].f0) return rows[0].attack;
+  if (f0 >= rows[rows.length - 1].f0) return rows[rows.length - 1].attack;
+  let hi = 1;
+  while (hi < rows.length && rows[hi].f0 < f0) hi++;
+  const lo = rows[hi - 1], upper = rows[hi];
+  const t = (Math.log(f0) - Math.log(lo.f0)) / (Math.log(upper.f0) - Math.log(lo.f0));
+  return lo.attack + (upper.attack - lo.attack) * t;
+}
+
 /** Resolve a measured onset transient. Explicit pinned fields win; absent
  * fields preserve the profile exactly, so existing presets are unchanged. */
 export function resolveAttackNoise(profileNoise, params = {}, fundamentalHz = null) {
@@ -2238,7 +2257,7 @@ export class GenerationEngine {
         };
         // the base joins the sync: replace its independent draw with the
         // shared trigger applied around the base's own means
-        Object.assign(out, this._envelopeShared(sharedEnv, this.p));
+        Object.assign(out, this._envelopeShared(sharedEnv, this.p, fittedFrequency));
       }
       out.layerRenders = this.p.layers.map((layer, i) =>
         this._layerRender(layer, i, velocity, fittedFrequency, note.degree, note.formantPos, out, sharedEnv));
@@ -2300,7 +2319,7 @@ export class GenerationEngine {
       ...this._toneColourImperfection(),
       ...this._vibratoParams(),
       ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
-      ...this._envelopeVariation(),
+      ...this._envelopeVariation(fundamentalHz),
     };
   }
 
@@ -2309,14 +2328,17 @@ export class GenerationEngine {
   // magnitude of the variation (SD) is shared across base + layers (owner
   // 07-07: "it will have to be the same SDs for all of them"); only the
   // baseline means stay per-stream.
-  _envelopeShared(shared, p) {
+  _envelopeShared(shared, p, fundamentalHz = null) {
     const sample = (mean, sd, lo, hi, z) => {
       const base = this._clamp(mean, lo, hi);
       if (!shared.vary || sd <= 0) return base;
       return this._clamp(base + z * sd, lo, hi);
     };
+    const registerAttack = registerEnvelopeAttackAt(
+      p.envelopeAttackByRegister, fundamentalHz);
     return {
-      envelopeAttack: sample(p.envelopeAttack ?? 0.008, shared.sd.a, 0.001, 0.18, shared.z.a),
+      envelopeAttack: sample(registerAttack ?? p.envelopeAttack ?? 0.008,
+        shared.sd.a, 0.001, 0.18, shared.z.a),
       envelopeDecay: sample(p.envelopeDecay ?? 0.04, shared.sd.d, 0.001, 0.5, shared.z.d),
       envelopeSustain: sample(p.envelopeSustain ?? 0.6, shared.sd.s, 0.05, 1, shared.z.s),
       envelopeRelease: sample(p.envelopeRelease ?? 0.08, shared.sd.r, 0.004, 0.6, shared.z.r),
@@ -2335,7 +2357,8 @@ export class GenerationEngine {
         ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
         // synced: the shared trigger around THIS layer's own baselines;
         // otherwise an independent draw
-        ...(sharedEnv ? this._envelopeShared(sharedEnv, this.p) : this._envelopeVariation()),
+        ...(sharedEnv ? this._envelopeShared(sharedEnv, this.p, fundamentalHz) :
+          this._envelopeVariation(fundamentalHz)),
       };
     } finally {
       this.p = saved;
@@ -2630,15 +2653,18 @@ export class GenerationEngine {
     return Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : lo));
   }
 
-  _envelopeVariation() {
+  _envelopeVariation(fundamentalHz = null) {
     const vary = this.rng.next() < (this.p.envelopeProb ?? 0);
     const sample = (mean, sd, lo, hi) => {
       const base = this._clamp(mean, lo, hi);
       if (!vary || sd <= 0) return base;
       return this._clamp(base + this._gaussian() * sd, lo, hi);
     };
+    const registerAttack = registerEnvelopeAttackAt(
+      this.p.envelopeAttackByRegister, fundamentalHz);
     return {
-      envelopeAttack: sample(this.p.envelopeAttack ?? 0.008, this.p.envelopeAttackSd ?? 0.006, 0.001, 0.18),
+      envelopeAttack: sample(registerAttack ?? this.p.envelopeAttack ?? 0.008,
+        this.p.envelopeAttackSd ?? 0.006, 0.001, 0.18),
       envelopeDecay: sample(this.p.envelopeDecay ?? 0.04, this.p.envelopeDecaySd ?? 0.018, 0.001, 0.5),
       envelopeSustain: sample(this.p.envelopeSustain ?? 0.6, this.p.envelopeSustainSd ?? 0.08, 0.05, 1),
       envelopeRelease: sample(this.p.envelopeRelease ?? 0.08, this.p.envelopeReleaseSd ?? 0.035, 0.004, 0.6),

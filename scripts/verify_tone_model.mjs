@@ -24,6 +24,7 @@ import {
   attackNoiseVelocityGain,
   registerAttackNoiseAt,
   registerAttackStaggerAt,
+  registerEnvelopeAttackAt,
   resolveAttackNoise,
   registerProfileAt,
   humanFluctuationTrace,
@@ -80,6 +81,11 @@ console.log("WP-3 register attack timing");
     registerAttackStaggerAt(anchors, 800) === 0);
   check("French horn profile carries three measured register timing anchors",
     SPECTRAL_PROFILES["french-horn"].attackByRegister?.length === 3);
+  check("register envelope attack is neutral when absent and interpolates",
+    registerEnvelopeAttackAt([], 160) === null &&
+    near(registerEnvelopeAttackAt([
+      { f0: 80, attack: .16 }, { f0: 320, attack: .08 },
+    ], 160), .12, 1e-9));
 }
 
 console.log("T-B3: stiff-string inharmonicity law");

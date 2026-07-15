@@ -352,6 +352,7 @@ export const DEFAULTS = {
   attackNoiseDirect: 0,
   attackNoiseVelocityExponent: 1,
   attackNoiseByRegister: [],
+  envelopeAttackByRegister: [],
   arpStep: 2,
   arpOctaves: 1,
   intervalRange: 7,
