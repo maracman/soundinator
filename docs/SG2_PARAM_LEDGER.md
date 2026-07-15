@@ -29,3 +29,29 @@ reference-variability floor is already demonstrated. Playback compression is
 separate: `spectralCullThreshold = 0.002` adds `0.2264 dB` mel distance while
 meeting the construction and resource tripwires; the full 64-partial fit is
 retained in the external run dossier.
+
+## clarinet — wp5-clarinet-pass1
+
+Composite loss: `3.832757` on reference set `08fb213770122ba8`, improved from
+the corrected-engine baseline `4.066620`. All nine construction assertions
+passed and all five eligible same-note/dynamic groups reached the measured
+reference-variability floor. The tightest group is middle-register `pp` at
+`0.9991×` its take-to-take floor.
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseLevel` | 1.000000 | -0.000078 |
+| `breathNoiseColor` | 0.000000 | -0.016883 |
+| `dynamicBlare` | 0.000000 | -0.001408 |
+| `excitationHuman` | 0.500000 | 0.013784 |
+| `excitationPosition` | 0.150000 | 0.053647 |
+| `partialTilt` | 0.000000 | 0.107363 |
+| `partialTransfer` | 0.050000 | 0.026097 |
+| `spectralResonanceAmount` | 0.350000 | 0.001492 |
+| `toneBreath` | 0.030000 | 0.000019 |
+
+This run also corrected the construction mapping that preceded fitting:
+`closedTube` retains the passive `1:3:5…` bore-mode law, while measured
+radiated partial tables are indexed on integer output harmonics. That change
+made the dossier-required high-register even-partial rise possible instead of
+misplacing every measured table entry after the fundamental.
