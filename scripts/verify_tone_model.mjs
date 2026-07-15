@@ -22,6 +22,7 @@ import {
   twoStageDecayPlan,
   attackNoiseRouting,
   attackNoiseVelocityGain,
+  resolveAttackNoise,
   registerProfileAt,
   humanFluctuationTrace,
   humanPartialShape,
@@ -639,6 +640,16 @@ console.log("CH-B2: onset-noise level scaling");
     base.attackNoise && Math.abs(base.attackNoise.level - fpAt(undefined ?? 1).attackNoise.level) < 1e-9);
   check("onset noise at 0 = silent transient, at 2 = doubled",
     off.attackNoise.level === 0 && Math.abs(loud.attackNoise.level - base.attackNoise.level * 2) < 1e-9);
+  const measured = { freq: 1400, q: 2.1, decay: .08, level: .3, bandT90ms: [5, 8] };
+  const legacy = resolveAttackNoise(measured, {});
+  const pinned = resolveAttackNoise(measured, {
+    attackNoiseFreq: 620, attackNoiseQ: 1.25, attackNoiseDecay: .23, attackNoiseLevel: .5,
+  });
+  check("absent pinned transient fields preserve the measured profile exactly",
+    JSON.stringify(legacy) === JSON.stringify(measured));
+  check("explicit pinned transient fields reach the renderer without losing metadata",
+    pinned.freq === 620 && pinned.q === 1.25 && pinned.decay === .23 &&
+    Math.abs(pinned.level - .15) < 1e-12 && pinned.bandT90ms === measured.bandT90ms);
 }
 
 console.log("P3: note connection — glide vs ring on overlap");

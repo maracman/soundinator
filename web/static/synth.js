@@ -1172,6 +1172,21 @@ export function attackNoiseVelocityGain(velocity, exponent = 1) {
   return Math.pow(v, e);
 }
 
+/** Resolve a measured onset transient. Explicit pinned fields win; absent
+ * fields preserve the profile exactly, so existing presets are unchanged. */
+export function resolveAttackNoise(profileNoise, params = {}) {
+  if (!profileNoise) return null;
+  const levelScale = Math.max(0, Math.min(2,
+    Number.isFinite(params.attackNoiseLevel) ? params.attackNoiseLevel : 1));
+  return {
+    ...profileNoise,
+    freq: Number.isFinite(params.attackNoiseFreq) ? params.attackNoiseFreq : profileNoise.freq,
+    q: Number.isFinite(params.attackNoiseQ) ? params.attackNoiseQ : profileNoise.q,
+    decay: Number.isFinite(params.attackNoiseDecay) ? params.attackNoiseDecay : profileNoise.decay,
+    level: profileNoise.level * levelScale,
+  };
+}
+
 // ── Tone model v2: the Human dial (T3, §3.1) ──
 //
 // One seeded fluctuation per note stands in for the player: bow pressure /
@@ -2488,13 +2503,9 @@ export class GenerationEngine {
     });
     return {
       harmonicPartials: partials,
-      attackNoise: (() => {
-        const an = profile.performance?.attackNoise;
-        if (!an) return null;
-        // CH-B2: user-scalable onset transient (1 = the instrument's own)
-        const lvl = this._clamp(this.p.attackNoiseLevel ?? 1, 0, 2);
-        return lvl === 1 ? an : { ...an, level: an.level * lvl };
-      })(),
+      // Shape/frequency/decay are pinned by the measurement campaign. The
+      // profile remains the exact fallback for legacy presets.
+      attackNoise: resolveAttackNoise(profile.performance?.attackNoise, this.p),
       attackNoiseDirect: this._clamp(this.p.attackNoiseDirect ?? 0, 0, 1),
       attackNoiseVelocityExponent: this._clamp(this.p.attackNoiseVelocityExponent ?? 1, 0, 2),
       // Q8 attack stagger: measured low→high onset spread when the profile
