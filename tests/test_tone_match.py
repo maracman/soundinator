@@ -154,6 +154,25 @@ def test_blown_scoring_does_not_fit_stiff_string_inharmonicity():
     assert weights_for_instrument("trumpet", {"noise": .5})["noise"] == .5
 
 
+def test_horn_checklist_requires_register_onset_evidence():
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, velocity)
+               for register in ("low", "mid", "high")
+               for dynamic, velocity in (("pp", .2), ("ff", .92))]
+    base = {
+        "excitationType": "blow", "resonatorClass": "conicalTube",
+        "dynamicBlare": .25, "attackNoiseDirect": 1,
+        "attackNoiseVelocityExponent": .99,
+    }
+    missing = evaluate_construction("french-horn", samples, params=base)
+    by_id = {row["id"]: row for row in missing["assertions"]}
+    assert by_id["french-horn.register-onset-law"]["status"] == "fail"
+    anchors = [{"f0": f0, "levelScale": 1} for f0 in (62, 262, 523)]
+    fitted = evaluate_construction(
+        "french-horn", samples, params={**base, "attackNoiseByRegister": anchors})
+    by_id = {row["id"]: row for row in fitted["assertions"]}
+    assert by_id["french-horn.register-onset-law"]["status"] == "pass"
+
+
 def test_register_fit_retains_valid_notes_below_100_hz():
     notes = [_bundle(f0=f0, partials=partials).note for f0, partials in (
         (60, [1, .1, .05, .02, .01, .005, .002, .001]),
@@ -175,4 +194,3 @@ def test_corpus_sidecar_filename_classification():
     assert _vowel("m3_long_straight_u.wav") == "u"
     assert _vowel("AltoSax.NoVib.ff.C4B4.aiff") is None
     assert vowel_from_filename("vocalset.m3.long.m3_long_straight_i.wav") == "i"
-

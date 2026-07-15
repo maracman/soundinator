@@ -279,6 +279,14 @@ def evaluate_construction(
             rows.append(_result("french-horn.soft-onset-law", "Soft horn attacks retain a measured lip transient",
                                 None if exponent is None else float(exponent) < 1, exponent,
                                 "attackNoiseVelocityExponent < 1", strict_evidence=strict_evidence))
+            onset_registers = _param(params, "attackNoiseByRegister")
+            valid_onset_registers = [row for row in onset_registers
+                                     if isinstance(row, dict) and isinstance(row.get("f0"), (int, float))] \
+                if isinstance(onset_registers, list) else []
+            rows.append(_result("french-horn.register-onset-law",
+                                "Lip-transient shape follows the measured register",
+                                len(valid_onset_registers) >= 3, len(valid_onset_registers),
+                                "at least 3 attackNoiseByRegister anchors", strict_evidence=strict_evidence))
 
     if name in {"violin", "cello"}:
         b_values = [s.render.note.B for s in sample_list if s.render.note.B is not None]
