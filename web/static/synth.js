@@ -1165,6 +1165,13 @@ export function attackNoiseRouting(amount = 0) {
   return { envelopeGain: 1 - directGain, directGain };
 }
 
+/** Velocity law for the independently measured onset transient. */
+export function attackNoiseVelocityGain(velocity, exponent = 1) {
+  const v = Math.max(0, Math.min(1, Number(velocity) || 0));
+  const e = Math.max(0, Math.min(2, Number.isFinite(exponent) ? exponent : 1));
+  return Math.pow(v, e);
+}
+
 // ── Tone model v2: the Human dial (T3, §3.1) ──
 //
 // One seeded fluctuation per note stands in for the player: bow pressure /
@@ -2489,6 +2496,7 @@ export class GenerationEngine {
         return lvl === 1 ? an : { ...an, level: an.level * lvl };
       })(),
       attackNoiseDirect: this._clamp(this.p.attackNoiseDirect ?? 0, 0, 1),
+      attackNoiseVelocityExponent: this._clamp(this.p.attackNoiseVelocityExponent ?? 1, 0, 2),
       // Q8 attack stagger: measured low→high onset spread when the profile
       // carries one (hand defaults per excitation type apply otherwise)
       attackStaggerMs: profile.performance?.lowToHighStaggerMs ?? null,
@@ -4825,7 +4833,8 @@ export class SynthEngine {
     bp.frequency.setValueAtTime(Math.max(80, an.freq || 2000), t0);
     bp.Q.value = Math.max(0.3, an.q || 1);
     const g = this.ctx.createGain();
-    const peak = Math.max(0.0001, note.velocity * (an.level || 0.2) * 0.3);
+    const velocityGain = attackNoiseVelocityGain(note.velocity, note.attackNoiseVelocityExponent);
+    const peak = Math.max(0.0001, velocityGain * (an.level || 0.2) * 0.3);
     const decay = Math.max(0.015, an.decay || 0.05);
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(peak, t0 + 0.005);

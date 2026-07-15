@@ -557,6 +557,7 @@ const PARAM_DESC = {
   tempo: "Playback speed in beats per minute",
   attackNoiseLevel: "Scales the instrument's onset transient (bow scratch, breath chiff, hammer thump): 0 = removed, 1 = as measured/designed, 2 = exaggerated",
   attackNoiseDirect: "Lets the measured onset transient use its own fast envelope instead of being suppressed by the sustained note ADSR; 0 preserves legacy routing, 1 is fully independent",
+  attackNoiseVelocityExponent: "Shapes onset-noise response to velocity: 1 is the legacy linear law, lower values retain more measured transient at soft dynamics",
   melodyPattern: "How the melody chooses notes: Walk = the probabilistic interval walk shaped by the dials below; Arp = a deterministic cycle over a fixed set of in-scale notes (up, down, or up-and-down) — rhythm, rests, dynamics and surprise still apply on top",
   arpStep: "Arp stride in scale steps: 2 = every other scale note (thirds, triad-like), 3 = wider voicings, 1 = a scale run",
   arpOctaves: "How many octaves the arp cycle spans before it wraps",
@@ -8918,7 +8919,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent",
     "dynamicBlare","decaySecondStage","decaySecondRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
@@ -14240,6 +14241,7 @@ function chInspectorHTML(p) {
           ${controlRow("velocityHardnessCoupling", "Velocity → hardness", p.velocityHardnessCoupling ?? 0, 0, 1, 0.01)}
           ${controlRow("breathNoiseColor", "Air-noise colour", p.breathNoiseColor ?? 0, -1, 1, 0.01)}
           ${controlRow("attackNoiseDirect", "Independent onset", p.attackNoiseDirect ?? 0, 0, 1, 0.01)}
+          ${controlRow("attackNoiseVelocityExponent", "Onset velocity curve", p.attackNoiseVelocityExponent ?? 1, 0, 2, 0.01)}
         </div>
       </details>
       <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>

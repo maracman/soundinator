@@ -275,6 +275,10 @@ def evaluate_construction(
             rows.append(_result("french-horn.independent-onset", "Measured lip transient is not masked by the sustained ADSR",
                                 None if direct is None else float(direct) > 0, direct,
                                 "attackNoiseDirect > 0", strict_evidence=strict_evidence))
+            exponent = _param(params, "attackNoiseVelocityExponent")
+            rows.append(_result("french-horn.soft-onset-law", "Soft horn attacks retain a measured lip transient",
+                                None if exponent is None else float(exponent) < 1, exponent,
+                                "attackNoiseVelocityExponent < 1", strict_evidence=strict_evidence))
 
     if name in {"violin", "cello"}:
         b_values = [s.render.note.B for s in sample_list if s.render.note.B is not None]

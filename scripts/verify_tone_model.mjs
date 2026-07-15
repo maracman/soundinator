@@ -21,6 +21,7 @@ import {
   velocityHardness,
   twoStageDecayPlan,
   attackNoiseRouting,
+  attackNoiseVelocityGain,
   registerProfileAt,
   humanFluctuationTrace,
   humanPartialShape,
@@ -241,6 +242,10 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     attackNoiseRouting(0).envelopeGain === 1 && attackNoiseRouting(0).directGain === 0);
   check("measured onset can opt into its own fast envelope",
     attackNoiseRouting(1).envelopeGain === 0 && attackNoiseRouting(1).directGain === 1);
+  check("onset velocity exponent is neutral at one",
+    near(attackNoiseVelocityGain(.2, 1), .2, 1e-12));
+  check("lower onset exponent retains more soft transient",
+    attackNoiseVelocityGain(.2, .25) > attackNoiseVelocityGain(.2, 1));
 }
 
 console.log("T2: engine excitation transform (normalised against profile default)");
