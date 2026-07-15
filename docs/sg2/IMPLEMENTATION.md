@@ -61,6 +61,16 @@ floor, or the session records a measurable improvement or a named limiting
 factor with a concrete follow-up work item. Human A/B/X audition is deferred to
 the capstone and does not block fitting or preset freezing.
 
+Construction assertions live in `scripts/tone_match/assertions.py`; the four
+evidence dossiers in this directory define their physical meaning and source
+thresholds. `score.py --instrument ... --params ...` reports note-local checks
+and marks unavailable cross-note evidence `not-applicable`. `iterate.py` runs
+the same checklist in strict campaign mode: missing register/dynamic/preset
+evidence is a failure, every failure receives a separate hard objective
+penalty, and best-candidate selection ranks construction failures before raw
+perceptual loss. Reference manifests must label every row with `register` and
+either `dynamic` or `velocity`.
+
 The reference recordings are public corpus inputs (Iowa MIS, Philharmonia and
 VocalSet) stored outside git. Tenor sax uses the approved modelling-synth gap
 path; boy soprano uses a found reference or the dossier's approved morphology

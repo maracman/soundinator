@@ -26,7 +26,8 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
-from .score import score_files, write_report
+from .assertions import ConstructionSample, evaluate_construction
+from .score import extract_features, score_files, write_report
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
@@ -90,19 +91,36 @@ class ToneMatcher:
                                  cwd=ROOT, text=True, capture_output=True)
         if process.returncode:
             raise RuntimeError(process.stderr or process.stdout)
-        scores = [score_files(ref["path"], job["out"]) for ref, job in zip(self.references, jobs)]
+        scores = [score_files(ref["path"], job["out"], instrument=self.instrument, params=params,
+                              context={"register": ref.get("register"), "dynamic": ref.get("dynamic"),
+                                       "velocity": ref.get("velocity")})
+                  for ref, job in zip(self.references, jobs)]
+        construction_samples = [
+            ConstructionSample(render=extract_features(job["out"]), reference=extract_features(ref["path"]),
+                               register=ref.get("register"), dynamic=ref.get("dynamic"),
+                               velocity=ref.get("velocity"))
+            for ref, job in zip(self.references, jobs)
+        ]
+        construction = evaluate_construction(self.instrument, construction_samples, params=params,
+                                             strict_evidence=True)
         loss = float(np.mean([row["composite"] for row in scores]))
+        # Construction is a hard gate, not another feature that a low
+        # composite can average away.  The large objective penalty guides
+        # Powell back into a valid topology while reports retain raw loss.
+        gate_penalty = 100.0 * construction["counts"]["fail"]
+        objective = loss + gate_penalty
         record = {"evaluation": index, "loss": loss, "params": {p.key: params[p.key] for p in self.free},
-                  "scores": scores}
+                  "objective": objective, "construction": construction, "scores": scores}
         self.evaluations.append(record)
         (self.run_dir / "loss_curve.json").write_text(json.dumps(self.evaluations, indent=2) + "\n")
-        if self.best is None or loss < self.best["loss"]:
-            self.best = {"loss": loss, "params": params, "evaluation": index, "scores": scores}
+        if self.best is None or (construction["counts"]["fail"], loss) < (self.best["construction"]["counts"]["fail"], self.best["loss"]):
+            self.best = {"loss": loss, "objective": objective, "params": params, "evaluation": index,
+                         "construction": construction, "scores": scores}
             (self.run_dir / "best.json").write_text(json.dumps(self.best, indent=2) + "\n")
         if not retain_audio and self.best and self.best["evaluation"] != index:
             for job in jobs:
                 Path(job["out"]).unlink(missing_ok=True)
-        return loss
+        return objective
 
 
 def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
@@ -113,7 +131,8 @@ def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
         losses = []
         for sign in (-1, 1):
             trial = base.copy(); trial[index] = np.clip(trial[index] + sign * span, spec.lo, spec.hi)
-            losses.append(matcher.evaluate(trial))
+            matcher.evaluate(trial)
+            losses.append(matcher.evaluations[-1]["loss"])
         rows[spec.key] = {"minus": losses[0], "plus": losses[1],
                           "increase": float(np.mean(losses) - best["loss"])}
     return rows
@@ -166,7 +185,8 @@ def main(argv: list[str] | None = None) -> int:
     matcher = ToneMatcher(args.instrument, initial, references, free, run_dir)
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
-    baseline = matcher.evaluate(x0, retain_audio=True)
+    matcher.evaluate(x0, retain_audio=True)
+    baseline = matcher.evaluations[0]["loss"]
     result = minimize(matcher.evaluate, x0, method="Powell", bounds=bounds,
                       options={"maxfev": max(1, args.budget - 1), "ftol": .01, "xtol": .002})
     best = matcher.best or {"loss": baseline, "params": initial}

@@ -151,8 +151,29 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
             "composite": float(composite), "refF0": ref.note.f0, "renderF0": render.note.f0}
 
 
-def score_files(ref_path: str | Path, render_path: str | Path, weights: dict[str, float] | None = None) -> dict[str, Any]:
-    return compare_features(extract_features(ref_path), extract_features(render_path), weights)
+def score_files(
+    ref_path: str | Path,
+    render_path: str | Path,
+    weights: dict[str, float] | None = None,
+    *,
+    instrument: str | None = None,
+    params: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    ref = extract_features(ref_path)
+    render = extract_features(render_path)
+    result = compare_features(ref, render, weights)
+    if instrument:
+        # Local import avoids an import cycle: assertions operates on the
+        # FeatureBundle defined by this module.
+        from .assertions import ConstructionSample, evaluate_construction
+        context = context or {}
+        sample = ConstructionSample(render=render, reference=ref,
+                                    register=context.get("register"), dynamic=context.get("dynamic"),
+                                    velocity=context.get("velocity"))
+        result["construction"] = evaluate_construction(
+            instrument, [sample], params=params, strict_evidence=False)
+    return result
 
 
 def write_report(path: str | Path, result: dict[str, Any], ref_path: str, render_path: str) -> None:
@@ -173,11 +194,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ref", required=True)
     parser.add_argument("--render", required=True)
     parser.add_argument("--weights", help="JSON file overriding feature weights")
+    parser.add_argument("--instrument", help="also run the matching dossier checklist")
+    parser.add_argument("--params", help="preset JSON used by topology assertions")
+    parser.add_argument("--register")
+    parser.add_argument("--dynamic")
+    parser.add_argument("--velocity", type=float)
     parser.add_argument("--json", dest="json_path")
     parser.add_argument("--report")
     args = parser.parse_args(argv)
     weights = json.loads(Path(args.weights).read_text()) if args.weights else None
-    result = score_files(args.ref, args.render, weights)
+    params = json.loads(Path(args.params).read_text()) if args.params else None
+    result = score_files(args.ref, args.render, weights, instrument=args.instrument, params=params,
+                         context={"register": args.register, "dynamic": args.dynamic, "velocity": args.velocity})
     output = json.dumps(result, indent=2)
     print(output)
     if args.json_path:
