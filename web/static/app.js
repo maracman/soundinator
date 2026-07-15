@@ -634,6 +634,7 @@ const PARAM_DESC = {
   spectralProb: "Chance that each new note samples every harmonic amplitude from its mean/SD distribution. Otherwise it uses the means; Hold drift handles changes during a held note",
   spectralMix: "How strongly the harmonic tone print is mixed into the tone",
   spectralPartials: "Number of harmonic partials in the tone print",
+  spectralCullThreshold: "Playback-only audibility floor for weak upper modes; the first eight modes are always retained and the fitted print is unchanged",
   spectralSpread: "Global scale for each harmonic's amplitude distribution",
   spectralDynamicAmount: "How strongly note dynamics reshape each harmonic amplitude",
   spectralRegisterAmount: "How strongly note range reshapes each harmonic amplitude",
@@ -14279,6 +14280,7 @@ function chInspectorHTML(p) {
           ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
           ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
           ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
+          ${controlRow("spectralCullThreshold", "Cull floor", p.spectralCullThreshold ?? 0.0005, 0.0001, 0.01, 0.0001)}
         </div>
         <div class="subsection-label">Octave groups</div>
         <div class="controls-grid">

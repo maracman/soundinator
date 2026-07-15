@@ -508,6 +508,8 @@ export const DEFAULTS = {
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
+  // Renderer-only audibility floor; fitted prints remain full resolution.
+  spectralCullThreshold: 0.0005,
   spectralSpread: 0.45,
   spectralPartialMeans: null,
   spectralPartialSds: null,

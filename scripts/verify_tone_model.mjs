@@ -13,6 +13,7 @@ import {
   positionComb,
   hardnessRolloff,
   usesFreeDecay,
+  partialIsAudible,
   excitationSpectrum,
   dynamicBrightness,
   glottalSourceGain,
@@ -113,6 +114,9 @@ console.log("T-B2: material damping is a law over real Hz");
   check("free decay applies to impulse-driven excitations only",
     usesFreeDecay("strike") && usesFreeDecay("pluck") &&
     !usesFreeDecay("bow") && !usesFreeDecay("blow"));
+  check("compression cull is neutral by default and preserves modes 1-8",
+    partialIsAudible(0.0005, 1, 9) && !partialIsAudible(0.00049, 1, 9) &&
+    partialIsAudible(0, 1, 8, 0.01));
 }
 
 console.log("Resonator ratio tables");

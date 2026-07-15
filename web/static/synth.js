@@ -1106,6 +1106,11 @@ export function usesFreeDecay(excitationType) {
   return excitationType === "strike" || excitationType === "pluck";
 }
 
+/** Per-preset renderer cull; the first eight construction modes are sacred. */
+export function partialIsAudible(amp, norm, harmonic, threshold = 0.0005) {
+  return harmonic <= 8 || Math.max(0, amp) / Math.max(0.001, norm) >= threshold;
+}
+
 export function excitationSpectrum(type, n, { position = 0.5, hardness = 0.6, freqHz = n * 261.63 } = {}) {
   return excitationDrive(type, n) * positionComb(n, position) * hardnessRolloff(freqHz, hardness, type);
 }
@@ -2480,6 +2485,7 @@ export class GenerationEngine {
       bodyBands,
       bodyAmount: resonanceAmount,
       spectralReferenceNorm: Math.max(0.001, referenceNorm),
+      spectralCullThreshold: this._clamp(this.p.spectralCullThreshold ?? 0.0005, 0.0001, 0.01),
       spectralStretchCents: this.p.spectralStretchCents ?? 0,
       // Tone v2 resonator (T1): inharmonicity as a physical B constant
       // (new param wins; legacy cents map onto it) and the mode ratio class.
@@ -4617,7 +4623,8 @@ export class SynthEngine {
       if (freq > this.ctx.sampleRate * 0.45 || freq > 16000) return;
       // Audibility cull: partials that can never rise above ~-66 dB of the
       // print are dead weight (typical live set stays at 20-40 oscillators).
-      if (Math.max(part.amp, part.mean) / norm < 0.0005 && harmonic > 8) return;
+      if (!partialIsAudible(Math.max(part.amp, part.mean), norm, harmonic,
+                            note.spectralCullThreshold)) return;
       const osc = this.ctx.createOscillator();
       osc.type = "sine";
       this._setFrequency(osc.frequency, freq, t0, note, multiplier);
