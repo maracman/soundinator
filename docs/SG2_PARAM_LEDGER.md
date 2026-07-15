@@ -87,3 +87,34 @@ The shipping playback variant uses `spectralCullThreshold = 0.0006`: 23
 oscillators and 230 automation events/note, both within 1.25× the current
 factory medians. It adds `0.2108 dB` mean mel distance versus the full fit and
 preserves every construction assertion and both measured-floor groups.
+
+## flute — wp5-flute-pass1
+
+Composite loss: `4.134439`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseLevel` | 1.695930318309064 | 0.000215 |
+| `breathNoiseColor` | 0.17102302745352282 | 0.002085 |
+| `excitationHuman` | 0.6463232212150435 | 0.011840 |
+| `excitationPosition` | 0.27160207847800744 | 0.121688 |
+| `partialTilt` | 0.0 | 0.316496 |
+| `partialTransfer` | 0.0 | 0.015301 |
+| `spectralResonanceAmount` | 0.35 | 0.001674 |
+| `toneBreath` | 0.2784344436125379 | 0.000001 |
+
+## flute — wp5-flute-pass2
+
+Composite loss: `3.917010`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseDirect` | 0.30284110384850393 | not run |
+| `attackNoiseLevel` | 1.6640631626276137 | not run |
+| `attackNoiseVelocityExponent` | 0.001056068160506296 | not run |
+| `breathNoiseColor` | 0.17102302745352282 | not run |
+| `excitationHuman` | 0.6463232212150435 | not run |
+| `excitationPosition` | 0.27160207847800744 | not run |
+| `partialTilt` | 0.0 | not run |
+| `partialTransfer` | 0.0 | not run |
+| `spectralResonanceAmount` | 0.35 | not run |

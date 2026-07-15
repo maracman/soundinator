@@ -115,3 +115,8 @@ Low-forte and both high-register groups reached their variability floors;
 low-soft (1.1741×), mid-forte (1.0412×), and mid-soft (1.2017×) remain open.
 The corrected weighted residual report identifies spectral centroid—not the
 zero-weight stiff-string diagnostic—as the next refinement target.
+
+A focused onset-law pass then improved flute again from 4.1344 to 3.9170.
+`attackNoiseVelocityExponent ≈ 0.0011` and 30% independent transient routing
+closed the low-soft floor without weakening construction. Mid-forte is now
+1.0420× floor and mid-soft 1.1805×; those two groups keep the campaign open.
