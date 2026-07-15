@@ -14,6 +14,10 @@ import {
   hardnessRolloff,
   excitationSpectrum,
   dynamicBrightness,
+  glottalSourceGain,
+  velocityHardness,
+  twoStageDecayPlan,
+  registerProfileAt,
   humanFluctuationTrace,
   humanPartialShape,
   transferCoupling,
@@ -187,6 +191,37 @@ console.log("T2: drive spectra, hardness, dynamic brightness");
     near(excitationSpectrum("pluck", 2, { position: 0.5, hardness: 1 }), 0, 1e-9));
   check("dynamic brightness grows with mode number",
     dynamicBrightness(1) === 0.5 && dynamicBrightness(8) > dynamicBrightness(4) && dynamicBrightness(32) > 2);
+}
+
+console.log("Sound Generator 2.0 neutral engine extensions");
+{
+  const mock = { partials: [{ amp: 0.8, spread: 0.2 }], performance: { partialB: 1e-4 },
+    partialsByRegister: [
+      { f0: 110, partialB: 1e-4, partials: [{ amp: 1, spread: 0.2 }] },
+      { f0: 440, partialB: 4e-4, partials: [{ amp: 0.2, spread: 0.4 }] },
+    ] };
+  const mid = registerProfileAt(mock, 220);
+  check("G1 register spectra interpolate in log-f0 space",
+    near(mid.partials[0].amp, 0.6, 1e-12) && near(mid.partialB, 2.5e-4, 1e-12));
+  check("G1 absent register tables preserve the profile table",
+    registerProfileAt({ partials: mock.partials }, 220).partials === mock.partials);
+  check("G2 conical tube carries the full harmonic series",
+    [1, 2, 3, 8].every(n => resonatorRatio("conicalTube", n) === n));
+  check("G3 blare is neutral at zero and enriches forte",
+    dynamicBrightness(16, 0, 1.5) === dynamicBrightness(16) &&
+    dynamicBrightness(16, 1, 1.5) > dynamicBrightness(16));
+  const ordinary = twoStageDecayPlan(1000, 0.6, 0, 8);
+  const double = twoStageDecayPlan(1000, 0.6, 1, 4);
+  check("G4 second decay stage is neutral at zero",
+    near(ordinary.earlyT60, ordinary.lateT60, 1e-12));
+  check("G4 opted-in late decay outlasts the early stage",
+    near(double.lateT60, double.earlyT60 * 4, 1e-12));
+  check("G6 glottal source tilt is neutral at zero and darkens upper partials",
+    glottalSourceGain(16, 0) === 1 && glottalSourceGain(16, 0.8) < glottalSourceGain(2, 0.8));
+  check("G7 velocity-hardness coupling is neutral at zero",
+    velocityHardness(0.6, 1, 0) === 0.6);
+  check("G7 harder velocity brightens an opted-in strike",
+    velocityHardness(0.6, 1, 1) > velocityHardness(0.6, 0.2, 1));
 }
 
 console.log("T2: engine excitation transform (normalised against profile default)");

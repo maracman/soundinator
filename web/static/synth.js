@@ -896,6 +896,9 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
     dyn: hand[i]?.dyn ?? +((hand[last]?.dyn ?? 0) + dynSlope * (i - last)).toFixed(2),
     ...(hand[i]?.reg !== undefined ? { reg: hand[i].reg } : {}),
   }));
+  if (Array.isArray(m.partialsByRegister) && m.partialsByRegister.length) {
+    prof.partialsByRegister = m.partialsByRegister;
+  }
   const perf = prof.performance || (prof.performance = {});
   if (Number.isFinite(m.material)) perf.partialMaterial = m.material;
   if (Number.isFinite(m.partialB)) perf.partialB = m.partialB;
@@ -921,6 +924,7 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
 
 export const RESONATOR_CLASSES = {
   string:     { label: "String / open tube", ratio: (n) => n },
+  conicalTube:{ label: "Conical tube",       ratio: (n) => n },
   closedTube: { label: "Closed tube",        ratio: (n) => 2 * n - 1 },
   // First transverse modes of an ideal membrane (Bessel zeros, ratios to
   // the fundamental) and of a free bar; tails extend geometrically.
@@ -944,6 +948,35 @@ export function resonatorRatio(className, n) {
 export function partialFrequency(n, f0, B = 0, className = "string") {
   const b = Math.max(0, B || 0);
   return resonatorRatio(className, n) * f0 * Math.sqrt((1 + b * n * n) / (1 + b));
+}
+
+/** Interpolate measured amplitude/B tables in log-frequency register space. */
+export function registerProfileAt(profile, fundamentalHz) {
+  const entries = Array.isArray(profile?.partialsByRegister)
+    ? profile.partialsByRegister.filter(row => Number.isFinite(row?.f0) && Array.isArray(row?.partials)).slice().sort((a, b) => a.f0 - b.f0)
+    : [];
+  if (!entries.length) return { partials: profile?.partials || [], partialB: null };
+  const hz = Math.max(1, Number(fundamentalHz) || entries[0].f0);
+  let hi = entries.findIndex(row => row.f0 >= hz);
+  if (hi <= 0) return { partials: entries[0].partials, partialB: entries[0].partialB ?? profile?.performance?.partialB ?? null };
+  if (hi < 0) {
+    const last = entries[entries.length - 1];
+    return { partials: last.partials, partialB: last.partialB ?? profile?.performance?.partialB ?? null };
+  }
+  const a = entries[hi - 1], b = entries[hi];
+  const t = Math.max(0, Math.min(1, Math.log(hz / a.f0) / Math.log(b.f0 / a.f0)));
+  const count = Math.max(a.partials.length, b.partials.length);
+  const partials = Array.from({ length: count }, (_, i) => {
+    const pa = a.partials[i] || { amp: 0, spread: 0.5 };
+    const pb = b.partials[i] || { amp: 0, spread: 0.5 };
+    return {
+      amp: (pa.amp || 0) + ((pb.amp || 0) - (pa.amp || 0)) * t,
+      spread: (pa.spread ?? 0.5) + ((pb.spread ?? 0.5) - (pa.spread ?? 0.5)) * t,
+    };
+  });
+  const ba = Number.isFinite(a.partialB) ? a.partialB : (profile?.performance?.partialB ?? 0);
+  const bb = Number.isFinite(b.partialB) ? b.partialB : (profile?.performance?.partialB ?? 0);
+  return { partials, partialB: ba + (bb - ba) * t };
 }
 
 // Legacy conversion: the old spectralStretchCents pinned a quadratic cents
@@ -1014,8 +1047,30 @@ export function excitationSpectrum(type, n, { position = 0.5, hardness = 0.6, fr
 // dyn grids. The velocity exponent grows with mode number so upper partials
 // bloom under force the way strings and air columns actually do (Schelleng
 // bow-force behaviour); spectralDynamicAmount scales the whole law.
-export function dynamicBrightness(n) {
-  return 0.5 * Math.log2(1 + Math.max(1, n));
+export function dynamicBrightness(n, blare = 0, velocityRatio = 1) {
+  const base = 0.5 * Math.log2(1 + Math.max(1, n));
+  const forte = Math.max(0, (Number(velocityRatio) || 1) - 1);
+  return base * (1 + Math.max(0, Number(blare) || 0) * forte * forte * 2.5);
+}
+
+/** Glottal closed-quotient/source tilt. Zero is exactly neutral. */
+export function glottalSourceGain(n, tilt = 0) {
+  return Math.pow(Math.max(1, n), -Math.max(-1, Math.min(1, Number(tilt) || 0)));
+}
+
+/** Velocity raises contact hardness only when a preset opts in. */
+export function velocityHardness(baseHardness, velocity, coupling = 0) {
+  const h = Number(baseHardness) || 0;
+  const c = Math.max(0, Math.min(1, Number(coupling) || 0));
+  return Math.max(0, Math.min(1, h + c * ((Number(velocity) || 0.62) - 0.62) * 0.75));
+}
+
+/** Early/late T60 plan for piano/guitar double decay; amount 0 is legacy. */
+export function twoStageDecayPlan(freqHz, material, amount = 0, lateRatio = 1) {
+  const earlyT60 = materialT60(freqHz, material);
+  const a = Math.max(0, Math.min(1, Number(amount) || 0));
+  const ratio = Math.max(1, Math.min(8, Number(lateRatio) || 1));
+  return { earlyT60, lateT60: earlyT60 * (1 + a * (ratio - 1)), breakpointDb: -18 };
 }
 
 // ── Tone model v2: the Human dial (T3, §3.1) ──
@@ -2243,7 +2298,9 @@ export class GenerationEngine {
 
   _spectralFingerprint(velocity = 0.6, fundamentalHz = 261.63, degree = 0, formantPos = null) {
     const profile = SPECTRAL_PROFILES[this.p.spectralProfile] || SPECTRAL_PROFILES.violin;
-    const count = Math.max(1, Math.min(profile.partials.length, Math.round(this.p.spectralPartials ?? 12)));
+    const registerProfile = registerProfileAt(profile, fundamentalHz);
+    const profilePartials = registerProfile.partials.length ? registerProfile.partials : profile.partials;
+    const count = Math.max(1, Math.min(profilePartials.length, Math.round(this.p.spectralPartials ?? 12)));
     const dynamicsAmount = Math.max(0, this.p.spectralDynamicAmount ?? 0.8);
     const resonanceAmount = this._clamp(this.p.spectralResonanceAmount ?? 0.35, 0, 1.5);
     const velocityRatio = Math.max(0.08, velocity / 0.62);
@@ -2258,7 +2315,11 @@ export class GenerationEngine {
       ? this.p.bodyBands                       // preset used as a starting point, then band-edited
       : bodyBandsFor(this.p, profile);
     const artic = this._articulatedBands(formantPos);
-    const bodyBands = artic ? baseBands.concat(artic) : baseBands;
+    let bodyBands = artic ? baseBands.concat(artic) : baseBands;
+    const singerFormant = this._clamp(this.p.singerFormantAmount ?? 0, 0, 1.5);
+    if (singerFormant > 0) {
+      bodyBands = bodyBands.concat([{ freq: 3000, gain: singerFormant * 1.4, width: 0.22 }]);
+    }
     // Tone v2 (T2): resolve the excitation once per note. Current settings
     // are applied as a transform NORMALISED against the profile's own
     // excitation defaults — the measured amplitude tables already embody
@@ -2267,12 +2328,15 @@ export class GenerationEngine {
     // reshapes the spectrum relative to that natural state.
     const partialB = Number.isFinite(this.p.partialB)
       ? Math.max(0, this.p.partialB)
-      : legacyStretchToB(this.p.spectralStretchCents ?? 0);
+      : (Number.isFinite(registerProfile.partialB)
+        ? Math.max(0, registerProfile.partialB)
+        : legacyStretchToB(this.p.spectralStretchCents ?? 0));
     const resClass = this.p.resonatorClass || "string";
     const excDefault = profile.performance?.excitation || { type: "bow", position: 0.5, hardness: 0.6 };
     const excType = this.p.excitationType || excDefault.type || "bow";
     const excPos = Number.isFinite(this.p.excitationPosition) ? this.p.excitationPosition : (excDefault.position ?? 0.5);
     let excHard = Number.isFinite(this.p.excitationHardness) ? this.p.excitationHardness : (excDefault.hardness ?? 0.6);
+    excHard = velocityHardness(excHard, velocity, this.p.velocityHardnessCoupling);
     // The Human dial (T3): one coherent draw stands in for the player's
     // onset variation (audit A1 — no more independent per-partial draws).
     // Struck/plucked humanity is per-note only: hardness and level jitter,
@@ -2286,7 +2350,7 @@ export class GenerationEngine {
       levelJitter = Math.max(0.5, 1 + this._gaussian() * 0.04 * human);
     }
     let referenceNorm = 0;
-    const partials = profile.partials.slice(0, count).map((partial, i) => {
+    const partials = profilePartials.slice(0, count).map((partial, i) => {
       const fallbackAmp = typeof partial === "number" ? partial : partial.amp;
       const fallbackSd = fallbackAmp * (typeof partial === "number" ? 0.08 : partial.spread ?? 0.25) * 0.5;
       const amp = this._clamp(means[i] ?? fallbackAmp, 0, 1.5);
@@ -2294,7 +2358,8 @@ export class GenerationEngine {
       const harmonic = i + 1;
       // Dynamic-brightness law (T2, audit A14): the per-partial dyn grids
       // are retired — louder playing brightens the top by one global law.
-      const dynamics = Math.pow(velocityRatio, dynamicBrightness(harmonic) * dynamicsAmount);
+      const dynamics = Math.pow(velocityRatio,
+        dynamicBrightness(harmonic, this.p.dynamicBlare, velocityRatio) * dynamicsAmount);
       // Realised mode frequency (T1 law) — body resonances and hardness
       // rolloff both act on where the partial actually sits.
       const harmonicFrequency = Math.max(1, partialFrequency(harmonic, fundamentalHz, partialB, resClass));
@@ -2304,7 +2369,8 @@ export class GenerationEngine {
         position: excDefault.position ?? 0.5, hardness: excDefault.hardness ?? 0.6, freqHz: harmonicFrequency,
       });
       const excitation = excBase > 1e-6 ? Math.min(8, excCur / excBase) : (excCur > 1e-6 ? 8 : 1);
-      const dynamicMean = amp * dynamics * registerResponse * excitation * this._partialMacroGain(harmonic);
+      const sourceTilt = glottalSourceGain(harmonic, this.p.glottalTilt);
+      const dynamicMean = amp * dynamics * registerResponse * excitation * sourceTilt * this._partialMacroGain(harmonic);
       // Per-partial sensitivity to the shared fluctuation — the old SD grid
       // reinterpreted: partials that used to wobble a lot follow the player
       // harder, but always in the same direction as everyone else.
@@ -2334,9 +2400,13 @@ export class GenerationEngine {
       // carries one (hand defaults per excitation type apply otherwise)
       attackStaggerMs: profile.performance?.lowToHighStaggerMs ?? null,
       partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
+      decaySecondStage: this._clamp(this.p.decaySecondStage ?? 0, 0, 1),
+      decaySecondRatio: this._clamp(this.p.decaySecondRatio ?? 1, 1, 8),
       spectralMix: this.p.spectralMix ?? 0,
       excitationType: excType,
       excitationHuman: human,
+      breathNoiseColor: this._clamp(this.p.breathNoiseColor ?? 0, -1, 1),
+      voiceBreathSync: this._clamp(this.p.voiceBreathSync ?? 0, 0, 1),
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
       // Body stage (T5): carried on the note so the renderer can evaluate
       // the body against MODULATED frequencies (vibrato FM → body AM).
@@ -2346,9 +2416,7 @@ export class GenerationEngine {
       spectralStretchCents: this.p.spectralStretchCents ?? 0,
       // Tone v2 resonator (T1): inharmonicity as a physical B constant
       // (new param wins; legacy cents map onto it) and the mode ratio class.
-      partialB: Number.isFinite(this.p.partialB)
-        ? Math.max(0, this.p.partialB)
-        : legacyStretchToB(this.p.spectralStretchCents ?? 0),
+      partialB,
       resonatorClass: this.p.resonatorClass || "string",
     };
   }
@@ -4532,10 +4600,16 @@ export class SynthEngine {
       const material = Math.max(0, Math.min(1, note.partialMaterial ?? 0));
       if (material > 0 && harmonic > 1) {
         const decayG = this.ctx.createGain();
-        const t60 = materialT60(freq, material);
-        const tau = Math.max(0.02, t60 / 6.91); // setTargetAtTime hits -60 dB at ~6.91τ
+        const plan = twoStageDecayPlan(freq, material, note.decaySecondStage, note.decaySecondRatio);
+        const tau = Math.max(0.02, plan.earlyT60 / 6.91); // setTargetAtTime hits -60 dB at ~6.91τ
         decayG.gain.setValueAtTime(1, t0);
         decayG.gain.setTargetAtTime(0.0001, t0 + 0.01, tau);
+        if ((note.decaySecondStage || 0) > 0 && plan.lateT60 > plan.earlyT60) {
+          const breakpointGain = Math.pow(10, plan.breakpointDb / 20);
+          const breakpointTime = t0 + 0.01 + plan.earlyT60 * Math.abs(plan.breakpointDb) / 60;
+          decayG.gain.setValueAtTime(breakpointGain, breakpointTime);
+          decayG.gain.setTargetAtTime(0.0001, breakpointTime, Math.max(0.02, plan.lateT60 / 6.91));
+        }
         tail.connect(decayG); // tail is g, or the body-AM node when vibrato rides a ridge
         decayG.connect(env);
         tail = null;
@@ -4605,7 +4679,7 @@ export class SynthEngine {
     src.loop = true;
     const bp = this.ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.setValueAtTime(2200, t0);
+    bp.frequency.setValueAtTime(2200 * Math.pow(2, (note.breathNoiseColor || 0) * 2), t0);
     bp.Q.value = 0.7;
     const g = this.ctx.createGain();
     const level = Math.max(0.0001, note.velocity * human * 0.035);
@@ -4673,8 +4747,22 @@ export class SynthEngine {
     hp.type = "highpass";
     hp.frequency.setValueAtTime(900, t0);
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(Math.max(0.0001, note.velocity * level * 0.2), t0);
+    const base = Math.max(0.0001, note.velocity * level * 0.2);
+    g.gain.setValueAtTime(base, t0);
     g.gain.linearRampToValueAtTime(0.0001, t1);
+    const sync = this._clamp(note.voiceBreathSync ?? 0, 0, 1);
+    if (sync > 0) {
+      const pulse = this.ctx.createOscillator();
+      pulse.type = "sine";
+      pulse.frequency.setValueAtTime(Math.max(20, note.frequency || 120), t0);
+      const depth = this.ctx.createGain();
+      depth.gain.value = base * sync * 0.65;
+      pulse.connect(depth);
+      depth.connect(g.gain);
+      pulse.start(t0);
+      pulse.stop(t1 + 0.02);
+      this._track(pulse);
+    }
     src.connect(hp);
     hp.connect(g);
     g.connect(env);
@@ -4694,7 +4782,9 @@ export class SynthEngine {
     // at its own T60 instead of the envelope's hard cut (renderers extend
     // their oscillator stop times by note._ringSec to let the tail sound).
     const ring = releaseRingSeconds(note.partialMaterial, note.frequency);
-    note._ringSec = ring;
+    const doubleDecay = this._clamp(note.decaySecondStage ?? 0, 0, 1);
+    const doubleRatio = this._clamp(note.decaySecondRatio ?? 1, 1, 8);
+    note._ringSec = Math.min(3.5, ring * (1 + doubleDecay * (doubleRatio - 1) * 0.5));
     const release = (fromT) => {
       if (ring > 0.05) {
         g.gain.setTargetAtTime(0.0001, fromT, ring / 6.91); // -60 dB at ~6.91τ

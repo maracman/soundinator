@@ -461,6 +461,16 @@ export const DEFAULTS = {
   excitationPosition: 0.13,
   excitationHardness: 0.6,
   excitationHuman: 0.4,
+  // Sound Generator 2.0 model extensions are neutral until a fitted preset
+  // opts in, preserving every existing factory/user sound.
+  velocityHardnessCoupling: 0,
+  breathNoiseColor: 0,
+  dynamicBlare: 0,
+  decaySecondStage: 0,
+  decaySecondRatio: 1,
+  glottalTilt: 0,
+  singerFormantAmount: 0,
+  voiceBreathSync: 0,
   partialTransfer: 0.15,
   bodyType: "auto",
   bodyArticulation: 0,

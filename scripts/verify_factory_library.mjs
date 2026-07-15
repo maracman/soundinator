@@ -6,9 +6,9 @@
 // claims are structurally true, and that full patches produce deterministic
 // musical event streams under a fixed fixture.
 
-import fs from "node:fs";
 import { FACTORY_CATALOG_TARGETS, FACTORY_PRESETS } from "../web/static/factory-presets.js";
 import { GenerationEngine } from "../web/static/synth.js";
+import { DEFAULTS } from "../web/static/params.js";
 
 let failures = 0;
 const check = (name, condition, detail = "") => {
@@ -16,18 +16,7 @@ const check = (name, condition, detail = "") => {
 };
 
 function defaultKeys() {
-  const source = fs.readFileSync(new URL("../web/static/app.js", import.meta.url), "utf8");
-  const marker = "const DEFAULTS = {";
-  const start = source.indexOf(marker);
-  if (start < 0) throw new Error("Could not find DEFAULTS in app.js");
-  const bodyStart = source.indexOf("{", start);
-  let depth = 0, end = -1;
-  for (let i = bodyStart; i < source.length; i++) {
-    if (source[i] === "{") depth++;
-    else if (source[i] === "}" && --depth === 0) { end = i; break; }
-  }
-  if (end < 0) throw new Error("Could not parse DEFAULTS boundary");
-  return new Set([...source.slice(bodyStart + 1, end).matchAll(/^  ([A-Za-z_$][\w$]*):/gm)].map(m => m[1]));
+  return new Set(Object.keys(DEFAULTS));
 }
 
 const validSections = new Set(["sound", "melody", "rhythm", "dynamics", "surprise", "percussion", "space", "full"]);
