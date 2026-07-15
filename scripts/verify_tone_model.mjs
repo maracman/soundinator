@@ -12,6 +12,7 @@ import {
   excitationDrive,
   positionComb,
   hardnessRolloff,
+  usesFreeDecay,
   excitationSpectrum,
   dynamicBrightness,
   glottalSourceGain,
@@ -109,6 +110,9 @@ console.log("T-B2: material damping is a law over real Hz");
   const ratioGlass = materialT60(4000, 0) / materialT60(500, 0);
   const ratioFelt = materialT60(4000, 1) / materialT60(500, 1);
   check("damping slope steepens with material", ratioFelt < ratioGlass);
+  check("free decay applies to impulse-driven excitations only",
+    usesFreeDecay("strike") && usesFreeDecay("pluck") &&
+    !usesFreeDecay("bow") && !usesFreeDecay("blow"));
 }
 
 console.log("Resonator ratio tables");

@@ -1101,6 +1101,11 @@ export function hardnessRolloff(freqHz, hardness, type) {
   return 1 / (r * r);
 }
 
+/** Only an impulse-driven resonator freely decays while its note is held. */
+export function usesFreeDecay(excitationType) {
+  return excitationType === "strike" || excitationType === "pluck";
+}
+
 export function excitationSpectrum(type, n, { position = 0.5, hardness = 0.6, freqHz = n * 261.63 } = {}) {
   return excitationDrive(type, n) * positionComb(n, position) * hardnessRolloff(freqHz, hardness, type);
 }
@@ -4660,7 +4665,11 @@ export class SynthEngine {
       // n=16 of a low one, and decay no longer depends on note duration.
       // Wood/felt kills the highs, glass/metal lets them ring.
       const material = Math.max(0, Math.min(1, note.partialMaterial ?? 0));
-      if (material > 0 && harmonic > 1) {
+      // A bowed string or blown air column is continuously driven: its
+      // upper modes must not free-decay from note onset while excitation is
+      // still present. Frequency-dependent material decay belongs only to
+      // impulse-driven strike/pluck notes (release remains envelope-driven).
+      if (material > 0 && harmonic > 1 && usesFreeDecay(note.excitationType)) {
         const decayG = this.ctx.createGain();
         const plan = twoStageDecayPlan(freq, material, note.decaySecondStage, note.decaySecondRatio);
         const tau = Math.max(0.02, plan.earlyT60 / 6.91); // setTargetAtTime hits -60 dB at ~6.91τ
