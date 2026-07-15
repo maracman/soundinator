@@ -443,7 +443,7 @@ serial.
 - `spaceAzimuth`/`spaceDistance` are consumed by BOTH the base voice position
   and several visualisers (`drawSpacePad`, stage, ears view) — when they move
   into `layers[0].space`, sweep `grep -n "spaceAzimuth" web/static/app.js`
-  (~60 hits) exhaustively.
+  (48 hits at time of writing) exhaustively.
 - The effects registry registers by side effect of importing
   `effects/index.js` — keep import order when extracting modules.
 - localStorage keys are versioned (`phase0.*.v1`) — shape migration happens
