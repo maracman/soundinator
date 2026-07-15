@@ -82,3 +82,8 @@ high-register same-note/dynamic groups reached the measured variability floor:
 | `partialTransfer` | 0.100000 | 0.017431 |
 | `spectralResonanceAmount` | 0.350000 | 0.068296 |
 | `toneBreath` | 0.030000 | -0.000076 |
+
+The shipping playback variant uses `spectralCullThreshold = 0.0006`: 23
+oscillators and 230 automation events/note, both within 1.25× the current
+factory medians. It adds `0.2108 dB` mean mel distance versus the full fit and
+preserves every construction assertion and both measured-floor groups.
