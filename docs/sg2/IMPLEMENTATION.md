@@ -107,3 +107,11 @@ loss fell from 3.5683 to 3.5565 and its worst ratio to 1.3421×; trumpet loss
 fell from 3.8301 to 3.8050, while its 1.1385× high-soft limit was unchanged.
 These are committed improvements, not freeze claims; both external work items
 remain open for corrected-objective refinement.
+
+Flute was added to the covered WP-5 matrix with six Iowa/Philharmonia
+alternate-take groups and a measured three-anchor register attack table. Its
+first formal pass improved loss from 4.3298 to 4.1344 with construction green.
+Low-forte and both high-register groups reached their variability floors;
+low-soft (1.1741×), mid-forte (1.0412×), and mid-soft (1.2017×) remain open.
+The corrected weighted residual report identifies spectral centroid—not the
+zero-weight stiff-string diagnostic—as the next refinement target.
