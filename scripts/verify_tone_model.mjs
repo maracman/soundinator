@@ -20,6 +20,7 @@ import {
   glottalSourceGain,
   velocityHardness,
   twoStageDecayPlan,
+  attackNoiseRouting,
   registerProfileAt,
   humanFluctuationTrace,
   humanPartialShape,
@@ -236,6 +237,10 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     velocityHardness(0.6, 1, 0) === 0.6);
   check("G7 harder velocity brightens an opted-in strike",
     velocityHardness(0.6, 1, 1) > velocityHardness(0.6, 0.2, 1));
+  check("measured onset routing is neutral at zero",
+    attackNoiseRouting(0).envelopeGain === 1 && attackNoiseRouting(0).directGain === 0);
+  check("measured onset can opt into its own fast envelope",
+    attackNoiseRouting(1).envelopeGain === 0 && attackNoiseRouting(1).directGain === 1);
 }
 
 console.log("T2: engine excitation transform (normalised against profile default)");

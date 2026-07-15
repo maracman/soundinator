@@ -349,6 +349,7 @@ export const DEFAULTS = {
   intervalPeakedness: 2.0,
   melodyPattern: "walk",
   attackNoiseLevel: 1,
+  attackNoiseDirect: 0,
   arpStep: 2,
   arpOctaves: 1,
   intervalRange: 7,

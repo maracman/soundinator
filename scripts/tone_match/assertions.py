@@ -270,6 +270,11 @@ def evaluate_construction(
         rows.append(_result(f"{name}.blare-law", "Nonlinear forte enrichment is explicitly enabled",
                             None if blare is None else float(blare) > 0, blare, "dynamicBlare > 0",
                             strict_evidence=strict_evidence))
+        if name == "french-horn":
+            direct = _param(params, "attackNoiseDirect")
+            rows.append(_result("french-horn.independent-onset", "Measured lip transient is not masked by the sustained ADSR",
+                                None if direct is None else float(direct) > 0, direct,
+                                "attackNoiseDirect > 0", strict_evidence=strict_evidence))
 
     if name in {"violin", "cello"}:
         b_values = [s.render.note.B for s in sample_list if s.render.note.B is not None]

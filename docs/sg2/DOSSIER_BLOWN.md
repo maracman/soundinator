@@ -118,6 +118,7 @@ register/dynamic labels fail rather than skip.
 | Trumpet | `trumpet.excitor`, `trumpet.resonator` | Lip-reed approximation and SG2 full-series class |
 |  | `trumpet.full-series`, `trumpet.dynamic-brightening`, `trumpet.blare-law` | Complete series and nonlinear forte enrichment |
 | French horn | Corresponding `french-horn.*` IDs | Full series, sustained drive, and fitted nonlinear dynamic response |
+|  | `french-horn.independent-onset` | The measured fast lip transient is independently enveloped rather than suppressed by the sustained-note ADSR |
 
 `conicalTube` in the trumpet/horn assertion means “SG2 full-series wind
 resonator”. A future enum rename would be semantically cleaner, but is not an
@@ -133,6 +134,7 @@ acoustic blocker because its implemented frequency law is the required one.
 | G3 nonlinear dynamic brightening | **Confirmed.** Brass nonlinear propagation produces upper-spectrum enrichment with level. | `dynamicBlare > 0` plus measured dynamic brightening are hard gates for trumpet/horn and the sax interim fits. |
 | G5 attack stagger | **Confirmed as already landed.** Tonguing/reed and lip attacks are frequency-dependent and cannot be replaced by one gain ramp. | Measure and retain transient-band timing; no new engine work from WP-R. |
 | Renderer audit: free decay under continuous drive | **Rejected.** Applying the struck/plucked material-decay envelope during a held wind note extinguishes upper modes despite ongoing excitation. | Gate material free decay to impulse-driven excitation; retain the normal note-release envelope for wind notes. |
+| Renderer audit: fast onset through sustained ADSR | **Rejected for measured horn attacks.** A transient with its own 5 ms rise and measured decay was attenuated again by the much slower sustained-note ADSR, leaving the paired high-register onsets roughly an order of magnitude too weak. | Add neutral `attackNoiseDirect`; keep `0` bit-compatible and require the horn fit to opt in before its construction gate can pass. |
 | Missing gap | **No new pre-fit engine gap.** Full reed/lip–bore feedback and sax altissimo tract coupling are real, but the present campaign covers dry, standard-range sustained notes. | If residuals localise to attack instability or altissimo rather than fitted params, file a bounded model gap; do not widen the optimiser to disguise it. |
 
 Verdict: the existing G2/G3 laws are justified, with the stated semantic

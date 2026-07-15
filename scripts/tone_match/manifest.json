@@ -16,6 +16,7 @@
     { "key": "toneBreath", "min": 0.0, "max": 0.4, "step": 0.01, "default": 0.03 },
     { "key": "breathNoiseColor", "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["blow", "sung"] },
     { "key": "attackNoiseLevel", "min": 0.0, "max": 2.0, "step": 0.01, "default": 1.0, "note": "shape/freq/decay of the transient are pinned from measurement; only the level is free" },
+    { "key": "attackNoiseDirect", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "note": "neutral legacy routing at 0; opt in when the note ADSR masks a measured fast onset" },
     { "key": "partialMaterial", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.45, "note": "pinned to suggestedMaterial where a T60 fit exists; free only for instruments without free-decay evidence" },
     { "key": "partialTransfer", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.15 },
     { "key": "partialTilt", "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.0 },

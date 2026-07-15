@@ -1159,6 +1159,12 @@ export function twoStageDecayPlan(freqHz, material, amount = 0, lateRatio = 1) {
   return { earlyT60, lateT60: earlyT60 * (1 + a * (ratio - 1)), breakpointDb: -18 };
 }
 
+/** Blend between legacy ADSR-bound and independently enveloped onset noise. */
+export function attackNoiseRouting(amount = 0) {
+  const directGain = Math.max(0, Math.min(1, Number(amount) || 0));
+  return { envelopeGain: 1 - directGain, directGain };
+}
+
 // ── Tone model v2: the Human dial (T3, §3.1) ──
 //
 // One seeded fluctuation per note stands in for the player: bow pressure /
@@ -2482,6 +2488,7 @@ export class GenerationEngine {
         const lvl = this._clamp(this.p.attackNoiseLevel ?? 1, 0, 2);
         return lvl === 1 ? an : { ...an, level: an.level * lvl };
       })(),
+      attackNoiseDirect: this._clamp(this.p.attackNoiseDirect ?? 0, 0, 1),
       // Q8 attack stagger: measured low→high onset spread when the profile
       // carries one (hand defaults per excitation type apply otherwise)
       attackStaggerMs: profile.performance?.lowToHighStaggerMs ?? null,
@@ -4501,10 +4508,11 @@ export class SynthEngine {
   _renderFourier(note, t0) {
     const t1 = t0 + note.duration;
     const env = this._adsr(note.velocity, t0, t1, note);
+    const out = note._out || this._voiceBus || this.master;
     this._renderSpectralPartials(note, t0, t1, env);
-    this._renderAttackNoise(note, t0, env);
+    this._renderAttackNoise(note, t0, env, out);
     this._renderBreath(note, t0, t1, env);
-    env.connect(note._out || this._voiceBus || this.master);
+    env.connect(out);
   }
 
   _spectralMix(note) {
@@ -4807,7 +4815,7 @@ export class SynthEngine {
    * This carries a large share of instrument identity that a static
    * spectrum cannot.
    */
-  _renderAttackNoise(note, t0, env) {
+  _renderAttackNoise(note, t0, env, out) {
     const an = note.attackNoise;
     if (!an || !this._noiseBuffer || !note.velocity) return;
     const src = this.ctx.createBufferSource();
@@ -4824,7 +4832,19 @@ export class SynthEngine {
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + decay);
     src.connect(bp);
     bp.connect(g);
-    g.connect(env);
+    const routing = attackNoiseRouting(note.attackNoiseDirect);
+    if (routing.directGain <= 0) {
+      g.connect(env);
+    } else if (routing.envelopeGain <= 0) {
+      g.connect(out);
+    } else {
+      const legacy = this.ctx.createGain();
+      const direct = this.ctx.createGain();
+      legacy.gain.value = routing.envelopeGain;
+      direct.gain.value = routing.directGain;
+      g.connect(legacy); legacy.connect(env);
+      g.connect(direct); direct.connect(out);
+    }
     src.start(t0);
     src.stop(t0 + decay + 0.02);
     this._track(src);
