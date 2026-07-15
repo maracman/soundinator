@@ -287,6 +287,19 @@ def evaluate_construction(
                                 "Lip-transient shape follows the measured register",
                                 len(valid_onset_registers) >= 3, len(valid_onset_registers),
                                 "at least 3 attackNoiseByRegister anchors", strict_evidence=strict_evidence))
+            envelope_registers = _param(params, "envelopeAttackByRegister")
+            valid_envelope_registers = [row for row in envelope_registers
+                                        if isinstance(row, dict) and
+                                        isinstance(row.get("f0"), (int, float)) and
+                                        isinstance(row.get("attack", row.get("envelopeAttack")),
+                                                   (int, float))] \
+                if isinstance(envelope_registers, list) else []
+            rows.append(_result("french-horn.register-envelope-law",
+                                "Amplitude-envelope attack follows the measured register",
+                                len(valid_envelope_registers) >= 3,
+                                len(valid_envelope_registers),
+                                "at least 3 envelopeAttackByRegister anchors",
+                                strict_evidence=strict_evidence))
 
     if name in {"violin", "cello"}:
         b_values = [s.render.note.B for s in sample_list if s.render.note.B is not None]
