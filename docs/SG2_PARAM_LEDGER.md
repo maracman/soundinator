@@ -63,3 +63,22 @@ first scalar cull that passes the 1.25× resource gate (`0.00121`, 23/230) adds
 its reference floor, so it is rejected. The external work item specifies a
 scorer-guided per-partial shipping mask; the converged research fit remains
 frozen and is not regressed to satisfy the later compression pass.
+
+## trumpet — wp5-trumpet-pass1
+
+Composite loss: `3.664635` on reference set `618957c6167cedd3`, improved from
+`4.301156`. All nine construction assertions passed. Both eligible
+high-register same-note/dynamic groups reached the measured variability floor:
+`ff = 0.9775×` and `pp = 0.7930×` their respective take-to-take distances.
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseLevel` | 1.000000 | -0.000045 |
+| `breathNoiseColor` | 0.000000 | 0.010672 |
+| `dynamicBlare` | 0.250000 | 0.015055 |
+| `excitationHuman` | 0.800000 | 0.105983 |
+| `excitationPosition` | 0.300000 | -0.094447 |
+| `partialTilt` | -0.100000 | 0.194935 |
+| `partialTransfer` | 0.100000 | 0.017431 |
+| `spectralResonanceAmount` | 0.350000 | 0.068296 |
+| `toneBreath` | 0.030000 | -0.000076 |
