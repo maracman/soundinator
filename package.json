@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --test tests/js/*.test.js",
     "test:browser": "playwright test",
-    "test:regen": "node tests/js/generate-fixtures.mjs"
+    "test:regen": "node tests/js/generate-fixtures.mjs",
+    "test:render-note": "node scripts/render_note.mjs --verify"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.0"

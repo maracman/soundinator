@@ -2,7 +2,7 @@
   "_doc": "Free-tier parameter manifest for the Sound Generator 2.0 iteration loop (docs/SOUND_GENERATOR_2_PLAN.md §2.4). Only optimiser-adjustable params are listed; pinned-tier params (set directly from measurement) are named at the bottom. Bounds mirror the sub-note inspector knobs (app.js chInspectorHTML) so every fitted preset is reachable and editable in the UI. WP-4 consumes this file; WP-9's ledger keys off the same names.",
   "categorical": {
     "excitationType": ["bow", "pluck", "strike", "blow"],
-    "resonatorClass": ["string", "closedTube", "membrane", "bar"],
+    "resonatorClass": ["string", "closedTube", "conicalTube", "membrane", "bar"],
     "bodyType": {
       "values": "enumerate at runtime: 'auto' + Object.keys(BODY_PRESETS) from web/static/synth.js",
       "note": "candidate set restricted per family before optimisation (e.g. sung → vocal bodies + auto)"
@@ -11,13 +11,21 @@
   "continuous": [
     { "key": "excitationPosition", "min": 0.02, "max": 0.5, "step": 0.01, "default": 0.13 },
     { "key": "excitationHardness", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.6, "appliesTo": ["strike", "pluck"] },
+    { "key": "velocityHardnessCoupling", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["strike", "pluck"] },
     { "key": "excitationHuman", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.4 },
     { "key": "toneBreath", "min": 0.0, "max": 0.4, "step": 0.01, "default": 0.03 },
+    { "key": "breathNoiseColor", "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["blow", "sung"] },
     { "key": "attackNoiseLevel", "min": 0.0, "max": 2.0, "step": 0.01, "default": 1.0, "note": "shape/freq/decay of the transient are pinned from measurement; only the level is free" },
     { "key": "partialMaterial", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.45, "note": "pinned to suggestedMaterial where a T60 fit exists; free only for instruments without free-decay evidence" },
     { "key": "partialTransfer", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.15 },
     { "key": "partialTilt", "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.0 },
     { "key": "spectralResonanceAmount", "min": 0.0, "max": 1.5, "step": 0.01, "default": 0.35 },
+    { "key": "dynamicBlare", "min": 0.0, "max": 1.5, "step": 0.01, "default": 0.0 },
+    { "key": "decaySecondStage", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["strike", "pluck"] },
+    { "key": "decaySecondRatio", "min": 1.0, "max": 8.0, "step": 0.1, "default": 1.0, "appliesTo": ["strike", "pluck"] },
+    { "key": "glottalTilt", "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["sung"] },
+    { "key": "singerFormantAmount", "min": 0.0, "max": 1.5, "step": 0.01, "default": 0.0, "appliesTo": ["sung"] },
+    { "key": "voiceBreathSync", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["sung"] },
     { "key": "bodyArticulation", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["sung"] },
     { "key": "formantBandwidth", "min": 0.4, "max": 2.5, "step": 0.01, "default": 1.0, "appliesTo": ["sung"] },
     { "key": "toneFormantDrift", "min": 0.0, "max": 0.5, "step": 0.01, "default": 0.08, "appliesTo": ["sung"] },
