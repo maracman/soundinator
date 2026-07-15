@@ -34,9 +34,17 @@ git merge --ff-only "origin/$BRANCH"
 .venv/bin/pip install -q -r requirements.txt
 
 sudo systemctl restart resona
-sleep 2
 
-if curl -fsS localhost:8765/api/health > /dev/null; then
+# The server can take >2s to come up — poll rather than one fixed sleep, so a
+# healthy-but-slow start doesn't read as a failed deploy (false alarm on the
+# 2026-07-15 deploy).
+healthy=0
+for _ in $(seq 1 15); do
+    sleep 2
+    if curl -fsS localhost:8765/api/health > /dev/null 2>&1; then healthy=1; break; fi
+done
+
+if [ "$healthy" = 1 ]; then
     echo "OK — $(git rev-parse --short HEAD) is live and healthy."
 else
     echo "!! Health check FAILED on $(git rev-parse --short HEAD)."
