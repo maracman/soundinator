@@ -41,6 +41,14 @@ def main():
             "performance": perf,
             "source": (v.get("provenance", {}) or {}).get("source", ""),
         }
+        registers = v.get("partialsByRegister")
+        if isinstance(registers, list) and registers:
+            entry["partialsByRegister"] = [{
+                "f0": row["f0"],
+                "partialB": row.get("partialB"),
+                "partials": [{"amp": round(p["amp"], 5), "spread": round(p["spread"], 3)}
+                             for p in row.get("partials", [])],
+            } for row in registers if isinstance(row, dict) and row.get("partials")]
         an = v["performance"].get("attackNoise")
         if isinstance(an, dict):
             entry["attackNoise"] = {k: round(x, 4) for k, x in an.items()

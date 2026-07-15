@@ -62,8 +62,12 @@ import os
 from dataclasses import dataclass, field
 
 import numpy as np
-import soundfile as sf
 from scipy import signal as sig
+
+try:
+    import soundfile as sf
+except ImportError:  # importable math/feature helpers do not require audio I/O
+    sf = None
 
 # ──────────────────────────────────────────────────────────────────────────
 # Engine constants (mirrors of synth.js — keep in sync manually)
@@ -101,6 +105,8 @@ def hz_to_note_name(f: float) -> str:
 # ──────────────────────────────────────────────────────────────────────────
 
 def load_mono(path: str) -> tuple[np.ndarray, int]:
+    if sf is None:
+        raise RuntimeError("audio analysis requires the optional 'soundfile' package")
     x, sr = sf.read(path, always_2d=True)
     return x.mean(axis=1).astype(np.float64), sr
 
@@ -829,6 +835,34 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             spread[i] = float(min(0.8, ref + 0.04))
         last = spread[i]
 
+    # G1 register storage: three log-f0 regions retain the measured source
+    # spectrum instead of collapsing the whole instrument into one table.
+    # The engine interpolates these anchors continuously; instruments with
+    # fewer than three analysed pitches simply omit the field.
+    partials_by_register = []
+    if len(spec_notes) >= 3:
+        ordered = sorted(spec_notes, key=lambda item: item.f0)
+        for group in np.array_split(np.asarray(ordered, dtype=object), min(3, len(ordered))):
+            group = list(group)
+            if not group:
+                continue
+            g_amp = np.zeros(n_partials)
+            g_spread = []
+            for i in range(n_partials):
+                detected = [n.partial_amps[i] for n in group
+                            if n.partial_snr_ok[i] and n.partial_amps[i] > 0]
+                g_amp[i] = float(np.median(detected)) if detected else 0.0
+                g_spread.append(float(spread[i]))
+            if g_amp.max() > 0:
+                g_amp /= g_amp.max()
+            g_b = robust_mean([n.B for n in group if n.B is not None])
+            partials_by_register.append(dict(
+                f0=round(float(np.exp(np.mean(np.log([n.f0 for n in group])))), 3),
+                partialB=round(float(g_b), 8) if g_b is not None else None,
+                partials=[dict(amp=round(float(a), 5), spread=round(float(s), 3))
+                          for a, s in zip(g_amp, g_spread)],
+            ))
+
     # tail slope diagnostic: dB/octave of harmonic rank over n ≥ 8
     det_idx = [i for i in range(7, n_partials) if amp[i] > 0]
     tail_db_oct = None
@@ -931,6 +965,7 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
                   for a, s in zip(amp, spread)],
         partialB=round(B_med, 8),
         partialBByNote=B_by_note,
+        partialsByRegister=partials_by_register,
         tailSlopeDbPerOct=round(tail_db_oct, 1) if tail_db_oct is not None else None,
         material=material,
         performance=dict(
