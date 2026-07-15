@@ -101,3 +101,9 @@ alternate-take floor and the trumpet MIDI-72 `pp` group is 1.1385×. Corrected
 audit artifacts and filed fixes live beside the external runs under
 `/private/tmp/sg2/<instrument>/`; neither preset is considered frozen until a
 current-engine render demonstrates every available group at or below floor.
+
+WP-3 register-envelope evidence then improved the reopened leaders: clarinet
+loss fell from 3.5683 to 3.5565 and its worst ratio to 1.3421×; trumpet loss
+fell from 3.8301 to 3.8050, while its 1.1385× high-soft limit was unchanged.
+These are committed improvements, not freeze claims; both external work items
+remain open for corrected-objective refinement.
