@@ -27,7 +27,7 @@ RESONATOR = {"flute": "string", "clarinet": "closedTube", "alto-sax": "conicalTu
 # identify the run; target MIDI selects one detected segment from that run.
 CAMPAIGNS: dict[str, list[dict[str, Any]]] = {
     "flute": [
-        {"register": "low", "midi": 59, "pp": "Flute.nonvib.pp.B3B4.aiff", "ff": "Flute.nonvib.ff.B3B4.aiff"},
+        {"register": "low", "midi": 60, "pp": "Flute.nonvib.pp.B3B4.aiff", "ff": "Flute.nonvib.ff.B3B4.aiff"},
         {"register": "mid", "midi": 72, "pp": "Flute.nonvib.pp.B4Bb5.aiff", "ff": "Flute.nonvib.ff.C5B5.aiff"},
         {"register": "high", "midi": 84, "pp": "Flute.nonvib.pp.C6Bb6.aiff", "ff": "Flute.nonvib.ff.C6B6.aiff"},
     ],
@@ -72,6 +72,14 @@ PHILHARMONIA_ALTERNATES = {
 # D3-E6 sounding range matches the alto corpus used here; retain the source's
 # own label in the manifest rather than silently asserting extra metadata.
 PHILHARMONIA_WOODWIND_ALTERNATES = {
+    "flute": [
+        {"register": "low", "midi": 60, "dynamic": "pp", "file": "flute_C4_15_pianissimo_normal.mp3"},
+        {"register": "low", "midi": 60, "dynamic": "ff", "file": "flute_C4_15_forte_normal.mp3"},
+        {"register": "mid", "midi": 72, "dynamic": "pp", "file": "flute_C5_15_pianissimo_normal.mp3"},
+        {"register": "mid", "midi": 72, "dynamic": "ff", "file": "flute_C5_15_forte_normal.mp3"},
+        {"register": "high", "midi": 84, "dynamic": "pp", "file": "flute_C6_05_piano_normal.mp3"},
+        {"register": "high", "midi": 84, "dynamic": "ff", "file": "flute_C6_05_forte_normal.mp3"},
+    ],
     "clarinet": [
         {"register": "low", "midi": 54, "dynamic": "pp", "file": "clarinet_Fs3_15_pianissimo_normal.mp3"},
         {"register": "low", "midi": 54, "dynamic": "ff", "file": "clarinet_Fs3_15_fortissimo_normal.mp3"},

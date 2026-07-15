@@ -231,3 +231,4 @@ def test_blown_campaign_matrix_has_three_registers_and_two_dynamics():
         assert RESONATOR[instrument] == expected
     assert len(PHILHARMONIA_WOODWIND_ALTERNATES["clarinet"]) == 6
     assert len(PHILHARMONIA_WOODWIND_ALTERNATES["alto-sax"]) == 4
+    assert len(PHILHARMONIA_WOODWIND_ALTERNATES["flute"]) == 6
