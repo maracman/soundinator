@@ -142,8 +142,30 @@ Band count is now up to 16 (was 7) and widths ~0.18 log2 (was ~0.5).
 + finer body division; clarinet media ~5 dB per-partial): blown campaign
 leaderboards must re-baseline (P5.2) — which the L6 refits require anyway.
 
-**P3 references: in progress.** P4 is design guidance for Agent A's engine
-work; P5 gates remain Agent A's to close.
+**P3 references: LANDED** (`scripts/tone_match/strings_prep.py`; artifacts
+under `/private/tmp/sg2/campaigns/{violin,cello}/`, never committed):
+- `string` (sulG/sulD/…) carried through every reference row; floor groups
+  are `midi|dynamic|articulation|string|source|duration-bucket`, and
+  same-pitch take pairs are trimmed to a common duration before writing.
+- Bow-change detection trims every take to its longest single-bow span
+  (76 violin / 134 cello segments trimmed).
+- L3 screen (z > 2.5 within same-string/same-dynamic/same-source peers):
+  SPECTRAL outliers are excluded and queued in the corpus COVERAGE.md for
+  owner ears; attack-noise flags are ADVISORY only — articulation spread is
+  §2.5c human material, not corpus damage. Violin: one junk stray segment
+  excluded. Cello: two spectral exclusions.
+- Iowa keeps the spectral role; Philharmonia vibrato takes are inventoried
+  for the vibrato role only and never become spectral reference rows.
+- §2.5c take-pair inventory (`take-pairs.json`): violin has ONE true
+  duplicate pair (Cs4 mezzo-piano non-vib, 1s vs long, duration-matched);
+  cello has NO true duplicates but four same-pitch same-dynamic vib/nonvib
+  pairs; both instruments list their same-string chromatic runs as the
+  adjacent-semitone proxy sources (weaker evidence, logged per §2.5c-4).
+  Cello's variability floor therefore rests on proxies until better
+  duplicate takes are acquired — a named corpus gap for WP-6.
+
+P4 is design guidance for Agent A's engine work; P5 gates remain Agent A's
+to close. Fitting campaigns stay NOT STARTED per the gating rules.
 
 ## P6 · Cheap wins to bank while set up (decision 7)
 

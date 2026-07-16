@@ -12,6 +12,7 @@ from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, 
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
+from scripts.tone_match.strings_prep import STRING_CAMPAIGNS, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, compare_features, weights_for_instrument
 
 
@@ -516,6 +517,82 @@ def test_bowed_p1_features_have_zero_weight_for_blown():
 def _bowed_samples():
     return [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
             for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+
+
+def test_string_labels_are_carried_and_phil_names_parsed():
+    assert parse_string_label("Violin.arco.pp.sulG.G3B3.aiff") == "sulG"
+    assert parse_string_label("Cello.arco.ff.sulC.C2A2.aiff") == "sulC"
+    assert parse_string_label("phil.violin_G3_15_piano_non-vibrato.mp3") is None
+    meta = parse_phil_name("phil.violin_Cs4_long_mezzo-piano_non-vibrato.mp3")
+    assert meta == {"midi": 61, "length": "long", "dynamic": "mezzo-piano",
+                    "vibrato": "nonvib"}
+    vib = parse_phil_name("phil.cello_A4_1_mezzo-piano_molto-vibrato.mp3")
+    assert vib["vibrato"] == "vib" and vib["midi"] == 69
+
+
+def test_bow_change_detection_trims_to_single_bow():
+    sr = 44_100
+    t = np.arange(int(2.0 * sr)) / sr
+    tone = np.sin(2 * np.pi * 220 * t)
+    envelope = np.ones_like(t)
+    envelope[t < .05] = t[t < .05] / .05
+    dip = np.abs(t - 1.2) < .04                  # bow change at 1.2 s
+    envelope[dip] *= .12
+    segment, changed = trim_to_single_bow(tone * envelope, sr)
+    assert changed
+    # the longest single-bow span is the first ~1.2 s
+    assert 0.8 * sr <= len(segment) <= 1.35 * sr
+
+    clean, changed_clean = trim_to_single_bow(tone * np.ones_like(t), sr)
+    assert not changed_clean
+    assert len(clean) == len(t)
+
+
+def test_outlier_screen_flags_muted_take_within_peer_group():
+    rng = np.random.default_rng(3)
+    rows = [{"group": "violin|sulA|ff|Iowa", "name": f"take-{i}",
+             "features": {"tiltDbPerOct": -6 + rng.normal(0, .4),
+                          "spectralIndex": 3 + rng.normal(0, .2),
+                          "attackNoiseLevel": .02 + rng.normal(0, .005)}}
+            for i in range(9)]
+    rows.append({"group": "violin|sulA|ff|Iowa", "name": "muted-take",
+                 "features": {"tiltDbPerOct": -18.0, "spectralIndex": 1.2,
+                              "attackNoiseLevel": .02}})
+    rows.append({"group": "violin|sulA|ff|Iowa", "name": "hard-attack-take",
+                 "features": {"tiltDbPerOct": -6.0, "spectralIndex": 3.0,
+                              "attackNoiseLevel": .3}})
+    flags = screen_outliers(rows)
+    muted = [flag for flag in flags if flag["name"] == "muted-take"]
+    assert muted and all(not flag["advisory"] for flag in muted)
+    # a strong articulation is human variation: flagged for ears, advisory
+    hard = [flag for flag in flags if flag["name"] == "hard-attack-take"]
+    assert hard and all(flag["advisory"] for flag in hard)
+    # small peer groups never flag (evidence, not guesswork)
+    assert screen_outliers(rows[:3]) == []
+
+
+def test_take_pair_inventory_separates_duplicates_from_vibrato_pairs():
+    files = [
+        "phil.violin_Cs4_1_mezzo-piano_non-vibrato.mp3",
+        "phil.violin_Cs4_long_mezzo-piano_non-vibrato.mp3",   # true duplicate
+        "phil.cello_A4_1_mezzo-piano_molto-vibrato.mp3",
+        "phil.cello_A4_1_mezzo-piano_non-vibrato.mp3",        # vib/nonvib pair
+        "phil.violin_E5_1_mezzo-forte_molto-vibrato.mp3",     # unpaired
+    ]
+    pairs = inventory_take_pairs(files)
+    assert len(pairs["trueDuplicates"]) == 1
+    assert pairs["trueDuplicates"][0]["midi"] == 61
+    assert pairs["trueDuplicates"][0]["vibrato"] == "nonvib"
+    assert len(pairs["vibratoPairs"]) == 1
+    assert pairs["vibratoPairs"][0]["midi"] == 69
+
+
+def test_string_campaigns_cover_three_registers_and_two_dynamics():
+    for instrument, anchors in STRING_CAMPAIGNS.items():
+        assert {a["register"] for a in anchors} == {"low", "mid", "high"}
+        for anchor in anchors:
+            assert anchor["string"].startswith("sul")
+            assert "pp" in anchor and "ff" in anchor
 
 
 def test_bowed_checklist_requires_instrument_specific_measured_body():
