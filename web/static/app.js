@@ -92,7 +92,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.12.0"; // Sound Generator 2.0 excitor/resonator/body laws (neutral until a preset opts in)
+const APP_VERSION = "sound-studio-0.13.0"; // Human onset articulation and deterministic blown-air gating
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -658,6 +658,14 @@ const PARAM_DESC = {
   breathBodyAmount: "Routes sustained air through the same fitted body resonances as the harmonic tone so the noise fuses with the instrument; 0 is neutral",
   onsetSpectrumTilt: "Temporary harmonic tilt at the start of a blown note: positive is a brighter plosive, negative darker; 0 leaves the sustain print unchanged",
   onsetSpectrumDecay: "Time for the onset-only harmonic colour to settle into the sustained tone; inert while onset tilt is 0",
+  articulationCoupling: "Couples one seeded articulation-strength draw across the onset: stronger tongue raises the plosive, reduces breath lead, and suppresses pitch scoop; 0 is neutral",
+  articulationStrength: "Mean onset articulation from breath-started (0) to strongly tongued/accented (1)",
+  articulationVariation: "Human-scaled per-note variation around articulation strength; all onset consequences share this one draw",
+  onsetScoopDepthCents: "Measured maximum phrase-start pitch approach from below for weak articulation at full Human; Human 0 hits pitch exactly and depth 0 disables the fitted scoop model",
+  onsetScoopSettle: "Measured time for an onset pitch scoop to settle onto the target",
+  onsetScoopRearticulatedScale: "Scoop depth retained for a separately tongued note inside a phrase; legato always has zero scoop",
+  onsetScoopRegisterSlope: "Fitted log-register scaling of scoop depth: positive values give lower notes a deeper approach",
+  onsetScoopVelocitySlope: "Fitted within-instrument dynamic scaling of scoop depth: negative values give softer, underplayed starts a deeper approach",
   dynamicBlare: "Nonlinear forte brightening: upper partials enrich increasingly above the normal dynamic pivot, modelling brass blare and high-force bowed edge. 0 preserves the ordinary law",
   decaySecondStage: "Amount of double decay after the first 18 dB: 0 uses one T60; higher values reveal a slower aftersound for piano strings and plucked bodies",
   decaySecondRatio: "Late-to-early T60 ratio for double decay. Has no effect while Second stage is 0",
@@ -9072,7 +9080,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
     "dynamicBlare","decaySecondStage","decaySecondRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
@@ -14401,6 +14409,14 @@ function chInspectorHTML(p) {
           ${controlRow("attackNoiseVelocityExponent", "Onset velocity curve", p.attackNoiseVelocityExponent ?? 1, 0, 2, 0.01)}
           ${controlRow("onsetSpectrumTilt", "Onset harmonic tilt", p.onsetSpectrumTilt ?? 0, -1, 1, 0.01)}
           ${controlRow("onsetSpectrumDecay", "Onset-colour decay", p.onsetSpectrumDecay ?? 0.06, 0.015, 0.25, 0.005)}
+          ${controlRow("articulationCoupling", "Coupled articulation", p.articulationCoupling ?? 0, 0, 1, 0.01)}
+          ${controlRow("articulationStrength", "Articulation strength", p.articulationStrength ?? 0.5, 0, 1, 0.01)}
+          ${controlRow("articulationVariation", "Articulation variation", p.articulationVariation ?? 0, 0, 1, 0.01)}
+          ${controlRow("onsetScoopDepthCents", "Scoop depth (cents)", p.onsetScoopDepthCents ?? 0, 0, 180, 1)}
+          ${controlRow("onsetScoopSettle", "Scoop settle", p.onsetScoopSettle ?? 0.06, 0.015, 0.35, 0.005)}
+          ${controlRow("onsetScoopRearticulatedScale", "Inside-phrase scoop", p.onsetScoopRearticulatedScale ?? 0.35, 0, 1, 0.01)}
+          ${controlRow("onsetScoopRegisterSlope", "Scoop register curve", p.onsetScoopRegisterSlope ?? 0, -1.5, 1.5, 0.01)}
+          ${controlRow("onsetScoopVelocitySlope", "Scoop velocity curve", p.onsetScoopVelocitySlope ?? 0, -1.5, 1.5, 0.01)}
         </div>
       </details>
       <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>

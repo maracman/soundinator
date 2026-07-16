@@ -106,6 +106,7 @@ export async function renderNoteOffline(soundParams = {}, options = {}) {
     intonationCents: 0,
     isRest: false,
     legatoFromPrevious: false,
+    phraseStart: true,
     slideFromFrequency: null,
     slideDuration: 0,
     formant: params.formantFocus || "ah",

@@ -673,6 +673,14 @@ export function bodyBandsFor(p, profile) {
   return (profile && profile.resonances) || [];
 }
 
+// Owner L4: blown airflow level is a deterministic consequence of the
+// instrument/dynamic laws.  Human variation belongs in the continuous
+// turbulence trace, not in a per-note gate that can randomly remove breath.
+export function toneBreathLevelFor(excitationType, breath, nextRandom = Math.random) {
+  const level = Math.max(0, Number.isFinite(breath) ? breath : 0);
+  return excitationType === "blow" ? level : nextRandom() * level;
+}
+
 // ── Tone model v2: SPACE positioning (owner request 2026-07-06) ──
 // The instrument sits at a distance and bearing from the listener. The
 // direct path gets true physics; the reverb stays diffuse, so the
@@ -1562,6 +1570,50 @@ export function onsetScoopCents(excitationType, human = 0) {
   return -base * Math.max(0, Math.min(1, human ?? 0));
 }
 
+/** Owner L5/L5b: one articulation-strength draw drives the correlated onset.
+ * Coupling 0 is an exact identity so old presets retain their Q8 behaviour;
+ * fitted presets opt into the measured distribution with explicit scoop
+ * depth/settle values instead of the hand instrument-class table. */
+export function articulationOnsetPlan(nextRandom, options = {}) {
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
+    Number.isFinite(Number(value)) ? Number(value) : lo));
+  const coupling = clamp(options.coupling ?? 0, 0, 1);
+  if (coupling <= 0) return {
+    strength: 0.5, transientGain: 1, breathLeadGain: 1,
+    scoopCents: 0, scoopSettleSec: 0,
+  };
+  const human = clamp(options.human ?? 0, 0, 1);
+  const velocity = clamp(options.velocity ?? 0.62, 0, 1);
+  const variation = clamp(options.variation ?? 0, 0, 1) * human;
+  const draw = typeof nextRandom === "function" ? nextRandom() : 0.5;
+  const mean = clamp(options.strength ?? 0.5, 0, 1);
+  const strength = clamp(mean + (draw * 2 - 1) * variation * 0.5, 0, 1);
+  const transientGain = 1 + coupling * (strength - 0.5) * 1.5;
+  const breathLeadGain = 1 + coupling * (0.5 - strength) * 1.5;
+  if (options.legato) return {
+    strength, transientGain, breathLeadGain, scoopCents: 0,
+    scoopSettleSec: 0,
+  };
+  const phraseScale = options.phraseStart === false
+    ? clamp(options.rearticulatedScale ?? 0.35, 0, 1)
+    : 1;
+  const referenceHz = Math.max(1, Number(options.referenceHz) || 261.63);
+  const frequency = Math.max(1, Number(options.frequency) || referenceHz);
+  const registerScale = Math.pow(referenceHz / frequency,
+    clamp(options.registerSlope ?? 0, -1.5, 1.5));
+  const velocityScale = Math.pow(Math.max(.05, velocity) / .62,
+    clamp(options.velocitySlope ?? 0, -1.5, 1.5));
+  const depth = clamp(options.depthCents ?? 0, 0, 180) * coupling * human *
+    (1 - strength) * phraseScale * registerScale * velocityScale;
+  const settle = clamp(options.settleSec ?? .06, .015, .35) *
+    (0.6 + 0.8 * (1 - strength));
+  return {
+    strength, transientGain, breathLeadGain,
+    scoopCents: -Math.min(180, depth),
+    scoopSettleSec: depth >= 1 ? settle : 0,
+  };
+}
+
 // 2 · Attack stagger: low partials speak first for bow/blow. Measured
 // lowToHighStaggerMs wins when a profile carries it; hand values apply
 // until the sample fitter is re-run.
@@ -2184,6 +2236,7 @@ export class GenerationEngine {
     const gridDuration = durationDivs * divSec;
     const fittedFrequency = this._fitFrequency(hz);
     const previousFrequency = this._lastOutputFrequency;
+    const phraseStart = previousFrequency == null || this._lastGapFraction >= .15 || isMotifStart;
     // P3 note connection (owner): when notes overlap, either GLIDE the new
     // note from the previous pitch (mono legato, the old behaviour) or let
     // both RING (multiphonic) — the tail extension stays either way.
@@ -2260,6 +2313,7 @@ export class GenerationEngine {
       gapFraction,
       intonationCents,
       legatoFromPrevious,
+      phraseStart,
       slideFromFrequency: legatoFromPrevious ? previousFrequency : null,
       slideDuration,
       startDiv: note.startDiv || 0,
@@ -2489,10 +2543,14 @@ export class GenerationEngine {
     const formant = this.p.toneFormantDrift ?? 0;
     const resonance = this.p.toneResonanceDrift ?? 0;
     const breath = this.p.toneBreath ?? 0;
+    const profile = SPECTRAL_PROFILES[this.p.spectralProfile];
+    const excitationType = this.p.excitationType ||
+      profile?.performance?.excitation?.type;
     return {
       toneFormantShift: (this.rng.next() * 2 - 1) * formant,
       toneResonanceShift: (this.rng.next() * 2 - 1) * resonance,
-      toneBreathLevel: this.rng.next() * breath,
+      toneBreathLevel: toneBreathLevelFor(
+        excitationType, breath, () => this.rng.next()),
     };
   }
 
@@ -2640,6 +2698,14 @@ export class GenerationEngine {
       breathBodyAmount: this._clamp(this.p.breathBodyAmount ?? 0, 0, 1),
       onsetSpectrumTilt: this._clamp(this.p.onsetSpectrumTilt ?? 0, -1, 1),
       onsetSpectrumDecay: this._clamp(this.p.onsetSpectrumDecay ?? 0.06, 0.015, 0.25),
+      articulationCoupling: this._clamp(this.p.articulationCoupling ?? 0, 0, 1),
+      articulationStrength: this._clamp(this.p.articulationStrength ?? 0.5, 0, 1),
+      articulationVariation: this._clamp(this.p.articulationVariation ?? 0, 0, 1),
+      onsetScoopDepthCents: this._clamp(this.p.onsetScoopDepthCents ?? 0, 0, 180),
+      onsetScoopSettle: this._clamp(this.p.onsetScoopSettle ?? 0.06, 0.015, 0.35),
+      onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),
+      onsetScoopRegisterSlope: this._clamp(this.p.onsetScoopRegisterSlope ?? 0, -1.5, 1.5),
+      onsetScoopVelocitySlope: this._clamp(this.p.onsetScoopVelocitySlope ?? 0, -1.5, 1.5),
       voiceBreathSync: this._clamp(this.p.voiceBreathSync ?? 0, 0, 1),
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
       // Body stage (T5): carried on the note so the renderer can evaluate
@@ -4527,9 +4593,31 @@ export class SynthEngine {
     if (t0 < this.ctx.currentTime - 0.02) return;
     if (note.isRest || note.velocity <= 0) return; // silence for rest surprises
     note._vibratoEvents = this._buildVibratoEvents(note, t0, t0 + note.duration);
-    // Q8 imperfections: pitch scoops in from below on fresh onsets (never on
-    // legato joins) and wanders slowly during the sustain — both Human-scaled.
-    note._scoopCents = note.legatoFromPrevious ? 0 : onsetScoopCents(note.excitationType, note.excitationHuman);
+    // L5/L5b: one seeded articulation draw controls plosive strength, breath
+    // lead and fitted pitch scoop together. Presets that have not opted in
+    // retain the exact Q8 class-based scoop for compatibility.
+    note._articulationOnset = articulationOnsetPlan(
+      () => this._nextRandom(), {
+        coupling: note.articulationCoupling,
+        strength: note.articulationStrength,
+        variation: note.articulationVariation,
+        human: note.excitationHuman,
+        velocity: note.velocity,
+        frequency: note.frequency,
+        depthCents: note.onsetScoopDepthCents,
+        settleSec: note.onsetScoopSettle,
+        rearticulatedScale: note.onsetScoopRearticulatedScale,
+        registerSlope: note.onsetScoopRegisterSlope,
+        velocitySlope: note.onsetScoopVelocitySlope,
+        phraseStart: note.phraseStart,
+        legato: note.legatoFromPrevious,
+      });
+    note._scoopCents = (note.articulationCoupling || 0) > 0
+      ? note._articulationOnset.scoopCents
+      : (note.legatoFromPrevious ? 0 : onsetScoopCents(note.excitationType, note.excitationHuman));
+    note._scoopSettleSec = (note.articulationCoupling || 0) > 0
+      ? note._articulationOnset.scoopSettleSec
+      : 0;
     note._wanderEvents = f0WanderTrace(() => this._nextRandom(), note.duration, note.excitationHuman);
     const dispatch = (n) => {
       if (this._voiceMode === "formant" || this._voiceMode === "fourier") {
@@ -4672,7 +4760,9 @@ export class SynthEngine {
     // Q8: onset scoop rises over the attack; f0 wander steps slowly through
     // the sustain. Both are cent offsets shared by every partial (coherent).
     const scoopCents = note._scoopCents || 0;
-    const atk = Math.min((note.duration || 0.2) * 0.4, Math.max(0.015, note.envelopeAttack ?? 0.02));
+    const fittedSettle = note._scoopSettleSec || 0;
+    const atk = Math.min((note.duration || 0.2) * 0.4,
+      fittedSettle > 0 ? fittedSettle : Math.max(0.015, note.envelopeAttack ?? 0.02));
     const scoopAt = (time) => scoopCents
       ? scoopCents * Math.max(0, 1 - (time - t0) / atk)
       : 0;
@@ -4876,7 +4966,9 @@ export class SynthEngine {
     if (partials.length === 0) return;
     partials.forEach(item => {
       const target = item.gainScale * Math.max(0, item.part.amp);
-      const onsetGain = onsetSpectrumGain(item.part.harmonic, note.onsetSpectrumTilt);
+      const onsetTilt = (note.onsetSpectrumTilt || 0) *
+        (note._articulationOnset?.transientGain ?? 1);
+      const onsetGain = onsetSpectrumGain(item.part.harmonic, onsetTilt);
       const onsetTarget = target * onsetGain;
       // Q8 attack stagger: delayed partials fade in over their delay
       if ((item.onsetDelay || 0) > 0.001) {
@@ -4936,7 +5028,10 @@ export class SynthEngine {
     const level = Math.max(0.0001,
       breathVelocityGain(note.velocity, note.breathVelocityExponent) * human * 0.035 *
       this._clamp(note.breathLevelScale ?? 1, 0, 3));
-    g.gain.setValueAtTime(0.0001, t0);
+    const breathLead = (note.articulationCoupling || 0) > 0
+      ? level * (note._articulationOnset?.breathLeadGain ?? 1)
+      : 0.0001;
+    g.gain.setValueAtTime(Math.max(0.0001, breathLead), t0);
     g.gain.linearRampToValueAtTime(level, t0 + 0.08);
     const turbulence = this._clamp(note.breathTurbulence ?? 0, 0, 1);
     if (turbulence > 0) {
@@ -5006,7 +5101,8 @@ export class SynthEngine {
     bp.Q.value = Math.max(0.3, an.q || 1);
     const g = this.ctx.createGain();
     const velocityGain = attackNoiseVelocityGain(note.velocity, note.attackNoiseVelocityExponent);
-    const peak = Math.max(0.0001, velocityGain * (an.level || 0.2) * 0.3);
+    const articulationGain = note._articulationOnset?.transientGain ?? 1;
+    const peak = Math.max(0.0001, velocityGain * articulationGain * (an.level || 0.2) * 0.3);
     const decay = Math.max(0.015, an.decay || 0.05);
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(peak, t0 + 0.005);

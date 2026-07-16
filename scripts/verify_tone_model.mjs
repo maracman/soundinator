@@ -23,6 +23,7 @@ import {
   attackNoiseRouting,
   attackNoiseVelocityGain,
   breathVelocityGain,
+  toneBreathLevelFor,
   onsetSpectrumGain,
   registerAttackNoiseAt,
   registerAttackStaggerAt,
@@ -279,6 +280,12 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     near(breathVelocityGain(.2, 1), .2, 1e-12));
   check("lower breath exponent retains relatively more pp turbulence",
     breathVelocityGain(.2, .25) > breathVelocityGain(.2, 1));
+  let breathDraws = 0;
+  check("L4 blown airflow is deterministic rather than randomly gated",
+    toneBreathLevelFor("blow", .3, () => { breathDraws++; return 0; }) === .3 &&
+    breathDraws === 0);
+  check("L4 does not change non-blown tone-colour imperfection",
+    toneBreathLevelFor("bow", .3, () => .5) === .15);
   check("onset harmonic colour is neutral at zero",
     [1, 2, 8, 32].every(n => onsetSpectrumGain(n, 0) === 1));
   check("positive onset tilt brightens only the transient harmonic print",
@@ -891,6 +898,50 @@ console.log("P3: note connection — glide vs ring on overlap");
   check("Q8 wander: short notes don't wander", f0WanderTrace(mkRand(7), 0.3, 1).length === 0);
   check("Q8 wander: deterministic per seed",
     JSON.stringify(f0WanderTrace(mkRand(7), 4, 1)) === JSON.stringify(f0WanderTrace(mkRand(7), 4, 1)));
+}
+
+// ── Owner L5/L5b: correlated onset articulation ──
+{
+  const { articulationOnsetPlan } = await import("../web/static/synth.js");
+  let draws = 0;
+  const neutral = articulationOnsetPlan(() => { draws++; return .1; }, { coupling: 0 });
+  check("L5 articulation: neutral coupling is an exact identity",
+    draws === 0 && neutral.transientGain === 1 && neutral.breathLeadGain === 1 &&
+    neutral.scoopCents === 0);
+  const machine = articulationOnsetPlan(() => .1, {
+    coupling: 1, human: 0, strength: 0, depthCents: 100,
+  });
+  check("L5 articulation: Human 0 hits the pitch exactly",
+    machine.scoopCents === 0);
+  const options = {
+    coupling: 1, human: 1, variation: 0, velocity: .9, frequency: 130,
+    depthCents: 100, settleSec: .1, phraseStart: true,
+  };
+  const weak = articulationOnsetPlan(() => .5, { ...options, strength: .1 });
+  const strong = articulationOnsetPlan(() => .5, { ...options, strength: .9 });
+  check("L5b articulation: plosive and scoop are anticorrelated",
+    strong.transientGain > weak.transientGain &&
+    Math.abs(strong.scoopCents) < Math.abs(weak.scoopCents));
+  check("L5b articulation: weak attacks lead with more breath",
+    weak.breathLeadGain > strong.breathLeadGain);
+  const inside = articulationOnsetPlan(() => .5,
+    { ...options, strength: .1, phraseStart: false, rearticulatedScale: .25 });
+  const legato = articulationOnsetPlan(() => .5,
+    { ...options, strength: .1, legato: true });
+  check("L5 articulation: phrase position reduces scoop and legato removes it",
+    near(Math.abs(inside.scoopCents), Math.abs(weak.scoopCents) * .25, 1e-9) &&
+    legato.scoopCents === 0);
+  const low = articulationOnsetPlan(() => .5,
+    { ...options, strength: .1, frequency: 100, registerSlope: .5 });
+  const high = articulationOnsetPlan(() => .5,
+    { ...options, strength: .1, frequency: 400, registerSlope: .5 });
+  const soft = articulationOnsetPlan(() => .5,
+    { ...options, strength: .1, velocity: .25, velocitySlope: -.5 });
+  const loud = articulationOnsetPlan(() => .5,
+    { ...options, strength: .1, velocity: 1, velocitySlope: -.5 });
+  check("L5 articulation: fitted laws can favour low/soft cold starts",
+    Math.abs(low.scoopCents) > Math.abs(high.scoopCents) &&
+    Math.abs(soft.scoopCents) > Math.abs(loud.scoopCents));
 }
 
 // ── Q7: layered subnote modules ──
