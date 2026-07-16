@@ -912,12 +912,13 @@ console.log("P3: note connection — glide vs ring on overlap");
   const { onsetScoopCents, partialOnsetDelay, releaseRingSeconds, f0WanderTrace, materialT60 } =
     await import("../web/static/synth.js");
   // 1 · onset scoop
-  check("Q8 scoop: from below (negative cents)", onsetScoopCents("bow", 1) < 0);
-  check("Q8 scoop: sustained excitation hunts more than struck",
-    Math.abs(onsetScoopCents("bow", 1)) > Math.abs(onsetScoopCents("strike", 1)) &&
-    Math.abs(onsetScoopCents("blow", 1)) > Math.abs(onsetScoopCents("pluck", 1)));
-  check("Q8 scoop: machines don't hunt (human 0 → 0)", onsetScoopCents("bow", 0) === 0);
-  check("Q8 scoop: scales with human", Math.abs(onsetScoopCents("bow", 0.5)) === Math.abs(onsetScoopCents("bow", 1)) / 2);
+  check("Q8 scoop: blown embouchure approaches from below",
+    onsetScoopCents("blow", 1) < 0);
+  check("T-008 non-blown defaults do not inherit the embouchure scoop",
+    onsetScoopCents("bow", 1) === 0 && onsetScoopCents("pluck", 1) === 0 &&
+    onsetScoopCents("strike", 1) === 0);
+  check("Q8 scoop: machines don't hunt (human 0 → 0)", onsetScoopCents("blow", 0) === 0);
+  check("Q8 scoop: scales with human", Math.abs(onsetScoopCents("blow", 0.5)) === Math.abs(onsetScoopCents("blow", 1)) / 2);
   // 2 · attack stagger
   check("Q8 stagger: fundamental speaks first", partialOnsetDelay(1, "bow") === 0);
   check("Q8 stagger: higher partials wait longer",

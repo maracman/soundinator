@@ -1580,9 +1580,13 @@ export function kbdIsNoteCode(code) {
 // 1 · Onset pitch scoop: f0 approaches from below over the attack —
 // sustained excitation (bow/blow) hunts for pitch far more than a struck
 // or plucked string, and only humans hunt at all.
-const _SCOOP_BASE_CENTS = { bow: 35, blow: 45, pluck: 10, strike: 6 };
+// T-008 / owner L11: scoop-from-below is a blown embouchure gesture, not a
+// neutral Human default for every excitation. Bowed onset pitch will opt into
+// its separately fitted wander/settle model; struck/plucked starts stay exact
+// unless their own family evidence supplies a mechanism.
+const _SCOOP_BASE_CENTS = { blow: 45 };
 export function onsetScoopCents(excitationType, human = 0) {
-  const base = _SCOOP_BASE_CENTS[excitationType] ?? 12;
+  const base = _SCOOP_BASE_CENTS[excitationType] ?? 0;
   return -base * Math.max(0, Math.min(1, human ?? 0));
 }
 
