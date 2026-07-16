@@ -661,6 +661,7 @@ const PARAM_DESC = {
   articulationCoupling: "Couples one seeded articulation-strength draw across the onset: stronger tongue raises the plosive, reduces breath lead, and suppresses pitch scoop; 0 is neutral",
   articulationStrength: "Mean onset articulation from breath-started (0) to strongly tongued/accented (1)",
   articulationVariation: "Human-scaled per-note variation around articulation strength; all onset consequences share this one draw",
+  articulationVelocitySlope: "Within-instrument dynamic slope of the shared articulation draw: positive makes forte more firmly articulated and soft starts more breath-led; 0 is neutral",
   onsetScoopDepthCents: "Measured maximum phrase-start pitch approach from below for weak articulation at full Human; Human 0 hits pitch exactly and depth 0 disables the fitted scoop model",
   onsetScoopSettle: "Measured time for an onset pitch scoop to settle onto the target",
   onsetScoopRearticulatedScale: "Scoop depth retained for a separately tongued note inside a phrase; legato always has zero scoop",
@@ -9080,7 +9081,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
     "dynamicBlare","decaySecondStage","decaySecondRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
@@ -14412,6 +14413,7 @@ function chInspectorHTML(p) {
           ${controlRow("articulationCoupling", "Coupled articulation", p.articulationCoupling ?? 0, 0, 1, 0.01)}
           ${controlRow("articulationStrength", "Articulation strength", p.articulationStrength ?? 0.5, 0, 1, 0.01)}
           ${controlRow("articulationVariation", "Articulation variation", p.articulationVariation ?? 0, 0, 1, 0.01)}
+          ${controlRow("articulationVelocitySlope", "Articulation velocity", p.articulationVelocitySlope ?? 0, -1.5, 1.5, 0.01)}
           ${controlRow("onsetScoopDepthCents", "Scoop depth (cents)", p.onsetScoopDepthCents ?? 0, 0, 180, 1)}
           ${controlRow("onsetScoopSettle", "Scoop settle", p.onsetScoopSettle ?? 0.06, 0.015, 0.35, 0.005)}
           ${controlRow("onsetScoopRearticulatedScale", "Inside-phrase scoop", p.onsetScoopRearticulatedScale ?? 0.35, 0, 1, 0.01)}

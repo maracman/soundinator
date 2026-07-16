@@ -987,6 +987,22 @@ console.log("P3: note connection — glide vs ring on overlap");
   check("L5 articulation: fitted laws can favour low/soft cold starts",
     Math.abs(low.scoopCents) > Math.abs(high.scoopCents) &&
     Math.abs(soft.scoopCents) > Math.abs(loud.scoopCents));
+  const softPlosive = articulationOnsetPlan(() => .5,
+    { ...options, strength: .5, velocity: .2, strengthVelocitySlope: 1 });
+  const loudPlosive = articulationOnsetPlan(() => .5,
+    { ...options, strength: .5, velocity: 1, strengthVelocitySlope: 1 });
+  const neutralSoft = articulationOnsetPlan(() => .5,
+    { ...options, strength: .5, velocity: .2, strengthVelocitySlope: 0 });
+  const neutralLoud = articulationOnsetPlan(() => .5,
+    { ...options, strength: .5, velocity: 1, strengthVelocitySlope: 0 });
+  check("L9 articulation: positive velocity slope makes forte plosive stronger",
+    loudPlosive.strength > softPlosive.strength &&
+    loudPlosive.transientGain > softPlosive.transientGain &&
+    loudPlosive.breathLeadGain < softPlosive.breathLeadGain &&
+    Math.abs(loudPlosive.scoopCents) < Math.abs(softPlosive.scoopCents));
+  check("L9 articulation: zero velocity slope is an exact neutral law",
+    neutralSoft.strength === neutralLoud.strength &&
+    neutralSoft.transientGain === neutralLoud.transientGain);
 }
 
 // ── Q7: layered subnote modules ──
