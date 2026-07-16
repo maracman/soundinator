@@ -63,7 +63,7 @@ envelope-mode application below a crossover, or neighbour-relative gain
 caps. Applies to every instrument whose playing range reaches sparse
 partial spacing (cello, bass voice, guitar low strings, horn pedal).
 Affects: resonances emission (analysis) + bodyResponse application (engine).
-Status: engine=pending (needs analysis spec: selected law, parameter, bounds, and headless consumer assertion) analysis=adapted 8e3bc5b/6f4c027 (fit-side width floor TRIED AND REVERTED — smeared narrow A0/B1; option (c) selected, exact law+bounds+assertion in T-025; lowestF0Hz emitted) bowed=same struck/plucked=adapted (low guitar and harp references get a body-band granularity watch gate; engine law/value pending corpus evidence)
+Status: engine=incorporated c3f8ab8 (T-032 FWHM/three-partial-median cap bounded by consumed lowestF0Hz; metadata-absent and high-register identity asserted) analysis=adapted 8e3bc5b/6f4c027 (fit-side width floor TRIED AND REVERTED — smeared narrow A0/B1; option (c) selected, exact law+bounds+assertion in T-032; lowestF0Hz emitted) bowed=same struck/plucked=adapted (low guitar and harp references get a body-band granularity watch gate; engine law/value pending corpus evidence)
 
 ### T-004 · Measured-body calibration: unity at default
 Author: integrator · 2026-07-16 · Firewall: method
@@ -75,7 +75,7 @@ means more/less than real. Headless assertion: measured instrument at
 defaults reproduces fitted body envelope within tolerance.
 Affects: resonances gains (analysis) / bodyResponse consumption (engine) /
 spectralResonanceAmount semantics.
-Status: engine=pending (needs analysis spec: exact default calibration convention/tolerance and emitted provenance field) analysis=incorporated b68d67f (convention+tolerance+fields stated in T-025; reconstructionAmount/roundTripShapeMaxDb emitted per their T-018) struck/plucked=incorporated (require default measured-body reconstruction plus consuming-side assertion before fitted body carries weight)
+Status: engine=incorporated c3f8ab8 (reconstructionAmount consumed; measured default/UI/fitted presets use unity; fingerprint envelope asserted within 1.5 dB) analysis=incorporated b68d67f (convention+tolerance+fields stated in T-032; reconstructionAmount/roundTripShapeMaxDb emitted per their T-018) struck/plucked=incorporated (require default measured-body reconstruction plus consuming-side assertion before fitted body carries weight)
 
 ### T-005 · Coarse band-balance is a first-class scored dimension
 Author: research (RESEARCH_SUSTAIN_BALANCE) · 2026-07-16 · Firewall: method + per-instrument targets
@@ -144,7 +144,7 @@ land both laws with headless assertions that fail if either metadata field is
 absent or unused; merely present JSON is not acceptance.
 Affects: generated measured-profile schema / bodyResponse application /
 spectralResonanceAmount default / headless consumer assertions.
-Status: engine=pending (consumer boundary reviewed; awaiting the exact emitted contracts) analysis=incorporated b68d67f (resonancesFit subset incl. peakHzA/B + omittedReason in measured_profiles.js; exact laws in T-025) struck/plucked=adapted (grand/nylon seeds consume unity bodies now, but fitting stays blocked until emitted round-trip and low-F0 contracts pass T-007 assertions)
+Status: engine=incorporated c3f8ab8 (reconstructionAmount and lowestF0Hz reach the render fingerprint with T-007 assertions) analysis=incorporated b68d67f (resonancesFit subset incl. peakHzA/B + omittedReason in measured_profiles.js; exact laws in T-032) struck/plucked=adapted (grand/nylon seeds consume unity bodies now, but fitting stays blocked until emitted round-trip and low-F0 contracts pass T-007 assertions)
 
 ### T-011 · Dynamic articulation acts on the shared onset latent
 Author: engine/blown lane · 2026-07-16 · Firewall: mechanism (all sustained families; values per instrument)
@@ -208,7 +208,7 @@ for every fitted point. Engine assertion then applies those same rows at the
 declared amount and verifies the same envelope. This closes T-004/T-007 on
 both sides rather than merely changing the knob default.
 Affects: fit_fixed_body residual tables / resonancesFit provenance / T-004 engine consumption.
-Status: engine=pending (live-contract review; no incompatible engine law landed) analysis=incorporated 6f4c027 (mask equality) + b68d67f (roundTripShapeMaxDb per their T-018) struck/plucked=incorporated (piano/guitar/harp bodies may not carry weight until the emitted reconstruction mask round-trips within tolerance)
+Status: engine=incorporated c3f8ab8 (rounded emitted bands are the sole body consumer; unity fingerprint assertion closes the render side) analysis=incorporated 6f4c027 (mask equality) + b68d67f (roundTripShapeMaxDb per their T-018) struck/plucked=incorporated (piano/guitar/harp bodies may not carry weight until the emitted reconstruction mask round-trips within tolerance)
 
 ### T-015 · Open cylindrical bore is an explicit construction class
 Author: engine/blown lane · 2026-07-16 · Firewall: mechanism
@@ -241,7 +241,7 @@ method gate, not a transferred fitted value: it prevents a steep air-jet
 spectrum from being re-minted as a kazoo-like fixed formant (L7). Consuming
 tests cover one stable/non-minimal profile and both failure conditions.
 Affects: flute resonance emission / measured-body construction assertion / L7.
-Status: engine=pending (will consume the emitted decision, not re-evaluate hidden JSON) analysis=incorporated b68d67f (stability gate in fit_fixed_body; omittedReason emitted; tables undivided on omission per T-014) struck/plucked=n/a (flute-only prior)
+Status: engine=incorporated c3f8ab8 (explicit empty resonances resolves to zero effective bands; legacy flute fallback is suppressed) analysis=incorporated b68d67f (stability gate in fit_fixed_body; omittedReason emitted; tables undivided on omission per T-014) struck/plucked=n/a (flute-only prior)
 
 ### T-017 · Strict coverage is per bar×register×dynamic, not any-bar per cell
 Author: engine/blown lane · 2026-07-16 · Firewall: method-only
@@ -270,7 +270,7 @@ body/residual pair. JS provenance must include `peakHzA`, `peakHzB`, and
 provable. Consuming assertion: every measured blown profile has method v3 and
 all mandatory fields before a campaign builder may emit its initial preset.
 Affects: blown measured_profiles JSON/JS / build_campaign / consolidated refit wave.
-Status: engine=pending (refit wave blocked on the actual v3 blown rows) analysis=in-progress b68d67f (full v3 regeneration of the five blown + violin/cello running; new struck/plucked corpus folders lack contracts and are excluded from this run) struck/plucked=n/a (blown-profile migration; the same v3 schema will be required when struck/plucked profiles regenerate)
+Status: engine=incorporated c3f8ab8 (all mandatory v3 fields and explicit omission paths consumed; exact quarantined 642eefa profiles pass verifier/JS/render integration) analysis=in-progress b68d67f (full v3 regeneration of the five blown + violin/cello running; new struck/plucked corpus folders lack contracts and are excluded from this run) struck/plucked=n/a (blown-profile migration; the same v3 schema will be required when struck/plucked profiles regenerate)
 
 ### T-018 · Round-trip provenance measures the exported reconstruction
 Author: engine/blown lane · 2026-07-16 · Firewall: method-only
@@ -285,7 +285,7 @@ to JS. The engine consuming assertion uses the rounded JS rows and the same
 1 dB bound. Clamp diagnostics may remain separately named
 `bodyClampMaxDb`; they cannot stand in for reconstruction accuracy.
 Affects: resonancesFit provenance / analysis round-trip assertion / T-004 engine assertion.
-Status: engine=pending analysis=incorporated b68d67f (roundTripShapeMaxDb from ROUNDED emitted rows, median offset removed, acceptance <= 1 dB; bodyClampMaxDb separate) struck/plucked=incorporated (require exported rounded-body shape error <=1 dB before piano/guitar body loss is enabled)
+Status: engine=incorporated c3f8ab8 (unity-at-default consumer uses the rounded emitted rows; sustained-envelope assertion <=1.5 dB) analysis=incorporated b68d67f (roundTripShapeMaxDb from ROUNDED emitted rows, median offset removed, acceptance <= 1 dB; bodyClampMaxDb separate) struck/plucked=incorporated (require exported rounded-body shape error <=1 dB before piano/guitar body loss is enabled)
 
 ### T-020 · Percussive f0 analysis consumes the known note anchor
 Author: struck/plucked lane · 2026-07-16 · Firewall: method-only
@@ -532,7 +532,7 @@ emitted (b68d67f) and defined as:
    more than 6 dB; violin A4 render bit-identical with the cap enabled.
 Affects: bodyResponse consumption / spectralResonanceAmount default /
 L12 owner-ear acceptance ("body colour without a resonant extra note").
-Status: engine=pending analysis=incorporated b68d67f (all fields emitted and asserted analysis-side) struck/plucked=incorporated (piano/guitar body-weighted fitting remains blocked until these engine consumers land)
+Status: engine=incorporated c3f8ab8 (unity default, exact low-register cap and T-007 render assertions; validated against quarantined v3 commit 642eefa) analysis=incorporated b68d67f (all fields emitted and asserted analysis-side) struck/plucked=incorporated (piano/guitar body-weighted fitting is unblocked on the engine side)
 
 ### T-033 · ENGINE+ANALYSIS SPEC: per-string identity tables (G1 extension)
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; tables per instrument
@@ -582,7 +582,7 @@ no measured-body decision at all. Headless consumer assertion: explicit
 omission yields an empty effective body and differs from the legacy fallback;
 profiles with absent `resonances` may still use the logged fallback.
 Affects: measured-profile merge / BODY_PRESETS / T-016 / L7.
-Status: engine=pending (concrete failure reproduced at `642eefa`)
+Status: engine=incorporated c3f8ab8 (explicit empty is a first-class measured decision; absent-only fallback logs; 642eefa flute resolves to no body and passes the full verifier)
 analysis=incorporated `b359f32` (v3 bulk profile commit quarantined until
 the consuming assertion passes) struck/plucked=incorporated (explicit measured-body omission must suppress fallback for every family)
 
