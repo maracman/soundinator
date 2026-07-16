@@ -82,11 +82,11 @@ parameter ledger.
 
 ## Owner listening artifacts
 
-- Audit: `/private/tmp/sg2/guitar-nylon/restored-audit-03-profile-v2/`
-- Accepted renders: `/private/tmp/sg2/guitar-nylon/restored-iteration-04-profile-v2/renders/eval-0019/`
-- Listening page: `/private/tmp/sg2/guitar-nylon/restored-iteration-04-profile-v2/listen-guitar-nylon-restored-iteration-04-profile-v2.html`
-- Run report: `/private/tmp/sg2/guitar-nylon/restored-iteration-04-profile-v2/RUN_REPORT.md`
-- Plateau evidence/work item: `/private/tmp/sg2/guitar-nylon/restored-iteration-03/` and `/private/tmp/sg2/guitar-nylon/work-items.json`
+The loose pass-02 campaign artifacts under `/private/tmp` were destroyed by
+the 2026-07-16 host cleanup. The fitted parameters survived in git. The
+campaign was deterministically rebuilt and superseded by pass 03 under
+`SG2_DATA`; see `STRUCK_PLUCKED_PASS_03.md`. No campaign-critical SG2
+artifact is written under `/tmp`.
 
 ## Verification
 

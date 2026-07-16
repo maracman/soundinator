@@ -17,7 +17,11 @@ Run from the engine checkout whose sound you want on the page:
 Agents: run this at the end of every pass (owner-facing contract).
 """
 import hashlib, html, json, os, subprocess, sys, time
+from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 from scripts.tone_match.paths import sg2_data_root
 
 SG2 = str(sg2_data_root())

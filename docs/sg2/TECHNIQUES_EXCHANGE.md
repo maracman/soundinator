@@ -551,9 +551,33 @@ table set + per-string B/damping when present. Headless assertion: with
 per-string tables present, the same midi under two sul selections
 differs in high-band energy in the direction the tables encode; absent
 tables => bit-identical fallback.
+Guitar consuming extension (Agent C, pass 08): `partialsByString` uses
+unambiguous course keys `string6`..`string1` (standard open MIDI
+40/45/50/55/59/64). `stringSelect` is the enum
+`auto|string6|string5|string4|string3|string2|string1`, default `auto`.
+For `auto`, consider courses whose open MIDI is <= the requested MIDI and
+whose fret is <= 24, choose the minimum fret, and break ties toward the
+lower-pitched course. An explicit course outside that playable interval is
+invalid rather than silently falling back. Each course entry may override
+the existing bounded `partials`, `partialB`, and material/decay fields; a
+missing entry consumes the pooled profile bit-identically. Headless
+assertions: (1) E4 auto selects open `string1`; (2) an explicit playable
+course consumes its own table; (3) two synthetic course tables with opposite
+high-band tilt move rendered n>=8/n<=4 energy by at least 3 dB in the encoded
+direction at the same MIDI; (4) absent course tables are bit-identical to the
+current pooled renderer; (5) an unplayable explicit course is rejected.
+Analysis consuming assertion: a course-labelled reference can contribute
+only to its matching course table, and pooled fallback is emitted only when
+course coverage is below the declared minimum.
 Affects: partialsByRegister schema / engine table selection / WP-6 morph
 axis (SWAM exposes Alternate Fingering).
-Status: engine=pending analysis=pending b68d67f (storage lands with the first per-string fit next pass) struck/plucked=blocked-engine (nylon register tables now consume exact E2/G3/E5 anchors, but all 12 partial/mel cells remain above bar; steel↔nylon cannot share one pooled guitar table, and bow-specific sul-selection semantics do not transfer)
+Nylon evidence: pass 05 improved `3.493823→3.475820`, pass 06 improved
+`4.080068→4.060831`, and pass 07 improved `4.066990→3.725441`; pass 08 then
+tested all seven remaining shared spectrum/onset controls for 44 evaluations
+on the repeat-stable objective and produced no improvement
+(`3.470322→3.470322`). All six active mel cells remain above bar while
+construction is 11/11 and resources pass.
+Status: engine=pending (guitar extension above is ready for one-pass consumption) analysis=pending b68d67f (storage lands with the first per-string fit) struck/plucked=blocked-engine T-033 (global-control plateau demonstrated; rerun from durable pass-08 state after consumer lands)
 
 ### T-034 · ENGINE SPEC (small): dynamic pitch flattening for bowed forte
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; value fitted per instrument; INSTRUMENT physics, not Human
