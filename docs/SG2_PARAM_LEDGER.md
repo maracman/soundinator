@@ -118,3 +118,19 @@ Composite loss: `3.917010`
 | `partialTilt` | 0.0 | not run |
 | `partialTransfer` | 0.0 | not run |
 | `spectralResonanceAmount` | 0.35 | not run |
+
+## alto-sax — wp5-alto-sax-corrected-pass1b
+
+Composite loss: `4.645456`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseLevel` | 0.5266877345078729 | 0.000093 |
+| `breathNoiseColor` | 0.2795888588276901 | 0.002166 |
+| `dynamicBlare` | 0.4 | 0.001597 |
+| `excitationHuman` | 0.364403648667616 | 0.006970 |
+| `excitationPosition` | 0.08315571358214188 | 0.369585 |
+| `partialTilt` | 0.0 | 0.183420 |
+| `partialTransfer` | 0.1 | 0.002441 |
+| `spectralResonanceAmount` | 0.35 | 0.002479 |
+| `toneBreath` | 0.3055728090000841 | -0.000000 |
