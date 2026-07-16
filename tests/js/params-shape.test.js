@@ -89,12 +89,15 @@ test("layer mix plan dual-reads gain and solo", () => {
   assert.deepEqual(layerMixPlan(unified, renders), layerMixPlan(legacy, renders));
 });
 
-test("converged alto sax is frozen as an interim factory sound", () => {
+test("audited alto sax remains an interim factory sound", () => {
   const preset = FACTORY_PRESETS.find(row => row.id === "factory-sub-alto-sax-sg2");
   assert.ok(preset);
   assert.equal(preset.section, "sound");
   assert.equal(preset.parameters.resonatorClass, "conicalTube");
-  assert.equal(preset.parameters.dynamicBlare, 1.0294720710325107);
+  assert.equal(preset.parameters.dynamicBlare, 0.4);
+  assert.equal(preset.parameters.breathVelocityExponent, 0.23432013743870406);
+  assert.equal(preset.parameters.spectralCullThreshold, 0.0024);
+  assert.equal(preset.parameters.envelopeAttackByRegister.length, 3);
   assert.ok(preset.tags.includes("interim"));
 });
 

@@ -130,3 +130,24 @@ A focused onset-law pass then improved flute again from 4.1344 to 3.9170.
 `attackNoiseVelocityExponent ≈ 0.0011` and 30% independent transient routing
 closed the low-soft floor without weakening construction. Mid-forte is now
 1.0420× floor and mid-soft 1.1805×; those two groups keep the campaign open.
+
+Alto sax was then reopened under the same process. Its campaign matrix now
+contains 12 Iowa/Philharmonia references and all six low/mid/high × pp/ff
+variability-floor groups; WP-3 supplies three measured register-attack
+anchors. The corrected baseline ran 98 evaluations, passed all construction
+checks, and reached five floors, leaving only high-ff at 1.1499×.
+
+The owner-note preflight then exposed two missing observables/laws: soft reed
+air retained separately from tone, and onset-only harmonic colour. Neutral
+engine controls and explicit sustained-noise/onset-tilt score dimensions were
+added, then encoded as sax construction assertions. The 100-evaluation
+owner-note pass improved its versioned objective from 3.9226 to 3.8672 and
+passed all 13 assertions. Five groups remain at/below floor; high-ff is
+1.2425× under the stricter objective. The interim factory preset now carries
+that audited best. A filed external work item limits the next change to
+register/dynamic-conditioned breath and onset anchors; alto sax is not frozen.
+The full-fidelity preset initially failed renderer-density tripwires at 39
+oscillators/390 automation events. Scorer-gated audibility culling selected
+`spectralCullThreshold = 0.0024` (0.465 dB log-mel delta, construction green;
+0.0025 exceeded the 0.5 dB budget). The resulting interim passes resource
+gates at 23 oscillators and 230 events, 1.15×/1.21× the factory median.

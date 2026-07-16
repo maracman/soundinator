@@ -134,3 +134,20 @@ Composite loss: `4.645456`
 | `partialTransfer` | 0.1 | 0.002441 |
 | `spectralResonanceAmount` | 0.35 | 0.002479 |
 | `toneBreath` | 0.3055728090000841 | -0.000000 |
+
+## alto-sax — wp5-alto-sax-owner-notes-pass2
+
+Composite loss: `3.867218`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseLevel` | 0.5266877345078729 | 0.000024 |
+| `breathBodyAmount` | 0.7835799563788599 | 0.002858 |
+| `breathLevelScale` | 2.0233281560585272 | -0.000061 |
+| `breathNoiseColor` | 0.03606797749978963 | 0.004457 |
+| `breathTurbulence` | 0.616623651029748 | 0.008380 |
+| `breathVelocityExponent` | 0.23432013743870406 | 0.015026 |
+| `dynamicBlare` | 0.4 | -0.000155 |
+| `onsetSpectrumDecay` | 0.06980930789040009 | 0.002184 |
+| `onsetSpectrumTilt` | -0.21878552323970732 | 0.002691 |
+| `partialTilt` | 0.0 | 0.174295 |

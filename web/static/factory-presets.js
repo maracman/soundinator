@@ -47,8 +47,8 @@ const profileSounds = [
     envelopeRelease: excitationType === "strike" ? 0.28 : 0.28,
   }));
 
-// WP-5 fitted instruments: automated construction gates passed and the
-// available same-note/dynamic groups reached the measured variability floor.
+// WP-5 fitted instruments. The alto-sax entry remains explicitly interim
+// until its final high-ff variability-floor cell closes.
 const fittedSounds = [
   sound("factory-sub-alto-sax-sg2", "Alto Sax — SG2 Interim",
     "A fitted classical alto sax stepping stone for the tenor-sax campaign.",
@@ -57,18 +57,29 @@ const fittedSounds = [
       spectralProfile: "alto-sax", spectralMix: 1, spectralPartials: 64,
       excitationType: "blow", resonatorClass: "conicalTube", bodyType: "auto",
       partialB: 0, partialMaterial: 0.29,
-      attackNoiseLevel: 1.3814721066344928, attackNoiseFreq: 1688,
+      attackNoiseLevel: 0.5266877345078729, attackNoiseFreq: 1688,
       attackNoiseQ: 0.89, attackNoiseDecay: 0.121,
       envelopeAttack: 0.0898, envelopeDecay: 0.0125,
       envelopeSustain: 0.8692, envelopeRelease: 0.3043, vibratoProb: 0,
-      excitationPosition: 0.1605073321079179,
-      excitationHuman: 0.6004405719544454,
-      toneBreath: 0.3626897744941535,
-      breathNoiseColor: 0.41555903348218937,
-      partialTransfer: 0.23606797749978972, partialTilt: 0,
+      excitationPosition: 0.08315571358214188,
+      excitationHuman: 0.364403648667616,
+      toneBreath: 0.3055728090000841,
+      breathNoiseColor: 0.03606797749978963,
+      breathLevelScale: 2.0233281560585272,
+      breathVelocityExponent: 0.23432013743870406,
+      breathTurbulence: 0.616623651029748,
+      breathBodyAmount: 0.7835799563788599,
+      onsetSpectrumTilt: -0.21878552323970732,
+      onsetSpectrumDecay: 0.06980930789040009,
+      partialTransfer: 0.1, partialTilt: 0,
       spectralResonanceAmount: 0.35, spectralDynamicAmount: 0.8,
-      spectralCullThreshold: 0.002,
-      dynamicBlare: 1.0294720710325107,
+      spectralCullThreshold: 0.0024,
+      dynamicBlare: 0.4,
+      envelopeAttackByRegister: [
+        { f0: 183.557, attack: 0.1197 },
+        { f0: 341.348, attack: 0.0898 },
+        { f0: 637.626, attack: 0.0649 },
+      ],
     }),
   sound("factory-sub-clarinet-sg2", "Clarinet — SG2 Fitted",
     "A fitted B-flat clarinet spanning chalumeau through clarino registers.",
