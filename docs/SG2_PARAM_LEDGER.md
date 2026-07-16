@@ -204,3 +204,57 @@ Composite loss: `7.504955`
 | `partialTilt` | 0.0 | not run |
 | `spectralResonanceAmount` | 1.0 | not run |
 | `velocityHardnessCoupling` | 0.408288512677725 | not run |
+
+## french-horn — wp5-french-horn-owner-l5-baseline
+
+Composite loss: `2.842461`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `articulationCoupling` | 0.5518 | not run |
+| `articulationStrength` | 0.5 | not run |
+| `articulationVariation` | 1.0 | not run |
+| `onsetScoopDepthCents` | 99.3814 | not run |
+| `onsetScoopRearticulatedScale` | 0.35 | not run |
+| `onsetScoopRegisterSlope` | 0.35 | not run |
+| `onsetScoopSettle` | 0.1533333 | not run |
+| `onsetScoopVelocitySlope` | -0.25 | not run |
+
+## french-horn — wp5-french-horn-owner-l5-baseline-v2
+
+Composite loss: `2.842462`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `articulationCoupling` | 0.5518 | not run |
+| `articulationStrength` | 0.5 | not run |
+| `articulationVariation` | 1.0 | not run |
+| `onsetScoopDepthCents` | 99.3814 | not run |
+| `onsetScoopRearticulatedScale` | 0.35 | not run |
+| `onsetScoopRegisterSlope` | 0.35 | not run |
+| `onsetScoopSettle` | 0.1533333 | not run |
+| `onsetScoopVelocitySlope` | -0.25 | not run |
+
+## french-horn — wp5-french-horn-owner-l6-baseline
+
+Composite loss: `2.704752`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `onsetScoopDepthCents` | 107.304 | not run |
+| `onsetScoopRegisterSlope` | 0.35 | not run |
+| `onsetScoopSettle` | 0.1502268 | not run |
+| `onsetScoopVelocitySlope` | -0.25 | not run |
+| `spectralResonanceAmount` | 1.0 | not run |
+
+## french-horn — wp5-french-horn-owner-l6-onset2
+
+Composite loss: `2.517304`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `onsetScoopDepthCents` | 3.5774106744509737 | not run |
+| `onsetScoopRegisterSlope` | 0.35 | not run |
+| `onsetScoopSettle` | 0.1502268 | not run |
+| `onsetScoopVelocitySlope` | -0.25 | not run |
+| `spectralResonanceAmount` | 0.5854814992176212 | not run |

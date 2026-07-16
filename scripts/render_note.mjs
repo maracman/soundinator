@@ -103,7 +103,10 @@ async function renderJobs(jobs) {
     await page.goto(`${ROOT_URL}/index.html`, { waitUntil: "domcontentloaded" });
     const results = [];
     for (const job of jobs) {
-      const params = await paramsFor(job);
+      const baseParams = await paramsFor(job);
+      const params = Number.isFinite(Number(job.seed))
+        ? { ...baseParams, seed: Number(job.seed) }
+        : baseParams;
       const rendered = await page.evaluate(async ({ params, options }) => {
         const { renderNoteOffline } = await import("/render-note.js");
         const buffer = await renderNoteOffline(params, options);
