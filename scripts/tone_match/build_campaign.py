@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Materialise analysis-only WP-5 note references and pinned seed presets.
 
-Source audio remains under /private/tmp.  Iowa chromatic runs are segmented
+Source audio remains under the gitignored SG2 data root. Iowa chromatic runs are segmented
 into individual notes; already-downloaded Philharmonia notes are used only as
 same-pitch/same-dynamic alternate takes for the variability floor.
 """
@@ -18,6 +18,7 @@ import numpy as np
 
 from scripts.fit_profiles_from_samples import analyse_note, load_mono, segment_notes, sf
 from scripts.tone_match.exclusions import is_excluded
+from scripts.tone_match.paths import sg2_data_root
 
 
 VELOCITY = {"pp": 0.2, "ff": 0.92}
@@ -293,13 +294,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instrument", choices=sorted(CAMPAIGNS), action="append",
                         help="repeatable; defaults to all WP-5 covered instruments")
-    parser.add_argument("--samples", type=Path, default=Path("/private/tmp/sg2/samples"))
+    data_root = sg2_data_root()
+    parser.add_argument("--samples", type=Path, default=data_root / "samples")
     parser.add_argument("--measured", type=Path, default=Path("web/static/measured_profiles.json"))
-    parser.add_argument("--output", type=Path, default=Path("/private/tmp/sg2/campaigns"))
+    parser.add_argument("--output", type=Path, default=data_root / "campaigns")
     parser.add_argument("--philharmonia", type=Path,
-                        default=Path("/private/tmp/sg2/phil_brass/Brass"))
+                        default=data_root / "phil_brass" / "Brass")
     parser.add_argument("--philharmonia-woodwind", type=Path,
-                        default=Path("/private/tmp/sg2/phil_woodwind/Woodwind"))
+                        default=data_root / "phil_woodwind" / "Woodwind")
     args = parser.parse_args(argv)
     instruments = args.instrument or list(CAMPAIGNS)
     summaries = [build(name, args.samples, args.measured, args.output, args.philharmonia,

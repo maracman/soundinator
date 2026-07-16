@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Rebuild the owner's SG2 listening page from the latest leaderboard bests.
 
-Scans /private/tmp/sg2/campaigns/* for reference sets, resolves each
+Scans SG2_DATA/campaigns/* for reference sets, resolves each
 instrument's current best parameters (leaderboard `best.params` inline,
 falling back to `<inst>/<run>/best.json` wrappers and flat params files),
 renders any stale notes through scripts/render_note.mjs, and writes
-/private/tmp/sg2/listen.html.
+SG2_DATA/listen.html.
 
-Renders are cached per instrument by (params hash, engine commit): nothing
-re-renders unless the best params or the engine changed. Instruments with
+Renders are cached per instrument by (params hash, engine commit, measured
+profile hash): nothing re-renders unless the best params or audible engine changed. Instruments with
 references but no leaderboard best (e.g. pre-campaign strings) render a
 clearly-tagged BASELINE from the bare measured profile.
 
@@ -18,7 +18,9 @@ Agents: run this at the end of every pass (owner-facing contract).
 """
 import hashlib, html, json, os, subprocess, sys, time
 
-SG2 = "/private/tmp/sg2"
+from scripts.tone_match.paths import sg2_data_root
+
+SG2 = str(sg2_data_root())
 NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 
 def nname(m): return f"{NOTE_NAMES[m % 12]}{m // 12 - 1}"
@@ -30,6 +32,12 @@ def engine_commit():
     except Exception:
         return "unknown"
 
+def measured_profile_hash():
+    try:
+        return hashlib.sha256(open("web/static/measured_profiles.js", "rb").read()).hexdigest()
+    except OSError:
+        return "missing"
+
 def unwrap(obj):
     if not isinstance(obj, dict): return None
     if "excitationType" in obj or "spectralProfile" in obj: return obj
@@ -38,19 +46,20 @@ def unwrap(obj):
 
 def resolve_best(inst):
     """Return (params, label) or (None, None)."""
-    lb_path = f"{SG2}/{inst}/leaderboard.json"
+    lb_path = f"{SG2}/state/{inst}/leaderboard.json"
     if os.path.exists(lb_path):
         best = (json.load(open(lb_path)).get("best") or {})
         run = best.get("run") or best.get("runId") or best.get("name") or "?"
         p = unwrap(best)
         if p: return p, f"{run} (leaderboard)"
-        for cand in (f"{SG2}/{inst}/{run}/best.json", f"{SG2}/refit-wave/{run}/best.json"):
+        for cand in (f"{SG2}/state/{inst}/{run}/best.json",
+                     f"{SG2}/runs/{inst}/{run}/best.json"):
             if os.path.exists(cand):
                 p = unwrap(json.load(open(cand)))
                 if p: return p, f"{run} (leaderboard)"
     # newest best.json anywhere under the instrument
     cands = []
-    for root, _dirs, files in os.walk(f"{SG2}/{inst}"):
+    for root, _dirs, files in os.walk(f"{SG2}/state/{inst}"):
         if "best.json" in files: cands.append(os.path.join(root, "best.json"))
     for cand in sorted(cands, key=os.path.getmtime, reverse=True):
         p = unwrap(json.load(open(cand)))
@@ -65,12 +74,12 @@ def baseline_params(inst, refs):
     return {"voiceMode": "fourier", "spectralMix": 1.0, "spectralPartials": 64,
             "excitationType": exc, "spectralProfile": profile, "seed": 7331}
 
-def render_if_stale(inst, params, refs, commit):
-    outdir = f"{SG2}/{inst}/listen-live"
+def render_if_stale(inst, params, refs, commit, profile_hash):
+    outdir = f"{SG2}/listen-live/{inst}"
     os.makedirs(outdir, exist_ok=True)
     stamp_path = f"{outdir}/stamp.json"
     want = {"paramsHash": hashlib.sha256(json.dumps(params, sort_keys=True).encode()).hexdigest(),
-            "engine": commit, "count": len(refs)}
+            "engine": commit, "measuredProfileHash": profile_hash, "count": len(refs)}
     if os.path.exists(stamp_path) and json.load(open(stamp_path)) == want \
        and all(os.path.exists(f"{outdir}/note-{i}.wav") for i in range(len(refs))):
         return False
@@ -86,6 +95,7 @@ def render_if_stale(inst, params, refs, commit):
 
 def main():
     commit = engine_commit()
+    profile_hash = measured_profile_hash()
     sections, rendered = [], []
     insts = sorted(d for d in os.listdir(f"{SG2}/campaigns")
                    if os.path.exists(f"{SG2}/campaigns/{d}/references.json"))
@@ -96,11 +106,11 @@ def main():
                      ("BASELINE — no fitted preset yet", "background:#3d332a;color:#d8bd9f")
         if not params: params = baseline_params(inst, refs)
         try:
-            if render_if_stale(inst, params, refs, commit): rendered.append(inst)
+            if render_if_stale(inst, params, refs, commit, profile_hash): rendered.append(inst)
         except subprocess.CalledProcessError as e:
             sections.append(f"<h2>{inst}</h2><p class=dim>render failed: {html.escape(str(e))}</p>")
             continue
-        rows = sorted(((f"{inst}/listen-live/note-{i}.wav", r) for i, r in enumerate(refs)),
+        rows = sorted(((f"listen-live/{inst}/note-{i}.wav", r) for i, r in enumerate(refs)),
                       key=lambda p: (p[1]["midi"], p[1].get("dynamic", ""), p[1].get("string", "")))
         body = [f"<h2>{inst}<span class=tag style='{style}'>{html.escape(tag)}</span></h2>"
                 "<table><tr><th>Note</th><th>Register · dynamic</th><th>Reference (real)</th>"

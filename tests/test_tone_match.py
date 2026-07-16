@@ -12,7 +12,7 @@ from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, 
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.controllability import canonical_hash, perturbations, validate_audit_contract
-from scripts.tone_match.iterate import FreeParam, ToneMatcher, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability, _renderer_contract_hash, _tripwire_gate, _update_leaderboard
+from scripts.tone_match.iterate import FreeParam, ToneMatcher, _append_ledger, _dominant_residual, _floor_evidence, _load_preset, _params, _reference_set_id, _reference_variability, _renderer_contract_hash, _tripwire_gate, _update_leaderboard
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, seed_preset
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
@@ -155,6 +155,14 @@ def test_reference_set_id_changes_when_the_scored_manifest_changes():
         _reference_set_id(base, weights={"partials_db": 0})
 
 
+def test_state_best_wrapper_is_a_valid_initial_preset(tmp_path):
+    path = tmp_path / "best.json"
+    path.write_text(json.dumps({"loss": 1.2, "params": {
+        "excitationType": "pluck", "spectralProfile": "guitar",
+    }}))
+    assert _load_preset(path)["excitationType"] == "pluck"
+
+
 def test_renderer_contract_hash_changes_with_profile_bytes(tmp_path, monkeypatch):
     monkeypatch.setattr(iterate_module, "ROOT", tmp_path)
     for relative in iterate_module.RENDERER_CONTRACT_FILES:
@@ -290,6 +298,7 @@ def test_ledger_keeps_fitted_free_values_when_sensitivity_is_skipped(tmp_path, m
 
 def test_leaderboard_preview_does_not_record_unaccepted_candidate(tmp_path, monkeypatch):
     monkeypatch.setattr(iterate_module, "DEFAULT_RUN_ROOT", tmp_path)
+    monkeypatch.setattr(iterate_module, "STATE_ROOT", tmp_path)
     best = {
         "loss": 1.5,
         "params": {"partialTilt": .2},

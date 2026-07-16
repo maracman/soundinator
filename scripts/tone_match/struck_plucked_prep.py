@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from scripts.fit_profiles_from_samples import analyse_note, load_mono, segment_notes, sf
+from scripts.tone_match.paths import sg2_data_root
 
 
 VELOCITY = {"pp": 0.2, "p": 0.28, "f": 0.82, "ff": 0.92}
@@ -248,9 +249,10 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instrument", choices=sorted(CAMPAIGNS), action="append")
-    parser.add_argument("--samples", type=Path, default=Path("/private/tmp/sg2/samples"))
+    data_root = sg2_data_root()
+    parser.add_argument("--samples", type=Path, default=data_root / "samples")
     parser.add_argument("--measured", type=Path, default=Path("web/static/measured_profiles.json"))
-    parser.add_argument("--output", type=Path, default=Path("/private/tmp/sg2/campaigns"))
+    parser.add_argument("--output", type=Path, default=data_root / "campaigns")
     args = parser.parse_args(argv)
     instruments = args.instrument or list(CAMPAIGNS)
     summaries = [build(name, args.samples, args.measured, args.output) for name in instruments]

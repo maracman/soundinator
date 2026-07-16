@@ -23,7 +23,8 @@ from typing import Any
 
 import numpy as np
 
-from .iterate import FreeParam, _params, _renderer_contract_hash
+from .iterate import FreeParam, _load_preset, _params, _renderer_contract_hash
+from .paths import sg2_data_root
 from .score import (
     SCORER_CONTRACT_VERSION,
     compare_features,
@@ -33,7 +34,7 @@ from .score import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ROOT = Path("/private/tmp/sg2")
+DEFAULT_ROOT = sg2_data_root() / "audits"
 DEFAULT_KEYS = (
     "excitationPosition", "excitationHardness", "velocityHardnessCoupling",
     "excitationHuman", "attackNoiseLevel", "attackNoiseDirect",
@@ -449,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     run_dir = args.output_root / args.instrument / args.run
     run_dir.mkdir(parents=True, exist_ok=args.resume)
-    initial = json.loads(args.initial.read_text())
+    initial = _load_preset(args.initial)
     references = json.loads(args.references.read_text())
     manifest = json.loads(args.manifest.read_text())
     keys = list(dict.fromkeys(key.strip() for key in args.keys.split(",") if key.strip()))

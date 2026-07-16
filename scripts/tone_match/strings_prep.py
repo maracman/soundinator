@@ -20,7 +20,7 @@ campaign (fits are gated on P2 landing plus the engine lane's P5 gates):
   adjacent-semitone proxies vs vib/nonvib pairs) is written as
   take-pairs.json — the differential fitting itself comes later.
 
-Artifacts land under /private/tmp/sg2/campaigns/<instrument>/ and are
+Artifacts land under SG2_DATA/campaigns/<instrument>/ and are
 never committed.
 """
 
@@ -36,6 +36,7 @@ from typing import Any
 import numpy as np
 
 from scripts.tone_match.exclusions import is_excluded
+from scripts.tone_match.paths import sg2_data_root
 from scripts.fit_profiles_from_samples import (
     analyse_note,
     load_mono,
@@ -529,10 +530,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instrument", choices=sorted(STRING_CAMPAIGNS),
                         action="append")
-    parser.add_argument("--samples", type=Path, default=Path("/private/tmp/sg2/samples"))
-    parser.add_argument("--output", type=Path, default=Path("/private/tmp/sg2/campaigns"))
+    data_root = sg2_data_root()
+    parser.add_argument("--samples", type=Path, default=data_root / "samples")
+    parser.add_argument("--output", type=Path, default=data_root / "campaigns")
     parser.add_argument("--phil-catalogue", type=Path,
-                        default=Path("/private/tmp/sg2/phil_strings/Strings"),
+                        default=data_root / "phil_strings" / "Strings",
                         help="downloaded Philharmonia strings catalogue root "
                              "(per-instrument folders) for duplicate-take floors")
     args = parser.parse_args(argv)

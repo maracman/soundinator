@@ -2,7 +2,7 @@
 
 Reference manifest example:
 [
-  {"path":"/private/tmp/sg2/samples/clarinet/C4-mf.wav","midi":60,
+  {"path":"<repo>/sg2-data/campaigns/clarinet/references/C4-mf.wav","midi":60,
    "velocity":0.62,"durationSec":1.5}
 ]
 
@@ -30,6 +30,7 @@ from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
 from .audition import build as build_audition
+from .paths import sg2_data_root
 from .score import (
     SCORER_CONTRACT_VERSION,
     compare_features,
@@ -41,7 +42,9 @@ from .score import (
 from .tripwires import aggregate_by_cell, evaluate_tripwires
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
+SG2_DATA_ROOT = sg2_data_root()
+DEFAULT_RUN_ROOT = SG2_DATA_ROOT / "runs"
+STATE_ROOT = SG2_DATA_ROOT / "state"
 RENDERER_CONTRACT_FILES = (
     Path("scripts/render_note.mjs"),
     Path("web/static/synth.js"),
@@ -66,6 +69,16 @@ def _candidate_fingerprint(free: list[FreeParam], params: dict[str, Any]) -> str
 
 def _load(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
+
+
+def _load_preset(path: str | Path) -> dict[str, Any]:
+    value = _load(path)
+    while isinstance(value, dict) and "excitationType" not in value and \
+            isinstance(value.get("params"), dict):
+        value = value["params"]
+    if not isinstance(value, dict) or "excitationType" not in value:
+        raise ValueError(f"{path}: no engine preset found")
+    return value
 
 
 def _renderer_contract_hash() -> str:
@@ -268,7 +281,8 @@ def _dominant_residual(best: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _file_work_item(instrument: str, run_dir: Path, factor: str, action: str) -> Path:
-    path = DEFAULT_RUN_ROOT / instrument / "work-items.json"
+    path = STATE_ROOT / instrument / "work-items.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     payload = _load(path) if path.exists() else {"instrument": instrument, "items": []}
     payload["items"].append({"run": run_dir.name, "limitingFactor": factor,
                              "proposedFix": action, "filedAt": time.time(), "status": "open"})
@@ -568,7 +582,7 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
     because they reduce a hard-gate failure count while worsening raw error.
     Callers preview first, classify the session, then persist accepted runs.
     """
-    board_path = DEFAULT_RUN_ROOT / instrument / "leaderboard.json"
+    board_path = STATE_ROOT / instrument / "leaderboard.json"
     board = _load(board_path) if board_path.exists() else {"instrument": instrument, "runs": []}
     comparable = [row for row in board.get("runs", [])
                   if row.get("referenceSet") == reference_set]
@@ -597,6 +611,13 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
         board["best"] = current
         board_path.write_text(json.dumps(board, indent=2) + "\n")
     return improved, previous_loss
+
+
+def _snapshot_best(instrument: str, run_dir: Path, best: dict) -> Path:
+    path = STATE_ROOT / instrument / run_dir.name / "best.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(best, indent=2) + "\n")
+    return path
 
 
 def _append_ledger(instrument: str, run_dir: Path, best: dict, sensitivity: dict,
@@ -630,7 +651,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limiting-factor", help="evidenced plateau cause when this run neither improves nor reaches the floor")
     parser.add_argument("--work-item", help="concrete fix to file for --limiting-factor")
     args = parser.parse_args(argv)
-    initial, references, manifest = _load(args.initial), _load(args.references), _load(args.manifest)
+    initial = _load_preset(args.initial)
+    references, manifest = _load(args.references), _load(args.manifest)
     # T-012 consuming-side assertion: an owner-rejected take must never be
     # scored, floored, or hashed into the objective id.
     from .exclusions import assert_no_excluded
@@ -698,6 +720,7 @@ def main(argv: list[str] | None = None) -> int:
             args.instrument, run_dir, best, reference_set, persist=True)
         if improved:
             _append_ledger(args.instrument, run_dir, best, sensitivity, free)
+            _snapshot_best(args.instrument, run_dir, best)
     summary = {"instrument": args.instrument, "run": run_dir.name,
                "baselineLoss": baseline, "bestLoss": best["loss"], "improvement": baseline - best["loss"],
                "evaluations": len(matcher.evaluations), "optimizer": {"success": bool(result.success), "message": str(result.message)},
