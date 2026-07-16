@@ -264,6 +264,13 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
         residual = summary["dominantResidual"]
         lines.extend(["\n## Dominant residual\n\n",
                       f"`{residual['feature']}` at `{residual['meanPerceptualUnits']:.4f}` perceptual units.\n"])
+    controllability = summary.get("controllability") or {}
+    lines.extend(["\n## Controllability gate\n\n",
+                  f"Status: `{controllability.get('status', 'not-supplied')}`\n"])
+    if controllability.get("zeroWeighted"):
+        lines.extend(["\n| Zero-weight watch metric | Reason |\n", "|---|---|\n"])
+        for row in controllability["zeroWeighted"]:
+            lines.append(f"| `{row['feature']}` | {row['reason']} |\n")
     outcome = summary["sessionOutcome"]
     if outcome["state"] == "limiting-factor":
         lines.extend(["\n## Filed limiting factor\n\n",
@@ -341,9 +348,11 @@ def _params(manifest: dict, initial: dict, only: list[str] | None) -> list[FreeP
 
 class ToneMatcher:
     def __init__(self, instrument: str, initial: dict, references: list[dict],
-                 free: list[FreeParam], run_dir: Path, variability: dict[str, Any]):
+                 free: list[FreeParam], run_dir: Path, variability: dict[str, Any],
+                 weights: dict[str, float] | None = None):
         self.instrument, self.initial, self.references, self.free = instrument, initial, references, free
         self.run_dir, self.variability = run_dir, variability
+        self.weights = weights
         self.evaluations: list[dict] = []
         self.best: dict | None = None
 
@@ -376,16 +385,22 @@ class ToneMatcher:
                                  cwd=ROOT, text=True, capture_output=True)
         if process.returncode:
             raise RuntimeError(process.stderr or process.stdout)
-        scores = [score_files(ref["path"], job["out"], instrument=self.instrument, params=params,
+        scores = [score_files(ref["path"], job["out"], weights=self.weights,
+                              instrument=self.instrument, params=params,
                               context={"register": ref.get("register"), "dynamic": ref.get("dynamic"),
-                                       "velocity": ref.get("velocity")})
+                                       "velocity": ref.get("velocity"), "midi": ref.get("midi"),
+                                       "durationSec": ref.get("durationSec", 1.5)})
                   for ref, job in zip(self.references, jobs)]
         construction_samples = []
         for ref_index, (ref, job) in enumerate(zip(self.references, jobs)):
             mean_limit, max_limit = _band_limits_for_reference(ref_index, self.variability)
+            expected_f0_hz = 440.0 * 2 ** ((float(ref.get("midi", 60)) - 69) / 12)
             construction_samples.append(ConstructionSample(
-                render=extract_features(job["out"], active_duration_s=ref.get("durationSec", 1.5)),
-                reference=extract_features(ref["path"]), register=ref.get("register"),
+                render=extract_features(
+                    job["out"], active_duration_s=ref.get("durationSec", 1.5),
+                    expected_f0_hz=expected_f0_hz),
+                reference=extract_features(ref["path"], expected_f0_hz=expected_f0_hz),
+                register=ref.get("register"),
                 dynamic=ref.get("dynamic"), velocity=ref.get("velocity"),
                 band_mean_limit_db=mean_limit, band_max_octave_limit_db=max_limit))
         construction = evaluate_construction(self.instrument, construction_samples, params=params,
@@ -432,9 +447,11 @@ def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
     return rows
 
 
-def _reference_set_id(references: list[dict[str, Any]], instrument: str | None = None) -> str:
+def _reference_set_id(references: list[dict[str, Any]], instrument: str | None = None,
+                      weights: dict[str, float] | None = None) -> str:
     """Identify the scored objective so unlike manifests are never ranked."""
-    objective = {"references": references, "weights": weights_for_instrument(instrument)}
+    objective = {"references": references,
+                 "weights": weights or weights_for_instrument(instrument)}
     canonical = json.dumps(objective, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
@@ -493,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--initial", required=True, help="initial/pinned preset JSON")
     parser.add_argument("--references", required=True, help="reference-note manifest JSON")
     parser.add_argument("--manifest", default=str(Path(__file__).with_name("manifest.json")))
+    parser.add_argument("--controllability", help="clean audit JSON for this exact instrument/reference/manifest")
     parser.add_argument("--keys", help="comma-separated free keys; default is every applicable continuous key")
     parser.add_argument("--budget", type=int, default=200)
     parser.add_argument("--run", default=time.strftime("%Y%m%d-%H%M%S"))
@@ -507,7 +525,14 @@ def main(argv: list[str] | None = None) -> int:
     assert_no_excluded(references, f"{args.instrument} campaign manifest")
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
-    scoring_weights = weights_for_instrument(args.instrument)
+    controllability = None
+    if args.controllability:
+        from .controllability import validate_audit_contract
+        controllability = _load(args.controllability)
+        validate_audit_contract(controllability, instrument=args.instrument,
+                                references=references, manifest=manifest)
+    scoring_weights = weights_for_instrument(
+        args.instrument, controllability.get("weights") if controllability else None)
     variability = _reference_variability(references, weights=scoring_weights)
     only = list(dict.fromkeys(key.strip() for key in args.keys.split(",") if key.strip())) if args.keys else None
     free = _params(manifest, initial, only)
@@ -516,7 +541,8 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = DEFAULT_RUN_ROOT / args.instrument / args.run
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "run.json").write_text(json.dumps(vars(args), indent=2) + "\n")
-    matcher = ToneMatcher(args.instrument, initial, references, free, run_dir, variability)
+    matcher = ToneMatcher(args.instrument, initial, references, free, run_dir, variability,
+                          weights=scoring_weights)
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
@@ -534,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
     resource = _benchmark_resources(run_dir, args.instrument, best)
     render_artifacts = _build_listening_page(run_dir, args.instrument, best, references)
-    reference_set = _reference_set_id(references, args.instrument)
+    reference_set = _reference_set_id(references, args.instrument, scoring_weights)
     improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
     if improved:
         _append_ledger(args.instrument, run_dir, best, sensitivity, free)
@@ -558,6 +584,12 @@ def main(argv: list[str] | None = None) -> int:
                "evaluations": len(matcher.evaluations), "optimizer": {"success": bool(result.success), "message": str(result.message)},
                "leaderboardImproved": improved, "previousBestLoss": previous_best_loss,
                "referenceSet": reference_set,
+               "controllability": ({
+                   "status": controllability["status"],
+                   "referenceContractHash": controllability["referenceContractHash"],
+                   "parameterManifestHash": controllability["parameterManifestHash"],
+                   "zeroWeighted": controllability.get("zeroWeighted", []),
+               } if controllability else {"status": "not-supplied"}),
                "constructionPassed": bool(best.get("construction", {}).get("passed")),
                "construction": best.get("construction", {}),
                "tripwireGate": best.get("tripwireGate", {}),

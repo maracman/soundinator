@@ -11,7 +11,9 @@ from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
+from scripts.tone_match.controllability import canonical_hash, perturbations, validate_audit_contract
 from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
+from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, seed_preset
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
@@ -135,6 +137,61 @@ def test_reference_set_id_changes_when_the_scored_manifest_changes():
     assert _reference_set_id(base) != _reference_set_id(base + [
         {"path": "/tmp/b.wav", "midi": 60, "velocity": .2}
     ])
+    assert _reference_set_id(base, weights={"partials_db": 1}) != \
+        _reference_set_id(base, weights={"partials_db": 0})
+
+
+def test_conditional_controllability_perturbation_moves_off_neutral_bound():
+    spec = FreeParam("decaySecondStage", 0, 1, 0)
+    assert perturbations(spec, {"decaySecondStage": 0, "decaySecondRatio": 4}) == [.1]
+
+
+def test_controllability_contract_asserts_exact_consumer_inputs():
+    references = [{"path": "/tmp/ref.wav", "midi": 60, "velocity": .2}]
+    manifest = {"continuous": [{"key": "partialTilt", "min": -1, "max": 1,
+                                 "default": 0}]}
+    audit = {
+        "instrument": "grand-piano", "status": "clean",
+        "referenceContractHash": canonical_hash(references),
+        "parameterManifestHash": canonical_hash(manifest),
+        "weights": {"partials_db": 1, "vibrato": 0},
+        "responders": {"partials_db": ["partialTilt"]},
+    }
+    validate_audit_contract(audit, instrument="grand-piano",
+                            references=references, manifest=manifest)
+    with pytest.raises(ValueError, match="reference manifest changed"):
+        validate_audit_contract(audit, instrument="grand-piano",
+                                references=[{**references[0], "midi": 61}], manifest=manifest)
+    with pytest.raises(ValueError, match="has no responsive"):
+        validate_audit_contract({**audit, "responders": {}}, instrument="grand-piano",
+                                references=references, manifest=manifest)
+
+
+def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
+    piano = STRUCK_CAMPAIGNS["grand-piano"]
+    nylon = STRUCK_CAMPAIGNS["guitar-nylon"]
+    assert len(piano["anchors"]) >= 5
+    assert piano["dynamics"] == ("pp", "ff")
+    assert len(nylon["anchors"]) >= 3
+    assert nylon["source"].startswith("Philharmonia")
+
+
+def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables():
+    measured = {"piano": {
+        "performance": {"attackNoise": {"freq": 800, "q": .8, "decay": .1}},
+        "material": {"suggestedMaterial": .2},
+        "attack": {"byRegister": [{"f0": 110, "envelopeAttack": .02}]},
+        "resonances": [{"freq": 200, "gain": 2, "width": 1}] * 3,
+        "partialsByRegister": [{"f0": 110, "partials": [1]}],
+        "partialB": .001,
+    }}
+    seed = seed_preset(STRUCK_CAMPAIGNS["grand-piano"], measured)
+    assert seed["toneBreath"] == 0
+    assert seed["excitationHuman"] == 0
+    assert seed["velocityHardnessCoupling"] == 0
+    assert seed["decaySecondStage"] == 0
+    assert seed["spectralResonanceAmount"] == 1
+    assert "partialB" not in seed
 
 
 def test_dominant_residual_ignores_zero_weight_diagnostics():
@@ -283,6 +340,17 @@ def test_blown_scoring_does_not_fit_stiff_string_inharmonicity():
     assert blown["inharmonicity_log_ratio"] == 0
     assert string["inharmonicity_log_ratio"] == 1
     assert weights_for_instrument("trumpet", {"noise": .5})["noise"] == .5
+
+
+def test_struck_scoring_firewalls_continuous_air_and_bow_observables():
+    grand = weights_for_instrument("grand-piano")
+    nylon = weights_for_instrument("guitar-nylon")
+    for weights in (grand, nylon):
+        assert weights["vibrato"] == 0
+        assert weights["sustain_noise_db"] == 0
+        assert weights["onset_scoop_cents"] == 0
+        assert weights["onset_noise_db"] == 1
+        assert weights["decay_log_ratio"] == 1
 
 
 def test_horn_checklist_requires_register_onset_evidence():
