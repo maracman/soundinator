@@ -11,7 +11,7 @@ the live instrument — at the quality bar of professional modelling synths
 | Family | Instruments |
 |---|---|
 | Bowed | violin, cello |
-| Struck/plucked | piano, acoustic guitar |
+| Struck/plucked | grand piano, upright piano, steel-string acoustic guitar, nylon-string acoustic guitar, harp, glockenspiel *(family expanded — §9 decision 10)* |
 | Blown | clarinet, tenor saxophone, trumpet, French horn |
 | Sung | male voice (tenor), male voice (contrabass/basso profondo), mezzo-soprano, boy soprano |
 
@@ -105,6 +105,24 @@ boundary in code: everything after the per-partial oscillator sum
 - **Coordinate with layer unification**: before starting a UI-touching WP
   (WP-10, S1/S2), check which layer-unification WPs are mid-flight in the
   same app.js regions and sequence rather than collide.
+- **Shared-branch integration cadence (owner, 2026-07-16)**: the shared
+  SG2 branch is the single integration point and must advance. Every
+  agent merges its green, landed work to the shared branch AT LEAST once
+  per pass (small merges, immediately after the suite passes) — private
+  branches live hours, not days. No agent builds on another agent's
+  unmerged branch except through an explicit custody handover. Forked
+  copies of another lane's code (e.g. analysis logic inlined into an
+  engine branch) are defects: one canonical implementation per component,
+  owned by its lane, consumed by everyone else from the shared branch.
+- **Techniques exchange (owner, 2026-07-16)**: when multiple agents work
+  in parallel, generalisable techniques (anything affecting parameters,
+  validation criteria, or fitting method beyond one instrument) are
+  written to `docs/sg2/TECHNIQUES_EXCHANGE.md` — append-only, firewall-
+  levelled entries. EVERY agent reads new entries at the start of every
+  pass and marks each one incorporated / adapted / rejected-with-reason;
+  an entry left pending across two passes must be flagged in that agent's
+  summary. Cross-agent knowledge moves through the file, not through the
+  owner.
 - **Determinism is a research requirement**: all randomness through the
   seeded RNG; new param keys are schema additions — bump `APP_VERSION`
   once when the first Sound Generator 2.0 engine param lands, so
@@ -247,6 +265,19 @@ a perceptual unit so the composite is interpretable:
 | Vibrato rate / depth | abs diff | Hz / cents |
 | Transient/sustain noise ratio + noise centroid | abs diff | dB / octaves |
 
+**Controllability rule (owner, 2026-07-16): a feature may carry non-zero
+weight for an instrument ONLY if at least one free manifest parameter
+demonstrably moves it.** Enforced mechanically, not by convention: the
+loop runs a controllability audit at campaign start — perturb each free
+parameter, record which features respond; any weighted feature with no
+responsive parameter is an ERROR that either (a) zero-weights the feature
+(it becomes a watch metric + a filed §6 engine gap), or (b) blocks the
+campaign until the generating parameter lands. Measurement may lead
+generation (senses first), but weighting must follow controllability.
+Every run report includes the controllability table, so "the agent is
+being scored on something it cannot adjust" is impossible by
+construction.
+
 Composite = weighted sum; weights start uniform-per-feature and are tuned
 once against ear judgements on the first converged family (a single
 listening session), then frozen so scores stay comparable across
@@ -321,6 +352,39 @@ the target. Rules:
   git history); a refinement run that regresses never overwrites the best
   preset, and the loop can always be resumed from it — so re-running the
   loop is always safe and always additive.
+
+### 2.5c Humanisation calibration — take-pair differential fitting (owner, 2026-07-16)
+
+Where the corpus holds matched takes (same instrument, note, dynamic,
+articulation — differences are purely human), do not use them only as the
+stopping floor (§2.5). Additionally:
+
+1. **Differential fit**: fit each take individually (identity parameters
+   frozen at the instrument's converged values; only Human-designated
+   parameters free — breath level, articulation strength, scoop
+   depth/settle, drive level, vibrato depth/phase, onset noise level).
+   The per-parameter deltas between matched takes are MEASUREMENTS of
+   human variation.
+2. **Decomposition validation (falsifiable)**: if matched takes cannot be
+   reconciled within the Human-designated set — if identity parameters
+   (body bands, B, material, base tables) must move to explain
+   take-to-take differences — the model has misfiled human variation as
+   instrument structure. That is a §2.5(b) limiting factor; file it, do
+   not widen the identity set to absorb it.
+3. **Calibrated ranges**: the observed delta distributions become the
+   per-instrument humanisation ranges — the Human dial at 1.0 spans the
+   measured take spread, so any draw within range is a humanly-possible
+   sound by construction. Store the fitted ranges in the measured profile
+   (`humanRanges`), consumed by the per-note draw machinery; ledger the
+   spreads alongside sensitivities.
+4. **Pair sources**: Philharmonia multi-takes, vib/nonvib pairs, VocalSet
+   repetitions; where no true duplicate exists, adjacent-semitone takes
+   with the register trend removed are the fallback proxy (per the
+   original spread estimator's method). Log which source calibrated each
+   range — proxy-calibrated ranges are weaker evidence.
+5. **Research payoff**: Human becomes a calibrated stimulus dimension —
+   per-note imperfection draws are measured player variation in physical
+   units, directly usable in the appeal/surprisal studies.
 
 ### 2.5b The parameter ledger (feeds WP-9/WP-10)
 
@@ -505,10 +569,13 @@ Each campaign WP has the same shape:
   bore class, register-dependent even/odd (clarinet's even partials rise
   with register), brass nonlinear brightening at forte, breath-noise
   spectrum shaping.
-- **WP-6 · Bowed campaign** (violin, cello). Expected gaps: attack stagger
-  consumption (CH-B4), bow-noise sustain texture, body-resonance
-  note-to-note re-weighting (the "spread saturation" problem in the violin
-  fit — likely needs per-register tables from WP-3/§6-G1).
+- **WP-6 · Bowed campaign** (violin, cello). **Preflight scaffold is
+  mandatory: docs/sg2/BOWED_PREFLIGHT.md** (scorer senses first, body
+  deconvolution, per-string references, excitation-generic onset/noise
+  architecture, discipline gates P5). Expected gaps: bow-noise sustain
+  texture (P4), body-resonance note-to-note re-weighting (the "spread
+  saturation" problem — addressed structurally by P2 body deconvolution
+  plus §6-G1 register tables), vibrato trajectory (P1).
 - **WP-7 · Struck/plucked campaign** (piano, acoustic guitar). Expected
   gaps: double decay (two-stage T60), release ring/damper (CH-B4), pluck
   position + body air-mode for guitar, velocity→hardness/noise coupling.
@@ -643,7 +710,13 @@ ROADMAP.md updated; `APP_VERSION` bumped (if not already at first engine
 WP); ledger and this doc marked final.
 **Accept**: CI green; owner final audition of all 11 (the §3 blind gate);
 docs updated; no layers/effects/space diffs anywhere in the branch history
-(`git diff --stat` audit against the boundary files).
+(`git diff --stat` audit against the boundary files);
+**humanisation calibrated (§2.5c) — HARD GATE for the production suite
+(owner, 2026-07-16)**: every shipped preset carries fitted `humanRanges`
+from take-pair differential fits (or the documented proxy), the
+decomposition test has run per instrument with its verdict recorded, and
+the Human dial demonstrably spans measured player variation — no preset
+ships with hand-guessed humanisation ranges.
 
 ---
 
@@ -713,6 +786,23 @@ regressions.
    (§2.5), and every session must end with an improvement, a named
    limiting factor + filed fix, or that demonstration. Best-so-far presets
    are never regressed.
+11. **Agent B retired; lanes reorganised** (2026-07-16): Agent D owns
+    BOTH the bowed campaign and the analysis infrastructure
+    (`scripts/tone_match/**`, `scripts/fit_profiles_from_samples.py`,
+    profile/reference pipelines) inherited from B. Agents A and C are
+    consumers of that infrastructure (specs via the exchange, T-007
+    assertions on every handoff). First-order handover debt: B's
+    unmerged branch `agentb/analysis-lane` (recalibrated profiles v3,
+    unity-reproduction convention, T-025 contract spec) must be
+    verified and integrated by D before any of its contents are
+    trusted or built upon.
+10. **Struck/plucked family expanded** (2026-07-16): piano splits into
+    grand + upright; acoustic guitar splits into steel-string +
+    nylon-string; harp and glockenspiel added. Glockenspiel exercises the
+    `bar` resonator class (strongly inharmonic mode set) — the first
+    non-stringed struck target. Decision 7 (interim presets ship) and all
+    standing rules apply. A dedicated agent (Agent C) owns this family
+    end-to-end per the multi-agent operating mode.
 
 ## 10. Exposure decision table
 
