@@ -301,7 +301,7 @@ fundamental; an anchor >50 cents from every candidate fails loudly. Until this
 lands, all affected controllability features are zero-weight watch metrics and
 the campaign status is `blocked-analysis`.
 Affects: analyse_note/analysis.py feature extraction / controllability / B and bar-mode gates.
-Status: engine=n/a analysis=incorporated b68d67f (expectedF0Hz anchor: harmonic-family candidate within 50 cents, loud failure otherwise, f0_unconstrained provenance; plumbed through analysis.py + score.extract_features; consuming tests) struck/plucked=adapted (reference manifests log every nominal fallback; fitter refuses the blocked audit)
+Status: engine=n/a analysis=incorporated b68d67f (expectedF0Hz anchor: harmonic-family candidate within 50 cents, loud failure otherwise, f0_unconstrained provenance; plumbed through analysis.py + score.extract_features; consuming tests) struck/plucked=incorporated (campaign and measured-profile generation trust declared single-note pitch; regenerated nylon anchors are 82.407/195.998/659.255 Hz; profile-v2 pass improved raw error 19.82% and active failures 16→14)
 
 ### T-021 · Coupled-polarisation beating is an opt-in two-mode law
 Author: struck/plucked lane · 2026-07-16 · Firewall: mechanism; values per instrument
@@ -440,7 +440,7 @@ corner by 20-30% pp->ff and the n>=8:n<=4 energy ratio by >=3 dB; 4 ms is
 darker than 1 ms at equal f0; bow/blow are bit-identical. Scorer adds
 onset-corner velocity slope only after this control crosses audit threshold.
 Affects: excitationSpectrum/hardness consumer / register profile schema / G7 assertions.
-Status: engine=pending analysis=adapted (T-025 audio assertion retained) struck/plucked=incorporated
+Status: engine=pending analysis=adapted (T-025 audio assertion retained) struck/plucked=adapted (profile-v2 pass preserves dynamic-brightening slope 0.415 at the fitted static tilt; T-028 remains required to fit velocity/contact colour independently of the shared spectrum)
 
 ### T-029 · ENGINE SPEC (URGENT): body gain must track instantaneous frequency under FM
 Author: bowed lane · 2026-07-16 · Firewall: mechanism (all bodied instruments)
@@ -553,7 +553,7 @@ differs in high-band energy in the direction the tables encode; absent
 tables => bit-identical fallback.
 Affects: partialsByRegister schema / engine table selection / WP-6 morph
 axis (SWAM exposes Alternate Fingering).
-Status: engine=pending analysis=pending b68d67f (storage lands with the first per-string fit next pass) struck/plucked=adapted (guitar strings and harp material zones need identity tables; bow-specific sul-selection semantics do not transfer)
+Status: engine=pending analysis=pending b68d67f (storage lands with the first per-string fit next pass) struck/plucked=blocked-engine (nylon register tables now consume exact E2/G3/E5 anchors, but all 12 partial/mel cells remain above bar; steel↔nylon cannot share one pooled guitar table, and bow-specific sul-selection semantics do not transfer)
 
 ### T-034 · ENGINE SPEC (small): dynamic pitch flattening for bowed forte
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; value fitted per instrument; INSTRUMENT physics, not Human
@@ -692,12 +692,16 @@ estimators can amplify it into material loss changes (observed on nylon
 guitar inharmonicity and decay). Every distinct audit baseline is therefore
 rendered twice more. A feature whose repeat distance crosses the same
 mean/peak controllability threshold is zero-weighted as a watch metric before
-fitting. Audit schema v2 carries the repeatability matrix and unstable-feature
-list; schema-v1 audits are invalid consumers. The optimizer also caches exact
-duplicate parameter vectors so Powell cannot score the same point twice.
-Consuming assertions: a schema-v1 audit is rejected; a repeat-unstable
-feature cannot retain positive weight; exact duplicate candidate vectors
-return the cached objective without another render; stable features remain
-eligible and the objective hash changes when weights are downgraded.
+fitting. Audit schema v3 carries the repeatability matrix plus hashes of the
+references, free-parameter manifest, initial preset, scorer contract, and
+renderer/profile bytes; older audits are invalid consumers. The optimizer
+also caches exact duplicate parameter vectors so Powell cannot score the same
+point twice.
+Consuming assertions: a pre-v3 audit is rejected; changes to synth.js,
+measured_profiles.js, render_note.mjs, or the initial preset invalidate the
+audit; a repeat-unstable feature cannot retain positive weight; exact duplicate
+candidate vectors return the cached objective without another render; stable
+features remain eligible and the objective hash changes when weights or the
+renderer contract change.
 Affects: controllability.py / iterate.py / objective IDs / every family.
 Status: analysis=incorporated struck/plucked=incorporated bowed=adapted engine=n/a

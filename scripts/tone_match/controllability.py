@@ -23,8 +23,13 @@ from typing import Any
 
 import numpy as np
 
-from .iterate import FreeParam, _params
-from .score import compare_features, extract_features, weights_for_instrument
+from .iterate import FreeParam, _params, _renderer_contract_hash
+from .score import (
+    SCORER_CONTRACT_VERSION,
+    compare_features,
+    extract_features,
+    weights_for_instrument,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -87,7 +92,8 @@ def perturbations(spec: FreeParam, initial: dict[str, Any]) -> list[float]:
 
 
 def validate_audit_contract(audit: dict[str, Any], *, instrument: str,
-                            references: list[dict[str, Any]], manifest: dict[str, Any]) -> None:
+                            references: list[dict[str, Any]], manifest: dict[str, Any],
+                            initial: dict[str, Any] | None = None) -> None:
     """T-007 consuming-side assertion for fitter/audit handoff."""
     errors = []
     if audit.get("instrument") != instrument:
@@ -96,9 +102,15 @@ def validate_audit_contract(audit: dict[str, Any], *, instrument: str,
         errors.append("reference manifest changed after controllability audit")
     if audit.get("parameterManifestHash") != canonical_hash(manifest):
         errors.append("free-parameter manifest changed after controllability audit")
+    if initial is not None and audit.get("initialPresetHash") != canonical_hash(initial):
+        errors.append("initial preset changed after controllability audit")
     if audit.get("status") != "clean":
         errors.append(f"audit status is {audit.get('status')!r}, not 'clean'")
-    if int(audit.get("schemaVersion", 0)) < 2:
+    if audit.get("scorerContractVersion") != SCORER_CONTRACT_VERSION:
+        errors.append("scorer contract changed after controllability audit")
+    if audit.get("rendererContractHash") != _renderer_contract_hash():
+        errors.append("renderer contract changed after controllability audit")
+    if int(audit.get("schemaVersion", 0)) < 3:
         errors.append("repeat-render stability evidence is missing")
     unstable = set(audit.get("repeatability", {}).get("unstableFeatures", []))
     active_unstable = sorted(
@@ -357,7 +369,9 @@ def run_audit(instrument: str, initial: dict[str, Any], references: list[dict[st
             planned.append(row)
             control_failures.append(row)
     report = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
+        "scorerContractVersion": SCORER_CONTRACT_VERSION,
+        "rendererContractHash": _renderer_contract_hash(),
         "instrument": instrument,
         "status": status,
         "createdAt": time.time(),
@@ -384,7 +398,9 @@ def run_audit(instrument: str, initial: dict[str, Any], references: list[dict[st
         "listenDirectory": str(run_dir / "listen-controllability"),
     }
     if status == "clean":
-        validate_audit_contract(report, instrument=instrument, references=references, manifest=manifest)
+        validate_audit_contract(
+            report, instrument=instrument, references=references,
+            manifest=manifest, initial=initial)
     return report
 
 

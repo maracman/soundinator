@@ -7,15 +7,15 @@ import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, fit_fixed_body, fit_take_spread, harmonic_frame_amps, onset_pitch_stats, validate_corpus_contract, vibrato_stats, vowel_from_filename
+from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, harmonic_frame_amps, onset_pitch_stats, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.controllability import canonical_hash, perturbations, validate_audit_contract
-from scripts.tone_match.iterate import FreeParam, ToneMatcher, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability, _tripwire_gate
+from scripts.tone_match.iterate import FreeParam, ToneMatcher, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability, _renderer_contract_hash, _tripwire_gate, _update_leaderboard
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, seed_preset
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
-from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
+from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 
@@ -33,6 +33,20 @@ def test_time_resampling_is_stable_at_endpoints():
     assert result.shape == (1, 9)
     assert result[0, 0] == 1.0
     assert result[0, -1] == 4.0
+
+
+def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
+    freqs = np.asarray([50.0, 100.0, 200.0, 10_000.0])
+    power = np.asarray([
+        [.2, .2, .2, 0],
+        [0, 0, 0, 0],
+        [1, 1, 1, 0],
+        [1e-4, 1e-4, 1e-4, 1e-6],
+    ])
+    mel_power, centroid_power = _trajectory_power(power, freqs, f0=200)
+    assert mel_power.shape[1] == 3
+    centroid = (freqs[:, None] * centroid_power).sum(axis=0) / centroid_power.sum(axis=0)
+    assert centroid == pytest.approx([200, 200, 200])
 
 
 def test_active_render_analysis_excludes_release_tail(monkeypatch):
@@ -141,6 +155,17 @@ def test_reference_set_id_changes_when_the_scored_manifest_changes():
         _reference_set_id(base, weights={"partials_db": 0})
 
 
+def test_renderer_contract_hash_changes_with_profile_bytes(tmp_path, monkeypatch):
+    monkeypatch.setattr(iterate_module, "ROOT", tmp_path)
+    for relative in iterate_module.RENDERER_CONTRACT_FILES:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(relative))
+    before = _renderer_contract_hash()
+    (tmp_path / "web/static/measured_profiles.js").write_text("changed profile")
+    assert _renderer_contract_hash() != before
+
+
 def test_conditional_controllability_perturbation_moves_off_neutral_bound():
     spec = FreeParam("decaySecondStage", 0, 1, 0)
     assert perturbations(spec, {"decaySecondStage": 0, "decaySecondRatio": 4}) == [.1]
@@ -151,30 +176,52 @@ def test_controllability_contract_asserts_exact_consumer_inputs():
     manifest = {"continuous": [{"key": "partialTilt", "min": -1, "max": 1,
                                  "default": 0}]}
     audit = {
-        "schemaVersion": 2, "instrument": "grand-piano", "status": "clean",
+        "schemaVersion": 3, "scorerContractVersion": SCORER_CONTRACT_VERSION,
+        "rendererContractHash": _renderer_contract_hash(),
+        "instrument": "grand-piano", "status": "clean",
         "referenceContractHash": canonical_hash(references),
         "parameterManifestHash": canonical_hash(manifest),
+        "initialPresetHash": canonical_hash({"partialTilt": 0}),
         "weights": {"partials_db": 1, "vibrato": 0},
         "responders": {"partials_db": ["partialTilt"]},
         "repeatability": {"status": "stable", "unstableFeatures": []},
     }
     validate_audit_contract(audit, instrument="grand-piano",
-                            references=references, manifest=manifest)
+                            references=references, manifest=manifest,
+                            initial={"partialTilt": 0})
     with pytest.raises(ValueError, match="reference manifest changed"):
         validate_audit_contract(audit, instrument="grand-piano",
-                                references=[{**references[0], "midi": 61}], manifest=manifest)
+                                references=[{**references[0], "midi": 61}], manifest=manifest,
+                                initial={"partialTilt": 0})
     with pytest.raises(ValueError, match="has no responsive"):
         validate_audit_contract({**audit, "responders": {}}, instrument="grand-piano",
-                                references=references, manifest=manifest)
+                                references=references, manifest=manifest,
+                                initial={"partialTilt": 0})
     with pytest.raises(ValueError, match="repeat-render stability"):
-        validate_audit_contract({**audit, "schemaVersion": 1}, instrument="grand-piano",
-                                references=references, manifest=manifest)
+        validate_audit_contract({**audit, "schemaVersion": 2}, instrument="grand-piano",
+                                references=references, manifest=manifest,
+                                initial={"partialTilt": 0})
+    with pytest.raises(ValueError, match="scorer contract changed"):
+        validate_audit_contract({
+            **audit, "scorerContractVersion": "obsolete",
+        }, instrument="grand-piano", references=references, manifest=manifest,
+            initial={"partialTilt": 0})
+    with pytest.raises(ValueError, match="renderer contract changed"):
+        validate_audit_contract({
+            **audit, "rendererContractHash": "obsolete",
+        }, instrument="grand-piano", references=references, manifest=manifest,
+            initial={"partialTilt": 0})
+    with pytest.raises(ValueError, match="initial preset changed"):
+        validate_audit_contract(
+            audit, instrument="grand-piano", references=references,
+            manifest=manifest, initial={"partialTilt": .5})
     with pytest.raises(ValueError, match="repeat-unstable"):
         validate_audit_contract({
             **audit,
             "repeatability": {"status": "watch-metrics-zeroed",
                               "unstableFeatures": ["partials_db"]},
-        }, instrument="grand-piano", references=references, manifest=manifest)
+        }, instrument="grand-piano", references=references, manifest=manifest,
+            initial={"partialTilt": 0})
 
 
 def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
@@ -184,6 +231,24 @@ def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
     assert piano["dynamics"] == ("pp", "ff")
     assert len(nylon["anchors"]) >= 3
     assert nylon["source"].startswith("Philharmonia")
+
+
+def test_single_note_corpus_filenames_supply_trusted_pitch_anchors():
+    assert expected_single_note_f0("phil.guitar_E2_very-long_forte_normal.mp3") == \
+        pytest.approx(82.406889, rel=1e-6)
+    assert expected_single_note_f0("phil.guitar_G3_very-long_piano_normal.mp3") == \
+        pytest.approx(195.997718, rel=1e-6)
+    assert expected_single_note_f0("Piano.pp.C1.aiff") == pytest.approx(32.703196, rel=1e-6)
+    assert expected_single_note_f0("Guitar.ff.sulE.E2B2.mono.aif") is None
+
+
+def test_guitar_measured_profile_uses_nominal_nylon_register_anchors():
+    measured = json.loads(
+        (iterate_module.ROOT / "web/static/measured_profiles.json").read_text())
+    assert [row["f0"] for row in measured["guitar"]["partialsByRegister"]] == \
+        pytest.approx([82.407, 195.998, 659.255], abs=.001)
+    assert {row["note"] for row in measured["guitar"]["notesAnalysed"]} == \
+        {"E2", "G3", "E5"}
 
 
 def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables():
@@ -221,6 +286,28 @@ def test_ledger_keeps_fitted_free_values_when_sensitivity_is_skipped(tmp_path, m
     ledger = (tmp_path / "docs" / "SG2_PARAM_LEDGER.md").read_text()
     assert "| `attackNoiseDirect` | 0.3 | not run |" in ledger
     assert "partialB" not in ledger
+
+
+def test_leaderboard_preview_does_not_record_unaccepted_candidate(tmp_path, monkeypatch):
+    monkeypatch.setattr(iterate_module, "DEFAULT_RUN_ROOT", tmp_path)
+    best = {
+        "loss": 1.5,
+        "params": {"partialTilt": .2},
+        "construction": {"passed": True, "counts": {"fail": 0}},
+        "tripwireGate": {"passed": False, "failureCount": 2},
+    }
+    improved, previous = _update_leaderboard(
+        "guitar-nylon", tmp_path / "invalid-stop", best, "objective-v2", persist=False)
+    assert improved
+    assert previous is None
+    assert not (tmp_path / "guitar-nylon" / "leaderboard.json").exists()
+
+    improved, previous = _update_leaderboard(
+        "guitar-nylon", tmp_path / "accepted", best, "objective-v2", persist=True)
+    assert improved
+    assert previous is None
+    board = json.loads((tmp_path / "guitar-nylon" / "leaderboard.json").read_text())
+    assert [row["run"] for row in board["runs"]] == ["accepted"]
 
 
 def _bundle(*, f0=220.0, partials=None, percussive=False, B=0.0002):

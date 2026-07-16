@@ -82,6 +82,7 @@ SLOPE_MIN, SLOPE_SPAN = 0.25, 1.1
 
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 VOWEL_RE = re.compile(r"_([aeiou])\.(?:wav|aif|aiff|flac|ogg|mp3)$", re.IGNORECASE)
+SINGLE_NOTE_RE = re.compile(r"(?:^|[._])([A-Ga-g])([#b]?)(-?\d)(?=[._-]|$)")
 
 
 def engine_t60(freq_hz: float, material: float) -> float:
@@ -102,6 +103,26 @@ def hz_to_note_name(f: float) -> str:
     midi = 69 + 12 * math.log2(f / 440.0)
     m = int(round(midi))
     return f"{NOTE_NAMES[m % 12]}{m // 12 - 1}"
+
+
+def expected_single_note_f0(filename: str) -> float | None:
+    """Return the pitch declared by a known single-note corpus filename."""
+    name = os.path.basename(filename)
+    if not (name.startswith("phil.") or name.startswith("Piano.")):
+        return None
+    match = SINGLE_NOTE_RE.search(name)
+    if not match:
+        return None
+    letter, accidental, octave_text = match.groups()
+    pitch_class = {
+        "C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11,
+    }[letter.upper()]
+    if accidental == "#":
+        pitch_class += 1
+    elif accidental == "b":
+        pitch_class -= 1
+    midi = 12 * (int(octave_text) + 1) + pitch_class
+    return 440.0 * 2 ** ((midi - 69) / 12)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1875,6 +1896,7 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
         for fn in file_list:
             path = os.path.join(inst_dir, fn)
             x, sr = load_mono(path)
+            expected_f0_hz = expected_single_note_f0(fn)
             # The Iowa horn chromatic runs use shorter inter-note gaps than
             # the other MIS sets; 250 ms merges entire scales into one note.
             # Keep the conservative gate elsewhere so vibrato/bow dips are
@@ -1887,10 +1909,22 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
                 peaks = [float(np.abs(x[s:e]).max()) for s, e in segs]
                 top = max(peaks)
                 segs = [se for se, p in zip(segs, peaks) if p > top * 0.1]
+            if expected_f0_hz is not None and segs:
+                # These archives declare one pitch per file. Codec tails or
+                # room-noise islands must not become extra "notes", and a
+                # dominant upper harmonic must not relabel the source.
+                segs = [max(segs, key=lambda se: float(np.abs(x[se[0]:se[1]]).max()))]
             if verbose:
                 print(f"    {fn}: {len(segs)} note(s)")
             for s, e in segs:
-                note = analyse_note(x[s:e], sr, path, n_partials)
+                note = analyse_note(
+                    x[s:e], sr, path, n_partials,
+                    expected_f0_hz=expected_f0_hz,
+                    trust_expected_f0=expected_f0_hz is not None,
+                    force_percussive=(True if expected_f0_hz is not None and
+                                      ("guitar" in fn.lower() or
+                                       fn.startswith("Piano.")) else None),
+                )
                 if note is not None:
                     result.append(note)
         return result
@@ -1964,6 +1998,15 @@ def main(argv=None):
         # without --keep-existing to intentionally drop instruments.
         with open(args.out) as fh:
             previous = json.load(fh)
+        for inst, profile in out.items():
+            prior = previous.get(inst)
+            if not isinstance(prior, dict):
+                continue
+            # A sparse single-note refresh can replace corrupt pitch/spectral
+            # evidence without pretending it also re-measured the body.
+            for key in ("resonances", "resonancesFit"):
+                if not profile.get(key) and prior.get(key):
+                    profile[key] = prior[key]
         for inst, profile in previous.items():
             if inst not in out:
                 out[inst] = profile

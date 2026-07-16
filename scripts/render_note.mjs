@@ -1,12 +1,34 @@
 #!/usr/bin/env node
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { accessSync, constants } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
+
+async function loadChromium() {
+  try {
+    return (await import("playwright")).chromium;
+  } catch (error) {
+    // Git worktrees intentionally do not duplicate node_modules. Resolve the
+    // dependency from the primary worktree containing the shared .git dir.
+    try {
+      const common = execFileSync(
+        "git", ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        { encoding: "utf8" },
+      ).trim();
+      const require = createRequire(join(dirname(common), "package.json"));
+      return require("playwright").chromium;
+    } catch {
+      throw error;
+    }
+  }
+}
+
+const chromium = await loadChromium();
 
 const ROOT_URL = process.env.SG2_URL || "http://127.0.0.1:8765";
 

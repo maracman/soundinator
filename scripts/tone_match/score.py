@@ -46,6 +46,8 @@ DEFAULT_WEIGHTS = {
     "onset_lockin_periods": 1.0,
 }
 
+SCORER_CONTRACT_VERSION = "sg2-score-active-trajectories-v2"
+
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
 }
@@ -365,6 +367,27 @@ def _mel_bank(sample_rate: int, nfft: int, bands: int = 48, fmin: float = 40, fm
     return bank
 
 
+def _trajectory_power(power: np.ndarray, freqs: np.ndarray,
+                      f0: float) -> tuple[np.ndarray, np.ndarray]:
+    """Active-frame mel power and noise-robust centroid power."""
+    frame_energy = np.sum(power, axis=0)
+    if not frame_energy.size or float(np.max(frame_energy)) <= 0:
+        return power, power
+    active = frame_energy >= float(np.max(frame_energy)) * 1e-4
+    if not np.any(active):
+        active = frame_energy > 0
+    mel_power = power[:, active]
+    # Codec/room residue tens of dB below a frame's dominant component is
+    # inaudible but can dominate a broadband centroid after the note decays.
+    floor = np.max(mel_power, axis=0, keepdims=True) * 1e-3
+    centroid_power = np.where(mel_power >= floor, mel_power, 0.0)
+    centroid_power[freqs < max(20.0, 0.5 * float(f0)), :] = 0.0
+    empty = np.sum(centroid_power, axis=0) <= 0
+    if np.any(empty):
+        centroid_power[:, empty] = mel_power[:, empty]
+    return mel_power, centroid_power
+
+
 def extract_features(
     path: str | Path,
     n_partials: int = 32,
@@ -398,11 +421,13 @@ def extract_features(
     _, times, spectrum = signal.stft(samples, fs=sample_rate, nperseg=nfft, noverlap=1536,
                                      boundary=None, padded=False)
     power = np.abs(spectrum) ** 2
-    mel = _mel_bank(sample_rate, nfft) @ power
+    freqs = np.fft.rfftfreq(nfft, 1 / sample_rate)
+    mel_power, centroid_power = _trajectory_power(power, freqs, note.f0)
+    mel = _mel_bank(sample_rate, nfft) @ mel_power
     mel_db = 10 * np.log10(np.maximum(mel, 1e-12))
     mel_db -= np.percentile(mel_db, 95)  # loudness-match without chasing peaks
-    freqs = np.fft.rfftfreq(nfft, 1 / sample_rate)
-    centroid = (freqs[:, None] * power).sum(axis=0) / np.maximum(power.sum(axis=0), 1e-20)
+    centroid = (freqs[:, None] * centroid_power).sum(axis=0) / \
+        np.maximum(centroid_power.sum(axis=0), 1e-20)
     amps = np.maximum(note.partial_amps[:n_partials], 1e-4)
     partial_db = 20 * np.log10(amps / max(float(np.max(amps)), 1e-12))
     (sustain_noise_db, onset_tilt, onset_noise_db,
@@ -609,7 +634,8 @@ def score_files(
         "piano", "grand-piano", "upright-piano", "guitar", "guitar-nylon",
         "guitar-steel", "harp", "glockenspiel",
     }
-    ref = extract_features(ref_path, expected_f0_hz=expected_f0_hz,
+    ref = extract_features(ref_path, active_duration_s=context.get("durationSec"),
+                           expected_f0_hz=expected_f0_hz,
                            trust_expected_f0=expected_f0_hz is not None,
                            force_percussive=force_percussive)
     render = extract_features(

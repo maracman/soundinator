@@ -30,11 +30,23 @@ from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
 from .audition import build as build_audition
-from .score import compare_features, extract_features, score_files, weights_for_instrument, write_report
+from .score import (
+    SCORER_CONTRACT_VERSION,
+    compare_features,
+    extract_features,
+    score_files,
+    weights_for_instrument,
+    write_report,
+)
 from .tripwires import aggregate_by_cell, evaluate_tripwires
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
+RENDERER_CONTRACT_FILES = (
+    Path("scripts/render_note.mjs"),
+    Path("web/static/synth.js"),
+    Path("web/static/measured_profiles.js"),
+)
 
 
 @dataclass
@@ -56,6 +68,17 @@ def _load(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
 
 
+def _renderer_contract_hash() -> str:
+    digest = hashlib.sha256()
+    for relative in RENDERER_CONTRACT_FILES:
+        path = ROOT / relative
+        digest.update(str(relative).encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()[:16]
+
+
 def _floor_group(reference: dict[str, Any]) -> str:
     """Group alternate takes only when pitch, dynamic and articulation agree."""
     if reference.get("floorGroup"):
@@ -70,7 +93,8 @@ def _floor_group(reference: dict[str, Any]) -> str:
 
 
 def _reference_variability(references: list[dict[str, Any]], feature_loader=extract_features,
-                           weights: dict[str, float] | None = None) -> dict[str, Any]:
+                           weights: dict[str, float] | None = None,
+                           instrument: str | None = None) -> dict[str, Any]:
     """Measure same-note/same-dynamic take-to-take feature distance."""
     groups: dict[str, list[int]] = {}
     for index, reference in enumerate(references):
@@ -79,8 +103,25 @@ def _reference_variability(references: list[dict[str, Any]], feature_loader=extr
     if not eligible:
         return {"status": "insufficient-evidence", "groups": [], "eligibleReferences": 0,
                 "reason": "no same-pitch/same-dynamic group contains at least two takes"}
-    cache = {index: feature_loader(references[index]["path"])
-             for indices in eligible.values() for index in indices}
+    cache = {}
+    for indices in eligible.values():
+        for index in indices:
+            reference = references[index]
+            if feature_loader is extract_features:
+                expected_f0_hz = None
+                if reference.get("midi") is not None:
+                    expected_f0_hz = 440.0 * 2 ** ((float(reference["midi"]) - 69) / 12)
+                cache[index] = feature_loader(
+                    reference["path"],
+                    active_duration_s=reference.get("durationSec"),
+                    expected_f0_hz=expected_f0_hz,
+                    trust_expected_f0=expected_f0_hz is not None,
+                    force_percussive=(instrument or "").strip().lower() in {
+                        "piano", "grand-piano", "upright-piano", "guitar",
+                        "guitar-nylon", "guitar-steel", "harp", "glockenspiel",
+                    })
+            else:
+                cache[index] = feature_loader(reference["path"])
     rows = []
     for key, indices in sorted(eligible.items()):
         pairs = []
@@ -447,7 +488,8 @@ class ToneMatcher:
                 expected_f0_hz=expected_f0_hz, trust_expected_f0=True,
                 force_percussive=True)
             reference_bundle = extract_features(
-                ref["path"], expected_f0_hz=expected_f0_hz,
+                ref["path"], active_duration_s=ref.get("durationSec", 1.5),
+                expected_f0_hz=expected_f0_hz,
                 trust_expected_f0=True, force_percussive=True)
             construction_samples.append(ConstructionSample(
                 render=render_bundle,
@@ -511,15 +553,22 @@ def _reference_set_id(references: list[dict[str, Any]], instrument: str | None =
                       weights: dict[str, float] | None = None) -> str:
     """Identify the scored objective so unlike manifests are never ranked."""
     objective = {"references": references,
-                 "weights": weights or weights_for_instrument(instrument)}
+                 "weights": weights or weights_for_instrument(instrument),
+                 "scorerContractVersion": SCORER_CONTRACT_VERSION,
+                 "rendererContractHash": _renderer_contract_hash()}
     canonical = json.dumps(objective, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
 def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
-                        reference_set: str) -> tuple[bool, float | None]:
+                        reference_set: str, *, persist: bool = True) -> tuple[bool, float | None]:
+    """Compare a candidate with the board, optionally recording it.
+
+    Invalid stops and filed plateaus must not become fitted presets merely
+    because they reduce a hard-gate failure count while worsening raw error.
+    Callers preview first, classify the session, then persist accepted runs.
+    """
     board_path = DEFAULT_RUN_ROOT / instrument / "leaderboard.json"
-    board_path.parent.mkdir(parents=True, exist_ok=True)
     board = _load(board_path) if board_path.exists() else {"instrument": instrument, "runs": []}
     comparable = [row for row in board.get("runs", [])
                   if row.get("referenceSet") == reference_set]
@@ -533,17 +582,20 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
              "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0)),
              "tripwirePassed": bool(best.get("tripwireGate", {}).get("passed")),
              "tripwireFailures": int(best.get("tripwireGate", {}).get("failureCount", 0))}
-    board["runs"].append(entry)
-    board["runs"].sort(key=lambda row: (row.get("referenceSet", ""),
-                                        row.get("constructionFailures", 0),
-                                        row.get("tripwireFailures", 0), row["loss"]))
-    current = min((row for row in board["runs"] if row.get("referenceSet") == reference_set),
+    candidate_runs = [*board.get("runs", []), entry]
+    candidate_runs.sort(key=lambda row: (row.get("referenceSet", ""),
+                                         row.get("constructionFailures", 0),
+                                         row.get("tripwireFailures", 0), row["loss"]))
+    current = min((row for row in candidate_runs if row.get("referenceSet") == reference_set),
                   key=lambda row: (row.get("constructionFailures", 0),
                                    row.get("tripwireFailures", 0), row["loss"]))
     improved = current["run"] == run_dir.name
-    board.setdefault("bestByReferenceSet", {})[reference_set] = current
-    board["best"] = current
-    board_path.write_text(json.dumps(board, indent=2) + "\n")
+    if persist:
+        board_path.parent.mkdir(parents=True, exist_ok=True)
+        board["runs"] = candidate_runs
+        board.setdefault("bestByReferenceSet", {})[reference_set] = current
+        board["best"] = current
+        board_path.write_text(json.dumps(board, indent=2) + "\n")
     return improved, previous_loss
 
 
@@ -590,10 +642,12 @@ def main(argv: list[str] | None = None) -> int:
         from .controllability import validate_audit_contract
         controllability = _load(args.controllability)
         validate_audit_contract(controllability, instrument=args.instrument,
-                                references=references, manifest=manifest)
+                                references=references, manifest=manifest,
+                                initial=initial)
     scoring_weights = weights_for_instrument(
         args.instrument, controllability.get("weights") if controllability else None)
-    variability = _reference_variability(references, weights=scoring_weights)
+    variability = _reference_variability(
+        references, weights=scoring_weights, instrument=args.instrument)
     only = list(dict.fromkeys(key.strip() for key in args.keys.split(",") if key.strip())) if args.keys else None
     free = _params(manifest, initial, only)
     if not free:
@@ -621,13 +675,12 @@ def main(argv: list[str] | None = None) -> int:
     resource = _benchmark_resources(run_dir, args.instrument, best)
     render_artifacts = _build_listening_page(run_dir, args.instrument, best, references)
     reference_set = _reference_set_id(references, args.instrument, scoring_weights)
-    improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
-    if improved:
-        _append_ledger(args.instrument, run_dir, best, sensitivity, free)
+    candidate_improved, previous_best_loss = _update_leaderboard(
+        args.instrument, run_dir, best, reference_set, persist=False)
     floor = _floor_evidence(variability, best)
     automated_gate_passed = bool(best.get("tripwireGate", {}).get("passed")) and \
         bool(resource.get("passed"))
-    measurable_improvement = improved and baseline - best["loss"] > 1e-6
+    measurable_improvement = candidate_improved and baseline - best["loss"] > 1e-6
     if floor["status"] == "demonstrated" and automated_gate_passed:
         outcome = {"state": "reference-variability-floor"}
     elif measurable_improvement:
@@ -638,7 +691,13 @@ def main(argv: list[str] | None = None) -> int:
                    "workItem": args.work_item, "workItemFile": str(item_path)}
     else:
         outcome = {"state": "invalid-stop",
-                   "reason": "no leaderboard improvement, floor demonstration, or filed limiting factor"}
+                   "reason": "no measurable raw composite improvement, floor demonstration, or filed limiting factor"}
+    improved = False
+    if outcome["state"] in {"improvement", "reference-variability-floor"}:
+        improved, previous_best_loss = _update_leaderboard(
+            args.instrument, run_dir, best, reference_set, persist=True)
+        if improved:
+            _append_ledger(args.instrument, run_dir, best, sensitivity, free)
     summary = {"instrument": args.instrument, "run": run_dir.name,
                "baselineLoss": baseline, "bestLoss": best["loss"], "improvement": baseline - best["loss"],
                "evaluations": len(matcher.evaluations), "optimizer": {"success": bool(result.success), "message": str(result.message)},
@@ -648,6 +707,9 @@ def main(argv: list[str] | None = None) -> int:
                    "status": controllability["status"],
                    "referenceContractHash": controllability["referenceContractHash"],
                    "parameterManifestHash": controllability["parameterManifestHash"],
+                   "initialPresetHash": controllability["initialPresetHash"],
+                   "scorerContractVersion": controllability["scorerContractVersion"],
+                   "rendererContractHash": controllability["rendererContractHash"],
                    "zeroWeighted": controllability.get("zeroWeighted", []),
                    "repeatability": controllability.get("repeatability", {}),
                } if controllability else {"status": "not-supplied"}),
@@ -662,6 +724,7 @@ def main(argv: list[str] | None = None) -> int:
                "bestParams": best.get("params", {}),
                "exchangeStatuses": _technique_exchange_statuses(),
                "leaderboardState": {"isLeader": improved,
+                                    "candidateWouldLead": candidate_improved,
                                     "previousBestLoss": previous_best_loss},
                "renderArtifacts": render_artifacts,
                "sessionOutcome": outcome}

@@ -256,3 +256,29 @@ Composite loss: `9.205591`
 | `partialTilt` | 0.6677885819738671 | not run |
 | `spectralResonanceAmount` | 1.0 | not run |
 | `velocityHardnessCoupling` | 0.408288512677725 | not run |
+
+## guitar-nylon — restored-iteration-02
+
+Composite loss: `4.765464`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseDirect` | 0.0 | not run |
+| `attackNoiseLevel` | 0.835135772995787 | not run |
+| `attackNoiseVelocityExponent` | 1.0 | not run |
+| `partialTransfer` | 0.3782651457196373 | not run |
+| `spectralResonanceAmount` | 1.214176449778871 | not run |
+
+## guitar-nylon — restored-iteration-04-profile-v2
+
+Composite loss: `4.064514`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseLevel` | 0.835135772995787 | not run |
+| `excitationPosition` | 0.20595744192774962 | not run |
+| `partialMaterial` | 0.11769280432873208 | not run |
+| `partialTilt` | 0.28887173476093186 | not run |
+| `partialTransfer` | 0.3782651457196373 | not run |
+| `spectralResonanceAmount` | 1.214176449778871 | not run |
+| `velocityHardnessCoupling` | 0.22004370245514032 | not run |
