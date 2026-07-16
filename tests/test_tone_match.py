@@ -5,6 +5,7 @@ import json
 import numpy as np
 import pytest
 import scripts.tone_match.iterate as iterate_module
+import scripts.tone_match.score as score_module
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, validate_corpus_contract, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
@@ -27,6 +28,24 @@ def test_time_resampling_is_stable_at_endpoints():
     assert result.shape == (1, 9)
     assert result[0, 0] == 1.0
     assert result[0, -1] == 4.0
+
+
+def test_active_render_analysis_excludes_release_tail(monkeypatch):
+    sample_rate = 48_000
+    observed = {}
+    monkeypatch.setattr(score_module, "load_mono",
+                        lambda _path: (np.ones(sample_rate * 2), sample_rate))
+
+    def analyse_active(samples, sr, **_kwargs):
+        observed["frames"] = len(samples)
+        assert sr == sample_rate
+        return _bundle().note
+
+    monkeypatch.setattr(score_module, "analyse_audio_samples", analyse_active)
+    monkeypatch.setattr(score_module, "analyse_audio_file",
+                        lambda *_args, **_kwargs: pytest.fail("full release tail was analysed"))
+    score_module.extract_features("render.wav", active_duration_s=.5)
+    assert observed["frames"] == round((.5 + .02) * sample_rate)
 
 
 def test_nonvibrato_estimator_peaks_do_not_count_as_vibrato_distance():

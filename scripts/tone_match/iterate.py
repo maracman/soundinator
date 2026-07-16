@@ -224,7 +224,9 @@ class ToneMatcher:
                                        "velocity": ref.get("velocity")})
                   for ref, job in zip(self.references, jobs)]
         construction_samples = [
-            ConstructionSample(render=extract_features(job["out"]), reference=extract_features(ref["path"]),
+            ConstructionSample(render=extract_features(
+                                   job["out"], active_duration_s=ref.get("durationSec", 1.5)),
+                               reference=extract_features(ref["path"]),
                                register=ref.get("register"), dynamic=ref.get("dynamic"),
                                velocity=ref.get("velocity"))
             for ref, job in zip(self.references, jobs)

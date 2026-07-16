@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 from scipy import signal
 
-from .analysis import NoteAnalysis, analyse_audio_file, load_mono
+from .analysis import NoteAnalysis, analyse_audio_file, analyse_audio_samples, load_mono
 
 
 DEFAULT_WEIGHTS = {
@@ -100,9 +100,26 @@ def _mel_bank(sample_rate: int, nfft: int, bands: int = 48, fmin: float = 40, fm
     return bank
 
 
-def extract_features(path: str | Path, n_partials: int = 32) -> FeatureBundle:
+def extract_features(
+    path: str | Path,
+    n_partials: int = 32,
+    *,
+    active_duration_s: float | None = None,
+) -> FeatureBundle:
     samples, sample_rate = load_mono(str(path))
-    note = analyse_audio_file(path, n_partials=max(64, n_partials))
+    if active_duration_s is None:
+        note = analyse_audio_file(path, n_partials=max(64, n_partials))
+    else:
+        # Offline renders contain the requested active note plus a deliberately
+        # long release/ring tail.  Construction assertions about sustained vs
+        # impulsive excitation must inspect the active interval, otherwise a
+        # short reference duration makes the same sustained synth look
+        # percussive merely because its tail occupies the middle analysis
+        # window.  Preserve the renderer's fixed 20 ms lead-in.
+        active_frames = round((max(0.03, float(active_duration_s)) + 0.02) * sample_rate)
+        samples = samples[:active_frames]
+        note = analyse_audio_samples(samples, sample_rate, name=str(path),
+                                     n_partials=max(64, n_partials))
     nfft = 2048
     _, _, spectrum = signal.stft(samples, fs=sample_rate, nperseg=nfft, noverlap=1536,
                                  boundary=None, padded=False)

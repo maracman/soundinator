@@ -57,7 +57,9 @@ def main() -> int:
             scores = [score_files(ref["path"], wav, instrument=args.instrument, params=candidate)
                       for ref, wav in zip(references, wavs)]
             samples = [
-                ConstructionSample(extract_features(wav), extract_features(ref["path"]),
+                ConstructionSample(extract_features(
+                                       wav, active_duration_s=ref.get("durationSec", 1.5)),
+                                   extract_features(ref["path"]),
                                    ref.get("register"), ref.get("dynamic"), ref.get("velocity"))
                 for ref, wav in zip(references, wavs)
             ]
