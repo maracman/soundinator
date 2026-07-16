@@ -1653,10 +1653,12 @@ export function partialOnsetDelay(harmonic, excitationType, staggerMs = null) {
 
 // 3 · Release ring: after note-off the resonator keeps ringing at the
 // material's own T60 instead of being cut by the envelope (capped for CPU).
-export function releaseRingSeconds(material, freqHz) {
+export function releaseRingSeconds(material, freqHz, releaseDamping = 0) {
   const m = Math.max(0, Math.min(1, material ?? 0));
   if (m <= 0) return 0;
-  return Math.min(1.8, materialT60(Math.max(60, freqHz || 261.63), m) * 0.5);
+  const base = Math.min(1.8, materialT60(Math.max(60, freqHz || 261.63), m) * 0.5);
+  const damping = Math.max(0, Math.min(1, Number(releaseDamping) || 0));
+  return base * Math.exp(-4 * damping);
 }
 
 // 4 · f0 wander: a very slow seeded random walk (< ±4¢ at Human 1)
@@ -2744,6 +2746,7 @@ export class GenerationEngine {
       onsetScoopVelocitySlope: this._clamp(this.p.onsetScoopVelocitySlope ?? 0, -1.5, 1.5),
       voiceBreathSync: this._clamp(this.p.voiceBreathSync ?? 0, 0, 1),
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
+      releaseDamping: this._clamp(this.p.releaseDamping ?? 0, 0, 1),
       // Body stage (T5): carried on the note so the renderer can evaluate
       // the body against MODULATED frequencies (vibrato FM → body AM).
       bodyBands,
@@ -5211,7 +5214,7 @@ export class SynthEngine {
     // Q8 release ring: material keeps the resonator ringing past note-off
     // at its own T60 instead of the envelope's hard cut (renderers extend
     // their oscillator stop times by note._ringSec to let the tail sound).
-    const ring = releaseRingSeconds(note.partialMaterial, note.frequency);
+    const ring = releaseRingSeconds(note.partialMaterial, note.frequency, note.releaseDamping);
     const doubleDecay = this._clamp(note.decaySecondStage ?? 0, 0, 1);
     const doubleRatio = this._clamp(note.decaySecondRatio ?? 1, 1, 8);
     note._ringSec = Math.min(3.5, ring * (1 + doubleDecay * (doubleRatio - 1) * 0.5));

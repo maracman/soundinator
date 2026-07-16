@@ -938,6 +938,17 @@ console.log("P3: note connection — glide vs ring on overlap");
   check("Q8 ring: lows ring longer than highs (same material)",
     releaseRingSeconds(0.6, 220) >= releaseRingSeconds(0.6, 3520));
   check("Q8 ring: CPU cap at 1.8 s", releaseRingSeconds(1, 60) <= 1.8);
+  const undampedRing = releaseRingSeconds(0.6, 440, 0);
+  const dampedRing = releaseRingSeconds(0.6, 440, 1);
+  const releaseGain = (ring, seconds) => Math.exp(-6.91 * seconds / Math.max(ring, 1e-9));
+  check("T-023 release damping: zero is the exact legacy ring",
+    undampedRing === releaseRingSeconds(0.6, 440));
+  check("T-023 release damping: law is monotone and matches exp(-4d)",
+    dampedRing < releaseRingSeconds(0.6, 440, .5) &&
+    near(dampedRing, undampedRing * Math.exp(-4), 1e-12));
+  check("T-023 release damping: firm contact removes at least 12 dB by 0.5 s",
+    20 * Math.log10(Math.max(releaseGain(dampedRing, .5), 1e-12) /
+      Math.max(releaseGain(undampedRing, .5), 1e-12)) <= -12);
   // 4 · f0 wander
   const mkRand = (seed) => () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
   const w = f0WanderTrace(mkRand(7), 4, 1);
