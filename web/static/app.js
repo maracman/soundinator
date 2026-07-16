@@ -14451,7 +14451,7 @@ function chInspectorHTML(p) {
         <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery.">Advanced shaping</summary>
         <label class="control-row" title="${esc(PARAM_DESC.resonatorClass || "Physical resonator mode series")}"><span>Resonator class</span>
           <select data-param-select="resonatorClass" class="param-select">
-            ${[["string","String / open tube"],["closedTube","Closed tube"],["conicalTube","Conical tube"],["membrane","Membrane"],["bar","Bar / plate"]].map(([value,label]) => `<option value="${value}"${(p.resonatorClass || "string") === value ? " selected" : ""}>${label}</option>`).join("")}
+            ${[["string","String"],["openTube","Open cylindrical tube"],["closedTube","Closed tube"],["conicalTube","Conical tube"],["membrane","Membrane"],["bar","Bar / plate"]].map(([value,label]) => `<option value="${value}"${(p.resonatorClass || "string") === value ? " selected" : ""}>${label}</option>`).join("")}
           </select>
         </label>
         <div class="controls-grid">
