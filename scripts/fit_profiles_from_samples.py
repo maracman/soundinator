@@ -1185,13 +1185,13 @@ def _body_points(notes: list[NoteAnalysis], n_partials: int):
 
 
 def _solve_body(rows, n_notes: int, n_partials: int, centres: np.ndarray,
-                width: float, iters: int = 5, ridge: float = 8.0):
+                widths: np.ndarray, iters: int = 5, ridge: float = 8.0):
     """Alternating rank/note/body fit; returns band coefficients (log2)."""
     note_i = np.asarray([r[0] for r in rows], dtype=int)
     rank_i = np.asarray([r[1] for r in rows], dtype=int)
     log_hz = np.asarray([r[2] for r in rows])
     level = np.asarray([r[3] for r in rows])
-    basis = np.exp(-.5 * ((log_hz[:, None] - centres[None, :]) / width) ** 2)
+    basis = np.exp(-.5 * ((log_hz[:, None] - centres[None, :]) / widths[None, :]) ** 2)
     rank_effect = np.zeros(n_partials)
     for rank in range(n_partials):
         vals = level[rank_i == rank]
@@ -1222,9 +1222,9 @@ def _solve_body(rows, n_notes: int, n_partials: int, centres: np.ndarray,
     return np.clip(coeff / math.log(2), -1.5, 1.5)
 
 
-def _band_envelope(coeff_log2: np.ndarray, centres: np.ndarray, width: float,
-                   grid_log2: np.ndarray) -> np.ndarray:
-    basis = np.exp(-.5 * ((grid_log2[:, None] - centres[None, :]) / width) ** 2)
+def _band_envelope(coeff_log2: np.ndarray, centres: np.ndarray,
+                   widths: np.ndarray, grid_log2: np.ndarray) -> np.ndarray:
+    basis = np.exp(-.5 * ((grid_log2[:, None] - centres[None, :]) / widths[None, :]) ** 2)
     return basis @ coeff_log2
 
 
@@ -1251,21 +1251,37 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
     if len(rows) < 80:
         return [], raw, None
     log_hz = np.asarray([r[2] for r in rows])
-    lo = max(math.log2(100), float(np.percentile(log_hz, 3)))
+    # The low bound follows the corpus's lowest fundamental, not a fixed
+    # 100 Hz: a cello's A0/wood modes live at 90-250 Hz where only the low
+    # notes' first harmonics reach, so a blunt 3rd-percentile cut removed
+    # that region from the model entirely (L12 investigation).
+    f0_floor = math.log2(max(70.0, 0.9 * float(min(note.f0 for note in notes))))
+    lo = max(f0_floor, float(np.percentile(log_hz, 1)))
     hi = min(math.log2(9000), float(np.percentile(log_hz, 97)))
     if hi - lo < 1.5:
         return [], raw, None
-    n_bands = int(np.clip(round((hi - lo) * 3) + 1, 5, 16))
+    n_bands = int(np.clip(round((hi - lo) * 3) + 1, 5, 18))
     centres = np.linspace(lo, hi, n_bands)
     spacing = (hi - lo) / max(1, n_bands - 1)
-    width = float(max(.14, min(.62, spacing * .55)))
-    coeff_log2 = _solve_body(rows, len(notes), n_partials, centres, width)
+    base_width = float(max(.14, min(.62, spacing * .55)))
+    # L12 / T-003: a fitting-side width floor was TRIED and REVERTED — with
+    # violin's 195 Hz lowest fundamental it forced ~0.65-octave sigmas over
+    # the A0/B1 region and smeared away the narrow signature modes the
+    # dossier requires (split-half corr fell 0.70 -> 0.57).  Real low body
+    # modes ARE narrow; the single-partial "spotlight" at sparse low
+    # spacing is an APPLICATION-time problem.  The fit therefore keeps its
+    # honest resolution and exports `lowestF0Hz` so the engine can apply
+    # the neighbour-relative gain cap (T-003 option c) per instrument.
+    f0_min = float(min(note.f0 for note in notes))
+    widths = np.full(len(centres), base_width)
+    coeff_log2 = _solve_body(rows, len(notes), n_partials, centres, widths)
 
     # Split-half stability: refit on alternating file halves with the SAME
     # bands and correlate the envelopes.  This is the "body peaks sit at
     # note-independent frequencies" validation, demonstrated per fit rather
     # than asserted once.
     stability = None
+    band_agrees = np.ones(len(centres), dtype=bool)
     files = sorted({n.file for n in notes})
     if len(files) >= 4:
         half = set(files[0::2])
@@ -1276,11 +1292,23 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
         rows_a = [(remap_a[r[0]], r[1], r[2], r[3]) for r in rows if r[0] in remap_a]
         rows_b = [(remap_b[r[0]], r[1], r[2], r[3]) for r in rows if r[0] in remap_b]
         if len(rows_a) >= 40 and len(rows_b) >= 40:
-            ca = _solve_body(rows_a, len(idx_a), n_partials, centres, width)
-            cb = _solve_body(rows_b, len(idx_b), n_partials, centres, width)
-            grid = np.linspace(lo, hi, 160)
-            ea = _band_envelope(ca, centres, width, grid)
-            eb = _band_envelope(cb, centres, width, grid)
+            ca = _solve_body(rows_a, len(idx_a), n_partials, centres, widths)
+            cb = _solve_body(rows_b, len(idx_b), n_partials, centres, widths)
+            # Per-band agreement is the emission gate: a band both corpus
+            # halves fit with the same sign and comparable size is real;
+            # one they disagree on is take noise wearing a body costume.
+            for index, (ga, gb) in enumerate(zip(ca, cb)):
+                weak = min(abs(float(ga)), abs(float(gb))) < .05
+                same_sign = float(ga) * float(gb) >= 0
+                close = abs(float(ga) - float(gb)) <= .6
+                band_agrees[index] = (weak or same_sign) and close
+            dense = [float(centre) for centre, band_width in zip(centres, widths)
+                     if int(np.sum(np.abs(log_hz - centre) <=
+                                   max(band_width, .25))) >= 12]
+            grid = np.linspace(min(dense) if dense else lo,
+                               max(dense) if dense else hi, 160)
+            ea = _band_envelope(ca, centres, widths, grid)
+            eb = _band_envelope(cb, centres, widths, grid)
             if float(np.std(ea)) > 1e-6 and float(np.std(eb)) > 1e-6:
                 corr = float(np.corrcoef(ea, eb)[0, 1])
                 stability = dict(
@@ -1291,15 +1319,25 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
     # Negligible envelopes are omitted so a new family remains neutral until
     # its own corpus demonstrates a fixed-Hz body.
     grid = np.linspace(lo, hi, 160)
-    if float(np.ptp(_band_envelope(coeff_log2, centres, width, grid))) < .12:
+    if float(np.ptp(_band_envelope(coeff_log2, centres, widths, grid))) < .12:
         return [], raw, None
+    # Per-band evidence support: a band needs a minimal point count in its
+    # +/-max(sigma, 0.25 oct) neighbourhood; beyond that the cross-half
+    # AGREEMENT gate above is the real evidence test (a fixed high count
+    # penalised small ensembles and dense-vs-sparse regions unevenly).
+    support = np.array([
+        int(np.sum(np.abs(log_hz - centre) <= max(band_width, .25)))
+        for centre, band_width in zip(centres, widths)])
     bands = [dict(freq=round(2 ** float(center), 1),
-                  gain=round(float(gain), 4), width=round(float(width), 4))
-             for center, gain in zip(centres, coeff_log2)
-             if abs(gain) >= .025]
-    fit_info = dict(method="ensemble-rank-note-body-v2",
+                  gain=round(float(gain), 4), width=round(float(band_width), 4))
+             for center, gain, band_width, n_pts, agrees
+             in zip(centres, coeff_log2, widths, support, band_agrees)
+             if abs(gain) >= .025 and n_pts >= 12 and agrees]
+    fit_info = dict(method="ensemble-rank-note-body-v3",
                     bands=len(bands), points=len(rows), notes=len(notes),
-                    widthLog2=round(width, 4))
+                    widthLog2=round(base_width, 4),
+                    prunedUnstableBands=int(np.sum(~band_agrees)),
+                    lowestF0Hz=round(f0_min, 1))
     if stability:
         fit_info.update(stability)
 
@@ -1311,7 +1349,7 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
             freq = float(note.partial_freqs[rank])
             if not np.isfinite(freq) or freq <= 0:
                 freq = note.f0 * (rank + 1)
-            g = np.exp(-.5 * ((math.log2(max(20, freq)) - centres) / width) ** 2)
+            g = np.exp(-.5 * ((math.log2(max(20, freq)) - centres) / widths) ** 2)
             body_gain = float(2 ** np.dot(coeff_log2, g))
             adjusted[note_index, rank] /= max(.2, min(4.5, body_gain))
         peak = float(adjusted[note_index].max())

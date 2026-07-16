@@ -41,6 +41,9 @@ DEFAULT_WEIGHTS = {
     "onset_noise_centroid_oct": 1.0,
     "noise_lead_ms": 1.0,
     "onset_wander_cents": 1.0,
+    "band_balance_db": 1.0,
+    "ltas_rolloff_db_oct": 1.0,
+    "onset_lockin_periods": 1.0,
 }
 
 _BLOWN_INSTRUMENTS = {
@@ -55,7 +58,22 @@ _BOWED_P1_FEATURES = (
     "vibrato_onset_delay_ms", "vibrato_ramp_ms", "vibrato_rate_drift",
     "body_am_db", "onset_noise_db", "onset_noise_centroid_oct",
     "noise_lead_ms", "onset_wander_cents",
+    # RESEARCH_BOWED_REALISM 7a senses (C7/C18) — same comparability rule.
+    "ltas_rolloff_db_oct", "onset_lockin_periods",
 )
+
+# T-005 band balance (RESEARCH_SUSTAIN_BALANCE 5.a).  The machinery serves
+# every family; the blown lane flips this weight on when it re-baselines its
+# leaderboards (its objective ids reset at that point anyway).
+_PENDING_BLOWN_FEATURES = ("band_balance_db",)
+
+# IEC 61260-1 nominal 1/3-octave centres, 100 Hz … 10 kHz (21 bands), and
+# the octave summaries built from consecutive triples (125 … 8k centres).
+THIRD_OCTAVE_CENTRES_HZ = (
+    100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000,
+    1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
+)
+OCTAVE_CENTRES_HZ = (125, 250, 500, 1000, 2000, 4000, 8000)
 
 
 def weights_for_instrument(instrument: str | None,
@@ -71,6 +89,8 @@ def weights_for_instrument(instrument: str | None,
     if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
         weights["inharmonicity_log_ratio"] = 0.0
         for key in _BOWED_P1_FEATURES:
+            weights[key] = 0.0
+        for key in _PENDING_BLOWN_FEATURES:
             weights[key] = 0.0
     if overrides:
         weights.update(overrides)
@@ -100,6 +120,9 @@ PERCEPTUAL_UNITS = {
     "onset_noise_centroid_oct": 1.0,
     "noise_lead_ms": 20.0,
     "onset_wander_cents": 10.0,
+    "band_balance_db": 3.0,       # L10/§3: 3 dB mean deviation = one unit
+    "ltas_rolloff_db_oct": 4.0,   # C7: ±4 dB/oct tolerance = one unit
+    "onset_lockin_periods": 9.0,  # C18: half the 18-period acceptance bound
 }
 
 
@@ -114,6 +137,71 @@ class FeatureBundle:
     onset_noise_db: float = 0.0
     onset_noise_centroid_oct: float = 0.0
     noise_lead_ms: float = 0.0
+    band_profile_db: np.ndarray | None = None   # 21 x 1/3-oct, dB re total
+    ltas_rolloff_db_oct: float | None = None    # 3-8 kHz sustained slope
+    onset_lockin_periods: float | None = None   # aperiodic window / period
+
+
+def band_profile(samples: np.ndarray, sample_rate: int) -> np.ndarray | None:
+    """Sustained-window 1/3-octave profile, dB re total (T-005 / 5.a spec).
+
+    Window = [onset + 0.25 s, release − 0.1 s], minimum 1.0 s; Welch PSD
+    (Hann 4096, 75% overlap), IEC 1/3-octave bands 100 Hz–10 kHz, each band
+    expressed relative to total sustained energy so uniform gain cancels
+    and tilt does not.  Returns None (not-applicable) for short notes.
+    """
+    envelope_hop = 512
+    frame_rms = np.sqrt(np.convolve(samples ** 2, np.ones(2048) / 2048,
+                                    mode="same"))[::envelope_hop]
+    peak = float(np.max(frame_rms)) if frame_rms.size else 0.0
+    if peak <= 0:
+        return None
+    active = np.flatnonzero(frame_rms >= peak * 1e-3)
+    if active.size < 4:
+        return None
+    onset_s = active[0] * envelope_hop / sample_rate
+    release_s = active[-1] * envelope_hop / sample_rate
+    lo = onset_s + 0.25
+    hi = release_s - 0.1
+    if hi - lo < 1.0:
+        return None
+    segment = samples[int(lo * sample_rate):int(hi * sample_rate)]
+    nper = min(4096, len(segment))
+    freqs, psd = signal.welch(segment, fs=sample_rate, window="hann",
+                              nperseg=nper, noverlap=nper * 3 // 4)
+    edge = 2 ** (1 / 6)
+    energies = np.zeros(len(THIRD_OCTAVE_CENTRES_HZ))
+    for index, centre in enumerate(THIRD_OCTAVE_CENTRES_HZ):
+        band = (freqs >= centre / edge) & (freqs < centre * edge)
+        energies[index] = float(np.sum(psd[band]))
+    total = float(np.sum(energies))
+    if total <= 0:
+        return None
+    return 10 * np.log10(np.maximum(energies / total, 1e-12))
+
+
+def octave_summary_db(profile_db: np.ndarray) -> np.ndarray:
+    """Octave summaries (energy sums of consecutive 1/3-oct triples)."""
+    linear = 10 ** (np.asarray(profile_db, dtype=float) / 10)
+    return np.asarray([
+        10 * math.log10(max(float(np.sum(linear[k * 3:k * 3 + 3])), 1e-12))
+        for k in range(len(OCTAVE_CENTRES_HZ))])
+
+
+def ltas_rolloff(profile_db: np.ndarray | None) -> float | None:
+    """Sustained LTAS slope over the 3.15-8 kHz 1/3-oct bands, dB/octave.
+
+    C7: violin radiated spectrum above ~3 kHz falls at roughly −15 dB/oct;
+    too shallow reads as "synth string", too steep as "behind a door".
+    """
+    if profile_db is None:
+        return None
+    centres = np.asarray(THIRD_OCTAVE_CENTRES_HZ, dtype=float)
+    mask = (centres >= 3150) & (centres <= 8000)
+    values = np.asarray(profile_db, dtype=float)[mask]
+    if np.all(values <= -119):
+        return None
+    return float(np.polyfit(np.log2(centres[mask]), values, 1)[0])
 
 
 def _noise_and_onset_observables(
@@ -121,7 +209,7 @@ def _noise_and_onset_observables(
     freqs: np.ndarray,
     times: np.ndarray,
     f0: float,
-) -> tuple[float, float, float, float, float]:
+) -> tuple[float, float, float, float, float, float | None]:
     """Measure sustained turbulence, onset-only colour and the scratch window.
 
     Harmonic/noise separation uses spectral-density means rather than total
@@ -137,12 +225,12 @@ def _noise_and_onset_observables(
     mechanism; scratch-lead for bow).
     """
     if power.size == 0 or not np.isfinite(f0) or f0 <= 0:
-        return 0.0, 0.0, 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0.0, None
     frame_energy = np.sum(power, axis=0)
     peak = float(np.max(frame_energy)) if frame_energy.size else 0.0
     active = np.flatnonzero(frame_energy >= peak * 1e-3)
     if peak <= 0 or active.size < 4:
-        return 0.0, 0.0, 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0.0, None
     lo = active[int(active.size * .35)]
     hi = active[min(active.size - 1, int(active.size * .65))]
     sustain_frames = np.arange(lo, max(lo + 1, hi + 1))
@@ -191,6 +279,7 @@ def _noise_and_onset_observables(
     # minus the same crossing for the harmonic content (positive = noise
     # leads the tone speaking)
     noise_lead_ms = 0.0
+    lockin_periods = None
     if np.any(noise) and np.any(harmonic) and noise_density > 1e-20 and harmonic_density > 1e-20:
         noise_t = np.mean(power[noise, :], axis=0)
         harm_t = np.mean(power[harmonic, :], axis=0)
@@ -200,8 +289,20 @@ def _noise_and_onset_observables(
         t_harm = cross(harm_t, 0.1 * harmonic_density)
         if t_noise is not None and t_harm is not None:
             noise_lead_ms = float((t_harm - t_noise) * 1000)
+        # onset lock-in (C18): nominal periods from the note start until the
+        # harmonic regime is established (50% of sustain harmonic density,
+        # held).  G&A 1997 acceptance: <= 18 periods loose, <= 10 good.
+        t_start = times[active[0]]
+        hold = 3
+        t_lock = None
+        for j in range(len(harm_t) - hold):
+            if np.all(harm_t[j:j + hold] >= 0.5 * harmonic_density):
+                t_lock = times[j]
+                break
+        if t_lock is not None:
+            lockin_periods = float(max(0.0, (t_lock - t_start)) * f0)
     return (sustain_noise_db, onset_tilt, onset_noise_db,
-            onset_noise_centroid_oct, noise_lead_ms)
+            onset_noise_centroid_oct, noise_lead_ms, lockin_periods)
 
 
 def _resample_time(values: np.ndarray, frames: int = 120) -> np.ndarray:
@@ -261,11 +362,15 @@ def extract_features(
     amps = np.maximum(note.partial_amps[:n_partials], 1e-4)
     partial_db = 20 * np.log10(amps / max(float(np.max(amps)), 1e-12))
     (sustain_noise_db, onset_tilt, onset_noise_db,
-     onset_noise_centroid_oct, noise_lead_ms) = _noise_and_onset_observables(
-        power, freqs, times, note.f0)
+     onset_noise_centroid_oct, noise_lead_ms,
+     lockin_periods) = _noise_and_onset_observables(power, freqs, times, note.f0)
+    profile = band_profile(samples, sample_rate)
     return FeatureBundle(note, partial_db, _resample_time(mel_db),
                          _resample_time(centroid)[0], sustain_noise_db, onset_tilt,
-                         onset_noise_db, onset_noise_centroid_oct, noise_lead_ms)
+                         onset_noise_db, onset_noise_centroid_oct, noise_lead_ms,
+                         band_profile_db=profile,
+                         ltas_rolloff_db_oct=ltas_rolloff(profile),
+                         onset_lockin_periods=lockin_periods)
 
 
 def _paired(values_a: dict, values_b: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -307,6 +412,30 @@ def _vibrato_distance(ref: NoteAnalysis, render: NoteAnalysis) -> float:
     distance = abs(ref_rate - render_rate) / .3
     distance += abs(ref_depth - render_depth) / max(5, .3 * (ref_depth or 1))
     return distance
+
+
+def band_balance_distance(ref: FeatureBundle,
+                          render: FeatureBundle) -> tuple[float, float | None]:
+    """(mean 1/3-oct deviation, max octave-summary deviation), dB.
+
+    Bands where the reference sits below −60 dB re total are noise floor on
+    both sides and excluded (5.a validity mask).  Returns (0, None) when
+    either note is too short for a sustained profile (not-applicable).
+    """
+    if ref.band_profile_db is None or render.band_profile_db is None:
+        return 0.0, None
+    ref_profile = np.asarray(ref.band_profile_db, dtype=float)
+    render_profile = np.asarray(render.band_profile_db, dtype=float)
+    valid = ref_profile > -60
+    if not np.any(valid):
+        return 0.0, None
+    d_mean = float(np.mean(np.abs(render_profile[valid] - ref_profile[valid])))
+    ref_oct = octave_summary_db(ref_profile)
+    render_oct = octave_summary_db(render_profile)
+    oct_valid = ref_oct > -60
+    d_max8 = float(np.max(np.abs(render_oct[oct_valid] - ref_oct[oct_valid]))) \
+        if np.any(oct_valid) else None
+    return d_mean, d_max8
 
 
 def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[str, float] | None = None) -> dict[str, Any]:
@@ -367,6 +496,15 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
         "noise_lead_ms": abs(render.noise_lead_ms - ref.noise_lead_ms),
         "onset_wander_cents": abs(number(ps.get("wanderCents")) -
                                     number(pr.get("wanderCents"))),
+        "band_balance_db": band_balance_distance(ref, render)[0],
+        "ltas_rolloff_db_oct": (
+            abs(render.ltas_rolloff_db_oct - ref.ltas_rolloff_db_oct)
+            if ref.ltas_rolloff_db_oct is not None and
+            render.ltas_rolloff_db_oct is not None else 0.0),
+        "onset_lockin_periods": (
+            abs(render.onset_lockin_periods - ref.onset_lockin_periods)
+            if ref.onset_lockin_periods is not None and
+            render.onset_lockin_periods is not None else 0.0),
     }
     normalized = {key: values[key] / PERCEPTUAL_UNITS[key] for key in values}
     active_weight = sum(weights[key] for key in values if weights[key] > 0)

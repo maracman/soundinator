@@ -13,7 +13,8 @@ from scripts.tone_match.assertions import ConstructionSample, evaluate_construct
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
-from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, compare_features, weights_for_instrument
+from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
+from scripts.tone_match.tripwires import evaluate_tripwires, tripwire_table_markdown
 
 
 def test_mel_bank_is_nonnegative_and_has_requested_shape():
@@ -371,8 +372,33 @@ def test_profile_fit_separates_fixed_hz_body_from_partial_rank():
     assert any(550 <= band["freq"] <= 1200 and band["gain"] > .1
                for band in bands)
     assert adjusted.shape == (12, 16)
-    assert fit_info["method"] == "ensemble-rank-note-body-v2"
+    assert fit_info["method"] == "ensemble-rank-note-body-v3"
     assert fit_info["notes"] == 12
+
+
+def test_body_fit_keeps_narrow_low_modes_and_exports_f0_floor():
+    # L12/T-003: the fit must NOT smear narrow low modes (a width floor in
+    # the basis was tried and reverted — it erased violin A0/B1); instead it
+    # exports lowestF0Hz so the ENGINE can cap single-partial spotlights at
+    # application time (exchange spec, option c).
+    rng = np.random.default_rng(11)
+    notes = []
+    for index in range(14):
+        f0 = 100 * 2 ** (index / 6)
+        freqs = f0 * np.arange(1, 25)
+        source = np.arange(1, 25, dtype=float) ** -1.0
+        body = 2 ** (.9 * np.exp(-.5 * (np.log2(freqs / 400) / .18) ** 2))
+        amps = source * body * np.exp(rng.normal(0, .05, 24))
+        amps /= amps.max()
+        notes.append(NoteAnalysis(
+            f"file-{index % 4}", f0, "test", 1, amps, freqs,
+            np.ones(24, dtype=bool)))
+    bands, adjusted, fit_info = fit_fixed_body(notes, 24)
+    assert bands, "body must still be fitted"
+    peak = max(bands, key=lambda band: band["gain"])
+    assert 300 <= peak["freq"] <= 550          # narrow 400 Hz mode recovered
+    assert peak["width"] <= .35                # ...at honest resolution
+    assert fit_info["lowestF0Hz"] == 100.0
 
 
 def test_frame_tracked_partials_survive_vibrato():
@@ -478,7 +504,7 @@ def test_scratch_window_noise_leads_the_tone_at_soft_starts():
     power = np.abs(spectrum) ** 2
     freqs = np.fft.rfftfreq(nfft, 1 / sr)
     (sustain_noise_db, _tilt, onset_noise_db,
-     onset_centroid_oct, noise_lead_ms) = _noise_and_onset_observables(
+     onset_centroid_oct, noise_lead_ms, lockin_periods) = _noise_and_onset_observables(
         power, freqs, times, 440.0)
     assert noise_lead_ms > 25
     assert onset_noise_db > sustain_noise_db + 3
@@ -512,6 +538,120 @@ def test_bowed_p1_features_have_zero_weight_for_blown():
     diff = compare_features(reference, rendered_diff, weights_for_instrument("clarinet"))
     assert diff["composite"] == pytest.approx(same["composite"])
     assert diff["features"]["onset_noise_db"] == 9.0
+
+
+def _sustained_tone(duration=2.2, sr=44_100, f0=440.0, tilt_db_oct=0.0):
+    t = np.arange(int(sr * duration)) / sr
+    tone = np.zeros_like(t)
+    for k in range(1, 20):
+        f = k * f0
+        if f > 0.45 * sr:
+            break
+        gain_db = -6 * np.log2(k) + tilt_db_oct * np.log2(f / f0)
+        tone += 10 ** (gain_db / 20) * np.sin(2 * np.pi * f * t)
+    envelope = np.minimum(1, t / .02) * np.minimum(1, (duration - t) / .05)
+    return tone * envelope
+
+
+def test_band_profile_measures_octave_tilt_not_gain():
+    sr = 44_100
+    flat = band_profile(_sustained_tone(), sr)
+    louder = band_profile(_sustained_tone() * 4, sr)
+    assert flat is not None and louder is not None
+    # uniform gain cancels in band-re-total space
+    assert np.max(np.abs(flat - louder)) < .5
+    bright = band_profile(_sustained_tone(tilt_db_oct=6), sr)
+    diff = bright - flat
+    # a +6 dB/oct tilt must raise high bands relative to low ones
+    assert diff[-4:].mean() - diff[:4].mean() > 6
+    short = band_profile(_sustained_tone(duration=.8), sr)
+    assert short is None  # not-applicable below 1 s sustained
+
+
+def test_band_balance_distance_flags_octave_scale_tilt():
+    sr = 44_100
+    ref = _bundle()
+    ref.band_profile_db = band_profile(_sustained_tone(), sr)
+    same = _bundle()
+    same.band_profile_db = band_profile(_sustained_tone(), sr)
+    tilted = _bundle()
+    tilted.band_profile_db = band_profile(_sustained_tone(tilt_db_oct=6), sr)
+    d_same, _ = band_balance_distance(ref, same)
+    d_tilt, d_max8 = band_balance_distance(ref, tilted)
+    assert d_same < .5
+    assert d_tilt > 3
+    assert d_max8 is not None and d_max8 > 6
+
+
+def test_ltas_rolloff_recovers_synthetic_slope():
+    sr = 44_100
+    profile = band_profile(_sustained_tone(tilt_db_oct=-9), sr)
+    slope = ltas_rolloff(profile)
+    # source is -6 dB/oct (1/n) plus -9 tilt => ~-15 dB/oct up high
+    assert slope is not None
+    assert -20 < slope < -9
+
+
+def test_tripwire_gate_reports_every_bar_with_no_silent_pass():
+    sr = 44_100
+    ref = _bundle()
+    ref.band_profile_db = band_profile(_sustained_tone(), sr)
+    render = _bundle()
+    render.band_profile_db = band_profile(_sustained_tone(tilt_db_oct=6), sr)
+    ref.note.band_t90 = {"500": {"t90": .05}}
+    render.note.band_t90 = {"500": {"t90": .055}}
+    result = compare_features(ref, render, weights_for_instrument("violin"))
+    gate = evaluate_tripwires("violin", [{
+        "register": "mid", "dynamic": "mf", "result": result,
+        "ref": ref, "render": render,
+    }])
+    bars = {row["bar"]: row for row in gate["bars"]}
+    for bar in ("partial-table", "mel-spectrogram", "attack-t90",
+                "vibrato", "inharmonicity", "band-balance"):
+        assert bar in bars
+    assert bars["band-balance"]["status"] == "fail"   # the tilt trips it
+    assert bars["vibrato"]["status"] == "not-applicable"
+    assert not gate["passed"]
+    table = tripwire_table_markdown(gate)
+    assert "band-balance" in table and "FAIL" in table
+
+
+def test_bowed_dynamic_tilt_gate_rejects_static_dynamics():
+    def sample(dynamic, partials):
+        bundle = _bundle(partials=partials)
+        return ConstructionSample(bundle, bundle, "mid", dynamic, dynamic)
+    dull = [1, .3, .1, .05, .02, .01, .005, .002]
+    bright = [1, .6, .45, .3, .25, .18, .12, .08]
+    base = {"excitationType": "bow", "resonatorClass": "string"}
+    static = evaluate_construction("violin", [sample(.2, dull), sample(.9, dull)],
+                                   params=base)
+    by_id = {row["id"]: row for row in static["assertions"]}
+    assert by_id["violin.dynamic-tilt"]["status"] == "fail"
+    tilted = evaluate_construction("violin", [sample(.2, dull), sample(.9, bright)],
+                                   params=base)
+    by_id = {row["id"]: row for row in tilted["assertions"]}
+    assert by_id["violin.dynamic-tilt"]["status"] == "pass"
+    assert "violin.bow-force-edge" not in {row["id"] for row in tilted["assertions"]}
+
+
+def test_bowed_body_peak_cluster_requires_signature_modes():
+    base = {"excitationType": "bow", "resonatorClass": "string"}
+    wrong = evaluate_construction("violin", _bowed_samples(), params={
+        **base, "bodyBands": [
+            {"freq": 800, "gain": .4, "width": .2},
+            {"freq": 2300, "gain": 1.0, "width": .3},
+            {"freq": 4200, "gain": .2, "width": .3},
+        ]})
+    by_id = {row["id"]: row for row in wrong["assertions"]}
+    assert by_id["violin.body-peak-cluster"]["status"] == "fail"
+    right = evaluate_construction("violin", _bowed_samples(), params={
+        **base, "bodyBands": [
+            {"freq": 275, "gain": .5, "width": .2},   # A0
+            {"freq": 500, "gain": .6, "width": .2},   # B1 cluster
+            {"freq": 2300, "gain": 1.0, "width": .3},
+        ]})
+    by_id = {row["id"]: row for row in right["assertions"]}
+    assert by_id["violin.body-peak-cluster"]["status"] == "pass"
 
 
 def _bowed_samples():
