@@ -22,6 +22,8 @@ import {
   twoStageDecayPlan,
   attackNoiseRouting,
   attackNoiseVelocityGain,
+  breathVelocityGain,
+  onsetSpectrumGain,
   registerAttackNoiseAt,
   registerAttackStaggerAt,
   registerEnvelopeAttackAt,
@@ -273,6 +275,14 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     near(attackNoiseVelocityGain(.2, 1), .2, 1e-12));
   check("lower onset exponent retains more soft transient",
     attackNoiseVelocityGain(.2, .25) > attackNoiseVelocityGain(.2, 1));
+  check("breath velocity exponent is neutral at one",
+    near(breathVelocityGain(.2, 1), .2, 1e-12));
+  check("lower breath exponent retains relatively more pp turbulence",
+    breathVelocityGain(.2, .25) > breathVelocityGain(.2, 1));
+  check("onset harmonic colour is neutral at zero",
+    [1, 2, 8, 32].every(n => onsetSpectrumGain(n, 0) === 1));
+  check("positive onset tilt brightens only the transient harmonic print",
+    onsetSpectrumGain(16, .5) > onsetSpectrumGain(2, .5));
 }
 
 console.log("T2: engine excitation transform (normalised against profile default)");

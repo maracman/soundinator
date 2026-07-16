@@ -1257,6 +1257,22 @@ export function resolveAttackNoise(profileNoise, params = {}, fundamentalHz = nu
   return resolved;
 }
 
+/** Soft-playing air leakage law. Exponent 1 is the exact legacy scaling;
+ * lower exponents retain proportionally more breath at pp. */
+export function breathVelocityGain(velocity, exponent = 1) {
+  const v = Math.max(0, Math.min(1, Number(velocity) || 0));
+  const k = Math.max(0, Math.min(2, Number.isFinite(exponent) ? exponent : 1));
+  return Math.pow(v, k);
+}
+
+/** Short-lived harmonic colour of an onset relative to its sustain print.
+ * Zero tilt is an identity, as required for neutral engine landings. */
+export function onsetSpectrumGain(harmonic, tilt = 0) {
+  const n = Math.max(1, Number(harmonic) || 1);
+  const amount = Math.max(-1, Math.min(1, Number(tilt) || 0));
+  return Math.max(0.125, Math.min(8, Math.pow(n, amount * 0.75)));
+}
+
 // ── Tone model v2: the Human dial (T3, §3.1) ──
 //
 // One seeded fluctuation per note stands in for the player: bow pressure /
@@ -2593,6 +2609,12 @@ export class GenerationEngine {
       excitationType: excType,
       excitationHuman: human,
       breathNoiseColor: this._clamp(this.p.breathNoiseColor ?? 0, -1, 1),
+      breathLevelScale: this._clamp(this.p.breathLevelScale ?? 1, 0, 3),
+      breathVelocityExponent: this._clamp(this.p.breathVelocityExponent ?? 1, 0, 2),
+      breathTurbulence: this._clamp(this.p.breathTurbulence ?? 0, 0, 1),
+      breathBodyAmount: this._clamp(this.p.breathBodyAmount ?? 0, 0, 1),
+      onsetSpectrumTilt: this._clamp(this.p.onsetSpectrumTilt ?? 0, -1, 1),
+      onsetSpectrumDecay: this._clamp(this.p.onsetSpectrumDecay ?? 0.06, 0.015, 0.25),
       voiceBreathSync: this._clamp(this.p.voiceBreathSync ?? 0, 0, 1),
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
       // Body stage (T5): carried on the note so the renderer can evaluate
@@ -4829,12 +4851,18 @@ export class SynthEngine {
     if (partials.length === 0) return;
     partials.forEach(item => {
       const target = item.gainScale * Math.max(0, item.part.amp);
+      const onsetGain = onsetSpectrumGain(item.part.harmonic, note.onsetSpectrumTilt);
+      const onsetTarget = target * onsetGain;
       // Q8 attack stagger: delayed partials fade in over their delay
       if ((item.onsetDelay || 0) > 0.001) {
         item.param.setValueAtTime(0.0001, t0);
-        item.param.linearRampToValueAtTime(target, t0 + item.onsetDelay);
+        item.param.linearRampToValueAtTime(onsetTarget, t0 + item.onsetDelay);
       } else {
-        item.param.setValueAtTime(target, t0);
+        item.param.setValueAtTime(onsetTarget, t0);
+      }
+      if (Math.abs(onsetGain - 1) > 1e-9) {
+        const settle = Math.max(item.onsetDelay || 0, note.onsetSpectrumDecay || 0.06);
+        item.param.linearRampToValueAtTime(target, t0 + settle);
       }
     });
     const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
@@ -4876,16 +4904,46 @@ export class SynthEngine {
     src.loop = true;
     const bp = this.ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.setValueAtTime(2200 * Math.pow(2, (note.breathNoiseColor || 0) * 2), t0);
+    const centre = 2200 * Math.pow(2, (note.breathNoiseColor || 0) * 2);
+    bp.frequency.setValueAtTime(centre, t0);
     bp.Q.value = 0.7;
     const g = this.ctx.createGain();
-    const level = Math.max(0.0001, note.velocity * human * 0.035);
+    const level = Math.max(0.0001,
+      breathVelocityGain(note.velocity, note.breathVelocityExponent) * human * 0.035 *
+      this._clamp(note.breathLevelScale ?? 1, 0, 3));
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(level, t0 + 0.08);
+    const turbulence = this._clamp(note.breathTurbulence ?? 0, 0, 1);
+    if (turbulence > 0) {
+      const trace = humanFluctuationTrace(
+        () => this._nextRandom(), t1 - t0, "blow", turbulence);
+      for (const point of trace) {
+        if (point.t <= 0.08 || point.t >= t1 - t0 - 0.06) continue;
+        const at = t0 + point.t;
+        g.gain.linearRampToValueAtTime(
+          level * Math.max(0.4, 1 + point.f * turbulence * 0.3), at);
+        bp.frequency.linearRampToValueAtTime(
+          centre * Math.pow(2, point.f * turbulence * 0.18), at);
+      }
+    }
     g.gain.setValueAtTime(level, Math.max(t0 + 0.08, t1 - 0.06));
     g.gain.linearRampToValueAtTime(0.0001, t1);
     src.connect(bp);
-    bp.connect(g);
+    let tail = bp;
+    const bodyAmount = this._clamp(note.breathBodyAmount ?? 0, 0, 1);
+    if (bodyAmount > 0 && Array.isArray(note.bodyBands)) {
+      for (const band of note.bodyBands) {
+        if (!Number.isFinite(band?.freq) || !Number.isFinite(band?.gain)) continue;
+        const body = this.ctx.createBiquadFilter();
+        body.type = "peaking";
+        body.frequency.setValueAtTime(Math.max(40, band.freq), t0);
+        body.Q.value = Math.max(0.3, Math.min(12, 1 / Math.max(0.08, band.width || 0.3)));
+        body.gain.value = Math.max(-12, Math.min(12, band.gain * 6 * bodyAmount));
+        tail.connect(body);
+        tail = body;
+      }
+    }
+    tail.connect(g);
     g.connect(env);
     src.start(t0);
     src.stop(t1 + 0.02);

@@ -649,6 +649,12 @@ const PARAM_DESC = {
   excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
   velocityHardnessCoupling: "How strongly playing velocity changes contact hardness. At 0 the selected hardness is fixed; higher values make forceful piano/guitar attacks brighter and soft attacks darker",
   breathNoiseColor: "Spectral colour of the sustained air noise for blown sounds: negative is darker/turbulent, positive is brighter/hissier",
+  breathLevelScale: "Overall level of the continuous blown-air layer; 1 preserves the legacy level",
+  breathVelocityExponent: "How sustained air responds to playing pressure: 1 is legacy linear scaling, lower values retain proportionally more separate breath at pp",
+  breathTurbulence: "Seeded continuous variation in air-noise level and colour; 0 is uniform/legacy, higher values add turbulent texture",
+  breathBodyAmount: "Routes sustained air through the same fitted body resonances as the harmonic tone so the noise fuses with the instrument; 0 is neutral",
+  onsetSpectrumTilt: "Temporary harmonic tilt at the start of a blown note: positive is a brighter plosive, negative darker; 0 leaves the sustain print unchanged",
+  onsetSpectrumDecay: "Time for the onset-only harmonic colour to settle into the sustained tone; inert while onset tilt is 0",
   dynamicBlare: "Nonlinear forte brightening: upper partials enrich increasingly above the normal dynamic pivot, modelling brass blare and high-force bowed edge. 0 preserves the ordinary law",
   decaySecondStage: "Amount of double decay after the first 18 dB: 0 uses one T60; higher values reveal a slower aftersound for piano strings and plucked bodies",
   decaySecondRatio: "Late-to-early T60 ratio for double decay. Has no effect while Second stage is 0",
@@ -8921,7 +8927,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay",
     "dynamicBlare","decaySecondStage","decaySecondRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
@@ -14242,8 +14248,14 @@ function chInspectorHTML(p) {
         <div class="controls-grid">
           ${controlRow("velocityHardnessCoupling", "Velocity → hardness", p.velocityHardnessCoupling ?? 0, 0, 1, 0.01)}
           ${controlRow("breathNoiseColor", "Air-noise colour", p.breathNoiseColor ?? 0, -1, 1, 0.01)}
+          ${controlRow("breathLevelScale", "Air-noise level", p.breathLevelScale ?? 1, 0, 3, 0.01)}
+          ${controlRow("breathVelocityExponent", "Air velocity curve", p.breathVelocityExponent ?? 1, 0, 2, 0.01)}
+          ${controlRow("breathTurbulence", "Air turbulence", p.breathTurbulence ?? 0, 0, 1, 0.01)}
+          ${controlRow("breathBodyAmount", "Air through body", p.breathBodyAmount ?? 0, 0, 1, 0.01)}
           ${controlRow("attackNoiseDirect", "Independent onset", p.attackNoiseDirect ?? 0, 0, 1, 0.01)}
           ${controlRow("attackNoiseVelocityExponent", "Onset velocity curve", p.attackNoiseVelocityExponent ?? 1, 0, 2, 0.01)}
+          ${controlRow("onsetSpectrumTilt", "Onset harmonic tilt", p.onsetSpectrumTilt ?? 0, -1, 1, 0.01)}
+          ${controlRow("onsetSpectrumDecay", "Onset-colour decay", p.onsetSpectrumDecay ?? 0.06, 0.015, 0.25, 0.005)}
         </div>
       </details>
       <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
