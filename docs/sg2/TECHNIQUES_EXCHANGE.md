@@ -853,3 +853,119 @@ attack-t90 and onset-lockin gates.
 Status: analysis=incorporated (dedicated roles, corrected metric, external
 contract, clean isolated audit) engine=pending bowed=blocked-engine
 struck/plucked=n/a
+
+## Sung lane pass-01 disposition (Agent E, 2026-07-16)
+
+This table records the sung lane's required status on every existing entry
+without rewriting another lane's entry body. `adapted` means the mechanism or
+method transfers but all fitted values remain neutral until sung-corpus
+evidence supplies them.
+
+| Entry | Sung status |
+|---|---|
+| T-001 | adapted — pitch-synchronous aspiration uses the shared body-routed airflow × inefficiency architecture; values pending primary-singer fits |
+| T-002 | incorporated — consonants are colours on the shared articulation latent, never independent draws |
+| T-003 | adapted — basso low-register vowel bands require the sparse-partial limiter and a consuming render assertion |
+| T-004 | incorporated — every fitted vowel body reconstructs at unity by default |
+| T-005 | incorporated — sustained band balance is scored per vowel × register × dynamic after controllability |
+| T-006 | incorporated — within-singer dynamic laws and across-singer morphology remain separate |
+| T-007 | incorporated — source/body/spec handoffs carry consuming-side assertions |
+| T-008 | incorporated — sung imperfection values remain neutral; no blown/bowed fitted defaults transfer |
+| T-009 | incorporated — sung consumes the canonical LTAS/tripwire implementation |
+| T-010 | adapted — per-vowel bodies must emit unity/low-f0 metadata before weighted fitting |
+| T-011 | adapted — dynamic consonant articulation remains neutral until a licensed consonant corpus exists |
+| T-012 | incorporated — take exclusions precede reference/objective hashing |
+| T-013 | incorporated — evidence is strict per required vowel/register/dynamic bar |
+| T-014 | adapted — the per-vowel deconvolution basis is also the emitted reconstruction basis; engine consumption remains asserted |
+| T-015 | n/a — open cylindrical bore is not a sung resonator class |
+| T-016 | n/a — air-jet-only body prior |
+| T-017 | incorporated — no any-bar shortcut for sung cells |
+| T-018 | adapted — sung fit reports exported reconstruction error; the ≤1 dB max-shape freeze gate is pending first corpus fit |
+| T-019 | n/a — blown v2 migration |
+| T-020 | incorporated — official VocalSet annotation MIDI/f0 anchors drive every scale/arpeggio segment |
+| T-021 | n/a — string polarisation law |
+| T-022 | n/a — superseded bar law |
+| T-023 | n/a — struck release damping |
+| T-024 | incorporated — the sung audit must hash references, manifest, preset, scorer and renderer identity |
+| T-025 (G7) | n/a — struck hardness law |
+| T-025 (L9) | adapted — a consonant/articulation gate activates only after its responsible sung control audits responsive |
+| T-026 | n/a — string amplitude-beating law |
+| T-027 | n/a — bar mode tuning |
+| T-028 | n/a — contact-time law |
+| T-029 | adapted — vocal vibrato requires the same instantaneous-frequency body gain; blocked-engine until the shared consumer lands |
+| T-030 | adapted — sung vibrato delay/ramp/drift uses the same neutral trajectory mechanism; values fitted per singer |
+| T-031 | rejected — bow lock-in/scratch values and shape are excitation-specific |
+| T-032 | adapted — unity body and low-register cap apply directly to basso vowel bodies |
+| T-033 | n/a — per-string identity tables |
+| T-034 | n/a — bow-force pitch flattening |
+| T-035 | incorporated — explicit omitted sung body evidence may never trigger a legacy fallback |
+| T-036 | incorporated — sung references declare spectral/onset/vibrato/floor/humanisation roles |
+| T-037 | adapted — sung source is harmonic; B stays a zero-weight watch metric and near-zero stretch uses cents if reported |
+| T-038 | rejected — bowed Helmholtz lock-in metric does not transfer to glottal onset |
+| T-039 | adapted — the shared excitation-noise architecture serves vocal aspiration, with a sung-specific pitch-synchronous consumer |
+| T-040 | rejected — violin A0/B1 corpus gate |
+| T-041 | incorporated — repeat-render stability is mandatory before sung weighting |
+| T-042 | incorporated — every sung render/audit is checkout-isolated and identity-bound |
+| T-043 | adapted — a global-source plateau promotes passaggio/register source tables, not cross-singer pooling |
+| T-044 | incorporated — role-declared coverage must straddle the class passaggio |
+| T-045 | incorporated — unanalysable candidates receive aligned high loss and evidence, not a fatal abort |
+| T-046 | n/a — violin rebaseline result |
+| T-047 | adapted — vibrato may require singer-specific register × dynamic tables after the first adult fit |
+| T-048 | rejected — bowed harmonic-organisation attack is not the voice-onset contract |
+
+### T-049 · Corpus labels are identity evidence, not convenient folder names
+Author: sung lane · 2026-07-16 · Firewall: process/data contract
+Finding: VocalSet's own readme identifies m1/m5 as baritones and f2/f6 as
+sopranos. The carried `voice-bass` profile pools m1+m5, while the carried
+`voice-mezzo` profile pools f2+f6. Both violate SUNG_PREFLIGHT V0.2 even though
+their generated profile keys look plausible. Voice-class selection must consume
+the corpus's singer metadata before any audio fit, and one primary singer alone
+defines an instrument identity. Cross-singer rows are morph evidence only.
+Consuming assertions: a documented soprano cannot build a mezzo seed; a baritone
+cannot silently satisfy the bass/contrabass identity contract; references for an
+adult identity contain exactly one singer ID.
+Affects: sung corpus selection / measured profile provenance / campaign builder.
+Status: sung=incorporated (m3 tenor, m8 bass, f5 mezzo selected; old pooled
+profiles quarantined) analysis=pending engine=n/a
+
+### T-050 · Sung fitting alternates one pooled source with per-vowel bodies
+Author: sung lane · 2026-07-16 · Firewall: method; values per primary singer
+Finding: fitting independent full spectra per vowel misfiles the same glottal
+source five times; fitting one body for all vowels destroys identity. The sung
+fit alternates a harmonic-rank source pooled across the primary singer's vowels
+against five fixed-Hz Gaussian body deconvolutions, removing a per-note level
+offset on every update. The exact emitted body basis is used for reconstruction.
+Consuming assertions: synthetic one-source/five-body data recovers five distinct
+bodies with <1 dB median scale-free reconstruction error; no observation from a
+second singer enters the fit; rendering each body passes the vowel classifier at
+low/mid registers before its spectral loss can be accepted.
+Affects: sung_features.py / per-vowel profile schema / V0.1/V1 gate.
+Status: sung=incorporated analysis=ack-required engine=consumer-spec filed
+
+### T-051 · Official note annotations are the expected-f0 contract
+Author: sung lane · 2026-07-16 · Firewall: method-only
+Finding: VocalSet's consolidated Annotated VocalSet table supplies start/end,
+ground-truth note name, frequency and MIDI for every scale/arpeggio/long-tone
+event. Filename-only segmentation is unnecessary and previously produced gross
+mode-lock errors in carried voice profiles (for example a bass candidate at
+2256 Hz). Sung references are cut at the official boundaries and carry
+`expectedF0Hz`/MIDI through the manifest.
+Consuming assertions: every segmented reference has an annotation-derived
+expected anchor; missing required spectral cells fail coverage, while optional
+unannotated files are excluded before hashing; the analysis tracker must lock
+within the canonical ±50-cent contract or reject the row.
+Affects: sung_prep.py / reference manifests / T-020.
+Status: sung=incorporated analysis=ack-required engine=n/a
+
+### T-052 · A public download link does not establish a corpus licence
+Author: sung lane · 2026-07-16 · Firewall: process/legal gate
+Finding: the official NUS SMC page exposes NUS-48E through Google Drive and the
+paper documents the corpus, but neither states a licence. A separately found NUS
+corpus licence is non-commercial, non-transferable and explicitly corpus/order
+specific, so it cannot be presumed to cover NUS-48E. Do not download or fit until
+the applicable licence is confirmed by the owner/NUS.
+Consuming assertions: consonant scorer weights remain zero; all consonant engine
+params remain neutral; provenance must name the exact licence/EULA before any
+NUS-derived row enters references or an objective hash.
+Affects: consonant corpus acquisition / N9 activation / provenance.
+Status: sung=blocked-owner-licence analysis=adapted engine=spec-only
