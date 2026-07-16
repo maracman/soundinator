@@ -966,6 +966,16 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
   if (Array.isArray(m.attackByRegister) && m.attackByRegister.length) {
     prof.attackByRegister = m.attackByRegister;
   }
+  // Agent B P2 data contract: the fitted fixed-Hz body is runtime data;
+  // resonancesFit remains JSON-only analysis provenance. Replacing both
+  // lookup paths prevents measured instruments from retaining borrowed
+  // clarinet/trombone bodies when bodyType is auto or explicitly selected.
+  if (Array.isArray(m.resonances) && m.resonances.length) {
+    const bands = m.resonances.map(band => ({ ...band }));
+    prof.resonances = bands;
+    SPECTRAL_RESONANCES[profileKey] = bands;
+    BODY_PRESETS[profileKey] = { label: `${profileKey} measured body`, bands };
+  }
   const perf = prof.performance || (prof.performance = {});
   if (Number.isFinite(m.material)) perf.partialMaterial = m.material;
   if (Number.isFinite(m.partialB)) perf.partialB = m.partialB;

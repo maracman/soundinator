@@ -92,7 +92,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.13.0"; // Human onset articulation and deterministic blown-air gating
+const APP_VERSION = "sound-studio-0.14.0"; // Measured per-instrument bodies plus Human onset articulation
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.

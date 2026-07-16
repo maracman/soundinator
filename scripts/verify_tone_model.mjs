@@ -420,6 +420,12 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
       "aeiou".split("").every(vowel => BODY_PRESETS[`${profile}-${vowel}`]?.measured)));
   check("instrument bodies present (violin, piano)",
     !!BODY_PRESETS.violin && !!BODY_PRESETS.piano);
+  const measuredBodies = ["flute", "clarinet", "alto-sax", "trumpet", "french-horn"];
+  check("P2 measured blown bodies replace borrowed hand seeds",
+    measuredBodies.every(key => SPECTRAL_PROFILES[key].resonances?.length >= 3 &&
+      BODY_PRESETS[key]?.bands === SPECTRAL_PROFILES[key].resonances) &&
+    BODY_PRESETS["alto-sax"].bands[0].freq !== BODY_PRESETS.clarinet.bands[0].freq &&
+    BODY_PRESETS["french-horn"].bands[0].freq !== BODY_PRESETS.trombone.bands[0].freq);
   const ah = BODY_PRESETS["vowel-ah"].bands;
   check("vowel-ah body carries F1-F5 at the measured frequencies",
     ah.length === 5 && ah[0].freq === FORMANT_PRESETS.ah.f1 && ah[4].freq === FORMANT_PRESETS.ah.f5);
