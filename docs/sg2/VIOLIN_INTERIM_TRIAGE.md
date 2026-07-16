@@ -1,64 +1,75 @@
-# Violin interim baseline — residual triage
+# Violin iteration residual triage
 
 Date: 2026-07-16  
-Run: `/private/tmp/sg2/violin/agentd-interim-v2-baseline-r3`  
-Engine scored: `c4712c9`  
+Authoritative baseline:
+`/private/tmp/sg2/violin/agentd-t041-isolated-rebaseline`
+
+Accepted best:
+`/private/tmp/sg2/violin/agentd-t044-controls-r4-isolated`
+
 Reference objective: `d88da9cd4056732d`
 
-This is a prioritisation baseline, not a freeze candidate. It used the
-profile/body version the engine demonstrably consumed before the final v3
-contract, with Human fixed at zero. The v3 profile rows remain quarantined
-until T-032/T-035 pass through Agent A's consumer.
+Controllability objective: `7c58c1ab437a5463`
 
-## Gate accounting
+The T-040 body fit is consumed and both body construction rows pass. T-037
+and T-041 are active in the scorer. All authoritative renders used an
+isolated server on port 8875; the earlier shared-port audit/run artifacts are
+superseded and excluded.
 
-The reported 46 failures comprise:
+## Iteration result
 
-| Source | Failures | Breakdown |
-|---|---:|---|
-| Construction checklist | 4 | measured body, low body cluster, pp noise rise, vibrato body-AM |
-| Measured §3 bar/cells | 35 | partial 7, mel 7, attack 7, B 7, band balance 6, vibrato 1 |
-| Strict evidence holes | 7 | vibrato 6 cells; band balance 1 floor-only cell |
+| Metric | Isolated baseline | Accepted best |
+|---|---:|---:|
+| Composite loss | 4.020718 | **3.448324** |
+| Total gate failures | 42 | **40** |
+| Construction failures | 2 | 2 |
+| Measured §3 cell failures | 33 | **31** |
+| Strict evidence holes | 7 | 7 |
 
-Five of six take-pair groups remain above their reference-variability floor.
-Low-register ff Philharmonia catalogue takes are already at the floor
-(ratio 0.995), but the construction and §3 gates still fail, so this is not
-a stopping-floor demonstration.
+The 14.2% loss reduction is real, but this is not a freeze candidate. Only
+two hard thresholds crossed: inharmonicity at mid/pp and mid/mezzo-piano.
+The accepted parameter changes are:
 
-T-040 rebaseline update: `agentd-t040-densified-body-baseline-r2` closes the
-measured-body and body-peak-cluster construction rows, reducing total gate
-failures from 46 to 44. The 35 measured-cell failures and 7 evidence holes
-are unchanged; parameter-first optimisation resumes from the unity-body run.
+- `partialTilt = -0.387629`;
+- `partialTransfer = 0.819660`;
+- `spectralResonanceAmount = 0.778869`.
 
-## Triage table
+Material, spectral-dynamic, and blare searches produced no further gate
+reduction. Five of six take-pair groups remain above their variability floor;
+low/ff is below floor, but construction and strict tripwires still fail.
 
-| Residual evidence | Classification | Next action / consuming assertion |
-|---|---|---|
-| `violin.measured-body` has no evidence in the run params | **Engine/data-contract gap** | T-032/T-035: effective auto body must consume the emitted measured-body decision, including explicit omission semantics and unity reconstruction. Construction assertion must inspect the effective consumer result, not merely a duplicated `bodyBands` param. |
-| `violin.body-peak-cluster` failed; the prior v3 bands had no positive 250–310 Hz A0 or 420–600 Hz B1 and split-half correlation was 0.451 | **Resolved analysis/corpus gap** | T-040 densified 48 Iowa body-role notes. The refit emits A0 at 301.1 Hz (+0.3137), B1 at 473.6 Hz (+0.4261), and split-half correlation 0.894. A hard emission gate now prevents recurrence; see `T040_VIOLIN_BODY_REPORT.md`. |
-| Partial-table failures in all 7 cells (typically 11–33 dB) | **Mixed: param-first, then engine/data** | After T-032 lands, optimise `spectralDynamicAmount`, `partialTilt`, `excitationPosition`, `spectralResonanceAmount`, and bounded `dynamicBlare`. Re-score the old best on the unchanged objective. Residual same-pitch/string errors then exercise T-033 per-string tables. |
-| Mel failures in all 7 cells (8.6–31 dB) | **Mixed: body consumer + param-fixable** | T-032 unity body first; then the same spectral free set. A body-consumed mid note must improve mel loss materially versus the quarantined baseline before v3 is accepted. |
-| Band-balance failures in all 6 measured primary cells (mean 9.6–40 dB; octave maximum 22–65 dB) | **Mixed: body consumer + param-fixable + per-string** | T-032 is the first dependency. Optimise the controllable spectral set. If high-register mean remains above 12 dB, T-033 becomes blocking rather than watch-only. |
-| Attack-T90 fails in 7 cells; 17 individual failures, often 125–291 ms | **Analysis/seed gap, followed by engine onset gap** | T-038 separates slow note-envelope fitting from pre-Helmholtz lock-in, emits register anchors, and asserts the campaign seed consumes them. T-031 then supplies bow scratch plus period-scaled wander/settle content. |
-| Inharmonicity fails in 7 cells with factors up to 15,000 although fitted register B is zero | **Scorer conditioning gap** | T-037 replaces factor distance near B=0 with a highest-reliable-mode cents tolerance and requires the known f0 anchor. This residual is not evidence for an engine B failure. |
-| Vibrato fails only mid/pp where evidence exists; six other cells are strict-missing | **Param-fixable + corpus gap + engine trajectory gap** | Fit `vibratoProb`, `vibratoDepth`, and `vibratoRate` only against vibrato-role takes. T-036 prevents non-vibrato/floor rows from creating vibrato coverage obligations. Acquire missing register/dynamic vibrato evidence before freeze. T-030/T-029 remain engine gaps for trajectory and body AM. |
-| `violin.pp-noise-rise` fails | **Engine gap** | T-039 enables the excitation-generic noise architecture for bow and proves the corpus-fitted soft/loud sign through rendered audio. |
-| `violin.vibrato-body-am` fails | **Engine gap** | T-029: instantaneous-frequency body evaluation; median partial AM ≥3 dB on the synthetic vibrato assertion. |
-| Mid/mezzo-piano band balance is strict-missing only because the duplicate floor takes are short | **Reference-role/gate bug** | T-036: floor-only rows inform variability but do not create strict spectral gate cells. |
+## Exact residual accounting
+
+| Classification | Count | Evidence | Filed spec |
+|---|---:|---|---|
+| Param-fixable | 4 | Inharmonicity fails in low/pp, low/ff, mid/ff; vibrato fails in mid/pp. T-037 plus tilt already changed two B cells from fail to pass. The audit names controls for all four residuals. | Continue bounded one-control probes; vibrato must use vibrato-role references only. |
+| Engine/data-contract gap | 29 | Partial table 7, mel 7, attack 7, band balance 6, plus `violin.pp-noise-rise` and `violin.vibrato-body-am`. Global spectral controls improved averages but plateaued without another cell crossing. | T-029, T-031, T-033, T-038, T-039, and T-043. |
+| Corpus/reference-role gap | 7 | Six vibrato cells have no evidencing take; mid/mezzo-piano band balance is created by short floor-only rows. | T-036 and T-044. |
+| **Total** | **40** |  |  |
+
+## Decisions by residual
+
+| Residual | Decision and rationale |
+|---|---|
+| Three remaining inharmonicity cells | **Param-fixable.** T-037 removed the near-zero ratio pathology and inharmonicity is no longer the dominant residual. The isolated audit is stable and names excitation position, tilt, transfer, dynamics, resonance, and vibrato controls as responders. Continue one-control probes; do not file an engine stiffness defect from the old ratio values. |
+| Mid/pp vibrato failure | **Param-fixable.** `vibratoProb` is the audit's only direct responder. Fit it against declared vibrato-role takes after T-036/T-044, not against floor or non-vibrato rows. |
+| Partial/mel/band failures in every measured cell | **Engine/data-contract gap after global-control plateau.** Tilt, transfer, material, dynamics, resonance, and blare were exercised. They reduced loss, but only tilt crossed gates and it did so on inharmonicity. The remaining cell-specific spectral errors promote per-string/register/dynamic table consumption from watch to blocking (T-033/T-043). |
+| Attack failure in all seven cells | **Analysis + engine onset gap.** A slow whole-note envelope is not a bow lock-in measurement. T-038 must emit local attack anchors; T-031 consumes period-scaled scratch and wander/settle. Global spectral controls are not a valid substitute. |
+| `violin.pp-noise-rise` | **Engine gap.** The accepted best still measures −6.75 dB against a required +2 dB soft-minus-loud sign. T-039 remains blocking. |
+| `violin.vibrato-body-am` | **Engine gap.** The accepted best measures 0.133 dB against a required 3 dB. The audit finds no `body_am_db` responder, which directly supports T-029 rather than another parameter pass. |
+| Six vibrato holes | **Corpus/role gap.** Add dedicated vibrato-role references from the existing Iowa/Philharmonia holdings and declare required coverage explicitly. |
+| Mid/mezzo-piano band hole | **Reference-role bug.** Short floor duplicates inform variability only; they must not create a strict sustained-band obligation. |
 
 ## Ordered next pass
 
-1. Land T-032/T-035 in Agent A's engine and run the end-to-end body
-   round-trip assertion.
-2. Re-score `agentd-interim-v2-baseline-r2` unchanged under the new engine;
-   this is the mandatory new-engine baseline.
-3. Land the analysis-side T-036/T-037/T-038/T-040 corrections and rebuild
-   the reference objective if required. Any objective change gets a new hash
-   and re-scores the prior best before optimisation.
-4. Run the spectral free-parameter optimiser. Do not use it to absorb
-   per-string, bow-noise, body-AM, or onset-trajectory gaps.
-5. Promote T-033/T-039/T-029/T-030/T-031 according to the residuals that
-   remain after the body consumer and scorer corrections.
+1. Land T-036/T-044 role-aware coverage and rebuild the reference objective.
+2. Re-score the accepted best on that new objective before any fitting.
+3. Run one-control probes for the three B cells and the evidenced vibrato
+   cell.
+4. Land T-038/T-031, T-039, and T-029 for onset, bow noise, and body-AM.
+5. Implement T-033/T-043 per-string and register/dynamic spectral
+   consumption, then rerun the partial/mel/band cells.
 
-Cello remains independently limited by having no true duplicate take-pairs;
-its floor and humanisation calibration use adjacent-semitone proxies.
+The T-040 corpus supports A0/B1, so no owner escalation is required for body
+modes. The remaining blockers are now named implementation or evidence work,
+not an undifferentiated optimizer plateau.

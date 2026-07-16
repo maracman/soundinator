@@ -145,7 +145,9 @@ second component: legacy-body fallback remained audible even after analysis
 correctly rejected the unstable fitted body. Tracked by T-035; Agent A's
 acceptance must prove explicit omission produces an empty effective body,
 while a profile with no measured-body decision may still use a logged
-fallback.
+fallback. In other words, the reported flute kazoo was partly the legacy-body
+fallback that survived the analysis-side empty-body decision; this is direct
+evidence for the L7 diagnosis, not merely a schema concern.
 
 ### L8 · French horn: high register "sounds like a clarinet/woodwind" (low/mid good) — likely D4
 Verified at entry: the `registerProfileAt` above-range defect (review D4 /

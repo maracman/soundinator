@@ -21,6 +21,7 @@ from .score import (
     FeatureBundle,
     OCTAVE_CENTRES_HZ,
     band_balance_distance,
+    inharmonicity_comparison,
     octave_summary_db,
     weights_for_instrument,
 )
@@ -50,6 +51,15 @@ BARS = {
     "band_octave_db": 6.0,     # T-005: max octave-summary deviation
 }
 
+TRIPWIRE_FEATURES = {
+    "partial-table": "partials_db",
+    "mel-spectrogram": "log_mel_db",
+    "attack-t90": "attack_ms",
+    "vibrato": "vibrato",
+    "inharmonicity": "inharmonicity_log_ratio",
+    "band-balance": "band_balance_db",
+}
+
 
 def _row(bar: str, register: str | None, dynamic: Any, value: Any,
          limit: str, passed: bool | None) -> dict[str, Any]:
@@ -64,7 +74,9 @@ def _octave_band_of(freq_hz: float) -> int:
 
 
 def evaluate_tripwires(instrument: str,
-                       notes: list[dict[str, Any]]) -> dict[str, Any]:
+                       notes: list[dict[str, Any]],
+                       weights: dict[str, float] | None = None,
+                       ) -> dict[str, Any]:
     """Evaluate every §3 bar for a set of scored note pairs.
 
     ``notes`` rows carry {register, dynamic, result (compare_features
@@ -72,9 +84,15 @@ def evaluate_tripwires(instrument: str,
     per-row bar table plus an overall verdict; `not-applicable` rows do
     not fail the gate but are always listed (no silent passes).
     """
-    weights = weights_for_instrument(instrument)
+    weights = weights or weights_for_instrument(instrument)
+    active_bars = {
+        bar for bar, feature in TRIPWIRE_FEATURES.items()
+        if float(weights.get(feature, 0)) > 0
+    }
     rows: list[dict[str, Any]] = []
     anchor = ENVELOPE_PEAK_ANCHORS.get((instrument or "").strip().lower())
+    if anchor:
+        active_bars.add("envelope-peak")
 
     for note in notes:
         register = note.get("register")
@@ -84,19 +102,28 @@ def evaluate_tripwires(instrument: str,
         render: FeatureBundle = note["render"]
         features = result["features"]
 
-        rows.append(_row("partial-table", register, dynamic,
-                         round(features["partials_db"], 2),
-                         f"<= {BARS['partials_db']} dB mean",
-                         features["partials_db"] <= BARS["partials_db"]))
-        rows.append(_row("mel-spectrogram", register, dynamic,
-                         round(features["log_mel_db"], 2),
-                         f"<= {BARS['log_mel_db']} dB mean",
-                         features["log_mel_db"] <= BARS["log_mel_db"]))
+        rows.append(_row(
+            "partial-table", register, dynamic,
+            round(features["partials_db"], 2)
+            if "partial-table" in active_bars else None,
+            f"<= {BARS['partials_db']} dB mean",
+            features["partials_db"] <= BARS["partials_db"]
+            if "partial-table" in active_bars else None))
+        rows.append(_row(
+            "mel-spectrogram", register, dynamic,
+            round(features["log_mel_db"], 2)
+            if "mel-spectrogram" in active_bars else None,
+            f"<= {BARS['log_mel_db']} dB mean",
+            features["log_mel_db"] <= BARS["log_mel_db"]
+            if "mel-spectrogram" in active_bars else None))
 
         # attack: ±30% of the reference's mean band T90 or ±20 ms
         ref_t90 = [entry.get("t90", 0) if isinstance(entry, dict) else entry
                    for entry in (ref.note.band_t90 or {}).values()]
-        if ref_t90:
+        if "attack-t90" not in active_bars:
+            rows.append(_row("attack-t90", register, dynamic, None,
+                             "±30% or ±20 ms", None))
+        elif ref_t90:
             allowance = max(BARS["attack_ms_floor"],
                             BARS["attack_pct"] * float(np.mean(ref_t90)) * 1000)
             rows.append(_row("attack-t90", register, dynamic,
@@ -110,7 +137,10 @@ def evaluate_tripwires(instrument: str,
         # vibrato: rate ±0.3 Hz, depth ±30% — only when the reference vibrates
         ref_vib = ref.note.vibrato or {}
         render_vib = render.note.vibrato or {}
-        if ref_vib.get("present"):
+        if "vibrato" not in active_bars:
+            rows.append(_row("vibrato", register, dynamic, None,
+                             "rate ±0.3 Hz, depth ±30%", None))
+        elif ref_vib.get("present"):
             rate_err = abs(float(render_vib.get("rate", 0)) - float(ref_vib.get("rate", 0)))
             ref_depth = float(ref_vib.get("depth", 0) or 0)
             depth_err = abs(float(render_vib.get("depth", 0) or 0) - ref_depth)
@@ -125,21 +155,33 @@ def evaluate_tripwires(instrument: str,
             rows.append(_row("vibrato", register, dynamic, None,
                              "rate ±0.3 Hz, depth ±30%", None))
 
-        # inharmonicity, where measured and where the family scores it
-        if weights.get("inharmonicity_log_ratio", 0) > 0 and ref.note.B:
-            factor = math.exp(abs(math.log(
-                max(render.note.B or 1e-8, 1e-8) / max(ref.note.B, 1e-8))))
-            rows.append(_row("inharmonicity", register, dynamic,
-                             round(factor, 3),
-                             f"within x{BARS['inharmonicity_factor']}",
-                             factor <= BARS["inharmonicity_factor"]))
+        # T-037: a B ratio is ill-conditioned at zero. Near-harmonic
+        # references use upper-mode stretch cents at the common reliable
+        # harmonic; ordinary non-zero references retain the factor gate.
+        inharmonicity = inharmonicity_comparison(ref.note, render.note)
+        if "inharmonicity" in active_bars and \
+                inharmonicity["applicable"]:
+            if inharmonicity["kind"] == "cents":
+                rows.append(_row(
+                    "inharmonicity", register, dynamic,
+                    {"mode": inharmonicity["mode"],
+                     "errorCents": round(inharmonicity["errorCents"], 3)},
+                    "upper-mode stretch error <= 3 cents",
+                    inharmonicity["passed"]))
+            else:
+                rows.append(_row(
+                    "inharmonicity", register, dynamic,
+                    round(inharmonicity["factor"], 3),
+                    f"within x{BARS['inharmonicity_factor']}",
+                    inharmonicity["passed"]))
         else:
             rows.append(_row("inharmonicity", register, dynamic, None,
-                             f"within x{BARS['inharmonicity_factor']}", None))
+                             "3-cent near-zero error or within x1.5", None))
 
         # T-005 band balance (per register AND dynamic, never pooled)
         d_mean, d_max8 = band_balance_distance(ref, render)
-        if ref.band_profile_db is None or render.band_profile_db is None:
+        if "band-balance" not in active_bars or \
+                ref.band_profile_db is None or render.band_profile_db is None:
             rows.append(_row("band-balance", register, dynamic, None,
                              "mean <= 3 dB, max octave <= 6 dB", None))
         else:
@@ -176,6 +218,7 @@ def evaluate_tripwires(instrument: str,
             "notApplicable": sum(row["status"] == "not-applicable" for row in rows),
         },
         "bars": rows,
+        "activeBars": sorted(active_bars),
     }
 
 

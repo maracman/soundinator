@@ -50,6 +50,15 @@ class FreeParam:
     default: float
 
 
+def _candidate_fingerprint(free: list[FreeParam],
+                           params: dict[str, Any]) -> str:
+    payload = {spec.key: round(float(params[spec.key]), 12)
+               for spec in free}
+    return hashlib.sha256(json.dumps(
+        payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()[:16]
+
+
 def _load(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
 
@@ -172,6 +181,15 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
         lines.append(f"| `{verdict['feature']}` | {verdict['weight']} | "
                      f"{', '.join(f'`{key}`' for key in responders) or '—'} | "
                      f"{verdict['status']} |\n")
+    repeatability = summary["controllability"].get("repeatability", {})
+    lines.extend([
+        "\n## Repeat-render stability\n\n",
+        f"Status: `{repeatability.get('status', 'missing')}`  \n",
+        "Unstable features: " +
+        (", ".join(f"`{feature}`" for feature in
+                   repeatability.get("unstableFeatures", [])) or "none") +
+        "\n\n",
+    ])
     lines.extend(["\n", tripwire_table_markdown(summary["tripwires"]), "\n"])
     if floor.get("groups"):
         lines.extend(["## Reference-variability evidence\n\n",
@@ -214,12 +232,15 @@ def _params(manifest: dict, initial: dict, only: list[str] | None) -> list[FreeP
 
 class ToneMatcher:
     def __init__(self, instrument: str, initial: dict, references: list[dict],
-                 free: list[FreeParam], run_dir: Path, repo_root: Path = ROOT):
+                 free: list[FreeParam], run_dir: Path, repo_root: Path = ROOT,
+                 weights: dict[str, float] | None = None):
         self.instrument, self.initial, self.references, self.free = instrument, initial, references, free
         self.run_dir = run_dir
         self.repo_root = repo_root
+        self.weights = weights or weights_for_instrument(instrument)
         self.evaluations: list[dict] = []
         self.best: dict | None = None
+        self._objective_cache: dict[str, tuple[float, float]] = {}
 
     def decode(self, values: np.ndarray) -> dict:
         params = dict(self.initial)
@@ -229,6 +250,9 @@ class ToneMatcher:
 
     def evaluate(self, values: np.ndarray, *, retain_audio: bool = False) -> float:
         params = self.decode(values)
+        candidate_fingerprint = _candidate_fingerprint(self.free, params)
+        if candidate_fingerprint in self._objective_cache:
+            return self._objective_cache[candidate_fingerprint][0]
         index = len(self.evaluations)
         target = self.run_dir / "renders" / f"eval-{index:04d}"
         target.mkdir(parents=True, exist_ok=True)
@@ -250,13 +274,13 @@ class ToneMatcher:
                                  cwd=self.repo_root, text=True, capture_output=True)
         if process.returncode:
             raise RuntimeError(process.stderr or process.stdout)
-        weights = weights_for_instrument(self.instrument)
         scores, construction_samples, tripwire_notes = [], [], []
         for ref, job in zip(self.references, jobs):
             reference_bundle = extract_features(ref["path"])
             render_bundle = extract_features(
                 job["out"], active_duration_s=ref.get("durationSec", 1.5))
-            score = compare_features(reference_bundle, render_bundle, weights)
+            score = compare_features(
+                reference_bundle, render_bundle, self.weights)
             scores.append(score)
             construction_samples.append(ConstructionSample(
                 render=render_bundle, reference=reference_bundle,
@@ -271,7 +295,8 @@ class ToneMatcher:
             })
         construction = evaluate_construction(self.instrument, construction_samples, params=params,
                                              strict_evidence=True)
-        raw_tripwires = evaluate_tripwires(self.instrument, tripwire_notes)
+        raw_tripwires = evaluate_tripwires(
+            self.instrument, tripwire_notes, weights=self.weights)
         required_cells = sorted({
             (str(ref.get("register")), str(ref.get("dynamic")))
             for ref in self.references
@@ -282,6 +307,7 @@ class ToneMatcher:
             **aggregate_by_cell(
                 raw_tripwires,
                 required_cells=required_cells,
+                required_bars=raw_tripwires["activeBars"],
                 family=params.get("sg2Family"),
             ),
         }
@@ -312,6 +338,7 @@ class ToneMatcher:
         if not retain_audio and self.best and self.best["evaluation"] != index:
             for job in jobs:
                 Path(job["out"]).unlink(missing_ok=True)
+        self._objective_cache[candidate_fingerprint] = (objective, loss)
         return objective
 
 
@@ -324,15 +351,22 @@ def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
         for sign in (-1, 1):
             trial = base.copy(); trial[index] = np.clip(trial[index] + sign * span, spec.lo, spec.hi)
             matcher.evaluate(trial)
-            losses.append(matcher.evaluations[-1]["loss"])
+            fingerprint = _candidate_fingerprint(
+                matcher.free, matcher.decode(trial))
+            losses.append(matcher._objective_cache[fingerprint][1])
         rows[spec.key] = {"minus": losses[0], "plus": losses[1],
                           "increase": float(np.mean(losses) - best["loss"])}
     return rows
 
 
-def _reference_set_id(references: list[dict[str, Any]], instrument: str | None = None) -> str:
+def _reference_set_id(references: list[dict[str, Any]],
+                      instrument: str | None = None,
+                      weights: dict[str, float] | None = None) -> str:
     """Identify the scored objective so unlike manifests are never ranked."""
-    objective = {"references": references, "weights": weights_for_instrument(instrument)}
+    objective = {
+        "references": references,
+        "weights": weights or weights_for_instrument(instrument),
+    }
     canonical = json.dumps(objective, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
@@ -345,11 +379,15 @@ def _free_manifest_contract(free: list[FreeParam]) -> list[dict[str, Any]]:
 def _consume_controllability_audit(path: Path, instrument: str,
                                    references: list[dict[str, Any]],
                                    free: list[FreeParam],
-                                   weights: dict[str, float]) -> dict[str, Any]:
+                                   starting_weights: dict[str, float]) -> dict[str, Any]:
     if not path.exists():
         raise ValueError(f"missing controllability audit: {path}")
     audit = _load(path)
-    expected_objective = objective_contract_hash(instrument, references, weights)
+    final_weights = audit.get("finalWeights")
+    if not isinstance(final_weights, dict):
+        final_weights = {}
+    expected_objective = objective_contract_hash(
+        instrument, references, final_weights)
     expected_manifest = manifest_contract_hash(_free_manifest_contract(free))
     errors = []
     if audit.get("instrument") != instrument:
@@ -358,10 +396,26 @@ def _consume_controllability_audit(path: Path, instrument: str,
         errors.append("reference objective hash mismatch")
     if audit.get("manifestHash") != expected_manifest:
         errors.append("free-parameter manifest hash mismatch")
-    if audit.get("finalWeights") != weights:
-        errors.append("final scoring weights mismatch")
+    if int(audit.get("schemaVersion", 0)) < 2:
+        errors.append("repeat-render stability evidence is missing")
+    if set(final_weights) != set(starting_weights):
+        errors.append("final scoring weight keys mismatch")
+    invalid_weights = sorted(
+        feature for feature, weight in starting_weights.items()
+        if float(final_weights.get(feature, 0)) not in (0.0, float(weight)))
+    if invalid_weights:
+        errors.append(
+            f"audit changed weights rather than zeroing them: {invalid_weights}")
+    unstable = set(audit.get("repeatability", {}).get(
+        "unstableFeatures", []))
+    active_unstable = sorted(
+        feature for feature in unstable
+        if float(final_weights.get(feature, 0)) > 0)
+    if active_unstable:
+        errors.append(
+            f"repeat-unstable features still carry weight: {active_unstable}")
     uncontrolled = [
-        feature for feature, weight in weights.items()
+        feature for feature, weight in final_weights.items()
         if weight > 0 and not audit.get("responsiveParameters", {}).get(feature)
     ]
     if uncontrolled:
@@ -461,8 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     assert_no_excluded(references, f"{args.instrument} campaign manifest")
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
-    scoring_weights = weights_for_instrument(args.instrument)
-    variability = _reference_variability(references, weights=scoring_weights)
+    starting_weights = weights_for_instrument(args.instrument)
     only = list(dict.fromkeys(key.strip() for key in args.keys.split(",") if key.strip())) if args.keys else None
     free = _params(manifest, initial, only)
     if not free:
@@ -471,13 +524,16 @@ def main(argv: list[str] | None = None) -> int:
                   DEFAULT_RUN_ROOT / "campaigns" / args.instrument /
                   "audit" / "controllability.json")
     controllability = _consume_controllability_audit(
-        audit_path, args.instrument, references, free, scoring_weights)
+        audit_path, args.instrument, references, free, starting_weights)
+    scoring_weights = controllability["finalWeights"]
+    variability = _reference_variability(
+        references, weights=scoring_weights)
     run_dir = DEFAULT_RUN_ROOT / args.instrument / args.run
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "run.json").write_text(
         json.dumps(vars(args), indent=2, default=str) + "\n")
     matcher = ToneMatcher(args.instrument, initial, references, free, run_dir,
-                          repo_root=args.repo_root)
+                          repo_root=args.repo_root, weights=scoring_weights)
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
@@ -493,7 +549,8 @@ def main(argv: list[str] | None = None) -> int:
     sensitivity = {} if args.skip_sensitivity else _sensitivity(matcher, best)
     best = matcher.best or best
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
-    reference_set = _reference_set_id(references, args.instrument)
+    reference_set = _reference_set_id(
+        references, args.instrument, weights=scoring_weights)
     improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
     if improved:
         _append_ledger(args.instrument, run_dir, best, sensitivity, free)

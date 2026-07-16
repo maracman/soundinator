@@ -627,7 +627,9 @@ B=0 versus 20-cent upper-mode stretch fails; ordinary non-zero B still uses
 the factor gate; the violin baseline no longer names B as dominant merely
 because the denominator is zero.
 Affects: score.extract_features / tripwires inharmonicity bar / residual ranking.
-Status: analysis=pending bowed=incorporated (baseline evidence) engine=n/a
+Status: analysis=incorporated (cents-floor scorer and canonical tripwire
+consumer assertions; isolated violin pass changes two B cells fail→pass)
+bowed=incorporated engine=n/a struck/plucked=incorporated
 
 ### T-038 · Bow attack calibration separates amplitude rise from lock-in
 Author: Agent D / analysis · 2026-07-16 · Firewall: mechanism + method; values per instrument
@@ -698,3 +700,72 @@ construction failures 4→2 and total failures 46→44.
 Status: analysis=incorporated bowed=incorporated engine=incorporated
 c3f8ab8/a900640 (unity body, explicit omission, lowest-F0 cap); no owner
 escalation required
+
+### T-041 · Repeat-render stability is part of the controllability contract
+Author: Agent C / struck-plucked · 2026-07-16 · Firewall: method-only
+Finding: Chromium offline renders with identical parameters may differ by
+one 16-bit PCM step. The audio delta is inaudible, but thresholded feature
+estimators can amplify it into material loss changes. Every distinct audit
+baseline is rendered twice more. A feature whose repeat distance crosses the
+same mean/peak controllability threshold is zero-weighted as a watch metric
+before fitting. Audit schema v2 carries the repeatability matrix and
+unstable-feature list; schema-v1 audits are invalid consumers. The optimizer
+also caches exact duplicate parameter vectors.
+Consuming assertions: schema v1 is rejected; unstable features cannot retain
+weight; exact duplicates return the cached objective; stable features remain
+eligible; tripwire hard gates consume the same final weights as the loss.
+Violin resolution: the checkout-isolated audit is stable (largest mean
+0.001503, largest peak 0.005839 against threshold 0.05), so no feature is
+quarantined. A non-isolated false quarantine was superseded after port 8765
+was observed serving another custody checkout.
+Affects: controllability.py / iterate.py / tripwires.py / objective IDs.
+Status: analysis=incorporated struck/plucked=incorporated bowed=incorporated
+engine=n/a
+
+### T-042 · Audit renders are checkout-isolated and identity-bound
+Author: Agent D / analysis · 2026-07-16 · Firewall: method-only
+Finding: the default renderer can attach to any existing server on port 8765.
+A violin optimization was observed loading assets from the struck/plucked
+worktree, making its scores invalid. Every audit/campaign must either start
+its own ephemeral-port server or verify a renderer identity containing the
+checkout commit and hashes of the served synthesis/profile assets. The run
+records that identity; a mismatch aborts before rendering.
+Consuming assertions: two worktrees with different `synth.js` hashes cannot
+share a campaign server; an existing mismatched server is rejected; the
+recorded renderer identity reproduces the served assets.
+Affects: render_note.mjs / audit and run metadata / multi-agent cadence.
+Status: analysis=specified bowed=incorporated (all authoritative violin runs
+used isolated port 8875) engine=n/a struck/plucked=adapted
+
+### T-043 · Global spectral plateau promotes cell-specific string tables
+Author: Agent D / bowed-analysis · 2026-07-16 · Firewall: mechanism + method
+Finding: violin tilt, transfer, material, spectral dynamics, resonance, and
+blare reduced composite loss 4.020718→3.448324, but only two inharmonicity
+cells crossed a gate. Partial-table and mel still fail all seven cells; band
+balance fails all six measured cells. The residual is cell-specific and
+cannot be absorbed safely by another global scalar.
+Spec: complete T-033 `partialsByString` storage and consumption, preserving
+register and dynamic interpolation. Campaign reports compare pooled versus
+selected-string tables per cell. An explicit string table must improve its
+own same-string reference direction without changing the absent-table
+fallback.
+Affects: profile schema / strings_prep / stringSelect / spectral table
+consumer / partial, mel, and band gates.
+Status: analysis=pending engine=pending bowed=blocked T-033
+struck/plucked=adapted (string/course identity, no bow selection semantics)
+
+### T-044 · Bowed strict coverage is role-declared and corpus-backed
+Author: Agent D / analysis · 2026-07-16 · Firewall: method + corpus
+Finding: the accepted violin run has seven evidence holes: six vibrato cells
+and mid/mezzo-piano band balance. The latter is created only by short
+floor-role duplicates; the former have no dedicated vibrato-role evidence.
+Spec: implement T-036 roles (`spectral`, `onset`, `vibrato`, `floor`) plus a
+per-bar coverage contract. Floor rows contribute only to variability. Build
+dedicated vibrato-role anchors from existing Iowa/Philharmonia holdings
+before declaring a vibrato cell required.
+Consuming assertions: floor duplicates do not create sustained-band cells;
+non-vibrato rows do not create vibrato cells; a declared required role with
+no eligible take fails loudly.
+Affects: strings_prep / references.json / aggregate_by_cell / objective hash.
+Status: analysis=pending bowed=blocked-corpus engine=n/a
+struck/plucked=adapted
