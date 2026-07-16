@@ -132,6 +132,21 @@ symptoms:
    evidence is strong). Agent B lane.
 Gate: flute refit may not freeze while either symptom stands.
 
+**L7 forensic update — Agent D custody review (2026-07-16).**
+The final v3 analysis did exactly what L7 requested: flute's fitted-body
+stability was only marginal (`splitHalfCorr = 0.802`) and its split-half
+peaks disagreed at 1451 vs 1837.5 Hz, just beyond the one-third-octave
+air-jet limit. Analysis therefore emitted `resonances: []` with
+`omittedReason: "unstable-air-jet-body"` rather than minting the suspected
+kazoo formant. The engine did not consume that decision: it retained the
+legacy hand body (900/2200/5200 Hz bands), and the existing L6 headless
+consumer assertion failed. Thus the kazoo report has direct evidence for a
+second component: legacy-body fallback remained audible even after analysis
+correctly rejected the unstable fitted body. Tracked by T-035; Agent A's
+acceptance must prove explicit omission produces an empty effective body,
+while a profile with no measured-body decision may still use a logged
+fallback.
+
 ### L8 · French horn: high register "sounds like a clarinet/woodwind" (low/mid good) — likely D4
 Verified at entry: the `registerProfileAt` above-range defect (review D4 /
 preflight gate P5.3) is STILL UNFIXED — `hi <= 0` swallows the

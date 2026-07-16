@@ -594,3 +594,92 @@ and T-029…T-035 on their named engine consumers, plus T-033 analysis storage.
 T-024's hashed controllability contract and T-009's canonical tripwire
 consumer are incorporated on `codex/sg2-agentd-analysis-custody`; the first
 new audit/run is required to prove their hashes before fitting proceeds.
+
+### T-036 · Strict gates consume reference roles, not every file indiscriminately
+Author: Agent D / analysis · 2026-07-16 · Firewall: method-only
+Finding: the violin baseline created six missing vibrato bar/cells and one
+missing band-balance cell because floor-only/non-vibrato rows were treated as
+full construction evidence. Reference rows need explicit roles:
+`spectral`, `onset`, `vibrato`, and `floor`. A row contributes to a bar only
+when its role can evidence that bar; floor rows still contribute to
+take-to-take variability but never create strict §3 coverage obligations.
+Required cells are derived per bar from the campaign's declared coverage
+contract, not from the union of every row.
+Consuming assertions: two short floor duplicates do not create a
+band-balance requirement; a spectral-role row does; a non-vibrato spectral
+row does not create a vibrato requirement; a declared required vibrato cell
+with no vibrato-role row fails loudly.
+Affects: references.json schema / tripwires.aggregate_by_cell / objective hash.
+Status: analysis=pending bowed=incorporated (triage and exact tests specified)
+engine=n/a struck/plucked=adapted (decay/onset roles replace sustained roles)
+
+### T-037 · Near-zero inharmonicity uses cents, not a B ratio
+Author: Agent D / analysis · 2026-07-16 · Firewall: method-only
+Finding: violin's fitted register B is zero, yet the baseline's factor gate
+reported errors up to 15,000×. A multiplicative ratio is ill-conditioned at
+zero and turns estimator noise into the dominant residual. Use the known MIDI
+f0 anchor. At the highest reliable resolved mode n, compute stretch cents
+`600*log2((1+B*n^2)/(1+B))`. When the reference stretch is below 3 cents,
+gate absolute render-reference stretch error <=3 cents; otherwise retain the
+factor-1.5 B gate. Insufficient resolved modes are visibly N/A.
+Consuming assertions: B=0 versus tiny positive estimator noise passes;
+B=0 versus 20-cent upper-mode stretch fails; ordinary non-zero B still uses
+the factor gate; the violin baseline no longer names B as dominant merely
+because the denominator is zero.
+Affects: score.extract_features / tripwires inharmonicity bar / residual ranking.
+Status: analysis=pending bowed=incorporated (baseline evidence) engine=n/a
+
+### T-038 · Bow attack calibration separates amplitude rise from lock-in
+Author: Agent D / analysis · 2026-07-16 · Firewall: mechanism + method; values per instrument
+Finding: violin attack-T90 failed in every required cell, often by
+125–291 ms. The current fitted `envelopeAttack` (~0.4 s) follows the slow
+global RMS shape of a long bow, while the bowed gate needs the local onset
+amplitude rise and pre-Helmholtz lock-in. Analysis must emit two contracts:
+`envelopeAttackByRegister` from onset-local 10–90% RMS, and
+`onsetLockinPeriodsByRegister` from harmonic stability. Campaign seeds must
+pin the former now; T-031 consumes the latter. Never convert the 18-period
+literature maximum into a guessed fitted value.
+Consuming assertions: a built violin seed carries all measured register
+attack anchors; removing them worsens attack_ms; low cello permits more
+milliseconds for the same period count; global note fade cannot move either
+onset measurement.
+Affects: fit_profiles_from_samples / strings_prep seed / T-031 engine contract.
+Status: analysis=pending engine=pending (T-031) bowed=incorporated (triaged)
+
+### T-039 · ENGINE SPEC: sustained bow noise uses the shared excitation-noise law
+Author: Agent D / bowed · 2026-07-16 · Firewall: mechanism; values per instrument
+Finding: `violin.pp-noise-rise` is a hard construction failure. Extend the
+T-001 noise consumer to `excitationType=bow`; do not create an unrelated
+noise path. The existing continuous controls become excitation-generic
+internally while preserving blown compatibility: level [0,0.4], velocity
+exponent [0,2] (1 neutral), turbulence [0,1] (0 neutral), body routing
+[0,1] (0 neutral), and colour [-1,1] (0 neutral). Bow defaults remain exact
+zero until fitted. Noise follows the note envelope, routes through the same
+body, and uses seeded texture; the pp/ff ratio sign is fitted from each
+string corpus, not transferred from winds.
+Headless assertions: all-zero bow settings preserve the golden render;
+lowering the exponent raises bow NHR at pp relative to ff without changing
+the harmonic core; body routing moves noise-band energy in the fitted body's
+direction; blow renders remain bit-identical.
+Affects: excitation-noise renderer / DEFAULTS aliases / bowed manifest /
+`*.pp-noise-rise`.
+Status: engine=pending analysis=incorporated (NHR senses and sign gate)
+bowed=blocked-engine
+
+### T-040 · Bowed body generation must evidence the low signature modes
+Author: Agent D / analysis · 2026-07-16 · Firewall: method + per-instrument data
+Finding: the current v3 violin body round-trips its own emitted rows but
+fails the independent dossier fact: it has no positive 250–310 Hz A0 band
+and no positive 420–600 Hz B1 band; split-half correlation is 0.451. A
+mathematically self-consistent decomposition is not sufficient evidence for
+the correct physical body. Profile generation for violin/cello must run the
+body-peak-cluster assertions before emission. The fitter may add diagnostic
+basis centres around dossier regions, but gains remain corpus-fitted; if the
+corpus does not support the modes, generation fails with a named coverage
+gap instead of hand-injecting them.
+Consuming assertions: synthetic corpus with stable A0/B1 recovers positive
+bands in tolerance; split halves disagreeing on a low peak fail emission;
+every emitted bowed profile passes its dossier cluster before T-032 engine
+consumption is enabled.
+Affects: fit_fixed_body / profile generation gate / bowed corpus coverage.
+Status: analysis=pending bowed=blocked-analysis engine=pending T-032
