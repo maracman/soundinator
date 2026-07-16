@@ -29,6 +29,8 @@ DEFAULT_WEIGHTS = {
     "inharmonicity_log_ratio": 1.0,
     "vibrato": 1.0,
     "noise": 1.0,
+    "sustain_noise_db": 1.0,
+    "onset_tilt_db_oct": 1.0,
 }
 
 _BLOWN_INSTRUMENTS = {
@@ -64,6 +66,8 @@ PERCEPTUAL_UNITS = {
     "inharmonicity_log_ratio": math.log(1.5),
     "vibrato": 1.0,
     "noise": 1.0,
+    "sustain_noise_db": 3.0,
+    "onset_tilt_db_oct": 3.0,
 }
 
 
@@ -73,6 +77,59 @@ class FeatureBundle:
     partial_db: np.ndarray
     mel_db: np.ndarray
     centroid_hz: np.ndarray
+    sustain_noise_db: float = 0.0
+    onset_tilt_db_oct: float = 0.0
+
+
+def _noise_and_onset_observables(
+    power: np.ndarray,
+    freqs: np.ndarray,
+    times: np.ndarray,
+    f0: float,
+) -> tuple[float, float]:
+    """Measure sustained turbulence and onset-only harmonic colour.
+
+    Harmonic/noise separation uses spectral-density means rather than total
+    band energy, so adding more high-frequency bins cannot manufacture extra
+    breath.  The onset observable is the dB/octave regression of the
+    onset-to-sustain ratio across resolved harmonic slots.
+    """
+    if power.size == 0 or not np.isfinite(f0) or f0 <= 0:
+        return 0.0, 0.0
+    frame_energy = np.sum(power, axis=0)
+    peak = float(np.max(frame_energy)) if frame_energy.size else 0.0
+    active = np.flatnonzero(frame_energy >= peak * 1e-3)
+    if peak <= 0 or active.size < 4:
+        return 0.0, 0.0
+    lo = active[int(active.size * .35)]
+    hi = active[min(active.size - 1, int(active.size * .65))]
+    sustain_frames = np.arange(lo, max(lo + 1, hi + 1))
+
+    audible = (freqs >= 80) & (freqs <= min(16_000, freqs[-1]))
+    harmonic = np.zeros_like(freqs, dtype=bool)
+    half_width = max((freqs[1] - freqs[0]) * 2 if len(freqs) > 1 else 20, f0 * .035)
+    for multiple in range(1, int(min(freqs[-1], 16_000) // f0) + 1):
+        harmonic |= np.abs(freqs - multiple * f0) <= half_width
+    harmonic &= audible
+    noise = audible & ~harmonic
+    harmonic_density = float(np.mean(power[np.ix_(harmonic, sustain_frames)])) if np.any(harmonic) else 0.0
+    noise_density = float(np.mean(power[np.ix_(noise, sustain_frames)])) if np.any(noise) else 0.0
+    sustain_noise_db = 10 * math.log10(max(noise_density, 1e-20) / max(harmonic_density, 1e-20))
+
+    onset_start = times[active[0]] + .01
+    onset_frames = np.flatnonzero((times >= onset_start) & (times <= onset_start + .08))
+    indices, ratios = [], []
+    for multiple in range(1, min(32, int(min(freqs[-1], 16_000) // f0)) + 1):
+        bins = np.flatnonzero(np.abs(freqs - multiple * f0) <= half_width)
+        if bins.size == 0 or onset_frames.size == 0:
+            continue
+        onset_power = float(np.max(np.mean(power[np.ix_(bins, onset_frames)], axis=1)))
+        sustain_power = float(np.max(np.mean(power[np.ix_(bins, sustain_frames)], axis=1)))
+        if onset_power > 1e-16 and sustain_power > 1e-16:
+            indices.append(math.log2(multiple))
+            ratios.append(10 * math.log10(onset_power / sustain_power))
+    onset_tilt = float(np.polyfit(indices, ratios, 1)[0]) if len(indices) >= 4 else 0.0
+    return sustain_noise_db, onset_tilt
 
 
 def _resample_time(values: np.ndarray, frames: int = 120) -> np.ndarray:
@@ -121,8 +178,8 @@ def extract_features(
         note = analyse_audio_samples(samples, sample_rate, name=str(path),
                                      n_partials=max(64, n_partials))
     nfft = 2048
-    _, _, spectrum = signal.stft(samples, fs=sample_rate, nperseg=nfft, noverlap=1536,
-                                 boundary=None, padded=False)
+    _, times, spectrum = signal.stft(samples, fs=sample_rate, nperseg=nfft, noverlap=1536,
+                                     boundary=None, padded=False)
     power = np.abs(spectrum) ** 2
     mel = _mel_bank(sample_rate, nfft) @ power
     mel_db = 10 * np.log10(np.maximum(mel, 1e-12))
@@ -131,7 +188,10 @@ def extract_features(
     centroid = (freqs[:, None] * power).sum(axis=0) / np.maximum(power.sum(axis=0), 1e-20)
     amps = np.maximum(note.partial_amps[:n_partials], 1e-4)
     partial_db = 20 * np.log10(amps / max(float(np.max(amps)), 1e-12))
-    return FeatureBundle(note, partial_db, _resample_time(mel_db), _resample_time(centroid)[0])
+    sustain_noise_db, onset_tilt = _noise_and_onset_observables(
+        power, freqs, times, note.f0)
+    return FeatureBundle(note, partial_db, _resample_time(mel_db),
+                         _resample_time(centroid)[0], sustain_noise_db, onset_tilt)
 
 
 def _paired(values_a: dict, values_b: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -209,6 +269,8 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
         "centroid_semitones": centroid, "attack_ms": attack,
         "decay_log_ratio": decay, "inharmonicity_log_ratio": b_distance,
         "vibrato": vibrato, "noise": noise,
+        "sustain_noise_db": abs(render.sustain_noise_db - ref.sustain_noise_db),
+        "onset_tilt_db_oct": abs(render.onset_tilt_db_oct - ref.onset_tilt_db_oct),
     }
     normalized = {key: values[key] / PERCEPTUAL_UNITS[key] for key in values}
     active_weight = sum(weights[key] for key in values if weights[key] > 0)

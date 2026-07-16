@@ -67,6 +67,20 @@ def test_inaudible_attack_residual_has_no_phantom_frequency_penalty():
     assert compare_features(reference, rendered)["features"]["noise"] == 1
 
 
+def test_owner_listening_observables_are_explicit_score_dimensions():
+    reference = _bundle()
+    rendered = _bundle()
+    reference.sustain_noise_db = -32
+    rendered.sustain_noise_db = -23
+    reference.onset_tilt_db_oct = 2.5
+    rendered.onset_tilt_db_oct = -0.5
+    result = compare_features(reference, rendered)
+    assert result["features"]["sustain_noise_db"] == 9
+    assert result["normalized"]["sustain_noise_db"] == 3
+    assert result["features"]["onset_tilt_db_oct"] == 3
+    assert result["normalized"]["onset_tilt_db_oct"] == 1
+
+
 def test_requested_parameter_order_is_preserved_for_construction_first_fits():
     manifest = {
         "continuous": [
