@@ -68,6 +68,41 @@ STRING_CAMPAIGNS: dict[str, list[dict[str, Any]]] = {
     ],
 }
 
+# Philharmonia note names of the campaign anchor pitches (for the catalogue
+# duplicate-take search; MIDI 55 = G3, 72 = C5, 88 = E6, 36 = C2, 76 = E5).
+PHIL_ANCHOR_NOTES = {
+    "violin": {55: "G3", 72: "C5", 88: "E6"},
+    "cello": {36: "C2", 55: "G3", 76: "E5"},
+}
+
+# Philharmonia catalogue length codes >= 0.5 s (the analyser needs at least
+# a 0.2 s mid-note window); the quarter-second "025" takes are unusable.
+_CATALOGUE_LENGTHS = ("05", "1", "15", "long", "phrase")
+_CATALOGUE_DYNAMICS = {"pp": "pianissimo", "ff": "fortissimo"}
+
+
+def find_catalogue_duplicates(catalogue_dir: Path, instrument: str) -> list[dict[str, Any]]:
+    """Same note/dynamic/articulation multi-take groups at the anchor pitches.
+
+    The Philharmonia catalogue holds several independent takes of the same
+    note+dynamic+articulation under different length codes — trimmed to a
+    common duration these are TRUE duplicate groups (owner direction
+    2026-07-16), replacing adjacent-semitone proxies as the variability
+    floor wherever they exist.  arco-normal takes carry the player's normal
+    vibrato, so they never enter the Iowa spectral fit corpus; they are
+    floor/§2.5c material read straight from the downloaded catalogue.
+    """
+    groups = []
+    for midi, note in PHIL_ANCHOR_NOTES.get(instrument, {}).items():
+        for dynamic, catalogue_dynamic in _CATALOGUE_DYNAMICS.items():
+            names = [f"{instrument}_{note}_{length}_{catalogue_dynamic}_arco-normal.mp3"
+                     for length in _CATALOGUE_LENGTHS]
+            present = [name for name in names if (catalogue_dir / name).exists()]
+            if len(present) >= 2:
+                groups.append({"midi": midi, "note": note, "dynamic": dynamic,
+                               "articulation": "arco-normal", "files": present})
+    return groups
+
 _STRING_RE = re.compile(r"\bsul([A-G])\b|\.sul([A-G])\.", re.IGNORECASE)
 _PHIL_RE = re.compile(
     r"^phil\.(?P<instrument>[a-z-]+)_(?P<note>[A-Ga-g]s?\d)_"
@@ -262,7 +297,8 @@ def _select_segment(path: Path, target_midi: int):
 
 
 def build_string_references(instrument: str, samples_root: Path,
-                            output_root: Path) -> dict[str, Any]:
+                            output_root: Path,
+                            catalogue_root: Path | None = None) -> dict[str, Any]:
     if instrument not in STRING_CAMPAIGNS:
         raise ValueError(f"unsupported string instrument: {instrument}")
     corpus = samples_root / instrument
@@ -375,9 +411,59 @@ def build_string_references(instrument: str, samples_root: Path,
                 "sourceClass": "Philharmonia", "sourceFile": file_name,
             })
 
+    # ── Philharmonia CATALOGUE duplicate-take groups at the anchors ──
+    # (owner direction 2026-07-16: real same-note/dynamic/articulation
+    # takes replace adjacent-semitone proxies as the floor where they exist)
+    catalogue_groups = []
+    anchor_register = {a["midi"]: a["register"] for a in STRING_CAMPAIGNS[instrument]}
+    catalogue_dir = (catalogue_root / instrument) if catalogue_root else None
+    if catalogue_dir and catalogue_dir.is_dir():
+        for group in find_catalogue_duplicates(catalogue_dir, instrument):
+            group_segments = []
+            for file_name in group["files"]:
+                try:
+                    segment, sample_rate, f0 = _select_segment(
+                        catalogue_dir / file_name, group["midi"])
+                except RuntimeError:
+                    continue
+                segment, _ = trim_to_single_bow(segment, sample_rate)
+                group_segments.append((file_name, segment, sample_rate, f0))
+            if len(group_segments) < 2:
+                continue
+            min_len = min(len(seg) for _, seg, _, _ in group_segments)
+            used = []
+            for file_name, segment, sample_rate, f0 in group_segments:
+                segment = segment[:min_len]
+                midi = _midi_of(f0)
+                peak = float(np.max(np.abs(segment)))
+                if peak > 0.99:
+                    segment = segment * (0.99 / peak)
+                target = notes_dir / f"philcat-{Path(file_name).stem}.wav"
+                sf.write(target, segment, sample_rate, subtype="PCM_16")
+                duration = len(segment) / sample_rate
+                render_duration = max(0.5, min(2.0, duration * 0.72))
+                references.append({
+                    "path": str(target), "midi": midi, "detectedF0": round(f0, 3),
+                    "velocity": VELOCITY[group["dynamic"]],
+                    "dynamic": group["dynamic"],
+                    "register": anchor_register.get(group["midi"], "mid"),
+                    "string": "unlabelled",
+                    "durationSec": render_duration,
+                    "articulation": "arco", "vibrato": "normal",
+                    "floorGroup": (f"{midi}|{group['dynamic']}|arco-normal|"
+                                   f"unlabelled|PhilCat|"
+                                   f"{_duration_bucket(render_duration)}"),
+                    "sourceClass": "Philharmonia catalogue",
+                    "sourceFile": file_name,
+                })
+                used.append(file_name)
+            if len(used) >= 2:
+                catalogue_groups.append({**group, "files": used})
+
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
     (output / "take-pairs.json").write_text(json.dumps({
         **pairs,
+        "catalogueDuplicates": catalogue_groups,
         "adjacentSemitoneProxySources": [
             {"file": p.name, "string": parse_string_label(p.name),
              "note": "same-string same-dynamic chromatic run — register-trend-"
@@ -427,6 +513,7 @@ def build_string_references(instrument: str, samples_root: Path,
         "flagged": flags,
         "bowChangeTrims": len(bow_trims),
         "trueDuplicatePairs": len(pairs["trueDuplicates"]),
+        "catalogueDuplicateGroups": len(catalogue_groups),
         "vibratoPairs": len(pairs["vibratoPairs"]),
     }
     (output / "BUILD.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -439,9 +526,14 @@ def main(argv: list[str] | None = None) -> int:
                         action="append")
     parser.add_argument("--samples", type=Path, default=Path("/private/tmp/sg2/samples"))
     parser.add_argument("--output", type=Path, default=Path("/private/tmp/sg2/campaigns"))
+    parser.add_argument("--phil-catalogue", type=Path,
+                        default=Path("/private/tmp/sg2/phil_strings/Strings"),
+                        help="downloaded Philharmonia strings catalogue root "
+                             "(per-instrument folders) for duplicate-take floors")
     args = parser.parse_args(argv)
     instruments = args.instrument or list(STRING_CAMPAIGNS)
-    summaries = [build_string_references(name, args.samples, args.output)
+    summaries = [build_string_references(name, args.samples, args.output,
+                                         catalogue_root=args.phil_catalogue)
                  for name in instruments]
     print(json.dumps(summaries, indent=2))
     return 0

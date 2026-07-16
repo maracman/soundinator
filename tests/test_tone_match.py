@@ -12,7 +12,7 @@ from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, 
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
-from scripts.tone_match.strings_prep import STRING_CAMPAIGNS, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
+from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, compare_features, weights_for_instrument
 
 
@@ -585,6 +585,24 @@ def test_take_pair_inventory_separates_duplicates_from_vibrato_pairs():
     assert pairs["trueDuplicates"][0]["vibrato"] == "nonvib"
     assert len(pairs["vibratoPairs"]) == 1
     assert pairs["vibratoPairs"][0]["midi"] == 69
+
+
+def test_catalogue_duplicate_finder_requires_two_usable_takes(tmp_path):
+    # C2 fortissimo has two usable lengths; pianissimo has one usable and
+    # one too-short (025) take, so it must not form a group.
+    for name in ("cello_C2_1_fortissimo_arco-normal.mp3",
+                 "cello_C2_15_fortissimo_arco-normal.mp3",
+                 "cello_C2_05_pianissimo_arco-normal.mp3",
+                 "cello_C2_025_pianissimo_arco-normal.mp3"):
+        (tmp_path / name).write_bytes(b"")
+    groups = find_catalogue_duplicates(tmp_path, "cello")
+    assert len(groups) == 1
+    group = groups[0]
+    assert group["midi"] == 36 and group["dynamic"] == "ff"
+    assert len(group["files"]) == 2
+    # anchor notes stay consistent with the campaign tables
+    for instrument, anchors in STRING_CAMPAIGNS.items():
+        assert set(PHIL_ANCHOR_NOTES[instrument]) == {a["midi"] for a in anchors}
 
 
 def test_string_campaigns_cover_three_registers_and_two_dynamics():
