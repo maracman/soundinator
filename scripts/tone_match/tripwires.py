@@ -60,6 +60,58 @@ TRIPWIRE_FEATURES = {
     "band-balance": "band_balance_db",
 }
 
+ROLE_BARS = {
+    "spectral": {
+        "partial-table", "mel-spectrogram", "inharmonicity",
+        "band-balance", "envelope-peak",
+    },
+    "onset": {"attack-t90"},
+    "vibrato": {"vibrato"},
+    "floor": set(),
+}
+
+
+def reference_roles(reference: dict[str, Any]) -> set[str]:
+    """Return declared evidence roles; legacy rows retain prior behaviour."""
+    raw = reference.get("roles")
+    if raw is None:
+        return {"spectral", "onset", "vibrato"}
+    if isinstance(raw, str):
+        raw = [raw]
+    roles = {str(role) for role in raw}
+    unknown = sorted(roles - set(ROLE_BARS))
+    if unknown:
+        raise ValueError(f"unknown reference roles: {unknown}")
+    return roles
+
+
+def role_evidences_bar(roles: set[str], bar: str) -> bool:
+    return any(bar in ROLE_BARS[role] for role in roles)
+
+
+def required_cells_by_bar(
+        references: list[dict[str, Any]],
+        active_bars: list[str] | set[str],
+        ) -> dict[str, list[tuple[str, str]]]:
+    """Derive the strict coverage contract from explicit reference roles."""
+    result: dict[str, set[tuple[str, str]]] = {
+        bar: set() for bar in active_bars
+    }
+    for reference in references:
+        register = reference.get("register")
+        dynamic = reference.get("dynamic")
+        if register is None or dynamic is None:
+            continue
+        roles = reference_roles(reference)
+        for bar in result:
+            if role_evidences_bar(roles, bar):
+                result[bar].add((str(register), str(dynamic)))
+    return {
+        bar: sorted(cells)
+        for bar, cells in sorted(result.items())
+        if cells
+    }
+
 
 def _row(bar: str, register: str | None, dynamic: Any, value: Any,
          limit: str, passed: bool | None) -> dict[str, Any]:
@@ -97,6 +149,7 @@ def evaluate_tripwires(instrument: str,
     for note in notes:
         register = note.get("register")
         dynamic = note.get("dynamic")
+        roles = reference_roles(note)
         result = note["result"]
         ref: FeatureBundle = note["ref"]
         render: FeatureBundle = note["render"]
@@ -105,22 +158,27 @@ def evaluate_tripwires(instrument: str,
         rows.append(_row(
             "partial-table", register, dynamic,
             round(features["partials_db"], 2)
-            if "partial-table" in active_bars else None,
+            if "partial-table" in active_bars and
+            role_evidences_bar(roles, "partial-table") else None,
             f"<= {BARS['partials_db']} dB mean",
             features["partials_db"] <= BARS["partials_db"]
-            if "partial-table" in active_bars else None))
+            if "partial-table" in active_bars and
+            role_evidences_bar(roles, "partial-table") else None))
         rows.append(_row(
             "mel-spectrogram", register, dynamic,
             round(features["log_mel_db"], 2)
-            if "mel-spectrogram" in active_bars else None,
+            if "mel-spectrogram" in active_bars and
+            role_evidences_bar(roles, "mel-spectrogram") else None,
             f"<= {BARS['log_mel_db']} dB mean",
             features["log_mel_db"] <= BARS["log_mel_db"]
-            if "mel-spectrogram" in active_bars else None))
+            if "mel-spectrogram" in active_bars and
+            role_evidences_bar(roles, "mel-spectrogram") else None))
 
         # attack: ±30% of the reference's mean band T90 or ±20 ms
         ref_t90 = [entry.get("t90", 0) if isinstance(entry, dict) else entry
                    for entry in (ref.note.band_t90 or {}).values()]
-        if "attack-t90" not in active_bars:
+        if "attack-t90" not in active_bars or \
+                not role_evidences_bar(roles, "attack-t90"):
             rows.append(_row("attack-t90", register, dynamic, None,
                              "±30% or ±20 ms", None))
         elif ref_t90:
@@ -137,7 +195,8 @@ def evaluate_tripwires(instrument: str,
         # vibrato: rate ±0.3 Hz, depth ±30% — only when the reference vibrates
         ref_vib = ref.note.vibrato or {}
         render_vib = render.note.vibrato or {}
-        if "vibrato" not in active_bars:
+        if "vibrato" not in active_bars or \
+                not role_evidences_bar(roles, "vibrato"):
             rows.append(_row("vibrato", register, dynamic, None,
                              "rate ±0.3 Hz, depth ±30%", None))
         elif ref_vib.get("present"):
@@ -160,6 +219,7 @@ def evaluate_tripwires(instrument: str,
         # harmonic; ordinary non-zero references retain the factor gate.
         inharmonicity = inharmonicity_comparison(ref.note, render.note)
         if "inharmonicity" in active_bars and \
+                role_evidences_bar(roles, "inharmonicity") and \
                 inharmonicity["applicable"]:
             if inharmonicity["kind"] == "cents":
                 rows.append(_row(
@@ -181,6 +241,7 @@ def evaluate_tripwires(instrument: str,
         # T-005 band balance (per register AND dynamic, never pooled)
         d_mean, d_max8 = band_balance_distance(ref, render)
         if "band-balance" not in active_bars or \
+                not role_evidences_bar(roles, "band-balance") or \
                 ref.band_profile_db is None or render.band_profile_db is None:
             rows.append(_row("band-balance", register, dynamic, None,
                              "mean <= 3 dB, max octave <= 6 dB", None))
@@ -193,7 +254,8 @@ def evaluate_tripwires(instrument: str,
                              (d_max8 is None or d_max8 <= BARS["band_octave_db"])))
 
         # published envelope-peak anchor, at evidenced dynamics only
-        if anchor and render.band_profile_db is not None and \
+        if anchor and role_evidences_bar(roles, "envelope-peak") and \
+                render.band_profile_db is not None and \
                 str(dynamic).lower() in anchor["dynamics"]:
             summary = octave_summary_db(render.band_profile_db)
             peak_band = int(np.argmax(summary))
@@ -231,6 +293,8 @@ FAMILY_INAPPLICABLE_BARS = {
 def aggregate_by_cell(gate: dict[str, Any],
                       required_cells: list[tuple[str, str]] | None = None,
                       *,
+                      required_cells_by_bar: dict[
+                          str, list[tuple[str, str]]] | None = None,
                       required_bars: list[str] | None = None,
                       family: str | None = None,
                       ) -> dict[str, Any]:
@@ -260,7 +324,20 @@ def aggregate_by_cell(gate: dict[str, Any],
                           "counts": counts, "status": status})
     failed = [row for row in cell_rows if row["status"] == "fail"]
     strict_missing = []
-    if required_cells:
+    if required_cells_by_bar is not None:
+        inapplicable = FAMILY_INAPPLICABLE_BARS.get(family or "", set())
+        by_key = {(row["bar"], row["register"], row["dynamic"]): row
+                  for row in cell_rows}
+        for bar, required in sorted(required_cells_by_bar.items()):
+            if bar in inapplicable:
+                continue
+            for register, dynamic in required:
+                row = by_key.get((bar, register, str(dynamic)))
+                if row is None or row["status"] == "no-evidence":
+                    strict_missing.append({
+                        "bar": bar, "register": register, "dynamic": dynamic,
+                    })
+    elif required_cells:
         inapplicable = FAMILY_INAPPLICABLE_BARS.get(family or "", set())
         bars_required = [bar for bar in
                          (required_bars or sorted({row["bar"] for row in cell_rows}))
@@ -292,5 +369,8 @@ def tripwire_table_markdown(gate: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-__all__ = ["evaluate_tripwires", "tripwire_table_markdown", "BARS",
-           "ENVELOPE_PEAK_ANCHORS"]
+__all__ = [
+    "evaluate_tripwires", "tripwire_table_markdown", "BARS",
+    "ENVELOPE_PEAK_ANCHORS", "ROLE_BARS", "reference_roles",
+    "required_cells_by_bar", "role_evidences_bar",
+]

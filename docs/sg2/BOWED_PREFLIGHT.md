@@ -193,8 +193,12 @@ under `/private/tmp/sg2/campaigns/{violin,cello}/`, never committed):
   owner ears; attack-noise flags are ADVISORY only — articulation spread is
   §2.5c human material, not corpus damage. Violin: one junk stray segment
   excluded. Cello: two spectral exclusions.
-- Iowa keeps the spectral role; Philharmonia vibrato takes are inventoried
-  for the vibrato role only and never become spectral reference rows.
+- Iowa keeps explicit `spectral+onset` roles; six curated Philharmonia
+  molto-vibrato takes now form a dedicated low/mid/high × mf/f `vibrato`
+  contract; duplicate groups are `floor` only. The role-aware rebaseline has
+  zero strict evidence holes, and `vibrato-contract.json` carries the exact
+  T-047 consumer table without letting vibrato/floor rows stand in for
+  spectral evidence.
 - §2.5c take-pair inventory (`take-pairs.json`): violin has ONE true
   duplicate pair in the curated corpus (Cs4 mezzo-piano non-vib) plus the
   catalogue groups below; cello has four same-pitch same-dynamic

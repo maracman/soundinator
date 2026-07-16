@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -29,9 +30,9 @@ from scripts.tone_match.iterate import (
     _reference_variability,
     _update_leaderboard,
 )
-from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
+from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, weights_for_instrument
-from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
+from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 
 
@@ -757,6 +758,104 @@ def test_tripwire_gate_reports_every_bar_with_no_silent_pass():
     assert "band-balance" in table and "FAIL" in table
 
 
+def test_reference_roles_define_bar_specific_coverage_without_floor_leakage():
+    references = [
+        {"register": "low", "dynamic": "pp",
+         "roles": ["spectral", "onset"]},
+        {"register": "mid", "dynamic": "mf", "roles": ["vibrato"]},
+        {"register": "high", "dynamic": "ff", "roles": ["floor"]},
+    ]
+    contract = required_cells_by_bar(
+        references,
+        ["partial-table", "attack-t90", "vibrato", "band-balance"])
+    assert contract == {
+        "attack-t90": [("low", "pp")],
+        "band-balance": [("low", "pp")],
+        "partial-table": [("low", "pp")],
+        "vibrato": [("mid", "mf")],
+    }
+    assert reference_roles({"roles": "floor"}) == {"floor"}
+    assert reference_roles({}) == {"spectral", "onset", "vibrato"}
+    with pytest.raises(ValueError, match="unknown reference roles"):
+        reference_roles({"roles": ["mystery"]})
+
+
+def test_bowed_construction_uses_spectral_and_vibrato_roles_separately():
+    spectral = _bundle()
+    spectral.ltas_rolloff_db_oct = -15.0
+    vibrato = _bundle()
+    vibrato.ltas_rolloff_db_oct = 0.0
+    vibrato.note.vibrato = {
+        "present": True, "depth": 30.0, "bodyAmDepthDb": 4.0,
+    }
+    samples = [
+        ConstructionSample(
+            spectral, spectral, register, dynamic, dynamic,
+            frozenset({"spectral", "onset"}))
+        for register in ("low", "mid", "high")
+        for dynamic in (0.2, 0.9)
+    ]
+    samples.append(ConstructionSample(
+        vibrato, vibrato, "mid", 0.62, 0.62, frozenset({"vibrato"})))
+    result = evaluate_construction("violin", samples, params={
+        "excitationType": "bow", "resonatorClass": "string",
+        "bodyBands": [
+            {"freq": 275, "gain": .5, "width": .2},
+            {"freq": 500, "gain": .6, "width": .2},
+            {"freq": 2300, "gain": 1.0, "width": .3},
+        ],
+    })
+    by_id = {row["id"]: row for row in result["assertions"]}
+    assert by_id["violin.radiated-rolloff"]["status"] == "pass"
+    assert by_id["violin.radiated-rolloff"]["observed"] == -15.0
+    assert by_id["violin.vibrato-body-am"]["status"] == "pass"
+    assert by_id["violin.vibrato-body-am"]["observed"] == 4.0
+
+
+def test_floor_and_vibrato_roles_do_not_create_unrelated_tripwire_cells():
+    ref = _bundle(partials=[1] * 40, B=0.0)
+    render = _bundle(partials=[1] * 40, B=0.0004)
+    result = compare_features(
+        ref, render, weights_for_instrument("violin"))
+    gate = evaluate_tripwires("violin", [
+        {"register": "mid", "dynamic": "mp", "roles": ["floor"],
+         "result": result, "ref": ref, "render": render},
+        {"register": "high", "dynamic": "mf", "roles": ["vibrato"],
+         "result": result, "ref": ref, "render": render},
+    ])
+    floor_rows = [
+        row for row in gate["bars"]
+        if row["register"] == "mid" and row["dynamic"] == "mp"
+    ]
+    assert floor_rows and {row["status"] for row in floor_rows} == {
+        "not-applicable"}
+    vibrato_rows = [
+        row for row in gate["bars"]
+        if row["register"] == "high" and row["dynamic"] == "mf"
+    ]
+    assert next(
+        row for row in vibrato_rows if row["bar"] == "partial-table"
+    )["status"] == "not-applicable"
+    contract = {
+        "vibrato": [("high", "mf")],
+    }
+    aggregate = aggregate_by_cell(
+        gate, required_cells_by_bar=contract, family="bowed")
+    assert not any(
+        row["bar"] == "band-balance"
+        for row in aggregate["strictMissingCells"])
+
+
+def test_violin_vibrato_role_inventory_covers_three_registers_and_two_dynamics():
+    rows = VIBRATO_ROLE_FILES["violin"]
+    assert {(row["register"], row["dynamic"]) for row in rows} == {
+        (register, dynamic)
+        for register in ("low", "mid", "high")
+        for dynamic in ("mf", "f")
+    }
+    assert all(parse_phil_name(row["file"]) for row in rows)
+
+
 def test_zero_weighted_tripwire_feature_is_watch_only():
     ref = _bundle(partials=[1] * 40, B=0.0)
     render = _bundle(partials=[1] * 40, B=0.0004)
@@ -818,6 +917,40 @@ def test_tone_matcher_reuses_exact_duplicate_candidate_objective(tmp_path):
     assert matcher.evaluate(np.asarray([0.0])) == 12.5
     assert matcher.evaluations == []
     assert not (tmp_path / "renders").exists()
+
+
+def test_tone_matcher_penalizes_unanalysable_candidate_without_aborting(
+        tmp_path, monkeypatch):
+    matcher = ToneMatcher(
+        "violin",
+        {"partialTilt": 0.0, "sg2Family": "bowed"},
+        [
+            {"path": "reference-0.wav", "midi": 55, "velocity": .2,
+             "register": "low", "dynamic": "pp",
+             "roles": ["spectral", "onset"]},
+            {"path": "reference-1.wav", "midi": 72, "velocity": .9,
+             "register": "mid", "dynamic": "ff",
+             "roles": ["spectral", "onset"]},
+        ],
+        [FreeParam("partialTilt", -1, 1, 0)], tmp_path)
+    monkeypatch.setattr(
+        iterate_module.subprocess, "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0, stdout="", stderr=""))
+
+    def features(path, **_kwargs):
+        name = str(path)
+        if name.endswith("note-0.wav"):
+            raise ValueError("no stable pitched note detected")
+        return _bundle()
+
+    monkeypatch.setattr(iterate_module, "extract_features", features)
+    objective = matcher.evaluate(np.asarray([0.0]))
+    record = matcher.evaluations[0]
+    assert np.isfinite(objective)
+    assert len(record["analysisFailures"]) == 1
+    assert record["scores"][0]["composite"] == 100.0
+    assert record["gateFailures"] >= 1
 
 
 def test_bowed_dynamic_tilt_gate_rejects_static_dynamics():

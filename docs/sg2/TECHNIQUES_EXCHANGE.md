@@ -718,6 +718,10 @@ Violin resolution: the checkout-isolated audit is stable (largest mean
 0.001503, largest peak 0.005839 against threshold 0.05), so no feature is
 quarantined. A non-isolated false quarantine was superseded after port 8765
 was observed serving another custody checkout.
+Role-aware update: the later accepted-seed audit found inharmonicity unstable
+at 0.0163 mean / 0.0844 peak, so that distinct objective correctly
+quarantines it as a watch metric. Quarantine is baseline-specific evidence,
+not a permanent instrument-wide label.
 Affects: controllability.py / iterate.py / tripwires.py / objective IDs.
 Status: analysis=incorporated struck/plucked=incorporated bowed=incorporated
 engine=n/a
@@ -741,8 +745,8 @@ used isolated port 8875) engine=n/a struck/plucked=adapted
 Author: Agent D / bowed-analysis · 2026-07-16 · Firewall: mechanism + method
 Finding: violin tilt, transfer, material, spectral dynamics, resonance, and
 blare reduced composite loss 4.020718→3.448324, but only two inharmonicity
-cells crossed a gate. Partial-table and mel still fail all seven cells; band
-balance fails all six measured cells. The residual is cell-specific and
+cells crossed a gate. After role routing, partial-table, mel, and band balance
+still fail all six declared spectral cells. The residual is cell-specific and
 cannot be absorbed safely by another global scalar.
 Spec: complete T-033 `partialsByString` storage and consumption, preserving
 register and dynamic interpolation. Campaign reports compare pooled versus
@@ -767,5 +771,50 @@ Consuming assertions: floor duplicates do not create sustained-band cells;
 non-vibrato rows do not create vibrato cells; a declared required role with
 no eligible take fails loudly.
 Affects: strings_prep / references.json / aggregate_by_cell / objective hash.
-Status: analysis=pending bowed=blocked-corpus engine=n/a
+Resolution: `strings_prep` emits six spectral/onset, six dedicated vibrato,
+and fourteen floor references plus a per-bar coverage contract. All six
+vibrato cells have detected evidence; floor rows create no strict cells.
+The role-aware rebaseline has zero evidence holes.
+Status: analysis=incorporated bowed=incorporated engine=n/a
 struck/plucked=adapted
+
+### T-045 · Unanalysable optimizer candidates are rejected, not fatal
+Author: Agent D / analysis · 2026-07-16 · Firewall: method-only
+Finding: a violin vibrato-probability probe produced no stable pitched high/pp
+note and terminated Powell. A failed candidate is expected evidence near a
+parameter boundary, not permission to abort the iteration loop.
+Spec: retain reference-index/path/error evidence, insert an aligned
+high-loss score placeholder, add one hard gate per failed note, and continue.
+The candidate can never outrank a valid equal-gate render.
+Status: analysis=incorporated engine=n/a bowed=incorporated
+struck/plucked=adapted
+
+### T-046 · Role-aware violin rebaseline closes evidence holes
+Author: Agent D / bowed-analysis · 2026-07-16 · Firewall: method + corpus
+Finding: T-044 changes the objective from 20 mixed-role rows to 26 explicit
+rows. The mandatory rebaseline reduces total failures 40→31 and strict holes
+7→0. Its 29 measured failures are partial 6, mel 6, attack 6, band 6, and
+vibrato 5; construction remains bow noise plus body AM.
+Rate-first resolution: `vibratoRate = 5.431206` closes one more vibrato cell,
+for 30 total failures. Raw loss rises 0.00127, so this is a gate improvement,
+not a score improvement.
+Status: analysis=incorporated bowed=incorporated engine=n/a
+
+### T-047 · ENGINE SPEC: consume vibrato by register and dynamic
+Author: Agent D / bowed-analysis · 2026-07-16 · Firewall: mechanism + data
+Finding: six existing Philharmonia molto-vibrato takes measure rates
+5.60–6.58 Hz and depths 7.62–37.93 cents. One global probability/rate/depth
+tuple cannot pass low, mid, and high cells simultaneously. Probability and
+depth searches plateau; a global rate closes the two mid cells but leaves four
+low/high cells failing.
+Spec: analysis emits `vibratoByRegisterDynamic` rows with
+`{register,dynamic,midi,prob,rate,depth,sourceFile}`. The engine interpolates
+rate/depth across register and dynamic, and a declared vibrato-role render
+uses deterministic presence (`prob=1`) for the consuming assertion. The
+legacy scalar tuple remains the absent-table fallback.
+Consuming assertions: every emitted row reaches rate ±0.3 Hz and depth ±30%;
+removing the table reproduces at least one low/high failure; absent table is
+bit-identical to the scalar path.
+Affects: measured profile/seed schema / vibrato note law / bowed campaign.
+Status: analysis=incorporated (external contract + seed emitted)
+engine=pending bowed=blocked-engine struck/plucked=n/a

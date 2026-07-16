@@ -34,12 +34,15 @@ from .score import compare_features, extract_features, weights_for_instrument
 from .tripwires import (
     aggregate_by_cell,
     evaluate_tripwires,
+    reference_roles,
+    required_cells_by_bar,
     tripwire_table_markdown,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
 MEASURABLE_REL_IMPROVEMENT = 1e-3
+ANALYSIS_FAILURE_LOSS = 100.0
 
 
 @dataclass
@@ -275,20 +278,42 @@ class ToneMatcher:
         if process.returncode:
             raise RuntimeError(process.stderr or process.stdout)
         scores, construction_samples, tripwire_notes = [], [], []
-        for ref, job in zip(self.references, jobs):
+        analysis_failures = []
+        for ref_index, (ref, job) in enumerate(zip(self.references, jobs)):
             reference_bundle = extract_features(ref["path"])
-            render_bundle = extract_features(
-                job["out"], active_duration_s=ref.get("durationSec", 1.5))
+            try:
+                render_bundle = extract_features(
+                    job["out"], active_duration_s=ref.get(
+                        "durationSec", 1.5))
+            except ValueError as error:
+                failure = {
+                    "referenceIndex": ref_index,
+                    "reference": ref.get("path"),
+                    "render": job["out"],
+                    "error": str(error),
+                }
+                analysis_failures.append(failure)
+                scores.append({
+                    "composite": ANALYSIS_FAILURE_LOSS,
+                    "features": {key: 0.0 for key in self.weights},
+                    "normalized": {key: 0.0 for key in self.weights},
+                    "weights": self.weights,
+                    "analysisFailure": failure,
+                })
+                continue
             score = compare_features(
                 reference_bundle, render_bundle, self.weights)
             scores.append(score)
-            construction_samples.append(ConstructionSample(
-                render=render_bundle, reference=reference_bundle,
-                register=ref.get("register"), dynamic=ref.get("dynamic"),
-                velocity=ref.get("velocity")))
+            roles = reference_roles(ref)
+            if roles != {"floor"}:
+                construction_samples.append(ConstructionSample(
+                    render=render_bundle, reference=reference_bundle,
+                    register=ref.get("register"), dynamic=ref.get("dynamic"),
+                    velocity=ref.get("velocity"), roles=frozenset(roles)))
             tripwire_notes.append({
                 "register": ref.get("register"),
                 "dynamic": ref.get("dynamic"),
+                "roles": sorted(roles),
                 "result": score,
                 "ref": reference_bundle,
                 "render": render_bundle,
@@ -297,17 +322,14 @@ class ToneMatcher:
                                              strict_evidence=True)
         raw_tripwires = evaluate_tripwires(
             self.instrument, tripwire_notes, weights=self.weights)
-        required_cells = sorted({
-            (str(ref.get("register")), str(ref.get("dynamic")))
-            for ref in self.references
-            if ref.get("register") is not None and ref.get("dynamic") is not None
-        })
+        coverage_contract = required_cells_by_bar(
+            self.references, raw_tripwires["activeBars"])
         tripwires = {
             **raw_tripwires,
+            "coverageContract": coverage_contract,
             **aggregate_by_cell(
                 raw_tripwires,
-                required_cells=required_cells,
-                required_bars=raw_tripwires["activeBars"],
+                required_cells_by_bar=coverage_contract,
                 family=params.get("sg2Family"),
             ),
         }
@@ -319,11 +341,15 @@ class ToneMatcher:
         # Construction is a hard gate, not another feature that a low
         # composite can average away.  The large objective penalty guides
         # Powell back into a valid topology while reports retain raw loss.
-        gate_failures = construction["counts"]["fail"] + tripwire_failures
+        gate_failures = (
+            construction["counts"]["fail"] + tripwire_failures +
+            len(analysis_failures)
+        )
         gate_penalty = 100.0 * gate_failures
         objective = loss + gate_penalty
         record = {"evaluation": index, "loss": loss, "params": {p.key: params[p.key] for p in self.free},
                   "objective": objective, "gateFailures": gate_failures,
+                  "analysisFailures": analysis_failures,
                   "construction": construction, "tripwires": tripwires,
                   "scores": scores}
         self.evaluations.append(record)
@@ -332,6 +358,7 @@ class ToneMatcher:
                 self.best["gateFailures"], self.best["loss"]):
             self.best = {"loss": loss, "objective": objective, "params": params, "evaluation": index,
                          "gateFailures": gate_failures,
+                         "analysisFailures": analysis_failures,
                          "construction": construction, "tripwires": tripwires,
                          "scores": scores}
             (self.run_dir / "best.json").write_text(json.dumps(self.best, indent=2) + "\n")
@@ -556,11 +583,16 @@ def main(argv: list[str] | None = None) -> int:
         _append_ledger(args.instrument, run_dir, best, sensitivity, free)
     floor = _floor_evidence(variability, best)
     relative_improvement = ((baseline - best["loss"]) / max(abs(baseline), 1e-12))
-    measurable_improvement = (
+    measurable_loss_improvement = (
         improved and relative_improvement >= MEASURABLE_REL_IMPROVEMENT)
+    gate_improvement = (
+        improved and previous_best_loss is not None and
+        not measurable_loss_improvement)
     if floor["status"] == "demonstrated":
         outcome = {"state": "reference-variability-floor"}
-    elif measurable_improvement:
+    elif gate_improvement:
+        outcome = {"state": "gate-improvement"}
+    elif measurable_loss_improvement:
         outcome = {"state": "improvement"}
     elif args.limiting_factor and args.work_item:
         item_path = _file_work_item(args.instrument, run_dir, args.limiting_factor, args.work_item)
