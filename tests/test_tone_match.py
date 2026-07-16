@@ -7,12 +7,12 @@ import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, onset_pitch_stats, validate_corpus_contract, vowel_from_filename
+from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, fit_fixed_body, fit_take_spread, harmonic_frame_amps, onset_pitch_stats, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
-from scripts.tone_match.score import FeatureBundle, _mel_bank, _resample_time, compare_features, weights_for_instrument
+from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, compare_features, weights_for_instrument
 
 
 def test_mel_bank_is_nonnegative_and_has_requested_shape():
@@ -301,6 +301,32 @@ def test_horn_checklist_requires_register_onset_evidence():
     assert by_id["french-horn.register-onset-law"]["status"] == "pass"
 
 
+def test_horn_checklist_requires_coupled_articulation_distribution():
+    samples = []
+    for index, (transient, depth) in enumerate(((.2, 60), (.3, 50), (.5, 35),
+                                                (.7, 20), (.8, 10), (.9, 2))):
+        bundle = _bundle()
+        bundle.note.attack_noise = {"level": transient}
+        bundle.note.onset_pitch = {"depthCents": depth, "settleMs": 60}
+        samples.append(ConstructionSample(bundle, bundle,
+                                           ("low", "mid", "high")[index // 2],
+                                           .25 if index % 2 == 0 else .9,
+                                           .25 if index % 2 == 0 else .9))
+    base = {"excitationType": "blow", "resonatorClass": "conicalTube",
+            "dynamicBlare": .2}
+    missing = evaluate_construction("french-horn", samples, params=base)
+    by_id = {row["id"]: row for row in missing["assertions"]}
+    assert by_id["french-horn.coupled-articulation-law"]["status"] == "fail"
+    fitted = evaluate_construction("french-horn", samples, params={
+        **base, "articulationCoupling": .8, "articulationVariation": .5,
+        "onsetScoopDepthCents": 70, "onsetScoopSettle": .08,
+        "onsetArticulationCorrelation": -.6, "onsetPitchNotes": 6,
+    })
+    by_id = {row["id"]: row for row in fitted["assertions"]}
+    assert by_id["french-horn.coupled-articulation-law"]["status"] == "pass"
+    assert by_id["french-horn.articulation-anticorrelation"]["status"] == "pass"
+
+
 def test_register_fit_retains_valid_notes_below_100_hz():
     notes = [_bundle(f0=f0, partials=partials).note for f0, partials in (
         (60, [1, .1, .05, .02, .01, .005, .002, .001]),
@@ -325,6 +351,233 @@ def test_profile_fit_retains_scoop_distribution_and_plosive_anticorrelation():
     assert performance["onsetScoopProb"] == .75
     assert performance["onsetScoopDepthCents"] > 30
     assert performance["onsetArticulationCorrelation"] < -.9
+
+
+def test_profile_fit_separates_fixed_hz_body_from_partial_rank():
+    notes = []
+    for index in range(12):
+        f0 = 110 * 2 ** (index / 12)
+        freqs = f0 * np.arange(1, 17)
+        source = np.arange(1, 17, dtype=float) ** -1.15
+        body = 2 ** (1.1 * np.exp(-.5 * (np.log2(freqs / 800) / .38) ** 2))
+        amps = source * body
+        amps /= amps.max()
+        notes.append(NoteAnalysis(
+            f"note-{index}", f0, "test", 1, amps, freqs,
+            np.ones(16, dtype=bool)))
+    bands, adjusted, fit_info = fit_fixed_body(notes, 16)
+    assert len(bands) >= 3
+    assert any(550 <= band["freq"] <= 1200 and band["gain"] > .1
+               for band in bands)
+    assert adjusted.shape == (12, 16)
+    assert fit_info["method"] == "ensemble-rank-note-body-v2"
+    assert fit_info["notes"] == 12
+
+
+def test_frame_tracked_partials_survive_vibrato():
+    # A ±30-cent 5.5 Hz vibrato tone: the long-window FFT peak-read smears
+    # each harmonic into sidebands, but the frame tracker must still recover
+    # the underlying amplitude ratios.
+    sr = 44_100
+    duration = 2.4
+    t = np.arange(int(sr * duration)) / sr
+    f0 = 440.0
+    cents = 30 * np.sin(2 * np.pi * 5.5 * t)
+    inst_f = f0 * 2 ** (cents / 1200)
+    phase = 2 * np.pi * np.cumsum(inst_f) / sr
+    true_amps = np.array([1.0, .5, .25, .125, .0625])
+    seg = sum(a * np.sin((k + 1) * phase) for k, a in enumerate(true_amps))
+    result = harmonic_frame_amps(seg.astype(np.float64), sr, f0, n_partials=8)
+    assert result is not None
+    amps, freqs, ok = result
+    assert ok[:5].all()
+    measured = amps[:5] / amps[0]
+    ratio_db = 20 * np.log10(measured / true_amps)
+    assert np.abs(ratio_db).max() < 1.5
+    assert abs(freqs[0] - f0) < 3.0
+
+
+def test_take_spread_ignores_cross_file_dynamic_differences():
+    # Two files (dynamics) share one partial table; within-file jitter is
+    # sigma=0.1 ln.  File B carries a big constant tilt vs file A — the old
+    # pooled chain conflated that tilt into spread; the within-file
+    # estimator must report only the jitter (~0.2), nowhere near the cap.
+    rng = np.random.default_rng(20260716)
+    table = np.arange(1, 17, dtype=float) ** -1.0
+    notes = []
+    for file_name, tilt in (("take-pp.aiff", 0.0), ("take-ff.aiff", 1.2)):
+        for index in range(10):
+            f0 = 220 * 2 ** (index / 12)
+            amps = table * np.exp(tilt * np.linspace(0, 1, 16)
+                                  + rng.normal(0, .1, 16))
+            amps /= amps.max()
+            notes.append(NoteAnalysis(
+                file_name, f0, "test", 1, amps,
+                f0 * np.arange(1, 17), np.ones(16, dtype=bool)))
+    A = np.stack([n.partial_amps for n in notes])
+    OK = np.stack([n.partial_snr_ok for n in notes])
+    spread, pairs = fit_take_spread(notes, A, OK, 16)
+    assert pairs == 18
+    values = [s for s in spread if s is not None]
+    assert len(values) >= 12
+    assert np.median(values) < .35
+    assert max(values) < .5
+
+
+def _vibrato_tone(duration=3.0, sr=44_100, f0=440.0, depth_cents=30.0,
+                  rate_start=5.5, rate_end=5.5, vib_start=0.0, vib_ramp=0.0,
+                  am_db=0.0):
+    t = np.arange(int(sr * duration)) / sr
+    envelope = np.clip((t - vib_start) / max(vib_ramp, 1e-6), 0, 1) \
+        if (vib_start or vib_ramp) else np.ones_like(t)
+    rate = rate_start + (rate_end - rate_start) * (t / duration)
+    vib_phase = 2 * np.pi * np.cumsum(rate) / sr
+    modulation = envelope * np.sin(vib_phase)
+    inst_f = f0 * 2 ** (depth_cents * modulation / 1200)
+    phase = 2 * np.pi * np.cumsum(inst_f) / sr
+    gain = 10 ** (am_db * modulation / 20)
+    return (gain * np.sin(phase)).astype(np.float64), sr
+
+
+def test_vibrato_trajectory_measures_onset_delay_ramp_and_body_am():
+    seg, sr = _vibrato_tone(vib_start=.8, vib_ramp=.4, am_db=2.0)
+    stats = vibrato_stats(seg, sr, 440.0, np.array([1.0, .2, .1]))
+    assert stats.get("present")
+    assert 300 <= stats["onsetDelayMs"] <= 1400
+    assert 0 <= stats["depthRampMs"] <= 900
+    assert .8 <= stats["bodyAmDepthDb"] <= 3.5
+
+
+def test_vibrato_trajectory_measures_rate_drift():
+    seg, sr = _vibrato_tone(rate_start=5.0, rate_end=7.0)
+    stats = vibrato_stats(seg, sr, 440.0, np.array([1.0, .2, .1]))
+    assert stats.get("present")
+    assert stats["rateDriftHzPerSecond"] > .2
+
+    steady, sr = _vibrato_tone(rate_start=5.5, rate_end=5.5)
+    steady_stats = vibrato_stats(steady, sr, 440.0, np.array([1.0, .2, .1]))
+    assert abs(steady_stats["rateDriftHzPerSecond"]) < abs(stats["rateDriftHzPerSecond"])
+
+
+def test_scratch_window_noise_leads_the_tone_at_soft_starts():
+    sr = 44_100
+    t = np.arange(int(1.2 * sr)) / sr
+    rng = np.random.default_rng(7)
+    noise = rng.normal(0, 1, t.size)
+    from scipy import signal as _sig
+    sos = _sig.butter(4, [3000, 6000], btype="bandpass", fs=sr, output="sos")
+    scratch = _sig.sosfiltfilt(sos, noise) * .15
+    scratch[t > .35] *= .25                      # burst fades into sustain bed
+    tone = .8 * np.sin(2 * np.pi * 440 * t)
+    tone[t < .06] = 0                            # tone speaks 60 ms after noise
+    samples = scratch + tone
+    nfft = 2048
+    _, times, spectrum = _sig.stft(samples, fs=sr, nperseg=nfft, noverlap=1536,
+                                   boundary=None, padded=False)
+    power = np.abs(spectrum) ** 2
+    freqs = np.fft.rfftfreq(nfft, 1 / sr)
+    (sustain_noise_db, _tilt, onset_noise_db,
+     onset_centroid_oct, noise_lead_ms) = _noise_and_onset_observables(
+        power, freqs, times, 440.0)
+    assert noise_lead_ms > 25
+    assert onset_noise_db > sustain_noise_db + 3
+    assert onset_centroid_oct > .8               # scratch sits well above 1 kHz
+
+
+def test_onset_wander_measures_approach_from_above_without_calling_it_scoop():
+    sr = 44_100
+    t = np.arange(int(1.0 * sr)) / sr
+    settle = np.clip(t / .1, 0, 1)
+    cents = 40 * (1 - settle)                    # starts 40 cents SHARP
+    inst_f = 440 * 2 ** (cents / 1200)
+    seg = np.sin(2 * np.pi * np.cumsum(inst_f) / sr)
+    stats = onset_pitch_stats(seg, sr, 440.0, 0.0, np.array([1.0, .1, .05]))
+    assert stats["depthCents"] == 0.0            # no from-below scoop invented
+    assert stats["wanderCents"] > 15
+
+
+def test_bowed_p1_features_have_zero_weight_for_blown():
+    blown = weights_for_instrument("clarinet")
+    bowed = weights_for_instrument("violin")
+    for key in _BOWED_P1_FEATURES:
+        assert blown[key] == 0.0
+        assert bowed[key] == 1.0
+    # a blown composite must not move when only a P1 sense differs
+    reference = _bundle()
+    rendered_same = _bundle()
+    rendered_diff = _bundle()
+    rendered_diff.onset_noise_db = 9.0
+    same = compare_features(reference, rendered_same, weights_for_instrument("clarinet"))
+    diff = compare_features(reference, rendered_diff, weights_for_instrument("clarinet"))
+    assert diff["composite"] == pytest.approx(same["composite"])
+    assert diff["features"]["onset_noise_db"] == 9.0
+
+
+def _bowed_samples():
+    return [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+            for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+
+
+def test_bowed_checklist_requires_instrument_specific_measured_body():
+    base = {"excitationType": "bow", "resonatorClass": "string"}
+    missing = evaluate_construction("violin", _bowed_samples(), params=base)
+    by_id = {row["id"]: row for row in missing["assertions"]}
+    assert by_id["violin.measured-body"]["status"] == "fail"
+    fitted = evaluate_construction("violin", _bowed_samples(), params={
+        **base, "bodyBands": [
+            {"freq": 480, "gain": .3, "width": .2},
+            {"freq": 1180, "gain": -.3, "width": .2},
+            {"freq": 2330, "gain": 1.1, "width": .2},
+        ],
+    })
+    by_id = {row["id"]: row for row in fitted["assertions"]}
+    assert by_id["violin.measured-body"]["status"] == "pass"
+
+
+def test_bowed_family_firewall_blocks_blown_fitted_onset_values():
+    # A blown-fitted articulation law pasted onto a bowed preset without
+    # string-corpus evidence must fail; the same values WITH per-instrument
+    # onset evidence pass; fully neutral presets pass by construction.
+    base = {"excitationType": "bow", "resonatorClass": "string"}
+    neutral = evaluate_construction("cello", _bowed_samples(), params=base)
+    by_id = {row["id"]: row for row in neutral["assertions"]}
+    assert by_id["cello.family-firewall-neutral-onset"]["status"] == "pass"
+
+    pasted = evaluate_construction("cello", _bowed_samples(), params={
+        **base, "articulationCoupling": .6, "onsetScoopDepthCents": 40})
+    by_id = {row["id"]: row for row in pasted["assertions"]}
+    assert by_id["cello.family-firewall-neutral-onset"]["status"] == "fail"
+
+    evidenced = evaluate_construction("cello", _bowed_samples(), params={
+        **base, "articulationCoupling": .6, "onsetScoopDepthCents": 40,
+        "onsetArticulationCorrelation": -.4, "onsetPitchNotes": 9})
+    by_id = {row["id"]: row for row in evidenced["assertions"]}
+    assert by_id["cello.family-firewall-neutral-onset"]["status"] == "pass"
+
+    # legacy linear breath exponent (1.0) is neutral, not a fitted law
+    linear = evaluate_construction("cello", _bowed_samples(), params={
+        **base, "breathVelocityExponent": 1.0})
+    by_id = {row["id"]: row for row in linear["assertions"]}
+    assert by_id["cello.family-firewall-neutral-onset"]["status"] == "pass"
+
+
+def test_blown_checklist_requires_instrument_specific_measured_body():
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+               for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+    base = {"excitationType": "blow", "resonatorClass": "conicalTube",
+            "dynamicBlare": .2}
+    missing = evaluate_construction("french-horn", samples, params=base)
+    by_id = {row["id"]: row for row in missing["assertions"]}
+    assert by_id["french-horn.measured-body"]["status"] == "fail"
+    fitted = evaluate_construction("french-horn", samples, params={
+        **base, "bodyBands": [
+            {"freq": 300, "gain": -.2, "width": .5},
+            {"freq": 800, "gain": .5, "width": .5},
+            {"freq": 2200, "gain": .2, "width": .6},
+        ],
+    })
+    by_id = {row["id"]: row for row in fitted["assertions"]}
+    assert by_id["french-horn.measured-body"]["status"] == "pass"
 
 
 def test_corpus_sidecar_filename_classification():

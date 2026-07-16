@@ -18,6 +18,8 @@ PERF_KEYS = [
     "envelopeRelease", "vibratoProb", "vibratoRate", "vibratoRateSd",
     "vibratoDepth", "vibratoDepthSd",
     "microDriftCentsSd", "microDriftCentsRange", "microDriftCentsPerSecond",
+    "onsetScoopProb", "onsetScoopDepthCents", "onsetScoopDepthSd",
+    "onsetScoopSettleMs", "onsetArticulationCorrelation", "onsetPitchNotes",
     # Q8 attack stagger: measured low-to-high partial onset spread; flows to
     # the renderer when a future fit run provides it (hand defaults apply
     # until then — the current measured_profiles.json predates the fitter's
@@ -50,6 +52,15 @@ def main():
             "source": ", ".join(source_classes) or legacy_source,
             "notesAnalysed": len(v.get("notesAnalysed", [])),
         }
+        resonances = v.get("resonances")
+        if isinstance(resonances, list) and resonances:
+            entry["resonances"] = [{
+                "freq": round(row["freq"], 1),
+                "gain": round(row["gain"], 4),
+                "width": round(row["width"], 4),
+            } for row in resonances if isinstance(row, dict) and
+                all(isinstance(row.get(key), (int, float))
+                    for key in ("freq", "gain", "width"))]
         vowel_formants = v.get("vowelFormants")
         if isinstance(vowel_formants, dict) and vowel_formants:
             entry["vowelFormants"] = vowel_formants

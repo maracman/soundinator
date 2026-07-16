@@ -90,6 +90,8 @@ the sustained-envelope check.
 |  | `cello.near-harmonic-string` | Measured `B` lies in 0…0.003 |
 |  | `cello.fixed-body-region` | 180–700 Hz body region is present across notes |
 |  | `cello.bow-force-edge` | Dynamic spectral slope is not negative beyond tolerance |
+| Both | `<instr>.measured-body` | `bodyBands` fitted from this instrument's corpus (≥3 non-neutral bands spanning an octave) — register-shifted or borrowed bodies are structurally wrong (§1) |
+|  | `<instr>.family-firewall-neutral-onset` | Excitation-generic articulation/scoop/breath laws all neutral, or evidenced by ≥4 tracked onsets from this instrument's own references (FAMILY FIREWALL, owner 2026-07-16) |
 
 The numerical body bands are broad tripwires. The fitted/reference mel and
 partial distances remain responsible for the individual instrument's exact

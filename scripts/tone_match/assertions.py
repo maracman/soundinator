@@ -221,6 +221,29 @@ def evaluate_construction(
                         len(dynamic_values) >= 2 if dynamic_values else None, len(dynamic_values), "at least 2 dynamics",
                         strict_evidence=strict_evidence))
 
+    if name in {"flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
+                "violin", "cello"}:
+        # The bowed dossier makes the same demand as owner note L6 did for
+        # blown: the body must be fitted from THIS instrument's corpus —
+        # reusing another instrument's bands (or a pitch-shifted copy) is
+        # structurally wrong for a fixed-Hz radiator.
+        bands = _param(params, "bodyBands")
+        valid_bands = [row for row in bands
+                       if isinstance(row, dict) and
+                       all(isinstance(row.get(key), (int, float))
+                           for key in ("freq", "gain", "width")) and
+                       row["freq"] > 0 and row["width"] > 0] \
+            if isinstance(bands, list) else []
+        body_valid = (len(valid_bands) >= 3 and
+                      max(row["freq"] for row in valid_bands) /
+                      min(row["freq"] for row in valid_bands) >= 2 and
+                      max(abs(row["gain"]) for row in valid_bands) >= .05)
+        rows.append(_result(f"{name}.measured-body",
+                            "Fixed-Hz body is fitted from this instrument's corpus",
+                            body_valid, len(valid_bands),
+                            "at least 3 non-neutral fitted body bands spanning an octave",
+                            strict_evidence=strict_evidence))
+
     pitch_errors = []
     for sample in sample_list:
         if sample.reference and sample.reference.note.f0 > 0 and sample.render.note.f0 > 0:
@@ -270,6 +293,32 @@ def evaluate_construction(
         rows.append(_result(f"{name}.blare-law", "Nonlinear forte enrichment is explicitly enabled",
                             None if blare is None else float(blare) > 0, blare, "dynamicBlare > 0",
                             strict_evidence=strict_evidence))
+        if name == "french-horn":
+            coupling = _param(params, "articulationCoupling")
+            variation = _param(params, "articulationVariation")
+            scoop_depth = _param(params, "onsetScoopDepthCents")
+            scoop_settle = _param(params, "onsetScoopSettle")
+            enabled = None if any(value is None for value in
+                                  (coupling, variation, scoop_depth, scoop_settle)) else (
+                float(coupling) > 0 and float(variation) > 0 and
+                float(scoop_depth) > 0 and float(scoop_settle) > 0)
+            rows.append(_result(f"{name}.coupled-articulation-law",
+                                "One fitted articulation distribution couples plosive, breath lead and pitch scoop",
+                                enabled,
+                                {"coupling": coupling, "variation": variation,
+                                 "depthCents": scoop_depth, "settle": scoop_settle},
+                                "articulationCoupling/Variation and onset scoop depth/settle > 0",
+                                strict_evidence=strict_evidence))
+            correlation = _param(params, "onsetArticulationCorrelation")
+            correlation_count = _param(params, "onsetPitchNotes")
+            evidenced = None if correlation is None or correlation_count is None else (
+                float(correlation) <= -.2 and int(correlation_count) >= 4)
+            rows.append(_result(f"{name}.articulation-anticorrelation",
+                                "WP-3 references demonstrate inverse plosive strength versus scoop depth",
+                                evidenced,
+                                {"correlation": correlation, "samples": correlation_count},
+                                "at least 4 tracked reference onsets and Pearson r <= -0.2",
+                                strict_evidence=strict_evidence))
         if name in {"alto-sax", "tenor-sax"}:
             breath_exponent = _param(params, "breathVelocityExponent")
             rows.append(_result(f"{name}.soft-breath-law",
@@ -346,6 +395,33 @@ def evaluate_construction(
         rows.append(_result(f"{name}.bow-force-edge", "Higher bow intensity does not darken the spectrum",
                             None if edge_slope is None else edge_slope >= -.05,
                             {"slope": edge_slope, "samples": edge_count}, "partial-index slope >= -0.05",
+                            strict_evidence=strict_evidence))
+        # FAMILY FIREWALL (OWNER_LISTENING_NOTES.md header): the onset /
+        # articulation mechanisms may share code with blown, but every
+        # slope, coupling and depth ships NEUTRAL for bowed until this
+        # instrument's own corpus evidences it.  A bowed preset carrying a
+        # non-neutral articulation law must carry the per-instrument
+        # measurement that justifies it (same evidence rule the horn gate
+        # uses) — blown-fitted values are never defaults for bow.
+        firewall_keys = ("articulationCoupling", "articulationVariation",
+                         "onsetScoopDepthCents", "onsetScoopVelocitySlope",
+                         "onsetScoopRegisterSlope", "breathVelocityExponent")
+        non_neutral = {key: _param(params, key) for key in firewall_keys
+                       if isinstance(_param(params, key), (int, float))
+                       and abs(float(_param(params, key))) > 1e-9
+                       and not (key == "breathVelocityExponent"
+                                and float(_param(params, key)) == 1)}
+        correlation = _param(params, "onsetArticulationCorrelation")
+        correlation_count = _param(params, "onsetPitchNotes")
+        evidenced = (isinstance(correlation, (int, float)) and
+                     isinstance(correlation_count, (int, float)) and
+                     int(correlation_count) >= 4)
+        rows.append(_result(f"{name}.family-firewall-neutral-onset",
+                            "Excitation-generic onset laws stay neutral until string-corpus evidence fits them",
+                            (not non_neutral) or evidenced,
+                            {"nonNeutral": sorted(non_neutral),
+                             "correlation": correlation, "samples": correlation_count},
+                            "articulation/scoop/breath laws all neutral, or >= 4 tracked onsets from this instrument's references",
                             strict_evidence=strict_evidence))
 
     if name in {"piano", "guitar"}:

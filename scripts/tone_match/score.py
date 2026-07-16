@@ -33,11 +33,29 @@ DEFAULT_WEIGHTS = {
     "onset_tilt_db_oct": 1.0,
     "onset_scoop_cents": 1.0,
     "onset_scoop_settle_ms": 1.0,
+    "vibrato_onset_delay_ms": 1.0,
+    "vibrato_ramp_ms": 1.0,
+    "vibrato_rate_drift": 1.0,
+    "body_am_db": 1.0,
+    "onset_noise_db": 1.0,
+    "onset_noise_centroid_oct": 1.0,
+    "noise_lead_ms": 1.0,
+    "onset_wander_cents": 1.0,
 }
 
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
 }
+
+# BOWED_PREFLIGHT P1 senses.  They enter with ZERO weight for blown so the
+# frozen/reopened blown leaderboards keep scoring on the exact dimensions
+# they were fitted against (comparability rule); bowed campaigns and later
+# families score them from day one.
+_BOWED_P1_FEATURES = (
+    "vibrato_onset_delay_ms", "vibrato_ramp_ms", "vibrato_rate_drift",
+    "body_am_db", "onset_noise_db", "onset_noise_centroid_oct",
+    "noise_lead_ms", "onset_wander_cents",
+)
 
 
 def weights_for_instrument(instrument: str | None,
@@ -52,6 +70,8 @@ def weights_for_instrument(instrument: str | None,
     weights = dict(DEFAULT_WEIGHTS)
     if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
         weights["inharmonicity_log_ratio"] = 0.0
+        for key in _BOWED_P1_FEATURES:
+            weights[key] = 0.0
     if overrides:
         weights.update(overrides)
     return weights
@@ -72,6 +92,14 @@ PERCEPTUAL_UNITS = {
     "onset_tilt_db_oct": 3.0,
     "onset_scoop_cents": 10.0,
     "onset_scoop_settle_ms": 20.0,
+    "vibrato_onset_delay_ms": 150.0,
+    "vibrato_ramp_ms": 150.0,
+    "vibrato_rate_drift": 0.5,
+    "body_am_db": 2.0,
+    "onset_noise_db": 3.0,
+    "onset_noise_centroid_oct": 1.0,
+    "noise_lead_ms": 20.0,
+    "onset_wander_cents": 10.0,
 }
 
 
@@ -83,6 +111,9 @@ class FeatureBundle:
     centroid_hz: np.ndarray
     sustain_noise_db: float = 0.0
     onset_tilt_db_oct: float = 0.0
+    onset_noise_db: float = 0.0
+    onset_noise_centroid_oct: float = 0.0
+    noise_lead_ms: float = 0.0
 
 
 def _noise_and_onset_observables(
@@ -90,21 +121,28 @@ def _noise_and_onset_observables(
     freqs: np.ndarray,
     times: np.ndarray,
     f0: float,
-) -> tuple[float, float]:
-    """Measure sustained turbulence and onset-only harmonic colour.
+) -> tuple[float, float, float, float, float]:
+    """Measure sustained turbulence, onset-only colour and the scratch window.
 
     Harmonic/noise separation uses spectral-density means rather than total
     band energy, so adding more high-frequency bins cannot manufacture extra
     breath.  The onset observable is the dB/octave regression of the
     onset-to-sustain ratio across resolved harmonic slots.
+
+    Returns (sustain_noise_db, onset_tilt, onset_noise_db,
+    onset_noise_centroid_oct, noise_lead_ms).  The last three are the
+    BOWED_PREFLIGHT P1 scratch-window senses: noise-to-harmonic ratio inside
+    the first ~80 ms, that noise's spectral centroid (octaves re 1 kHz), and
+    how far the noise leads the tone at soft starts (L4's breath-lead
+    mechanism; scratch-lead for bow).
     """
     if power.size == 0 or not np.isfinite(f0) or f0 <= 0:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0.0
     frame_energy = np.sum(power, axis=0)
     peak = float(np.max(frame_energy)) if frame_energy.size else 0.0
     active = np.flatnonzero(frame_energy >= peak * 1e-3)
     if peak <= 0 or active.size < 4:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0.0
     lo = active[int(active.size * .35)]
     hi = active[min(active.size - 1, int(active.size * .65))]
     sustain_frames = np.arange(lo, max(lo + 1, hi + 1))
@@ -133,7 +171,37 @@ def _noise_and_onset_observables(
             indices.append(math.log2(multiple))
             ratios.append(10 * math.log10(onset_power / sustain_power))
     onset_tilt = float(np.polyfit(indices, ratios, 1)[0]) if len(indices) >= 4 else 0.0
-    return sustain_noise_db, onset_tilt
+
+    # scratch window: noise character of the first ~80 ms
+    onset_noise_db = 0.0
+    onset_noise_centroid_oct = 0.0
+    if onset_frames.size and np.any(noise) and np.any(harmonic):
+        onset_harmonic = float(np.mean(power[np.ix_(harmonic, onset_frames)]))
+        onset_noise_power = power[np.ix_(noise, onset_frames)]
+        onset_noise = float(np.mean(onset_noise_power))
+        onset_noise_db = 10 * math.log10(max(onset_noise, 1e-20) /
+                                         max(onset_harmonic, 1e-20))
+        band_power = np.mean(onset_noise_power, axis=1)
+        total = float(np.sum(band_power))
+        if total > 1e-20:
+            centroid_hz = float(np.dot(freqs[noise], band_power) / total)
+            onset_noise_centroid_oct = math.log2(max(centroid_hz, 40) / 1000)
+
+    # noise lead: time the noise floor crosses 10% of its sustain level
+    # minus the same crossing for the harmonic content (positive = noise
+    # leads the tone speaking)
+    noise_lead_ms = 0.0
+    if np.any(noise) and np.any(harmonic) and noise_density > 1e-20 and harmonic_density > 1e-20:
+        noise_t = np.mean(power[noise, :], axis=0)
+        harm_t = np.mean(power[harmonic, :], axis=0)
+        cross = lambda track, level: next(
+            (times[j] for j in range(len(track)) if track[j] >= level), None)
+        t_noise = cross(noise_t, 0.1 * noise_density)
+        t_harm = cross(harm_t, 0.1 * harmonic_density)
+        if t_noise is not None and t_harm is not None:
+            noise_lead_ms = float((t_harm - t_noise) * 1000)
+    return (sustain_noise_db, onset_tilt, onset_noise_db,
+            onset_noise_centroid_oct, noise_lead_ms)
 
 
 def _resample_time(values: np.ndarray, frames: int = 120) -> np.ndarray:
@@ -192,10 +260,12 @@ def extract_features(
     centroid = (freqs[:, None] * power).sum(axis=0) / np.maximum(power.sum(axis=0), 1e-20)
     amps = np.maximum(note.partial_amps[:n_partials], 1e-4)
     partial_db = 20 * np.log10(amps / max(float(np.max(amps)), 1e-12))
-    sustain_noise_db, onset_tilt = _noise_and_onset_observables(
+    (sustain_noise_db, onset_tilt, onset_noise_db,
+     onset_noise_centroid_oct, noise_lead_ms) = _noise_and_onset_observables(
         power, freqs, times, note.f0)
     return FeatureBundle(note, partial_db, _resample_time(mel_db),
-                         _resample_time(centroid)[0], sustain_noise_db, onset_tilt)
+                         _resample_time(centroid)[0], sustain_noise_db, onset_tilt,
+                         onset_noise_db, onset_noise_centroid_oct, noise_lead_ms)
 
 
 def _paired(values_a: dict, values_b: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -269,6 +339,13 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
         freq_oct = abs(math.log2(max(number(ns.get("freq"), 1), 1) /
                                  max(number(nr.get("freq"), 1), 1)))
     noise = level_db + freq_oct
+    # Vibrato-trajectory distances only apply when both notes vibrate: the
+    # presence mismatch itself is already the `vibrato` feature's job, and
+    # trajectory keys measured on a straight tone are analysis noise.
+    vr, vs = ref.note.vibrato or {}, render.note.vibrato or {}
+    both_vibrato = bool(vr.get("present")) and bool(vs.get("present"))
+    trajectory = lambda key: abs(number(vs.get(key)) - number(vr.get(key))) \
+        if both_vibrato else 0.0
     values = {
         "partials_db": partial_db, "log_mel_db": mel_db,
         "centroid_semitones": centroid, "attack_ms": attack,
@@ -280,6 +357,16 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
                                    number(pr.get("depthCents"))),
         "onset_scoop_settle_ms": abs(number(ps.get("settleMs")) -
                                       number(pr.get("settleMs"))),
+        "vibrato_onset_delay_ms": trajectory("onsetDelayMs"),
+        "vibrato_ramp_ms": trajectory("depthRampMs"),
+        "vibrato_rate_drift": trajectory("rateDriftHzPerSecond"),
+        "body_am_db": trajectory("bodyAmDepthDb"),
+        "onset_noise_db": abs(render.onset_noise_db - ref.onset_noise_db),
+        "onset_noise_centroid_oct": abs(render.onset_noise_centroid_oct -
+                                        ref.onset_noise_centroid_oct),
+        "noise_lead_ms": abs(render.noise_lead_ms - ref.noise_lead_ms),
+        "onset_wander_cents": abs(number(ps.get("wanderCents")) -
+                                    number(pr.get("wanderCents"))),
     }
     normalized = {key: values[key] / PERCEPTUAL_UNITS[key] for key in values}
     active_weight = sum(weights[key] for key in values if weights[key] > 0)

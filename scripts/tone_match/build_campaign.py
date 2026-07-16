@@ -164,12 +164,46 @@ def _seed(instrument: str, measured: dict[str, Any]) -> dict[str, Any]:
         "spectralDynamicAmount": 0.8 if instrument in {"clarinet", "alto-sax"} else 1.2,
         "dynamicBlare": 0.25 if instrument in {"alto-sax", "trumpet", "french-horn"} else 0.0,
     }
+    resonances = profile.get("resonances") or []
+    if len(resonances) >= 3:
+        # Pin the exact WP-3 body evidence into the run report/checklist.
+        # The partial tables above have been divided by this full-strength
+        # fixed-Hz envelope, so unity reconstructs the measured spectrum.
+        seed["bodyBands"] = resonances
+        seed["spectralResonanceAmount"] = 1.0
     if attack_registers:
         seed["envelopeAttackByRegister"] = [
             {"f0": row["f0"], "attack": row["envelopeAttack"]}
             for row in attack_registers
             if row.get("f0") is not None and row.get("envelopeAttack") is not None
         ]
+    # Owner L5/L5b is fitted only where the analysed take set demonstrates
+    # the proposed inverse articulation relation.  Horn currently clears the
+    # dossier gate; trumpet does not, so its neutral defaults remain absent.
+    correlation = performance.get("onsetArticulationCorrelation")
+    scoop_depth = performance.get("onsetScoopDepthCents")
+    scoop_sd = performance.get("onsetScoopDepthSd")
+    scoop_settle_ms = performance.get("onsetScoopSettleMs")
+    if (instrument == "french-horn" and isinstance(correlation, (int, float)) and
+            correlation <= -.2 and isinstance(scoop_depth, (int, float)) and
+            scoop_depth > 0):
+        seed.update({
+            "excitationHuman": .8,
+            "articulationCoupling": min(1., max(.1, -float(correlation) / .5)),
+            "articulationStrength": .5,
+            "articulationVariation": min(1., max(.1, float(scoop_sd or 0) /
+                                                   max(float(scoop_depth), 1))),
+            # At mean strength .5 and Human 1, the plan emits half this max.
+            "onsetScoopDepthCents": min(180., 2 * float(scoop_depth)),
+            "onsetScoopSettle": min(.35, max(.015, float(scoop_settle_ms or 60) / 1000)),
+            "onsetScoopRearticulatedScale": .35,
+            "onsetScoopRegisterSlope": .35,
+            # Soft underplaying is the owner prior; the optimiser/scorer must
+            # still demonstrate its magnitude on this instrument.
+            "onsetScoopVelocitySlope": -.25,
+            "onsetArticulationCorrelation": float(correlation),
+            "onsetPitchNotes": int(performance.get("onsetPitchNotes") or 0),
+        })
     # A scalar preset B would override the measured G1 register anchors in
     # the engine. Keep it only for legacy/sparse profiles without register
     # evidence; multi-register campaigns consume each anchor directly.

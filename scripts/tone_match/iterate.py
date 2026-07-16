@@ -210,9 +210,14 @@ class ToneMatcher:
         params_path.write_text(json.dumps(params, indent=2) + "\n")
         jobs = []
         for ref_index, ref in enumerate(self.references):
+            articulation_seed = None
+            if float(params.get("articulationCoupling", 0) or 0) > 0:
+                articulation_seed = int(params.get("seed", 7331)) + ref_index * 104729
             jobs.append({"paramsFile": str(params_path), "midi": ref.get("midi", 60),
                          "velocity": ref.get("velocity", .62), "durationSec": ref.get("durationSec", 1.5),
-                         "sampleRate": ref.get("sampleRate", 48000), "out": str(target / f"note-{ref_index}.wav")})
+                         "sampleRate": ref.get("sampleRate", 48000),
+                         **({"seed": articulation_seed} if articulation_seed is not None else {}),
+                         "out": str(target / f"note-{ref_index}.wav")})
         jobs_path = target / "jobs.json"
         jobs_path.write_text(json.dumps(jobs))
         process = subprocess.run(["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],

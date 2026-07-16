@@ -360,6 +360,116 @@ class NoteAnalysis:
     percussive: bool = False
 
 
+def harmonic_frame_amps(seg: np.ndarray, sr: int, f0: float,
+                        n_partials: int = 64, B: float = 0.0):
+    """Vibrato-robust partial measurement: per-frame harmonic tracking.
+
+    A single long-window FFT peak-read smears a vibrato tone into a Bessel
+    sideband cluster whose peak height is quasi-random in the modulation
+    index — on the violin corpus it produced per-partial errors of several
+    dB with 30–50 dB outliers.  Instead: STFT with ~93 ms frames, track
+    f0(t) from the strongest low partial, read each harmonic's interpolated
+    peak near n·f0(t) per frame, take the median across frames.  For a
+    stationary tone this agrees with the long-window measure; under FM/AM it
+    estimates the mean amplitude the vibrato modulates around.
+
+    Returns (amps, freqs, ok) like the long-window `measure`, or None when
+    the segment is too short to frame.
+    """
+    a, b = len(seg) // 4, 3 * len(seg) // 4
+    y = seg[a:b]
+    nper = 1 << int(round(math.log2(sr * 0.093)))
+    if f0 < 120:
+        nper *= 2                     # resolve low-cello/low-voice harmonics
+    if len(y) < 2 * nper:
+        return None
+    f, _t, Z = sig.stft(y, fs=sr, nperseg=nper, noverlap=nper * 3 // 4,
+                        window="hann", padded=False, boundary=None)
+    mag = np.abs(Z)
+    n_frames = mag.shape[1]
+    if n_frames < 6:
+        return None
+    df = float(f[1] - f[0])
+    nyq_lim = 0.47 * sr
+
+    def peak_track(target: np.ndarray, halfwidth: float):
+        """Per-frame (peak height, band RMS energy, interpolated peak Hz).
+
+        The band energy is the vibrato-proof amplitude: intra-frame FM
+        smears a fast-sweeping harmonic across bins, which lowers the peak
+        but preserves the energy inside the tracking band.
+        """
+        peaks = np.full(n_frames, np.nan)
+        energy = np.full(n_frames, np.nan)
+        freqs_out = np.full(n_frames, np.nan)
+        for j in range(n_frames):
+            lo = max(1, int((target[j] - halfwidth) / df))
+            hi = min(len(f) - 2, int((target[j] + halfwidth) / df))
+            if hi - lo < 2:
+                continue
+            k = lo + int(np.argmax(mag[lo:hi + 1, j]))
+            va, vb, vc = mag[k - 1, j], mag[k, j], mag[k + 1, j]
+            la, lb, lc = (math.log(max(v, 1e-15)) for v in (va, vb, vc))
+            den = la - 2 * lb + lc
+            delta = 0.5 * (la - lc) / den if abs(den) > 1e-9 else 0.0
+            peaks[j] = float(vb)
+            energy[j] = float(math.sqrt(np.sum(mag[lo:hi + 1, j] ** 2)))
+            freqs_out[j] = (k + max(-.5, min(.5, delta))) * df
+        return peaks, energy, freqs_out
+
+    # f0 track from the strongest of partials 1–3
+    probe_med = []
+    for k in (1, 2, 3):
+        if k * f0 >= nyq_lim:
+            break
+        amps_k, _, _ = peak_track(np.full(n_frames, k * f0), 0.3 * f0)
+        probe_med.append(np.nanmedian(amps_k))
+    if not probe_med:
+        return None
+    k_star = int(np.argmax(probe_med)) + 1
+    _amps_k, _e_k, freqs_k = peak_track(np.full(n_frames, k_star * f0), 0.45 * f0)
+    f0_track = freqs_k / k_star
+    good = np.isfinite(f0_track) & (np.abs(1200 * np.log2(
+        np.clip(f0_track, 1, None) / f0)) < 120)
+    if good.sum() < max(6, n_frames // 4):
+        f0_track = np.full(n_frames, f0)
+    else:
+        f0_track = np.where(good, f0_track, np.nan)
+
+    amps = np.zeros(n_partials)
+    pfreqs = np.full(n_partials, np.nan)
+    ok = np.zeros(n_partials, dtype=bool)
+    for n in range(1, n_partials + 1):
+        stretch = partial_frequency(n, f0, B) / (n * f0) if B else 1.0
+        centre = n * f0 * stretch
+        if centre > nyq_lim:
+            break
+        target = np.where(np.isfinite(f0_track), n * f0_track * stretch, centre)
+        # wide enough for the intra-frame vibrato sweep of high harmonics,
+        # capped below half the harmonic spacing to avoid neighbour bleed
+        halfwidth = float(min(0.4 * f0, max(0.18 * f0, 0.035 * centre, 2.5 * df)))
+        frame_peaks, frame_energy, frame_freqs = peak_track(target, halfwidth)
+        finite = np.isfinite(frame_peaks)
+        if finite.sum() < 4:
+            continue
+        med_peak = float(np.median(frame_peaks[finite]))
+        med_amp = float(np.median(frame_energy[finite]))
+        # SNR gate mirrors the long-window rule: the tracked level must
+        # clear the local background magnitude around the harmonic
+        i_lo = max(0, int((centre - 0.45 * f0) / df))
+        i_hi = min(len(f) - 1, int((centre + 0.45 * f0) / df))
+        if i_hi - i_lo < 3:
+            continue
+        local_med = float(np.median(mag[i_lo:i_hi, :])) + 1e-15
+        if med_peak > 5 * local_med:
+            amps[n - 1] = med_amp
+            pfreqs[n - 1] = float(np.nanmedian(frame_freqs[finite]))
+            ok[n - 1] = True
+    if not ok.any():
+        return None
+    return amps, pfreqs, ok
+
+
 def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
                  min_detected_partials: int = 5):
     f0 = estimate_f0(seg, sr)
@@ -435,11 +545,22 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
                 ok[n - 1] = True
         return amps, pfreqs, ok
 
-    amps, pfreqs, ok = measure(0.0)
+    # Sustained notes use the vibrato-robust per-frame tracker; percussive
+    # notes keep the early-window FFT (their partials decay too fast for a
+    # frame median to mean anything).  The long-window `measure` remains the
+    # fallback for segments too short to frame.
+    def measure_best(B_guess: float):
+        if not percussive:
+            framed = harmonic_frame_amps(seg, sr, f0, n_partials, B_guess)
+            if framed is not None:
+                return framed
+        return measure(B_guess)
+
+    amps, pfreqs, ok = measure_best(0.0)
     B_fit = fit_inharmonicity(pfreqs, ok, f0)
     if B_fit is not None and B_fit > 1e-6:
         # second pass with widened, recentred search windows
-        amps, pfreqs, ok = measure(B_fit)
+        amps, pfreqs, ok = measure_best(B_fit)
         B2 = fit_inharmonicity(pfreqs, ok, f0)
         if B2 is not None:
             B_fit = B2
@@ -560,8 +681,14 @@ def onset_pitch_stats(seg: np.ndarray, sr: int, f0: float, onset_t: float,
     harmonic = int(np.argmax(partials)) + 1 if partials.size else 1
     target = harmonic * f0
     nyquist = sr / 2
-    low = max(20.0, target * .68)
-    high = min(nyquist * .94, target * 1.32)
+    # Keep adjacent harmonics outside the passband.  A fixed ±32 % window
+    # works for a fundamental but overlaps the neighbours of harmonics 2–3,
+    # making their changing amplitudes look like pitch motion.  Scale the
+    # window with harmonic number while retaining enough bandwidth for the
+    # largest onset approaches we accept (240 cents is about 15 %).
+    fractional_band = min(.28, .48 / harmonic)
+    low = max(20.0, target * (1 - fractional_band))
+    high = min(nyquist * .94, target * (1 + fractional_band))
     if not low < high:
         return {}
     try:
@@ -606,9 +733,14 @@ def onset_pitch_stats(seg: np.ndarray, sr: int, f0: float, onset_t: float,
     if early.size < 3:
         early = indices[:max(3, indices.size // 2)]
     low_cents = float(np.percentile(cents[early], 15))
+    high_cents = float(np.percentile(cents[early], 85))
+    # Bowed onsets wander around the target rather than scooping from below
+    # (BOWED_PREFLIGHT P1: measure, don't assume the blown shape).  Keep the
+    # blown depth/settle semantics untouched; wanderCents is additive.
+    wander = float(max(abs(low_cents), abs(high_cents)))
     depth = max(0.0, -low_cents)
     if depth < 3.0:
-        return {"depthCents": 0.0, "settleMs": 0.0,
+        return {"depthCents": 0.0, "settleMs": 0.0, "wanderCents": wander,
                 "direction": "stable", "harmonic": harmonic}
 
     threshold = max(5.0, depth * .15)
@@ -622,7 +754,8 @@ def onset_pitch_stats(seg: np.ndarray, sr: int, f0: float, onset_t: float,
             settle_ms = max(0.0, (times[index] - onset_t) * 1000)
             break
     return {"depthCents": float(depth), "settleMs": float(settle_ms),
-            "direction": "from-below", "harmonic": harmonic}
+            "wanderCents": wander, "direction": "from-below",
+            "harmonic": harmonic}
 
 
 def fit_inharmonicity(pfreqs: np.ndarray, ok: np.ndarray, f0: float):
@@ -873,6 +1006,8 @@ def vibrato_stats(seg: np.ndarray, sr: int, f0: float, amps: np.ndarray):
         delta = np.where(np.abs(den) > 1e-9, 0.5 * (la - lc) / den, 0.0)
     delta = np.nan_to_num(delta)
     fi = (kk + np.clip(delta, -0.5, 0.5)) * df
+    fi_all = fi.copy()          # full-note track for onset-trajectory stats
+    amp_track = b.copy()        # tracked-partial magnitude per frame (body AM)
     # sustain region only
     s0, s1 = len(t) // 5, 4 * len(t) // 5
     fi = fi[s0:s1]
@@ -909,9 +1044,84 @@ def vibrato_stats(seg: np.ndarray, sr: int, f0: float, amps: np.ndarray):
     drift_sd = float(np.std(slow)) if len(slow) else 0.0
     drift_range = float(np.percentile(slow, 95) - np.percentile(slow, 5)) if len(slow) >= 8 else 0.0
     drift_rate = float(np.polyfit(slow_t, slow, 1)[0]) if len(slow) >= 8 else 0.0
-    return dict(rate=rate, depth=depth, present=bool(present),
-                microDriftCentsSd=drift_sd, microDriftCentsRange=drift_range,
-                microDriftCentsPerSecond=drift_rate)
+    result = dict(rate=rate, depth=depth, present=bool(present),
+                  microDriftCentsSd=drift_sd, microDriftCentsRange=drift_range,
+                  microDriftCentsPerSecond=drift_rate)
+
+    # ── vibrato trajectory + body AM (bowed P1; additive keys) ────────
+    # A static rate/depth pair renders mechanical vibrato: real string
+    # vibrato starts after the note settles, ramps its depth in, drifts its
+    # rate, and is heard as much through body-filtered AM as through FM.
+    # These keys are additive — existing consumers are untouched.
+    if present:
+        ref_hz = float(np.median(fi))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            cents_full = 1200 * np.log2(np.clip(fi_all, 1, None) / max(ref_hz, 1))
+        cents_full = np.where(np.abs(cents_full) < 150, cents_full, np.nan)
+        idx = np.arange(len(cents_full))
+        finite = np.isfinite(cents_full)
+        if finite.sum() >= 16:
+            cents_full = np.interp(idx, idx[finite], cents_full[finite])
+            w_full = min(max(3, int(0.7 * frame_rate) | 1),
+                         (len(cents_full) // 2) * 2 - 1)
+            trend_full = np.convolve(cents_full, np.ones(w_full) / w_full,
+                                     mode="same")
+            detrended = cents_full - trend_full
+            win = max(3, int(0.4 * frame_rate) | 1)
+            half_win = win // 2
+            depth_t = np.zeros(len(detrended))
+            for j in range(len(detrended)):
+                lo_j = max(0, j - half_win)
+                seg_d = detrended[lo_j:j + half_win + 1]
+                depth_t[j] = math.sqrt(2) * float(np.std(seg_d))
+            hold = max(2, int(0.2 * frame_rate))
+            onset_delay_ms = None
+            ramp_ms = None
+            for j in range(len(depth_t) - hold):
+                if float(np.mean(depth_t[j:j + hold])) >= 0.5 * depth:
+                    onset_delay_ms = float(t[j] * 1000)
+                    for j2 in range(j, len(depth_t) - hold):
+                        if float(np.mean(depth_t[j2:j2 + hold])) >= 0.8 * depth:
+                            ramp_ms = float(max(0.0, (t[j2] - t[j]) * 1000))
+                            break
+                    break
+            if onset_delay_ms is not None:
+                result["onsetDelayMs"] = onset_delay_ms
+            if ramp_ms is not None:
+                result["depthRampMs"] = ramp_ms
+
+        # rate drift: modulation-spectrum rate of each sustain half
+        def _mod_rate(track: np.ndarray) -> float | None:
+            if len(track) < 32:
+                return None
+            windowed = (track - np.mean(track)) * np.hanning(len(track))
+            spec_h = np.abs(np.fft.rfft(windowed, 4 * len(windowed)))
+            fax_h = np.fft.rfftfreq(4 * len(windowed), 1 / frame_rate)
+            band_h = (fax_h >= 3.0) & (fax_h <= 9.0)
+            if not band_h.any():
+                return None
+            return float(fax_h[band_h][int(np.argmax(spec_h[band_h]))])
+
+        detr_sus = cents - trend
+        half_len = len(detr_sus) // 2
+        rate_a = _mod_rate(detr_sus[:half_len])
+        rate_b = _mod_rate(detr_sus[half_len:])
+        span_s = float(tt[-1] - tt[0]) if len(tt) >= 2 else 0.0
+        if rate_a is not None and rate_b is not None and span_s > 0.2:
+            result["rateDriftHzPerSecond"] = float((rate_b - rate_a) / (span_s / 2))
+
+        # body AM: the tracked partial's level modulation at the vibrato
+        # rate (FM through fixed body slopes reads as AM — engine T5)
+        am_db = 20 * np.log10(np.clip(amp_track[s0:s1], 1e-12, None))
+        if len(am_db) >= 32:
+            w_am = min(max(3, int(0.7 * frame_rate) | 1),
+                       (len(am_db) // 2) * 2 - 1)
+            am_trend = np.convolve(am_db, np.ones(w_am) / w_am, mode="same")
+            am_detr = am_db - am_trend
+            phase_arg = 2 * np.pi * rate * tt[:len(am_detr)]
+            am_depth = 2 * abs(np.mean(am_detr * np.exp(-1j * phase_arg)))
+            result["bodyAmDepthDb"] = float(am_depth)
+    return result
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -958,6 +1168,197 @@ def robust_mean(vals):
     return float(np.median(v))
 
 
+def _body_points(notes: list[NoteAnalysis], n_partials: int):
+    """(note, rank, log2 Hz, ln amp) tuples for detected in-range partials."""
+    rows = []
+    for note_index, note in enumerate(notes):
+        for rank in range(n_partials):
+            amp = float(note.partial_amps[rank])
+            if not note.partial_snr_ok[rank] or amp <= 1e-4:
+                continue
+            freq = float(note.partial_freqs[rank])
+            if not np.isfinite(freq) or freq <= 0:
+                freq = note.f0 * (rank + 1)
+            if 70 <= freq <= 12000:
+                rows.append((note_index, rank, math.log2(freq), math.log(amp)))
+    return rows
+
+
+def _solve_body(rows, n_notes: int, n_partials: int, centres: np.ndarray,
+                width: float, iters: int = 5, ridge: float = 8.0):
+    """Alternating rank/note/body fit; returns band coefficients (log2)."""
+    note_i = np.asarray([r[0] for r in rows], dtype=int)
+    rank_i = np.asarray([r[1] for r in rows], dtype=int)
+    log_hz = np.asarray([r[2] for r in rows])
+    level = np.asarray([r[3] for r in rows])
+    basis = np.exp(-.5 * ((log_hz[:, None] - centres[None, :]) / width) ** 2)
+    rank_effect = np.zeros(n_partials)
+    for rank in range(n_partials):
+        vals = level[rank_i == rank]
+        rank_effect[rank] = float(np.median(vals)) if vals.size else 0.0
+    body = np.zeros(len(level))
+    note_effect = np.zeros(n_notes)
+    coeff = np.zeros(len(centres))
+    mean_basis = np.mean(basis, axis=0)
+    for _ in range(iters):
+        residual = level - rank_effect[rank_i] - body
+        for index in range(n_notes):
+            vals = residual[note_i == index]
+            note_effect[index] = float(np.median(vals)) if vals.size else 0.0
+        target = level - rank_effect[rank_i] - note_effect[note_i]
+        # The overlapping Gaussian basis is intentionally smooth.  Ridge
+        # regularisation prevents adjacent bands from taking huge opposite
+        # gains to explain individual partials (which belong to excitation).
+        coeff = np.linalg.solve(
+            basis.T @ basis + ridge * np.eye(len(centres)) +
+            20.0 * np.outer(mean_basis, mean_basis),
+            basis.T @ target)
+        body = basis @ coeff
+        body -= float(np.median(body))
+        for rank in range(n_partials):
+            vals = (level - body - note_effect[note_i])[rank_i == rank]
+            if vals.size:
+                rank_effect[rank] = float(np.median(vals))
+    return np.clip(coeff / math.log(2), -1.5, 1.5)
+
+
+def _band_envelope(coeff_log2: np.ndarray, centres: np.ndarray, width: float,
+                   grid_log2: np.ndarray) -> np.ndarray:
+    basis = np.exp(-.5 * ((grid_log2[:, None] - centres[None, :]) / width) ** 2)
+    return basis @ coeff_log2
+
+
+def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
+    """Separate a smooth fixed-Hz body envelope from partial-rank excitation.
+
+    The same body resonance crosses different harmonic ranks as pitch changes.
+    Alternating robust fits therefore separate rank, note-level and absolute-
+    frequency effects without treating a register table as the body.  The body
+    is represented in the engine's native log2-Gaussian band format; the
+    returned matrix is the body-divided source spectrum used for partial fits.
+
+    Band resolution is ~1/3 octave: the violin split-half experiment
+    (2026-07-16) showed the fixed-Hz structure replicates across corpus
+    halves at that scale and degrades below it, so finer bands would encode
+    take noise as body.  Returns (bands, adjusted, fit_info); fit_info is the
+    provenance record stored beside the resonances (method, evidence counts,
+    split-half stability) so a profile always names how its body was fitted.
+    """
+    raw = np.stack([n.partial_amps for n in notes]) if notes else np.zeros((0, n_partials))
+    if len(notes) < 8:
+        return [], raw, None
+    rows = _body_points(notes, n_partials)
+    if len(rows) < 80:
+        return [], raw, None
+    log_hz = np.asarray([r[2] for r in rows])
+    lo = max(math.log2(100), float(np.percentile(log_hz, 3)))
+    hi = min(math.log2(9000), float(np.percentile(log_hz, 97)))
+    if hi - lo < 1.5:
+        return [], raw, None
+    n_bands = int(np.clip(round((hi - lo) * 3) + 1, 5, 16))
+    centres = np.linspace(lo, hi, n_bands)
+    spacing = (hi - lo) / max(1, n_bands - 1)
+    width = float(max(.14, min(.62, spacing * .55)))
+    coeff_log2 = _solve_body(rows, len(notes), n_partials, centres, width)
+
+    # Split-half stability: refit on alternating file halves with the SAME
+    # bands and correlate the envelopes.  This is the "body peaks sit at
+    # note-independent frequencies" validation, demonstrated per fit rather
+    # than asserted once.
+    stability = None
+    files = sorted({n.file for n in notes})
+    if len(files) >= 4:
+        half = set(files[0::2])
+        idx_a = [i for i, n in enumerate(notes) if n.file in half]
+        idx_b = [i for i, n in enumerate(notes) if n.file not in half]
+        remap_a = {v: k for k, v in enumerate(idx_a)}
+        remap_b = {v: k for k, v in enumerate(idx_b)}
+        rows_a = [(remap_a[r[0]], r[1], r[2], r[3]) for r in rows if r[0] in remap_a]
+        rows_b = [(remap_b[r[0]], r[1], r[2], r[3]) for r in rows if r[0] in remap_b]
+        if len(rows_a) >= 40 and len(rows_b) >= 40:
+            ca = _solve_body(rows_a, len(idx_a), n_partials, centres, width)
+            cb = _solve_body(rows_b, len(idx_b), n_partials, centres, width)
+            grid = np.linspace(lo, hi, 160)
+            ea = _band_envelope(ca, centres, width, grid)
+            eb = _band_envelope(cb, centres, width, grid)
+            if float(np.std(ea)) > 1e-6 and float(np.std(eb)) > 1e-6:
+                corr = float(np.corrcoef(ea, eb)[0, 1])
+                stability = dict(
+                    splitHalfCorr=round(corr, 3),
+                    peakHzA=round(2 ** float(grid[int(np.argmax(ea))]), 1),
+                    peakHzB=round(2 ** float(grid[int(np.argmax(eb))]), 1))
+
+    # Negligible envelopes are omitted so a new family remains neutral until
+    # its own corpus demonstrates a fixed-Hz body.
+    grid = np.linspace(lo, hi, 160)
+    if float(np.ptp(_band_envelope(coeff_log2, centres, width, grid))) < .12:
+        return [], raw, None
+    bands = [dict(freq=round(2 ** float(center), 1),
+                  gain=round(float(gain), 4), width=round(float(width), 4))
+             for center, gain in zip(centres, coeff_log2)
+             if abs(gain) >= .025]
+    fit_info = dict(method="ensemble-rank-note-body-v2",
+                    bands=len(bands), points=len(rows), notes=len(notes),
+                    widthLog2=round(width, 4))
+    if stability:
+        fit_info.update(stability)
+
+    adjusted = raw.astype(float).copy()
+    for note_index, note in enumerate(notes):
+        for rank in range(n_partials):
+            if adjusted[note_index, rank] <= 0:
+                continue
+            freq = float(note.partial_freqs[rank])
+            if not np.isfinite(freq) or freq <= 0:
+                freq = note.f0 * (rank + 1)
+            g = np.exp(-.5 * ((math.log2(max(20, freq)) - centres) / width) ** 2)
+            body_gain = float(2 ** np.dot(coeff_log2, g))
+            adjusted[note_index, rank] /= max(.2, min(4.5, body_gain))
+        peak = float(adjusted[note_index].max())
+        if peak > 0:
+            adjusted[note_index] /= peak
+    return bands, adjusted, fit_info
+
+
+def fit_take_spread(notes: list[NoteAnalysis], A: np.ndarray, OK: np.ndarray,
+                    n_partials: int):
+    """Per-partial take variability from WITHIN-FILE adjacent-note pairs.
+
+    The historical estimator pooled every take into one pitch-ordered chain,
+    so successive diffs jumped between dynamics, strings and sources — it
+    measured corpus heterogeneity, not note-to-note variability, and pinned
+    every instrument's spread at the 0.8 cap.  Restrict pairs to the same
+    file (same source, string and dynamic for the Iowa chromatic runs) and
+    remove each pair's common level offset before pooling.
+
+    Returns (spread list with None gaps, pair count).
+    """
+    by_file: dict[str, list[int]] = {}
+    for idx, note in enumerate(notes):
+        by_file.setdefault(note.file, []).append(idx)
+    diffs: list[list[float]] = [[] for _ in range(n_partials)]
+    pairs = 0
+    for indices in by_file.values():
+        indices = sorted(indices, key=lambda i: notes[i].f0)
+        for a, b in zip(indices[:-1], indices[1:]):
+            both = OK[a] & OK[b] & (A[a] > 0) & (A[b] > 0)
+            ranks = np.where(both)[0]
+            if ranks.size < 4:
+                continue
+            d = np.log(A[b, ranks]) - np.log(A[a, ranks])
+            d = d - float(np.median(d))
+            pairs += 1
+            for rank, dv in zip(ranks, d):
+                diffs[rank].append(float(dv))
+    spread: list[float | None] = [None] * n_partials
+    for i in range(n_partials):
+        if len(diffs[i]) >= 6:
+            # a diff of two takes has variance 2·sd²; engine spread = 2·rel_sd
+            rel_sd = float(np.std(diffs[i], ddof=1) / math.sqrt(2))
+            spread[i] = float(np.clip(2 * rel_sd, 0.08, 0.8))
+    return spread, pairs
+
+
 def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis],
                          n_partials: int, min_amp_f0: float = 40.0):
     """Combine per-note measurements into one engine-shaped record."""
@@ -969,33 +1370,32 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         spec_notes = notes
 
     # ── 64-partial amplitude table ────────────────────────────────────
-    A = np.stack([n.partial_amps for n in spec_notes])          # notes × 64
+    resonances, A, resonances_fit = fit_fixed_body(spec_notes, n_partials)
     OK = np.stack([n.partial_snr_ok for n in spec_notes])
+    spec_index = {id(note): index for index, note in enumerate(spec_notes)}
     logf0 = np.log([n.f0 for n in spec_notes])
     amp = np.zeros(n_partials)
-    spread = [None] * n_partials
     for i in range(n_partials):
-        sel = OK[:, i] & (A[:, i] > 0)
-        det = A[sel, i]
-        if det.size == 0:
-            continue
-        amp[i] = float(np.median(det))
-        if det.size >= 4:
-            # engine draws sd = amp·spread·0.5 → spread = 2·(sd/amp).
-            # The takes are DIFFERENT pitches within ~an octave, so much of
-            # the raw variance is a smooth register trend, not take-to-take
-            # variability.  Estimate the local scatter instead: order the
-            # takes by pitch and use successive log-amplitude differences —
-            # sd(diff)/√2 is insensitive to any smooth trend.
-            order = np.argsort(logf0[sel])
-            la = np.log(det)[order]
-            if la.size >= 3:
-                rel_sd = float(np.std(np.diff(la), ddof=1) / math.sqrt(2))
-            else:
-                rel_sd = float(np.std(la, ddof=1))
-            spread[i] = float(np.clip(2 * rel_sd, 0.08, 0.8))
+        det = A[OK[:, i] & (A[:, i] > 0), i]
+        if det.size:
+            amp[i] = float(np.median(det))
     if amp.max() > 0:
         amp = amp / amp.max()
+
+    # Take variability from same-file (same string/dynamic/source) pairs.
+    spread, spread_pairs = fit_take_spread(spec_notes, A, OK, n_partials)
+    if spread_pairs < 3:
+        # single-note-per-file corpus: fall back to the pooled pitch-ordered
+        # diff chain rather than fabricating defaults from nothing
+        for i in range(n_partials):
+            sel = OK[:, i] & (A[:, i] > 0)
+            det = A[sel, i]
+            if det.size >= 4:
+                order = np.argsort(logf0[sel])
+                la = np.log(det)[order]
+                rel_sd = float(np.std(np.diff(la), ddof=1) / math.sqrt(2)) \
+                    if la.size >= 3 else float(np.std(la, ddof=1))
+                spread[i] = float(np.clip(2 * rel_sd, 0.08, 0.8))
     # fill spread gaps with the engine's tail rule (+0.04 per stride-2 step)
     last = 0.25
     for i in range(n_partials):
@@ -1020,8 +1420,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             g_amp = np.zeros(n_partials)
             g_spread = []
             for i in range(n_partials):
-                detected = [n.partial_amps[i] for n in group
-                            if n.partial_snr_ok[i] and n.partial_amps[i] > 0]
+                detected = [A[spec_index[id(n)], i] for n in group
+                            if n.partial_snr_ok[i] and A[spec_index[id(n)], i] > 0]
                 g_amp[i] = float(np.median(detected)) if detected else 0.0
                 g_spread.append(float(spread[i]))
             if g_amp.max() > 0:
@@ -1218,6 +1618,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         partialB=round(B_med, 8),
         partialBByNote=B_by_note,
         partialsByRegister=partials_by_register,
+        resonances=resonances,
+        resonancesFit=resonances_fit,
         vowelFormants=vowel_formants,
         tailSlopeDbPerOct=round(tail_db_oct, 1) if tail_db_oct is not None else None,
         material=material,
@@ -1368,6 +1770,10 @@ def main(argv=None):
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--require-contract", action="store_true",
                     help="refuse to run unless every selected audio folder has PROVENANCE.json and COVERAGE.md")
+    ap.add_argument("--keep-existing", action="store_true",
+                    help="preserve instruments already in --out that have no "
+                         "corpus folder (legacy fits, e.g. trombone) instead "
+                         "of silently dropping them on a full regeneration")
     args = ap.parse_args(argv)
 
     only = set(args.only.split(",")) if args.only else None
@@ -1394,6 +1800,18 @@ def main(argv=None):
               f"t60Ref={mat.get('t60Ref')} slope={mat.get('slope')} "
               f"m*={mat.get('suggestedMaterial')} "
               f"A={p['envelopeAttack']} S={p['envelopeSustain']}")
+    if args.keep_existing and os.path.exists(args.out):
+        # Conservative merge: never silently lose an instrument on a partial
+        # (--only) or full regeneration — legacy fits without a corpus folder
+        # (e.g. trombone) and instruments outside --only survive.  Run
+        # without --keep-existing to intentionally drop instruments.
+        with open(args.out) as fh:
+            previous = json.load(fh)
+        for inst, profile in previous.items():
+            if inst not in out:
+                out[inst] = profile
+                print(f"[{inst}] kept previous profile (not re-analysed this run)")
+    out = {inst: out[inst] for inst in sorted(out)}
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as fh:
         json.dump(out, fh, indent=1)
