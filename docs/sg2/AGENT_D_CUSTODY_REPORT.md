@@ -92,3 +92,13 @@ but the broad audible failures are more informative: partial-table distance,
 mel distance, attack timing, and coarse band balance all miss across the
 registers. These results prioritise the measured-body contract, bow onset,
 body-AM, and per-string consumers; they are not a freeze candidate.
+
+Detailed classification and consuming assertions are filed in
+`docs/sg2/VIOLIN_INTERIM_TRIAGE.md` and exchange entries T-036…T-040.
+
+## Shared-branch integration
+
+The custody branch was merged into `codex/sg2-l4-l5-engine` at `95118d4`
+after owner governance commit `bb8ef3f`. The only merge conflict was the
+append-only parameter ledger; both histories were preserved. The final v3
+bulk profile data remains intentionally reverted until T-032/T-035 pass.
