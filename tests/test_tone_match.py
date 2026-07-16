@@ -30,7 +30,7 @@ from scripts.tone_match.iterate import (
     _reference_variability,
     _update_leaderboard,
 )
-from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
+from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
@@ -643,6 +643,28 @@ def test_scratch_window_noise_leads_the_tone_at_soft_starts():
     assert noise_lead_ms > 25
     assert onset_noise_db > sustain_noise_db + 3
     assert onset_centroid_oct > .8               # scratch sits well above 1 kHz
+    assert 10 < lockin_periods < 18              # organisation follows scratch
+
+
+def test_lockin_measures_harmonic_organisation_not_slow_amplitude_bloom():
+    sr = 44_100
+    t = np.arange(int(1.2 * sr)) / sr
+    # A stable harmonic tone is organised from its first audible frame even
+    # though its amplitude takes a full second to bloom.
+    ramp = np.clip(t / 1.0, 0, 1)
+    samples = ramp * (
+        np.sin(2 * np.pi * 440 * t) +
+        .25 * np.sin(2 * np.pi * 880 * t))
+    from scipy import signal as _sig
+    _, times, spectrum = _sig.stft(
+        samples, fs=sr, nperseg=2048, noverlap=1536,
+        boundary=None, padded=False)
+    power = np.abs(spectrum) ** 2
+    freqs = np.fft.rfftfreq(2048, 1 / sr)
+    (*_noise_stats, lockin_periods) = _noise_and_onset_observables(
+        power, freqs, times, 440.0)
+    assert lockin_periods is not None
+    assert lockin_periods <= 5
 
 
 def test_onset_wander_measures_approach_from_above_without_calling_it_scoop():
@@ -854,6 +876,22 @@ def test_violin_vibrato_role_inventory_covers_three_registers_and_two_dynamics()
         for dynamic in ("mf", "f")
     }
     assert all(parse_phil_name(row["file"]) for row in rows)
+
+
+def test_violin_onset_role_inventory_covers_three_registers_and_two_dynamics():
+    rows = ONSET_ROLE_MIDIS["violin"]
+    assert {
+        (register, dynamic)
+        for register, by_dynamic in rows.items()
+        for dynamic in by_dynamic
+    } == {
+        (register, dynamic)
+        for register in ("low", "mid", "high")
+        for dynamic in ("pp", "ff")
+    }
+    assert rows["low"] == {"pp": 55, "ff": 55}
+    assert rows["mid"] == {"pp": 79, "ff": 79}
+    assert rows["high"] == {"pp": 88, "ff": 88}
 
 
 def test_zero_weighted_tripwire_feature_is_watch_only():
