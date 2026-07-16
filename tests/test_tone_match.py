@@ -158,6 +158,27 @@ def test_single_note_checklist_marks_campaign_evidence_not_applicable():
     assert {row["status"] for row in result["assertions"]} <= {"pass", "fail", "not-applicable"}
 
 
+def test_alto_sax_owner_notes_are_construction_gates():
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+               for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+    base = {
+        "excitationType": "blow", "resonatorClass": "conicalTube", "dynamicBlare": .2,
+        "breathVelocityExponent": 1, "breathTurbulence": 0, "breathBodyAmount": 0,
+        "onsetSpectrumTilt": 0, "onsetSpectrumDecay": .06,
+    }
+    failed = evaluate_construction("alto-sax", samples, params=base)
+    failed_ids = {row["id"] for row in failed["assertions"] if row["status"] == "fail"}
+    owner_ids = {"alto-sax.soft-breath-law", "alto-sax.turbulence-law",
+                 "alto-sax.body-coloured-air", "alto-sax.onset-spectrum-law"}
+    assert owner_ids <= failed_ids
+    fitted = evaluate_construction("alto-sax", samples, params={
+        **base, "breathVelocityExponent": .5, "breathTurbulence": .2,
+        "breathBodyAmount": .4, "onsetSpectrumTilt": .2,
+    })
+    by_id = {row["id"]: row["status"] for row in fitted["assertions"]}
+    assert all(by_id[key] == "pass" for key in owner_ids)
+
+
 def test_boy_morphology_requires_scaled_formants_to_reach_body_stage():
     bundle = _bundle()
     samples = [ConstructionSample(bundle, bundle, register, dynamic, dynamic)

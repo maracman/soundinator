@@ -270,6 +270,34 @@ def evaluate_construction(
         rows.append(_result(f"{name}.blare-law", "Nonlinear forte enrichment is explicitly enabled",
                             None if blare is None else float(blare) > 0, blare, "dynamicBlare > 0",
                             strict_evidence=strict_evidence))
+        if name in {"alto-sax", "tenor-sax"}:
+            breath_exponent = _param(params, "breathVelocityExponent")
+            rows.append(_result(f"{name}.soft-breath-law",
+                                "Soft reed dynamics retain proportionally more air noise",
+                                None if breath_exponent is None else float(breath_exponent) < 1,
+                                breath_exponent, "breathVelocityExponent < 1",
+                                strict_evidence=strict_evidence))
+            turbulence = _param(params, "breathTurbulence")
+            rows.append(_result(f"{name}.turbulence-law",
+                                "Sustained air has continuous seeded texture",
+                                None if turbulence is None else float(turbulence) > 0,
+                                turbulence, "breathTurbulence > 0",
+                                strict_evidence=strict_evidence))
+            body_air = _param(params, "breathBodyAmount")
+            rows.append(_result(f"{name}.body-coloured-air",
+                                "Air noise passes through the fitted instrument body",
+                                None if body_air is None else float(body_air) > 0,
+                                body_air, "breathBodyAmount > 0",
+                                strict_evidence=strict_evidence))
+            onset_tilt = _param(params, "onsetSpectrumTilt")
+            onset_decay = _param(params, "onsetSpectrumDecay")
+            onset_enabled = None if onset_tilt is None or onset_decay is None else (
+                abs(float(onset_tilt)) > .01 and float(onset_decay) > 0)
+            rows.append(_result(f"{name}.onset-spectrum-law",
+                                "Onset harmonic colour is distinct from the sustain print",
+                                onset_enabled, {"tilt": onset_tilt, "decay": onset_decay},
+                                "abs(onsetSpectrumTilt) > 0.01 and onsetSpectrumDecay > 0",
+                                strict_evidence=strict_evidence))
         if name == "french-horn":
             direct = _param(params, "attackNoiseDirect")
             rows.append(_result("french-horn.independent-onset", "Measured lip transient is not masked by the sustained ADSR",
