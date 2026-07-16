@@ -1602,7 +1602,13 @@ export function articulationOnsetPlan(nextRandom, options = {}) {
   const velocity = clamp(options.velocity ?? 0.62, 0, 1);
   const variation = clamp(options.variation ?? 0, 0, 1) * human;
   const draw = typeof nextRandom === "function" ? nextRandom() : 0.5;
-  const mean = clamp(options.strength ?? 0.5, 0, 1);
+  // Owner L9: forte trumpet onsets recruit firmer tongue/lip support. This
+  // is a fitted within-instrument slope on the ONE articulation latent, not
+  // an independent plosive multiplier. Zero is exactly neutral; positive
+  // values bias forte toward stronger/cleaner articulation and pp toward
+  // weaker/breath-led articulation before the Human-scaled draw is applied.
+  const velocitySlope = clamp(options.strengthVelocitySlope ?? 0, -1.5, 1.5);
+  const mean = clamp((options.strength ?? 0.5) + velocitySlope * (velocity - 0.62), 0, 1);
   const strength = clamp(mean + (draw * 2 - 1) * variation * 0.5, 0, 1);
   const transientGain = 1 + coupling * (strength - 0.5) * 1.5;
   const breathLeadGain = 1 + coupling * (0.5 - strength) * 1.5;
@@ -2725,6 +2731,7 @@ export class GenerationEngine {
       articulationCoupling: this._clamp(this.p.articulationCoupling ?? 0, 0, 1),
       articulationStrength: this._clamp(this.p.articulationStrength ?? 0.5, 0, 1),
       articulationVariation: this._clamp(this.p.articulationVariation ?? 0, 0, 1),
+      articulationVelocitySlope: this._clamp(this.p.articulationVelocitySlope ?? 0, -1.5, 1.5),
       onsetScoopDepthCents: this._clamp(this.p.onsetScoopDepthCents ?? 0, 0, 180),
       onsetScoopSettle: this._clamp(this.p.onsetScoopSettle ?? 0.06, 0.015, 0.35),
       onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),
@@ -4624,6 +4631,7 @@ export class SynthEngine {
       () => this._nextRandom(), {
         coupling: note.articulationCoupling,
         strength: note.articulationStrength,
+        strengthVelocitySlope: note.articulationVelocitySlope,
         variation: note.articulationVariation,
         human: note.excitationHuman,
         velocity: note.velocity,

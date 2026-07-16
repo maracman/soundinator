@@ -358,6 +358,7 @@ export const DEFAULTS = {
   articulationCoupling: 0,
   articulationStrength: 0.5,
   articulationVariation: 0,
+  articulationVelocitySlope: 0,
   onsetScoopDepthCents: 0,
   onsetScoopSettle: 0.06,
   onsetScoopRearticulatedScale: 0.35,
