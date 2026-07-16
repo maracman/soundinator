@@ -647,6 +647,7 @@ const PARAM_DESC = {
   spectralRegisterAmount: "How strongly note range reshapes each harmonic amplitude",
   spectralResonanceAmount: "How strongly fixed instrument resonances reshape absolute harmonic frequencies",
   partialMaterial: "Damping law for the harmonic partials: low values let every partial ring (glass, metal); high values make the upper partials die away quickly (wood, felt). Applied per note, faster decay for higher harmonics",
+  releaseDamping: "Independent damping applied only after note-off: 0 preserves the material ring; 1 models firm damper or hand contact without changing the held-note spectrum or decay",
   excitationType: "How energy enters the resonator: bow (continuous drive), pluck (displacement release), strike (force impulse), blow (air jet). Sets the physical drive spectrum",
   excitationPosition: "Where the string/tube/membrane is excited (0.02 near the edge to 0.5 the middle). Modes with a node at this point go silent — 0.5 kills every even partial, 0.33 every third. Applied relative to the instrument's natural position",
   excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
@@ -9082,7 +9083,7 @@ function renderExplore() {
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
     "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
-    "dynamicBlare","decaySecondStage","decaySecondRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
+    "dynamicBlare","decaySecondStage","decaySecondRatio","releaseDamping","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF1Level","formantF2Level","formantF3Level","formantF4Level","formantF5Level","formantBandwidth","bodyArticulation",
@@ -14458,6 +14459,7 @@ function chInspectorHTML(p) {
           ${controlRow("dynamicBlare", "Forte curvature", p.dynamicBlare ?? 0, 0, 1.5, 0.01)}
           ${controlRow("decaySecondStage", "Second decay", p.decaySecondStage ?? 0, 0, 1, 0.01)}
           ${controlRow("decaySecondRatio", "Late T60 ratio", p.decaySecondRatio ?? 1, 1, 8, 0.1)}
+          ${controlRow("releaseDamping", "Release damping", p.releaseDamping ?? 0, 0, 1, 0.01)}
           ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
           ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
           ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}

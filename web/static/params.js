@@ -541,6 +541,9 @@ export const DEFAULTS = {
   // Material damping law: 0 = glass/metal (all partials ring), 1 = wood/felt
   // (high partials die fast). Per-instrument defaults ride the profile.
   partialMaterial: 0.45,
+  // Independent note-off damping: 0 preserves the material ring; 1 models
+  // firm damper/hand contact without changing the held-note decay law.
+  releaseDamping: 0,
   // Partial macros: transforms over the whole harmonic set (see
   // docs/PARTIAL_MACROS_DESIGN.md). Tilt = spectral slope; odd/even
   // balance; comb = movable boost of a related-frequency group; six
