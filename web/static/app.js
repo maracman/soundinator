@@ -13923,7 +13923,7 @@ let _tdSideTab = "envelope";
 const _chBypass = { body: null, space: null };
 
 function stagePowerState(p, stage) {
-  if (stage === "body") return (p.spectralResonanceAmount ?? 0.35) > 0.001;
+  if (stage === "body") return (p.spectralResonanceAmount ?? 1) > 0.001;
   if (stage === "effects") return p.stageEffectsOn !== false;
   if (stage === "space") return (p.reverbWet ?? 0.16) > 0.001;
   return true; // excitor + resonator are always in the chain
@@ -13932,10 +13932,10 @@ function stagePowerState(p, stage) {
 function toggleStagePower(p, stage) {
   if (stage === "body") {
     if (stagePowerState(p, "body")) {
-      _chBypass.body = p.spectralResonanceAmount ?? 0.35;
+      _chBypass.body = p.spectralResonanceAmount ?? 1;
       p.spectralResonanceAmount = 0;
     } else {
-      p.spectralResonanceAmount = _chBypass.body ?? 0.35;
+      p.spectralResonanceAmount = _chBypass.body ?? 1;
     }
     return;
   }
@@ -14003,7 +14003,7 @@ function chCardSummary(p, stage) {
   }
   if (stage === "body") {
     const label = !p.bodyType || p.bodyType === "auto" ? "auto" : (BODY_PRESETS[p.bodyType]?.label || p.bodyType);
-    return `${label} · amount ${(p.spectralResonanceAmount ?? 0.35).toFixed(2)}`;
+    return `${label} · amount ${(p.spectralResonanceAmount ?? 1).toFixed(2)}`;
   }
   if (stage === "effects") {
     const chain = sanitizeFxChain(p.effectsChain);
@@ -14487,7 +14487,7 @@ function chInspectorHTML(p) {
       </select>
       ${bodyBandChipsHTML(p)}
       <div class="knob-row">
-        ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 0.35, cool: true })}
+        ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 1, cool: true })}
         ${knobHTML("bodyArticulation", "Articulate", p.bodyArticulation ?? (p.bodyType === "vocal" ? 1 : 0), 0, 1, 0.01, { def: 0, cool: true })}
         ${(p.bodyArticulation ?? 0) > 0 ? knobHTML("formantChangeProb", "Vowel walk", p.formantChangeProb, 0, 1, 0.01, { def: 0.25, cool: true }) : ""}
       </div>
@@ -14758,7 +14758,7 @@ function drawChThumbs() {
   if (g) {
     const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
     const bands = bodyBandsFor(p, profile);
-    const amount = clamp(p.spectralResonanceAmount ?? 0.35, 0, 1.5);
+    const amount = clamp(p.spectralResonanceAmount ?? 1, 0, 1.5);
     g.ctx.beginPath();
     for (let px = 0; px <= g.w; px += 3) {
       const f = 60 * Math.pow(12000 / 60, px / g.w);
@@ -16328,7 +16328,7 @@ function drawBodyRidge() {
   ctx.clearRect(0, 0, w, h);
   const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
   const bands = bodyBandsFor(exploreParams, profile);
-  const amount = clamp(exploreParams.spectralResonanceAmount ?? 0.35, 0, 1.5);
+  const amount = clamp(exploreParams.spectralResonanceAmount ?? 1, 0, 1.5);
   const FMIN = 60, FMAX = 12000;
   ctx.beginPath();
   ctx.moveTo(0, h);
