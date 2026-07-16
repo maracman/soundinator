@@ -151,3 +151,43 @@ Composite loss: `3.867218`
 | `onsetSpectrumDecay` | 0.06980930789040009 | 0.002184 |
 | `onsetSpectrumTilt` | -0.21878552323970732 | 0.002691 |
 | `partialTilt` | 0.0 | 0.174295 |
+
+## flute — flute-p52
+
+Composite loss: `3.931730`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `spectralResonanceAmount` | 1.0 | not run |
+
+## clarinet — clarinet-p52
+
+Composite loss: `3.640671`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `spectralResonanceAmount` | 1.0 | not run |
+
+## alto-sax — alto-sax-p52
+
+Composite loss: `3.926406`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `spectralResonanceAmount` | 1.0 | not run |
+
+## trumpet — trumpet-p52
+
+Composite loss: `3.121096`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `spectralResonanceAmount` | 1.0 | not run |
+
+## french-horn — french-horn-p52
+
+Composite loss: `2.888251`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `spectralResonanceAmount` | 1.0 | not run |
