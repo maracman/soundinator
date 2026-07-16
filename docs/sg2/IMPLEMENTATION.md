@@ -4,6 +4,16 @@ This directory records the executable portion of
 `docs/SOUND_GENERATOR_2_PLAN.md`. Public reference-corpus downloads and
 optimization artifacts remain outside git under `/private/tmp/sg2/`.
 
+## Owner-note preflight
+
+Before starting or resuming any SG2 fitting, refinement, compression, or
+freeze session, read `docs/sg2/OWNER_LISTENING_NOTES.md` from the top and
+check for additions since the previous run. Treat every applicable new entry
+as a work item in the normal §2.5 loop: verify its engine/scorer evidence,
+implement or file the identified gap, and rerun affected instruments before
+freeze. A prior read is not sufficient because the file is intentionally a
+live owner-feedback queue.
+
 ## Reference layout
 
 Reconstruct the corpus as:
