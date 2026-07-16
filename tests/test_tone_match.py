@@ -7,7 +7,7 @@ import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, validate_corpus_contract, vowel_from_filename
+from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, onset_pitch_stats, validate_corpus_contract, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
@@ -74,11 +74,39 @@ def test_owner_listening_observables_are_explicit_score_dimensions():
     rendered.sustain_noise_db = -23
     reference.onset_tilt_db_oct = 2.5
     rendered.onset_tilt_db_oct = -0.5
+    reference.note.onset_pitch = {"depthCents": 42, "settleMs": 76}
+    rendered.note.onset_pitch = {"depthCents": 17, "settleMs": 36}
     result = compare_features(reference, rendered)
     assert result["features"]["sustain_noise_db"] == 9
     assert result["normalized"]["sustain_noise_db"] == 3
     assert result["features"]["onset_tilt_db_oct"] == 3
     assert result["normalized"]["onset_tilt_db_oct"] == 1
+    assert result["features"]["onset_scoop_cents"] == 25
+    assert result["normalized"]["onset_scoop_cents"] == 2.5
+    assert result["features"]["onset_scoop_settle_ms"] == 40
+    assert result["normalized"]["onset_scoop_settle_ms"] == 2
+
+
+def test_onset_pitch_tracker_measures_scoop_without_calling_it_vibrato():
+    sr = 48_000
+    duration = .8
+    t = np.arange(round(sr * duration)) / sr
+    settle = .08
+    cents = -60 * np.maximum(0, 1 - t / settle)
+    hz = 220 * np.power(2, cents / 1200)
+    phase = 2 * np.pi * np.cumsum(hz) / sr
+    envelope = np.minimum(1, t / .012) * np.minimum(1, (duration - t) / .03)
+    audio = np.sin(phase) * envelope
+    measured = onset_pitch_stats(audio, sr, 220, 0, np.array([1, .2, .1]))
+    assert measured["direction"] == "from-below"
+    assert 35 <= measured["depthCents"] <= 75
+    assert 35 <= measured["settleMs"] <= 130
+
+    stable = np.sin(2 * np.pi * 220 * t) * envelope
+    measured_stable = onset_pitch_stats(stable, sr, 220, 0,
+                                         np.array([1, .2, .1]))
+    assert measured_stable["direction"] == "stable"
+    assert measured_stable["depthCents"] == 0
 
 
 def test_requested_parameter_order_is_preserved_for_construction_first_fits():
@@ -283,6 +311,20 @@ def test_register_fit_retains_valid_notes_below_100_hz():
     anchors = fitted["partialsByRegister"]
     assert [row["f0"] for row in anchors] == [60.0, 80.0, 200.0]
     assert anchors[0]["partials"][1]["amp"] == .1
+
+
+def test_profile_fit_retains_scoop_distribution_and_plosive_anticorrelation():
+    notes = []
+    for index, (transient, depth) in enumerate(((.8, 2), (.6, 18), (.4, 36), (.2, 55))):
+        note = _bundle(f0=180 + index * 40).note
+        note.attack_noise = {"level": transient, "freq": 1200, "q": 1,
+                             "decay": .05, "bandwidth": 600}
+        note.onset_pitch = {"depthCents": depth, "settleMs": 40 + depth}
+        notes.append(note)
+    performance = aggregate_instrument(notes, [], 8)["performance"]
+    assert performance["onsetScoopProb"] == .75
+    assert performance["onsetScoopDepthCents"] > 30
+    assert performance["onsetArticulationCorrelation"] < -.9
 
 
 def test_corpus_sidecar_filename_classification():

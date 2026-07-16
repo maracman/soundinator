@@ -31,6 +31,8 @@ DEFAULT_WEIGHTS = {
     "noise": 1.0,
     "sustain_noise_db": 1.0,
     "onset_tilt_db_oct": 1.0,
+    "onset_scoop_cents": 1.0,
+    "onset_scoop_settle_ms": 1.0,
 }
 
 _BLOWN_INSTRUMENTS = {
@@ -68,6 +70,8 @@ PERCEPTUAL_UNITS = {
     "noise": 1.0,
     "sustain_noise_db": 3.0,
     "onset_tilt_db_oct": 3.0,
+    "onset_scoop_cents": 10.0,
+    "onset_scoop_settle_ms": 20.0,
 }
 
 
@@ -250,6 +254,7 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
     number = lambda value, fallback=0.0: float(value) if isinstance(value, (int, float)) and np.isfinite(value) else fallback
     vibrato = _vibrato_distance(ref.note, render.note)
     nr, ns = ref.note.attack_noise or {}, render.note.attack_noise or {}
+    pr, ps = ref.note.onset_pitch or {}, render.note.onset_pitch or {}
     # Below a 0.1% attack/sustain ratio the residual centre is not a
     # perceptually stable feature: the detector may return no burst at all,
     # or a harmonic/noise-bin peak. Compare floored level, but only compare
@@ -271,6 +276,10 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
         "vibrato": vibrato, "noise": noise,
         "sustain_noise_db": abs(render.sustain_noise_db - ref.sustain_noise_db),
         "onset_tilt_db_oct": abs(render.onset_tilt_db_oct - ref.onset_tilt_db_oct),
+        "onset_scoop_cents": abs(number(ps.get("depthCents")) -
+                                   number(pr.get("depthCents"))),
+        "onset_scoop_settle_ms": abs(number(ps.get("settleMs")) -
+                                      number(pr.get("settleMs"))),
     }
     normalized = {key: values[key] / PERCEPTUAL_UNITS[key] for key in values}
     active_weight = sum(weights[key] for key in values if weights[key] > 0)

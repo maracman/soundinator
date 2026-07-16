@@ -352,6 +352,7 @@ class NoteAnalysis:
     adsr: dict = field(default_factory=dict)
     band_t90: dict = field(default_factory=dict)  # {band_center: t90_s}
     attack_noise: dict = field(default_factory=dict)
+    onset_pitch: dict = field(default_factory=dict)
     vibrato: dict = field(default_factory=dict)
     vowel: str | None = None
     formants: list[float] = field(default_factory=list)
@@ -528,6 +529,12 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
     # ── attack transient (→ attackNoise) ─────────────────────────────
     note.attack_noise = attack_transient(seg, sr, f0, note.B or 0.0, onset_t)
 
+    # ── onset f0 trajectory (owner L5) ───────────────────────────────
+    # Keep this distinct from the sustain-only vibrato estimator: a scoop is
+    # a one-way pressure/tuning transient, not periodic modulation.
+    note.onset_pitch = onset_pitch_stats(seg, sr, f0, onset_t,
+                                         note.partial_amps)
+
     # ── per-partial decay → T60 ──────────────────────────────────────
     note.t60 = partial_t60(seg, sr, f0, note.B or 0.0, ok, percussive)
 
@@ -536,6 +543,86 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
         note.vibrato = vibrato_stats(seg, sr, f0, note.partial_amps)
 
     return note
+
+
+def onset_pitch_stats(seg: np.ndarray, sr: int, f0: float, onset_t: float,
+                      amps: np.ndarray) -> dict:
+    """Measure an onset approach from below and its settling time.
+
+    The strongest of partials 1–3 is isolated before taking the analytic
+    phase derivative.  Tracking a strong low partial makes the measurement
+    usable for horn/reed notes whose fundamental is weak; the result is
+    divided back to fundamental frequency before conversion to cents.
+    """
+    if len(seg) < int(.18 * sr) or not np.isfinite(f0) or f0 <= 0:
+        return {}
+    partials = np.asarray(amps[:3], dtype=float)
+    harmonic = int(np.argmax(partials)) + 1 if partials.size else 1
+    target = harmonic * f0
+    nyquist = sr / 2
+    low = max(20.0, target * .68)
+    high = min(nyquist * .94, target * 1.32)
+    if not low < high:
+        return {}
+    try:
+        sos = sig.butter(4, [low, high], btype="bandpass", fs=sr,
+                         output="sos")
+        filtered = sig.sosfiltfilt(sos, np.asarray(seg, dtype=float))
+    except ValueError:
+        return {}
+    analytic = sig.hilbert(filtered)
+    magnitude = np.abs(analytic)
+    phase = np.unwrap(np.angle(analytic))
+    instantaneous = np.gradient(phase) * sr / (2 * np.pi) / harmonic
+
+    # A 12–30 ms median rejects phase spikes while retaining the onset shape;
+    # low notes need the longer end to cover at least a few cycles.
+    smooth_s = min(.030, max(.012, 3 / max(f0, 1)))
+    kernel = max(3, int(round(smooth_s * sr)) | 1)
+    if kernel >= len(instantaneous):
+        return {}
+    instantaneous = sig.medfilt(instantaneous, kernel_size=kernel)
+    times = np.arange(len(seg)) / sr
+    sustain = ((times >= onset_t + .22) &
+               (times <= min(times[-1] - .03, onset_t + .70)))
+    if np.count_nonzero(sustain) < kernel:
+        sustain = (times >= onset_t + .12) & (times <= times[-1] - .03)
+    sustain_level = float(np.median(magnitude[sustain])) if np.any(sustain) else 0
+    reliable = magnitude >= max(1e-10, sustain_level * .18)
+    target_hz = float(np.median(instantaneous[sustain & reliable])) \
+        if np.any(sustain & reliable) else math.nan
+    if not np.isfinite(target_hz) or target_hz <= 0:
+        return {}
+    cents = 1200 * np.log2(np.clip(instantaneous, 1, None) / target_hz)
+    onset = ((times >= onset_t + smooth_s / 2) &
+             (times <= min(times[-1], onset_t + .20)) & reliable &
+             (np.abs(cents) <= 240))
+    indices = np.flatnonzero(onset)
+    if indices.size < max(6, kernel // 6):
+        return {}
+
+    early_end = onset_t + min(.09, max(.04, 6 / max(f0, 1)))
+    early = indices[times[indices] <= early_end]
+    if early.size < 3:
+        early = indices[:max(3, indices.size // 2)]
+    low_cents = float(np.percentile(cents[early], 15))
+    depth = max(0.0, -low_cents)
+    if depth < 3.0:
+        return {"depthCents": 0.0, "settleMs": 0.0,
+                "direction": "stable", "harmonic": harmonic}
+
+    threshold = max(5.0, depth * .15)
+    hold = max(3, int(round(.020 * sr)))
+    settle_ms = 200.0
+    start = int(early[np.argmin(cents[early])])
+    final = min(len(cents), int(round((onset_t + .30) * sr)))
+    within = reliable & (np.abs(cents) <= threshold)
+    for index in range(start, max(start, final - hold)):
+        if np.all(within[index:index + hold]):
+            settle_ms = max(0.0, (times[index] - onset_t) * 1000)
+            break
+    return {"depthCents": float(depth), "settleMs": float(settle_ms),
+            "direction": "from-below", "harmonic": harmonic}
 
 
 def fit_inharmonicity(pfreqs: np.ndarray, ok: np.ndarray, f0: float):
@@ -1045,6 +1132,35 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             measuredLevelRatio=float(round(an["level"], 3)) if an["level"] is not None else None,
         )
 
+    # ── onset pitch / articulation distribution (owner L5/L5b) ──────
+    onset_rows = [n for n in notes if n.onset_pitch]
+    scooped = [n for n in onset_rows
+               if (n.onset_pitch.get("depthCents") or 0) >= 3]
+    scoop_depths = [n.onset_pitch["depthCents"] for n in scooped]
+    scoop_settles = [n.onset_pitch["settleMs"] for n in scooped]
+    articulation_pairs = [
+        (float(n.attack_noise["level"]), float(n.onset_pitch["depthCents"]))
+        for n in onset_rows
+        if n.attack_noise.get("level") is not None and
+        n.onset_pitch.get("depthCents") is not None
+    ]
+    articulation_correlation = None
+    if len(articulation_pairs) >= 4:
+        transient = np.asarray([row[0] for row in articulation_pairs])
+        depth = np.asarray([row[1] for row in articulation_pairs])
+        if np.std(transient) > 1e-9 and np.std(depth) > 1e-9:
+            articulation_correlation = float(np.corrcoef(transient, depth)[0, 1])
+    onset_pitch = dict(
+        onsetScoopProb=(float(len(scooped) / len(onset_rows))
+                        if onset_rows else None),
+        onsetScoopDepthCents=robust_mean(scoop_depths),
+        onsetScoopDepthSd=(float(np.std(scoop_depths, ddof=1))
+                           if len(scoop_depths) >= 4 else None),
+        onsetScoopSettleMs=robust_mean(scoop_settles),
+        onsetArticulationCorrelation=articulation_correlation,
+        onsetPitchNotes=len(onset_rows),
+    )
+
     # ── vibrato ───────────────────────────────────────────────────────
     vib_pool = vib_notes if vib_notes else notes
     vib = [n.vibrato for n in vib_pool if n.vibrato]
@@ -1111,6 +1227,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             envelopeRelease=r4(adsr["release"]),
             **(vibrato or dict(vibratoProb=0.0, vibratoRate=None, vibratoRateSd=None,
                                vibratoDepth=None, vibratoDepthSd=None)),
+            **{key: r4(value) if isinstance(value, float) else value
+               for key, value in onset_pitch.items()},
             attackNoise=attack_noise,
         ),
         attack=dict(bandT90ms={str(fc): round(v * 1000, 1) for fc, v in band_t90.items()},
@@ -1118,6 +1236,7 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
                     byRegister=attack_by_register),
         notesAnalysed=[dict(file=os.path.basename(n.file), note=n.note,
                             f0=round(n.f0, 2), percussive=n.percussive,
+                            onsetPitch=n.onset_pitch,
                             **({"vowel": n.vowel} if n.vowel else {}))
                        for n in notes],
     )
