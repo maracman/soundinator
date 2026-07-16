@@ -123,10 +123,40 @@ scoop-from-below semantics are untouched). Each landed with a unit test.
   note a different tube (p2 jumps −43 → −10 dB across the break). The
   historic estimator saturated EVERY instrument for a different reason
   (pooled cross-dynamic diffs); the honest per-note variability for strings
-  still sits at/above the cap. §2.5(b) work item: model per-note variation
-  structurally — seeded per-note excitationPosition/articulation draws
-  calibrated from take pairs (§2.5c) — rather than widening independent
-  per-partial noise.
+  still sits at/above the cap.
+
+**Two-cause decomposition — FILED in two homes (owner direction, 2026-07-16):**
+
+1. *Violin bow-position comb wander → §2.5c structured Human draw.*
+   **ENGINE REQUEST to Agent A:** a per-note seeded draw on
+   `excitationPosition` (the existing param; positionComb = |sin nπx|),
+   Human-scaled, neutral at Human 0, range consumed from the measured
+   profile like `humanRanges`. Measured from the violin within-file pairs
+   (87 pairs, body-divided robust amps, grid fit of the engine comb law):
+   central fitted position 0.176 (IQR 0.109–0.246 — the spread across
+   strings/registers is real: stopped notes shorten the vibrating length,
+   growing effective β); per-note wander is EPISODIC, not Gaussian —
+   median |Δposition| between adjacent takes is 0.008 while p90 is 0.144
+   (players hold bow placement and occasionally reposition), so the draw
+   model should be small jitter + an occasional-repositioning tail rather
+   than one wide Gaussian. The comb model explains a real but partial
+   share of per-note deviation (median 30%, p75 42% of pair-diff
+   variance) — the remainder is pressure/vibrato-AM take variation that
+   stays in `spread`/other Human draws. Values above are MEASUREMENTS to
+   seed the §2.5c calibration, not fitted campaign parameters.
+
+2. *Clarinet per-fingering tube identity → PER-PITCH STRUCTURE, never
+   Human draws (FAMILY FIREWALL level rule: this is instrument structure,
+   not player variation).* Every fingering is a different tube: measured
+   per-partial jumps of 20–30 dB between adjacent semitones around the
+   break are deterministic per pitch, reproducible across dynamics.
+   Candidate mechanism: extend the G1 register-table machinery toward
+   per-pitch identity anchors (analysis side already measures per-note
+   tables; storage would add a per-pitch anchor layer to
+   `partialsByRegister`, engine side interpolates anchors instead of
+   three coarse registers). Filed for the blown lane's next refit round —
+   analysis-side storage is Agent B's, engine consumption is Agent A's
+   (G1 extension).
 - Profiles regenerated for all 12 corpus instruments (trombone legacy fit
   carried forward; `--keep-existing` flag added so partial or full re-runs
   can never silently drop an instrument again).
@@ -157,12 +187,21 @@ under `/private/tmp/sg2/campaigns/{violin,cello}/`, never committed):
 - Iowa keeps the spectral role; Philharmonia vibrato takes are inventoried
   for the vibrato role only and never become spectral reference rows.
 - §2.5c take-pair inventory (`take-pairs.json`): violin has ONE true
-  duplicate pair (Cs4 mezzo-piano non-vib, 1s vs long, duration-matched);
-  cello has NO true duplicates but four same-pitch same-dynamic vib/nonvib
-  pairs; both instruments list their same-string chromatic runs as the
-  adjacent-semitone proxy sources (weaker evidence, logged per §2.5c-4).
-  Cello's variability floor therefore rests on proxies until better
-  duplicate takes are acquired — a named corpus gap for WP-6.
+  duplicate pair in the curated corpus (Cs4 mezzo-piano non-vib) plus the
+  catalogue groups below; cello has four same-pitch same-dynamic
+  vib/nonvib pairs; both instruments list their same-string chromatic runs
+  as the adjacent-semitone proxy sources (weaker evidence, per §2.5c-4).
+- **Catalogue duplicate floors (owner direction 2026-07-16): the cello
+  duplicate gap is CLOSED.** The downloaded Philharmonia catalogue holds
+  several independent takes of the same note/dynamic/articulation under
+  different length codes; `strings_prep --phil-catalogue` reads them
+  directly (they carry normal vibrato, so they never join the Iowa
+  spectral fit corpus), trims each group to a common duration and single
+  bow, and emits them as `PhilCat` floor groups at the campaign anchor
+  pitches. Result: cello 6/6 anchor register×dynamic cells have true
+  same-note floor groups (21 reference rows); violin 5 catalogue groups +
+  the Cs4 pair (20 rows). Adjacent-semitone proxies remain only as
+  SECONDARY §2.5c evidence.
 
 P4 is design guidance for Agent A's engine work; P5 gates remain Agent A's
 to close. Fitting campaigns stay NOT STARTED per the gating rules.

@@ -179,7 +179,7 @@ def _topology_assertions(instrument: str, params: dict[str, Any], strict: bool) 
         "contrabass": "blow", "mezzo-soprano": "blow", "boy-soprano": "blow",
     }.get(instrument)
     expected_resonator = {
-        "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "string",
+        "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "openTube",
         "clarinet": "closedTube", "alto-sax": "conicalTube", "tenor-sax": "conicalTube",
         "trumpet": "conicalTube", "french-horn": "conicalTube",
     }.get(instrument)
@@ -271,6 +271,42 @@ def evaluate_construction(
                             {"slope": brightness_slope, "samples": brightness_count}, "partial-index slope > 0.15 per unit velocity",
                             strict_evidence=strict_evidence))
 
+    if name == "flute":
+        breath = _param(params, "toneBreath")
+        turbulence = _param(params, "breathTurbulence")
+        rows.append(_result("flute.air-jet-breath-law",
+                            "An air-jet instrument carries fitted breath and turbulence",
+                            None if breath is None or turbulence is None else
+                            float(breath) > 0 and float(turbulence) > 0,
+                            {"toneBreath": breath, "breathTurbulence": turbulence},
+                            "toneBreath > 0 and breathTurbulence > 0",
+                            strict_evidence=strict_evidence))
+        stability_info = params.get("bodyStability") \
+            if isinstance(params.get("bodyStability"), dict) else {}
+        flute_bands = params.get("bodyBands") \
+            if isinstance(params.get("bodyBands"), list) else []
+        if len(flute_bands) >= 3:
+            corr = stability_info.get("splitHalfCorr")
+            peak_a = stability_info.get("peakHzA")
+            peak_b = stability_info.get("peakHzB")
+            stable = (isinstance(corr, (int, float)) and corr >= .8 and
+                      isinstance(peak_a, (int, float)) and
+                      isinstance(peak_b, (int, float)) and
+                      abs(math.log2(peak_a / peak_b)) <= 1 / 3)
+            rows.append(_result("flute.body-stability",
+                                "A non-minimal air-jet body clears the T-016 stability gate",
+                                stable, stability_info,
+                                "splitHalfCorr >= 0.80 and |log2(peakA/peakB)| <= 1/3",
+                                strict_evidence=strict_evidence))
+        else:
+            rows.append(_result("flute.body-stability",
+                                "Body omission is evidence-backed, not accidental",
+                                stability_info.get("omittedReason") == "unstable-air-jet-body"
+                                if not flute_bands else None,
+                                stability_info.get("omittedReason"),
+                                "empty bodyBands must carry omittedReason 'unstable-air-jet-body'",
+                                strict_evidence=strict_evidence))
+
     if name == "clarinet":
         low = registers.get("low", []) or registers.get("chalumeau", [])
         high = registers.get("high", []) or registers.get("clarino", [])
@@ -293,6 +329,39 @@ def evaluate_construction(
         rows.append(_result(f"{name}.blare-law", "Nonlinear forte enrichment is explicitly enabled",
                             None if blare is None else float(blare) > 0, blare, "dynamicBlare > 0",
                             strict_evidence=strict_evidence))
+        if name == "trumpet":
+            # T-011 consuming-side assertion (L9): the fitted articulation
+            # slope is positive AND the rendered loud-minus-soft onset
+            # transient direction matches this instrument's own references.
+            slope = _param(params, "articulationVelocitySlope")
+
+            def _onset_level(bundle):
+                noise_fit = bundle.note.attack_noise or {}
+                return float(noise_fit.get("level", 0) or 0)
+
+            def _direction(pick):
+                soft = [_onset_level(pick(s)) for s in sample_list
+                        if (_dynamic_value(s) or .5) <= .35 and pick(s)]
+                loud = [_onset_level(pick(s)) for s in sample_list
+                        if (_dynamic_value(s) or .5) >= .7 and pick(s)]
+                if not soft or not loud:
+                    return None
+                return float(np.median(loud) - np.median(soft))
+
+            ref_direction = _direction(lambda s: s.reference)
+            render_direction = _direction(lambda s: s.render)
+            direction_match = None
+            if ref_direction is not None and render_direction is not None:
+                direction_match = (ref_direction * render_direction >= 0)
+            passed = None if slope is None or direction_match is None else (
+                float(slope) > 0 and direction_match)
+            rows.append(_result("trumpet.dynamic-articulation",
+                                "Forte onsets are more firmly articulated, matching the references (L9/T-011)",
+                                passed,
+                                {"slope": slope, "refDirection": ref_direction,
+                                 "renderDirection": render_direction},
+                                "articulationVelocitySlope > 0 and rendered loud-minus-soft onset direction matches references",
+                                strict_evidence=strict_evidence))
         if name == "french-horn":
             coupling = _param(params, "articulationCoupling")
             variation = _param(params, "articulationVariation")
@@ -391,10 +460,112 @@ def evaluate_construction(
         rows.append(_result(f"{name}.fixed-body-region", "A fixed-Hz body/bridge region survives pitch changes",
                             None if median is None else median >= -6, median,
                             f"median {low_hz}-{high_hz} Hz prominence >= -6 dB vs flanks", strict_evidence=strict_evidence))
-        edge_slope, edge_count = _dynamic_slope(sample_list, _spectral_index)
-        rows.append(_result(f"{name}.bow-force-edge", "Higher bow intensity does not darken the spectrum",
-                            None if edge_slope is None else edge_slope >= -.05,
-                            {"slope": edge_slope, "samples": edge_count}, "partial-index slope >= -0.05",
+        # RESEARCH_BOWED_REALISM 7b: `dynamic-tilt` SUPERSEDES the weak
+        # one-sided `bow-force-edge` bound (slope >= -0.05 accepted a
+        # spectrally static render — the baseline failure mode).  Bow force
+        # is THE brightness control (C3): the same-register centroid proxy
+        # must rise by 1.2-3.0x from the soft to the loud takes.
+        tilt_lo = 1.25 if name == "violin" else 1.2
+        ratios = []
+        for register_samples in _register_groups(sample_list).values():
+            by_level = [(_dynamic_value(s), _spectral_index(s.render))
+                        for s in register_samples
+                        if _dynamic_value(s) is not None]
+            soft = [v for level, v in by_level if level is not None and level <= .35]
+            loud = [v for level, v in by_level if level is not None and level >= .7]
+            if soft and loud and np.isfinite(np.mean(soft)) and np.mean(soft) > 0:
+                ratios.append(float(np.mean(loud) / np.mean(soft)))
+        tilt_ratio = float(np.median(ratios)) if ratios else None
+        rows.append(_result(f"{name}.dynamic-tilt",
+                            "Loud bowing brightens the spectrum like bow force does (C2/C3)",
+                            None if tilt_ratio is None else tilt_lo <= tilt_ratio <= 3.0,
+                            {"ratio": tilt_ratio, "registers": len(ratios)},
+                            f"same-register loud/soft partial-index ratio in [{tilt_lo}, 3.0]",
+                            strict_evidence=strict_evidence))
+
+        # C5/C9 body-peak clusters: the fitted body must carry the signature
+        # low modes, not merely any three bands (values are bowed-instrument
+        # constants from the literature; cello Hz are [single-source] and
+        # re-measured against the corpus fit before freezing).
+        cluster_ranges = ((250, 310), (420, 600)) if name == "violin" else \
+            ((88, 112), (160, 235))
+        bands = _param(params, "bodyBands")
+        band_rows = [row for row in bands if isinstance(row, dict)] \
+            if isinstance(bands, list) else []
+        cluster_hits = [
+            any(lo <= float(row.get("freq", 0)) <= hi and
+                float(row.get("gain", 0)) > 0 for row in band_rows)
+            for lo, hi in cluster_ranges]
+        rows.append(_result(f"{name}.body-peak-cluster",
+                            "Fitted body carries the signature low-mode clusters",
+                            None if not band_rows else all(cluster_hits),
+                            {"ranges": cluster_ranges, "hits": cluster_hits},
+                            "positive-gain fitted band in each signature range",
+                            strict_evidence=strict_evidence))
+
+        if name == "cello":
+            # C9: the two radiated mid "hills" — the 180-700 Hz gate alone
+            # leaves renders woolly
+            for label, lo_hz, hi_hz in (("mid-hill-1k", 800, 1200),
+                                        ("mid-hill-2k", 1800, 2500)):
+                prominences = [_band_prominence(s.render, lo_hz, hi_hz)
+                               for s in sample_list]
+                prominences = [x for x in prominences if np.isfinite(x)]
+                median = float(np.median(prominences)) if prominences else None
+                rows.append(_result(f"cello.{label}",
+                                    "Radiated mid hill survives pitch changes (C9)",
+                                    None if median is None else median >= -6,
+                                    median, f"median {lo_hz}-{hi_hz} Hz prominence >= -6 dB",
+                                    strict_evidence=strict_evidence))
+
+        # C7 radiated rolloff: 3-8 kHz sustained LTAS slope at mf-ish takes
+        rolloff_lo, rolloff_hi = (-19, -11) if name == "violin" else (-20, -10)
+        slopes = [s.render.ltas_rolloff_db_oct for s in sample_list
+                  if getattr(s.render, "ltas_rolloff_db_oct", None) is not None]
+        slope_med = float(np.median(slopes)) if slopes else None
+        rows.append(_result(f"{name}.radiated-rolloff",
+                            "Rendered LTAS above 3 kHz falls like a radiated string (C7)",
+                            None if slope_med is None else rolloff_lo <= slope_med <= rolloff_hi,
+                            slope_med, f"{rolloff_lo} <= dB/oct <= {rolloff_hi}",
+                            strict_evidence=strict_evidence))
+
+        # C18 onset lock-in: stable harmonic regime within 18 nominal periods
+        lockins = [s.render.onset_lockin_periods for s in sample_list
+                   if getattr(s.render, "onset_lockin_periods", None) is not None]
+        lockin_med = float(np.median(lockins)) if lockins else None
+        rows.append(_result(f"{name}.onset-lockin",
+                            "Onset reaches the harmonic regime within the G&A acceptance window",
+                            None if lockin_med is None else lockin_med <= 18,
+                            lockin_med, "median onset lock-in <= 18 nominal periods",
+                            strict_evidence=strict_evidence))
+
+        # C15/C16 pp noise rise: bow noise ratio grows toward soft dynamics
+        # (sign gate only; values are corpus-fitted per C16)
+        soft_nhr = [s.render.sustain_noise_db for s in sample_list
+                    if (_dynamic_value(s) or .5) <= .35]
+        loud_nhr = [s.render.sustain_noise_db for s in sample_list
+                    if (_dynamic_value(s) or .5) >= .7]
+        nhr_rise = (float(np.median(soft_nhr)) - float(np.median(loud_nhr))) \
+            if soft_nhr and loud_nhr else None
+        rows.append(_result(f"{name}.pp-noise-rise",
+                            "Sustained noise-to-harmonic ratio rises toward soft dynamics (C15)",
+                            None if nhr_rise is None else nhr_rise >= 2,
+                            nhr_rise, "NHR(pp) - NHR(f) >= +2 dB (provisional until corpus-fitted)",
+                            strict_evidence=strict_evidence))
+
+        # C28/C29 vibrato body-AM: the FM->AM mechanism must be audible on a
+        # vibrato render (depth >= 10 cents); a set with no vibrato render
+        # reports not-applicable, which strict campaigns must cover
+        am_values = [
+            float((s.render.note.vibrato or {}).get("bodyAmDepthDb", 0) or 0)
+            for s in sample_list
+            if (s.render.note.vibrato or {}).get("present")
+            and float((s.render.note.vibrato or {}).get("depth", 0) or 0) >= 10]
+        am_med = float(np.median(am_values)) if am_values else None
+        rows.append(_result(f"{name}.vibrato-body-am",
+                            "Vibrato produces body-coupled per-partial AM (C28)",
+                            None if am_med is None else am_med >= 3,
+                            am_med, "median tracked-partial AM at vibrato rate >= 3 dB",
                             strict_evidence=strict_evidence))
         # FAMILY FIREWALL (OWNER_LISTENING_NOTES.md header): the onset /
         # articulation mechanisms may share code with blown, but every

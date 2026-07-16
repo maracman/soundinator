@@ -358,6 +358,7 @@ class NoteAnalysis:
     formants: list[float] = field(default_factory=list)
     formant_bandwidths: list[float] = field(default_factory=list)
     percussive: bool = False
+    f0_unconstrained: float | None = None   # T-020 QC provenance
 
 
 def harmonic_frame_amps(seg: np.ndarray, sr: int, f0: float,
@@ -471,8 +472,34 @@ def harmonic_frame_amps(seg: np.ndarray, sr: int, f0: float,
 
 
 def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
-                 min_detected_partials: int = 5):
+                 min_detected_partials: int = 5,
+                 expected_f0_hz: float | None = None):
     f0 = estimate_f0(seg, sr)
+    f0_unconstrained = f0
+    if expected_f0_hz is not None:
+        # T-020: the reference's nominal pitch is known before analysis.
+        # The monophonic tracker can lock onto a dominant upper mode (low
+        # piano/guitar) or fail on short high notes; pick the tracker
+        # candidate harmonically consistent with the anchor (est/k or
+        # est*k within +/-50 cents), fall back to the anchor itself when
+        # tracking failed entirely, and fail LOUDLY when the anchor is
+        # >50 cents from every candidate.  The unconstrained estimate is
+        # retained as QC provenance; source MIDI is never rewritten.
+        def _cents(a: float, b: float) -> float:
+            return abs(1200 * math.log2(a / b))
+        if f0 is not None:
+            candidates = [f0 * ratio for k in range(1, 7)
+                          for ratio in (1.0 / k, float(k))]
+            matches = [c for c in candidates if _cents(c, expected_f0_hz) <= 50]
+            if matches:
+                f0 = min(matches, key=lambda c: _cents(c, expected_f0_hz))
+            else:
+                raise ValueError(
+                    f"{fname}: expected f0 {expected_f0_hz:.1f} Hz is more "
+                    f"than 50 cents from every tracker candidate "
+                    f"(unconstrained estimate {f0:.1f} Hz)")
+        else:
+            f0 = expected_f0_hz
     if f0 is None or not (40 < f0 < 2500):
         return None
     env, hop = rms_envelope(seg, sr)
@@ -494,6 +521,7 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
     percussive = sustain_ratio < 0.35 and peak_i < len(env) // 4
 
     note = NoteAnalysis(file=fname, f0=f0, note=hz_to_note_name(f0),
+                        f0_unconstrained=f0_unconstrained,
                         dur_s=len(seg) / sr,
                         partial_amps=np.zeros(n_partials),
                         partial_freqs=np.full(n_partials, np.nan),
@@ -1185,13 +1213,13 @@ def _body_points(notes: list[NoteAnalysis], n_partials: int):
 
 
 def _solve_body(rows, n_notes: int, n_partials: int, centres: np.ndarray,
-                width: float, iters: int = 5, ridge: float = 8.0):
+                widths: np.ndarray, iters: int = 5, ridge: float = 8.0):
     """Alternating rank/note/body fit; returns band coefficients (log2)."""
     note_i = np.asarray([r[0] for r in rows], dtype=int)
     rank_i = np.asarray([r[1] for r in rows], dtype=int)
     log_hz = np.asarray([r[2] for r in rows])
     level = np.asarray([r[3] for r in rows])
-    basis = np.exp(-.5 * ((log_hz[:, None] - centres[None, :]) / width) ** 2)
+    basis = np.exp(-.5 * ((log_hz[:, None] - centres[None, :]) / widths[None, :]) ** 2)
     rank_effect = np.zeros(n_partials)
     for rank in range(n_partials):
         vals = level[rank_i == rank]
@@ -1222,13 +1250,24 @@ def _solve_body(rows, n_notes: int, n_partials: int, centres: np.ndarray,
     return np.clip(coeff / math.log(2), -1.5, 1.5)
 
 
-def _band_envelope(coeff_log2: np.ndarray, centres: np.ndarray, width: float,
-                   grid_log2: np.ndarray) -> np.ndarray:
-    basis = np.exp(-.5 * ((grid_log2[:, None] - centres[None, :]) / width) ** 2)
+def _band_envelope(coeff_log2: np.ndarray, centres: np.ndarray,
+                   widths: np.ndarray, grid_log2: np.ndarray) -> np.ndarray:
+    basis = np.exp(-.5 * ((grid_log2[:, None] - centres[None, :]) / widths[None, :]) ** 2)
     return basis @ coeff_log2
 
 
-def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
+# T-016: air-jet instruments have weak fixed-body structure; a steep
+# spectrum can be re-minted as a kazoo-like fixed formant (L7).  A
+# non-minimal body is eligible only under this stability gate; otherwise
+# the profile records an explicit evidence-backed omission.
+AIR_JET_BODY_GATE = {
+    "flute": dict(minSplitHalfCorr=0.80, maxPeakShiftOct=1 / 3,
+                  omittedReason="unstable-air-jet-body"),
+}
+
+
+def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
+                   stability_gate: dict | None = None):
     """Separate a smooth fixed-Hz body envelope from partial-rank excitation.
 
     The same body resonance crosses different harmonic ranks as pitch changes.
@@ -1251,21 +1290,37 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
     if len(rows) < 80:
         return [], raw, None
     log_hz = np.asarray([r[2] for r in rows])
-    lo = max(math.log2(100), float(np.percentile(log_hz, 3)))
+    # The low bound follows the corpus's lowest fundamental, not a fixed
+    # 100 Hz: a cello's A0/wood modes live at 90-250 Hz where only the low
+    # notes' first harmonics reach, so a blunt 3rd-percentile cut removed
+    # that region from the model entirely (L12 investigation).
+    f0_floor = math.log2(max(70.0, 0.9 * float(min(note.f0 for note in notes))))
+    lo = max(f0_floor, float(np.percentile(log_hz, 1)))
     hi = min(math.log2(9000), float(np.percentile(log_hz, 97)))
     if hi - lo < 1.5:
         return [], raw, None
-    n_bands = int(np.clip(round((hi - lo) * 3) + 1, 5, 16))
+    n_bands = int(np.clip(round((hi - lo) * 3) + 1, 5, 18))
     centres = np.linspace(lo, hi, n_bands)
     spacing = (hi - lo) / max(1, n_bands - 1)
-    width = float(max(.14, min(.62, spacing * .55)))
-    coeff_log2 = _solve_body(rows, len(notes), n_partials, centres, width)
+    base_width = float(max(.14, min(.62, spacing * .55)))
+    # L12 / T-003: a fitting-side width floor was TRIED and REVERTED — with
+    # violin's 195 Hz lowest fundamental it forced ~0.65-octave sigmas over
+    # the A0/B1 region and smeared away the narrow signature modes the
+    # dossier requires (split-half corr fell 0.70 -> 0.57).  Real low body
+    # modes ARE narrow; the single-partial "spotlight" at sparse low
+    # spacing is an APPLICATION-time problem.  The fit therefore keeps its
+    # honest resolution and exports `lowestF0Hz` so the engine can apply
+    # the neighbour-relative gain cap (T-003 option c) per instrument.
+    f0_min = float(min(note.f0 for note in notes))
+    widths = np.full(len(centres), base_width)
+    coeff_log2 = _solve_body(rows, len(notes), n_partials, centres, widths)
 
     # Split-half stability: refit on alternating file halves with the SAME
     # bands and correlate the envelopes.  This is the "body peaks sit at
     # note-independent frequencies" validation, demonstrated per fit rather
     # than asserted once.
     stability = None
+    band_agrees = np.ones(len(centres), dtype=bool)
     files = sorted({n.file for n in notes})
     if len(files) >= 4:
         half = set(files[0::2])
@@ -1276,11 +1331,23 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
         rows_a = [(remap_a[r[0]], r[1], r[2], r[3]) for r in rows if r[0] in remap_a]
         rows_b = [(remap_b[r[0]], r[1], r[2], r[3]) for r in rows if r[0] in remap_b]
         if len(rows_a) >= 40 and len(rows_b) >= 40:
-            ca = _solve_body(rows_a, len(idx_a), n_partials, centres, width)
-            cb = _solve_body(rows_b, len(idx_b), n_partials, centres, width)
-            grid = np.linspace(lo, hi, 160)
-            ea = _band_envelope(ca, centres, width, grid)
-            eb = _band_envelope(cb, centres, width, grid)
+            ca = _solve_body(rows_a, len(idx_a), n_partials, centres, widths)
+            cb = _solve_body(rows_b, len(idx_b), n_partials, centres, widths)
+            # Per-band agreement is the emission gate: a band both corpus
+            # halves fit with the same sign and comparable size is real;
+            # one they disagree on is take noise wearing a body costume.
+            for index, (ga, gb) in enumerate(zip(ca, cb)):
+                weak = min(abs(float(ga)), abs(float(gb))) < .05
+                same_sign = float(ga) * float(gb) >= 0
+                close = abs(float(ga) - float(gb)) <= .6
+                band_agrees[index] = (weak or same_sign) and close
+            dense = [float(centre) for centre, band_width in zip(centres, widths)
+                     if int(np.sum(np.abs(log_hz - centre) <=
+                                   max(band_width, .25))) >= 12]
+            grid = np.linspace(min(dense) if dense else lo,
+                               max(dense) if dense else hi, 160)
+            ea = _band_envelope(ca, centres, widths, grid)
+            eb = _band_envelope(cb, centres, widths, grid)
             if float(np.std(ea)) > 1e-6 and float(np.std(eb)) > 1e-6:
                 corr = float(np.corrcoef(ea, eb)[0, 1])
                 stability = dict(
@@ -1291,19 +1358,33 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
     # Negligible envelopes are omitted so a new family remains neutral until
     # its own corpus demonstrates a fixed-Hz body.
     grid = np.linspace(lo, hi, 160)
-    if float(np.ptp(_band_envelope(coeff_log2, centres, width, grid))) < .12:
+    if float(np.ptp(_band_envelope(coeff_log2, centres, widths, grid))) < .12:
         return [], raw, None
+    # Per-band evidence support: a band needs a minimal point count in its
+    # +/-max(sigma, 0.25 oct) neighbourhood; beyond that the cross-half
+    # AGREEMENT gate above is the real evidence test (a fixed high count
+    # penalised small ensembles and dense-vs-sparse regions unevenly).
+    support = np.array([
+        int(np.sum(np.abs(log_hz - centre) <= max(band_width, .25)))
+        for centre, band_width in zip(centres, widths)])
+    emitted = np.array([abs(float(gain)) >= .025 and int(n_pts) >= 12 and bool(agrees)
+                        for gain, n_pts, agrees
+                        in zip(coeff_log2, support, band_agrees)])
     bands = [dict(freq=round(2 ** float(center), 1),
-                  gain=round(float(gain), 4), width=round(float(width), 4))
-             for center, gain in zip(centres, coeff_log2)
-             if abs(gain) >= .025]
-    fit_info = dict(method="ensemble-rank-note-body-v2",
-                    bands=len(bands), points=len(rows), notes=len(notes),
-                    widthLog2=round(width, 4))
-    if stability:
-        fit_info.update(stability)
+                  gain=round(float(gain), 4), width=round(float(band_width), 4))
+             for center, gain, band_width, keep
+             in zip(centres, coeff_log2, widths, emitted) if keep]
 
+    # T-014: the deconvolution mask must equal the emitted mask.  Dividing
+    # tables by pruned (never-shipped) coefficients would leave permanent
+    # spectral holes the renderer can never restore — so the residual tables
+    # are divided by the envelope of the EMITTED bands only, making
+    # raw = emittedBody(amount=1) x residual exact up to the safety clip
+    # (round-trip deviation recorded below; per-note max renormalisation is
+    # a level, not a shape).
+    coeff_emitted = np.where(emitted, coeff_log2, 0.0)
     adjusted = raw.astype(float).copy()
+    round_trip_max_db = 0.0
     for note_index, note in enumerate(notes):
         for rank in range(n_partials):
             if adjusted[note_index, rank] <= 0:
@@ -1311,12 +1392,71 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
             freq = float(note.partial_freqs[rank])
             if not np.isfinite(freq) or freq <= 0:
                 freq = note.f0 * (rank + 1)
-            g = np.exp(-.5 * ((math.log2(max(20, freq)) - centres) / width) ** 2)
-            body_gain = float(2 ** np.dot(coeff_log2, g))
-            adjusted[note_index, rank] /= max(.2, min(4.5, body_gain))
+            g = np.exp(-.5 * ((math.log2(max(20, freq)) - centres) / widths) ** 2)
+            body_gain = float(2 ** np.dot(coeff_emitted, g))
+            clipped = max(.2, min(4.5, body_gain))
+            round_trip_max_db = max(round_trip_max_db,
+                                    abs(20 * math.log10(clipped / body_gain))
+                                    if body_gain > 0 else 0.0)
+            adjusted[note_index, rank] /= clipped
         peak = float(adjusted[note_index].max())
         if peak > 0:
             adjusted[note_index] /= peak
+    fit_info = dict(method="ensemble-rank-note-body-v3",
+                    bands=len(bands), points=len(rows), notes=len(notes),
+                    widthLog2=round(base_width, 4),
+                    prunedUnstableBands=int(np.sum(~band_agrees)),
+                    lowestF0Hz=round(f0_min, 1),
+                    reconstructionAmount=1,
+                    bodyClampMaxDb=round(round_trip_max_db, 3))
+    if stability:
+        fit_info.update(stability)
+
+    # T-016: stability gate for weak-body (air-jet) instruments — emit no
+    # bands and record the evidence-backed omission; tables stay undivided
+    # so T-014's mask equality holds trivially.
+    if stability_gate and bands:
+        corr = (stability or {}).get("splitHalfCorr")
+        peak_a = (stability or {}).get("peakHzA")
+        peak_b = (stability or {}).get("peakHzB")
+        shift_ok = (peak_a and peak_b and
+                    abs(math.log2(peak_a / peak_b)) <= stability_gate["maxPeakShiftOct"])
+        if corr is None or corr < stability_gate["minSplitHalfCorr"] or not shift_ok:
+            fit_info["omittedReason"] = stability_gate["omittedReason"]
+            fit_info["bands"] = 0
+            fit_info["roundTripShapeMaxDb"] = 0.0
+            undivided = raw.astype(float).copy()
+            for note_index in range(len(notes)):
+                peak = float(undivided[note_index].max())
+                if peak > 0:
+                    undivided[note_index] /= peak
+            return [], undivided, fit_info
+
+    # T-018: round-trip SHAPE error against the ROUNDED emitted rows —
+    # per note, reconstruct emittedResidual x emittedBody(amount=1), remove
+    # the median dB offset, take the max absolute dB error over fitted
+    # points.  This is the exported reconstruction accuracy; the safety
+    # clamp diagnostic stays separately named bodyClampMaxDb.
+    shape_max_db = 0.0
+    for note_index, note in enumerate(notes):
+        errors = []
+        for rank in range(n_partials):
+            raw_amp = float(raw[note_index, rank])
+            residual = float(adjusted[note_index, rank])
+            if raw_amp <= 1e-6 or residual <= 1e-9 or not note.partial_snr_ok[rank]:
+                continue
+            freq = float(note.partial_freqs[rank])
+            if not np.isfinite(freq) or freq <= 0:
+                freq = note.f0 * (rank + 1)
+            gain_log2 = sum(band["gain"] * math.exp(
+                -.5 * ((math.log2(max(20, freq) / band["freq"])) / band["width"]) ** 2)
+                for band in bands)
+            recon = residual * (2 ** gain_log2)
+            errors.append(20 * math.log10(raw_amp / max(recon, 1e-12)))
+        if errors:
+            centred = np.asarray(errors) - float(np.median(errors))
+            shape_max_db = max(shape_max_db, float(np.max(np.abs(centred))))
+    fit_info["roundTripShapeMaxDb"] = round(shape_max_db, 3)
     return bands, adjusted, fit_info
 
 
@@ -1360,7 +1500,8 @@ def fit_take_spread(notes: list[NoteAnalysis], A: np.ndarray, OK: np.ndarray,
 
 
 def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis],
-                         n_partials: int, min_amp_f0: float = 40.0):
+                         n_partials: int, min_amp_f0: float = 40.0,
+                         body_stability_gate: dict | None = None):
     """Combine per-note measurements into one engine-shaped record."""
     # analyse_note already rejects f0 <= 40 Hz.  The historical 100 Hz
     # spectral cutoff silently removed the practical low register of horn,
@@ -1370,7 +1511,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         spec_notes = notes
 
     # ── 64-partial amplitude table ────────────────────────────────────
-    resonances, A, resonances_fit = fit_fixed_body(spec_notes, n_partials)
+    resonances, A, resonances_fit = fit_fixed_body(
+        spec_notes, n_partials, stability_gate=body_stability_gate)
     OK = np.stack([n.partial_snr_ok for n in spec_notes])
     spec_index = {id(note): index for index, note in enumerate(spec_notes)}
     logf0 = np.log([n.f0 for n in spec_notes])
@@ -1744,7 +1886,9 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
     vib_notes = run(vibrato_files) if vibrato_files else []
     if not notes:
         return None
-    agg = aggregate_instrument(notes, vib_notes, n_partials)
+    instrument_name = os.path.basename(os.path.normpath(inst_dir))
+    agg = aggregate_instrument(notes, vib_notes, n_partials,
+                               body_stability_gate=AIR_JET_BODY_GATE.get(instrument_name))
     # Corpus contract uses uppercase; retain lowercase as a legacy fallback.
     prov_path = os.path.join(inst_dir, "PROVENANCE.json")
     if not os.path.exists(prov_path):

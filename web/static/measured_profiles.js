@@ -355,6 +355,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1872
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.788
+    },
     "partialsByRegister": [
       {
         "f0": 183.557,
@@ -1202,255 +1206,255 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.78481,
+        "amp": 0.79245,
         "spread": 0.8
       },
       {
-        "amp": 0.43097,
+        "amp": 0.4422,
         "spread": 0.8
       },
       {
-        "amp": 0.30466,
+        "amp": 0.30241,
         "spread": 0.8
       },
       {
-        "amp": 0.24697,
+        "amp": 0.2661,
         "spread": 0.8
       },
       {
-        "amp": 0.11795,
+        "amp": 0.12675,
         "spread": 0.8
       },
       {
-        "amp": 0.10751,
+        "amp": 0.10933,
         "spread": 0.8
       },
       {
-        "amp": 0.07795,
+        "amp": 0.08054,
         "spread": 0.8
       },
       {
-        "amp": 0.06005,
+        "amp": 0.05899,
         "spread": 0.8
       },
       {
-        "amp": 0.04652,
+        "amp": 0.04661,
         "spread": 0.8
       },
       {
-        "amp": 0.03753,
+        "amp": 0.03843,
         "spread": 0.8
       },
       {
-        "amp": 0.03026,
+        "amp": 0.03104,
         "spread": 0.8
       },
       {
-        "amp": 0.02763,
+        "amp": 0.02725,
         "spread": 0.8
       },
       {
-        "amp": 0.01855,
+        "amp": 0.01815,
         "spread": 0.8
       },
       {
-        "amp": 0.01427,
+        "amp": 0.0139,
         "spread": 0.8
       },
       {
-        "amp": 0.01452,
+        "amp": 0.01475,
         "spread": 0.8
       },
       {
-        "amp": 0.01262,
+        "amp": 0.0124,
         "spread": 0.8
       },
       {
-        "amp": 0.01149,
+        "amp": 0.01113,
         "spread": 0.8
       },
       {
-        "amp": 0.00954,
+        "amp": 0.00949,
         "spread": 0.8
       },
       {
-        "amp": 0.00841,
-        "spread": 0.683
+        "amp": 0.0082,
+        "spread": 0.679
       },
       {
-        "amp": 0.00749,
+        "amp": 0.00724,
         "spread": 0.8
       },
       {
-        "amp": 0.00623,
+        "amp": 0.00608,
         "spread": 0.667
       },
       {
-        "amp": 0.00638,
-        "spread": 0.664
+        "amp": 0.00632,
+        "spread": 0.666
       },
       {
-        "amp": 0.00503,
+        "amp": 0.005,
         "spread": 0.786
       },
       {
-        "amp": 0.00467,
+        "amp": 0.00468,
         "spread": 0.786
       },
       {
-        "amp": 0.00429,
-        "spread": 0.735
+        "amp": 0.00424,
+        "spread": 0.734
       },
       {
-        "amp": 0.00412,
-        "spread": 0.715
-      },
-      {
-        "amp": 0.00326,
-        "spread": 0.725
-      },
-      {
-        "amp": 0.00357,
-        "spread": 0.626
-      },
-      {
-        "amp": 0.00281,
-        "spread": 0.659
-      },
-      {
-        "amp": 0.00327,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00332,
-        "spread": 0.706
-      },
-      {
-        "amp": 0.00283,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00258,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00246,
-        "spread": 0.704
-      },
-      {
-        "amp": 0.00231,
+        "amp": 0.00394,
         "spread": 0.713
       },
       {
-        "amp": 0.00249,
+        "amp": 0.00332,
+        "spread": 0.717
+      },
+      {
+        "amp": 0.00355,
+        "spread": 0.624
+      },
+      {
+        "amp": 0.00285,
+        "spread": 0.654
+      },
+      {
+        "amp": 0.0032,
+        "spread": 0.797
+      },
+      {
+        "amp": 0.00335,
+        "spread": 0.705
+      },
+      {
+        "amp": 0.00286,
         "spread": 0.8
       },
       {
-        "amp": 0.00193,
-        "spread": 0.691
+        "amp": 0.00254,
+        "spread": 0.8
       },
       {
-        "amp": 0.00206,
-        "spread": 0.739
+        "amp": 0.00245,
+        "spread": 0.701
       },
       {
-        "amp": 0.00149,
-        "spread": 0.728
+        "amp": 0.00237,
+        "spread": 0.712
       },
       {
-        "amp": 0.00175,
-        "spread": 0.662
+        "amp": 0.00241,
+        "spread": 0.8
       },
       {
-        "amp": 0.00161,
-        "spread": 0.707
-      },
-      {
-        "amp": 0.0016,
-        "spread": 0.487
-      },
-      {
-        "amp": 0.00187,
-        "spread": 0.501
-      },
-      {
-        "amp": 0.00187,
-        "spread": 0.536
-      },
-      {
-        "amp": 0.00172,
-        "spread": 0.746
-      },
-      {
-        "amp": 0.00167,
-        "spread": 0.685
-      },
-      {
-        "amp": 0.00168,
-        "spread": 0.498
-      },
-      {
-        "amp": 0.00147,
-        "spread": 0.725
-      },
-      {
-        "amp": 0.00135,
-        "spread": 0.538
-      },
-      {
-        "amp": 0.00143,
+        "amp": 0.00185,
         "spread": 0.69
       },
       {
-        "amp": 0.00282,
-        "spread": 0.578
+        "amp": 0.00203,
+        "spread": 0.728
       },
       {
-        "amp": 0.00174,
-        "spread": 0.73
+        "amp": 0.00147,
+        "spread": 0.724
       },
       {
-        "amp": 0.00136,
+        "amp": 0.00175,
+        "spread": 0.652
+      },
+      {
+        "amp": 0.00159,
+        "spread": 0.705
+      },
+      {
+        "amp": 0.00167,
+        "spread": 0.481
+      },
+      {
+        "amp": 0.00179,
+        "spread": 0.499
+      },
+      {
+        "amp": 0.00184,
+        "spread": 0.539
+      },
+      {
+        "amp": 0.00168,
+        "spread": 0.758
+      },
+      {
+        "amp": 0.00164,
+        "spread": 0.68
+      },
+      {
+        "amp": 0.00177,
+        "spread": 0.506
+      },
+      {
+        "amp": 0.00144,
+        "spread": 0.72
+      },
+      {
+        "amp": 0.00145,
+        "spread": 0.546
+      },
+      {
+        "amp": 0.0014,
+        "spread": 0.692
+      },
+      {
+        "amp": 0.00275,
+        "spread": 0.586
+      },
+      {
+        "amp": 0.00172,
+        "spread": 0.732
+      },
+      {
+        "amp": 0.00135,
         "spread": 0.8
       },
       {
-        "amp": 0.00176,
-        "spread": 0.77
+        "amp": 0.00179,
+        "spread": 0.772
+      },
+      {
+        "amp": 0.00157,
+        "spread": 0.8
       },
       {
         "amp": 0.00169,
         "spread": 0.8
       },
       {
-        "amp": 0.00171,
+        "amp": 0.00144,
         "spread": 0.8
       },
       {
-        "amp": 0.00147,
+        "amp": 0.00134,
         "spread": 0.8
       },
       {
-        "amp": 0.00152,
+        "amp": 0.00235,
         "spread": 0.8
       },
       {
-        "amp": 0.0024,
+        "amp": 0.00165,
         "spread": 0.8
       },
       {
-        "amp": 0.00175,
+        "amp": 0.00168,
         "spread": 0.8
       },
       {
-        "amp": 0.00172,
+        "amp": 0.00091,
         "spread": 0.8
       },
       {
-        "amp": 0.00093,
-        "spread": 0.8
-      },
-      {
-        "amp": 0.00171,
+        "amp": 0.0017,
         "spread": 0.8
       }
     ],
@@ -1482,88 +1486,90 @@ export const MEASURED_PROFILES = {
     "notesAnalysed": 140,
     "resonances": [
       {
-        "freq": 253.3,
-        "gain": -0.5586,
-        "width": 0.1889
+        "freq": 236.3,
+        "gain": -0.4226,
+        "width": 0.1925
       },
       {
-        "freq": 321.4,
-        "gain": -0.4644,
-        "width": 0.1889
+        "freq": 301.2,
+        "gain": -0.5725,
+        "width": 0.1925
       },
       {
-        "freq": 407.8,
-        "gain": -0.3884,
-        "width": 0.1889
+        "freq": 383.9,
+        "gain": -0.4395,
+        "width": 0.1925
       },
       {
-        "freq": 517.4,
-        "gain": -0.4303,
-        "width": 0.1889
+        "freq": 489.3,
+        "gain": -0.3996,
+        "width": 0.1925
       },
       {
-        "freq": 656.4,
-        "gain": -0.5379,
-        "width": 0.1889
+        "freq": 623.7,
+        "gain": -0.7453,
+        "width": 0.1925
       },
       {
-        "freq": 832.8,
-        "gain": 0.903,
-        "width": 0.1889
+        "freq": 795.0,
+        "gain": 0.7586,
+        "width": 0.1925
       },
       {
-        "freq": 1056.6,
-        "gain": 0.065,
-        "width": 0.1889
+        "freq": 1291.6,
+        "gain": 0.2599,
+        "width": 0.1925
       },
       {
-        "freq": 1340.5,
-        "gain": 0.3754,
-        "width": 0.1889
+        "freq": 1646.4,
+        "gain": 1.2362,
+        "width": 0.1925
       },
       {
-        "freq": 1700.8,
-        "gain": 1.4064,
-        "width": 0.1889
+        "freq": 2098.5,
+        "gain": 1.5,
+        "width": 0.1925
       },
       {
-        "freq": 2157.8,
-        "gain": 1.4825,
-        "width": 0.1889
+        "freq": 2674.9,
+        "gain": 0.8367,
+        "width": 0.1925
       },
       {
-        "freq": 2737.7,
-        "gain": 0.7619,
-        "width": 0.1889
+        "freq": 4345.9,
+        "gain": -0.1791,
+        "width": 0.1925
       },
       {
-        "freq": 4406.9,
-        "gain": -0.2032,
-        "width": 0.1889
+        "freq": 5539.5,
+        "gain": -0.1625,
+        "width": 0.1925
       },
       {
-        "freq": 5591.1,
-        "gain": -0.1419,
-        "width": 0.1889
-      },
-      {
-        "freq": 7093.7,
-        "gain": 0.1659,
-        "width": 0.1889
+        "freq": 7060.8,
+        "gain": 0.1823,
+        "width": 0.1925
       },
       {
         "freq": 9000.0,
-        "gain": -0.4764,
-        "width": 0.1889
+        "gain": -0.4707,
+        "width": 0.1925
       }
     ],
+    "resonancesFit": {
+      "lowestF0Hz": 64.9,
+      "reconstructionAmount": 1,
+      "roundTripMaxDb": 0.0,
+      "method": "ensemble-rank-note-body-v3",
+      "splitHalfCorr": 0.936
+    },
     "partialsByRegister": [
       {
         "f0": 91.437,
         "partialB": 0.0,
         "partials": [
           {
-            "amp": 0.45818,
+            "amp": 0.44579,
             "spread": 0.8
           },
           {
@@ -1571,251 +1577,251 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.90888,
+            "amp": 0.85879,
             "spread": 0.8
           },
           {
-            "amp": 0.83477,
+            "amp": 0.80673,
             "spread": 0.8
           },
           {
-            "amp": 0.54706,
+            "amp": 0.54772,
             "spread": 0.8
           },
           {
-            "amp": 0.31469,
+            "amp": 0.31863,
             "spread": 0.8
           },
           {
-            "amp": 0.17018,
+            "amp": 0.16929,
             "spread": 0.8
           },
           {
-            "amp": 0.24369,
+            "amp": 0.2502,
             "spread": 0.8
           },
           {
-            "amp": 0.1362,
+            "amp": 0.13561,
             "spread": 0.8
           },
           {
-            "amp": 0.127,
+            "amp": 0.11761,
             "spread": 0.8
           },
           {
-            "amp": 0.11479,
+            "amp": 0.11411,
             "spread": 0.8
           },
           {
-            "amp": 0.08115,
+            "amp": 0.08608,
             "spread": 0.8
           },
           {
-            "amp": 0.07537,
+            "amp": 0.08223,
             "spread": 0.8
           },
           {
-            "amp": 0.06053,
+            "amp": 0.05925,
             "spread": 0.8
           },
           {
-            "amp": 0.04775,
+            "amp": 0.04986,
             "spread": 0.8
           },
           {
-            "amp": 0.04793,
+            "amp": 0.04545,
             "spread": 0.8
           },
           {
-            "amp": 0.03964,
+            "amp": 0.0379,
             "spread": 0.8
           },
           {
-            "amp": 0.03517,
+            "amp": 0.03205,
             "spread": 0.8
           },
           {
-            "amp": 0.02934,
+            "amp": 0.02808,
             "spread": 0.8
           },
           {
-            "amp": 0.01838,
-            "spread": 0.683
+            "amp": 0.01859,
+            "spread": 0.679
           },
           {
-            "amp": 0.02294,
+            "amp": 0.02254,
             "spread": 0.8
           },
           {
-            "amp": 0.02716,
+            "amp": 0.02724,
             "spread": 0.667
           },
           {
-            "amp": 0.02037,
-            "spread": 0.664
+            "amp": 0.02014,
+            "spread": 0.666
           },
           {
-            "amp": 0.01904,
+            "amp": 0.01825,
             "spread": 0.786
           },
           {
-            "amp": 0.01532,
+            "amp": 0.01513,
             "spread": 0.786
           },
           {
-            "amp": 0.01332,
-            "spread": 0.735
+            "amp": 0.01336,
+            "spread": 0.734
           },
           {
-            "amp": 0.01174,
-            "spread": 0.715
-          },
-          {
-            "amp": 0.01136,
-            "spread": 0.725
-          },
-          {
-            "amp": 0.01001,
-            "spread": 0.626
-          },
-          {
-            "amp": 0.00922,
-            "spread": 0.659
-          },
-          {
-            "amp": 0.01078,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00703,
-            "spread": 0.706
-          },
-          {
-            "amp": 0.00689,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00771,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00679,
-            "spread": 0.704
-          },
-          {
-            "amp": 0.00638,
+            "amp": 0.01134,
             "spread": 0.713
           },
           {
-            "amp": 0.00625,
+            "amp": 0.01097,
+            "spread": 0.717
+          },
+          {
+            "amp": 0.01019,
+            "spread": 0.624
+          },
+          {
+            "amp": 0.00902,
+            "spread": 0.654
+          },
+          {
+            "amp": 0.01069,
+            "spread": 0.797
+          },
+          {
+            "amp": 0.00686,
+            "spread": 0.705
+          },
+          {
+            "amp": 0.00655,
             "spread": 0.8
           },
           {
-            "amp": 0.00543,
-            "spread": 0.691
+            "amp": 0.00721,
+            "spread": 0.8
           },
           {
-            "amp": 0.00581,
-            "spread": 0.739
+            "amp": 0.00668,
+            "spread": 0.701
           },
           {
-            "amp": 0.00523,
-            "spread": 0.728
+            "amp": 0.00623,
+            "spread": 0.712
           },
           {
-            "amp": 0.00383,
-            "spread": 0.662
+            "amp": 0.00598,
+            "spread": 0.8
           },
           {
-            "amp": 0.00302,
-            "spread": 0.707
-          },
-          {
-            "amp": 0.005,
-            "spread": 0.487
-          },
-          {
-            "amp": 0.00429,
-            "spread": 0.501
-          },
-          {
-            "amp": 0.0069,
-            "spread": 0.536
-          },
-          {
-            "amp": 0.00359,
-            "spread": 0.746
-          },
-          {
-            "amp": 0.00505,
-            "spread": 0.685
-          },
-          {
-            "amp": 0.00385,
-            "spread": 0.498
-          },
-          {
-            "amp": 0.00395,
-            "spread": 0.725
-          },
-          {
-            "amp": 0.0045,
-            "spread": 0.538
-          },
-          {
-            "amp": 0.00316,
+            "amp": 0.00511,
             "spread": 0.69
           },
           {
-            "amp": 0.00399,
-            "spread": 0.578
+            "amp": 0.00557,
+            "spread": 0.728
           },
           {
-            "amp": 0.00331,
-            "spread": 0.73
+            "amp": 0.00513,
+            "spread": 0.724
+          },
+          {
+            "amp": 0.00361,
+            "spread": 0.652
+          },
+          {
+            "amp": 0.00285,
+            "spread": 0.705
+          },
+          {
+            "amp": 0.00475,
+            "spread": 0.481
+          },
+          {
+            "amp": 0.00414,
+            "spread": 0.499
+          },
+          {
+            "amp": 0.00662,
+            "spread": 0.539
+          },
+          {
+            "amp": 0.00345,
+            "spread": 0.758
+          },
+          {
+            "amp": 0.00477,
+            "spread": 0.68
+          },
+          {
+            "amp": 0.00373,
+            "spread": 0.506
+          },
+          {
+            "amp": 0.00386,
+            "spread": 0.72
           },
           {
             "amp": 0.00422,
+            "spread": 0.546
+          },
+          {
+            "amp": 0.00294,
+            "spread": 0.692
+          },
+          {
+            "amp": 0.00373,
+            "spread": 0.586
+          },
+          {
+            "amp": 0.00313,
+            "spread": 0.732
+          },
+          {
+            "amp": 0.00403,
             "spread": 0.8
           },
           {
-            "amp": 0.00481,
-            "spread": 0.77
+            "amp": 0.00453,
+            "spread": 0.772
           },
           {
-            "amp": 0.00226,
+            "amp": 0.00213,
             "spread": 0.8
           },
           {
-            "amp": 0.00998,
+            "amp": 0.0095,
             "spread": 0.8
           },
           {
-            "amp": 0.00247,
+            "amp": 0.00233,
             "spread": 0.8
           },
           {
-            "amp": 0.00306,
+            "amp": 0.00291,
             "spread": 0.8
           },
           {
-            "amp": 0.00435,
+            "amp": 0.00386,
             "spread": 0.8
           },
           {
-            "amp": 0.00243,
+            "amp": 0.00231,
             "spread": 0.8
           },
           {
-            "amp": 0.00443,
+            "amp": 0.00415,
             "spread": 0.8
           },
           {
-            "amp": 0.00161,
+            "amp": 0.00149,
             "spread": 0.8
           },
           {
-            "amp": 0.00226,
+            "amp": 0.00212,
             "spread": 0.8
           }
         ]
@@ -1829,255 +1835,255 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.76248,
+            "amp": 0.76916,
             "spread": 0.8
           },
           {
-            "amp": 0.32061,
+            "amp": 0.34738,
             "spread": 0.8
           },
           {
-            "amp": 0.23819,
+            "amp": 0.23687,
             "spread": 0.8
           },
           {
-            "amp": 0.19052,
+            "amp": 0.20389,
             "spread": 0.8
           },
           {
-            "amp": 0.10812,
+            "amp": 0.106,
             "spread": 0.8
           },
           {
-            "amp": 0.09872,
+            "amp": 0.09811,
             "spread": 0.8
           },
           {
-            "amp": 0.05833,
+            "amp": 0.05774,
             "spread": 0.8
           },
           {
-            "amp": 0.04499,
+            "amp": 0.04461,
             "spread": 0.8
           },
           {
-            "amp": 0.03581,
+            "amp": 0.03768,
             "spread": 0.8
           },
           {
-            "amp": 0.02744,
+            "amp": 0.02649,
             "spread": 0.8
           },
           {
-            "amp": 0.02739,
+            "amp": 0.02636,
             "spread": 0.8
           },
           {
-            "amp": 0.0203,
+            "amp": 0.01997,
             "spread": 0.8
           },
           {
-            "amp": 0.01525,
+            "amp": 0.0151,
             "spread": 0.8
           },
           {
-            "amp": 0.01121,
+            "amp": 0.01102,
             "spread": 0.8
           },
           {
-            "amp": 0.01079,
+            "amp": 0.0103,
             "spread": 0.8
           },
           {
-            "amp": 0.01056,
+            "amp": 0.01035,
             "spread": 0.8
           },
           {
-            "amp": 0.00897,
+            "amp": 0.00878,
             "spread": 0.8
           },
           {
-            "amp": 0.00772,
+            "amp": 0.00755,
             "spread": 0.8
           },
           {
-            "amp": 0.00649,
-            "spread": 0.683
+            "amp": 0.00614,
+            "spread": 0.679
           },
           {
-            "amp": 0.00646,
+            "amp": 0.00614,
             "spread": 0.8
           },
           {
-            "amp": 0.00521,
+            "amp": 0.00502,
             "spread": 0.667
           },
           {
-            "amp": 0.00537,
-            "spread": 0.664
-          },
-          {
-            "amp": 0.00422,
-            "spread": 0.786
+            "amp": 0.0051,
+            "spread": 0.666
           },
           {
             "amp": 0.0041,
             "spread": 0.786
           },
           {
-            "amp": 0.00366,
-            "spread": 0.735
+            "amp": 0.00412,
+            "spread": 0.786
           },
           {
-            "amp": 0.00395,
-            "spread": 0.715
+            "amp": 0.00349,
+            "spread": 0.734
           },
           {
-            "amp": 0.00253,
-            "spread": 0.725
-          },
-          {
-            "amp": 0.00267,
-            "spread": 0.626
-          },
-          {
-            "amp": 0.00229,
-            "spread": 0.659
-          },
-          {
-            "amp": 0.00288,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00239,
-            "spread": 0.706
-          },
-          {
-            "amp": 0.00234,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00226,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00191,
-            "spread": 0.704
-          },
-          {
-            "amp": 0.00195,
+            "amp": 0.00388,
             "spread": 0.713
           },
           {
-            "amp": 0.00149,
+            "amp": 0.00239,
+            "spread": 0.717
+          },
+          {
+            "amp": 0.00255,
+            "spread": 0.624
+          },
+          {
+            "amp": 0.00221,
+            "spread": 0.654
+          },
+          {
+            "amp": 0.0028,
+            "spread": 0.797
+          },
+          {
+            "amp": 0.00234,
+            "spread": 0.705
+          },
+          {
+            "amp": 0.00229,
             "spread": 0.8
           },
           {
-            "amp": 0.00159,
-            "spread": 0.691
+            "amp": 0.0021,
+            "spread": 0.8
           },
           {
-            "amp": 0.00146,
-            "spread": 0.739
+            "amp": 0.00182,
+            "spread": 0.701
           },
           {
-            "amp": 0.00114,
-            "spread": 0.728
+            "amp": 0.00184,
+            "spread": 0.712
           },
           {
-            "amp": 0.00116,
-            "spread": 0.662
+            "amp": 0.00144,
+            "spread": 0.8
           },
           {
-            "amp": 0.00118,
-            "spread": 0.707
-          },
-          {
-            "amp": 0.0012,
-            "spread": 0.487
-          },
-          {
-            "amp": 0.00116,
-            "spread": 0.501
-          },
-          {
-            "amp": 0.00116,
-            "spread": 0.536
-          },
-          {
-            "amp": 0.00079,
-            "spread": 0.746
-          },
-          {
-            "amp": 0.00102,
-            "spread": 0.685
-          },
-          {
-            "amp": 0.00121,
-            "spread": 0.498
-          },
-          {
-            "amp": 0.00108,
-            "spread": 0.725
-          },
-          {
-            "amp": 0.00096,
-            "spread": 0.538
-          },
-          {
-            "amp": 0.00087,
+            "amp": 0.00148,
             "spread": 0.69
           },
           {
+            "amp": 0.00142,
+            "spread": 0.728
+          },
+          {
+            "amp": 0.0011,
+            "spread": 0.724
+          },
+          {
+            "amp": 0.00111,
+            "spread": 0.652
+          },
+          {
+            "amp": 0.00112,
+            "spread": 0.705
+          },
+          {
+            "amp": 0.00116,
+            "spread": 0.481
+          },
+          {
+            "amp": 0.00111,
+            "spread": 0.499
+          },
+          {
+            "amp": 0.0011,
+            "spread": 0.539
+          },
+          {
+            "amp": 0.00075,
+            "spread": 0.758
+          },
+          {
+            "amp": 0.00097,
+            "spread": 0.68
+          },
+          {
+            "amp": 0.00116,
+            "spread": 0.506
+          },
+          {
+            "amp": 0.0011,
+            "spread": 0.72
+          },
+          {
+            "amp": 0.0009,
+            "spread": 0.546
+          },
+          {
+            "amp": 0.00081,
+            "spread": 0.692
+          },
+          {
             "amp": 0.00056,
-            "spread": 0.578
+            "spread": 0.586
           },
           {
-            "amp": 0.00118,
-            "spread": 0.73
+            "amp": 0.00114,
+            "spread": 0.732
           },
           {
-            "amp": 0.00062,
+            "amp": 0.00063,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00083,
+            "spread": 0.772
+          },
+          {
+            "amp": 0.00126,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00125,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00113,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00091,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00104,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0013,
             "spread": 0.8
           },
           {
             "amp": 0.00087,
-            "spread": 0.77
-          },
-          {
-            "amp": 0.0014,
             "spread": 0.8
           },
           {
-            "amp": 0.00136,
+            "amp": 0.00047,
             "spread": 0.8
           },
           {
-            "amp": 0.00112,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00098,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00114,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0014,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00105,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00048,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00062,
+            "amp": 0.0006,
             "spread": 0.8
           }
         ]
@@ -2091,212 +2097,212 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.40056,
+            "amp": 0.42508,
             "spread": 0.8
           },
           {
-            "amp": 0.29114,
+            "amp": 0.28823,
             "spread": 0.8
           },
           {
-            "amp": 0.20041,
+            "amp": 0.19366,
             "spread": 0.8
           },
           {
-            "amp": 0.14514,
+            "amp": 0.13407,
             "spread": 0.8
           },
           {
-            "amp": 0.06931,
+            "amp": 0.0653,
             "spread": 0.8
           },
           {
-            "amp": 0.06741,
+            "amp": 0.06676,
             "spread": 0.8
           },
           {
-            "amp": 0.05154,
+            "amp": 0.04787,
             "spread": 0.8
           },
           {
-            "amp": 0.03757,
+            "amp": 0.03611,
             "spread": 0.8
           },
           {
-            "amp": 0.02948,
+            "amp": 0.02654,
             "spread": 0.8
           },
           {
-            "amp": 0.02164,
+            "amp": 0.01997,
             "spread": 0.8
           },
           {
-            "amp": 0.01749,
+            "amp": 0.01713,
             "spread": 0.8
           },
           {
-            "amp": 0.01203,
+            "amp": 0.01163,
             "spread": 0.8
           },
           {
-            "amp": 0.00999,
+            "amp": 0.00951,
             "spread": 0.8
           },
           {
-            "amp": 0.00772,
+            "amp": 0.00742,
             "spread": 0.8
           },
           {
-            "amp": 0.00739,
+            "amp": 0.00706,
             "spread": 0.8
           },
           {
-            "amp": 0.00754,
+            "amp": 0.00709,
             "spread": 0.8
           },
           {
-            "amp": 0.00554,
+            "amp": 0.00527,
             "spread": 0.8
           },
           {
-            "amp": 0.00425,
+            "amp": 0.00398,
             "spread": 0.8
           },
           {
-            "amp": 0.00378,
-            "spread": 0.683
+            "amp": 0.00362,
+            "spread": 0.679
           },
           {
-            "amp": 0.00416,
+            "amp": 0.00403,
             "spread": 0.8
           },
           {
-            "amp": 0.00295,
+            "amp": 0.00277,
             "spread": 0.667
           },
           {
-            "amp": 0.00335,
-            "spread": 0.664
+            "amp": 0.00296,
+            "spread": 0.666
           },
           {
-            "amp": 0.00252,
+            "amp": 0.00229,
             "spread": 0.786
           },
           {
-            "amp": 0.00192,
+            "amp": 0.00185,
             "spread": 0.786
           },
           {
-            "amp": 0.00186,
-            "spread": 0.735
+            "amp": 0.00174,
+            "spread": 0.734
           },
           {
-            "amp": 0.00188,
-            "spread": 0.715
-          },
-          {
-            "amp": 0.0016,
-            "spread": 0.725
-          },
-          {
-            "amp": 0.00147,
-            "spread": 0.626
-          },
-          {
-            "amp": 0.00143,
-            "spread": 0.659
-          },
-          {
-            "amp": 0.00142,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00142,
-            "spread": 0.706
-          },
-          {
-            "amp": 0.00107,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00115,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.00074,
-            "spread": 0.704
-          },
-          {
-            "amp": 0.00075,
+            "amp": 0.00177,
             "spread": 0.713
           },
           {
-            "amp": 0.00077,
+            "amp": 0.0015,
+            "spread": 0.717
+          },
+          {
+            "amp": 0.00138,
+            "spread": 0.624
+          },
+          {
+            "amp": 0.00137,
+            "spread": 0.654
+          },
+          {
+            "amp": 0.00133,
+            "spread": 0.797
+          },
+          {
+            "amp": 0.0014,
+            "spread": 0.705
+          },
+          {
+            "amp": 0.00098,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00113,
             "spread": 0.8
           },
           {
             "amp": 0.00067,
-            "spread": 0.691
+            "spread": 0.701
           },
           {
-            "amp": 0.00091,
-            "spread": 0.739
+            "amp": 0.00072,
+            "spread": 0.712
           },
           {
-            "amp": 0.00061,
-            "spread": 0.728
+            "amp": 0.00074,
+            "spread": 0.8
           },
           {
-            "amp": 0.00113,
-            "spread": 0.662
-          },
-          {
-            "amp": 0.00094,
-            "spread": 0.707
-          },
-          {
-            "amp": 0.00055,
-            "spread": 0.487
-          },
-          {
-            "amp": 0.00053,
-            "spread": 0.501
-          },
-          {
-            "amp": 0.00064,
-            "spread": 0.536
-          },
-          {
-            "amp": 0.00052,
-            "spread": 0.746
-          },
-          {
-            "amp": 0.00047,
-            "spread": 0.685
-          },
-          {
-            "amp": 0.00035,
-            "spread": 0.498
-          },
-          {
-            "amp": 0.00049,
-            "spread": 0.725
-          },
-          {
-            "amp": 0.00075,
-            "spread": 0.538
-          },
-          {
-            "amp": 0.00089,
+            "amp": 0.00058,
             "spread": 0.69
           },
           {
-            "amp": 0.00064,
-            "spread": 0.578
+            "amp": 0.00075,
+            "spread": 0.728
+          },
+          {
+            "amp": 0.00058,
+            "spread": 0.724
+          },
+          {
+            "amp": 0.00102,
+            "spread": 0.652
+          },
+          {
+            "amp": 0.00077,
+            "spread": 0.705
+          },
+          {
+            "amp": 0.00053,
+            "spread": 0.481
+          },
+          {
+            "amp": 0.00051,
+            "spread": 0.499
+          },
+          {
+            "amp": 0.00054,
+            "spread": 0.539
+          },
+          {
+            "amp": 0.0005,
+            "spread": 0.758
+          },
+          {
+            "amp": 0.00046,
+            "spread": 0.68
+          },
+          {
+            "amp": 0.00034,
+            "spread": 0.506
+          },
+          {
+            "amp": 0.00047,
+            "spread": 0.72
+          },
+          {
+            "amp": 0.00073,
+            "spread": 0.546
+          },
+          {
+            "amp": 0.00086,
+            "spread": 0.692
+          },
+          {
+            "amp": 0.00062,
+            "spread": 0.586
           },
           {
             "amp": 0.0,
-            "spread": 0.73
+            "spread": 0.732
           },
           {
             "amp": 0.0,
@@ -2304,7 +2310,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.77
+            "spread": 0.772
           },
           {
             "amp": 0.0,
@@ -2753,6 +2759,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1809
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.819
+    },
     "partialsByRegister": [
       {
         "f0": 239.465,
@@ -3948,6 +3958,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1805
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.825
+    },
     "partialsByRegister": [
       {
         "f0": 332.612,
@@ -5149,6 +5163,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1902
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.978
+    },
     "partialsByRegister": [
       {
         "f0": 84.421,
@@ -6349,6 +6367,10 @@ export const MEASURED_PROFILES = {
         "width": 0.2005
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.297
+    },
     "partialsByRegister": [
       {
         "f0": 120.041,
@@ -7553,6 +7575,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1813
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.931
+    },
     "partialsByRegister": [
       {
         "f0": 119.747,
@@ -9032,6 +9058,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1773
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.471
+    },
     "partialsByRegister": [
       {
         "f0": 225.216,
@@ -9878,227 +9908,227 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.74886,
+        "amp": 0.81905,
         "spread": 0.8
       },
       {
-        "amp": 0.36915,
+        "amp": 0.40452,
         "spread": 0.8
       },
       {
-        "amp": 0.24422,
+        "amp": 0.24252,
         "spread": 0.8
       },
       {
-        "amp": 0.14306,
+        "amp": 0.14611,
         "spread": 0.8
       },
       {
-        "amp": 0.12891,
+        "amp": 0.13687,
         "spread": 0.8
       },
       {
-        "amp": 0.0847,
+        "amp": 0.08827,
         "spread": 0.8
       },
       {
-        "amp": 0.07153,
+        "amp": 0.06961,
         "spread": 0.8
       },
       {
-        "amp": 0.04967,
+        "amp": 0.05141,
         "spread": 0.8
       },
       {
-        "amp": 0.04308,
+        "amp": 0.04317,
         "spread": 0.8
       },
       {
-        "amp": 0.03109,
-        "spread": 0.757
+        "amp": 0.03114,
+        "spread": 0.765
       },
       {
-        "amp": 0.02622,
+        "amp": 0.02664,
         "spread": 0.8
       },
       {
-        "amp": 0.02111,
+        "amp": 0.02257,
         "spread": 0.8
       },
       {
-        "amp": 0.02111,
+        "amp": 0.02128,
         "spread": 0.8
       },
       {
-        "amp": 0.01689,
+        "amp": 0.01594,
         "spread": 0.8
       },
       {
-        "amp": 0.01752,
+        "amp": 0.0184,
         "spread": 0.8
       },
       {
-        "amp": 0.01389,
+        "amp": 0.01392,
         "spread": 0.8
       },
       {
-        "amp": 0.01549,
+        "amp": 0.01634,
         "spread": 0.8
       },
       {
-        "amp": 0.01041,
+        "amp": 0.01068,
         "spread": 0.8
       },
       {
-        "amp": 0.00998,
+        "amp": 0.01038,
         "spread": 0.8
       },
       {
-        "amp": 0.00747,
+        "amp": 0.00784,
         "spread": 0.8
       },
       {
-        "amp": 0.0075,
+        "amp": 0.00752,
         "spread": 0.8
       },
       {
-        "amp": 0.00709,
+        "amp": 0.007,
         "spread": 0.778
       },
       {
-        "amp": 0.00751,
+        "amp": 0.00797,
         "spread": 0.8
       },
       {
-        "amp": 0.00562,
+        "amp": 0.00588,
         "spread": 0.8
       },
       {
-        "amp": 0.00571,
-        "spread": 0.595
+        "amp": 0.00546,
+        "spread": 0.597
       },
       {
-        "amp": 0.00684,
+        "amp": 0.00698,
         "spread": 0.8
       },
       {
-        "amp": 0.00475,
+        "amp": 0.00492,
         "spread": 0.8
       },
       {
-        "amp": 0.00567,
-        "spread": 0.787
+        "amp": 0.00563,
+        "spread": 0.786
       },
       {
-        "amp": 0.00409,
+        "amp": 0.0043,
         "spread": 0.767
       },
       {
-        "amp": 0.00335,
-        "spread": 0.677
+        "amp": 0.00372,
+        "spread": 0.674
       },
       {
-        "amp": 0.00439,
-        "spread": 0.753
+        "amp": 0.00488,
+        "spread": 0.755
       },
       {
-        "amp": 0.00432,
-        "spread": 0.672
+        "amp": 0.00458,
+        "spread": 0.674
       },
       {
-        "amp": 0.00472,
-        "spread": 0.561
+        "amp": 0.00454,
+        "spread": 0.562
       },
       {
-        "amp": 0.00441,
-        "spread": 0.648
+        "amp": 0.00454,
+        "spread": 0.651
       },
       {
-        "amp": 0.00286,
+        "amp": 0.0032,
         "spread": 0.8
       },
       {
-        "amp": 0.00297,
-        "spread": 0.41
-      },
-      {
         "amp": 0.0036,
-        "spread": 0.515
+        "spread": 0.409
       },
       {
-        "amp": 0.00319,
-        "spread": 0.45
+        "amp": 0.00362,
+        "spread": 0.511
       },
       {
-        "amp": 0.00392,
-        "spread": 0.555
+        "amp": 0.00339,
+        "spread": 0.449
       },
       {
-        "amp": 0.00346,
-        "spread": 0.49
+        "amp": 0.00416,
+        "spread": 0.551
       },
       {
-        "amp": 0.00212,
+        "amp": 0.0033,
         "spread": 0.489
       },
       {
-        "amp": 0.00199,
-        "spread": 0.53
+        "amp": 0.00217,
+        "spread": 0.487
       },
       {
-        "amp": 0.00163,
+        "amp": 0.00184,
         "spread": 0.529
       },
       {
-        "amp": 0.00191,
-        "spread": 0.57
+        "amp": 0.00161,
+        "spread": 0.527
       },
       {
-        "amp": 0.00155,
+        "amp": 0.00175,
         "spread": 0.569
       },
       {
-        "amp": 0.00216,
-        "spread": 0.61
+        "amp": 0.00177,
+        "spread": 0.567
       },
       {
-        "amp": 0.00164,
+        "amp": 0.00208,
         "spread": 0.609
       },
       {
-        "amp": 0.00207,
-        "spread": 0.65
+        "amp": 0.00167,
+        "spread": 0.607
       },
       {
-        "amp": 0.00252,
+        "amp": 0.00195,
         "spread": 0.649
       },
       {
-        "amp": 0.00213,
-        "spread": 0.69
+        "amp": 0.00232,
+        "spread": 0.647
       },
       {
-        "amp": 0.00138,
+        "amp": 0.00197,
         "spread": 0.689
       },
       {
-        "amp": 0.00151,
-        "spread": 0.73
+        "amp": 0.00153,
+        "spread": 0.687
       },
       {
-        "amp": 0.00052,
+        "amp": 0.00134,
         "spread": 0.729
       },
       {
-        "amp": 0.0013,
-        "spread": 0.77
+        "amp": 0.00056,
+        "spread": 0.727
       },
       {
-        "amp": 0.00182,
+        "amp": 0.00114,
         "spread": 0.769
       },
       {
-        "amp": 0.00092,
+        "amp": 0.00188,
+        "spread": 0.767
+      },
+      {
+        "amp": 0.00096,
         "spread": 0.8
       },
       {
@@ -10106,7 +10136,7 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.00012,
+        "amp": 0.00013,
         "spread": 0.8
       },
       {
@@ -10114,11 +10144,11 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.00093,
+        "amp": 0.00103,
         "spread": 0.8
       },
       {
-        "amp": 0.00101,
+        "amp": 0.00114,
         "spread": 0.8
       },
       {
@@ -10126,7 +10156,7 @@ export const MEASURED_PROFILES = {
         "spread": 0.8
       },
       {
-        "amp": 0.00109,
+        "amp": 0.0012,
         "spread": 0.8
       }
     ],
@@ -10158,315 +10188,302 @@ export const MEASURED_PROFILES = {
     "notesAnalysed": 117,
     "resonances": [
       {
-        "freq": 480.0,
-        "gain": 0.321,
-        "width": 0.1789
+        "freq": 366.9,
+        "gain": 0.2002,
+        "width": 0.1814
       },
       {
-        "freq": 601.4,
-        "gain": -0.4707,
-        "width": 0.1789
+        "freq": 579.5,
+        "gain": -0.4012,
+        "width": 0.1814
       },
       {
-        "freq": 753.5,
-        "gain": 0.3176,
-        "width": 0.1789
+        "freq": 1150.4,
+        "gain": -0.245,
+        "width": 0.1814
       },
       {
-        "freq": 944.0,
-        "gain": -0.0313,
-        "width": 0.1789
+        "freq": 1445.8,
+        "gain": -0.1775,
+        "width": 0.1814
       },
       {
-        "freq": 1182.8,
-        "gain": -0.2812,
-        "width": 0.1789
+        "freq": 2283.7,
+        "gain": 1.1364,
+        "width": 0.1814
       },
       {
-        "freq": 1482.0,
-        "gain": -0.1272,
-        "width": 0.1789
+        "freq": 2870.2,
+        "gain": 0.5989,
+        "width": 0.1814
       },
       {
-        "freq": 1856.8,
-        "gain": 0.3065,
-        "width": 0.1789
+        "freq": 3607.2,
+        "gain": 0.7312,
+        "width": 0.1814
       },
       {
-        "freq": 2326.4,
-        "gain": 1.1558,
-        "width": 0.1789
+        "freq": 4533.6,
+        "gain": 0.5111,
+        "width": 0.1814
       },
       {
-        "freq": 2914.9,
-        "gain": 0.549,
-        "width": 0.1789
-      },
-      {
-        "freq": 3652.1,
-        "gain": 0.7601,
-        "width": 0.1789
-      },
-      {
-        "freq": 4575.8,
-        "gain": 0.4724,
-        "width": 0.1789
-      },
-      {
-        "freq": 5733.1,
-        "gain": 0.0258,
-        "width": 0.1789
-      },
-      {
-        "freq": 7183.2,
-        "gain": -0.1416,
-        "width": 0.1789
+        "freq": 7161.0,
+        "gain": -0.1393,
+        "width": 0.1814
       },
       {
         "freq": 9000.0,
-        "gain": -0.4779,
-        "width": 0.1789
+        "gain": -0.4828,
+        "width": 0.1814
       }
     ],
+    "resonancesFit": {
+      "lowestF0Hz": 195.1,
+      "reconstructionAmount": 1,
+      "roundTripMaxDb": 0.0,
+      "method": "ensemble-rank-note-body-v3",
+      "splitHalfCorr": 0.451
+    },
     "partialsByRegister": [
       {
         "f0": 274.653,
         "partialB": 0.0,
         "partials": [
           {
+            "amp": 0.94349,
+            "spread": 0.8
+          },
+          {
             "amp": 1.0,
             "spread": 0.8
           },
           {
-            "amp": 0.83139,
+            "amp": 0.64648,
             "spread": 0.8
           },
           {
-            "amp": 0.6106,
+            "amp": 0.37626,
             "spread": 0.8
           },
           {
-            "amp": 0.31384,
+            "amp": 0.3167,
             "spread": 0.8
           },
           {
-            "amp": 0.29251,
+            "amp": 0.17866,
             "spread": 0.8
           },
           {
-            "amp": 0.18188,
+            "amp": 0.16147,
             "spread": 0.8
           },
           {
-            "amp": 0.14359,
+            "amp": 0.12053,
             "spread": 0.8
           },
           {
-            "amp": 0.11422,
+            "amp": 0.08675,
             "spread": 0.8
           },
           {
-            "amp": 0.07927,
+            "amp": 0.07447,
             "spread": 0.8
           },
           {
-            "amp": 0.07034,
+            "amp": 0.05076,
+            "spread": 0.765
+          },
+          {
+            "amp": 0.03974,
             "spread": 0.8
           },
           {
-            "amp": 0.0468,
-            "spread": 0.757
-          },
-          {
-            "amp": 0.03573,
+            "amp": 0.05121,
             "spread": 0.8
           },
           {
-            "amp": 0.0467,
+            "amp": 0.03241,
             "spread": 0.8
           },
           {
-            "amp": 0.03092,
+            "amp": 0.02672,
             "spread": 0.8
           },
           {
-            "amp": 0.0234,
+            "amp": 0.02631,
             "spread": 0.8
           },
           {
-            "amp": 0.02427,
+            "amp": 0.02434,
             "spread": 0.8
           },
           {
-            "amp": 0.02291,
+            "amp": 0.02643,
             "spread": 0.8
           },
           {
-            "amp": 0.02694,
+            "amp": 0.01632,
             "spread": 0.8
           },
           {
-            "amp": 0.01657,
+            "amp": 0.01562,
             "spread": 0.8
           },
           {
-            "amp": 0.01419,
+            "amp": 0.01491,
             "spread": 0.8
           },
           {
-            "amp": 0.01417,
+            "amp": 0.01869,
             "spread": 0.8
           },
           {
-            "amp": 0.01706,
-            "spread": 0.8
-          },
-          {
-            "amp": 0.0147,
+            "amp": 0.01559,
             "spread": 0.778
           },
           {
-            "amp": 0.01208,
+            "amp": 0.01292,
             "spread": 0.8
           },
           {
-            "amp": 0.00993,
+            "amp": 0.01065,
             "spread": 0.8
           },
           {
-            "amp": 0.01132,
-            "spread": 0.595
+            "amp": 0.01216,
+            "spread": 0.597
           },
           {
-            "amp": 0.00998,
+            "amp": 0.01167,
             "spread": 0.8
           },
           {
-            "amp": 0.00898,
+            "amp": 0.00942,
             "spread": 0.8
           },
           {
-            "amp": 0.0084,
-            "spread": 0.787
+            "amp": 0.00832,
+            "spread": 0.786
           },
           {
-            "amp": 0.00969,
+            "amp": 0.01007,
             "spread": 0.767
           },
           {
-            "amp": 0.00769,
-            "spread": 0.677
+            "amp": 0.00798,
+            "spread": 0.674
           },
           {
-            "amp": 0.00705,
-            "spread": 0.753
+            "amp": 0.00689,
+            "spread": 0.755
           },
           {
-            "amp": 0.00646,
-            "spread": 0.672
+            "amp": 0.00727,
+            "spread": 0.674
           },
           {
-            "amp": 0.00541,
-            "spread": 0.561
+            "amp": 0.00551,
+            "spread": 0.562
           },
           {
-            "amp": 0.00673,
-            "spread": 0.648
+            "amp": 0.00742,
+            "spread": 0.651
           },
           {
-            "amp": 0.00535,
+            "amp": 0.00536,
             "spread": 0.8
           },
           {
-            "amp": 0.00606,
-            "spread": 0.41
+            "amp": 0.00614,
+            "spread": 0.409
           },
           {
-            "amp": 0.00424,
-            "spread": 0.515
+            "amp": 0.00444,
+            "spread": 0.511
           },
           {
-            "amp": 0.00416,
-            "spread": 0.45
+            "amp": 0.00393,
+            "spread": 0.449
           },
           {
-            "amp": 0.00448,
-            "spread": 0.555
+            "amp": 0.00542,
+            "spread": 0.551
           },
           {
-            "amp": 0.00491,
-            "spread": 0.49
-          },
-          {
-            "amp": 0.00242,
+            "amp": 0.00494,
             "spread": 0.489
           },
           {
-            "amp": 0.00288,
-            "spread": 0.53
+            "amp": 0.00275,
+            "spread": 0.487
           },
           {
-            "amp": 0.00185,
+            "amp": 0.00267,
             "spread": 0.529
           },
           {
-            "amp": 0.00218,
-            "spread": 0.57
+            "amp": 0.002,
+            "spread": 0.527
           },
           {
-            "amp": 0.00223,
+            "amp": 0.00249,
             "spread": 0.569
           },
           {
-            "amp": 0.00243,
-            "spread": 0.61
+            "amp": 0.00221,
+            "spread": 0.567
           },
           {
-            "amp": 0.00184,
+            "amp": 0.00241,
             "spread": 0.609
           },
           {
-            "amp": 0.0025,
-            "spread": 0.65
+            "amp": 0.00193,
+            "spread": 0.607
           },
           {
-            "amp": 0.00284,
+            "amp": 0.00256,
             "spread": 0.649
           },
           {
-            "amp": 0.00239,
-            "spread": 0.69
+            "amp": 0.00269,
+            "spread": 0.647
           },
           {
-            "amp": 0.00156,
+            "amp": 0.00228,
             "spread": 0.689
           },
           {
-            "amp": 0.0017,
-            "spread": 0.73
+            "amp": 0.00177,
+            "spread": 0.687
           },
           {
-            "amp": 0.00058,
+            "amp": 0.00155,
             "spread": 0.729
           },
           {
-            "amp": 0.00146,
-            "spread": 0.77
+            "amp": 0.00065,
+            "spread": 0.727
           },
           {
-            "amp": 0.00204,
+            "amp": 0.00132,
             "spread": 0.769
           },
           {
-            "amp": 0.00103,
+            "amp": 0.00217,
+            "spread": 0.767
+          },
+          {
+            "amp": 0.00111,
             "spread": 0.8
           },
           {
-            "amp": 0.0001,
+            "amp": 0.00011,
             "spread": 0.8
           },
           {
-            "amp": 0.00014,
+            "amp": 0.00015,
             "spread": 0.8
           },
           {
@@ -10474,11 +10491,11 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00104,
+            "amp": 0.00119,
             "spread": 0.8
           },
           {
-            "amp": 0.00113,
+            "amp": 0.00132,
             "spread": 0.8
           },
           {
@@ -10486,7 +10503,7 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.00122,
+            "amp": 0.00139,
             "spread": 0.8
           }
         ]
@@ -10500,204 +10517,200 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.84562,
+            "amp": 0.73827,
             "spread": 0.8
           },
           {
-            "amp": 0.24184,
+            "amp": 0.25092,
             "spread": 0.8
           },
           {
-            "amp": 0.19497,
+            "amp": 0.18603,
             "spread": 0.8
           },
           {
-            "amp": 0.12937,
+            "amp": 0.12278,
             "spread": 0.8
           },
           {
-            "amp": 0.1308,
+            "amp": 0.12648,
             "spread": 0.8
           },
           {
-            "amp": 0.06274,
+            "amp": 0.05698,
             "spread": 0.8
           },
           {
-            "amp": 0.06418,
+            "amp": 0.0548,
             "spread": 0.8
           },
           {
-            "amp": 0.04276,
+            "amp": 0.03697,
             "spread": 0.8
           },
           {
-            "amp": 0.03423,
+            "amp": 0.0301,
             "spread": 0.8
           },
           {
-            "amp": 0.0253,
-            "spread": 0.757
+            "amp": 0.02223,
+            "spread": 0.765
           },
           {
-            "amp": 0.02069,
+            "amp": 0.01843,
             "spread": 0.8
           },
           {
-            "amp": 0.01881,
+            "amp": 0.01696,
             "spread": 0.8
           },
           {
-            "amp": 0.01365,
+            "amp": 0.01217,
             "spread": 0.8
           },
           {
-            "amp": 0.01196,
+            "amp": 0.01145,
             "spread": 0.8
           },
           {
-            "amp": 0.01585,
+            "amp": 0.01545,
             "spread": 0.8
           },
           {
-            "amp": 0.01216,
+            "amp": 0.01198,
             "spread": 0.8
           },
           {
-            "amp": 0.01251,
+            "amp": 0.01219,
             "spread": 0.8
           },
           {
-            "amp": 0.00911,
+            "amp": 0.00888,
             "spread": 0.8
           },
           {
-            "amp": 0.00741,
+            "amp": 0.007,
             "spread": 0.8
           },
           {
-            "amp": 0.0065,
+            "amp": 0.00613,
             "spread": 0.8
           },
           {
-            "amp": 0.00649,
+            "amp": 0.00565,
             "spread": 0.8
           },
           {
-            "amp": 0.00577,
+            "amp": 0.00508,
             "spread": 0.778
           },
           {
-            "amp": 0.0053,
+            "amp": 0.00462,
             "spread": 0.8
           },
           {
-            "amp": 0.00358,
+            "amp": 0.00323,
             "spread": 0.8
           },
           {
-            "amp": 0.00388,
-            "spread": 0.595
+            "amp": 0.00363,
+            "spread": 0.597
           },
           {
-            "amp": 0.00461,
+            "amp": 0.00406,
             "spread": 0.8
           },
           {
-            "amp": 0.00365,
+            "amp": 0.00323,
             "spread": 0.8
           },
           {
-            "amp": 0.00319,
-            "spread": 0.787
+            "amp": 0.00304,
+            "spread": 0.786
           },
           {
-            "amp": 0.00306,
+            "amp": 0.00285,
             "spread": 0.767
           },
           {
-            "amp": 0.00225,
-            "spread": 0.677
+            "amp": 0.00201,
+            "spread": 0.674
           },
           {
-            "amp": 0.00243,
-            "spread": 0.753
+            "amp": 0.00236,
+            "spread": 0.755
           },
           {
-            "amp": 0.00178,
-            "spread": 0.672
+            "amp": 0.00151,
+            "spread": 0.674
           },
           {
-            "amp": 0.00225,
-            "spread": 0.561
+            "amp": 0.00222,
+            "spread": 0.562
           },
           {
-            "amp": 0.00186,
-            "spread": 0.648
+            "amp": 0.00185,
+            "spread": 0.651
           },
           {
-            "amp": 0.00247,
+            "amp": 0.00234,
             "spread": 0.8
           },
           {
-            "amp": 0.00177,
-            "spread": 0.41
+            "amp": 0.00161,
+            "spread": 0.409
           },
           {
             "amp": 0.00163,
-            "spread": 0.515
+            "spread": 0.511
           },
           {
-            "amp": 0.00168,
-            "spread": 0.45
+            "amp": 0.00158,
+            "spread": 0.449
           },
           {
-            "amp": 0.00126,
-            "spread": 0.555
+            "amp": 0.00125,
+            "spread": 0.551
           },
           {
-            "amp": 0.00088,
-            "spread": 0.49
-          },
-          {
-            "amp": 0.00193,
+            "amp": 0.00087,
             "spread": 0.489
           },
           {
-            "amp": 0.00161,
-            "spread": 0.53
+            "amp": 0.00169,
+            "spread": 0.487
           },
           {
-            "amp": 0.00153,
+            "amp": 0.0014,
             "spread": 0.529
           },
           {
             "amp": 0.00133,
-            "spread": 0.57
+            "spread": 0.527
           },
           {
-            "amp": 0.00133,
+            "amp": 0.00116,
             "spread": 0.569
           },
           {
-            "amp": 0.0,
-            "spread": 0.61
+            "amp": 0.00116,
+            "spread": 0.567
           },
           {
             "amp": 0.0,
             "spread": 0.609
           },
           {
-            "amp": 0.00122,
-            "spread": 0.65
+            "amp": 0.0,
+            "spread": 0.607
           },
           {
-            "amp": 0.0,
+            "amp": 0.00106,
             "spread": 0.649
           },
           {
             "amp": 0.0,
-            "spread": 0.69
+            "spread": 0.647
           },
           {
             "amp": 0.0,
@@ -10705,7 +10718,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.73
+            "spread": 0.687
           },
           {
             "amp": 0.0,
@@ -10713,11 +10726,15 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.77
+            "spread": 0.727
           },
           {
             "amp": 0.0,
             "spread": 0.769
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.767
           },
           {
             "amp": 0.0,
@@ -10762,108 +10779,104 @@ export const MEASURED_PROFILES = {
             "spread": 0.8
           },
           {
-            "amp": 0.72346,
+            "amp": 0.68891,
             "spread": 0.8
           },
           {
-            "amp": 0.3114,
+            "amp": 0.30847,
             "spread": 0.8
           },
           {
-            "amp": 0.22301,
+            "amp": 0.20902,
             "spread": 0.8
           },
           {
-            "amp": 0.12785,
+            "amp": 0.11969,
             "spread": 0.8
           },
           {
-            "amp": 0.11802,
+            "amp": 0.11286,
             "spread": 0.8
           },
           {
-            "amp": 0.07232,
+            "amp": 0.06397,
             "spread": 0.8
           },
           {
-            "amp": 0.06083,
+            "amp": 0.06033,
             "spread": 0.8
           },
           {
-            "amp": 0.04044,
+            "amp": 0.04042,
             "spread": 0.8
           },
           {
-            "amp": 0.0279,
+            "amp": 0.02695,
             "spread": 0.8
           },
           {
-            "amp": 0.02763,
-            "spread": 0.757
+            "amp": 0.02387,
+            "spread": 0.765
           },
           {
-            "amp": 0.03209,
+            "amp": 0.0301,
             "spread": 0.8
           },
           {
-            "amp": 0.01523,
+            "amp": 0.01388,
             "spread": 0.8
           },
           {
-            "amp": 0.02071,
+            "amp": 0.01785,
             "spread": 0.8
           },
           {
-            "amp": 0.0113,
+            "amp": 0.01035,
             "spread": 0.8
           },
           {
-            "amp": 0.01094,
+            "amp": 0.01071,
             "spread": 0.8
           },
           {
-            "amp": 0.00648,
+            "amp": 0.00598,
             "spread": 0.8
           },
           {
-            "amp": 0.0112,
+            "amp": 0.01122,
             "spread": 0.8
           },
           {
-            "amp": 0.00539,
+            "amp": 0.00481,
             "spread": 0.8
           },
           {
-            "amp": 0.0047,
+            "amp": 0.00419,
             "spread": 0.8
           },
           {
-            "amp": 0.00408,
+            "amp": 0.00347,
             "spread": 0.8
           },
           {
-            "amp": 0.00248,
+            "amp": 0.00217,
             "spread": 0.8
           },
           {
-            "amp": 0.00314,
+            "amp": 0.00271,
             "spread": 0.778
           },
           {
-            "amp": 0.00203,
+            "amp": 0.00178,
             "spread": 0.8
           },
           {
-            "amp": 0.00083,
+            "amp": 0.00072,
             "spread": 0.8
           },
           {
             "amp": 0.0,
-            "spread": 0.595
-          },
-          {
-            "amp": 0.0,
-            "spread": 0.8
+            "spread": 0.597
           },
           {
             "amp": 0.0,
@@ -10871,7 +10884,11 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.787
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.786
           },
           {
             "amp": 0.0,
@@ -10879,23 +10896,23 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.677
+            "spread": 0.674
           },
           {
             "amp": 0.0,
-            "spread": 0.753
+            "spread": 0.755
           },
           {
             "amp": 0.0,
-            "spread": 0.672
+            "spread": 0.674
           },
           {
             "amp": 0.0,
-            "spread": 0.561
+            "spread": 0.562
           },
           {
             "amp": 0.0,
-            "spread": 0.648
+            "spread": 0.651
           },
           {
             "amp": 0.0,
@@ -10903,23 +10920,19 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.41
+            "spread": 0.409
           },
           {
             "amp": 0.0,
-            "spread": 0.515
+            "spread": 0.511
           },
           {
             "amp": 0.0,
-            "spread": 0.45
+            "spread": 0.449
           },
           {
             "amp": 0.0,
-            "spread": 0.555
-          },
-          {
-            "amp": 0.0,
-            "spread": 0.49
+            "spread": 0.551
           },
           {
             "amp": 0.0,
@@ -10927,7 +10940,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.53
+            "spread": 0.487
           },
           {
             "amp": 0.0,
@@ -10935,7 +10948,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.57
+            "spread": 0.527
           },
           {
             "amp": 0.0,
@@ -10943,7 +10956,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.61
+            "spread": 0.567
           },
           {
             "amp": 0.0,
@@ -10951,7 +10964,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.65
+            "spread": 0.607
           },
           {
             "amp": 0.0,
@@ -10959,7 +10972,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.69
+            "spread": 0.647
           },
           {
             "amp": 0.0,
@@ -10967,7 +10980,7 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.73
+            "spread": 0.687
           },
           {
             "amp": 0.0,
@@ -10975,11 +10988,15 @@ export const MEASURED_PROFILES = {
           },
           {
             "amp": 0.0,
-            "spread": 0.77
+            "spread": 0.727
           },
           {
             "amp": 0.0,
             "spread": 0.769
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.767
           },
           {
             "amp": 0.0,
@@ -11434,6 +11451,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1814
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.721
+    },
     "vowelFormants": {
       "a": {
         "formantsHz": [
@@ -12716,6 +12737,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1781
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.741
+    },
     "vowelFormants": {
       "a": {
         "formantsHz": [
@@ -14014,6 +14039,10 @@ export const MEASURED_PROFILES = {
         "width": 0.1883
       }
     ],
+    "resonancesFit": {
+      "method": "ensemble-rank-note-body-v2",
+      "splitHalfCorr": 0.975
+    },
     "vowelFormants": {
       "a": {
         "formantsHz": [

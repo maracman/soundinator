@@ -17,10 +17,11 @@ from typing import Any
 import numpy as np
 
 from scripts.fit_profiles_from_samples import analyse_note, load_mono, segment_notes, sf
+from scripts.tone_match.exclusions import is_excluded
 
 
 VELOCITY = {"pp": 0.2, "ff": 0.92}
-RESONATOR = {"flute": "string", "clarinet": "closedTube", "alto-sax": "conicalTube",
+RESONATOR = {"flute": "openTube", "clarinet": "closedTube", "alto-sax": "conicalTube",
              "trumpet": "conicalTube", "french-horn": "conicalTube"}
 
 # Every campaign spans named low/mid/high registers at pp and ff.  Filenames
@@ -164,6 +165,12 @@ def _seed(instrument: str, measured: dict[str, Any]) -> dict[str, Any]:
         "spectralDynamicAmount": 0.8 if instrument in {"clarinet", "alto-sax"} else 1.2,
         "dynamicBlare": 0.25 if instrument in {"alto-sax", "trumpet", "french-horn"} else 0.0,
     }
+    fit_provenance = profile.get("resonancesFit") or {}
+    if fit_provenance:
+        seed["bodyStability"] = {key: fit_provenance[key] for key in
+                                 ("splitHalfCorr", "peakHzA", "peakHzB",
+                                  "omittedReason")
+                                 if fit_provenance.get(key) is not None}
     resonances = profile.get("resonances") or []
     if len(resonances) >= 3:
         # Pin the exact WP-3 body evidence into the run report/checklist.
@@ -236,6 +243,8 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
     for alternate in PHILHARMONIA_ALTERNATES.get(instrument, []):
         family = "trumpet" if instrument == "trumpet" else "french horn"
         source = phil_root / family / alternate["file"]
+        if is_excluded(alternate["file"]):
+            continue  # T-012: owner-rejected take
         dynamic = alternate["dynamic"]
         target = notes_dir / f"phil-{alternate['register']}-{dynamic}-{alternate['midi']}.wav"
         midi, f0, duration = _write_reference(source, alternate["midi"], target)
@@ -250,6 +259,8 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
     for alternate in PHILHARMONIA_WOODWIND_ALTERNATES.get(instrument, []):
         family = "saxophone" if instrument == "alto-sax" else instrument
         source = phil_woodwind_root / family / alternate["file"]
+        if is_excluded(alternate["file"]):
+            continue  # T-012: owner-rejected take
         dynamic = alternate["dynamic"]
         target = notes_dir / f"phil-{alternate['register']}-{dynamic}-{alternate['midi']}.wav"
         midi, f0, duration = _write_reference(source, alternate["midi"], target)

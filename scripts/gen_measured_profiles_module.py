@@ -53,7 +53,7 @@ def main():
             "notesAnalysed": len(v.get("notesAnalysed", [])),
         }
         resonances = v.get("resonances")
-        if isinstance(resonances, list) and resonances:
+        if isinstance(resonances, list):
             entry["resonances"] = [{
                 "freq": round(row["freq"], 1),
                 "gain": round(row["gain"], 4),
@@ -61,6 +61,20 @@ def main():
             } for row in resonances if isinstance(row, dict) and
                 all(isinstance(row.get(key), (int, float))
                     for key in ("freq", "gain", "width"))]
+            # T-010: the engine-facing subset of the fit provenance — the
+            # JS consumer needs lowestF0Hz for the T-003 low-register
+            # application cap and reconstructionAmount for the T-004
+            # unity-at-default law; the engine's headless assertions fail
+            # when these fields are absent or unused.
+            fit = v.get("resonancesFit")
+            if isinstance(fit, dict):
+                entry["resonancesFit"] = {
+                    key: fit[key] for key in
+                    ("lowestF0Hz", "reconstructionAmount",
+                     "roundTripShapeMaxDb", "bodyClampMaxDb",
+                     "method", "splitHalfCorr", "peakHzA", "peakHzB",
+                     "omittedReason")
+                    if fit.get(key) is not None}
         vowel_formants = v.get("vowelFormants")
         if isinstance(vowel_formants, dict) and vowel_formants:
             entry["vowelFormants"] = vowel_formants

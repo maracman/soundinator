@@ -29,10 +29,17 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
-from .score import compare_features, extract_features, score_files, weights_for_instrument, write_report
+from .controllability import objective_contract_hash, manifest_contract_hash
+from .score import compare_features, extract_features, weights_for_instrument
+from .tripwires import (
+    aggregate_by_cell,
+    evaluate_tripwires,
+    tripwire_table_markdown,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
+MEASURABLE_REL_IMPROVEMENT = 1e-3
 
 
 @dataclass
@@ -107,9 +114,12 @@ def _floor_evidence(variability: dict[str, Any], best: dict[str, Any]) -> dict[s
                        "ratioToFloor": render_composite / max(floor_composite, 1e-12),
                        "atOrBelowFloor": render_composite <= floor_composite})
     construction_passed = bool(best.get("construction", {}).get("passed"))
-    demonstrated = construction_passed and all(row["atOrBelowFloor"] for row in groups)
+    tripwire_passed = bool(best.get("tripwires", {}).get("strictPassed"))
+    demonstrated = (construction_passed and tripwire_passed and
+                    all(row["atOrBelowFloor"] for row in groups))
     return {"status": "demonstrated" if demonstrated else "above-floor",
-            "constructionPassed": construction_passed, "groups": groups,
+            "constructionPassed": construction_passed,
+            "tripwirePassed": tripwire_passed, "groups": groups,
             "eligibleReferences": variability["eligibleReferences"]}
 
 
@@ -148,7 +158,21 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
              f"Best loss: `{summary['bestLoss']:.6f}`  \n",
              f"Improvement: `{summary['improvement']:.6f}`  \n",
              f"Construction gate: `{'pass' if summary['constructionPassed'] else 'fail'}`  \n",
+             f"§3 tripwire gate: `{'pass' if summary['tripwirePassed'] else 'fail'}`  \n",
              f"Reference-variability status: `{floor['status']}`\n\n"]
+    lines.extend(["## Controllability contract\n\n",
+                  f"Objective hash: `{summary['controllability']['objectiveHash']}`  \n",
+                  f"Manifest hash: `{summary['controllability']['manifestHash']}`  \n",
+                  f"Verdict: `{'CLEAN' if summary['controllability']['clean'] else 'NOT CLEAN'}`\n\n",
+                  "| Feature | Weight | Responsive parameters | Status |\n",
+                  "|---|---:|---|---|\n"])
+    for verdict in summary["controllability"]["verdicts"]:
+        responders = summary["controllability"]["responsiveParameters"].get(
+            verdict["feature"], [])
+        lines.append(f"| `{verdict['feature']}` | {verdict['weight']} | "
+                     f"{', '.join(f'`{key}`' for key in responders) or '—'} | "
+                     f"{verdict['status']} |\n")
+    lines.extend(["\n", tripwire_table_markdown(summary["tripwires"]), "\n"])
     if floor.get("groups"):
         lines.extend(["## Reference-variability evidence\n\n",
                       "| Same-note/dynamic group | Take↔take floor | Render↔reference | Ratio | At/below |\n",
@@ -189,9 +213,11 @@ def _params(manifest: dict, initial: dict, only: list[str] | None) -> list[FreeP
 
 
 class ToneMatcher:
-    def __init__(self, instrument: str, initial: dict, references: list[dict], free: list[FreeParam], run_dir: Path):
+    def __init__(self, instrument: str, initial: dict, references: list[dict],
+                 free: list[FreeParam], run_dir: Path, repo_root: Path = ROOT):
         self.instrument, self.initial, self.references, self.free = instrument, initial, references, free
         self.run_dir = run_dir
+        self.repo_root = repo_root
         self.evaluations: list[dict] = []
         self.best: dict | None = None
 
@@ -221,36 +247,67 @@ class ToneMatcher:
         jobs_path = target / "jobs.json"
         jobs_path.write_text(json.dumps(jobs))
         process = subprocess.run(["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],
-                                 cwd=ROOT, text=True, capture_output=True)
+                                 cwd=self.repo_root, text=True, capture_output=True)
         if process.returncode:
             raise RuntimeError(process.stderr or process.stdout)
-        scores = [score_files(ref["path"], job["out"], instrument=self.instrument, params=params,
-                              context={"register": ref.get("register"), "dynamic": ref.get("dynamic"),
-                                       "velocity": ref.get("velocity")})
-                  for ref, job in zip(self.references, jobs)]
-        construction_samples = [
-            ConstructionSample(render=extract_features(
-                                   job["out"], active_duration_s=ref.get("durationSec", 1.5)),
-                               reference=extract_features(ref["path"]),
-                               register=ref.get("register"), dynamic=ref.get("dynamic"),
-                               velocity=ref.get("velocity"))
-            for ref, job in zip(self.references, jobs)
-        ]
+        weights = weights_for_instrument(self.instrument)
+        scores, construction_samples, tripwire_notes = [], [], []
+        for ref, job in zip(self.references, jobs):
+            reference_bundle = extract_features(ref["path"])
+            render_bundle = extract_features(
+                job["out"], active_duration_s=ref.get("durationSec", 1.5))
+            score = compare_features(reference_bundle, render_bundle, weights)
+            scores.append(score)
+            construction_samples.append(ConstructionSample(
+                render=render_bundle, reference=reference_bundle,
+                register=ref.get("register"), dynamic=ref.get("dynamic"),
+                velocity=ref.get("velocity")))
+            tripwire_notes.append({
+                "register": ref.get("register"),
+                "dynamic": ref.get("dynamic"),
+                "result": score,
+                "ref": reference_bundle,
+                "render": render_bundle,
+            })
         construction = evaluate_construction(self.instrument, construction_samples, params=params,
                                              strict_evidence=True)
+        raw_tripwires = evaluate_tripwires(self.instrument, tripwire_notes)
+        required_cells = sorted({
+            (str(ref.get("register")), str(ref.get("dynamic")))
+            for ref in self.references
+            if ref.get("register") is not None and ref.get("dynamic") is not None
+        })
+        tripwires = {
+            **raw_tripwires,
+            **aggregate_by_cell(
+                raw_tripwires,
+                required_cells=required_cells,
+                family=params.get("sg2Family"),
+            ),
+        }
+        tripwire_failures = (
+            sum(row["status"] == "fail" for row in tripwires["cells"]) +
+            len(tripwires["strictMissingCells"])
+        )
         loss = float(np.mean([row["composite"] for row in scores]))
         # Construction is a hard gate, not another feature that a low
         # composite can average away.  The large objective penalty guides
         # Powell back into a valid topology while reports retain raw loss.
-        gate_penalty = 100.0 * construction["counts"]["fail"]
+        gate_failures = construction["counts"]["fail"] + tripwire_failures
+        gate_penalty = 100.0 * gate_failures
         objective = loss + gate_penalty
         record = {"evaluation": index, "loss": loss, "params": {p.key: params[p.key] for p in self.free},
-                  "objective": objective, "construction": construction, "scores": scores}
+                  "objective": objective, "gateFailures": gate_failures,
+                  "construction": construction, "tripwires": tripwires,
+                  "scores": scores}
         self.evaluations.append(record)
         (self.run_dir / "loss_curve.json").write_text(json.dumps(self.evaluations, indent=2) + "\n")
-        if self.best is None or (construction["counts"]["fail"], loss) < (self.best["construction"]["counts"]["fail"], self.best["loss"]):
+        if self.best is None or (gate_failures, loss) < (
+                self.best["gateFailures"], self.best["loss"]):
             self.best = {"loss": loss, "objective": objective, "params": params, "evaluation": index,
-                         "construction": construction, "scores": scores}
+                         "gateFailures": gate_failures,
+                         "construction": construction, "tripwires": tripwires,
+                         "scores": scores}
             (self.run_dir / "best.json").write_text(json.dumps(self.best, indent=2) + "\n")
         if not retain_audio and self.best and self.best["evaluation"] != index:
             for job in jobs:
@@ -280,6 +337,42 @@ def _reference_set_id(references: list[dict[str, Any]], instrument: str | None =
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
+def _free_manifest_contract(free: list[FreeParam]) -> list[dict[str, Any]]:
+    return [{"key": row.key, "min": row.lo, "max": row.hi,
+             "default": row.default} for row in free]
+
+
+def _consume_controllability_audit(path: Path, instrument: str,
+                                   references: list[dict[str, Any]],
+                                   free: list[FreeParam],
+                                   weights: dict[str, float]) -> dict[str, Any]:
+    if not path.exists():
+        raise ValueError(f"missing controllability audit: {path}")
+    audit = _load(path)
+    expected_objective = objective_contract_hash(instrument, references, weights)
+    expected_manifest = manifest_contract_hash(_free_manifest_contract(free))
+    errors = []
+    if audit.get("instrument") != instrument:
+        errors.append(f"instrument {audit.get('instrument')!r} != {instrument!r}")
+    if audit.get("objectiveHash") != expected_objective:
+        errors.append("reference objective hash mismatch")
+    if audit.get("manifestHash") != expected_manifest:
+        errors.append("free-parameter manifest hash mismatch")
+    if audit.get("finalWeights") != weights:
+        errors.append("final scoring weights mismatch")
+    uncontrolled = [
+        feature for feature, weight in weights.items()
+        if weight > 0 and not audit.get("responsiveParameters", {}).get(feature)
+    ]
+    if uncontrolled:
+        errors.append(f"weighted features without responder: {uncontrolled}")
+    if not audit.get("clean"):
+        errors.append(f"audit is not clean: {audit.get('uncontrolledWeightedFeatures', [])}")
+    if errors:
+        raise ValueError(f"invalid controllability audit {path}: " + "; ".join(errors))
+    return audit
+
+
 def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
                         reference_set: str) -> tuple[bool, float | None]:
     board_path = DEFAULT_RUN_ROOT / instrument / "leaderboard.json"
@@ -287,19 +380,40 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
     board = _load(board_path) if board_path.exists() else {"instrument": instrument, "runs": []}
     comparable = [row for row in board.get("runs", [])
                   if row.get("referenceSet") == reference_set]
-    previous = min(comparable, key=lambda row: (row.get("constructionFailures", 0), row["loss"])) \
+    previous = min(comparable, key=lambda row: (row.get("gateFailures",
+                                                        row.get("constructionFailures", 0)),
+                                                row["loss"])) \
         if comparable else None
     previous_loss = float(previous["loss"]) if previous and "loss" in previous else None
     entry = {"run": run_dir.name, "loss": best["loss"], "params": best["params"], "time": time.time(),
              "referenceSet": reference_set,
              "constructionPassed": bool(best.get("construction", {}).get("passed")),
-             "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0))}
+             "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0)),
+             "tripwirePassed": bool(best.get("tripwires", {}).get("strictPassed")),
+             "tripwireFailures": int(
+                 sum(row.get("status") == "fail"
+                     for row in best.get("tripwires", {}).get("cells", [])) +
+                 len(best.get("tripwires", {}).get("strictMissingCells", []))),
+             "gateFailures": int(best.get("gateFailures", 0))}
     board["runs"].append(entry)
-    board["runs"].sort(key=lambda row: (row.get("referenceSet", ""),
-                                        row.get("constructionFailures", 0), row["loss"]))
-    current = min((row for row in board["runs"] if row.get("referenceSet") == reference_set),
-                  key=lambda row: (row.get("constructionFailures", 0), row["loss"]))
-    improved = current["run"] == run_dir.name
+    board["runs"].sort(key=lambda row: (
+        row.get("referenceSet", ""),
+        row.get("gateFailures", row.get("constructionFailures", 0)),
+        row["loss"]))
+    if previous is None:
+        current = entry
+        improved = True
+    else:
+        previous_gates = previous.get(
+            "gateFailures", previous.get("constructionFailures", 0))
+        entry_gates = entry.get("gateFailures", entry.get("constructionFailures", 0))
+        improved = (
+            entry_gates < previous_gates or
+            (entry_gates == previous_gates and
+             entry["loss"] < previous["loss"] *
+             (1.0 - MEASURABLE_REL_IMPROVEMENT))
+        )
+        current = entry if improved else previous
     board.setdefault("bestByReferenceSet", {})[reference_set] = current
     board["best"] = current
     board_path.write_text(json.dumps(board, indent=2) + "\n")
@@ -335,8 +449,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-sensitivity", action="store_true")
     parser.add_argument("--limiting-factor", help="evidenced plateau cause when this run neither improves nor reaches the floor")
     parser.add_argument("--work-item", help="concrete fix to file for --limiting-factor")
+    parser.add_argument("--controllability",
+                        help="hashed controllability.json; defaults to the campaign audit")
+    parser.add_argument("--repo-root", type=Path, default=ROOT,
+                        help="engine checkout used for headless renders")
     args = parser.parse_args(argv)
     initial, references, manifest = _load(args.initial), _load(args.references), _load(args.manifest)
+    # T-012 consuming-side assertion: an owner-rejected take must never be
+    # scored, floored, or hashed into the objective id.
+    from .exclusions import assert_no_excluded
+    assert_no_excluded(references, f"{args.instrument} campaign manifest")
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
     scoring_weights = weights_for_instrument(args.instrument)
@@ -345,10 +467,17 @@ def main(argv: list[str] | None = None) -> int:
     free = _params(manifest, initial, only)
     if not free:
         raise SystemExit("no applicable free parameters")
+    audit_path = (Path(args.controllability) if args.controllability else
+                  DEFAULT_RUN_ROOT / "campaigns" / args.instrument /
+                  "audit" / "controllability.json")
+    controllability = _consume_controllability_audit(
+        audit_path, args.instrument, references, free, scoring_weights)
     run_dir = DEFAULT_RUN_ROOT / args.instrument / args.run
     run_dir.mkdir(parents=True, exist_ok=False)
-    (run_dir / "run.json").write_text(json.dumps(vars(args), indent=2) + "\n")
-    matcher = ToneMatcher(args.instrument, initial, references, free, run_dir)
+    (run_dir / "run.json").write_text(
+        json.dumps(vars(args), indent=2, default=str) + "\n")
+    matcher = ToneMatcher(args.instrument, initial, references, free, run_dir,
+                          repo_root=args.repo_root)
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
@@ -369,7 +498,9 @@ def main(argv: list[str] | None = None) -> int:
     if improved:
         _append_ledger(args.instrument, run_dir, best, sensitivity, free)
     floor = _floor_evidence(variability, best)
-    measurable_improvement = improved and baseline - best["loss"] > 1e-6
+    relative_improvement = ((baseline - best["loss"]) / max(abs(baseline), 1e-12))
+    measurable_improvement = (
+        improved and relative_improvement >= MEASURABLE_REL_IMPROVEMENT)
     if floor["status"] == "demonstrated":
         outcome = {"state": "reference-variability-floor"}
     elif measurable_improvement:
@@ -387,6 +518,9 @@ def main(argv: list[str] | None = None) -> int:
                "leaderboardImproved": improved, "previousBestLoss": previous_best_loss,
                "referenceSet": reference_set,
                "constructionPassed": bool(best.get("construction", {}).get("passed")),
+               "tripwirePassed": bool(best.get("tripwires", {}).get("strictPassed")),
+               "tripwires": best.get("tripwires", {}),
+               "controllability": controllability,
                "referenceVariabilityFloor": floor, "dominantResidual": _dominant_residual(best),
                "sessionOutcome": outcome}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
