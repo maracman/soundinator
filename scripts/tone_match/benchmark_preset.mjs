@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Reproducible T-B7 model/oscillator/automation benchmark for factory sounds. */
 
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 
 import { FACTORY_PRESETS } from "../../web/static/factory-presets.js";
@@ -13,7 +13,8 @@ import {
 } from "../../web/static/synth.js";
 
 function args(argv) {
-  const result = { preset: "factory-sub-alto-sax-sg2", iterations: 2000, threshold: null, out: null };
+  const result = { preset: "factory-sub-alto-sax-sg2", params: null, id: null,
+    iterations: 2000, threshold: null, out: null };
   for (let i = 0; i < argv.length; i += 2) {
     const key = argv[i]?.replace(/^--/, "");
     if (!(key in result) || argv[i + 1] == null) throw new Error(`unknown/incomplete argument: ${argv[i]}`);
@@ -62,12 +63,17 @@ function measure(preset, iterations) {
 
 const options = args(process.argv.slice(2));
 const sounds = FACTORY_PRESETS.filter(row => row.section === "sound");
-const factorySelected = sounds.find(row => row.id === options.preset);
-if (!factorySelected) throw new Error(`unknown sound preset: ${options.preset}`);
-const selected = Number.isFinite(options.threshold)
-  ? { ...factorySelected, parameters: { ...factorySelected.parameters, spectralCullThreshold: options.threshold } }
+const factorySelected = options.params ? null : sounds.find(row => row.id === options.preset);
+if (!options.params && !factorySelected) throw new Error(`unknown sound preset: ${options.preset}`);
+const supplied = options.params ? JSON.parse(await readFile(options.params, "utf8")) : null;
+const baseSelected = supplied
+  ? { id: options.id || "campaign-preset", parameters: supplied.params || supplied }
   : factorySelected;
-const baselines = sounds.filter(row => row.id !== factorySelected.id).map(row => measure(row, options.iterations));
+const selected = Number.isFinite(options.threshold)
+  ? { ...baseSelected, parameters: { ...baseSelected.parameters, spectralCullThreshold: options.threshold } }
+  : baseSelected;
+const baselines = sounds.filter(row => !factorySelected || row.id !== factorySelected.id)
+  .map(row => measure(row, options.iterations));
 const result = measure(selected, options.iterations);
 const median = (values) => values.slice().sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const baseline = {

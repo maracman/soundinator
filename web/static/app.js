@@ -647,6 +647,10 @@ const PARAM_DESC = {
   spectralRegisterAmount: "How strongly note range reshapes each harmonic amplitude",
   spectralResonanceAmount: "How strongly fixed instrument resonances reshape absolute harmonic frequencies",
   partialMaterial: "Damping law for the harmonic partials: low values let every partial ring (glass, metal); high values make the upper partials die away quickly (wood, felt). Applied per note, faster decay for higher harmonics",
+  releaseDamping: "Independent damping applied only after note-off: 0 preserves the material ring; 1 models firm damper or hand contact without changing the held-note spectrum or decay",
+  polarisationAmount: "Energy placed in a second close mode for string-polarisation or unison beating; 0 is the exact one-mode sound",
+  polarisationSplitCents: "Frequency separation of the coupled polarisation mode in cents; inert while polarisation amount is 0",
+  polarisationDecayRatio: "Second-mode T60 relative to the primary mode; changes the late/early beating balance without moving either frequency",
   excitationType: "How energy enters the resonator: bow (continuous drive), pluck (displacement release), strike (force impulse), blow (air jet). Sets the physical drive spectrum",
   excitationPosition: "Where the string/tube/membrane is excited (0.02 near the edge to 0.5 the middle). Modes with a node at this point go silent — 0.5 kills every even partial, 0.33 every third. Applied relative to the instrument's natural position",
   excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
@@ -661,6 +665,7 @@ const PARAM_DESC = {
   articulationCoupling: "Couples one seeded articulation-strength draw across the onset: stronger tongue raises the plosive, reduces breath lead, and suppresses pitch scoop; 0 is neutral",
   articulationStrength: "Mean onset articulation from breath-started (0) to strongly tongued/accented (1)",
   articulationVariation: "Human-scaled per-note variation around articulation strength; all onset consequences share this one draw",
+  articulationVelocitySlope: "Within-instrument dynamic slope of the shared articulation draw: positive makes forte more firmly articulated and soft starts more breath-led; 0 is neutral",
   onsetScoopDepthCents: "Measured maximum phrase-start pitch approach from below for weak articulation at full Human; Human 0 hits pitch exactly and depth 0 disables the fitted scoop model",
   onsetScoopSettle: "Measured time for an onset pitch scoop to settle onto the target",
   onsetScoopRearticulatedScale: "Scoop depth retained for a separately tongued note inside a phrase; legato always has zero scoop",
@@ -9080,8 +9085,8 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
-    "dynamicBlare","decaySecondStage","decaySecondRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
+    "dynamicBlare","decaySecondStage","decaySecondRatio","releaseDamping","polarisationAmount","polarisationSplitCents","polarisationDecayRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF1Level","formantF2Level","formantF3Level","formantF4Level","formantF5Level","formantBandwidth","bodyArticulation",
@@ -14412,6 +14417,7 @@ function chInspectorHTML(p) {
           ${controlRow("articulationCoupling", "Coupled articulation", p.articulationCoupling ?? 0, 0, 1, 0.01)}
           ${controlRow("articulationStrength", "Articulation strength", p.articulationStrength ?? 0.5, 0, 1, 0.01)}
           ${controlRow("articulationVariation", "Articulation variation", p.articulationVariation ?? 0, 0, 1, 0.01)}
+          ${controlRow("articulationVelocitySlope", "Articulation velocity", p.articulationVelocitySlope ?? 0, -1.5, 1.5, 0.01)}
           ${controlRow("onsetScoopDepthCents", "Scoop depth (cents)", p.onsetScoopDepthCents ?? 0, 0, 180, 1)}
           ${controlRow("onsetScoopSettle", "Scoop settle", p.onsetScoopSettle ?? 0.06, 0.015, 0.35, 0.005)}
           ${controlRow("onsetScoopRearticulatedScale", "Inside-phrase scoop", p.onsetScoopRearticulatedScale ?? 0.35, 0, 1, 0.01)}
@@ -14449,13 +14455,17 @@ function chInspectorHTML(p) {
         <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery.">Advanced shaping</summary>
         <label class="control-row" title="${esc(PARAM_DESC.resonatorClass || "Physical resonator mode series")}"><span>Resonator class</span>
           <select data-param-select="resonatorClass" class="param-select">
-            ${[["string","String / open tube"],["closedTube","Closed tube"],["conicalTube","Conical tube"],["membrane","Membrane"],["bar","Bar / plate"]].map(([value,label]) => `<option value="${value}"${(p.resonatorClass || "string") === value ? " selected" : ""}>${label}</option>`).join("")}
+            ${[["string","String"],["openTube","Open cylindrical tube"],["closedTube","Closed tube"],["conicalTube","Conical tube"],["membrane","Membrane"],["bar","Bar / plate"]].map(([value,label]) => `<option value="${value}"${(p.resonatorClass || "string") === value ? " selected" : ""}>${label}</option>`).join("")}
           </select>
         </label>
         <div class="controls-grid">
           ${controlRow("dynamicBlare", "Forte curvature", p.dynamicBlare ?? 0, 0, 1.5, 0.01)}
           ${controlRow("decaySecondStage", "Second decay", p.decaySecondStage ?? 0, 0, 1, 0.01)}
           ${controlRow("decaySecondRatio", "Late T60 ratio", p.decaySecondRatio ?? 1, 1, 8, 0.1)}
+          ${controlRow("releaseDamping", "Release damping", p.releaseDamping ?? 0, 0, 1, 0.01)}
+          ${controlRow("polarisationAmount", "Polarisation modes", p.polarisationAmount ?? 0, 0, 1, 0.01)}
+          ${controlRow("polarisationSplitCents", "Mode split (cents)", p.polarisationSplitCents ?? 0, 0, 6, 0.01)}
+          ${controlRow("polarisationDecayRatio", "Second-mode T60", p.polarisationDecayRatio ?? 1, 0.25, 4, 0.01)}
           ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
           ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
           ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}

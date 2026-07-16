@@ -358,6 +358,7 @@ export const DEFAULTS = {
   articulationCoupling: 0,
   articulationStrength: 0.5,
   articulationVariation: 0,
+  articulationVelocitySlope: 0,
   onsetScoopDepthCents: 0,
   onsetScoopSettle: 0.06,
   onsetScoopRearticulatedScale: 0.35,
@@ -540,6 +541,12 @@ export const DEFAULTS = {
   // Material damping law: 0 = glass/metal (all partials ring), 1 = wood/felt
   // (high partials die fast). Per-instrument defaults ride the profile.
   partialMaterial: 0.45,
+  // Independent note-off damping: 0 preserves the material ring; 1 models
+  // firm damper/hand contact without changing the held-note decay law.
+  releaseDamping: 0,
+  polarisationAmount: 0,
+  polarisationSplitCents: 0,
+  polarisationDecayRatio: 1,
   // Partial macros: transforms over the whole harmonic set (see
   // docs/PARTIAL_MACROS_DESIGN.md). Tilt = spectral slope; odd/even
   // balance; comb = movable boost of a related-frequency group; six

@@ -29,6 +29,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
+from .audition import build as build_audition
 from .score import compare_features, extract_features, score_files, weights_for_instrument, write_report
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -79,7 +80,8 @@ def _reference_variability(references: list[dict[str, Any]], feature_loader=extr
             for right in indices[offset + 1:]:
                 result = compare_features(cache[left], cache[right], weights)
                 pairs.append({"left": left, "right": right, "composite": result["composite"],
-                              "features": result["features"], "normalized": result["normalized"]})
+                              "features": result["features"], "normalized": result["normalized"],
+                              "bandBalance": result.get("bandBalance")})
         feature_keys = pairs[0]["features"]
         rows.append({
             "group": key,
@@ -88,6 +90,13 @@ def _reference_variability(references: list[dict[str, Any]], feature_loader=extr
             "floorComposite": float(np.median([row["composite"] for row in pairs])),
             "floorFeatures": {name: float(np.median([row["features"][name] for row in pairs]))
                               for name in feature_keys},
+            "floorBandMaxOctaveDb": float(np.median([
+                row["bandBalance"]["maxOctaveDb"] for row in pairs
+                if row.get("bandBalance") and
+                row["bandBalance"].get("maxOctaveDb") is not None
+            ])) if any(row.get("bandBalance") and
+                       row["bandBalance"].get("maxOctaveDb") is not None
+                       for row in pairs) else None,
             "pairs": pairs,
         })
     return {"status": "measured", "groups": rows,
@@ -111,6 +120,52 @@ def _floor_evidence(variability: dict[str, Any], best: dict[str, Any]) -> dict[s
     return {"status": "demonstrated" if demonstrated else "above-floor",
             "constructionPassed": construction_passed, "groups": groups,
             "eligibleReferences": variability["eligibleReferences"]}
+
+
+def _band_limits_for_reference(index: int, variability: dict[str, Any]) -> tuple[float, float]:
+    """T-005 bars widen to measured duplicate-take variability, never shrink."""
+    if variability.get("status") == "measured":
+        for group in variability.get("groups", []):
+            if index in group.get("referenceIndices", []):
+                mean_floor = group.get("floorFeatures", {}).get("band_balance_db")
+                max_floor = group.get("floorBandMaxOctaveDb")
+                return (max(3.0, float(mean_floor)) if mean_floor is not None else 3.0,
+                        max(6.0, float(max_floor)) if max_floor is not None else 6.0)
+    return 3.0, 6.0
+
+
+def _tripwire_gate(scores: list[dict[str, Any]], references: list[dict[str, Any]],
+                   variability: dict[str, Any], construction: dict[str, Any]) -> dict[str, Any]:
+    """Campaign-level §3 gate with owner-readable rows per register/dynamic."""
+    rows = []
+    failure_count = 0
+    for index, (score, reference) in enumerate(zip(scores, references)):
+        mean_limit, max_limit = _band_limits_for_reference(index, variability)
+        checks = []
+        for original in score.get("tripwires", {}).get("rows", []):
+            check = dict(original)
+            if check["name"] == "band-balance-mean":
+                observed = check.get("observed")
+                check.update(status="pass" if observed is not None and observed <= mean_limit else "fail",
+                             limit=f"<= {mean_limit:.3f} dB (3 dB or take floor)")
+            elif check["name"] == "band-balance-max-octave":
+                observed = check.get("observed")
+                check.update(status="pass" if observed is not None and observed <= max_limit else "fail",
+                             limit=f"<= {max_limit:.3f} dB (6 dB or take floor)")
+            checks.append(check)
+        failed = [row for row in checks if row["status"] == "fail"]
+        missing = [row for row in checks if row["status"] == "not-applicable" and
+                   row["name"] != "inharmonicity-b"]
+        passed = not failed and not missing
+        failure_count += len(failed) + len(missing)
+        rows.append({"referenceIndex": index, "register": reference.get("register"),
+                     "dynamic": reference.get("dynamic"), "midi": reference.get("midi"),
+                     "passed": passed, "checks": checks,
+                     "bandBalance": score.get("bandBalance")})
+    return {"passed": bool(construction.get("passed")) and failure_count == 0,
+            "constructionPassed": bool(construction.get("passed")),
+            "failureCount": failure_count + int(construction.get("counts", {}).get("fail", 0)),
+            "rows": rows}
 
 
 def _dominant_residual(best: dict[str, Any]) -> dict[str, Any] | None:
@@ -140,6 +195,53 @@ def _file_work_item(instrument: str, run_dir: Path, factor: str, action: str) ->
     return path
 
 
+def _benchmark_resources(run_dir: Path, instrument: str, best: dict[str, Any]) -> dict[str, Any]:
+    params_path = run_dir / "best-params.json"
+    params_path.write_text(json.dumps(best["params"], indent=2) + "\n")
+    output_path = run_dir / "resource-benchmark.json"
+    process = subprocess.run([
+        "node", "scripts/tone_match/benchmark_preset.mjs", "--params", str(params_path),
+        "--id", instrument, "--iterations", "500", "--out", str(output_path),
+    ], cwd=ROOT, text=True, capture_output=True)
+    if process.returncode:
+        return {"passed": False, "error": process.stderr or process.stdout}
+    return _load(output_path)
+
+
+def _build_listening_page(run_dir: Path, instrument: str, best: dict[str, Any],
+                          references: list[dict[str, Any]]) -> dict[str, Any]:
+    render_dir = run_dir / "renders" / f"eval-{int(best['evaluation']):04d}"
+    manifest = [{
+        "label": f"{instrument} · {reference.get('register', '?')} · {reference.get('dynamic', '?')}",
+        "instrument": instrument, "reference": reference["path"],
+        "render": str(render_dir / f"note-{index}.wav"),
+    } for index, reference in enumerate(references)]
+    manifest_path = run_dir / "audition-manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    listen_path = run_dir / f"listen-{instrument}-{run_dir.name}.html"
+    build_audition(str(manifest_path), str(listen_path))
+    return {"bestRenderDirectory": str(render_dir), "listeningPage": str(listen_path),
+            "auditionManifest": str(manifest_path)}
+
+
+def _technique_exchange_statuses() -> list[dict[str, str]]:
+    path = ROOT / "docs" / "sg2" / "TECHNIQUES_EXCHANGE.md"
+    if not path.exists():
+        return [{"id": "exchange", "title": "techniques exchange",
+                 "engine": "FAIL: file missing from branch"}]
+    statuses, current_id, title = [], None, ""
+    for line in path.read_text().splitlines():
+        if line.startswith("### T-"):
+            heading = line[4:].strip()
+            current_id, _, title = heading.partition(" · ")
+        elif current_id and line.startswith("Status:"):
+            engine = line.split("engine=", 1)[1].split(" analysis=", 1)[0].strip() \
+                if "engine=" in line else "missing"
+            statuses.append({"id": current_id, "title": title, "engine": engine})
+            current_id = None
+    return statuses
+
+
 def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
     floor = summary["referenceVariabilityFloor"]
     lines = [f"# SG2 run report — {summary['instrument']} / {summary['run']}\n\n",
@@ -167,6 +269,55 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
         lines.extend(["\n## Filed limiting factor\n\n",
                       f"Factor: {outcome['limitingFactor']}\n\n",
                       f"Fix: {outcome['workItem']}\n"])
+    gate = summary["tripwireGate"]
+    check_names = [row["name"] for row in gate["rows"][0]["checks"]] if gate.get("rows") else []
+    lines.extend(["\n## Automated §3 gate — " + ("PASS" if summary["automatedGatePassed"] else "FAIL") + "\n\n",
+                  "| Register | Dynamic | MIDI | " + " | ".join(check_names) + " | Row |\n",
+                  "|---|---|---:|" + "---:|" * len(check_names) + "---:|\n"])
+    for row in gate.get("rows", []):
+        by_name = {check["name"]: check for check in row["checks"]}
+        marks = [("PASS" if by_name[name]["status"] == "pass" else
+                  "N/A" if by_name[name]["status"] == "not-applicable" else "FAIL")
+                 for name in check_names]
+        lines.append(f"| {row.get('register') or '?'} | {row.get('dynamic') or '?'} | "
+                     f"{row.get('midi') or '?'} | " + " | ".join(marks) +
+                     f" | {'PASS' if row['passed'] else 'FAIL'} |\n")
+    construction = summary["construction"]
+    lines.extend(["\n### Construction checklist\n\n",
+                  "| Assertion | Status | Requirement |\n|---|:---:|---|\n"])
+    for row in construction.get("assertions", []):
+        lines.append(f"| `{row['id']}` | {row['status'].upper()} | {row['requirement']} |\n")
+    resource = summary["resourceTripwire"]
+    lines.extend(["\n### Resource tripwire\n\n",
+                  f"Overall: **{'PASS' if resource.get('passed') else 'FAIL'}**.  \n",
+                  f"Oscillators: `{resource.get('preset', {}).get('oscillators', 'n/a')}`; "
+                  f"automation events/note: `{resource.get('preset', {}).get('automationEventsPerNote', 'n/a')}`; "
+                  f"model ms/note: `{resource.get('preset', {}).get('modelMsPerNote', 'n/a')}`.\n"])
+    lines.extend(["\n## Controllability\n\n",
+                  "| Parameter | Fitted | −10% loss | +10% loss | Mean increase |\n",
+                  "|---|---:|---:|---:|---:|\n"])
+    for key in summary.get("freeParameters", []):
+        sensitivity = summary.get("sensitivity", {}).get(key)
+        if sensitivity:
+            lines.append(f"| `{key}` | {summary['bestParams'].get(key)} | "
+                         f"{sensitivity['minus']:.6f} | {sensitivity['plus']:.6f} | "
+                         f"{sensitivity['increase']:.6f} |\n")
+        else:
+            lines.append(f"| `{key}` | {summary['bestParams'].get(key)} | not run | not run | not run |\n")
+    lines.extend(["\n## Techniques exchange statuses\n\n",
+                  "| Entry | Engine/blown status |\n|---|---|\n"])
+    for row in summary.get("exchangeStatuses", []):
+        lines.append(f"| `{row['id']}` {row['title']} | {row['engine']} |\n")
+    board = summary["leaderboardState"]
+    lines.extend(["\n## Leaderboard state\n\n",
+                  f"Reference set: `{summary['referenceSet']}`. Current run is "
+                  f"**{'leader' if board['isLeader'] else 'not leader'}**; "
+                  f"previous comparable best: `{board.get('previousBestLoss')}`; "
+                  f"current loss: `{summary['bestLoss']:.6f}`.\n",
+                  "\n## Owner render directories\n\n",
+                  f"Best renders: `{summary['renderArtifacts']['bestRenderDirectory']}`  \n",
+                  f"Listening page: `{summary['renderArtifacts']['listeningPage']}`  \n",
+                  f"Manifest: `{summary['renderArtifacts']['auditionManifest']}`\n"])
     path.write_text("".join(lines), encoding="utf-8")
 
 
@@ -189,9 +340,10 @@ def _params(manifest: dict, initial: dict, only: list[str] | None) -> list[FreeP
 
 
 class ToneMatcher:
-    def __init__(self, instrument: str, initial: dict, references: list[dict], free: list[FreeParam], run_dir: Path):
+    def __init__(self, instrument: str, initial: dict, references: list[dict],
+                 free: list[FreeParam], run_dir: Path, variability: dict[str, Any]):
         self.instrument, self.initial, self.references, self.free = instrument, initial, references, free
-        self.run_dir = run_dir
+        self.run_dir, self.variability = run_dir, variability
         self.evaluations: list[dict] = []
         self.best: dict | None = None
 
@@ -228,29 +380,36 @@ class ToneMatcher:
                               context={"register": ref.get("register"), "dynamic": ref.get("dynamic"),
                                        "velocity": ref.get("velocity")})
                   for ref, job in zip(self.references, jobs)]
-        construction_samples = [
-            ConstructionSample(render=extract_features(
-                                   job["out"], active_duration_s=ref.get("durationSec", 1.5)),
-                               reference=extract_features(ref["path"]),
-                               register=ref.get("register"), dynamic=ref.get("dynamic"),
-                               velocity=ref.get("velocity"))
-            for ref, job in zip(self.references, jobs)
-        ]
+        construction_samples = []
+        for ref_index, (ref, job) in enumerate(zip(self.references, jobs)):
+            mean_limit, max_limit = _band_limits_for_reference(ref_index, self.variability)
+            construction_samples.append(ConstructionSample(
+                render=extract_features(job["out"], active_duration_s=ref.get("durationSec", 1.5)),
+                reference=extract_features(ref["path"]), register=ref.get("register"),
+                dynamic=ref.get("dynamic"), velocity=ref.get("velocity"),
+                band_mean_limit_db=mean_limit, band_max_octave_limit_db=max_limit))
         construction = evaluate_construction(self.instrument, construction_samples, params=params,
                                              strict_evidence=True)
+        tripwire_gate = _tripwire_gate(scores, self.references, self.variability, construction)
         loss = float(np.mean([row["composite"] for row in scores]))
         # Construction is a hard gate, not another feature that a low
         # composite can average away.  The large objective penalty guides
         # Powell back into a valid topology while reports retain raw loss.
-        gate_penalty = 100.0 * construction["counts"]["fail"]
+        gate_penalty = 100.0 * construction["counts"]["fail"] + 25.0 * tripwire_gate["failureCount"]
         objective = loss + gate_penalty
         record = {"evaluation": index, "loss": loss, "params": {p.key: params[p.key] for p in self.free},
-                  "objective": objective, "construction": construction, "scores": scores}
+                  "objective": objective, "construction": construction,
+                  "tripwireGate": tripwire_gate, "scores": scores}
         self.evaluations.append(record)
         (self.run_dir / "loss_curve.json").write_text(json.dumps(self.evaluations, indent=2) + "\n")
-        if self.best is None or (construction["counts"]["fail"], loss) < (self.best["construction"]["counts"]["fail"], self.best["loss"]):
+        candidate_key = (construction["counts"]["fail"], tripwire_gate["failureCount"], loss)
+        best_key = ((self.best["construction"]["counts"]["fail"],
+                     self.best["tripwireGate"]["failureCount"], self.best["loss"])
+                    if self.best else None)
+        if self.best is None or candidate_key < best_key:
             self.best = {"loss": loss, "objective": objective, "params": params, "evaluation": index,
-                         "construction": construction, "scores": scores}
+                         "construction": construction, "tripwireGate": tripwire_gate,
+                         "scores": scores}
             (self.run_dir / "best.json").write_text(json.dumps(self.best, indent=2) + "\n")
         if not retain_audio and self.best and self.best["evaluation"] != index:
             for job in jobs:
@@ -287,18 +446,23 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
     board = _load(board_path) if board_path.exists() else {"instrument": instrument, "runs": []}
     comparable = [row for row in board.get("runs", [])
                   if row.get("referenceSet") == reference_set]
-    previous = min(comparable, key=lambda row: (row.get("constructionFailures", 0), row["loss"])) \
+    previous = min(comparable, key=lambda row: (row.get("constructionFailures", 0),
+                                                row.get("tripwireFailures", 0), row["loss"])) \
         if comparable else None
     previous_loss = float(previous["loss"]) if previous and "loss" in previous else None
     entry = {"run": run_dir.name, "loss": best["loss"], "params": best["params"], "time": time.time(),
              "referenceSet": reference_set,
              "constructionPassed": bool(best.get("construction", {}).get("passed")),
-             "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0))}
+             "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0)),
+             "tripwirePassed": bool(best.get("tripwireGate", {}).get("passed")),
+             "tripwireFailures": int(best.get("tripwireGate", {}).get("failureCount", 0))}
     board["runs"].append(entry)
     board["runs"].sort(key=lambda row: (row.get("referenceSet", ""),
-                                        row.get("constructionFailures", 0), row["loss"]))
+                                        row.get("constructionFailures", 0),
+                                        row.get("tripwireFailures", 0), row["loss"]))
     current = min((row for row in board["runs"] if row.get("referenceSet") == reference_set),
-                  key=lambda row: (row.get("constructionFailures", 0), row["loss"]))
+                  key=lambda row: (row.get("constructionFailures", 0),
+                                   row.get("tripwireFailures", 0), row["loss"]))
     improved = current["run"] == run_dir.name
     board.setdefault("bestByReferenceSet", {})[reference_set] = current
     board["best"] = current
@@ -352,7 +516,7 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = DEFAULT_RUN_ROOT / args.instrument / args.run
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "run.json").write_text(json.dumps(vars(args), indent=2) + "\n")
-    matcher = ToneMatcher(args.instrument, initial, references, free, run_dir)
+    matcher = ToneMatcher(args.instrument, initial, references, free, run_dir, variability)
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
@@ -368,13 +532,17 @@ def main(argv: list[str] | None = None) -> int:
     sensitivity = {} if args.skip_sensitivity else _sensitivity(matcher, best)
     best = matcher.best or best
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
+    resource = _benchmark_resources(run_dir, args.instrument, best)
+    render_artifacts = _build_listening_page(run_dir, args.instrument, best, references)
     reference_set = _reference_set_id(references, args.instrument)
     improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
     if improved:
         _append_ledger(args.instrument, run_dir, best, sensitivity, free)
     floor = _floor_evidence(variability, best)
+    automated_gate_passed = bool(best.get("tripwireGate", {}).get("passed")) and \
+        bool(resource.get("passed"))
     measurable_improvement = improved and baseline - best["loss"] > 1e-6
-    if floor["status"] == "demonstrated":
+    if floor["status"] == "demonstrated" and automated_gate_passed:
         outcome = {"state": "reference-variability-floor"}
     elif measurable_improvement:
         outcome = {"state": "improvement"}
@@ -391,7 +559,18 @@ def main(argv: list[str] | None = None) -> int:
                "leaderboardImproved": improved, "previousBestLoss": previous_best_loss,
                "referenceSet": reference_set,
                "constructionPassed": bool(best.get("construction", {}).get("passed")),
+               "construction": best.get("construction", {}),
+               "tripwireGate": best.get("tripwireGate", {}),
+               "resourceTripwire": resource,
+               "automatedGatePassed": automated_gate_passed,
                "referenceVariabilityFloor": floor, "dominantResidual": _dominant_residual(best),
+               "sensitivity": sensitivity,
+               "freeParameters": [spec.key for spec in free],
+               "bestParams": best.get("params", {}),
+               "exchangeStatuses": _technique_exchange_statuses(),
+               "leaderboardState": {"isLeader": improved,
+                                    "previousBestLoss": previous_best_loss},
+               "renderArtifacts": render_artifacts,
                "sessionOutcome": outcome}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     _write_run_report(run_dir / "RUN_REPORT.md", summary)
