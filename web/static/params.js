@@ -536,7 +536,10 @@ export const DEFAULTS = {
   spectralPartialRegs: null,
   spectralDynamicAmount: 0.8,
   spectralRegisterAmount: 0.55,
-  spectralResonanceAmount: 0.35,
+  // T-004: fitted residual tables have the measured body divided out, so
+  // amount 1 reconstructs reality. Legacy saved presets that explicitly
+  // carry another value retain it.
+  spectralResonanceAmount: 1,
   spectralLoudnessNorm: 0.65,
   // Material damping law: 0 = glass/metal (all partials ring), 1 = wood/felt
   // (high partials die fast). Per-instrument defaults ride the profile.

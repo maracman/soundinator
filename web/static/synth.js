@@ -568,21 +568,58 @@ const SPECTRAL_RESONANCES = {
   ],
 };
 
-for (const [key, seed] of Object.entries({
+const LEGACY_SPECTRAL_RESONANCES = Object.fromEntries(
+  Object.entries(SPECTRAL_RESONANCES).map(([key, bands]) =>
+    [key, bands.map(band => ({ ...band }))]));
+const BODY_FALLBACK_SEEDS = {
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
-})) {
-  const fitted = MEASURED_PROFILES[key]?.resonances;
-  if (Array.isArray(fitted) && fitted.length) {
-    SPECTRAL_RESONANCES[key] = fitted.map(band => ({ ...band }));
-  } else {
-    SPECTRAL_RESONANCES[key] = SPECTRAL_RESONANCES[seed].map(band => ({ ...band }));
-    console.warn(`[SG2 body fallback] ${key} has no measured resonances; using ${seed}`);
+};
+
+/** T-035/T-007: resolve the measured-body contract before any consumer.
+ * An explicitly present `resonances` array is data even when empty: empty
+ * means the measurement rejected a stable body and MUST suppress the legacy
+ * fallback. Only a genuinely absent measurement may borrow a logged body. */
+export function resolveMeasuredBody(profileKey, measured, fallbackBands = [],
+                                    fallbackLabel = "legacy", warn = console.warn) {
+  const hasDecision = !!measured &&
+    Object.prototype.hasOwnProperty.call(measured, "resonances");
+  if (hasDecision) {
+    const bands = Array.isArray(measured.resonances)
+      ? measured.resonances.map(band => ({ ...band })) : [];
+    return {
+      bands,
+      status: bands.length ? "measured" : "omitted",
+      fit: measured.resonancesFit && typeof measured.resonancesFit === "object"
+        ? { ...measured.resonancesFit } : null,
+    };
   }
+  if (typeof warn === "function") {
+    warn(`[SG2 body fallback] ${profileKey} has no measured-body decision; using ${fallbackLabel}`);
+  }
+  return {
+    bands: Array.isArray(fallbackBands) ? fallbackBands.map(band => ({ ...band })) : [],
+    status: "fallback",
+    fit: null,
+  };
 }
 
-for (const [profileKey, resonances] of Object.entries(SPECTRAL_RESONANCES)) {
-  if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].resonances = resonances;
+// Resolve EVERY legacy/borrowed body through the same contract. This avoids
+// constructing BODY_PRESETS from a stale legacy body and trying to repair it
+// later (the precise plumbing fault behind L6 and T-035).
+for (const profileKey of new Set([
+  ...Object.keys(LEGACY_SPECTRAL_RESONANCES), ...Object.keys(BODY_FALLBACK_SEEDS),
+])) {
+  const fallbackKey = BODY_FALLBACK_SEEDS[profileKey] || profileKey;
+  const fallback = LEGACY_SPECTRAL_RESONANCES[fallbackKey] || [];
+  const decision = resolveMeasuredBody(profileKey, MEASURED_PROFILES[profileKey],
+    fallback, fallbackKey);
+  SPECTRAL_RESONANCES[profileKey] = decision.bands;
+  if (SPECTRAL_PROFILES[profileKey]) {
+    SPECTRAL_PROFILES[profileKey].resonances = decision.bands;
+    SPECTRAL_PROFILES[profileKey].resonancesFit = decision.fit;
+    SPECTRAL_PROFILES[profileKey].bodyMeasurementStatus = decision.status;
+  }
 }
 
 // ── Tone model v2: the Body stage (T5, docs/TONE_MODEL_V2_DESIGN.md §3.3) ──
@@ -677,6 +714,20 @@ export function bodyBandsFor(p, profile) {
   if (key === "vocal") return BODY_PRESETS["vowel-ah"].bands; // articulated: 'ah' baseline for displays
   if (key && key !== "auto" && BODY_PRESETS[key]) return BODY_PRESETS[key].bands;
   return (profile && profile.resonances) || [];
+}
+
+/** T-004: a deconvolved measured table reconstructs its real body at the
+ * emitted reconstructionAmount (normally 1). Legacy/unmeasured profiles keep
+ * the historical 0.35 fallback; an explicit user value always wins. */
+export function bodyAmountFor(p, profile) {
+  if (Number.isFinite(p?.spectralResonanceAmount)) {
+    return Math.max(0, Math.min(1.5, Number(p.spectralResonanceAmount)));
+  }
+  const fitted = profile?.resonancesFit?.reconstructionAmount;
+  if (profile?.bodyMeasurementStatus !== "fallback" && Number.isFinite(fitted)) {
+    return Math.max(0, Math.min(1.5, Number(fitted)));
+  }
+  return 0.35;
 }
 
 // Owner L4: blown airflow level is a deterministic consequence of the
@@ -809,11 +860,10 @@ export function spaceDistanceGain(distM) {
 }
 
 // Body gain at one frequency: Gaussian bands in log-frequency space,
-// summed in log gain. Pure so T-B6 asserts it headlessly, and so the
-// renderer can evaluate it against a partial's MODULATED frequency
-// (vibrato FM → body AM).
-export function bodyResponse(bands, freqHz, amount) {
-  if (!amount || amount <= 0 || !bands || bands.length === 0) return 1;
+// summed in log2 gain. Pure so the renderer, low-register limiter and
+// consuming assertions all evaluate the exact same fitted law.
+export function bodyLogGainAt(bands, freqHz, amount = 1) {
+  if (!amount || amount <= 0 || !bands || bands.length === 0) return 0;
   let logGain = 0;
   for (const band of bands) {
     const freq = Math.max(20, band.freq || 1000);
@@ -821,7 +871,63 @@ export function bodyResponse(bands, freqHz, amount) {
     const octDist = Math.log2(Math.max(20, freqHz) / freq);
     logGain += (band.gain || 0) * Math.exp(-0.5 * (octDist / width) ** 2);
   }
-  return Math.max(0.2, Math.min(4.5, Math.pow(2, logGain * amount)));
+  return logGain * amount;
+}
+
+export function bodyResponse(bands, freqHz, amount) {
+  const logGain = bodyLogGainAt(bands, freqHz, amount);
+  return Math.max(0.2, Math.min(4.5, Math.pow(2, logGain)));
+}
+
+// Width of the band that contributes most strongly at a partial frequency.
+// T-032 publishes Gaussian sigma in log2 octaves and this exact FWHM law.
+export function bodyFwhmHzAt(bands, freqHz) {
+  if (!Array.isArray(bands) || bands.length === 0) return Infinity;
+  let best = null, bestWeight = 0;
+  for (const band of bands) {
+    const centre = Math.max(20, Number(band?.freq) || 1000);
+    const width = Math.max(0.08, Number(band?.width) || 0.5);
+    const octDist = Math.log2(Math.max(20, freqHz) / centre);
+    const weight = Math.abs(Number(band?.gain) || 0) *
+      Math.exp(-0.5 * Math.pow(octDist / width, 2));
+    if (weight > bestWeight) { bestWeight = weight; best = { centre, width }; }
+  }
+  if (!best || bestWeight <= 1e-12) return Infinity;
+  return best.centre *
+    (Math.pow(2, 1.1775 * best.width) - Math.pow(2, -1.1775 * best.width));
+}
+
+/** T-003 option (c): at the lowest measured register only, prevent a narrow
+ * body ridge from turning one sparse partial into a second audible note.
+ * The raw fitted body remains untouched outside that evidence boundary.
+ * Within it, a >1-partial-spacing/FWHM ratio crossfades toward a +/-1 log2
+ * (about 6 dB) cap relative to the three-partial local median. */
+export function bodyResponsesForPartials(bands, frequencies, amount,
+                                         fundamentalHz, lowestF0Hz = null) {
+  const freqs = Array.isArray(frequencies) ? frequencies : [];
+  const raw = freqs.map(freq => bodyLogGainAt(bands, freq, amount));
+  const measuredFloor = Number(lowestF0Hz);
+  const f0 = Math.max(1, Number(fundamentalHz) || 1);
+  // lowestF0Hz is rounded analysis provenance; 1% admits that rounding but
+  // prevents the low-register remedy from altering ordinary/high registers.
+  const eligible = Number.isFinite(measuredFloor) && measuredFloor > 0 &&
+    f0 <= measuredFloor * 1.01;
+  if (!eligible || raw.length === 0) {
+    return raw.map(logGain => Math.max(0.2, Math.min(4.5, Math.pow(2, logGain))));
+  }
+  const limited = raw.map((logGain, index) => {
+    const local = raw.slice(Math.max(0, index - 1), Math.min(raw.length, index + 2))
+      .slice().sort((a, b) => a - b);
+    const median = local.length % 2
+      ? local[(local.length - 1) / 2]
+      : (local[local.length / 2 - 1] + local[local.length / 2]) / 2;
+    const fwhmHz = bodyFwhmHzAt(bands, freqs[index]);
+    const ratio = Number.isFinite(fwhmHz) && fwhmHz > 0 ? f0 / fwhmHz : 0;
+    const mix = Math.max(0, Math.min(1, ratio - 1));
+    const capped = median + Math.max(-1, Math.min(1, logGain - median));
+    return logGain + (capped - logGain) * mix;
+  });
+  return limited.map(logGain => Math.max(0.2, Math.min(4.5, Math.pow(2, logGain))));
 }
 
 // ── Per-instrument performance character ─────────────────────
@@ -972,16 +1078,10 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
   if (Array.isArray(m.attackByRegister) && m.attackByRegister.length) {
     prof.attackByRegister = m.attackByRegister;
   }
-  // Agent B P2 data contract: the fitted fixed-Hz body is runtime data;
-  // resonancesFit remains JSON-only analysis provenance. Replacing both
-  // lookup paths prevents measured instruments from retaining borrowed
-  // clarinet/trombone bodies when bodyType is auto or explicitly selected.
-  if (Array.isArray(m.resonances) && m.resonances.length) {
-    const bands = m.resonances.map(band => ({ ...band }));
-    prof.resonances = bands;
-    SPECTRAL_RESONANCES[profileKey] = bands;
-    BODY_PRESETS[profileKey] = { label: `${profileKey} measured body`, bands };
-  }
+  // The fitted body (including an explicit empty omission) was resolved
+  // before BODY_PRESETS construction above. Never re-merge it here: a
+  // length-gated late overwrite is exactly how empty flute data previously
+  // resurrected the legacy kazoo-like body (T-035/L7).
   const perf = prof.performance || (prof.performance = {});
   if (Number.isFinite(m.material)) perf.partialMaterial = m.material;
   if (Number.isFinite(m.partialB)) perf.partialB = m.partialB;
@@ -2643,7 +2743,7 @@ export class GenerationEngine {
     const profilePartials = registerProfile.partials.length ? registerProfile.partials : profile.partials;
     const count = Math.max(1, Math.min(profilePartials.length, Math.round(this.p.spectralPartials ?? 12)));
     const dynamicsAmount = Math.max(0, this.p.spectralDynamicAmount ?? 0.8);
-    const resonanceAmount = this._clamp(this.p.spectralResonanceAmount ?? 0.35, 0, 1.5);
+    const resonanceAmount = bodyAmountFor(this.p, profile);
     const velocityRatio = Math.max(0.08, velocity / 0.62);
     const means = Array.isArray(this.p.spectralPartialMeans) ? this.p.spectralPartialMeans : [];
     const sds = Array.isArray(this.p.spectralPartialSds) ? this.p.spectralPartialSds : [];
@@ -2652,7 +2752,7 @@ export class GenerationEngine {
     // is the ONLY register-dependent shaping now: the per-partial reg
     // grids are retired (audit A7 — register timbre emerges from where
     // the partials fall against fixed-Hz bands, not hand-set exponents).
-    const baseBands = (Array.isArray(this.p.bodyBands) && this.p.bodyBands.length)
+    const baseBands = Array.isArray(this.p.bodyBands)
       ? this.p.bodyBands                       // preset used as a starting point, then band-edited
       : bodyBandsFor(this.p, profile);
     const artic = this._articulatedBands(formantPos);
@@ -2691,6 +2791,10 @@ export class GenerationEngine {
       levelJitter = Math.max(0.5, 1 + this._gaussian() * 0.04 * human);
     }
     let referenceNorm = 0;
+    const harmonicFrequencies = profilePartials.slice(0, count).map((_, i) =>
+      Math.max(1, partialFrequency(i + 1, fundamentalHz, partialB, resClass)));
+    const bodyResponses = bodyResponsesForPartials(bodyBands, harmonicFrequencies,
+      resonanceAmount, fundamentalHz, profile.resonancesFit?.lowestF0Hz);
     const partials = profilePartials.slice(0, count).map((partial, i) => {
       const fallbackAmp = typeof partial === "number" ? partial : partial.amp;
       const fallbackSd = fallbackAmp * (typeof partial === "number" ? 0.08 : partial.spread ?? 0.25) * 0.5;
@@ -2703,8 +2807,8 @@ export class GenerationEngine {
         dynamicBrightness(harmonic, this.p.dynamicBlare, velocityRatio) * dynamicsAmount);
       // Realised mode frequency (T1 law) — body resonances and hardness
       // rolloff both act on where the partial actually sits.
-      const harmonicFrequency = Math.max(1, partialFrequency(harmonic, fundamentalHz, partialB, resClass));
-      const registerResponse = bodyResponse(bodyBands, harmonicFrequency, resonanceAmount);
+      const harmonicFrequency = harmonicFrequencies[i];
+      const registerResponse = bodyResponses[i] ?? 1;
       const excCur = excitationSpectrum(excType, harmonic, { position: excPos, hardness: excHard, freqHz: harmonicFrequency });
       const excBase = excitationSpectrum(excDefault.type || "bow", harmonic, {
         position: excDefault.position ?? 0.5, hardness: excDefault.hardness ?? 0.6, freqHz: harmonicFrequency,

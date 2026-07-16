@@ -37,8 +37,12 @@ import {
   transferCoupling,
   transferDeltas,
   BODY_PRESETS,
+  resolveMeasuredBody,
   bodyBandsFor,
+  bodyAmountFor,
+  bodyLogGainAt,
   bodyResponse,
+  bodyResponsesForPartials,
   FORMANT_PRESETS,
   migrateToneParams,
   spaceArrivalDelay,
@@ -534,6 +538,87 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
       "aeiou".split("").every(vowel => BODY_PRESETS[`${profile}-${vowel}`]?.measured)));
   check("instrument bodies present (violin, piano)",
     !!BODY_PRESETS.violin && !!BODY_PRESETS.piano);
+
+  const legacyFlute = [{ freq: 900, gain: .18, width: .65 }];
+  const omissionWarnings = [];
+  const omitted = resolveMeasuredBody("flute", {
+    resonances: [],
+    resonancesFit: { omittedReason: "unstable-air-jet-body",
+      reconstructionAmount: 1, lowestF0Hz: 246.9 },
+  }, legacyFlute, "legacy flute", message => omissionWarnings.push(message));
+  check("T-035 explicit measured-body omission suppresses legacy fallback",
+    omitted.status === "omitted" && omitted.bands.length === 0 &&
+    omitted.fit.omittedReason === "unstable-air-jet-body" &&
+    omissionWarnings.length === 0);
+  const fallbackWarnings = [];
+  const fallback = resolveMeasuredBody("unmeasured-flute", {}, legacyFlute,
+    "legacy flute", message => fallbackWarnings.push(message));
+  check("T-035 fallback is allowed and logged only when measurement is absent",
+    fallback.status === "fallback" && fallback.bands.length === 1 &&
+    fallbackWarnings.length === 1 && /no measured-body decision/.test(fallbackWarnings[0]));
+
+  const unityProfile = {
+    bodyMeasurementStatus: "measured",
+    resonancesFit: { reconstructionAmount: 1 },
+  };
+  check("T-004 reconstructionAmount is the measured-body default",
+    bodyAmountFor({}, unityProfile) === 1 &&
+    bodyAmountFor({ spectralResonanceAmount: .6 }, unityProfile) === .6 &&
+    bodyAmountFor({}, { bodyMeasurementStatus: "fallback" }) === .35);
+
+  // T-004 consuming render assertion: the fingerprint's sustained body
+  // response must be the emitted amount-1 envelope, not the old 0.35 scale.
+  const contractKey = "__body-contract-test";
+  const contractBands = [
+    { freq: 100, gain: .3, width: .18 },
+    { freq: 200, gain: -.2, width: .18 },
+    { freq: 300, gain: .45, width: .18 },
+  ];
+  SPECTRAL_PROFILES[contractKey] = {
+    label: "contract test", measured: true,
+    bodyMeasurementStatus: "measured",
+    resonances: contractBands,
+    resonancesFit: { reconstructionAmount: 1, lowestF0Hz: 40 },
+    partials: [1, 1, 1].map(amp => ({ amp, spread: 0, dyn: 0 })),
+    performance: { excitation: { type: "bow", position: .5, hardness: .6 } },
+  };
+  const contractEngine = new GenerationEngine({
+    seed: 1, spectralProfile: contractKey, spectralPartials: 3,
+    spectralMix: 1, spectralDynamicAmount: 0, excitationType: "bow",
+    excitationPosition: .5, excitationHardness: .6, excitationHuman: 0,
+    bodyType: "auto", partialTilt: 0, partialOddEven: 0, partialComb: 0,
+  });
+  const contractNote = contractEngine._spectralFingerprint(.62, 100);
+  const contractErrorDb = contractNote.harmonicPartials.map((row, i) =>
+    Math.abs(20 * Math.log10(row.registerResponse /
+      bodyResponse(contractBands, (i + 1) * 100, 1))));
+  check("T-004 rendered sustained envelope restores emitted bands within 1.5 dB",
+    contractNote.bodyAmount === 1 && contractErrorDb.every(db => db <= 1.5),
+    JSON.stringify(contractErrorDb));
+  delete SPECTRAL_PROFILES[contractKey];
+
+  const narrowBody = [{ freq: 200, gain: 2, width: .08 }];
+  const lowFreqs = [100, 200, 300];
+  const rawLow = lowFreqs.map(freq => bodyResponse(narrowBody, freq, 1));
+  const limitedLow = bodyResponsesForPartials(narrowBody, lowFreqs, 1, 100, 100);
+  const limitedLogs = limitedLow.map(Math.log2);
+  const localMedian = [limitedLogs[0], limitedLogs[1], limitedLogs[2]]
+    .slice().sort((a, b) => a - b)[1];
+  check("T-003 lowestF0Hz enables the low-register neighbour cap",
+    limitedLow[1] < rawLow[1] && Math.abs(limitedLogs[1] - localMedian) <= 1.000001);
+  const missingMetadata = bodyResponsesForPartials(narrowBody, lowFreqs, 1, 100, null);
+  check("T-007 T-003 limiter is inert when lowestF0Hz is absent",
+    JSON.stringify(missingMetadata) === JSON.stringify(rawLow));
+  const outOfRange = bodyResponsesForPartials(narrowBody, lowFreqs, 1, 100, 50);
+  check("T-003 lowestF0Hz bounds the limiter to the measured low register",
+    JSON.stringify(outOfRange) === JSON.stringify(rawLow));
+  const highBody = [{ freq: 880, gain: 2, width: .08 }];
+  const highFreqs = [440, 880, 1320];
+  check("T-003 high-register body response is bit-identical",
+    JSON.stringify(bodyResponsesForPartials(highBody, highFreqs, 1, 440, 100)) ===
+      JSON.stringify(highFreqs.map(freq => Math.max(.2, Math.min(4.5,
+        Math.pow(2, bodyLogGainAt(highBody, freq, 1)))))));
+
   const measuredBodies = ["flute", "clarinet", "alto-sax", "trumpet", "french-horn"];
   check("L6 every measured blown body reaches the effective profile unchanged",
     measuredBodies.every(key =>
