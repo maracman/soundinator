@@ -14,7 +14,8 @@ from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_A
 from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
-from scripts.tone_match.tripwires import evaluate_tripwires, tripwire_table_markdown
+from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
+from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 
 
 def test_mel_bank_is_nonnegative_and_has_requested_shape():
@@ -524,11 +525,18 @@ def test_onset_wander_measures_approach_from_above_without_calling_it_scoop():
 
 
 def test_bowed_p1_features_have_zero_weight_for_blown():
+    from scripts.tone_match.score import _BOWED_WATCH_METRICS
     blown = weights_for_instrument("clarinet")
     bowed = weights_for_instrument("violin")
     for key in _BOWED_P1_FEATURES:
         assert blown[key] == 0.0
-        assert bowed[key] == 1.0
+        if key in _BOWED_WATCH_METRICS:
+            # §2.3 controllability audit: no generating engine param yet —
+            # measured and reported, but weighted zero until the filed
+            # engine specs (N1/N4) land and the audit is re-run
+            assert bowed[key] == 0.0
+        else:
+            assert bowed[key] == 1.0
     # a blown composite must not move when only a P1 sense differs
     reference = _bundle()
     rendered_same = _bundle()
@@ -652,6 +660,93 @@ def test_bowed_body_peak_cluster_requires_signature_modes():
         ]})
     by_id = {row["id"]: row for row in right["assertions"]}
     assert by_id["violin.body-peak-cluster"]["status"] == "pass"
+
+
+def test_owner_excluded_takes_never_reach_a_reference_set():
+    # T-012/L3: exclusion is per take, not per source
+    assert is_excluded("trumpet_C5_15_fortissimo_normal.mp3")
+    assert not is_excluded("saxophone_C4_15_fortissimo_normal.mp3")
+    good = [{"sourceFile": "saxophone_C4_15_fortissimo_normal.mp3"}]
+    assert_no_excluded(good, "test")   # passes silently
+    bad = good + [{"sourceFile": "trumpet_C5_15_fortissimo_normal.mp3"}]
+    with pytest.raises(ValueError, match="owner-excluded"):
+        assert_no_excluded(bad, "test")
+
+
+def test_tripwire_cell_aggregation_keeps_short_takes_visible():
+    # T-013: one short (N/A) + one measured-pass take => cell passes and the
+    # N/A row stays; two short takes => strict campaign fails the cell.
+    def gate_with(statuses):
+        return {"bars": [{"bar": "band-balance", "register": "mid",
+                          "dynamic": "pp", "value": None, "limit": "",
+                          "status": status} for status in statuses]}
+    mixed = aggregate_by_cell(gate_with(["not-applicable", "pass"]),
+                              required_cells=[("mid", "pp")])
+    assert mixed["cells"][0]["status"] == "pass"
+    assert mixed["cells"][0]["counts"]["notApplicable"] == 1
+    assert mixed["strictPassed"]
+    all_short = aggregate_by_cell(gate_with(["not-applicable", "not-applicable"]),
+                                  required_cells=[("mid", "pp")])
+    assert all_short["cells"][0]["status"] == "no-evidence"
+    assert not all_short["strictPassed"]
+    assert all_short["strictMissingCells"] == [{"register": "mid", "dynamic": "pp"}]
+    failing = aggregate_by_cell(gate_with(["pass", "fail"]),
+                                required_cells=[("mid", "pp")])
+    assert failing["cells"][0]["status"] == "fail" and not failing["passed"]
+
+
+def test_trumpet_dynamic_articulation_requires_reference_direction_match():
+    def sample(dynamic, ref_level, render_level):
+        ref = _bundle(); render = _bundle()
+        ref.note.attack_noise = {"level": ref_level}
+        render.note.attack_noise = {"level": render_level}
+        return ConstructionSample(render, ref, "mid", dynamic, dynamic)
+    base = {"excitationType": "blow", "resonatorClass": "conicalTube",
+            "articulationVelocitySlope": .5}
+    # references: loud onsets stronger; render matches => pass
+    good = evaluate_construction("trumpet", [
+        sample(.2, .02, .03), sample(.9, .08, .09)], params=base)
+    by_id = {row["id"]: row for row in good["assertions"]}
+    assert by_id["trumpet.dynamic-articulation"]["status"] == "pass"
+    # render inverts the direction => fail
+    inverted = evaluate_construction("trumpet", [
+        sample(.2, .02, .09), sample(.9, .08, .01)], params=base)
+    by_id = {row["id"]: row for row in inverted["assertions"]}
+    assert by_id["trumpet.dynamic-articulation"]["status"] == "fail"
+
+
+def test_deconvolution_mask_equals_emission_mask_round_trip():
+    # T-014: raw ~= emittedBody(amount=1) x residual for every fitted point
+    rng = np.random.default_rng(5)
+    notes = []
+    for index in range(12):
+        f0 = 110 * 2 ** (index / 12)
+        freqs = f0 * np.arange(1, 17)
+        source = np.arange(1, 17, dtype=float) ** -1.15
+        body = 2 ** (1.1 * np.exp(-.5 * (np.log2(freqs / 800) / .38) ** 2))
+        amps = source * body
+        amps /= amps.max()
+        notes.append(NoteAnalysis(
+            f"file-{index % 4}", f0, "test", 1, amps, freqs,
+            np.ones(16, dtype=bool)))
+    bands, adjusted, fit_info = fit_fixed_body(notes, 16)
+    assert fit_info["reconstructionAmount"] == 1
+    assert fit_info["roundTripMaxDb"] <= 1.0
+    # reconstruct: emitted body envelope x residual === raw (per-note scale free)
+    def emitted_gain(freq):
+        total = 0.0
+        for band in bands:
+            total += band["gain"] * np.exp(
+                -.5 * ((np.log2(freq / band["freq"])) / band["width"]) ** 2)
+        return 2 ** total
+    worst = 0.0
+    for note, residual in zip(notes, adjusted):
+        recon = np.array([residual[i] * emitted_gain(note.partial_freqs[i])
+                          for i in range(16)])
+        ratio = note.partial_amps / np.maximum(recon, 1e-12)
+        log_ratio = np.log(ratio)
+        worst = max(worst, float(np.ptp(log_ratio)))   # scale-free shape error
+    assert worst < .25, worst
 
 
 def _bowed_samples():

@@ -1328,20 +1328,24 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
     support = np.array([
         int(np.sum(np.abs(log_hz - centre) <= max(band_width, .25)))
         for centre, band_width in zip(centres, widths)])
+    emitted = np.array([abs(float(gain)) >= .025 and int(n_pts) >= 12 and bool(agrees)
+                        for gain, n_pts, agrees
+                        in zip(coeff_log2, support, band_agrees)])
     bands = [dict(freq=round(2 ** float(center), 1),
                   gain=round(float(gain), 4), width=round(float(band_width), 4))
-             for center, gain, band_width, n_pts, agrees
-             in zip(centres, coeff_log2, widths, support, band_agrees)
-             if abs(gain) >= .025 and n_pts >= 12 and agrees]
-    fit_info = dict(method="ensemble-rank-note-body-v3",
-                    bands=len(bands), points=len(rows), notes=len(notes),
-                    widthLog2=round(base_width, 4),
-                    prunedUnstableBands=int(np.sum(~band_agrees)),
-                    lowestF0Hz=round(f0_min, 1))
-    if stability:
-        fit_info.update(stability)
+             for center, gain, band_width, keep
+             in zip(centres, coeff_log2, widths, emitted) if keep]
 
+    # T-014: the deconvolution mask must equal the emitted mask.  Dividing
+    # tables by pruned (never-shipped) coefficients would leave permanent
+    # spectral holes the renderer can never restore — so the residual tables
+    # are divided by the envelope of the EMITTED bands only, making
+    # raw = emittedBody(amount=1) x residual exact up to the safety clip
+    # (round-trip deviation recorded below; per-note max renormalisation is
+    # a level, not a shape).
+    coeff_emitted = np.where(emitted, coeff_log2, 0.0)
     adjusted = raw.astype(float).copy()
+    round_trip_max_db = 0.0
     for note_index, note in enumerate(notes):
         for rank in range(n_partials):
             if adjusted[note_index, rank] <= 0:
@@ -1350,11 +1354,24 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
             if not np.isfinite(freq) or freq <= 0:
                 freq = note.f0 * (rank + 1)
             g = np.exp(-.5 * ((math.log2(max(20, freq)) - centres) / widths) ** 2)
-            body_gain = float(2 ** np.dot(coeff_log2, g))
-            adjusted[note_index, rank] /= max(.2, min(4.5, body_gain))
+            body_gain = float(2 ** np.dot(coeff_emitted, g))
+            clipped = max(.2, min(4.5, body_gain))
+            round_trip_max_db = max(round_trip_max_db,
+                                    abs(20 * math.log10(clipped / body_gain))
+                                    if body_gain > 0 else 0.0)
+            adjusted[note_index, rank] /= clipped
         peak = float(adjusted[note_index].max())
         if peak > 0:
             adjusted[note_index] /= peak
+    fit_info = dict(method="ensemble-rank-note-body-v3",
+                    bands=len(bands), points=len(rows), notes=len(notes),
+                    widthLog2=round(base_width, 4),
+                    prunedUnstableBands=int(np.sum(~band_agrees)),
+                    lowestF0Hz=round(f0_min, 1),
+                    reconstructionAmount=1,
+                    roundTripMaxDb=round(round_trip_max_db, 3))
+    if stability:
+        fit_info.update(stability)
     return bands, adjusted, fit_info
 
 

@@ -337,6 +337,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--work-item", help="concrete fix to file for --limiting-factor")
     args = parser.parse_args(argv)
     initial, references, manifest = _load(args.initial), _load(args.references), _load(args.manifest)
+    # T-012 consuming-side assertion: an owner-rejected take must never be
+    # scored, floored, or hashed into the objective id.
+    from .exclusions import assert_no_excluded
+    assert_no_excluded(references, f"{args.instrument} campaign manifest")
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
     scoring_weights = weights_for_instrument(args.instrument)

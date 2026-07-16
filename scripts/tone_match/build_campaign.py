@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 
 from scripts.fit_profiles_from_samples import analyse_note, load_mono, segment_notes, sf
+from scripts.tone_match.exclusions import is_excluded
 
 
 VELOCITY = {"pp": 0.2, "ff": 0.92}
@@ -236,6 +237,8 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
     for alternate in PHILHARMONIA_ALTERNATES.get(instrument, []):
         family = "trumpet" if instrument == "trumpet" else "french horn"
         source = phil_root / family / alternate["file"]
+        if is_excluded(alternate["file"]):
+            continue  # T-012: owner-rejected take
         dynamic = alternate["dynamic"]
         target = notes_dir / f"phil-{alternate['register']}-{dynamic}-{alternate['midi']}.wav"
         midi, f0, duration = _write_reference(source, alternate["midi"], target)
@@ -250,6 +253,8 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
     for alternate in PHILHARMONIA_WOODWIND_ALTERNATES.get(instrument, []):
         family = "saxophone" if instrument == "alto-sax" else instrument
         source = phil_woodwind_root / family / alternate["file"]
+        if is_excluded(alternate["file"]):
+            continue  # T-012: owner-rejected take
         dynamic = alternate["dynamic"]
         target = notes_dir / f"phil-{alternate['register']}-{dynamic}-{alternate['midi']}.wav"
         midi, f0, duration = _write_reference(source, alternate["midi"], target)

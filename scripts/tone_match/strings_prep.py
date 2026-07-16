@@ -35,6 +35,7 @@ from typing import Any
 
 import numpy as np
 
+from scripts.tone_match.exclusions import is_excluded
 from scripts.fit_profiles_from_samples import (
     analyse_note,
     load_mono,
@@ -375,6 +376,8 @@ def build_string_references(instrument: str, samples_root: Path,
             continue  # spectral floor takes must be non-vibrato
         group_segments = []
         for file_name in pair["files"]:
+            if is_excluded(file_name.replace("phil.", "")):
+                continue  # T-012: owner-rejected take
             try:
                 segment, sample_rate, f0 = _select_segment(corpus / file_name,
                                                            pair["midi"])
@@ -421,6 +424,8 @@ def build_string_references(instrument: str, samples_root: Path,
         for group in find_catalogue_duplicates(catalogue_dir, instrument):
             group_segments = []
             for file_name in group["files"]:
+                if is_excluded(file_name):
+                    continue  # T-012: owner-rejected take
                 try:
                     segment, sample_rate, f0 = _select_segment(
                         catalogue_dir / file_name, group["midi"])

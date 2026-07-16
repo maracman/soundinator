@@ -115,23 +115,47 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     def distances(name: str) -> dict[str, list[float]]:
         table: dict[str, list[float]] = {}
         for ref_index, ref_bundle in enumerate(ref_bundles):
-            render_bundle = extract_features(
-                renders / f"{name}-{ref_index}.wav",
-                active_duration_s=references[ref_index].get("durationSec", 1.5))
+            try:
+                render_bundle = extract_features(
+                    renders / f"{name}-{ref_index}.wav",
+                    active_duration_s=references[ref_index].get("durationSec", 1.5))
+            except ValueError:
+                # a perturbation that kills the note entirely is itself a
+                # (maximal) response; record NaN and let the matrix step
+                # treat it as an extreme change rather than crash the audit
+                for key in DEFAULT_WEIGHTS:
+                    table.setdefault(key, []).append(float("nan"))
+                continue
             result = compare_features(ref_bundle, render_bundle, weights)
             for key, value in result["normalized"].items():
                 table.setdefault(key, []).append(float(value))
         return table
 
     base = distances("__base__")
+    # references whose BASE render cannot be analysed are excluded from the
+    # matrix (a response cannot be measured against a failed baseline) and
+    # reported — a fragile baseline reference is its own finding.
+    any_feature = next(iter(base))
+    base_ok = ~np.isnan(np.asarray(base[any_feature], dtype=float))
+    excluded_refs = [references[i].get("path") for i in range(len(references))
+                     if not base_ok[i]]
     matrix: dict[str, dict[str, float]] = {}
+    render_failures: dict[str, int] = {}
     for key in free_params:
         perturbed = distances(key)
-        matrix[key] = {
-            feature: float(np.max(np.abs(
-                np.asarray(perturbed[feature]) - np.asarray(base[feature]))))
-            for feature in base
-        }
+        matrix[key] = {}
+        for feature in base:
+            base_vals = np.asarray(base[feature], dtype=float)[base_ok]
+            pert_vals = np.asarray(perturbed[feature], dtype=float)[base_ok]
+            deltas = pert_vals - base_vals
+            finite = deltas[np.isfinite(deltas)]
+            # analysis failures are recorded separately, NOT as responses:
+            # knife-edge references fail under unrelated perturbations (the
+            # seeded noise realisation shifts), and folding that into the
+            # response matrix marked every feature "controllable".
+            matrix[key][feature] = float(np.max(np.abs(finite))) if finite.size else 0.0
+        any_pert = np.asarray(perturbed[next(iter(base))], dtype=float)[base_ok]
+        render_failures[key] = int(np.isnan(any_pert).sum())
 
     verdicts = []
     for feature, weight in sorted(DEFAULT_WEIGHTS.items()):
@@ -151,6 +175,8 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
 
     audit = {"instrument": instrument, "threshold": RESPONSE_THRESHOLD,
              "references": [ref.get("path") for ref in references],
+             "excludedReferences": excluded_refs,
+             "analysisFailuresPerParam": render_failures,
              "matrix": matrix, "verdicts": verdicts,
              "clean": not any(v["status"] == "UNCONTROLLABLE" for v in verdicts)}
     (output_dir / "controllability.json").write_text(
@@ -158,6 +184,9 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     lines = [f"# Controllability audit — {instrument}",
              "", f"Threshold: {RESPONSE_THRESHOLD} perceptual units. "
              f"Verdict: {'CLEAN' if audit['clean'] else 'NOT CLEAN'}",
+             "" if not excluded_refs else
+             f"\nBase render failed for {len(excluded_refs)} reference(s) "
+             f"(excluded, see controllability.json): {excluded_refs}",
              "", "| Feature | Weight | Best param | Max response | Status |",
              "|---|---|---|---|---|"]
     for verdict in verdicts:

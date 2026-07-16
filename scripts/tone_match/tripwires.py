@@ -179,6 +179,50 @@ def evaluate_tripwires(instrument: str,
     }
 
 
+def aggregate_by_cell(gate: dict[str, Any],
+                      required_cells: list[tuple[str, str]] | None = None,
+                      ) -> dict[str, Any]:
+    """T-013 campaign aggregation: evidence per instrument/register/dynamic.
+
+    An individual short take stays visibly not-applicable; a CELL passes a
+    bar when at least one eligible take measured it and every measured take
+    clears its limit; a strict campaign fails when a required cell has no
+    measured evidence at all.  This keeps §3 coverage without discarding
+    short-but-valid duplicate takes.
+    """
+    cells: dict[tuple[str, Any, str], dict[str, int]] = {}
+    for row in gate["bars"]:
+        key = (row["bar"], row["register"], str(row["dynamic"]))
+        counts = cells.setdefault(key, {"pass": 0, "fail": 0, "notApplicable": 0})
+        counts["pass" if row["status"] == "pass" else
+               "fail" if row["status"] == "fail" else "notApplicable"] += 1
+    cell_rows = []
+    for (bar, register, dynamic), counts in sorted(cells.items()):
+        measured = counts["pass"] + counts["fail"]
+        status = ("no-evidence" if measured == 0 else
+                  "pass" if counts["fail"] == 0 else "fail")
+        cell_rows.append({"bar": bar, "register": register, "dynamic": dynamic,
+                          "counts": counts, "status": status})
+    failed = [row for row in cell_rows if row["status"] == "fail"]
+    strict_missing = []
+    if required_cells:
+        covered = {(row["register"], row["dynamic"]) for row in cell_rows
+                   if row["status"] in ("pass", "fail")}
+        for register, dynamic in required_cells:
+            measured_here = any(
+                row["status"] != "no-evidence" for row in cell_rows
+                if row["register"] == register and row["dynamic"] == str(dynamic))
+            if not measured_here:
+                strict_missing.append({"register": register, "dynamic": dynamic})
+        del covered
+    return {
+        "cells": cell_rows,
+        "passed": not failed,
+        "strictPassed": not failed and not strict_missing,
+        "strictMissingCells": strict_missing,
+    }
+
+
 def tripwire_table_markdown(gate: dict[str, Any]) -> str:
     """RUN_REPORT.md rendering — the owner's at-a-glance §3 answer."""
     lines = [f"## §3 tripwire gate — {'PASS' if gate['passed'] else 'FAIL'}",

@@ -67,6 +67,19 @@ _BOWED_P1_FEATURES = (
 # leaderboards (its objective ids reset at that point anyway).
 _PENDING_BLOWN_FEATURES = ("band_balance_db",)
 
+# §2.3 controllability audit verdicts (violin, 2026-07-16): these features
+# have NO generating engine parameter yet — body_am_db because the body EQ
+# does not track instantaneous frequency under vibrato (annex N1: the
+# FM->AM path is static per note), the vibrato-trajectory trio because the
+# renderer has no onset-delay/ramp/rate-drift controls (annex N4).  They
+# are WATCH METRICS (zero weight, still measured and reported) until the
+# filed engine specs land; re-run the audit to flip them back on.
+_BOWED_WATCH_METRICS = (
+    "body_am_db", "vibrato_onset_delay_ms", "vibrato_ramp_ms",
+    "vibrato_rate_drift",
+)
+_BOWED_INSTRUMENTS = {"violin", "cello"}
+
 # IEC 61260-1 nominal 1/3-octave centres, 100 Hz … 10 kHz (21 bands), and
 # the octave summaries built from consecutive triples (125 … 8k centres).
 THIRD_OCTAVE_CENTRES_HZ = (
@@ -91,6 +104,9 @@ def weights_for_instrument(instrument: str | None,
         for key in _BOWED_P1_FEATURES:
             weights[key] = 0.0
         for key in _PENDING_BLOWN_FEATURES:
+            weights[key] = 0.0
+    if (instrument or "").strip().lower() in _BOWED_INSTRUMENTS:
+        for key in _BOWED_WATCH_METRICS:
             weights[key] = 0.0
     if overrides:
         weights.update(overrides)

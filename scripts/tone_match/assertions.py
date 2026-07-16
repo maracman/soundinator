@@ -293,6 +293,39 @@ def evaluate_construction(
         rows.append(_result(f"{name}.blare-law", "Nonlinear forte enrichment is explicitly enabled",
                             None if blare is None else float(blare) > 0, blare, "dynamicBlare > 0",
                             strict_evidence=strict_evidence))
+        if name == "trumpet":
+            # T-011 consuming-side assertion (L9): the fitted articulation
+            # slope is positive AND the rendered loud-minus-soft onset
+            # transient direction matches this instrument's own references.
+            slope = _param(params, "articulationVelocitySlope")
+
+            def _onset_level(bundle):
+                noise_fit = bundle.note.attack_noise or {}
+                return float(noise_fit.get("level", 0) or 0)
+
+            def _direction(pick):
+                soft = [_onset_level(pick(s)) for s in sample_list
+                        if (_dynamic_value(s) or .5) <= .35 and pick(s)]
+                loud = [_onset_level(pick(s)) for s in sample_list
+                        if (_dynamic_value(s) or .5) >= .7 and pick(s)]
+                if not soft or not loud:
+                    return None
+                return float(np.median(loud) - np.median(soft))
+
+            ref_direction = _direction(lambda s: s.reference)
+            render_direction = _direction(lambda s: s.render)
+            direction_match = None
+            if ref_direction is not None and render_direction is not None:
+                direction_match = (ref_direction * render_direction >= 0)
+            passed = None if slope is None or direction_match is None else (
+                float(slope) > 0 and direction_match)
+            rows.append(_result("trumpet.dynamic-articulation",
+                                "Forte onsets are more firmly articulated, matching the references (L9/T-011)",
+                                passed,
+                                {"slope": slope, "refDirection": ref_direction,
+                                 "renderDirection": render_direction},
+                                "articulationVelocitySlope > 0 and rendered loud-minus-soft onset direction matches references",
+                                strict_evidence=strict_evidence))
         if name == "french-horn":
             coupling = _param(params, "articulationCoupling")
             variation = _param(params, "articulationVariation")
