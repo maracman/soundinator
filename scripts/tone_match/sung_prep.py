@@ -32,17 +32,19 @@ AUDIO_RE = re.compile(
 )
 
 VOICE_CLASSES = {
-    "tenor": {"male2", "male3", "male7", "male11"},
-    "contrabass": {"male4", "male8", "male10"},
+    "tenor": {"male2", "male3", "male11"},
+    "bass": {"male8"},
     "mezzo-soprano": {"female5", "female8"},
+    "soprano": {"female2", "female6"},
 }
 
 # Initial physiological register boundaries. They are explicitly priors, not
 # fitted facts; pass 01 records whether the references straddle them.
 PASSAGGIO_PRIOR_HZ = {
     "tenor": 330.0,
-    "contrabass": 260.0,
+    "bass": 260.0,
     "mezzo-soprano": 523.25,
+    "soprano": 698.46,
 }
 
 DYNAMIC = {

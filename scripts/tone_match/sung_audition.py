@@ -37,6 +37,16 @@ ZERO_WEIGHT_WATCHES = {
 
 def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: Path) -> dict:
     references = json.loads(references_path.read_text())
+    voice_classes = {row.get("voiceClass") for row in references}
+    if len(voice_classes) != 1:
+        raise ValueError(f"audition requires exactly one voice class, found {voice_classes}")
+    voice_class = next(iter(voice_classes))
+    instrument = {
+        "tenor": "voice-tenor",
+        "bass": "voice-bass",
+        "mezzo-soprano": "voice-mezzo",
+        "soprano": "voice-soprano",
+    }[voice_class]
     selected = [
         row for row in references
         if row.get("technique") == "straight"
@@ -65,7 +75,7 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
             "out": str(out),
         })
         manifest.append({
-            "label": f"tenor /{row['vowel']}/ {row['register']} MIDI {row['midi']}",
+            "label": f"{voice_class} /{row['vowel']}/ {row['register']} MIDI {row['midi']}",
             "vowel": row["vowel"],
             "register": row["register"],
             "reference": row["path"],
@@ -79,7 +89,7 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
         cwd=repo_root, check=True,
     )
 
-    weights = weights_for_instrument("tenor")
+    weights = weights_for_instrument(voice_class)
     for feature in ZERO_WEIGHT_WATCHES:
         weights[feature] = 0.0
     score_rows = []
@@ -89,7 +99,11 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
             reference = extract_features(
                 trial["reference"], expected_f0_hz=row["expectedF0Hz"]
             )
-        except ValueError as exc:
+            rendered = extract_features(
+                trial["render"], active_duration_s=row["durationSec"],
+                expected_f0_hz=row["expectedF0Hz"],
+            )
+        except (ValueError, RuntimeError) as exc:
             score_rows.append({
                 "label": trial["label"],
                 "vowel": row["vowel"],
@@ -104,10 +118,6 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
                 "analysisError": str(exc),
             })
             continue
-        rendered = extract_features(
-            trial["render"], active_duration_s=row["durationSec"],
-            expected_f0_hz=row["expectedF0Hz"],
-        )
         score = compare_features(reference, rendered, weights)
         formants = rendered.note.formants
         if len(formants) >= 2:
@@ -139,15 +149,16 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
                 "attack": score["features"]["attack_ms"] <= attack_tolerance_ms,
             },
         })
-    vowel_gate = vowel_classification_gate(rendered_formants, "tenor")
+    vowel_gate = vowel_classification_gate(rendered_formants, voice_class)
+    composites = [
+        row["composite"] for row in score_rows
+        if row["composite"] is not None
+    ]
     summary = {
-        "instrument": "voice-tenor",
+        "instrument": instrument,
         "run": output_root.name,
         "rows": score_rows,
-        "meanComposite": float(np.mean([
-            row["composite"] for row in score_rows
-            if row["composite"] is not None
-        ])),
+        "meanComposite": float(np.mean(composites)) if composites else None,
         "scoredRows": sum(row["composite"] is not None for row in score_rows),
         "rejectedRows": sum(row["composite"] is None for row in score_rows),
         "gateCounts": {
@@ -166,11 +177,21 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
     (output_root / "baseline-scores.json").write_text(
         json.dumps(summary, indent=2) + "\n"
     )
-    _write_html(output_root / "listen-voice-tenor-pass01.html", manifest, score_rows)
+    _write_html(
+        output_root / f"listen-{instrument}-{output_root.name}.html",
+        manifest,
+        score_rows,
+        voice_class,
+    )
     return summary
 
 
-def _write_html(path: Path, manifest: list[dict], scores: list[dict]) -> None:
+def _write_html(
+    path: Path,
+    manifest: list[dict],
+    scores: list[dict],
+    voice_class: str,
+) -> None:
     rows = []
     for trial, score in zip(manifest, scores):
         composite = (
@@ -192,11 +213,11 @@ def _write_html(path: Path, manifest: list[dict], scores: list[dict]) -> None:
             "</tr>"
         )
     path.write_text(
-        "<!doctype html><meta charset='utf-8'><title>SG2 tenor pass 01</title>"
+        f"<!doctype html><meta charset='utf-8'><title>SG2 {html.escape(voice_class)} audition</title>"
         "<style>body{font:15px system-ui;background:#141518;color:#eee;margin:2em}"
         "table{border-collapse:collapse;width:100%}td,th{padding:7px;border-bottom:1px solid #333}"
         "audio{width:240px;height:32px}</style>"
-        "<h1>SG2 tenor — pass 01 pooled source + per-vowel bodies</h1>"
+        f"<h1>SG2 {html.escape(voice_class)} — pooled source + per-vowel bodies</h1>"
         "<p>Interim baseline. Straight-tone rows are grouped by vowel and register; production gates remain active.</p>"
         "<table><tr><th>Vowel</th><th>Register</th><th>Reference</th><th>Render</th>"
         "<th>Composite</th><th>Partial / mel dB</th></tr>"

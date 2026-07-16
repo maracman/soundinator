@@ -7,9 +7,10 @@ Rule: delivered data is incomplete until the named consumer assertion passes.
 ## A-VOICE-01 · Per-class singer-formant centre (Agent A, priority 1)
 
 Problem: `synth.js` constructs the singer-formant band at a hardcoded 3000 Hz.
-The best-supported centres are about 2.35–2.45 kHz for bass/contrabass and
-2.7–2.85 kHz for tenor. The current analysis gate also wrongly tests
-contrabass in the tenor 2.7–3.3 kHz window.
+The best-supported centres are about 2.35–2.45 kHz for bass and 2.7–2.85 kHz
+for tenor. The current analysis gate also wrongly tests bass in the tenor
+2.7–3.3 kHz window. Decision 12 makes bass the fitted section target; a later
+derived basso-profondo preset inherits the fitted bass law.
 
 Engine contract:
 
@@ -25,9 +26,9 @@ Consuming-side assertions:
 1. With amount zero, 2400/2800/3000 produce identical fingerprints and PCM.
 2. With amount nonzero, a 2400-Hz setting moves the fixed-Hz prominence into
    2.3–2.6 kHz and a 2800-Hz setting moves it into 2.7–3.0 kHz.
-3. A contrabass seed carrying 2400 is read by the real render path; absence of
+3. A bass seed carrying 2400 is read by the real render path; absence of
    the key retains the 3000-Hz legacy path.
-4. Agent D lowers `contrabass.singer-formant-band` to 2.3–2.6 kHz and the
+4. Agent D lowers `bass.singer-formant-band` to 2.3–2.6 kHz and the
    rendered consumer, not merely the JSON field, passes it.
 
 Defaults-neutral proof: existing presets omit the key; the default equals the
@@ -36,8 +37,9 @@ old constant and amount zero remains inert.
 ## A-VOICE-02 · Mezzo F1-to-f0 tuning law (Agent A, priority 2)
 
 Problem: above a vowel's fitted F1, upper mezzo singing raises R1 to roughly
-1.0–1.15 × f0, with gains up to about 30 dB. A static fixed-Hz body cannot
-express this class-defining mechanism.
+1.0–1.15 × f0, with gains up to about 30 dB. Soprano uses this strategy more
+extensively. A static fixed-Hz body cannot express this class-defining
+mechanism; one law serves both classes with separately fitted values.
 
 Engine contract:
 
@@ -56,9 +58,9 @@ Consuming-side assertions:
 1. Default zero is fingerprint/PCM-identical to the current renderer.
 2. Below threshold, nonzero tuning is inert.
 3. Above threshold, rendered F1/f0 lies in [1.0, 1.20] while F2–F5 do not move.
-4. A three-register mezzo `/a/` grid consumes the law only where the fitted F1
-   threshold is crossed.
-5. Tenor/contrabass presets with the default remain unchanged.
+4. Three-register mezzo and soprano `/a/` grids consume the law only where each
+   class's fitted F1 threshold is crossed.
+5. Tenor/bass presets with the default remain unchanged.
 
 ## A-VOICE-03 · Consonant onset gesture layer (Agent A, corpus-gated)
 

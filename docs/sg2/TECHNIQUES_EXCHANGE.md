@@ -969,3 +969,20 @@ params remain neutral; provenance must name the exact licence/EULA before any
 NUS-derived row enters references or an objective hash.
 Affects: consonant corpus acquisition / N9 activation / provenance.
 Status: sung=blocked-owner-licence analysis=adapted engine=spec-only
+
+### T-053 · Fitted identities and derived morphology presets use different gates
+Author: sung lane · 2026-07-17 · Firewall: process/method
+Finding: owner decision 12 separates the four standard section identities
+(soprano, mezzo-soprano, tenor, bass) from morphology-derived extensions.
+Section identities require one correctly labelled primary singer and the full
+quantitative, construction, humanisation, resource, and owner-ear gates. Basso
+profondo and boy soprano are constructed only after their adult source classes
+pass; they are exempt from reference-distance tripwires but still require a
+frozen derivation recipe and capstone audition. A derived preset must never
+silently occupy a fitted target's gate row.
+Consuming assertions: the campaign target table contains exactly the four
+section types; soprano cannot reuse a mezzo identity; bass replaces contrabass
+as the corpus-fitted class; derived rows carry no quantitative PASS claim and
+name the frozen source preset plus morphology transform.
+Affects: sung target registry / report gates / morphology provenance / WP-8.
+Status: sung=incorporated analysis=ack-required engine=n/a

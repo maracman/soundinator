@@ -8,7 +8,7 @@ from scripts.tone_match.sung_features import (
     vowel_classification_gate,
     vowel_regions_for_class,
 )
-from scripts.tone_match.sung_prep import parse_vocalset_file, register_for_f0
+from scripts.tone_match.sung_prep import VOICE_CLASSES, parse_vocalset_file, register_for_f0
 from scripts.tone_match.sung_fit import fit_campaign
 
 
@@ -28,6 +28,17 @@ def test_register_prior_straddles_passaggio():
     assert register_for_f0("tenor", 260) == "mid"
     assert register_for_f0("tenor", 330) == "mid"
     assert register_for_f0("tenor", 440) == "high"
+
+
+def test_standard_section_voice_classes_are_first_class():
+    assert VOICE_CLASSES["bass"] == {"male8"}
+    assert VOICE_CLASSES["soprano"] == {"female2", "female6"}
+    assert "male7" not in VOICE_CLASSES["tenor"]
+    assert register_for_f0("bass", 260) == "mid"
+    assert register_for_f0("soprano", 880) == "high"
+    assert vowel_regions_for_class("soprano")["i"][0][0] > (
+        vowel_regions_for_class("mezzo-soprano")["i"][0][0]
+    )
 
 
 def test_vowel_gate_uses_class_scaled_regions():

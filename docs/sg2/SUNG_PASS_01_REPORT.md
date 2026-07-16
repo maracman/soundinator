@@ -1,5 +1,10 @@
 # SG2 sung campaign — pass 01
 
+> Historical report. Owner decision 12 (2026-07-17) supersedes this report's
+> target table: the fitted sections are now soprano, mezzo-soprano, tenor, and
+> bass. Basso profondo and boy soprano are derived audition-only extensions.
+> See `SUNG_PASS_02_REPORT.md` for the current gate registry.
+
 Date: 2026-07-16
 Owner: Agent E / sung lane
 Branch: `codex/sg2-sung-pass01`

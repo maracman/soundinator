@@ -33,8 +33,9 @@ ADULT_MALE_VOWEL_BOXES_HZ = {
 
 VOICE_CLASS_FORMANT_SCALE = {
     "tenor": 1.0,
-    "contrabass": 0.94,
+    "bass": 0.94,
     "mezzo-soprano": 1.15,
+    "soprano": 1.18,
     "boy-soprano": 1.25,
 }
 

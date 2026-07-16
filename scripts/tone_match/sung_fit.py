@@ -20,8 +20,9 @@ from scripts.tone_match.sung_features import (
 
 PROFILE_BY_CLASS = {
     "tenor": "voice-tenor",
-    "contrabass": "voice-bass",
+    "bass": "voice-bass",
     "mezzo-soprano": "voice-mezzo",
+    "soprano": "voice-soprano",
 }
 
 ADULT_MALE_FORMANT_PRIORS = {
@@ -37,7 +38,12 @@ def _formants_for_fit(note, vowel: str, voice_class: str) -> tuple[tuple[float, 
     """Use corpus LPC when plausible; otherwise retain a flagged class prior."""
 
     regions = vowel_regions_for_class(voice_class)
-    scale = {"tenor": 1.0, "contrabass": .94, "mezzo-soprano": 1.15}[voice_class]
+    scale = {
+        "tenor": 1.0,
+        "bass": .94,
+        "mezzo-soprano": 1.15,
+        "soprano": 1.18,
+    }[voice_class]
     prior = tuple(value * scale for value in ADULT_MALE_FORMANT_PRIORS[vowel])
     if len(note.formants) < 5:
         return prior, True
