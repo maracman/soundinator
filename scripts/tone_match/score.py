@@ -47,6 +47,11 @@ _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
 }
 
+_STRUCK_PLUCKED_INSTRUMENTS = {
+    "piano", "grand-piano", "upright-piano", "guitar", "guitar-nylon",
+    "guitar-steel", "harp", "glockenspiel",
+}
+
 # BOWED_PREFLIGHT P1 senses.  They enter with ZERO weight for blown so the
 # frozen/reopened blown leaderboards keep scoring on the exact dimensions
 # they were fitted against (comparability rule); bowed campaigns and later
@@ -55,6 +60,17 @@ _BOWED_P1_FEATURES = (
     "vibrato_onset_delay_ms", "vibrato_ramp_ms", "vibrato_rate_drift",
     "body_am_db", "onset_noise_db", "onset_noise_centroid_oct",
     "noise_lead_ms", "onset_wander_cents",
+)
+
+# FAMILY FIREWALL: these describe continuous-air/bow pitch behaviour, not an
+# impulsive hammer, finger, plectrum or mallet.  They stay visible in reports
+# but begin at zero weight for struck/plucked; family evidence would need to
+# introduce a struck-specific observable rather than inherit blown values.
+_STRUCK_FIREWALL_FEATURES = (
+    "vibrato", "sustain_noise_db", "onset_scoop_cents",
+    "onset_scoop_settle_ms", "vibrato_onset_delay_ms", "vibrato_ramp_ms",
+    "vibrato_rate_drift", "body_am_db", "noise_lead_ms",
+    "onset_wander_cents",
 )
 
 
@@ -71,6 +87,9 @@ def weights_for_instrument(instrument: str | None,
     if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
         weights["inharmonicity_log_ratio"] = 0.0
         for key in _BOWED_P1_FEATURES:
+            weights[key] = 0.0
+    if (instrument or "").strip().lower() in _STRUCK_PLUCKED_INSTRUMENTS:
+        for key in _STRUCK_FIREWALL_FEATURES:
             weights[key] = 0.0
     if overrides:
         weights.update(overrides)
