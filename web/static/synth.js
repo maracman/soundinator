@@ -1012,7 +1012,8 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
 // assertions (T-B2, T-B3) can verify them headlessly.
 
 export const RESONATOR_CLASSES = {
-  string:     { label: "String / open tube", ratio: (n) => n },
+  string:     { label: "String",              ratio: (n) => n },
+  openTube:   { label: "Open cylindrical tube", ratio: (n) => n },
   conicalTube:{ label: "Conical tube",       ratio: (n) => n },
   closedTube: { label: "Closed tube",        ratio: (n) => 2 * n - 1 },
   // First transverse modes of an ideal membrane (Bessel zeros, ratios to

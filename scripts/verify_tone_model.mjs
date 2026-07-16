@@ -156,6 +156,8 @@ console.log("T-B2: material damping is a law over real Hz");
 console.log("Resonator ratio tables");
 {
   check("string is the harmonic series", [1, 2, 3, 12].every(n => resonatorRatio("string", n) === n));
+  check("open cylindrical tube is an explicit full harmonic class",
+    [1, 2, 3, 12].every(n => resonatorRatio("openTube", n) === n));
   check("closed tube is odd harmonics", [1, 3, 5, 7].every((v, i) => resonatorRatio("closedTube", i + 1) === v));
   check("closed-tube radiated output retains integer harmonics",
     [1, 2, 3, 8].every(n => outputPartialRatio("closedTube", n) === n)
@@ -164,7 +166,8 @@ console.log("Resonator ratio tables");
   const m12 = resonatorRatio("membrane", 12), m13 = resonatorRatio("membrane", 13), m14 = resonatorRatio("membrane", 14);
   check("membrane tail extends monotonically", m12 < m13 && m13 < m14);
   check("unknown class falls back to string", resonatorRatio("nonsense", 5) === 5);
-  check("all classes exported", ["string", "closedTube", "membrane", "bar"].every(k => RESONATOR_CLASSES[k]));
+  check("all classes exported", ["string", "openTube", "closedTube", "conicalTube", "membrane", "bar"]
+    .every(k => RESONATOR_CLASSES[k]));
 }
 
 console.log("64-partial profile tables");
