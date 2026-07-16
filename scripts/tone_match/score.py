@@ -77,6 +77,14 @@ _PENDING_BLOWN_FEATURES = ("band_balance_db",)
 _BOWED_WATCH_METRICS = (
     "body_am_db", "vibrato_onset_delay_ms", "vibrato_ramp_ms",
     "vibrato_rate_drift",
+    # T-031 has measuring-side senses but no bowed wander/period-settle
+    # generator yet. The blown scoop shape is family-inapplicable to bow.
+    "onset_wander_cents", "onset_lockin_periods",
+    "onset_scoop_cents", "onset_scoop_settle_ms",
+    # A held bowed note is continuously driven; the engine correctly
+    # suppresses struck/plucked free decay for bow, so no bowed manifest
+    # parameter can or should move the free-decay T60 feature.
+    "decay_log_ratio",
 )
 _BOWED_INSTRUMENTS = {"violin", "cello"}
 

@@ -11,7 +11,22 @@ from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
-from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
+from scripts.tone_match.controllability import (
+    manifest_contract_hash,
+    objective_contract_hash,
+)
+from scripts.tone_match.iterate import (
+    FreeParam,
+    _append_ledger,
+    _consume_controllability_audit,
+    _dominant_residual,
+    _floor_evidence,
+    _free_manifest_contract,
+    _params,
+    _reference_set_id,
+    _reference_variability,
+    _update_leaderboard,
+)
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
@@ -258,15 +273,73 @@ def test_reference_variability_floor_uses_only_matching_take_groups():
     assert variability["groups"][0]["referenceIndices"] == [0, 1]
     assert variability["groups"][0]["floorComposite"] > 0
 
-    quiet_render = {"scores": [{"composite": 0.0}, {"composite": 0.0}, {"composite": 99.0}],
-                    "construction": {"passed": True}}
+    quiet_render = {
+        "scores": [{"composite": 0.0}, {"composite": 0.0}, {"composite": 99.0}],
+        "construction": {"passed": True},
+        "tripwires": {"strictPassed": True},
+    }
     evidence = _floor_evidence(variability, quiet_render)
     assert evidence["status"] == "demonstrated"
     assert evidence["groups"][0]["atOrBelowFloor"]
-
-    bad_render = {"scores": [{"composite": 99.0}, {"composite": 99.0}, {"composite": 0.0}],
-                  "construction": {"passed": True}}
+    quiet_render["tripwires"]["strictPassed"] = False
+    assert _floor_evidence(variability, quiet_render)["status"] == "above-floor"
+    bad_render = {
+        "scores": [{"composite": 99.0}, {"composite": 99.0}, {"composite": 0.0}],
+        "construction": {"passed": True},
+        "tripwires": {"strictPassed": True},
+    }
     assert _floor_evidence(variability, bad_render)["status"] == "above-floor"
+
+
+def test_controllability_contract_rejects_objective_or_manifest_drift(tmp_path):
+    instrument = "violin"
+    references = [{"path": "ref.wav", "midi": 69, "dynamic": "mf"}]
+    weights = weights_for_instrument(instrument)
+    free = [FreeParam("partialTilt", -1.0, 1.0, 0.0)]
+    contract = _free_manifest_contract(free)
+    responders = {feature: (["partialTilt"] if weight > 0 else [])
+                  for feature, weight in weights.items()}
+    audit = {
+        "instrument": instrument,
+        "objectiveHash": objective_contract_hash(instrument, references, weights),
+        "manifestHash": manifest_contract_hash(contract),
+        "finalWeights": weights,
+        "responsiveParameters": responders,
+        "uncontrolledWeightedFeatures": [],
+        "clean": True,
+        "verdicts": [],
+    }
+    path = tmp_path / "controllability.json"
+    path.write_text(json.dumps(audit))
+    assert _consume_controllability_audit(
+        path, instrument, references, free, weights)["clean"]
+    with pytest.raises(ValueError, match="objective hash mismatch"):
+        _consume_controllability_audit(
+            path, instrument, references + [{"path": "other.wav"}], free, weights)
+    with pytest.raises(ValueError, match="manifest hash mismatch"):
+        _consume_controllability_audit(
+            path, instrument, references,
+            [FreeParam("partialTransfer", 0.0, 1.0, 0.15)], weights)
+
+
+def test_leaderboard_ignores_subthreshold_score_jitter(tmp_path, monkeypatch):
+    import scripts.tone_match.iterate as iterate
+    monkeypatch.setattr(iterate, "DEFAULT_RUN_ROOT", tmp_path)
+    construction = {"passed": False, "counts": {"fail": 2}}
+    tripwires = {"strictPassed": False, "cells": [], "strictMissingCells": []}
+    first = {"loss": 4.0, "params": {}, "construction": construction,
+             "tripwires": tripwires, "gateFailures": 2}
+    improved, _ = _update_leaderboard(
+        "violin", tmp_path / "run-a", first, "objective")
+    assert improved
+    jitter = {**first, "loss": 3.998}
+    improved, previous = _update_leaderboard(
+        "violin", tmp_path / "run-b", jitter, "objective")
+    assert not improved and previous == 4.0
+    real = {**first, "loss": 3.99}
+    improved, _ = _update_leaderboard(
+        "violin", tmp_path / "run-c", real, "objective")
+    assert improved
 
 
 def test_reference_variability_floor_requires_alternate_takes():
@@ -537,6 +610,7 @@ def test_bowed_p1_features_have_zero_weight_for_blown():
             assert bowed[key] == 0.0
         else:
             assert bowed[key] == 1.0
+    assert bowed["decay_log_ratio"] == 0.0
     # a blown composite must not move when only a P1 sense differs
     reference = _bundle()
     rendered_same = _bundle()

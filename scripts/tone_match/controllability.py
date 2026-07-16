@@ -18,6 +18,7 @@ Outputs (per instrument, git-ignored under the campaign dir):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -64,6 +65,44 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
 }
 
 
+def _canonical_hash(value: Any) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def objective_contract_hash(instrument: str, references: list[dict[str, Any]],
+                            weights: dict[str, float]) -> str:
+    """Hash the exact scored reference objective consumed by the fitter."""
+    return _canonical_hash({
+        "instrument": instrument,
+        "references": references,
+        "weights": weights,
+    })
+
+
+def manifest_contract_hash(contract: list[dict[str, Any]]) -> str:
+    """Hash the exact free-parameter contract perturbed by the audit."""
+    return _canonical_hash(sorted(contract, key=lambda row: row["key"]))
+
+
+def _manifest_contract(manifest: dict[str, Any], baseline: dict[str, Any],
+                       keys: list[str]) -> list[dict[str, Any]]:
+    rows = {row["key"]: row for row in manifest.get("continuous", [])}
+    missing = [key for key in keys if key not in rows]
+    if missing:
+        raise ValueError(f"controllability keys missing from manifest: {missing}")
+    contract = []
+    for key in keys:
+        row = rows[key]
+        contract.append({
+            "key": key,
+            "min": float(row["min"]),
+            "max": float(row["max"]),
+            "default": float(baseline.get(key, row["default"])),
+        })
+    return contract
+
+
 def _render_batch(jobs: list[dict[str, Any]], repo_root: Path) -> None:
     jobs_path = Path(jobs[0]["out"]).parent / "audit-jobs.json"
     jobs_path.write_text(json.dumps(jobs))
@@ -78,6 +117,8 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
               references: list[dict[str, Any]], output_dir: Path,
               repo_root: Path,
               free_params: dict[str, tuple[float, float, float]] | None = None,
+              objective_references: list[dict[str, Any]] | None = None,
+              manifest_contract: list[dict[str, Any]] | None = None,
               ) -> dict[str, Any]:
     free_params = free_params or BOWED_FREE_PARAMS
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -164,8 +205,8 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         best_param = max(responses, key=responses.get) if responses else None
         best = responses.get(best_param, 0.0) if best_param else 0.0
         controllable = best >= RESPONSE_THRESHOLD
-        status = ("controllable" if controllable else
-                  "watch-metric" if active_weight == 0 else "UNCONTROLLABLE")
+        status = ("watch-metric" if active_weight == 0 else
+                  "controllable" if controllable else "UNCONTROLLABLE")
         verdicts.append({
             "feature": feature, "weight": active_weight,
             "bestParam": best_param, "maxResponse": round(best, 4),
@@ -173,12 +214,34 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "status": status,
         })
 
-    audit = {"instrument": instrument, "threshold": RESPONSE_THRESHOLD,
+    responsive = {
+        feature: sorted(key for key in matrix
+                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
+        for feature in DEFAULT_WEIGHTS
+    }
+    watch_metrics = [v["feature"] for v in verdicts if v["status"] == "watch-metric"]
+    uncontrolled = [v["feature"] for v in verdicts if v["status"] == "UNCONTROLLABLE"]
+    objective_references = objective_references or references
+    manifest_contract = manifest_contract or [
+        {"key": key, "baseline": values[0], "perturbed": values[1]}
+        for key, values in sorted(free_params.items())
+    ]
+    audit = {"schemaVersion": 1, "instrument": instrument,
+             "status": "clean" if not uncontrolled else "not-clean",
+             "threshold": RESPONSE_THRESHOLD,
+             "objectiveHash": objective_contract_hash(
+                 instrument, objective_references, weights),
+             "manifestHash": manifest_contract_hash(manifest_contract),
+             "manifest": manifest_contract,
+             "finalWeights": weights,
              "references": [ref.get("path") for ref in references],
              "excludedReferences": excluded_refs,
              "analysisFailuresPerParam": render_failures,
              "matrix": matrix, "verdicts": verdicts,
-             "clean": not any(v["status"] == "UNCONTROLLABLE" for v in verdicts)}
+             "responsiveParameters": responsive,
+             "watchMetrics": watch_metrics,
+             "uncontrolledWeightedFeatures": uncontrolled,
+             "clean": not uncontrolled}
     (output_dir / "controllability.json").write_text(
         json.dumps(audit, indent=1) + "\n")
     lines = [f"# Controllability audit — {instrument}",
@@ -206,14 +269,29 @@ def main(argv: list[str] | None = None) -> int:
                         help="references.json (subset used: first per register)")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, default=Path("."))
+    parser.add_argument("--manifest", type=Path,
+                        default=Path(__file__).with_name("manifest.json"))
+    parser.add_argument("--keys",
+                        help="comma-separated free keys; defaults to the bowed audit set")
     args = parser.parse_args(argv)
     references = json.loads(args.references.read_text())
+    baseline = json.loads(args.initial.read_text())
+    keys = (list(dict.fromkeys(key.strip() for key in args.keys.split(",")
+                              if key.strip()))
+            if args.keys else list(BOWED_FREE_PARAMS))
+    unknown = [key for key in keys if key not in BOWED_FREE_PARAMS]
+    if unknown:
+        parser.error(f"no perturbation specification for: {', '.join(unknown)}")
+    free_params = {key: BOWED_FREE_PARAMS[key] for key in keys}
+    contract = _manifest_contract(json.loads(args.manifest.read_text()), baseline, keys)
     seen: dict[str, dict[str, Any]] = {}
     for row in references:
         seen.setdefault(f"{row.get('register')}|{row.get('dynamic')}", row)
     subset = list(seen.values())[:6]
-    audit = run_audit(args.instrument, json.loads(args.initial.read_text()),
-                      subset, args.output, args.repo_root)
+    audit = run_audit(args.instrument, baseline, subset, args.output,
+                      args.repo_root, free_params=free_params,
+                      objective_references=references,
+                      manifest_contract=contract)
     print(json.dumps({"clean": audit["clean"],
                       "uncontrollable": [v["feature"] for v in audit["verdicts"]
                                          if v["status"] == "UNCONTROLLABLE"]}))

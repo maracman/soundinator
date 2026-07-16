@@ -191,3 +191,21 @@ Composite loss: `2.888251`
 | Parameter | Fitted | ±10% sensitivity |
 |---|---:|---:|
 | `spectralResonanceAmount` | 1.0 | not run |
+
+## violin — agentd-interim-v2-baseline-r2
+
+Composite loss: `4.278461`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseLevel` | 1.0 | not run |
+| `dynamicBlare` | 0.0 | not run |
+| `excitationPosition` | 0.09 | not run |
+| `partialMaterial` | 0.08 | not run |
+| `partialTilt` | 0.0 | not run |
+| `partialTransfer` | 0.1 | not run |
+| `spectralDynamicAmount` | 0.8 | not run |
+| `spectralResonanceAmount` | 0.35 | not run |
+| `vibratoDepth` | 30.335 | not run |
+| `vibratoProb` | 0.88 | not run |
+| `vibratoRate` | 5.911 | not run |
