@@ -572,7 +572,13 @@ for (const [key, seed] of Object.entries({
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
 })) {
-  SPECTRAL_RESONANCES[key] = SPECTRAL_RESONANCES[seed].map(band => ({ ...band }));
+  const fitted = MEASURED_PROFILES[key]?.resonances;
+  if (Array.isArray(fitted) && fitted.length) {
+    SPECTRAL_RESONANCES[key] = fitted.map(band => ({ ...band }));
+  } else {
+    SPECTRAL_RESONANCES[key] = SPECTRAL_RESONANCES[seed].map(band => ({ ...band }));
+    console.warn(`[SG2 body fallback] ${key} has no measured resonances; using ${seed}`);
+  }
 }
 
 for (const [profileKey, resonances] of Object.entries(SPECTRAL_RESONANCES)) {
@@ -1055,11 +1061,11 @@ export function registerProfileAt(profile, fundamentalHz) {
   if (!entries.length) return { partials: profile?.partials || [], partialB: null };
   const hz = Math.max(1, Number(fundamentalHz) || entries[0].f0);
   let hi = entries.findIndex(row => row.f0 >= hz);
-  if (hi <= 0) return { partials: entries[0].partials, partialB: entries[0].partialB ?? profile?.performance?.partialB ?? null };
   if (hi < 0) {
     const last = entries[entries.length - 1];
     return { partials: last.partials, partialB: last.partialB ?? profile?.performance?.partialB ?? null };
   }
+  if (hi === 0) return { partials: entries[0].partials, partialB: entries[0].partialB ?? profile?.performance?.partialB ?? null };
   const a = entries[hi - 1], b = entries[hi];
   const t = Math.max(0, Math.min(1, Math.log(hz / a.f0) / Math.log(b.f0 / a.f0)));
   const count = Math.max(a.partials.length, b.partials.length);
