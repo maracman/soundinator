@@ -37,9 +37,9 @@ CAMPAIGNS: dict[str, list[dict[str, Any]]] = {
         {"register": "high", "midi": 84, "pp": "BbClar.pp.C6B6.aiff", "ff": "BbClar.ff.C6B6.aiff"},
     ],
     "alto-sax": [
-        {"register": "low", "midi": 49, "pp": "AltoSax.NoVib.pp.Db3B3.aiff", "ff": "AltoSax.NoVib.ff.Db3B3.aiff"},
+        {"register": "low", "midi": 51, "pp": "AltoSax.NoVib.pp.Db3B3.aiff", "ff": "AltoSax.NoVib.ff.Db3B3.aiff"},
         {"register": "mid", "midi": 60, "pp": "AltoSax.NoVib.pp.C4B4.aiff", "ff": "AltoSax.NoVib.ff.C4B4.aiff"},
-        {"register": "high", "midi": 72, "pp": "AltoSax.NoVib.pp.C5Ab5.aiff", "ff": "AltoSax.NoVib.ff.C5Ab5.aiff"},
+        {"register": "high", "midi": 74, "pp": "AltoSax.NoVib.pp.C5Ab5.aiff", "ff": "AltoSax.NoVib.ff.C5Ab5.aiff"},
     ],
     "trumpet": [
         {"register": "low", "midi": 52, "pp": "Trumpet.novib.pp.E3B3.aiff", "ff": "Trumpet.novib.ff.E3B3.aiff"},
@@ -89,10 +89,12 @@ PHILHARMONIA_WOODWIND_ALTERNATES = {
         {"register": "high", "midi": 84, "dynamic": "ff", "file": "clarinet_C6_15_fortissimo_normal.mp3"},
     ],
     "alto-sax": [
+        {"register": "low", "midi": 51, "dynamic": "pp", "file": "saxophone_Ds3_05_pianissimo_normal.mp3"},
+        {"register": "low", "midi": 51, "dynamic": "ff", "file": "saxophone_Ds3_05_fortissimo_normal.mp3"},
         {"register": "mid", "midi": 60, "dynamic": "pp", "file": "saxophone_C4_15_pianissimo_normal.mp3"},
         {"register": "mid", "midi": 60, "dynamic": "ff", "file": "saxophone_C4_15_fortissimo_normal.mp3"},
-        {"register": "high", "midi": 72, "dynamic": "pp", "file": "saxophone_C5_1_pianissimo_normal.mp3"},
-        {"register": "high", "midi": 72, "dynamic": "ff", "file": "saxophone_C5_15_fortissimo_normal.mp3"},
+        {"register": "high", "midi": 74, "dynamic": "pp", "file": "saxophone_D5_05_pianissimo_normal.mp3"},
+        {"register": "high", "midi": 74, "dynamic": "ff", "file": "saxophone_D5_05_fortissimo_normal.mp3"},
     ],
 }
 
