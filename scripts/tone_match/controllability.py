@@ -134,6 +134,11 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         perturbed_params = dict(variants["__base__"])
         perturbed_params[key] = perturbed
         variants[key] = perturbed_params
+    # T-041: repeat the exact baseline in independent offline render
+    # contexts. One inaudible PCM step can destabilise thresholded feature
+    # estimators, so repeat-unstable features cannot retain loss weight.
+    for repeat in range(2):
+        variants[f"__base__-repeat-{repeat}"] = dict(variants["__base__"])
 
     jobs = []
     for name, params in variants.items():
@@ -152,14 +157,22 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
 
     ref_bundles = [extract_features(ref["path"]) for ref in references]
     weights = weights_for_instrument(instrument)
+    render_cache: dict[tuple[str, int], Any] = {}
+
+    def render_bundle(name: str, ref_index: int):
+        key = (name, ref_index)
+        if key not in render_cache:
+            render_cache[key] = extract_features(
+                renders / f"{name}-{ref_index}.wav",
+                active_duration_s=references[ref_index].get(
+                    "durationSec", 1.5))
+        return render_cache[key]
 
     def distances(name: str) -> dict[str, list[float]]:
         table: dict[str, list[float]] = {}
         for ref_index, ref_bundle in enumerate(ref_bundles):
             try:
-                render_bundle = extract_features(
-                    renders / f"{name}-{ref_index}.wav",
-                    active_duration_s=references[ref_index].get("durationSec", 1.5))
+                rendered = render_bundle(name, ref_index)
             except ValueError:
                 # a perturbation that kills the note entirely is itself a
                 # (maximal) response; record NaN and let the matrix step
@@ -167,7 +180,7 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
                 for key in DEFAULT_WEIGHTS:
                     table.setdefault(key, []).append(float("nan"))
                 continue
-            result = compare_features(ref_bundle, render_bundle, weights)
+            result = compare_features(ref_bundle, rendered, weights)
             for key, value in result["normalized"].items():
                 table.setdefault(key, []).append(float(value))
         return table
@@ -180,6 +193,47 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     base_ok = ~np.isnan(np.asarray(base[any_feature], dtype=float))
     excluded_refs = [references[i].get("path") for i in range(len(references))
                      if not base_ok[i]]
+    repeat_rows = []
+    repeat_means: dict[str, float] = {}
+    repeat_peaks: dict[str, float] = {}
+    for repeat in range(2):
+        repeat_name = f"__base__-repeat-{repeat}"
+        comparisons = []
+        for ref_index in np.flatnonzero(base_ok):
+            try:
+                comparisons.append(compare_features(
+                    render_bundle("__base__", int(ref_index)),
+                    render_bundle(repeat_name, int(ref_index)),
+                    weights))
+            except ValueError:
+                continue
+        if not comparisons:
+            continue
+        means = {
+            feature: float(np.mean([
+                row["normalized"][feature] for row in comparisons]))
+            for feature in comparisons[0]["normalized"]
+        }
+        peaks = {
+            feature: float(np.max([
+                row["normalized"][feature] for row in comparisons]))
+            for feature in comparisons[0]["normalized"]
+        }
+        for feature in means:
+            repeat_means[feature] = max(
+                repeat_means.get(feature, 0.0), means[feature])
+            repeat_peaks[feature] = max(
+                repeat_peaks.get(feature, 0.0), peaks[feature])
+        repeat_rows.append({
+            "baseline": "__base__",
+            "repeat": repeat_name,
+            "meanPerceptualUnits": means,
+            "peakPerceptualUnits": peaks,
+        })
+    unstable_features = sorted(
+        feature for feature in repeat_means
+        if repeat_means[feature] >= RESPONSE_THRESHOLD or
+        repeat_peaks[feature] >= RESPONSE_THRESHOLD)
     matrix: dict[str, dict[str, float]] = {}
     render_failures: dict[str, int] = {}
     for key in free_params:
@@ -198,9 +252,22 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         any_pert = np.asarray(perturbed[next(iter(base))], dtype=float)[base_ok]
         render_failures[key] = int(np.isnan(any_pert).sum())
 
+    final_weights = dict(weights)
+    zero_weighted = []
+    for feature in unstable_features:
+        if float(final_weights.get(feature, 0)) <= 0:
+            continue
+        zero_weighted.append({
+            "feature": feature,
+            "previousWeight": final_weights[feature],
+            "reason": "repeat renders crossed the controllability threshold",
+            "status": "watch-metric",
+        })
+        final_weights[feature] = 0.0
+
     verdicts = []
     for feature, weight in sorted(DEFAULT_WEIGHTS.items()):
-        active_weight = weights.get(feature, weight)
+        active_weight = final_weights.get(feature, weight)
         responses = {key: matrix[key].get(feature, 0.0) for key in matrix}
         best_param = max(responses, key=responses.get) if responses else None
         best = responses.get(best_param, 0.0) if best_param else 0.0
@@ -226,17 +293,27 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         {"key": key, "baseline": values[0], "perturbed": values[1]}
         for key, values in sorted(free_params.items())
     ]
-    audit = {"schemaVersion": 1, "instrument": instrument,
+    audit = {"schemaVersion": 2, "instrument": instrument,
              "status": "clean" if not uncontrolled else "not-clean",
              "threshold": RESPONSE_THRESHOLD,
              "objectiveHash": objective_contract_hash(
-                 instrument, objective_references, weights),
+                 instrument, objective_references, final_weights),
              "manifestHash": manifest_contract_hash(manifest_contract),
              "manifest": manifest_contract,
-             "finalWeights": weights,
+             "startingWeights": weights,
+             "finalWeights": final_weights,
              "references": [ref.get("path") for ref in references],
              "excludedReferences": excluded_refs,
              "analysisFailuresPerParam": render_failures,
+             "repeatability": {
+                 "status": ("stable" if not unstable_features else
+                            "watch-metrics-zeroed"),
+                 "unstableFeatures": unstable_features,
+                 "maxMeanPerceptualUnits": repeat_means,
+                 "maxPeakPerceptualUnits": repeat_peaks,
+                 "comparisons": repeat_rows,
+             },
+             "zeroWeighted": zero_weighted,
              "matrix": matrix, "verdicts": verdicts,
              "responsiveParameters": responsive,
              "watchMetrics": watch_metrics,
@@ -256,6 +333,16 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         lines.append(f"| {verdict['feature']} | {verdict['weight']} | "
                      f"{verdict['bestParam']} | {verdict['maxResponse']} | "
                      f"{verdict['status']} |")
+    lines.extend([
+        "",
+        "## Repeat-render stability",
+        "",
+        f"Status: **{audit['repeatability']['status'].upper()}**",
+        "",
+        "Unstable features: " +
+        (", ".join(f"`{feature}`" for feature in unstable_features)
+         or "none"),
+    ])
     (output_dir / "CONTROLLABILITY.md").write_text("\n".join(lines) + "\n")
     return audit
 
@@ -293,6 +380,9 @@ def main(argv: list[str] | None = None) -> int:
                       objective_references=references,
                       manifest_contract=contract)
     print(json.dumps({"clean": audit["clean"],
+                      "repeatability": audit["repeatability"]["status"],
+                      "unstableFeatures": audit["repeatability"][
+                          "unstableFeatures"],
                       "uncontrollable": [v["feature"] for v in audit["verdicts"]
                                          if v["status"] == "UNCONTROLLABLE"]}))
     return 0

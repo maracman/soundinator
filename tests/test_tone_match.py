@@ -17,7 +17,9 @@ from scripts.tone_match.controllability import (
 )
 from scripts.tone_match.iterate import (
     FreeParam,
+    ToneMatcher,
     _append_ledger,
+    _candidate_fingerprint,
     _consume_controllability_audit,
     _dominant_residual,
     _floor_evidence,
@@ -28,7 +30,7 @@ from scripts.tone_match.iterate import (
     _update_leaderboard,
 )
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
-from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
+from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 
@@ -300,11 +302,14 @@ def test_controllability_contract_rejects_objective_or_manifest_drift(tmp_path):
     responders = {feature: (["partialTilt"] if weight > 0 else [])
                   for feature, weight in weights.items()}
     audit = {
+        "schemaVersion": 2,
         "instrument": instrument,
         "objectiveHash": objective_contract_hash(instrument, references, weights),
         "manifestHash": manifest_contract_hash(contract),
+        "startingWeights": weights,
         "finalWeights": weights,
         "responsiveParameters": responders,
+        "repeatability": {"status": "stable", "unstableFeatures": []},
         "uncontrolledWeightedFeatures": [],
         "clean": True,
         "verdicts": [],
@@ -320,6 +325,21 @@ def test_controllability_contract_rejects_objective_or_manifest_drift(tmp_path):
         _consume_controllability_audit(
             path, instrument, references,
             [FreeParam("partialTransfer", 0.0, 1.0, 0.15)], weights)
+    path.write_text(json.dumps({**audit, "schemaVersion": 1}))
+    with pytest.raises(ValueError, match="repeat-render stability"):
+        _consume_controllability_audit(
+            path, instrument, references, free, weights)
+    unstable = {
+        **audit,
+        "repeatability": {
+            "status": "watch-metrics-zeroed",
+            "unstableFeatures": ["partials_db"],
+        },
+    }
+    path.write_text(json.dumps(unstable))
+    with pytest.raises(ValueError, match="repeat-unstable"):
+        _consume_controllability_audit(
+            path, instrument, references, free, weights)
 
 
 def test_leaderboard_ignores_subthreshold_score_jitter(tmp_path, monkeypatch):
@@ -735,6 +755,69 @@ def test_tripwire_gate_reports_every_bar_with_no_silent_pass():
     assert not gate["passed"]
     table = tripwire_table_markdown(gate)
     assert "band-balance" in table and "FAIL" in table
+
+
+def test_zero_weighted_tripwire_feature_is_watch_only():
+    ref = _bundle(partials=[1] * 40, B=0.0)
+    render = _bundle(partials=[1] * 40, B=0.0004)
+    weights = weights_for_instrument("violin")
+    weights["inharmonicity_log_ratio"] = 0.0
+    result = compare_features(ref, render, weights)
+    gate = evaluate_tripwires("violin", [{
+        "register": "mid", "dynamic": "mf", "result": result,
+        "ref": ref, "render": render,
+    }], weights=weights)
+    inharmonicity = next(
+        row for row in gate["bars"] if row["bar"] == "inharmonicity")
+    assert inharmonicity["status"] == "not-applicable"
+    assert "inharmonicity" not in gate["activeBars"]
+    aggregate = aggregate_by_cell(
+        gate, required_cells=[("mid", "mf")],
+        required_bars=gate["activeBars"], family="bowed")
+    assert not any(
+        row["bar"] == "inharmonicity"
+        for row in aggregate["strictMissingCells"])
+
+
+def test_near_zero_inharmonicity_uses_stretch_cents_instead_of_b_ratio():
+    ref = _bundle(partials=[1] * 40, B=0.0)
+    tiny = _bundle(partials=[1] * 40, B=1e-8)
+    stretched = _bundle(partials=[1] * 40, B=0.0004)
+    near_zero = inharmonicity_comparison(ref.note, tiny.note)
+    assert near_zero["kind"] == "cents"
+    assert near_zero["passed"]
+    assert near_zero["errorCents"] < 3
+    too_stretched = inharmonicity_comparison(ref.note, stretched.note)
+    assert not too_stretched["passed"]
+    assert too_stretched["errorCents"] > 3
+
+    nonzero_ref = _bundle(partials=[1] * 40, B=0.0002)
+    nonzero_render = _bundle(partials=[1] * 40, B=0.00025)
+    ordinary = inharmonicity_comparison(
+        nonzero_ref.note, nonzero_render.note)
+    assert ordinary["kind"] == "factor"
+    assert ordinary["factor"] == pytest.approx(1.25)
+    assert ordinary["passed"]
+
+    ref.note.partial_snr_ok[30:] = False
+    stretched.note.partial_snr_ok[30:] = False
+    ref.note.partial_snr_ok[29] = False
+    stretched.note.partial_snr_ok[28] = False
+    common_mode = inharmonicity_comparison(ref.note, stretched.note)
+    assert common_mode["mode"] == 28
+
+
+def test_tone_matcher_reuses_exact_duplicate_candidate_objective(tmp_path):
+    matcher = ToneMatcher(
+        "violin", {"partialTilt": 0.0}, [],
+        [FreeParam("partialTilt", -1, 1, 0)], tmp_path,
+        weights={"partials_db": 1.0})
+    fingerprint = _candidate_fingerprint(
+        matcher.free, {"partialTilt": 0.0})
+    matcher._objective_cache[fingerprint] = (12.5, 2.5)
+    assert matcher.evaluate(np.asarray([0.0])) == 12.5
+    assert matcher.evaluations == []
+    assert not (tmp_path / "renders").exists()
 
 
 def test_bowed_dynamic_tilt_gate_rejects_static_dynamics():
