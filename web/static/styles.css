@@ -11097,6 +11097,11 @@ body.explore-mode .view {
 .tb-producer .tb-util-btn:hover { border-color: var(--accent); color: var(--text); }
 .tb-producer .tb-util-btn.tb-icon-only { width: 32px; padding: 0; justify-content: center; }
 .tb-producer .tb-util-btn .tb-ico { width: 16px; height: 16px; }
+/* Musical typing: the lit state says "letter keys are notes right now",
+   and the badge carries the two live values (base octave · velocity). */
+.tb-producer .tb-util-btn.on { border-color: var(--accent); color: var(--text); background: rgba(139,124,246,0.16); }
+.tb-producer .kbd-oct { font-size: 0.66rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.tb-producer .kbd-hint { font-size: 0.7rem; color: var(--text3); white-space: nowrap; }
 /* Zoom's two buttons read as one control (shared context) without a group box. */
 .tb-producer .daw-zoom { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 

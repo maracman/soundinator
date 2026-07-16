@@ -823,6 +823,38 @@ console.log("P3: note connection — glide vs ring on overlap");
   check("Q10: invalid input maps to nothing", m(NaN, WPO) === null && midiMapDegree(60, null, WPO) === null);
 }
 
+// ── Q10b: musical typing — computer keyboard as MIDI keyboard ──
+{
+  const { kbdMidiNote, kbdIsNoteCode, midiMapDegree, GenerationEngine } = await import("../web/static/synth.js");
+  // the DAW-standard two-row piano: home row white, row above black
+  check("Q10b typing: A-row walks the white keys from middle C",
+    kbdMidiNote("KeyA") === 60 && kbdMidiNote("KeyS") === 62 && kbdMidiNote("KeyD") === 64 &&
+    kbdMidiNote("KeyF") === 65 && kbdMidiNote("KeyJ") === 71 && kbdMidiNote("KeyK") === 72);
+  check("Q10b typing: W-row fills in the black keys",
+    kbdMidiNote("KeyW") === 61 && kbdMidiNote("KeyE") === 63 && kbdMidiNote("KeyT") === 66 &&
+    kbdMidiNote("KeyY") === 68 && kbdMidiNote("KeyU") === 70 && kbdMidiNote("KeyO") === 73);
+  check("Q10b typing: the map runs to the apostrophe (octave and a half)",
+    kbdMidiNote("KeyL") === 74 && kbdMidiNote("KeyP") === 75 &&
+    kbdMidiNote("Semicolon") === 76 && kbdMidiNote("Quote") === 77);
+  check("Q10b typing: octave shift moves in whole octaves",
+    kbdMidiNote("KeyA", 1) === 72 && kbdMidiNote("KeyA", -2) === 36 && kbdMidiNote("Quote", 1) === 89);
+  check("Q10b typing: notes outside 0-127 stay silent",
+    kbdMidiNote("KeyA", -6) === null && kbdMidiNote("Quote", 6) === null && kbdMidiNote("KeyA", 5) === 120);
+  check("Q10b typing: non-note keys map to nothing",
+    kbdMidiNote("KeyZ") === null && kbdMidiNote("KeyX") === null && kbdMidiNote("Space") === null &&
+    kbdMidiNote("KeyQ") === null && !kbdIsNoteCode("KeyR") && kbdIsNoteCode("KeyH"));
+  check("Q10b typing: bad octave shift maps to nothing", kbdMidiNote("KeyA", NaN) === null);
+  // end-to-end: a typed key feeds the existing mapping unchanged — under the
+  // white/packed/octave default, black-key codes land on black MIDI notes
+  // which the mapping silences, exactly like a hardware keyboard
+  const majorScale = new GenerationEngine({ scaleMode: "12tone", scalePreset: "major", subScaleWeight: 0.7 })._buildScale();
+  const WPO = { keys: "white", coverage: "packed", anchor: "octave" };
+  check("Q10b typing → mapping: home row plays the scale, black-key row is silent",
+    midiMapDegree(kbdMidiNote("KeyA"), majorScale, WPO) === 0 &&
+    midiMapDegree(kbdMidiNote("KeyD"), majorScale, WPO) === 4 &&
+    midiMapDegree(kbdMidiNote("KeyW"), majorScale, WPO) === null);
+}
+
 // ── Q8: imperfections — four small physical truths ──
 {
   const { onsetScoopCents, partialOnsetDelay, releaseRingSeconds, f0WanderTrace, materialT60 } =

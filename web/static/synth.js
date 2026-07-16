@@ -1523,6 +1523,31 @@ export function midiMapDegree(noteNumber, scale, opts = {}) {
   return degree;
 }
 
+// ─── Musical typing (Q10b) ──────────────────────────────────
+// The computer keyboard as a two-row piano, the layout every DAW ships
+// (Ableton/Logic/FL "musical typing"): the home row plays white keys from
+// A = C, the row above plays the black keys between them, and the map
+// runs on up to the apostrophe for a span of an octave and a half.
+// Physical key codes, not characters, so AZERTY/Dvorak users get the same
+// piano shape. Returns a MIDI note number — the rest of the MIDI path
+// (midiMapDegree, mapping preferences, recording) is unchanged, which is
+// the point: typing IS a MIDI keyboard. octaveShift moves the whole map
+// in octaves relative to A = middle C (60). Pure — table-tested.
+const KBD_NOTE_CODES = Object.freeze({
+  KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6,
+  KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11, KeyK: 12, KeyO: 13,
+  KeyL: 14, KeyP: 15, Semicolon: 16, Quote: 17,
+});
+export function kbdMidiNote(code, octaveShift = 0) {
+  const semis = KBD_NOTE_CODES[code];
+  if (semis === undefined || !Number.isFinite(octaveShift)) return null;
+  const note = 60 + Math.round(octaveShift) * 12 + semis;
+  return note >= 0 && note <= 127 ? note : null;
+}
+export function kbdIsNoteCode(code) {
+  return Object.prototype.hasOwnProperty.call(KBD_NOTE_CODES, code);
+}
+
 // ─── Imperfections (Q8) ─────────────────────────────────────
 // Four small physical truths of played notes, each a pure law asserted
 // headlessly, each scaled by the Human dial so machine-precise settings

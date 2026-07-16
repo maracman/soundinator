@@ -43,6 +43,8 @@ import {
   globalScaleAt,
   trackSpaceAt,
   midiMapDegree,
+  kbdMidiNote,
+  kbdIsNoteCode,
   CULTURAL_SCALES,
   itdSeconds,
   headShadowDb,
@@ -345,6 +347,7 @@ const TB_ICONS = {
   zoomOut: `<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.7-4.7"/><path d="M7.5 10.5h6"/>`,
   zoomIn:  `<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.7-4.7"/><path d="M7.5 10.5h6M10.5 7.5v6"/>`,
   midi:    `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="7" r="1.15" fill="currentColor" stroke="none"/><circle cx="7.4" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.6" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="8.8" cy="15" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="15" r="1.15" fill="currentColor" stroke="none"/>`,
+  kbd:     `<rect x="3" y="6.5" width="18" height="11" rx="1.5"/><path d="M7.5 6.5v6.5M12 6.5v6.5M16.5 6.5v6.5"/>`,
 };
 
 // Inline SVG for a top-bar control. `mods` adds extra classes (e.g. an icon
@@ -3958,13 +3961,22 @@ function _midiTrackParams(track) {
 function onMidiMessage(ev) {
   if (_midi.deviceId && ev.target && ev.target.id !== _midi.deviceId) return;
   const [status, noteNumber, rawVel] = ev.data || [];
+  handleMidiEvent(status, noteNumber, rawVel);
+}
+
+// Shared by hardware MIDI (after the device filter) and musical typing —
+// from here down a typed key and a played key are indistinguishable.
+function handleMidiEvent(status, noteNumber, rawVel) {
   const cmd = status & 0xf0;
   if (cmd !== 0x90 && cmd !== 0x80) return;
   const isOn = cmd === 0x90 && rawVel > 0;
   const track = arrangement.tracks.find(t => t.id === _midi.armedTrackId);
   if (!track) return;
   const params = _midiTrackParams(track);
-  if (!_midi.engine) { _midi.engine = new GenerationEngine(params); _midi.engine.initialise(); }
+  // Constructor only — the monitor needs the scale and per-note variation.
+  // initialise() would compose a full motif repertoire the player's own
+  // melody then overrides note for note.
+  if (!_midi.engine) _midi.engine = new GenerationEngine(params);
   const engine = _midi.engine;
   const now = performance.now();
   if (isOn) {
@@ -4024,36 +4036,164 @@ function finishMidiRecording() {
   }).sort((a, b) => a.offsetDivs - b.offsetDivs);
   const lengthBeats = Math.max(1, Math.ceil(Math.max(...notes.map(n => n.offsetDivs + n.durationDivs)) / beatDiv));
   const free = trackFreeFrom(track, rec.startBeat);
-  if (free < 1) { alert("No free space on the armed track at the playhead — recording kept in memory was discarded."); return; }
-  track.regions.push({
+  let target = track;
+  let fit = Math.min(lengthBeats, free);
+  if (free < 1) {
+    // The armed lane is occupied at the playhead. A take is never thrown
+    // away: spill it onto a fresh track carrying the same voice, the way a
+    // DAW records an overlapping pass onto a new take lane.
+    target = {
+      id: crypto.randomUUID(),
+      name: `${track.name} take`,
+      gain: track.gain ?? 1,
+      regions: [],
+      ...(track.instrumentParams ? { instrumentParams: track.instrumentParams } : {}),
+      ...(track.useGlobalScale ? { useGlobalScale: true } : {}),
+    };
+    arrangement.tracks.splice(arrangement.tracks.indexOf(track) + 1, 0, target);
+    initialiseTrackThreadFromPatch(target, _midiTrackParams(track));
+    fit = Math.max(1, Math.min(lengthBeats, totalBeats() - rec.startBeat));
+  }
+  target.regions.push({
     id: crypto.randomUUID(),
     paletteId: track.regions[0]?.paletteId,
     startBeat: rec.startBeat,
-    lengthBeats: Math.min(lengthBeats, free),
+    lengthBeats: fit,
     seed: newSeed(),
     type: "baked",
     notes,
-    loopSourceBeats: Math.min(lengthBeats, free),
+    loopSourceBeats: fit,
   });
   saveArrangement("MIDI recording");
   renderProduce();
 }
 
-function midiToolbarHTML() {
-  if (!("requestMIDIAccess" in navigator)) return "";
-  if (!_midi.access) {
-    return `<button class="tb-util-btn" id="midiBtn" title="Connect a MIDI keyboard — arm a track with its ● button, play, and stop the arm to bake the take">${tbIcon("midi")}<span class="tb-label">MIDI</span></button>`;
+// ── Q10b: musical typing — the computer keyboard as a MIDI input ──
+// A toggle, not always-on, because the producer already spends letters on
+// shortcuts (Z zoom, R reroll…): while typing is on, note keys win, exactly
+// as in every DAW's computer-MIDI-keyboard mode. Typed keys synthesize
+// note-on/off into handleMidiEvent, so mapping preferences, monitoring and
+// record-arm behave identically to hardware — and no Web MIDI permission
+// is needed, so this also serves browsers without requestMIDIAccess.
+const KBD_MIDI_KEY = "phase0.kbdMidi.v1";
+let _kbd = { on: false, octave: 0, velocity: 100, down: new Map() };
+try {
+  const saved = JSON.parse(localStorage.getItem(KBD_MIDI_KEY) || "{}");
+  if (Number.isFinite(saved.octave)) _kbd.octave = clamp(Math.round(saved.octave), -4, 4);
+  if (Number.isFinite(saved.velocity)) _kbd.velocity = clamp(Math.round(saved.velocity), 1, 127);
+} catch { /* defaults stand */ }
+function saveKbdMidi() {
+  localStorage.setItem(KBD_MIDI_KEY, JSON.stringify({ octave: _kbd.octave, velocity: _kbd.velocity }));
+}
+
+function kbdReleaseAll() {
+  _kbd.down.forEach((note) => handleMidiEvent(0x80, note, 0));
+  _kbd.down.clear();
+}
+
+function setKbdMidi(on) {
+  if (_kbd.on === !!on) return;
+  _kbd.on = !!on;
+  if (!_kbd.on) {
+    kbdReleaseAll();
+  } else if (!_midi.armedTrackId && arrangement?.tracks.length) {
+    // DAW convention: enabling musical typing arms the selected (else first)
+    // track so keys make sound immediately; ● disarms and bakes as usual.
+    const sel = arrangement.tracks.find(t => t.id === selectedRegion?.trackId);
+    _midi.armedTrackId = (sel || arrangement.tracks[0]).id;
+    _midi.engine = null;
   }
-  const inputs = [..._midi.access.inputs.values()];
-  return `
-    <select id="midiDevice" class="splits-filter" title="Which MIDI input records">
-      <option value="">All inputs</option>
-      ${inputs.map(inp => `<option value="${esc(inp.id)}"${_midi.deviceId === inp.id ? " selected" : ""}>${esc(inp.name || inp.id)}</option>`).join("")}
-    </select>
-    ${_midi.armedTrackId ? `<span class="midi-rec-dot" title="Recording arms on the ● track — playing keys records; disarm to bake">●</span>` : ""}`;
+  renderProduce();
+}
+
+// Badge updates go straight to the DOM: a full renderProduce would drop
+// keys held mid-phrase (it rebuilds the toolbar the badge lives in).
+function updateKbdBadge() {
+  const el = document.getElementById("kbdOct");
+  if (el) el.textContent = `C${4 + _kbd.octave} · v${_kbd.velocity}`;
+}
+
+if (!window._kbdMidiInstalled) {
+  window._kbdMidiInstalled = true;
+  const inTextField = (t) =>
+    !!t && (/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || "") || t.isContentEditable);
+  // Capture phase so note keys pre-empt the producer's single-letter
+  // shortcuts (Z zoom, R reroll…) while typing mode is on.
+  document.addEventListener("keydown", (e) => {
+    if (!location.hash.includes("produce") || !arrangement) return;
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === "KeyK") {
+      e.preventDefault(); // ⌘K: the Logic/GarageBand musical-typing toggle
+      e.stopPropagation();
+      setKbdMidi(!_kbd.on);
+      return;
+    }
+    if (!_kbd.on || inTextField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.code === "KeyZ" || e.code === "KeyX") {
+      e.preventDefault();
+      e.stopPropagation();
+      kbdReleaseAll(); // octave moves under held keys would strand note-offs
+      _kbd.octave = clamp(_kbd.octave + (e.code === "KeyX" ? 1 : -1), -4, 4);
+      saveKbdMidi();
+      updateKbdBadge();
+      return;
+    }
+    if (e.code === "KeyC" || e.code === "KeyV") {
+      e.preventDefault();
+      e.stopPropagation();
+      _kbd.velocity = clamp(_kbd.velocity + (e.code === "KeyV" ? 10 : -10), 1, 127);
+      saveKbdMidi();
+      updateKbdBadge();
+      return;
+    }
+    if (!kbdIsNoteCode(e.code)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.repeat || _kbd.down.has(e.code)) return;
+    const note = kbdMidiNote(e.code, _kbd.octave);
+    if (note == null) return;
+    _kbd.down.set(e.code, note);
+    handleMidiEvent(0x90, note, _kbd.velocity);
+  }, true);
+  // keyup is not gated on mode/hash: a key pressed before a toggle or view
+  // switch must still deliver its note-off.
+  document.addEventListener("keyup", (e) => {
+    const note = _kbd.down.get(e.code);
+    if (note == null) return;
+    _kbd.down.delete(e.code);
+    e.stopPropagation();
+    handleMidiEvent(0x80, note, 0);
+  }, true);
+  window.addEventListener("blur", () => kbdReleaseAll());
+}
+
+function midiToolbarHTML() {
+  const kbdBtn = `
+    <button class="tb-util-btn${_kbd.on ? " on" : ""}" id="kbdBtn" aria-pressed="${_kbd.on}"
+      title="Musical typing (⌘K) — play notes from this keyboard: A-row white keys, W-row black keys, Z/X octave, C/V velocity. The ● armed track supplies the voice; disarm ● to bake the take.">
+      ${tbIcon("kbd")}<span class="tb-label">Keys</span>${_kbd.on ? `<span class="kbd-oct" id="kbdOct">C${4 + _kbd.octave} · v${_kbd.velocity}</span>` : ""}
+    </button>`;
+  let device = "";
+  if ("requestMIDIAccess" in navigator) {
+    if (!_midi.access) {
+      device = `<button class="tb-util-btn" id="midiBtn" title="Connect a MIDI keyboard — arm a track with its ● button, play, and stop the arm to bake the take">${tbIcon("midi")}<span class="tb-label">MIDI</span></button>`;
+    } else {
+      const inputs = [..._midi.access.inputs.values()];
+      device = `
+        <select id="midiDevice" class="splits-filter" title="Which MIDI input records (musical typing is always heard)">
+          <option value="">All inputs</option>
+          ${inputs.map(inp => `<option value="${esc(inp.id)}"${_midi.deviceId === inp.id ? " selected" : ""}>${esc(inp.name || inp.id)}</option>`).join("")}
+        </select>`;
+    }
+  }
+  const armed = _midi.armedTrackId
+    ? `<span class="midi-rec-dot" title="Recording arms on the ● track — playing keys records; disarm to bake">●</span>`
+    : (_kbd.on ? `<span class="kbd-hint">arm a track ● to play</span>` : "");
+  return kbdBtn + device + armed;
 }
 
 function wireMidi(v) {
+  const kbdBtn = v.querySelector("#kbdBtn");
+  if (kbdBtn) kbdBtn.onclick = () => setKbdMidi(!_kbd.on);
   const midiBtn = v.querySelector("#midiBtn");
   if (midiBtn) midiBtn.onclick = async () => {
     try {
@@ -4235,7 +4375,7 @@ function produceTimelineHTML() {
           <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
           <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
           <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the Harmonic guide: this track's takes regenerate under the marker in force (baked notes stay put)">HG</button>
-          ${_midi.access ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
+          ${(_midi.access || _kbd.on) ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
           <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
           <canvas class="tl-space-dot" data-track-space-dot="${t.id}" width="28" height="28" title="Spatial position — drag: left/right rotates around you, up/down changes distance"></canvas>
         </div>
@@ -6392,6 +6532,11 @@ function toggleShortcutOverlay() {
           <dt>⌘C · ⌘V</dt><dd>copy · paste region</dd>
           <dt>⌫</dt><dd>delete selection</dd>
           <dt>⇧click · drag</dt><dd>multi-select regions</dd>
+          <dt colspan="2"><b>Musical typing (⌘K toggles)</b></dt><dd></dd>
+          <dt>A S D F…</dt><dd>white keys from middle C</dd>
+          <dt>W E · T Y U…</dt><dd>black keys between them</dd>
+          <dt>Z · X</dt><dd>octave down · up</dd>
+          <dt>C · V</dt><dd>velocity down · up</dd>
         </dl>
         <dl>
           <dt colspan="2"><b>Piano roll (note selected)</b></dt><dd></dd>
