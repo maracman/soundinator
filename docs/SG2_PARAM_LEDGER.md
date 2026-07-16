@@ -191,3 +191,16 @@ Composite loss: `2.888251`
 | Parameter | Fitted | ±10% sensitivity |
 |---|---:|---:|
 | `spectralResonanceAmount` | 1.0 | not run |
+
+## guitar-nylon — iteration-pilot-03
+
+Composite loss: `7.504955`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `decaySecondRatio` | 1.0 | not run |
+| `decaySecondStage` | 0.7936401413399085 | not run |
+| `excitationPosition` | 0.13 | not run |
+| `partialTilt` | 0.0 | not run |
+| `spectralResonanceAmount` | 1.0 | not run |
+| `velocityHardnessCoupling` | 0.408288512677725 | not run |

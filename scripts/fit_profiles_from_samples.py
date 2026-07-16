@@ -473,7 +473,9 @@ def harmonic_frame_amps(seg: np.ndarray, sr: int, f0: float,
 
 def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
                  min_detected_partials: int = 5,
-                 expected_f0_hz: float | None = None):
+                 expected_f0_hz: float | None = None,
+                 trust_expected_f0: bool = False,
+                 force_percussive: bool | None = None):
     f0 = estimate_f0(seg, sr)
     f0_unconstrained = f0
     if expected_f0_hz is not None:
@@ -487,7 +489,9 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
         # retained as QC provenance; source MIDI is never rewritten.
         def _cents(a: float, b: float) -> float:
             return abs(1200 * math.log2(a / b))
-        if f0 is not None:
+        if trust_expected_f0:
+            f0 = expected_f0_hz
+        elif f0 is not None:
             candidates = [f0 * ratio for k in range(1, 7)
                           for ratio in (1.0 / k, float(k))]
             matches = [c for c in candidates if _cents(c, expected_f0_hz) <= 50]
@@ -500,7 +504,9 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
                     f"(unconstrained estimate {f0:.1f} Hz)")
         else:
             f0 = expected_f0_hz
-    if f0 is None or not (40 < f0 < 2500):
+    f0_low, f0_high = ((20, 6000) if trust_expected_f0 and expected_f0_hz is not None
+                       else (40, 2500))
+    if f0 is None or not (f0_low < f0 < f0_high):
         return None
     env, hop = rms_envelope(seg, sr)
     t_env = np.arange(len(env)) * hop / sr
@@ -519,6 +525,8 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
     mid = env[len(env) // 4: 3 * len(env) // 4]
     sustain_ratio = float(np.median(mid)) / peak if mid.size else 0.0
     percussive = sustain_ratio < 0.35 and peak_i < len(env) // 4
+    if force_percussive is not None:
+        percussive = bool(force_percussive)
 
     note = NoteAnalysis(file=fname, f0=f0, note=hz_to_note_name(f0),
                         f0_unconstrained=f0_unconstrained,
@@ -567,7 +575,12 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
             i_lo = int(np.searchsorted(freqs, fn - half))
             i_hi = int(np.searchsorted(freqs, fn + half))
             local_med = float(np.median(mag[i_lo:i_hi])) + 1e-15
-            if pa > 8 * local_med:                      # ≈ +18 dB
+            # A trusted scheduled render can have a broad low-piano peak
+            # whose main lobe fills much of the ±0.42 f0 window.  The known
+            # MIDI already excludes noise/f0 impostors, so use a +9.5 dB
+            # local gate there; corpus discovery retains the stricter +18 dB.
+            snr_ratio = 3 if trust_expected_f0 else 8
+            if pa > snr_ratio * local_med:
                 amps[n - 1] = pa
                 pfreqs[n - 1] = pf
                 ok[n - 1] = True

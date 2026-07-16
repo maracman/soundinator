@@ -12,7 +12,7 @@ from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, 
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.controllability import canonical_hash, perturbations, validate_audit_contract
-from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability
+from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability, _tripwire_gate
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, seed_preset
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
@@ -778,6 +778,38 @@ def test_tripwire_cell_aggregation_keeps_short_takes_visible():
     assert blown["strictPassed"]
 
 
+def test_iteration_tripwire_consumer_keeps_zero_weight_watch_bars_non_blocking(monkeypatch):
+    def gate(_instrument, notes):
+        status = notes[0]["result"]["partialStatus"]
+        return {"bars": [
+            {"bar": "partial-table", "register": "mid", "dynamic": "mf",
+             "value": 2.0, "limit": "<= 3 dB", "status": status},
+            {"bar": "band-balance", "register": "mid", "dynamic": "mf",
+             "value": {"meanDb": 12}, "limit": "<= 3 dB", "status": "fail"},
+        ]}
+    monkeypatch.setattr(iterate_module, "evaluate_tripwires", gate)
+    references = [{"register": "mid", "dynamic": "mf", "midi": 60}]
+    construction = {"instrument": "guitar", "family": "struck-plucked",
+                    "passed": True, "counts": {"fail": 0}}
+    result = _tripwire_gate(
+        [{"register": "mid", "dynamic": "mf",
+          "result": {"partialStatus": "pass"}, "ref": _bundle(), "render": _bundle()}],
+        references, construction, {"partials_db": 1.0, "band_balance_db": 0.0})
+    assert result["passed"]
+    assert result["failureCount"] == 0
+    assert result["activeBars"] == ["partial-table"]
+    assert result["watchBars"] == ["band-balance"]
+    assert result["rows"][0]["passed"]
+
+    failed = _tripwire_gate(
+        [{"register": "mid", "dynamic": "mf",
+          "result": {"partialStatus": "fail"}, "ref": _bundle(), "render": _bundle()}],
+        references, construction, {"partials_db": 1.0, "band_balance_db": 0.0})
+    assert not failed["passed"]
+    assert failed["failureCount"] == 1
+    assert not failed["rows"][0]["passed"]
+
+
 def test_trumpet_dynamic_articulation_requires_reference_direction_match():
     def sample(dynamic, ref_level, render_level):
         ref = _bundle(); render = _bundle()
@@ -864,6 +896,18 @@ def test_anchored_f0_far_from_every_candidate_fails_loudly():
     with pytest.raises(ValueError, match="50 cents"):
         analyse_note(seg, sr, "off.wav", 16, min_detected_partials=2,
                      expected_f0_hz=555.0)   # ~402 cents off every candidate
+
+
+def test_trusted_render_anchor_allows_the_piano_c1_range():
+    sr = 24_000
+    f0 = 32.703
+    seg = _mode_locked_tone(f0, dominant_harmonic=2, sr=sr, n_partials=6)
+    from scripts.fit_profiles_from_samples import analyse_note
+    note = analyse_note(seg, sr, "scheduled-c1.wav", 16,
+                        min_detected_partials=2, expected_f0_hz=f0,
+                        trust_expected_f0=True, force_percussive=True)
+    assert note is not None
+    assert note.f0 == pytest.approx(f0)
 
 
 def _bowed_samples():

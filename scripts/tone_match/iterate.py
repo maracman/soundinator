@@ -31,6 +31,7 @@ from scipy.optimize import minimize
 from .assertions import ConstructionSample, evaluate_construction
 from .audition import build as build_audition
 from .score import compare_features, extract_features, score_files, weights_for_instrument, write_report
+from .tripwires import aggregate_by_cell, evaluate_tripwires
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_ROOT = Path("/private/tmp/sg2")
@@ -122,50 +123,82 @@ def _floor_evidence(variability: dict[str, Any], best: dict[str, Any]) -> dict[s
             "eligibleReferences": variability["eligibleReferences"]}
 
 
-def _band_limits_for_reference(index: int, variability: dict[str, Any]) -> tuple[float, float]:
-    """T-005 bars widen to measured duplicate-take variability, never shrink."""
-    if variability.get("status") == "measured":
-        for group in variability.get("groups", []):
-            if index in group.get("referenceIndices", []):
-                mean_floor = group.get("floorFeatures", {}).get("band_balance_db")
-                max_floor = group.get("floorBandMaxOctaveDb")
-                return (max(3.0, float(mean_floor)) if mean_floor is not None else 3.0,
-                        max(6.0, float(max_floor)) if max_floor is not None else 6.0)
-    return 3.0, 6.0
+_TRIPWIRE_FEATURES = {
+    "partial-table": "partials_db",
+    "mel-spectrogram": "log_mel_db",
+    "attack-t90": "attack_ms",
+    "vibrato": "vibrato",
+    "inharmonicity": "inharmonicity_log_ratio",
+    "band-balance": "band_balance_db",
+}
 
 
-def _tripwire_gate(scores: list[dict[str, Any]], references: list[dict[str, Any]],
-                   variability: dict[str, Any], construction: dict[str, Any]) -> dict[str, Any]:
-    """Campaign-level §3 gate with owner-readable rows per register/dynamic."""
+def _tripwire_gate(notes: list[dict[str, Any]], references: list[dict[str, Any]],
+                   construction: dict[str, Any],
+                   weights: dict[str, float] | None = None) -> dict[str, Any]:
+    """Consume the canonical §3 gate with audited feature controllability.
+
+    Bars attached to zero-weight watch metrics stay in the owner-facing table,
+    but only active bars participate in strict BAR x register x dynamic
+    coverage and failure counts. This is the consuming-side assertion for the
+    §2.3 rule: an uncontrollable metric cannot become an optimizer loss or a
+    hard gate by another route.
+    """
+    scoring_weights = weights or weights_for_instrument(construction.get("instrument"))
+    raw = evaluate_tripwires(construction.get("instrument", ""), notes)
+    all_bars = list(dict.fromkeys(row["bar"] for row in raw["bars"]))
+    active_bars = [
+        bar for bar in all_bars
+        if _TRIPWIRE_FEATURES.get(bar) is None or
+        scoring_weights.get(_TRIPWIRE_FEATURES[bar], 0) > 0
+    ]
+    active_gate = {
+        **raw,
+        "bars": [row for row in raw["bars"] if row["bar"] in active_bars],
+    }
+    required_cells = list(dict.fromkeys(
+        (str(reference.get("register")), str(reference.get("dynamic")))
+        for reference in references
+    ))
+    aggregate = aggregate_by_cell(
+        active_gate, required_cells=required_cells, required_bars=active_bars,
+        family=construction.get("family"))
+
     rows = []
-    failure_count = 0
-    for index, (score, reference) in enumerate(zip(scores, references)):
-        mean_limit, max_limit = _band_limits_for_reference(index, variability)
-        checks = []
-        for original in score.get("tripwires", {}).get("rows", []):
-            check = dict(original)
-            if check["name"] == "band-balance-mean":
-                observed = check.get("observed")
-                check.update(status="pass" if observed is not None and observed <= mean_limit else "fail",
-                             limit=f"<= {mean_limit:.3f} dB (3 dB or take floor)")
-            elif check["name"] == "band-balance-max-octave":
-                observed = check.get("observed")
-                check.update(status="pass" if observed is not None and observed <= max_limit else "fail",
-                             limit=f"<= {max_limit:.3f} dB (6 dB or take floor)")
-            checks.append(check)
-        failed = [row for row in checks if row["status"] == "fail"]
-        missing = [row for row in checks if row["status"] == "not-applicable" and
-                   row["name"] != "inharmonicity-b"]
-        passed = not failed and not missing
-        failure_count += len(failed) + len(missing)
-        rows.append({"referenceIndex": index, "register": reference.get("register"),
-                     "dynamic": reference.get("dynamic"), "midi": reference.get("midi"),
-                     "passed": passed, "checks": checks,
-                     "bandBalance": score.get("bandBalance")})
-    return {"passed": bool(construction.get("passed")) and failure_count == 0,
-            "constructionPassed": bool(construction.get("passed")),
-            "failureCount": failure_count + int(construction.get("counts", {}).get("fail", 0)),
-            "rows": rows}
+    for index, (note, reference) in enumerate(zip(notes, references)):
+        note_gate = evaluate_tripwires(construction.get("instrument", ""), [note])
+        checks = [{
+            "name": check["bar"],
+            "status": check["status"],
+            "observed": check["value"],
+            "limit": check["limit"],
+            "active": check["bar"] in active_bars,
+        } for check in note_gate["bars"]]
+        active_checks = [check for check in checks if check["active"]]
+        rows.append({
+            "referenceIndex": index,
+            "register": reference.get("register"),
+            "dynamic": reference.get("dynamic"),
+            "midi": reference.get("midi"),
+            "passed": bool(active_checks) and all(
+                check["status"] == "pass" for check in active_checks),
+            "checks": checks,
+            "bandBalance": note["result"].get("bandBalance"),
+        })
+
+    failed_cells = sum(row["status"] == "fail" for row in aggregate["cells"])
+    failure_count = failed_cells + len(aggregate["strictMissingCells"])
+    return {
+        "passed": bool(construction.get("passed")) and aggregate["strictPassed"],
+        "constructionPassed": bool(construction.get("passed")),
+        "failureCount": failure_count,
+        "activeBars": active_bars,
+        "watchBars": [bar for bar in all_bars if bar not in active_bars],
+        "bars": raw["bars"],
+        "cells": aggregate["cells"],
+        "strictMissingCells": aggregate["strictMissingCells"],
+        "rows": rows,
+    }
 
 
 def _dominant_residual(best: dict[str, Any]) -> dict[str, Any] | None:
@@ -283,7 +316,8 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
                   "|---|---|---:|" + "---:|" * len(check_names) + "---:|\n"])
     for row in gate.get("rows", []):
         by_name = {check["name"]: check for check in row["checks"]}
-        marks = [("PASS" if by_name[name]["status"] == "pass" else
+        marks = [("WATCH" if not by_name[name].get("active", True) else
+                  "PASS" if by_name[name]["status"] == "pass" else
                   "N/A" if by_name[name]["status"] == "not-applicable" else "FAIL")
                  for name in check_names]
         lines.append(f"| {row.get('register') or '?'} | {row.get('dynamic') or '?'} | "
@@ -392,20 +426,32 @@ class ToneMatcher:
                                        "durationSec": ref.get("durationSec", 1.5)})
                   for ref, job in zip(self.references, jobs)]
         construction_samples = []
-        for ref_index, (ref, job) in enumerate(zip(self.references, jobs)):
-            mean_limit, max_limit = _band_limits_for_reference(ref_index, self.variability)
+        tripwire_notes = []
+        for ref, job, score in zip(self.references, jobs, scores):
             expected_f0_hz = 440.0 * 2 ** ((float(ref.get("midi", 60)) - 69) / 12)
+            render_bundle = extract_features(
+                job["out"], active_duration_s=ref.get("durationSec", 1.5),
+                expected_f0_hz=expected_f0_hz, trust_expected_f0=True,
+                force_percussive=True)
+            reference_bundle = extract_features(
+                ref["path"], expected_f0_hz=expected_f0_hz,
+                trust_expected_f0=True, force_percussive=True)
             construction_samples.append(ConstructionSample(
-                render=extract_features(
-                    job["out"], active_duration_s=ref.get("durationSec", 1.5),
-                    expected_f0_hz=expected_f0_hz),
-                reference=extract_features(ref["path"], expected_f0_hz=expected_f0_hz),
+                render=render_bundle,
+                reference=reference_bundle,
                 register=ref.get("register"),
-                dynamic=ref.get("dynamic"), velocity=ref.get("velocity"),
-                band_mean_limit_db=mean_limit, band_max_octave_limit_db=max_limit))
+                dynamic=ref.get("dynamic"), velocity=ref.get("velocity")))
+            tripwire_notes.append({
+                "register": ref.get("register"),
+                "dynamic": ref.get("dynamic"),
+                "result": score,
+                "ref": reference_bundle,
+                "render": render_bundle,
+            })
         construction = evaluate_construction(self.instrument, construction_samples, params=params,
                                              strict_evidence=True)
-        tripwire_gate = _tripwire_gate(scores, self.references, self.variability, construction)
+        tripwire_gate = _tripwire_gate(
+            tripwire_notes, self.references, construction, self.weights)
         loss = float(np.mean([row["composite"] for row in scores]))
         # Construction is a hard gate, not another feature that a low
         # composite can average away.  The large objective penalty guides

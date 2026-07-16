@@ -210,7 +210,11 @@ def run_audit(instrument: str, initial: dict[str, Any], references: list[dict[st
             try:
                 feature_cache[str(path)] = extract_features(
                     path, active_duration_s=min(float(reference["durationSec"]), 0.75),
-                    expected_f0_hz=expected_f0_hz)
+                    expected_f0_hz=expected_f0_hz, trust_expected_f0=True,
+                    force_percussive=instrument in {
+                        "piano", "grand-piano", "upright-piano", "guitar",
+                        "guitar-nylon", "guitar-steel", "harp", "glockenspiel",
+                    })
             except ValueError as error:
                 analysis_failures.append({"config": config_id,
                                           "probeIndex": probe_indices[probe_index],

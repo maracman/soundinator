@@ -371,11 +371,15 @@ def extract_features(
     *,
     active_duration_s: float | None = None,
     expected_f0_hz: float | None = None,
+    trust_expected_f0: bool = False,
+    force_percussive: bool | None = None,
 ) -> FeatureBundle:
     samples, sample_rate = load_mono(str(path))
     if active_duration_s is None:
         note = analyse_audio_file(path, n_partials=max(64, n_partials),
-                                  expected_f0_hz=expected_f0_hz)
+                                  expected_f0_hz=expected_f0_hz,
+                                  trust_expected_f0=trust_expected_f0,
+                                  force_percussive=force_percussive)
     else:
         # Offline renders contain the requested active note plus a deliberately
         # long release/ring tail.  Construction assertions about sustained vs
@@ -387,7 +391,9 @@ def extract_features(
         samples = samples[:active_frames]
         note = analyse_audio_samples(samples, sample_rate, name=str(path),
                                      n_partials=max(64, n_partials),
-                                     expected_f0_hz=expected_f0_hz)
+                                     expected_f0_hz=expected_f0_hz,
+                                     trust_expected_f0=trust_expected_f0,
+                                     force_percussive=force_percussive)
     nfft = 2048
     _, times, spectrum = signal.stft(samples, fs=sample_rate, nperseg=nfft, noverlap=1536,
                                      boundary=None, padded=False)
@@ -564,10 +570,18 @@ def score_files(
     expected_f0_hz = context.get("expectedF0Hz")
     if expected_f0_hz is None and context.get("midi") is not None:
         expected_f0_hz = 440.0 * 2 ** ((float(context["midi"]) - 69) / 12)
-    ref = extract_features(ref_path, expected_f0_hz=expected_f0_hz)
+    force_percussive = instrument in {
+        "piano", "grand-piano", "upright-piano", "guitar", "guitar-nylon",
+        "guitar-steel", "harp", "glockenspiel",
+    }
+    ref = extract_features(ref_path, expected_f0_hz=expected_f0_hz,
+                           trust_expected_f0=expected_f0_hz is not None,
+                           force_percussive=force_percussive)
     render = extract_features(
         render_path, active_duration_s=context.get("durationSec"),
-        expected_f0_hz=expected_f0_hz)
+        expected_f0_hz=expected_f0_hz,
+        trust_expected_f0=expected_f0_hz is not None,
+        force_percussive=force_percussive)
     result = compare_features(ref, render, weights_for_instrument(instrument, weights))
     if instrument:
         # Local import avoids an import cycle: assertions operates on the
