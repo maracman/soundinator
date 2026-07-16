@@ -2,7 +2,7 @@
   "_doc": "Free-tier parameter manifest for the Sound Generator 2.0 iteration loop (docs/SOUND_GENERATOR_2_PLAN.md §2.4). Only optimiser-adjustable params are listed; pinned-tier params (set directly from measurement) are named at the bottom. Bounds mirror the sub-note inspector knobs (app.js chInspectorHTML) so every fitted preset is reachable and editable in the UI. WP-4 consumes this file; WP-9's ledger keys off the same names.",
   "categorical": {
     "excitationType": ["bow", "pluck", "strike", "blow"],
-    "resonatorClass": ["string", "closedTube", "conicalTube", "membrane", "bar"],
+    "resonatorClass": ["string", "openTube", "closedTube", "conicalTube", "membrane", "bar"],
     "bodyType": {
       "values": "enumerate at runtime: 'auto' + Object.keys(BODY_PRESETS) from web/static/synth.js",
       "note": "candidate set restricted per family before optimisation (e.g. sung → vocal bodies + auto)"

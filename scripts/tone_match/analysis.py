@@ -38,6 +38,7 @@ def analyse_audio_samples(
     *,
     name: str = "audio",
     n_partials: int = 64,
+    expected_f0_hz: float | None = None,
 ) -> NoteAnalysis:
     """Analyse the strongest note in mono samples using the profile fitter."""
     mono = np.asarray(samples, dtype=float)
@@ -49,17 +50,21 @@ def analyse_audio_samples(
     # stable f0 and reference, so accepting two prevents valid candidates
     # from crashing an optimiser session.
     note = analyse_note(_strongest_segment(mono, sample_rate), sample_rate, name,
-                        n_partials, min_detected_partials=2)
+                        n_partials, min_detected_partials=2,
+                        expected_f0_hz=expected_f0_hz)
     if note is None:
         raise ValueError(f"no stable pitched note detected in {name}")
     return note
 
 
-def analyse_audio_file(path: str | Path, *, n_partials: int = 64) -> NoteAnalysis:
+def analyse_audio_file(path: str | Path, *, n_partials: int = 64,
+                       expected_f0_hz: float | None = None) -> NoteAnalysis:
     """Load and analyse the strongest note in an audio file."""
     path = Path(path)
     samples, sample_rate = load_mono(str(path))
-    return analyse_audio_samples(samples, sample_rate, name=str(path), n_partials=n_partials)
+    return analyse_audio_samples(samples, sample_rate, name=str(path),
+                                 n_partials=n_partials,
+                                 expected_f0_hz=expected_f0_hz)
 
 
 def note_to_json(note: NoteAnalysis) -> dict[str, Any]:

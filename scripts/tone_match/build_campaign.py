@@ -21,7 +21,7 @@ from scripts.tone_match.exclusions import is_excluded
 
 
 VELOCITY = {"pp": 0.2, "ff": 0.92}
-RESONATOR = {"flute": "string", "clarinet": "closedTube", "alto-sax": "conicalTube",
+RESONATOR = {"flute": "openTube", "clarinet": "closedTube", "alto-sax": "conicalTube",
              "trumpet": "conicalTube", "french-horn": "conicalTube"}
 
 # Every campaign spans named low/mid/high registers at pp and ff.  Filenames
@@ -165,6 +165,12 @@ def _seed(instrument: str, measured: dict[str, Any]) -> dict[str, Any]:
         "spectralDynamicAmount": 0.8 if instrument in {"clarinet", "alto-sax"} else 1.2,
         "dynamicBlare": 0.25 if instrument in {"alto-sax", "trumpet", "french-horn"} else 0.0,
     }
+    fit_provenance = profile.get("resonancesFit") or {}
+    if fit_provenance:
+        seed["bodyStability"] = {key: fit_provenance[key] for key in
+                                 ("splitHalfCorr", "peakHzA", "peakHzB",
+                                  "omittedReason")
+                                 if fit_provenance.get(key) is not None}
     resonances = profile.get("resonances") or []
     if len(resonances) >= 3:
         # Pin the exact WP-3 body evidence into the run report/checklist.

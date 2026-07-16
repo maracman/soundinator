@@ -358,6 +358,7 @@ class NoteAnalysis:
     formants: list[float] = field(default_factory=list)
     formant_bandwidths: list[float] = field(default_factory=list)
     percussive: bool = False
+    f0_unconstrained: float | None = None   # T-020 QC provenance
 
 
 def harmonic_frame_amps(seg: np.ndarray, sr: int, f0: float,
@@ -471,8 +472,34 @@ def harmonic_frame_amps(seg: np.ndarray, sr: int, f0: float,
 
 
 def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
-                 min_detected_partials: int = 5):
+                 min_detected_partials: int = 5,
+                 expected_f0_hz: float | None = None):
     f0 = estimate_f0(seg, sr)
+    f0_unconstrained = f0
+    if expected_f0_hz is not None:
+        # T-020: the reference's nominal pitch is known before analysis.
+        # The monophonic tracker can lock onto a dominant upper mode (low
+        # piano/guitar) or fail on short high notes; pick the tracker
+        # candidate harmonically consistent with the anchor (est/k or
+        # est*k within +/-50 cents), fall back to the anchor itself when
+        # tracking failed entirely, and fail LOUDLY when the anchor is
+        # >50 cents from every candidate.  The unconstrained estimate is
+        # retained as QC provenance; source MIDI is never rewritten.
+        def _cents(a: float, b: float) -> float:
+            return abs(1200 * math.log2(a / b))
+        if f0 is not None:
+            candidates = [f0 * ratio for k in range(1, 7)
+                          for ratio in (1.0 / k, float(k))]
+            matches = [c for c in candidates if _cents(c, expected_f0_hz) <= 50]
+            if matches:
+                f0 = min(matches, key=lambda c: _cents(c, expected_f0_hz))
+            else:
+                raise ValueError(
+                    f"{fname}: expected f0 {expected_f0_hz:.1f} Hz is more "
+                    f"than 50 cents from every tracker candidate "
+                    f"(unconstrained estimate {f0:.1f} Hz)")
+        else:
+            f0 = expected_f0_hz
     if f0 is None or not (40 < f0 < 2500):
         return None
     env, hop = rms_envelope(seg, sr)
@@ -494,6 +521,7 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
     percussive = sustain_ratio < 0.35 and peak_i < len(env) // 4
 
     note = NoteAnalysis(file=fname, f0=f0, note=hz_to_note_name(f0),
+                        f0_unconstrained=f0_unconstrained,
                         dur_s=len(seg) / sr,
                         partial_amps=np.zeros(n_partials),
                         partial_freqs=np.full(n_partials, np.nan),
@@ -1228,7 +1256,18 @@ def _band_envelope(coeff_log2: np.ndarray, centres: np.ndarray,
     return basis @ coeff_log2
 
 
-def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
+# T-016: air-jet instruments have weak fixed-body structure; a steep
+# spectrum can be re-minted as a kazoo-like fixed formant (L7).  A
+# non-minimal body is eligible only under this stability gate; otherwise
+# the profile records an explicit evidence-backed omission.
+AIR_JET_BODY_GATE = {
+    "flute": dict(minSplitHalfCorr=0.80, maxPeakShiftOct=1 / 3,
+                  omittedReason="unstable-air-jet-body"),
+}
+
+
+def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
+                   stability_gate: dict | None = None):
     """Separate a smooth fixed-Hz body envelope from partial-rank excitation.
 
     The same body resonance crosses different harmonic ranks as pitch changes.
@@ -1369,9 +1408,55 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int):
                     prunedUnstableBands=int(np.sum(~band_agrees)),
                     lowestF0Hz=round(f0_min, 1),
                     reconstructionAmount=1,
-                    roundTripMaxDb=round(round_trip_max_db, 3))
+                    bodyClampMaxDb=round(round_trip_max_db, 3))
     if stability:
         fit_info.update(stability)
+
+    # T-016: stability gate for weak-body (air-jet) instruments — emit no
+    # bands and record the evidence-backed omission; tables stay undivided
+    # so T-014's mask equality holds trivially.
+    if stability_gate and bands:
+        corr = (stability or {}).get("splitHalfCorr")
+        peak_a = (stability or {}).get("peakHzA")
+        peak_b = (stability or {}).get("peakHzB")
+        shift_ok = (peak_a and peak_b and
+                    abs(math.log2(peak_a / peak_b)) <= stability_gate["maxPeakShiftOct"])
+        if corr is None or corr < stability_gate["minSplitHalfCorr"] or not shift_ok:
+            fit_info["omittedReason"] = stability_gate["omittedReason"]
+            fit_info["bands"] = 0
+            fit_info["roundTripShapeMaxDb"] = 0.0
+            undivided = raw.astype(float).copy()
+            for note_index in range(len(notes)):
+                peak = float(undivided[note_index].max())
+                if peak > 0:
+                    undivided[note_index] /= peak
+            return [], undivided, fit_info
+
+    # T-018: round-trip SHAPE error against the ROUNDED emitted rows —
+    # per note, reconstruct emittedResidual x emittedBody(amount=1), remove
+    # the median dB offset, take the max absolute dB error over fitted
+    # points.  This is the exported reconstruction accuracy; the safety
+    # clamp diagnostic stays separately named bodyClampMaxDb.
+    shape_max_db = 0.0
+    for note_index, note in enumerate(notes):
+        errors = []
+        for rank in range(n_partials):
+            raw_amp = float(raw[note_index, rank])
+            residual = float(adjusted[note_index, rank])
+            if raw_amp <= 1e-6 or residual <= 1e-9 or not note.partial_snr_ok[rank]:
+                continue
+            freq = float(note.partial_freqs[rank])
+            if not np.isfinite(freq) or freq <= 0:
+                freq = note.f0 * (rank + 1)
+            gain_log2 = sum(band["gain"] * math.exp(
+                -.5 * ((math.log2(max(20, freq) / band["freq"])) / band["width"]) ** 2)
+                for band in bands)
+            recon = residual * (2 ** gain_log2)
+            errors.append(20 * math.log10(raw_amp / max(recon, 1e-12)))
+        if errors:
+            centred = np.asarray(errors) - float(np.median(errors))
+            shape_max_db = max(shape_max_db, float(np.max(np.abs(centred))))
+    fit_info["roundTripShapeMaxDb"] = round(shape_max_db, 3)
     return bands, adjusted, fit_info
 
 
@@ -1415,7 +1500,8 @@ def fit_take_spread(notes: list[NoteAnalysis], A: np.ndarray, OK: np.ndarray,
 
 
 def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis],
-                         n_partials: int, min_amp_f0: float = 40.0):
+                         n_partials: int, min_amp_f0: float = 40.0,
+                         body_stability_gate: dict | None = None):
     """Combine per-note measurements into one engine-shaped record."""
     # analyse_note already rejects f0 <= 40 Hz.  The historical 100 Hz
     # spectral cutoff silently removed the practical low register of horn,
@@ -1425,7 +1511,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         spec_notes = notes
 
     # ── 64-partial amplitude table ────────────────────────────────────
-    resonances, A, resonances_fit = fit_fixed_body(spec_notes, n_partials)
+    resonances, A, resonances_fit = fit_fixed_body(
+        spec_notes, n_partials, stability_gate=body_stability_gate)
     OK = np.stack([n.partial_snr_ok for n in spec_notes])
     spec_index = {id(note): index for index, note in enumerate(spec_notes)}
     logf0 = np.log([n.f0 for n in spec_notes])
@@ -1799,7 +1886,9 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
     vib_notes = run(vibrato_files) if vibrato_files else []
     if not notes:
         return None
-    agg = aggregate_instrument(notes, vib_notes, n_partials)
+    instrument_name = os.path.basename(os.path.normpath(inst_dir))
+    agg = aggregate_instrument(notes, vib_notes, n_partials,
+                               body_stability_gate=AIR_JET_BODY_GATE.get(instrument_name))
     # Corpus contract uses uppercase; retain lowercase as a legacy fallback.
     prov_path = os.path.join(inst_dir, "PROVENANCE.json")
     if not os.path.exists(prov_path):

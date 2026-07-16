@@ -53,7 +53,7 @@ def main():
             "notesAnalysed": len(v.get("notesAnalysed", [])),
         }
         resonances = v.get("resonances")
-        if isinstance(resonances, list) and resonances:
+        if isinstance(resonances, list):
             entry["resonances"] = [{
                 "freq": round(row["freq"], 1),
                 "gain": round(row["gain"], 4),
@@ -70,8 +70,10 @@ def main():
             if isinstance(fit, dict):
                 entry["resonancesFit"] = {
                     key: fit[key] for key in
-                    ("lowestF0Hz", "reconstructionAmount", "roundTripMaxDb",
-                     "method", "splitHalfCorr")
+                    ("lowestF0Hz", "reconstructionAmount",
+                     "roundTripShapeMaxDb", "bodyClampMaxDb",
+                     "method", "splitHalfCorr", "peakHzA", "peakHzB",
+                     "omittedReason")
                     if fit.get(key) is not None}
         vowel_formants = v.get("vowelFormants")
         if isinstance(vowel_formants, dict) and vowel_formants:

@@ -179,16 +179,28 @@ def evaluate_tripwires(instrument: str,
     }
 
 
+# Bars a family legitimately never measures (excluded from strict coverage)
+FAMILY_INAPPLICABLE_BARS = {
+    "blown": {"inharmonicity"},
+}
+
+
 def aggregate_by_cell(gate: dict[str, Any],
                       required_cells: list[tuple[str, str]] | None = None,
+                      *,
+                      required_bars: list[str] | None = None,
+                      family: str | None = None,
                       ) -> dict[str, Any]:
-    """T-013 campaign aggregation: evidence per instrument/register/dynamic.
+    """T-013/T-017 campaign aggregation: evidence per BAR x register x dynamic.
 
-    An individual short take stays visibly not-applicable; a CELL passes a
-    bar when at least one eligible take measured it and every measured take
-    clears its limit; a strict campaign fails when a required cell has no
-    measured evidence at all.  This keeps §3 coverage without discarding
-    short-but-valid duplicate takes.
+    An individual short take stays visibly not-applicable; a (bar,
+    register, dynamic) cell passes when at least one eligible take
+    measured that bar there and every measured take clears its limit.
+    Strict coverage is per bar-cell (T-017): an onset measurement can
+    never stand in for a missing band-balance measurement.  Only
+    explicitly family-inapplicable bars are excluded from required bars;
+    `strictMissingCells` carries the bar name so the run report names the
+    missing evidence.
     """
     cells: dict[tuple[str, Any, str], dict[str, int]] = {}
     for row in gate["bars"]:
@@ -206,15 +218,18 @@ def aggregate_by_cell(gate: dict[str, Any],
     failed = [row for row in cell_rows if row["status"] == "fail"]
     strict_missing = []
     if required_cells:
-        covered = {(row["register"], row["dynamic"]) for row in cell_rows
-                   if row["status"] in ("pass", "fail")}
+        inapplicable = FAMILY_INAPPLICABLE_BARS.get(family or "", set())
+        bars_required = [bar for bar in
+                         (required_bars or sorted({row["bar"] for row in cell_rows}))
+                         if bar not in inapplicable]
+        by_key = {(row["bar"], row["register"], row["dynamic"]): row
+                  for row in cell_rows}
         for register, dynamic in required_cells:
-            measured_here = any(
-                row["status"] != "no-evidence" for row in cell_rows
-                if row["register"] == register and row["dynamic"] == str(dynamic))
-            if not measured_here:
-                strict_missing.append({"register": register, "dynamic": dynamic})
-        del covered
+            for bar in bars_required:
+                row = by_key.get((bar, register, str(dynamic)))
+                if row is None or row["status"] == "no-evidence":
+                    strict_missing.append({"bar": bar, "register": register,
+                                           "dynamic": dynamic})
     return {
         "cells": cell_rows,
         "passed": not failed,

@@ -179,7 +179,7 @@ def _topology_assertions(instrument: str, params: dict[str, Any], strict: bool) 
         "contrabass": "blow", "mezzo-soprano": "blow", "boy-soprano": "blow",
     }.get(instrument)
     expected_resonator = {
-        "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "string",
+        "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "openTube",
         "clarinet": "closedTube", "alto-sax": "conicalTube", "tenor-sax": "conicalTube",
         "trumpet": "conicalTube", "french-horn": "conicalTube",
     }.get(instrument)
@@ -270,6 +270,42 @@ def evaluate_construction(
                             None if brightness_slope is None else brightness_slope > .15,
                             {"slope": brightness_slope, "samples": brightness_count}, "partial-index slope > 0.15 per unit velocity",
                             strict_evidence=strict_evidence))
+
+    if name == "flute":
+        breath = _param(params, "toneBreath")
+        turbulence = _param(params, "breathTurbulence")
+        rows.append(_result("flute.air-jet-breath-law",
+                            "An air-jet instrument carries fitted breath and turbulence",
+                            None if breath is None or turbulence is None else
+                            float(breath) > 0 and float(turbulence) > 0,
+                            {"toneBreath": breath, "breathTurbulence": turbulence},
+                            "toneBreath > 0 and breathTurbulence > 0",
+                            strict_evidence=strict_evidence))
+        stability_info = params.get("bodyStability") \
+            if isinstance(params.get("bodyStability"), dict) else {}
+        flute_bands = params.get("bodyBands") \
+            if isinstance(params.get("bodyBands"), list) else []
+        if len(flute_bands) >= 3:
+            corr = stability_info.get("splitHalfCorr")
+            peak_a = stability_info.get("peakHzA")
+            peak_b = stability_info.get("peakHzB")
+            stable = (isinstance(corr, (int, float)) and corr >= .8 and
+                      isinstance(peak_a, (int, float)) and
+                      isinstance(peak_b, (int, float)) and
+                      abs(math.log2(peak_a / peak_b)) <= 1 / 3)
+            rows.append(_result("flute.body-stability",
+                                "A non-minimal air-jet body clears the T-016 stability gate",
+                                stable, stability_info,
+                                "splitHalfCorr >= 0.80 and |log2(peakA/peakB)| <= 1/3",
+                                strict_evidence=strict_evidence))
+        else:
+            rows.append(_result("flute.body-stability",
+                                "Body omission is evidence-backed, not accidental",
+                                stability_info.get("omittedReason") == "unstable-air-jet-body"
+                                if not flute_bands else None,
+                                stability_info.get("omittedReason"),
+                                "empty bodyBands must carry omittedReason 'unstable-air-jet-body'",
+                                strict_evidence=strict_evidence))
 
     if name == "clarinet":
         low = registers.get("low", []) or registers.get("chalumeau", [])

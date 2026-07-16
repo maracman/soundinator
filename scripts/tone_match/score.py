@@ -351,10 +351,12 @@ def extract_features(
     n_partials: int = 32,
     *,
     active_duration_s: float | None = None,
+    expected_f0_hz: float | None = None,
 ) -> FeatureBundle:
     samples, sample_rate = load_mono(str(path))
     if active_duration_s is None:
-        note = analyse_audio_file(path, n_partials=max(64, n_partials))
+        note = analyse_audio_file(path, n_partials=max(64, n_partials),
+                                  expected_f0_hz=expected_f0_hz)
     else:
         # Offline renders contain the requested active note plus a deliberately
         # long release/ring tail.  Construction assertions about sustained vs
@@ -365,7 +367,8 @@ def extract_features(
         active_frames = round((max(0.03, float(active_duration_s)) + 0.02) * sample_rate)
         samples = samples[:active_frames]
         note = analyse_audio_samples(samples, sample_rate, name=str(path),
-                                     n_partials=max(64, n_partials))
+                                     n_partials=max(64, n_partials),
+                                     expected_f0_hz=expected_f0_hz)
     nfft = 2048
     _, times, spectrum = signal.stft(samples, fs=sample_rate, nperseg=nfft, noverlap=1536,
                                      boundary=None, padded=False)

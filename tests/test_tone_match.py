@@ -674,25 +674,40 @@ def test_owner_excluded_takes_never_reach_a_reference_set():
 
 
 def test_tripwire_cell_aggregation_keeps_short_takes_visible():
-    # T-013: one short (N/A) + one measured-pass take => cell passes and the
-    # N/A row stays; two short takes => strict campaign fails the cell.
-    def gate_with(statuses):
-        return {"bars": [{"bar": "band-balance", "register": "mid",
-                          "dynamic": "pp", "value": None, "limit": "",
-                          "status": status} for status in statuses]}
-    mixed = aggregate_by_cell(gate_with(["not-applicable", "pass"]),
-                              required_cells=[("mid", "pp")])
+    # T-013/T-017: strict coverage is per BAR x register x dynamic — an
+    # onset measurement can never stand in for missing band-balance
+    # evidence, and the missing-cell report names the bar.
+    def gate_with(rows):
+        return {"bars": [{"bar": bar, "register": "mid", "dynamic": "pp",
+                          "value": None, "limit": "", "status": status}
+                         for bar, status in rows]}
+    mixed = aggregate_by_cell(
+        gate_with([("band-balance", "not-applicable"), ("band-balance", "pass")]),
+        required_cells=[("mid", "pp")], required_bars=["band-balance"])
     assert mixed["cells"][0]["status"] == "pass"
     assert mixed["cells"][0]["counts"]["notApplicable"] == 1
     assert mixed["strictPassed"]
-    all_short = aggregate_by_cell(gate_with(["not-applicable", "not-applicable"]),
-                                  required_cells=[("mid", "pp")])
-    assert all_short["cells"][0]["status"] == "no-evidence"
+    # two short takes: the band-balance BAR cell has no evidence even
+    # though another bar measured there (T-017's exact scenario)
+    all_short = aggregate_by_cell(
+        gate_with([("band-balance", "not-applicable"),
+                   ("band-balance", "not-applicable"),
+                   ("partial-table", "pass")]),
+        required_cells=[("mid", "pp")],
+        required_bars=["band-balance", "partial-table"])
     assert not all_short["strictPassed"]
-    assert all_short["strictMissingCells"] == [{"register": "mid", "dynamic": "pp"}]
-    failing = aggregate_by_cell(gate_with(["pass", "fail"]),
+    assert all_short["strictMissingCells"] == [
+        {"bar": "band-balance", "register": "mid", "dynamic": "pp"}]
+    failing = aggregate_by_cell(gate_with([("band-balance", "pass"),
+                                           ("band-balance", "fail")]),
                                 required_cells=[("mid", "pp")])
     assert failing["cells"][0]["status"] == "fail" and not failing["passed"]
+    # family-inapplicable bars never count as missing evidence
+    blown = aggregate_by_cell(
+        gate_with([("band-balance", "pass")]),
+        required_cells=[("mid", "pp")],
+        required_bars=["band-balance", "inharmonicity"], family="blown")
+    assert blown["strictPassed"]
 
 
 def test_trumpet_dynamic_articulation_requires_reference_direction_match():
@@ -731,7 +746,7 @@ def test_deconvolution_mask_equals_emission_mask_round_trip():
             np.ones(16, dtype=bool)))
     bands, adjusted, fit_info = fit_fixed_body(notes, 16)
     assert fit_info["reconstructionAmount"] == 1
-    assert fit_info["roundTripMaxDb"] <= 1.0
+    assert fit_info["roundTripShapeMaxDb"] <= 1.0
     # reconstruct: emitted body envelope x residual === raw (per-note scale free)
     def emitted_gain(freq):
         total = 0.0
@@ -747,6 +762,40 @@ def test_deconvolution_mask_equals_emission_mask_round_trip():
         log_ratio = np.log(ratio)
         worst = max(worst, float(np.ptp(log_ratio)))   # scale-free shape error
     assert worst < .25, worst
+
+
+def _mode_locked_tone(f0, dominant_harmonic, sr=44_100, duration=1.2,
+                      n_partials=6):
+    t = np.arange(int(sr * duration)) / sr
+    tone = np.zeros_like(t)
+    for k in range(1, n_partials + 1):
+        gain = 1.0 if k == dominant_harmonic else .08
+        tone += gain * np.sin(2 * np.pi * k * f0 * t)
+    envelope = np.minimum(1, t / .01) * np.minimum(1, (duration - t) / .05)
+    return tone * envelope
+
+
+def test_anchored_f0_recovers_fundamental_from_dominant_third_mode():
+    # T-020: low string with a dominant 3rd mode — tracker locks to 3*f0;
+    # the known note anchor recovers the fundamental, keeps QC provenance.
+    sr = 44_100
+    f0 = 32.7 * 2                       # C2-ish, above the 40 Hz floor
+    seg = _mode_locked_tone(f0, dominant_harmonic=3, sr=sr)
+    from scripts.fit_profiles_from_samples import analyse_note
+    anchored = analyse_note(seg, sr, "c2.wav", 16, min_detected_partials=2,
+                            expected_f0_hz=f0)
+    assert anchored is not None
+    assert abs(1200 * np.log2(anchored.f0 / f0)) < 50
+    assert anchored.f0_unconstrained is not None
+
+
+def test_anchored_f0_far_from_every_candidate_fails_loudly():
+    sr = 44_100
+    seg = _mode_locked_tone(440.0, dominant_harmonic=1, sr=sr)
+    from scripts.fit_profiles_from_samples import analyse_note
+    with pytest.raises(ValueError, match="50 cents"):
+        analyse_note(seg, sr, "off.wav", 16, min_detected_partials=2,
+                     expected_f0_hz=555.0)   # ~402 cents off every candidate
 
 
 def _bowed_samples():
@@ -926,7 +975,8 @@ def test_blown_campaign_matrix_has_three_registers_and_two_dynamics():
     for instrument, rows in CAMPAIGNS.items():
         assert {row["register"] for row in rows} == {"low", "mid", "high"}
         assert all({"pp", "ff", "midi"}.issubset(row) for row in rows)
-        expected = "string" if instrument == "flute" else "closedTube" if instrument == "clarinet" else "conicalTube"
+        # T-015: flute is an explicit open cylindrical bore, not a string alias
+        expected = "openTube" if instrument == "flute" else "closedTube" if instrument == "clarinet" else "conicalTube"
         assert RESONATOR[instrument] == expected
     assert len(PHILHARMONIA_WOODWIND_ALTERNATES["clarinet"]) == 6
     assert len(PHILHARMONIA_WOODWIND_ALTERNATES["alto-sax"]) == 6
