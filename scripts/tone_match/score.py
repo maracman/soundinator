@@ -313,14 +313,23 @@ def _noise_and_onset_observables(
         t_harm = cross(harm_t, 0.1 * harmonic_density)
         if t_noise is not None and t_harm is not None:
             noise_lead_ms = float((t_harm - t_noise) * 1000)
-        # onset lock-in (C18): nominal periods from the note start until the
-        # harmonic regime is established (50% of sustain harmonic density,
-        # held).  G&A 1997 acceptance: <= 18 periods loose, <= 10 good.
+        # Onset lock-in (C18): nominal periods from the note start until the
+        # harmonic ORGANISATION is established, held for three STFT frames.
+        # Comparing absolute harmonic amplitude with the sustain level folds
+        # a player's slow crescendo into "lock-in"; a bowed note can already
+        # be periodic while still blooming.  Use the local harmonic share
+        # relative to noise instead, normalised to the note's own sustain.
+        # G&A 1997 acceptance: <= 18 periods loose, <= 10 good.
         t_start = times[active[0]]
+        harmonic_share_t = harm_t / np.maximum(harm_t + noise_t, 1e-20)
+        sustain_harmonic_share = float(
+            np.median(harmonic_share_t[sustain_frames]))
+        lock_threshold = 0.8 * sustain_harmonic_share
         hold = 3
         t_lock = None
         for j in range(len(harm_t) - hold):
-            if np.all(harm_t[j:j + hold] >= 0.5 * harmonic_density):
+            if np.all(frame_energy[j:j + hold] >= peak * 1e-3) and \
+                    np.all(harmonic_share_t[j:j + hold] >= lock_threshold):
                 t_lock = times[j]
                 break
         if t_lock is not None:

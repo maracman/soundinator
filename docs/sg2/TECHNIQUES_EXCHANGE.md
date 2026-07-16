@@ -646,7 +646,13 @@ attack anchors; removing them worsens attack_ms; low cello permits more
 milliseconds for the same period count; global note fade cannot move either
 onset measurement.
 Affects: fit_profiles_from_samples / strings_prep seed / T-031 engine contract.
-Status: analysis=pending engine=pending (T-031) bowed=incorporated (triaged)
+Status: analysis=incorporated via T-048 engine=pending (T-031/T-048)
+bowed=blocked-engine
+Resolution update: the absolute-amplitude lock-in estimator was invalid for
+slow bowed blooms; T-048 replaces it with harmonic organisation relative to
+local noise. Dedicated onset-role selection and the exact dynamic table are
+incorporated there. The register-only envelope table remains valid for blown
+campaigns but is insufficient for violin.
 
 ### T-039 · ENGINE SPEC: sustained bow noise uses the shared excitation-noise law
 Author: Agent D / bowed · 2026-07-16 · Firewall: mechanism; values per instrument
@@ -771,10 +777,11 @@ Consuming assertions: floor duplicates do not create sustained-band cells;
 non-vibrato rows do not create vibrato cells; a declared required role with
 no eligible take fails loudly.
 Affects: strings_prep / references.json / aggregate_by_cell / objective hash.
-Resolution: `strings_prep` emits six spectral/onset, six dedicated vibrato,
-and fourteen floor references plus a per-bar coverage contract. All six
-vibrato cells have detected evidence; floor rows create no strict cells.
-The role-aware rebaseline has zero evidence holes.
+Resolution: `strings_prep` initially emitted six spectral/onset rows, then
+T-048 separated violin onset custody into six dedicated rows. The current
+manifest has six spectral, six onset, six vibrato, and fourteen floor rows
+plus a per-bar coverage contract. All declared cells have detected evidence;
+floor rows create no strict cells. The rebaseline has zero evidence holes.
 Status: analysis=incorporated bowed=incorporated engine=n/a
 struck/plucked=adapted
 
@@ -818,3 +825,31 @@ bit-identical to the scalar path.
 Affects: measured profile/seed schema / vibrato note law / bowed campaign.
 Status: analysis=incorporated (external contract + seed emitted)
 engine=pending bowed=blocked-engine struck/plucked=n/a
+
+### T-048 · ENGINE SPEC: bowed attack consumes register × dynamic evidence
+Author: Agent D / bowed-analysis · 2026-07-16 · Firewall: mechanism + data
+Finding: the old `onset_lockin_periods` waited for absolute harmonic
+amplitude to reach half its sustain value, misclassifying slow crescendos as
+late Helmholtz lock-in. It now measures harmonic share relative to local
+noise, requiring 80% of the sustain share for three STFT frames. Six
+separately selected Iowa onset anchors all clear the C18 limit (maximum
+15.89 periods).
+The measured band-T90 means are low pp/ff 286.85/195.27 ms, mid pp/ff
+203.11/261.49 ms, and high pp/ff 59.51/228.23 ms. The high acceptance
+intervals are disjoint (39.51–79.51 vs 159.76–296.70 ms), proving a
+register-only table cannot fit the corpus.
+Spec: analysis emits `envelopeAttackByRegisterDynamic` rows with
+`{register,dynamic,midi,f0,attack,meanBandT90Ms,bandT90Ms,
+onsetLockinPeriods,sourceFile}`. The bowed engine interpolates attack across
+log-f0 and velocity/dynamic. Existing `envelopeAttackByRegister` remains the
+blown/legacy fallback; absent new table is bit-identical.
+Consuming assertions: each emitted cell reaches the tripwire's ±30%/±20 ms
+band-T90 tolerance; all six rendered cells remain at or below 18 lock-in
+periods; removing the table reproduces the scalar/register fallback. The
+current engine produces exactly 53.0 ms mean band-T90 with and without the
+high/ff table across repeats, directly confirming the consumer is absent.
+Affects: bowed envelope law / measured seed schema / strings_prep /
+attack-t90 and onset-lockin gates.
+Status: analysis=incorporated (dedicated roles, corrected metric, external
+contract, clean isolated audit) engine=pending bowed=blocked-engine
+struck/plucked=n/a

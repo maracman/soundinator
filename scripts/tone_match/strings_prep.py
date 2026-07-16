@@ -11,8 +11,9 @@ campaign (fits are gated on P2 landing plus the engine lane's P5 gates):
   cannot inflate the variability floor);
 - long arco takes are trimmed to a single bow (amplitude-dip detection)
   so fits cannot chase bow-change artifacts as timbre;
-- Iowa arco keeps the spectral role, Philharmonia vibrato takes keep the
-  vibrato role (roles never mix inside one reference row);
+- Iowa arco keeps the spectral role, selected clean Iowa notes keep a
+  separate onset role, and Philharmonia vibrato takes keep the vibrato role
+  (roles never mix inside one reference row);
 - the L3 outlier screen runs per same-string/same-dynamic peer group and
   flagged takes are appended to the corpus COVERAGE.md for owner ears —
   flagged takes are excluded from references.json until cleared;
@@ -36,7 +37,7 @@ from typing import Any
 import numpy as np
 
 from scripts.tone_match.exclusions import is_excluded
-from scripts.tone_match.score import weights_for_instrument
+from scripts.tone_match.score import extract_features, weights_for_instrument
 from scripts.tone_match.tripwires import (
     ENVELOPE_PEAK_ANCHORS,
     ROLE_BARS,
@@ -75,6 +76,19 @@ STRING_CAMPAIGNS: dict[str, list[dict[str, Any]]] = {
         {"register": "high", "midi": 76, "string": "sulA",
          "pp": "Cello.arco.pp.sulA.B4Ab5.aiff", "ff": "Cello.arco.ff.sulA.C5Bb5.aiff"},
     ],
+}
+
+# T-048: onset truth is selected independently of spectral truth.  These
+# existing Iowa notes have a clean harmonic lock-in under the C18
+# organisation metric while retaining low/mid/high x pp/ff coverage.
+# Register-only attack anchors proved insufficient because the measured
+# pp/ff band-T90 intervals do not always overlap.
+ONSET_ROLE_MIDIS: dict[str, dict[str, dict[str, int]]] = {
+    "violin": {
+        "low": {"pp": 55, "ff": 55},
+        "mid": {"pp": 79, "ff": 79},
+        "high": {"pp": 88, "ff": 88},
+    },
 }
 
 # T-040 body evidence is intentionally separate from the scoring anchors.
@@ -558,10 +572,79 @@ def build_string_references(instrument: str, samples_root: Path,
                 "register": anchor["register"], "string": anchor["string"],
                 "durationSec": render_duration,
                 "articulation": "arco", "vibrato": "not-vibrato-role",
-                "roles": ["spectral", "onset"],
+                "roles": (
+                    ["spectral"] if instrument in ONSET_ROLE_MIDIS
+                    else ["spectral", "onset"]
+                ),
                 "floorGroup": (f"{midi}|{dynamic}|arco|{anchor['string']}|Iowa|"
                                f"{_duration_bucket(render_duration)}"),
                 "sourceClass": "Iowa MIS", "sourceFile": source.name,
+            })
+
+    # ── T-048 dedicated onset-role rows ──
+    onset_references = []
+    attack_contract = []
+    onset_midis = ONSET_ROLE_MIDIS.get(instrument, {})
+    for anchor in STRING_CAMPAIGNS[instrument]:
+        register = anchor["register"]
+        for dynamic in ("pp", "ff"):
+            target_midi = onset_midis.get(register, {}).get(dynamic)
+            if target_midi is None:
+                continue
+            source = corpus / anchor[dynamic]
+            [(midi, segment, sample_rate, unconstrained, expected_f0,
+              cents)] = select_chromatic_segments(source, (target_midi,))
+            peak = float(np.max(np.abs(segment)))
+            if peak > 0.99:
+                segment = segment * (0.99 / peak)
+            target = notes_dir / (
+                f"iowa-onset-{register}-{dynamic}-{anchor['string']}-{midi}.wav")
+            sf.write(target, segment, sample_rate, subtype="PCM_16")
+            bundle = extract_features(target, expected_f0_hz=expected_f0)
+            lockin = bundle.onset_lockin_periods
+            if lockin is None or lockin > 18:
+                raise RuntimeError(
+                    f"{source}: declared onset-role MIDI {midi} has "
+                    f"lock-in {lockin!r}, expected <= 18 periods")
+            band_t90 = {
+                str(freq): round(
+                    float(value.get("t90", 0) if isinstance(value, dict)
+                          else value) * 1000, 3)
+                for freq, value in bundle.note.band_t90.items()
+            }
+            if not band_t90:
+                raise RuntimeError(
+                    f"{source}: onset-role MIDI {midi} has no band-T90 evidence")
+            mean_t90_ms = float(np.mean(list(band_t90.values())))
+            duration = len(segment) / sample_rate
+            render_duration = max(0.5, min(2.0, duration * 0.72))
+            row = {
+                "path": str(target), "midi": midi,
+                "detectedF0": round(expected_f0, 3),
+                "velocity": VELOCITY[dynamic], "dynamic": dynamic,
+                "register": register, "string": anchor["string"],
+                "durationSec": render_duration,
+                "articulation": "arco", "vibrato": "not-vibrato-role",
+                "roles": ["onset"],
+                "floorGroup": (
+                    f"{midi}|{dynamic}|arco-onset|{anchor['string']}|Iowa|"
+                    f"{_duration_bucket(render_duration)}"),
+                "sourceClass": "Iowa MIS", "sourceFile": source.name,
+            }
+            references.append(row)
+            onset_references.append(row)
+            attack_contract.append({
+                "register": register,
+                "dynamic": dynamic,
+                "midi": midi,
+                "f0": round(expected_f0, 6),
+                "attack": round(mean_t90_ms / 1000, 6),
+                "meanBandT90Ms": round(mean_t90_ms, 3),
+                "bandT90Ms": band_t90,
+                "onsetLockinPeriods": round(float(lockin), 6),
+                "sourceFile": source.name,
+                "pitchErrorCents": round(cents, 2),
+                "unconstrainedF0Hz": round(unconstrained, 6),
             })
 
     # ── T-044 dedicated vibrato-role rows ──
@@ -737,6 +820,11 @@ def build_string_references(instrument: str, samples_root: Path,
         "purpose": "T-047 register/dynamic vibrato consumer contract",
         "vibratoByRegisterDynamic": vibrato_contract,
     }, indent=2) + "\n")
+    (output / "attack-contract.json").write_text(json.dumps({
+        "instrument": instrument,
+        "purpose": "T-048 register/dynamic local bow-attack contract",
+        "envelopeAttackByRegisterDynamic": attack_contract,
+    }, indent=2) + "\n")
     (output / "take-pairs.json").write_text(json.dumps({
         **pairs,
         "catalogueDuplicates": catalogue_groups,
@@ -753,6 +841,8 @@ def build_string_references(instrument: str, samples_root: Path,
             seed = bowed_seed(instrument, measured[instrument])
             if vibrato_contract:
                 seed["vibratoByRegisterDynamic"] = vibrato_contract
+            if attack_contract:
+                seed["envelopeAttackByRegisterDynamic"] = attack_contract
             (output / "initial.json").write_text(
                 json.dumps(seed, indent=2) + "\n")
 
@@ -798,6 +888,7 @@ def build_string_references(instrument: str, samples_root: Path,
             for role in ROLE_BARS
         },
         "vibratoReferences": len(vibrato_references),
+        "onsetReferences": len(onset_references),
         "coverageContract": coverage_contract,
         "bodyReferences": len(body_references),
         "bodyPartialTiling": tile_summary,

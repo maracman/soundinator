@@ -55,7 +55,8 @@
     "bodyBands": "per-band {freq,gain,width} trims on the selected body preset; gains free within ±6 dB of preset, freq/width free within ±15% — fitted after the continuous pass, one band at a time",
     "spectralPartialMeans": "per-partial level offsets vs the computed print; fitted CLOSED-FORM from the reference spectra (never by the optimiser)",
     "attackNoiseByRegister": "pinned {f0,levelScale,freq,q,decay} anchors; measured/triaged per register after the global onset fit",
-    "envelopeAttackByRegister": "pinned {f0,attack} anchors from WP-3 register envelope evidence"
+    "envelopeAttackByRegister": "pinned {f0,attack} anchors from WP-3 register envelope evidence",
+    "envelopeAttackByRegisterDynamic": "pinned bowed {register,dynamic,midi,f0,attack,meanBandT90Ms,bandT90Ms,onsetLockinPeriods} anchors; T-048 consumer pending"
   },
   "pinnedFromMeasurement": [
     "spectralPartialMeans base tables (per register once G1 lands)",
