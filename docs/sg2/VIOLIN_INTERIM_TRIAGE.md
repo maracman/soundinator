@@ -25,12 +25,17 @@ Low-register ff Philharmonia catalogue takes are already at the floor
 (ratio 0.995), but the construction and §3 gates still fail, so this is not
 a stopping-floor demonstration.
 
+T-040 rebaseline update: `agentd-t040-densified-body-baseline-r2` closes the
+measured-body and body-peak-cluster construction rows, reducing total gate
+failures from 46 to 44. The 35 measured-cell failures and 7 evidence holes
+are unchanged; parameter-first optimisation resumes from the unity-body run.
+
 ## Triage table
 
 | Residual evidence | Classification | Next action / consuming assertion |
 |---|---|---|
 | `violin.measured-body` has no evidence in the run params | **Engine/data-contract gap** | T-032/T-035: effective auto body must consume the emitted measured-body decision, including explicit omission semantics and unity reconstruction. Construction assertion must inspect the effective consumer result, not merely a duplicated `bodyBands` param. |
-| `violin.body-peak-cluster` fails; current v3 violin bands have no positive 250–310 Hz A0 band and no positive 420–600 Hz B1 band; split-half correlation is 0.451 | **Analysis/corpus gap** | T-040: body-profile generation hard-fails absent corpus-supported low signature modes. Refit with targeted low-mode diagnostics or acquire stronger low/open-string evidence; never hand-inject gains. |
+| `violin.body-peak-cluster` failed; the prior v3 bands had no positive 250–310 Hz A0 or 420–600 Hz B1 and split-half correlation was 0.451 | **Resolved analysis/corpus gap** | T-040 densified 48 Iowa body-role notes. The refit emits A0 at 301.1 Hz (+0.3137), B1 at 473.6 Hz (+0.4261), and split-half correlation 0.894. A hard emission gate now prevents recurrence; see `T040_VIOLIN_BODY_REPORT.md`. |
 | Partial-table failures in all 7 cells (typically 11–33 dB) | **Mixed: param-first, then engine/data** | After T-032 lands, optimise `spectralDynamicAmount`, `partialTilt`, `excitationPosition`, `spectralResonanceAmount`, and bounded `dynamicBlare`. Re-score the old best on the unchanged objective. Residual same-pitch/string errors then exercise T-033 per-string tables. |
 | Mel failures in all 7 cells (8.6–31 dB) | **Mixed: body consumer + param-fixable** | T-032 unity body first; then the same spectral free set. A body-consumed mid note must improve mel loss materially versus the quarantined baseline before v3 is accepted. |
 | Band-balance failures in all 6 measured primary cells (mean 9.6–40 dB; octave maximum 22–65 dB) | **Mixed: body consumer + param-fixable + per-string** | T-032 is the first dependency. Optimise the controllable spectral set. If high-register mean remains above 12 dB, T-033 becomes blocking rather than watch-only. |

@@ -7,7 +7,7 @@ import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, fit_fixed_body, fit_take_spread, harmonic_frame_amps, onset_pitch_stats, validate_corpus_contract, vibrato_stats, vowel_from_filename
+from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, fit_fixed_body, fit_take_spread, harmonic_frame_amps, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
@@ -27,7 +27,7 @@ from scripts.tone_match.iterate import (
     _reference_variability,
     _update_leaderboard,
 )
-from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
+from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
@@ -473,6 +473,45 @@ def test_body_fit_keeps_narrow_low_modes_and_exports_f0_floor():
     assert 300 <= peak["freq"] <= 550          # narrow 400 Hz mode recovered
     assert peak["width"] <= .35                # ...at honest resolution
     assert fit_info["lowestF0Hz"] == 100.0
+
+
+def test_body_fit_recovers_corpus_supported_violin_a0_b1_centres():
+    rng = np.random.default_rng(17)
+    notes = []
+    for index in range(36):
+        f0 = 195 * 2 ** ((index % 13) / 12)
+        freqs = f0 * np.arange(1, 25)
+        source = np.arange(1, 25, dtype=float) ** -1.1
+        a0 = .55 * np.exp(-.5 * (np.log2(freqs / 280) / .16) ** 2)
+        b1 = .75 * np.exp(-.5 * (np.log2(freqs / 500) / .18) ** 2)
+        amps = source * 2 ** (a0 + b1) * np.exp(rng.normal(0, .025, 24))
+        amps /= amps.max()
+        notes.append(NoteAnalysis(
+            f"body-{index:03d}", f0, "test", 1, amps, freqs,
+            np.ones(24, dtype=bool)))
+    bands, _, fit_info = fit_fixed_body(
+        notes, 24, diagnostic_centres_hz=(280.0, 500.0))
+    assert any(250 <= band["freq"] <= 310 and band["gain"] > .1
+               for band in bands)
+    assert any(420 <= band["freq"] <= 600 and band["gain"] > .1
+               for band in bands)
+    assert fit_info["splitHalfCorr"] >= .8
+
+
+def test_violin_body_mode_gate_rejects_missing_or_unstable_modes():
+    good = [
+        {"freq": 280, "gain": .2, "width": .18},
+        {"freq": 500, "gain": .3, "width": .18},
+    ]
+    evidence = validate_bowed_body_modes(
+        "violin", good, {"splitHalfCorr": .9})
+    assert evidence["bands"]["A0"]["freq"] == 280
+    with pytest.raises(ValueError, match="coverage gap.*B1"):
+        validate_bowed_body_modes(
+            "violin", good[:1], {"splitHalfCorr": .9})
+    with pytest.raises(ValueError, match="splitHalfCorr"):
+        validate_bowed_body_modes(
+            "violin", good, {"splitHalfCorr": .5})
 
 
 def test_frame_tracked_partials_survive_vibrato():
@@ -969,6 +1008,42 @@ def test_string_campaigns_cover_three_registers_and_two_dynamics():
         for anchor in anchors:
             assert anchor["string"].startswith("sul")
             assert "pp" in anchor and "ff" in anchor
+
+
+def test_violin_body_reference_runs_tile_low_signature_region():
+    runs = BODY_REFERENCE_RUNS["violin"]
+    assert {row["string"] for row in runs} == {"sulG", "sulD", "sulA"}
+    fundamentals = [440 * 2 ** ((midi - 69) / 12)
+                    for row in runs for midi in row["midis"]]
+    partials = sorted(freq * rank for freq in fundamentals
+                      for rank in range(1, 5)
+                      if 250 <= freq * rank <= 600)
+    assert partials[0] <= 295
+    assert partials[-1] >= 585
+    assert max(np.diff(partials)) < 50
+
+
+def test_bowed_seed_pins_measured_body_and_unity_reconstruction():
+    seed = bowed_seed("violin", {
+        "material": {"suggestedMaterial": .08},
+        "performance": {
+            "vibratoProb": .88, "vibratoDepth": 30.3, "vibratoRate": 5.91,
+        },
+        "resonances": [
+            {"freq": 280, "gain": .2, "width": .18},
+            {"freq": 500, "gain": .3, "width": .18},
+            {"freq": 2300, "gain": .9, "width": .18},
+        ],
+        "resonancesFit": {
+            "reconstructionAmount": 1,
+            "splitHalfCorr": .9,
+            "peakHzA": 2300,
+            "peakHzB": 2300,
+        },
+    })
+    assert len(seed["bodyBands"]) == 3
+    assert seed["spectralResonanceAmount"] == 1
+    assert seed["bodyStability"]["splitHalfCorr"] == .9
 
 
 def test_bowed_checklist_requires_instrument_specific_measured_body():

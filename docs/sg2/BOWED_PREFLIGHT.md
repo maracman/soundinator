@@ -113,6 +113,12 @@ scoop-from-below semantics are untouched). Each landed with a unit test.
   0.70 with the bridge-hill peak stable at 2343/2387 Hz (27 cents apart,
   inside the dossier's 2.0–3.2 kHz gate); cello 0.94; most instruments
   0.7–0.98. Each profile records its own numbers in `resonancesFit`.
+- **T-040 low-mode follow-up: DEMONSTRATED.** The mixed-role violin v3
+  regeneration later fell to 0.451 and lost positive A0/B1 evidence.
+  A dedicated 48-note Iowa body set now tiles 250–600 Hz independently of
+  scoring/floor roles. Its refit reaches 0.894 and emits positive A0
+  (301.1 Hz) and B1 (473.6 Hz); generation hard-fails if either mode or
+  correlation >=0.80 is absent. See `T040_VIOLIN_BODY_REPORT.md`.
 - **Spread de-saturation: DISPROVEN by evidence.** The 0.8 saturation was
   NOT caused by body re-weighting alone. Three fixes landed (body division,
   within-file same-string/same-dynamic pair estimator replacing the pooled
@@ -174,6 +180,9 @@ leaderboards must re-baseline (P5.2) — which the L6 refits require anyway.
 
 **P3 references: LANDED** (`scripts/tone_match/strings_prep.py`; artifacts
 under `/private/tmp/sg2/campaigns/{violin,cello}/`, never committed):
+- Violin additionally emits 48 pitch-anchored `fixed-body` references from
+  the existing Iowa sulG/sulD/sulA pp/mf/ff runs. They are consumed only by
+  `fit_fixed_body`, not by the scoring objective or excitation aggregation.
 - `string` (sulG/sulD/…) carried through every reference row; floor groups
   are `midi|dynamic|articulation|string|source|duration-bucket`, and
   same-pitch take pairs are trimmed to a common duration before writing.

@@ -49,7 +49,7 @@ OUTPUT
 
 USAGE
     python3 fit_profiles_from_samples.py --samples DIR --out out.json \
-        [--report report.md] [--partials 64]
+        [--partials 64] [--body-references /private/tmp/sg2/campaigns]
 
 Dependencies: numpy, scipy, soundfile (pure analysis — writes no audio).
 """
@@ -1265,9 +1265,56 @@ AIR_JET_BODY_GATE = {
                   omittedReason="unstable-air-jet-body"),
 }
 
+# T-040: uniform third-octave spacing can place adjacent basis centres on
+# either side of a narrow, independently established signature region.  The
+# additional centres are diagnostic coordinates only: their gains remain
+# entirely corpus-fitted and pass through the same support/split-half gates
+# as every other emitted band.
+BOWED_BODY_DIAGNOSTIC_CENTRES = {
+    "violin": (280.0, 500.0),
+}
+
+BOWED_BODY_MODE_GATES = {
+    "violin": {
+        "minSplitHalfCorr": 0.80,
+        "rangesHz": {"A0": (250.0, 310.0), "B1": (420.0, 600.0)},
+    },
+}
+
+
+def validate_bowed_body_modes(instrument: str, bands: list[dict],
+                              fit_info: dict | None) -> dict | None:
+    """Require corpus-positive signature modes before bowed profile emission."""
+    gate = BOWED_BODY_MODE_GATES.get(instrument)
+    if not gate:
+        return None
+    evidence = {}
+    missing = []
+    for name, (low, high) in gate["rangesHz"].items():
+        candidates = [band for band in bands
+                      if low <= band["freq"] <= high and band["gain"] > 0]
+        if not candidates:
+            missing.append(name)
+            continue
+        evidence[name] = max(candidates, key=lambda band: band["gain"])
+    corr = (fit_info or {}).get("splitHalfCorr")
+    if corr is None or corr < gate["minSplitHalfCorr"]:
+        missing.append(
+            f"splitHalfCorr {corr!r} < {gate['minSplitHalfCorr']:.2f}")
+    if missing:
+        raise ValueError(
+            f"{instrument}: fixed-body coverage gap ({', '.join(missing)}); "
+            "densify corpus evidence instead of hand-injecting gains")
+    return {
+        "minSplitHalfCorr": gate["minSplitHalfCorr"],
+        "bands": evidence,
+    }
+
 
 def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
-                   stability_gate: dict | None = None):
+                   stability_gate: dict | None = None,
+                   diagnostic_centres_hz: tuple[float, ...] = (),
+                   reconstruction_notes: list[NoteAnalysis] | None = None):
     """Separate a smooth fixed-Hz body envelope from partial-rank excitation.
 
     The same body resonance crosses different harmonic ranks as pitch changes.
@@ -1283,7 +1330,9 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
     provenance record stored beside the resonances (method, evidence counts,
     split-half stability) so a profile always names how its body was fitted.
     """
-    raw = np.stack([n.partial_amps for n in notes]) if notes else np.zeros((0, n_partials))
+    reconstruction_notes = notes if reconstruction_notes is None else reconstruction_notes
+    raw = np.stack([n.partial_amps for n in reconstruction_notes]) \
+        if reconstruction_notes else np.zeros((0, n_partials))
     if len(notes) < 8:
         return [], raw, None
     rows = _body_points(notes, n_partials)
@@ -1301,6 +1350,13 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
         return [], raw, None
     n_bands = int(np.clip(round((hi - lo) * 3) + 1, 5, 18))
     centres = np.linspace(lo, hi, n_bands)
+    diagnostic_centres = [
+        math.log2(freq) for freq in diagnostic_centres_hz
+        if lo <= math.log2(freq) <= hi
+    ]
+    if diagnostic_centres:
+        centres = np.asarray(sorted(set(float(value) for value in
+                                       [*centres, *diagnostic_centres])))
     spacing = (hi - lo) / max(1, n_bands - 1)
     base_width = float(max(.14, min(.62, spacing * .55)))
     # L12 / T-003: a fitting-side width floor was TRIED and REVERTED — with
@@ -1385,7 +1441,7 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
     coeff_emitted = np.where(emitted, coeff_log2, 0.0)
     adjusted = raw.astype(float).copy()
     round_trip_max_db = 0.0
-    for note_index, note in enumerate(notes):
+    for note_index, note in enumerate(reconstruction_notes):
         for rank in range(n_partials):
             if adjusted[note_index, rank] <= 0:
                 continue
@@ -1409,6 +1465,12 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
                     lowestF0Hz=round(f0_min, 1),
                     reconstructionAmount=1,
                     bodyClampMaxDb=round(round_trip_max_db, 3))
+    if reconstruction_notes is not notes:
+        fit_info["reconstructionNotes"] = len(reconstruction_notes)
+    if diagnostic_centres:
+        fit_info["diagnosticCentresHz"] = [
+            round(2 ** value, 1) for value in diagnostic_centres
+        ]
     if stability:
         fit_info.update(stability)
 
@@ -1426,7 +1488,7 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
             fit_info["bands"] = 0
             fit_info["roundTripShapeMaxDb"] = 0.0
             undivided = raw.astype(float).copy()
-            for note_index in range(len(notes)):
+            for note_index in range(len(reconstruction_notes)):
                 peak = float(undivided[note_index].max())
                 if peak > 0:
                     undivided[note_index] /= peak
@@ -1438,7 +1500,7 @@ def fit_fixed_body(notes: list[NoteAnalysis], n_partials: int,
     # points.  This is the exported reconstruction accuracy; the safety
     # clamp diagnostic stays separately named bodyClampMaxDb.
     shape_max_db = 0.0
-    for note_index, note in enumerate(notes):
+    for note_index, note in enumerate(reconstruction_notes):
         errors = []
         for rank in range(n_partials):
             raw_amp = float(raw[note_index, rank])
@@ -1501,7 +1563,9 @@ def fit_take_spread(notes: list[NoteAnalysis], A: np.ndarray, OK: np.ndarray,
 
 def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis],
                          n_partials: int, min_amp_f0: float = 40.0,
-                         body_stability_gate: dict | None = None):
+                         body_stability_gate: dict | None = None,
+                         body_diagnostic_centres_hz: tuple[float, ...] = (),
+                         body_notes: list[NoteAnalysis] | None = None):
     """Combine per-note measurements into one engine-shaped record."""
     # analyse_note already rejects f0 <= 40 Hz.  The historical 100 Hz
     # spectral cutoff silently removed the practical low register of horn,
@@ -1511,8 +1575,11 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         spec_notes = notes
 
     # ── 64-partial amplitude table ────────────────────────────────────
+    body_fit_notes = body_notes or spec_notes
     resonances, A, resonances_fit = fit_fixed_body(
-        spec_notes, n_partials, stability_gate=body_stability_gate)
+        body_fit_notes, n_partials, stability_gate=body_stability_gate,
+        diagnostic_centres_hz=body_diagnostic_centres_hz,
+        reconstruction_notes=spec_notes)
     OK = np.stack([n.partial_snr_ok for n in spec_notes])
     spec_index = {id(note): index for index, note in enumerate(spec_notes)}
     logf0 = np.log([n.f0 for n in spec_notes])
@@ -1843,7 +1910,8 @@ def is_vib_name(name: str) -> bool:
     return ".vib" in low or low.startswith("vib") or "_vib" in low or "vibrato" in low
 
 
-def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
+def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
+                       body_reference_manifest: str | None = None):
     files = sorted(f for f in os.listdir(inst_dir)
                    if f.lower().endswith(AUDIO_EXT))
     if not files:
@@ -1886,9 +1954,41 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True):
     vib_notes = run(vibrato_files) if vibrato_files else []
     if not notes:
         return None
+    body_reference_notes = []
+    if body_reference_manifest and os.path.isfile(body_reference_manifest):
+        with open(body_reference_manifest, encoding="utf-8") as handle:
+            body_manifest = json.load(handle)
+        rows = body_manifest.get("references", body_manifest) \
+            if isinstance(body_manifest, dict) else body_manifest
+        for row in rows:
+            path = row.get("path")
+            expected = row.get("expectedF0Hz")
+            if not path or not os.path.isfile(path):
+                continue
+            x, sr = load_mono(path)
+            segments = segment_notes(x, sr, merge_gap_s=0.25)
+            if not segments:
+                segments = [(0, len(x))]
+            # Body references are emitted as one trimmed note per file.
+            start, end = max(segments, key=lambda item: item[1] - item[0])
+            note = analyse_note(x[start:end], sr, path, n_partials,
+                                expected_f0_hz=expected)
+            if note is not None:
+                body_reference_notes.append(note)
+        if verbose:
+            print(f"    body references: {len(body_reference_notes)} note(s)")
     instrument_name = os.path.basename(os.path.normpath(inst_dir))
     agg = aggregate_instrument(notes, vib_notes, n_partials,
-                               body_stability_gate=AIR_JET_BODY_GATE.get(instrument_name))
+                               body_stability_gate=AIR_JET_BODY_GATE.get(instrument_name),
+                               body_diagnostic_centres_hz=
+                               BOWED_BODY_DIAGNOSTIC_CENTRES.get(instrument_name, ()),
+                               body_notes=body_reference_notes or notes)
+    if agg.get("resonancesFit") and body_reference_notes:
+        agg["resonancesFit"]["bodyReferenceNotes"] = len(body_reference_notes)
+    mode_evidence = validate_bowed_body_modes(
+        instrument_name, agg.get("resonances", []), agg.get("resonancesFit"))
+    if mode_evidence and agg.get("resonancesFit"):
+        agg["resonancesFit"]["modeEvidence"] = mode_evidence
     # Corpus contract uses uppercase; retain lowercase as a legacy fallback.
     prov_path = os.path.join(inst_dir, "PROVENANCE.json")
     if not os.path.exists(prov_path):
@@ -1918,6 +2018,9 @@ def main(argv=None):
                     help="preserve instruments already in --out that have no "
                          "corpus folder (legacy fits, e.g. trombone) instead "
                          "of silently dropping them on a full regeneration")
+    ap.add_argument("--body-references", default=None,
+                    help="optional root containing <instrument>/body-references.json; "
+                         "these pitch-anchored notes fit only the fixed-Hz body")
     args = ap.parse_args(argv)
 
     only = set(args.only.split(",")) if args.only else None
@@ -1932,7 +2035,12 @@ def main(argv=None):
         if not os.path.isdir(inst_dir) or (only and inst not in only):
             continue
         print(f"[{inst}]")
-        agg = analyse_instrument(inst_dir, args.partials, verbose=not args.quiet)
+        body_manifest = None
+        if args.body_references:
+            body_manifest = os.path.join(args.body_references, inst,
+                                         "body-references.json")
+        agg = analyse_instrument(inst_dir, args.partials, verbose=not args.quiet,
+                                 body_reference_manifest=body_manifest)
         if agg is None:
             print("    no analysable notes — skipped")
             continue

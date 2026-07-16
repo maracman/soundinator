@@ -38,6 +38,7 @@ import numpy as np
 from scripts.tone_match.exclusions import is_excluded
 from scripts.fit_profiles_from_samples import (
     analyse_note,
+    estimate_f0,
     load_mono,
     rms_envelope,
     segment_notes,
@@ -66,6 +67,17 @@ STRING_CAMPAIGNS: dict[str, list[dict[str, Any]]] = {
         # ff run C5–Bb5 — E5 sits inside both
         {"register": "high", "midi": 76, "string": "sulA",
          "pp": "Cello.arco.pp.sulA.B4Ab5.aiff", "ff": "Cello.arco.ff.sulA.C5Bb5.aiff"},
+    ],
+}
+
+# T-040 body evidence is intentionally separate from the scoring anchors.
+# These existing Iowa runs provide three dynamics over three lower/mid strings; the
+# selected fundamentals and their low harmonics densely tile 250–600 Hz.
+BODY_REFERENCE_RUNS: dict[str, list[dict[str, Any]]] = {
+    "violin": [
+        {"string": "sulG", "midis": tuple(range(55, 60))},
+        {"string": "sulD", "midis": tuple(range(62, 70))},
+        {"string": "sulA", "midis": tuple(range(72, 75))},
     ],
 }
 
@@ -297,9 +309,98 @@ def _select_segment(path: Path, target_midi: int):
     return segment, sample_rate, f0
 
 
+def _nearest_harmonic_candidate(f0: float, target_hz: float) -> float:
+    candidates = [f0 * ratio for k in range(1, 7)
+                  for ratio in (1.0 / k, float(k))]
+    return min(candidates,
+               key=lambda value: abs(1200 * math.log2(value / target_hz)))
+
+
+def select_chromatic_segments(path: Path, target_midis: tuple[int, ...],
+                              max_error_cents: float = 85.0):
+    """Assign one trimmed Iowa-run segment to each known chromatic pitch.
+
+    The low violin fundamental can be weaker than its second harmonic, and
+    long bows can create extra amplitude-separated regions.  Match the
+    detected periodicity harmonically to the known run order/pitches, keep
+    each segment at most once, and preserve the adjusted measured f0 rather
+    than replacing it with equal temperament.
+    """
+    samples, sample_rate = load_mono(str(path))
+    candidates = []
+    for index, (start, end) in enumerate(
+            segment_notes(samples, sample_rate, merge_gap_s=0.25)):
+        segment, _ = trim_to_single_bow(samples[start:end], sample_rate)
+        unconstrained = estimate_f0(segment, sample_rate)
+        if unconstrained is not None and np.isfinite(unconstrained) and unconstrained > 0:
+            candidates.append((index, segment, float(unconstrained)))
+    selected = []
+    used: set[int] = set()
+    for midi in target_midis:
+        target_hz = 440 * 2 ** ((midi - 69) / 12)
+        ranked = []
+        for index, segment, unconstrained in candidates:
+            if index in used:
+                continue
+            adjusted = _nearest_harmonic_candidate(unconstrained, target_hz)
+            cents = abs(1200 * math.log2(adjusted / target_hz))
+            ranked.append((cents, index, segment, unconstrained, adjusted))
+        if not ranked:
+            raise RuntimeError(f"{path}: no remaining segment for MIDI {midi}")
+        cents, index, segment, unconstrained, adjusted = min(
+            ranked, key=lambda row: row[0])
+        if cents > max_error_cents:
+            raise RuntimeError(
+                f"{path}: MIDI {midi} best segment is {cents:.1f} cents away")
+        used.add(index)
+        selected.append((midi, segment, sample_rate, unconstrained,
+                         adjusted, cents))
+    return selected
+
+
+def bowed_seed(instrument: str, profile: dict[str, Any]) -> dict[str, Any]:
+    """Campaign seed that pins the measured body decision for assertions."""
+    performance = profile.get("performance") or {}
+    fit = profile.get("resonancesFit") or {}
+    resonances = profile.get("resonances") or []
+    seed = {
+        "seed": 7331,
+        "sg2Family": "bowed",
+        "voiceMode": "fourier",
+        "spectralProfile": instrument,
+        "spectralMix": 1.0,
+        "spectralPartials": 64,
+        "excitationType": "bow",
+        "resonatorClass": "string",
+        "bodyType": "auto",
+        "excitationPosition": 0.09 if instrument == "violin" else 0.12,
+        "excitationHuman": 0.0,
+        "attackNoiseLevel": 1.0,
+        "partialMaterial": (profile.get("material") or {}).get(
+            "suggestedMaterial", 0.2),
+        "partialTransfer": 0.1,
+        "partialTilt": 0.0,
+        "spectralDynamicAmount": 0.8,
+        "spectralResonanceAmount": fit.get("reconstructionAmount", 1.0),
+        "dynamicBlare": 0.0,
+        "vibratoProb": performance.get("vibratoProb", 0.0),
+        "vibratoDepth": performance.get("vibratoDepth", 0.0),
+        "vibratoRate": performance.get("vibratoRate", 5.5),
+    }
+    if resonances or fit.get("omittedReason"):
+        seed["bodyBands"] = resonances
+        seed["bodyStability"] = {
+            key: fit[key] for key in
+            ("splitHalfCorr", "peakHzA", "peakHzB", "omittedReason")
+            if fit.get(key) is not None
+        }
+    return seed
+
+
 def build_string_references(instrument: str, samples_root: Path,
                             output_root: Path,
-                            catalogue_root: Path | None = None) -> dict[str, Any]:
+                            catalogue_root: Path | None = None,
+                            measured_path: Path | None = None) -> dict[str, Any]:
     if instrument not in STRING_CAMPAIGNS:
         raise ValueError(f"unsupported string instrument: {instrument}")
     corpus = samples_root / instrument
@@ -336,6 +437,76 @@ def build_string_references(instrument: str, samples_root: Path,
             })
     flags = screen_outliers(screen_rows)
     flagged_names = {flag["name"] for flag in flags if not flag["advisory"]}
+
+    # ── T-040 dedicated body references: low chromatic, pitch-anchored ──
+    body_references = []
+    body_dir = output / "body-references"
+    if instrument in BODY_REFERENCE_RUNS:
+        body_dir.mkdir(parents=True, exist_ok=True)
+        for dynamic in ("ff", "mf", "pp"):
+            for run in BODY_REFERENCE_RUNS[instrument]:
+                sources = sorted(corpus.glob(
+                    f"{instrument.capitalize()}.arco.{dynamic}."
+                    f"{run['string']}.*.aiff"))
+                if len(sources) != 1:
+                    raise RuntimeError(
+                        f"{instrument} {dynamic} {run['string']}: "
+                        f"expected one Iowa run, found {len(sources)}")
+                source = sources[0]
+                for (midi, segment, sample_rate, unconstrained, expected_f0,
+                     cents) in select_chromatic_segments(source, run["midis"]):
+                    peak = float(np.max(np.abs(segment)))
+                    if peak > 0.99:
+                        segment = segment * (0.99 / peak)
+                    target = body_dir / (
+                        f"low-{midi:03d}-{dynamic}-{run['string']}.wav")
+                    sf.write(target, segment, sample_rate, subtype="PCM_16")
+                    # Consume the pitch anchor now so a generated manifest can
+                    # never contain a segment the fitter will later reject.
+                    check = analyse_note(
+                        segment, sample_rate, str(target), 24,
+                        expected_f0_hz=expected_f0)
+                    if check is None:
+                        raise RuntimeError(f"{target}: body reference rejected")
+                    body_references.append({
+                        "path": str(target),
+                        "midi": midi,
+                        "dynamic": dynamic,
+                        "string": run["string"],
+                        "sourceClass": "Iowa MIS",
+                        "sourceFile": source.name,
+                        "unconstrainedF0Hz": round(unconstrained, 6),
+                        "expectedF0Hz": round(expected_f0, 6),
+                        "pitchErrorCents": round(cents, 2),
+                        "role": "fixed-body",
+                    })
+
+    partial_tile = sorted(
+        partial
+        for row in body_references
+        for rank in range(1, 5)
+        if 250 <= (partial := row["expectedF0Hz"] * rank) <= 600
+    )
+    tile_summary = None
+    if partial_tile:
+        tile_gaps = [
+            partial_tile[0] - 250,
+            *np.diff(partial_tile),
+            600 - partial_tile[-1],
+        ]
+        tile_summary = {
+            "targetHz": [250, 600],
+            "points": len(partial_tile),
+            "lowestHz": round(partial_tile[0], 1),
+            "highestHz": round(partial_tile[-1], 1),
+            "maxGapHz": round(max(tile_gaps), 1),
+        }
+    (output / "body-references.json").write_text(json.dumps({
+        "instrument": instrument,
+        "purpose": "T-040 low-register fixed-body evidence",
+        "partialTiling": tile_summary,
+        "references": body_references,
+    }, indent=2) + "\n")
 
     # ── reference rows: Iowa spectral anchors (single-bow, per-string) ──
     references = []
@@ -476,6 +647,12 @@ def build_string_references(instrument: str, samples_root: Path,
             for p in sorted(corpus.glob("*.aiff")) if parse_string_label(p.name)
         ],
     }, indent=2) + "\n")
+    if measured_path and measured_path.is_file():
+        measured = json.loads(measured_path.read_text())
+        if instrument in measured:
+            (output / "initial.json").write_text(
+                json.dumps(bowed_seed(instrument, measured[instrument]),
+                           indent=2) + "\n")
 
     # ── QC report → corpus COVERAGE.md (owner-ears queue, per L3) ──
     coverage = corpus / "COVERAGE.md"
@@ -514,6 +691,8 @@ def build_string_references(instrument: str, samples_root: Path,
     summary = {
         "instrument": instrument,
         "references": len(references),
+        "bodyReferences": len(body_references),
+        "bodyPartialTiling": tile_summary,
         "floorGroupsWithAlternates": sum(1 for n in floor_groups.values() if n >= 2),
         "flagged": flags,
         "bowChangeTrims": len(bow_trims),
@@ -535,10 +714,14 @@ def main(argv: list[str] | None = None) -> int:
                         default=Path("/private/tmp/sg2/phil_strings/Strings"),
                         help="downloaded Philharmonia strings catalogue root "
                              "(per-instrument folders) for duplicate-take floors")
+    parser.add_argument("--measured", type=Path,
+                        default=Path("web/static/measured_profiles.json"),
+                        help="measured profile JSON used to pin the bowed seed")
     args = parser.parse_args(argv)
     instruments = args.instrument or list(STRING_CAMPAIGNS)
     summaries = [build_string_references(name, args.samples, args.output,
-                                         catalogue_root=args.phil_catalogue)
+                                         catalogue_root=args.phil_catalogue,
+                                         measured_path=args.measured)
                  for name in instruments]
     print(json.dumps(summaries, indent=2))
     return 0
