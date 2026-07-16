@@ -18,8 +18,14 @@ PYTHONPATH=src:. python3 scripts/tone_match/finalize_corpus.py \
   --samples /private/tmp/sg2/samples \
   --vocalset-root /private/tmp/sg2/vocalset_extract/FULL
 
+PYTHONPATH=src:. python3 -m scripts.tone_match.strings_prep \
+  --instrument violin \
+  --samples /private/tmp/sg2/samples \
+  --output /private/tmp/sg2/campaigns
+
 PYTHONPATH=src:. python3 scripts/fit_profiles_from_samples.py \
   --samples /private/tmp/sg2/samples \
+  --body-references /private/tmp/sg2/campaigns \
   --out web/static/measured_profiles.json \
   --partials 64 --require-contract
 
@@ -70,7 +76,7 @@ guitar and piano it is a free-decay estimate.
 | acoustic guitar | 25 | 59–1424 | 5.83e−5 | 4.849 / 0.827 | — | 2.20 | −9.2 |
 | piano | 23 | 66–1104 | 1.16e−4 | 16.211 / 0.637 | — | 0.03 | −11.3 |
 | trumpet | 107 | 164–1254 | 4.0e−8 | 0.325 / −0.231 | 4.81 / 6.18 | 1.30 | −14.9 |
-| violin | 123 | 195–2039 | 5.0e−8 | 1.240 / −0.098 | 5.91 / 27.92 | 0.88 | −14.6 |
+| violin | 117 | 195–2039 | 0 | 1.274 / −0.088 | 5.91 / 30.34 | 1.00 | −15.5 |
 | bass-voice proxy | 27 | 127–841 | 0 | 0.471 / −0.292 | 5.38 / 82.12 | 11.80 | −14.0 |
 | mezzo-voice proxy | 28 | 257–637 | 0 | 4.167 / 0.492 | 3.01 / 84.11 | 5.47 | −5.1 |
 | tenor-voice proxy | 57 | 127–556 | 0 | 0.438 / −0.084 | 5.80 / 77.36 | 4.90 | −10.6 |
@@ -97,9 +103,13 @@ guitar and piano it is a free-decay estimate.
   contribute, including 26 observations below 100 Hz. Its register anchors
   moved from 163/342/571 Hz to 84/256/533 Hz, so the B1 campaign no longer
   receives a clamped mid-low spectrum.
-- **Violin and cello:** partial spread remains high because adjacent notes
-  move through strong fixed-Hz body resonances. Per-register tables reduce,
-  but do not eliminate, that source/body confound.
+- **Violin:** its fixed-Hz body now comes from a dedicated 48-note,
+  pitch-anchored Iowa subset whose low partials tile 250–600 Hz. The fit
+  recovers positive A0/B1 bands at 301/474 Hz with split-half correlation
+  0.894; the broader 117-note corpus remains responsible for excitation and
+  performance tables. **Cello:** partial spread remains high because
+  adjacent notes move through strong fixed-Hz body resonances; per-register
+  tables reduce, but do not eliminate, that source/body confound.
 - **Piano:** the larger corpus revises the old four-note B estimate downward
   to 1.16e−4. The register anchors retain the per-register progression, and
   the 16.2 s T60 remains outside the engine's single-stage material range.

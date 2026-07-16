@@ -682,4 +682,19 @@ bands in tolerance; split halves disagreeing on a low peak fail emission;
 every emitted bowed profile passes its dossier cluster before T-032 engine
 consumption is enabled.
 Affects: fit_fixed_body / profile generation gate / bowed corpus coverage.
-Status: analysis=pending bowed=blocked-analysis engine=pending T-032
+Resolution (2026-07-16): `strings_prep` now emits 48 pitch-anchored Iowa
+body-role notes (sulG 55–59, sulD 62–69, sulA 72–74; pp/mf/ff), whose
+partials tile 250–600 Hz with a 41.7 Hz maximum boundary-inclusive gap.
+The body solver uses that dedicated evidence set while reconstructing the
+unchanged 117-note excitation corpus. The refit recovers positive A0
+(301.1 Hz, +0.3137 log2; diagnostic 280 Hz +0.1590) and B1 (473.6 Hz,
++0.4261; diagnostic 500 Hz +0.2463), split-half correlation 0.894, and
+zero unstable-band prunes. Profile emission now hard-fails with a named
+coverage gap if either mode or correlation >=0.80 is absent. Synthetic
+A0/B1 recovery and rejection-path tests consume the rule.
+The unchanged-objective campaign rebaseline consumes the emitted seed:
+`violin.measured-body` and `violin.body-peak-cluster` pass, reducing the
+construction failures 4→2 and total failures 46→44.
+Status: analysis=incorporated bowed=incorporated engine=incorporated
+c3f8ab8/a900640 (unity body, explicit omission, lowest-F0 cap); no owner
+escalation required

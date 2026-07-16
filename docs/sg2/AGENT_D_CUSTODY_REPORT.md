@@ -96,6 +96,24 @@ body-AM, and per-string consumers; they are not a freeze candidate.
 Detailed classification and consuming assertions are filed in
 `docs/sg2/VIOLIN_INTERIM_TRIAGE.md` and exchange entries T-036…T-040.
 
+## T-040 low-mode resolution
+
+The existing Iowa takes were densified into a dedicated 48-note body-role
+set. The violin body moved from no positive A0/B1 evidence and split-half
+correlation 0.451 to positive bands at 301.1/473.6 Hz and correlation 0.894.
+Because the modes are corpus-supported, the regenerated profile is emitted
+rather than quarantined and no owner escalation is required. The fitter now
+hard-fails future violin generation if either mode or the 0.80 stability
+threshold is absent. Full evidence is in
+`docs/sg2/T040_VIOLIN_BODY_REPORT.md`.
+
+The unchanged-objective rebaseline
+`agentd-t040-densified-body-baseline-r2` also proves campaign consumption:
+`violin.measured-body` and `violin.body-peak-cluster` pass, construction
+failures fall 4→2, and total gate failures fall 46→44. The remaining two
+construction failures are the previously filed pp bow-noise and
+vibrato-body-AM engine gaps.
+
 ## Shared-branch integration
 
 The custody branch was merged into `codex/sg2-l4-l5-engine` at `95118d4`

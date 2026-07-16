@@ -38,6 +38,7 @@ contract flag so a partially written acquisition folder cannot be fitted.
 # Fit measured/pinned parameters.
 python3 scripts/fit_profiles_from_samples.py \
   --samples /private/tmp/sg2/samples \
+  --body-references /private/tmp/sg2/campaigns \
   --out web/static/measured_profiles.json --partials 64 --require-contract
 python3 scripts/gen_measured_profiles_module.py
 

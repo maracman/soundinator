@@ -7,8 +7,9 @@ falling back to `<inst>/<run>/best.json` wrappers and flat params files),
 renders any stale notes through scripts/render_note.mjs, and writes
 /private/tmp/sg2/listen.html.
 
-Renders are cached per instrument by (params hash, engine commit): nothing
-re-renders unless the best params or the engine changed. Instruments with
+Renders are cached per instrument by (params hash, engine commit, measured
+profile hash): nothing re-renders unless the best params or audible engine
+state changed. Instruments with
 references but no leaderboard best (e.g. pre-campaign strings) render a
 clearly-tagged BASELINE from the bare measured profile.
 
@@ -29,6 +30,14 @@ def engine_commit():
                               capture_output=True, text=True, check=True).stdout.strip()
     except Exception:
         return "unknown"
+
+def measured_profile_hash():
+    path = "web/static/measured_profiles.js"
+    try:
+        with open(path, "rb") as handle:
+            return hashlib.sha256(handle.read()).hexdigest()
+    except OSError:
+        return "missing"
 
 def unwrap(obj):
     if not isinstance(obj, dict): return None
@@ -65,12 +74,13 @@ def baseline_params(inst, refs):
     return {"voiceMode": "fourier", "spectralMix": 1.0, "spectralPartials": 64,
             "excitationType": exc, "spectralProfile": profile, "seed": 7331}
 
-def render_if_stale(inst, params, refs, commit):
+def render_if_stale(inst, params, refs, commit, profile_hash):
     outdir = f"{SG2}/{inst}/listen-live"
     os.makedirs(outdir, exist_ok=True)
     stamp_path = f"{outdir}/stamp.json"
     want = {"paramsHash": hashlib.sha256(json.dumps(params, sort_keys=True).encode()).hexdigest(),
-            "engine": commit, "count": len(refs)}
+            "engine": commit, "measuredProfileHash": profile_hash,
+            "count": len(refs)}
     if os.path.exists(stamp_path) and json.load(open(stamp_path)) == want \
        and all(os.path.exists(f"{outdir}/note-{i}.wav") for i in range(len(refs))):
         return False
@@ -86,6 +96,7 @@ def render_if_stale(inst, params, refs, commit):
 
 def main():
     commit = engine_commit()
+    profile_hash = measured_profile_hash()
     sections, rendered = [], []
     insts = sorted(d for d in os.listdir(f"{SG2}/campaigns")
                    if os.path.exists(f"{SG2}/campaigns/{d}/references.json"))
@@ -96,7 +107,8 @@ def main():
                      ("BASELINE — no fitted preset yet", "background:#3d332a;color:#d8bd9f")
         if not params: params = baseline_params(inst, refs)
         try:
-            if render_if_stale(inst, params, refs, commit): rendered.append(inst)
+            if render_if_stale(inst, params, refs, commit, profile_hash):
+                rendered.append(inst)
         except subprocess.CalledProcessError as e:
             sections.append(f"<h2>{inst}</h2><p class=dim>render failed: {html.escape(str(e))}</p>")
             continue
