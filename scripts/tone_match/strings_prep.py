@@ -36,6 +36,13 @@ from typing import Any
 import numpy as np
 
 from scripts.tone_match.exclusions import is_excluded
+from scripts.tone_match.score import weights_for_instrument
+from scripts.tone_match.tripwires import (
+    ENVELOPE_PEAK_ANCHORS,
+    ROLE_BARS,
+    TRIPWIRE_FEATURES,
+    required_cells_by_bar,
+)
 from scripts.fit_profiles_from_samples import (
     analyse_note,
     estimate_f0,
@@ -92,6 +99,25 @@ PHIL_ANCHOR_NOTES = {
 # a 0.2 s mid-note window); the quarter-second "025" takes are unusable.
 _CATALOGUE_LENGTHS = ("05", "1", "15", "long", "phrase")
 _CATALOGUE_DYNAMICS = {"pp": "pianissimo", "ff": "fortissimo"}
+
+# T-044: dedicated vibrato-role evidence from the already-held curated
+# Philharmonia takes. These rows never stand in for spectral/onset evidence.
+VIBRATO_ROLE_FILES: dict[str, list[dict[str, Any]]] = {
+    "violin": [
+        {"file": "phil.violin_G3_1_mezzo-forte_molto-vibrato.mp3",
+         "register": "low", "dynamic": "mf", "velocity": 0.62},
+        {"file": "phil.violin_G3_long_forte_molto-vibrato.mp3",
+         "register": "low", "dynamic": "f", "velocity": 0.82},
+        {"file": "phil.violin_E5_1_mezzo-forte_molto-vibrato.mp3",
+         "register": "mid", "dynamic": "mf", "velocity": 0.62},
+        {"file": "phil.violin_E5_long_forte_molto-vibrato.mp3",
+         "register": "mid", "dynamic": "f", "velocity": 0.82},
+        {"file": "phil.violin_A6_1_mezzo-forte_molto-vibrato.mp3",
+         "register": "high", "dynamic": "mf", "velocity": 0.62},
+        {"file": "phil.violin_A6_long_forte_molto-vibrato.mp3",
+         "register": "high", "dynamic": "f", "velocity": 0.82},
+    ],
+}
 
 
 def find_catalogue_duplicates(catalogue_dir: Path, instrument: str) -> list[dict[str, Any]]:
@@ -531,11 +557,64 @@ def build_string_references(instrument: str, samples_root: Path,
                 "velocity": VELOCITY[dynamic], "dynamic": dynamic,
                 "register": anchor["register"], "string": anchor["string"],
                 "durationSec": render_duration,
-                "articulation": "arco", "vibrato": "spectral-role",
+                "articulation": "arco", "vibrato": "not-vibrato-role",
+                "roles": ["spectral", "onset"],
                 "floorGroup": (f"{midi}|{dynamic}|arco|{anchor['string']}|Iowa|"
                                f"{_duration_bucket(render_duration)}"),
                 "sourceClass": "Iowa MIS", "sourceFile": source.name,
             })
+
+    # ── T-044 dedicated vibrato-role rows ──
+    vibrato_references = []
+    vibrato_contract = []
+    for spec in VIBRATO_ROLE_FILES.get(instrument, []):
+        source = corpus / spec["file"]
+        if not source.exists() or is_excluded(source.name.replace("phil.", "")):
+            continue
+        parsed = parse_phil_name(source.name)
+        if parsed is None:
+            raise RuntimeError(f"cannot parse vibrato-role filename: {source}")
+        segment, sample_rate, f0 = _select_segment(source, parsed["midi"])
+        segment, _ = trim_to_single_bow(segment, sample_rate)
+        peak = float(np.max(np.abs(segment)))
+        if peak > 0.99:
+            segment = segment * (0.99 / peak)
+        midi = _midi_of(f0)
+        target = notes_dir / (
+            f"phil-vibrato-{spec['register']}-{spec['dynamic']}-{midi}.wav")
+        sf.write(target, segment, sample_rate, subtype="PCM_16")
+        check = analyse_note(
+            segment, sample_rate, str(target), 24, expected_f0_hz=f0)
+        measured_vibrato = (check.vibrato or {}) if check is not None else {}
+        if not measured_vibrato.get("present"):
+            raise RuntimeError(
+                f"{source}: declared vibrato-role take has no stable "
+                "measured vibrato")
+        duration = len(segment) / sample_rate
+        render_duration = max(0.5, min(2.0, duration * 0.72))
+        row = {
+            "path": str(target), "midi": midi, "detectedF0": round(f0, 3),
+            "velocity": spec["velocity"], "dynamic": spec["dynamic"],
+            "register": spec["register"], "string": "unlabelled",
+            "durationSec": render_duration,
+            "articulation": "arco", "vibrato": "molto-vibrato",
+            "roles": ["vibrato"],
+            "floorGroup": (
+                f"{midi}|{spec['dynamic']}|arco-molto-vibrato|"
+                f"unlabelled|Philharmonia|{_duration_bucket(render_duration)}"),
+            "sourceClass": "Philharmonia", "sourceFile": source.name,
+        }
+        references.append(row)
+        vibrato_references.append(row)
+        vibrato_contract.append({
+            "register": row["register"],
+            "dynamic": row["dynamic"],
+            "midi": row["midi"],
+            "prob": 1.0,
+            "rate": round(float(measured_vibrato["rate"]), 6),
+            "depth": round(float(measured_vibrato["depth"]), 6),
+            "sourceFile": row["sourceFile"],
+        })
 
     # ── Philharmonia same-pitch alternates (floor takes, duration-matched)
     # and the §2.5c pairing inventory.  Vibrato takes keep the vibrato role:
@@ -580,6 +659,7 @@ def build_string_references(instrument: str, samples_root: Path,
                 "string": "unlabelled",
                 "durationSec": render_duration,
                 "articulation": "arco", "vibrato": "nonvib",
+                "roles": ["floor"],
                 "floorGroup": (f"{midi}|{pair['dynamic']}|arco|unlabelled|"
                                f"Philharmonia|{_duration_bucket(render_duration)}"),
                 "sourceClass": "Philharmonia", "sourceFile": file_name,
@@ -626,6 +706,7 @@ def build_string_references(instrument: str, samples_root: Path,
                     "string": "unlabelled",
                     "durationSec": render_duration,
                     "articulation": "arco", "vibrato": "normal",
+                    "roles": ["floor"],
                     "floorGroup": (f"{midi}|{group['dynamic']}|arco-normal|"
                                    f"unlabelled|PhilCat|"
                                    f"{_duration_bucket(render_duration)}"),
@@ -637,6 +718,25 @@ def build_string_references(instrument: str, samples_root: Path,
                 catalogue_groups.append({**group, "files": used})
 
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
+    coverage_weights = weights_for_instrument(instrument)
+    active_coverage_bars = {
+        bar for bar, feature in TRIPWIRE_FEATURES.items()
+        if float(coverage_weights.get(feature, 0)) > 0
+    }
+    if instrument in ENVELOPE_PEAK_ANCHORS:
+        active_coverage_bars.add("envelope-peak")
+    coverage_contract = required_cells_by_bar(
+        references, active_coverage_bars)
+    (output / "coverage-contract.json").write_text(json.dumps({
+        "instrument": instrument,
+        "roles": {role: sorted(bars) for role, bars in ROLE_BARS.items()},
+        "requiredCellsByBar": coverage_contract,
+    }, indent=2) + "\n")
+    (output / "vibrato-contract.json").write_text(json.dumps({
+        "instrument": instrument,
+        "purpose": "T-047 register/dynamic vibrato consumer contract",
+        "vibratoByRegisterDynamic": vibrato_contract,
+    }, indent=2) + "\n")
     (output / "take-pairs.json").write_text(json.dumps({
         **pairs,
         "catalogueDuplicates": catalogue_groups,
@@ -650,9 +750,11 @@ def build_string_references(instrument: str, samples_root: Path,
     if measured_path and measured_path.is_file():
         measured = json.loads(measured_path.read_text())
         if instrument in measured:
+            seed = bowed_seed(instrument, measured[instrument])
+            if vibrato_contract:
+                seed["vibratoByRegisterDynamic"] = vibrato_contract
             (output / "initial.json").write_text(
-                json.dumps(bowed_seed(instrument, measured[instrument]),
-                           indent=2) + "\n")
+                json.dumps(seed, indent=2) + "\n")
 
     # ── QC report → corpus COVERAGE.md (owner-ears queue, per L3) ──
     coverage = corpus / "COVERAGE.md"
@@ -691,6 +793,12 @@ def build_string_references(instrument: str, samples_root: Path,
     summary = {
         "instrument": instrument,
         "references": len(references),
+        "referencesByRole": {
+            role: sum(role in row.get("roles", []) for row in references)
+            for role in ROLE_BARS
+        },
+        "vibratoReferences": len(vibrato_references),
+        "coverageContract": coverage_contract,
         "bodyReferences": len(body_references),
         "bodyPartialTiling": tile_summary,
         "floorGroupsWithAlternates": sum(1 for n in floor_groups.values() if n >= 2),

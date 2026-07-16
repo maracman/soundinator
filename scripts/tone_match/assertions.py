@@ -27,6 +27,7 @@ class ConstructionSample:
     register: str | None = None
     dynamic: str | float | None = None
     velocity: float | None = None
+    roles: frozenset[str] | None = None
 
 
 ALIASES = {
@@ -148,6 +149,17 @@ def _register_groups(samples: list[ConstructionSample]) -> dict[str, list[Constr
         if sample.register:
             groups.setdefault(sample.register.strip().lower(), []).append(sample)
     return groups
+
+
+def _samples_for_role(
+        samples: list[ConstructionSample],
+        role: str,
+        ) -> list[ConstructionSample]:
+    """Filter explicit role evidence while preserving legacy campaigns."""
+    return [
+        sample for sample in samples
+        if sample.roles is None or role in sample.roles
+    ]
 
 
 def _dynamic_slope(samples: list[ConstructionSample], metric) -> tuple[float | None, int]:
@@ -448,13 +460,18 @@ def evaluate_construction(
                                 strict_evidence=strict_evidence))
 
     if name in {"violin", "cello"}:
-        b_values = [s.render.note.B for s in sample_list if s.render.note.B is not None]
+        spectral_samples = _samples_for_role(sample_list, "spectral")
+        onset_samples = _samples_for_role(sample_list, "onset")
+        vibrato_samples = _samples_for_role(sample_list, "vibrato")
+        b_values = [s.render.note.B for s in spectral_samples
+                    if s.render.note.B is not None]
         b_max = max(b_values) if b_values else None
         rows.append(_result(f"{name}.near-harmonic-string", "Bowed-string modes remain near harmonic",
                             None if b_max is None else 0 <= b_max <= .003, b_max, "0 <= measured B <= 0.003",
                             strict_evidence=strict_evidence))
         low_hz, high_hz = ((2000, 3200) if name == "violin" else (180, 700))
-        prominences = [_band_prominence(s.render, low_hz, high_hz) for s in sample_list]
+        prominences = [_band_prominence(s.render, low_hz, high_hz)
+                       for s in spectral_samples]
         prominences = [x for x in prominences if np.isfinite(x)]
         median = float(np.median(prominences)) if prominences else None
         rows.append(_result(f"{name}.fixed-body-region", "A fixed-Hz body/bridge region survives pitch changes",
@@ -467,7 +484,7 @@ def evaluate_construction(
         # must rise by 1.2-3.0x from the soft to the loud takes.
         tilt_lo = 1.25 if name == "violin" else 1.2
         ratios = []
-        for register_samples in _register_groups(sample_list).values():
+        for register_samples in _register_groups(spectral_samples).values():
             by_level = [(_dynamic_value(s), _spectral_index(s.render))
                         for s in register_samples
                         if _dynamic_value(s) is not None]
@@ -509,7 +526,7 @@ def evaluate_construction(
             for label, lo_hz, hi_hz in (("mid-hill-1k", 800, 1200),
                                         ("mid-hill-2k", 1800, 2500)):
                 prominences = [_band_prominence(s.render, lo_hz, hi_hz)
-                               for s in sample_list]
+                               for s in spectral_samples]
                 prominences = [x for x in prominences if np.isfinite(x)]
                 median = float(np.median(prominences)) if prominences else None
                 rows.append(_result(f"cello.{label}",
@@ -520,7 +537,7 @@ def evaluate_construction(
 
         # C7 radiated rolloff: 3-8 kHz sustained LTAS slope at mf-ish takes
         rolloff_lo, rolloff_hi = (-19, -11) if name == "violin" else (-20, -10)
-        slopes = [s.render.ltas_rolloff_db_oct for s in sample_list
+        slopes = [s.render.ltas_rolloff_db_oct for s in spectral_samples
                   if getattr(s.render, "ltas_rolloff_db_oct", None) is not None]
         slope_med = float(np.median(slopes)) if slopes else None
         rows.append(_result(f"{name}.radiated-rolloff",
@@ -530,7 +547,7 @@ def evaluate_construction(
                             strict_evidence=strict_evidence))
 
         # C18 onset lock-in: stable harmonic regime within 18 nominal periods
-        lockins = [s.render.onset_lockin_periods for s in sample_list
+        lockins = [s.render.onset_lockin_periods for s in onset_samples
                    if getattr(s.render, "onset_lockin_periods", None) is not None]
         lockin_med = float(np.median(lockins)) if lockins else None
         rows.append(_result(f"{name}.onset-lockin",
@@ -541,9 +558,9 @@ def evaluate_construction(
 
         # C15/C16 pp noise rise: bow noise ratio grows toward soft dynamics
         # (sign gate only; values are corpus-fitted per C16)
-        soft_nhr = [s.render.sustain_noise_db for s in sample_list
+        soft_nhr = [s.render.sustain_noise_db for s in spectral_samples
                     if (_dynamic_value(s) or .5) <= .35]
-        loud_nhr = [s.render.sustain_noise_db for s in sample_list
+        loud_nhr = [s.render.sustain_noise_db for s in spectral_samples
                     if (_dynamic_value(s) or .5) >= .7]
         nhr_rise = (float(np.median(soft_nhr)) - float(np.median(loud_nhr))) \
             if soft_nhr and loud_nhr else None
@@ -558,7 +575,7 @@ def evaluate_construction(
         # reports not-applicable, which strict campaigns must cover
         am_values = [
             float((s.render.note.vibrato or {}).get("bodyAmDepthDb", 0) or 0)
-            for s in sample_list
+            for s in vibrato_samples
             if (s.render.note.vibrato or {}).get("present")
             and float((s.render.note.vibrato or {}).get("depth", 0) or 0) >= 10]
         am_med = float(np.median(am_values)) if am_values else None
