@@ -151,3 +151,27 @@ oscillators/390 automation events. Scorer-gated audibility culling selected
 `spectralCullThreshold = 0.0024` (0.465 dB log-mel delta, construction green;
 0.0025 exceeded the 0.5 dB budget). The resulting interim passes resource
 gates at 23 oscillators and 230 events, 1.15×/1.21× the factory median.
+
+## P5.2 blown-family baseline reset (2026-07-16)
+
+Agent B's P2 fit regenerated the harmonic source tables after separating each
+instrument's fixed-Hz body and corrected the sustained-note partial estimator.
+The bowed-only scorer dimensions remain zero-weight for blown instruments, but
+the objective identity and source tables changed; no loss above this section is
+comparable to the baselines below. Frozen reference manifests were retained.
+Each input combines its last valid fitted free values with the new measured
+ADSR/onset pins, the L4 deterministic blown-air engine path, and its own
+13–15-band body at reconstruction strength.
+
+| Instrument | Objective ID | Baseline loss | Construction | Floor groups | Worst ratio | Dominant residual |
+|---|---|---:|---|---:|---:|---|
+| Flute | `9f851b331f59cb1e` | 3.9317 | pass | 1 / 6 | 1.5627× | centroid, 8.99 semitones |
+| Clarinet | `62f5373d70abab8e` | 3.6407 | pass | 1 / 5 | 1.4552× | centroid, 6.70 semitones |
+| Alto sax | `e21eda13e72af06e` | 3.9264 | pass | 3 / 6 | 1.2109× | centroid, 13.16 semitones |
+| Trumpet | `ad19b84dad5525e6` | 3.1211 | pass | 0 / 2 | 1.3968× | centroid, 7.26 semitones |
+| French horn | `0ffe1905b2a96981` | 2.8883 | pass | 1 / 6 | 1.8805× | onset scoop, 5.82 perceptual units |
+
+All five campaigns remain open. The table is the new lineage baseline, not an
+improvement claim and not a freeze decision. Refinement starts from these
+reports only; prior leaderboards are retained as historical artifacts but are
+excluded from comparisons.

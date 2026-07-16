@@ -572,7 +572,13 @@ for (const [key, seed] of Object.entries({
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
 })) {
-  SPECTRAL_RESONANCES[key] = SPECTRAL_RESONANCES[seed].map(band => ({ ...band }));
+  const fitted = MEASURED_PROFILES[key]?.resonances;
+  if (Array.isArray(fitted) && fitted.length) {
+    SPECTRAL_RESONANCES[key] = fitted.map(band => ({ ...band }));
+  } else {
+    SPECTRAL_RESONANCES[key] = SPECTRAL_RESONANCES[seed].map(band => ({ ...band }));
+    console.warn(`[SG2 body fallback] ${key} has no measured resonances; using ${seed}`);
+  }
 }
 
 for (const [profileKey, resonances] of Object.entries(SPECTRAL_RESONANCES)) {
@@ -966,6 +972,16 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
   if (Array.isArray(m.attackByRegister) && m.attackByRegister.length) {
     prof.attackByRegister = m.attackByRegister;
   }
+  // Agent B P2 data contract: the fitted fixed-Hz body is runtime data;
+  // resonancesFit remains JSON-only analysis provenance. Replacing both
+  // lookup paths prevents measured instruments from retaining borrowed
+  // clarinet/trombone bodies when bodyType is auto or explicitly selected.
+  if (Array.isArray(m.resonances) && m.resonances.length) {
+    const bands = m.resonances.map(band => ({ ...band }));
+    prof.resonances = bands;
+    SPECTRAL_RESONANCES[profileKey] = bands;
+    BODY_PRESETS[profileKey] = { label: `${profileKey} measured body`, bands };
+  }
   const perf = prof.performance || (prof.performance = {});
   if (Number.isFinite(m.material)) perf.partialMaterial = m.material;
   if (Number.isFinite(m.partialB)) perf.partialB = m.partialB;
@@ -1045,11 +1061,11 @@ export function registerProfileAt(profile, fundamentalHz) {
   if (!entries.length) return { partials: profile?.partials || [], partialB: null };
   const hz = Math.max(1, Number(fundamentalHz) || entries[0].f0);
   let hi = entries.findIndex(row => row.f0 >= hz);
-  if (hi <= 0) return { partials: entries[0].partials, partialB: entries[0].partialB ?? profile?.performance?.partialB ?? null };
   if (hi < 0) {
     const last = entries[entries.length - 1];
     return { partials: last.partials, partialB: last.partialB ?? profile?.performance?.partialB ?? null };
   }
+  if (hi === 0) return { partials: entries[0].partials, partialB: entries[0].partialB ?? profile?.performance?.partialB ?? null };
   const a = entries[hi - 1], b = entries[hi];
   const t = Math.max(0, Math.min(1, Math.log(hz / a.f0) / Math.log(b.f0 / a.f0)));
   const count = Math.max(a.partials.length, b.partials.length);
@@ -2691,6 +2707,14 @@ export class GenerationEngine {
       spectralMix: this.p.spectralMix ?? 0,
       excitationType: excType,
       excitationHuman: human,
+      // L4/L7: a blown note's airflow floor is an explicit, deterministic
+      // part of its spectral fingerprint.  The retired formant-only tone
+      // imperfection path cannot be the source of breath for Fourier winds.
+      // Human affects the continuous turbulence trace, never whether air is
+      // present at all.
+      toneBreathLevel: excType === "blow"
+        ? toneBreathLevelFor(excType, this.p.toneBreath, () => this.rng.next())
+        : 0,
       breathNoiseColor: this._clamp(this.p.breathNoiseColor ?? 0, -1, 1),
       breathLevelScale: this._clamp(this.p.breathLevelScale ?? 1, 0, 3),
       breathVelocityExponent: this._clamp(this.p.breathVelocityExponent ?? 1, 0, 2),
@@ -5010,12 +5034,13 @@ export class SynthEngine {
     }
   }
 
-  // Continuous breath-noise floor for blown excitation (T3): air is always
-  // audibly moving through a wind instrument; level follows the Human dial.
+  // Continuous breath-noise floor for blown excitation (T3/L4): air is
+  // always moving through a wind instrument. Its deterministic level follows
+  // airflow/inefficiency; Human lives in the continuous turbulence trace.
   _renderBlowFloor(note, t0, t1, env) {
     if (!this._noiseBuffer || !note.velocity || t1 - t0 < 0.15) return;
-    const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
-    if (human <= 0) return;
+    const airflow = this._clamp(note.toneBreathLevel ?? 0, 0, 1);
+    if (airflow <= 0) return;
     const src = this.ctx.createBufferSource();
     src.buffer = this._noiseBuffer;
     src.loop = true;
@@ -5026,7 +5051,7 @@ export class SynthEngine {
     bp.Q.value = 0.7;
     const g = this.ctx.createGain();
     const level = Math.max(0.0001,
-      breathVelocityGain(note.velocity, note.breathVelocityExponent) * human * 0.035 *
+      breathVelocityGain(note.velocity, note.breathVelocityExponent) * airflow * 0.2 *
       this._clamp(note.breathLevelScale ?? 1, 0, 3));
     const breathLead = (note.articulationCoupling || 0) > 0
       ? level * (note._articulationOnset?.breathLeadGain ?? 1)
@@ -5128,6 +5153,9 @@ export class SynthEngine {
   }
 
   _renderBreath(note, t0, t1, env) {
+    // Blown Fourier notes use the body-coloured, airflow-coupled floor above.
+    // Rendering this legacy layer as well would double their breath signal.
+    if ((note.excitationType || "") === "blow") return;
     const level = note.toneBreathLevel || 0;
     if (level <= 0 || !this._noiseBuffer) return;
     const src = this.ctx.createBufferSource();

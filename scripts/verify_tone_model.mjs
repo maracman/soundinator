@@ -46,6 +46,7 @@ import {
   GenerationEngine,
   layerMixPlan,
 } from "../web/static/synth.js";
+import { MEASURED_PROFILES } from "../web/static/measured_profiles.js";
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -251,6 +252,9 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     near(mid.partials[0].amp, 0.6, 1e-12) && near(mid.partialB, 2.5e-4, 1e-12));
   check("G1 absent register tables preserve the profile table",
     registerProfileAt({ partials: mock.partials }, 220).partials === mock.partials);
+  check("D4 above the top register anchor holds the highest table",
+    registerProfileAt(mock, 880).partials === mock.partialsByRegister[1].partials &&
+    registerProfileAt(mock, 880).partials !== mock.partialsByRegister[0].partials);
   check("G2 conical tube carries the full harmonic series",
     [1, 2, 3, 8].every(n => resonatorRatio("conicalTube", n) === n));
   check("G3 blare is neutral at zero and enriches forte",
@@ -286,6 +290,16 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     breathDraws === 0);
   check("L4 does not change non-blown tone-colour imperfection",
     toneBreathLevelFor("bow", .3, () => .5) === .15);
+  const breathEngine = new GenerationEngine({
+    seed: 91, voiceMode: "fourier", spectralProfile: "flute",
+    excitationType: "blow", excitationHuman: 0, toneBreath: .28,
+    spectralPartials: 16,
+  });
+  const breathFingerprint = breathEngine._spectralFingerprint(.4, 523.25, 0);
+  check("L7 Fourier winds carry fitted breath into the rendered note",
+    near(breathFingerprint.toneBreathLevel, .28, 1e-12));
+  check("L4 airflow remains present at Human zero",
+    breathFingerprint.excitationHuman === 0 && breathFingerprint.toneBreathLevel > 0);
   check("onset harmonic colour is neutral at zero",
     [1, 2, 8, 32].every(n => onsetSpectrumGain(n, 0) === 1));
   check("positive onset tilt brightens only the transient harmonic print",
@@ -420,6 +434,37 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
       "aeiou".split("").every(vowel => BODY_PRESETS[`${profile}-${vowel}`]?.measured)));
   check("instrument bodies present (violin, piano)",
     !!BODY_PRESETS.violin && !!BODY_PRESETS.piano);
+  const measuredBodies = ["flute", "clarinet", "alto-sax", "trumpet", "french-horn"];
+  check("L6 every measured blown body reaches the effective profile unchanged",
+    measuredBodies.every(key =>
+      JSON.stringify(SPECTRAL_PROFILES[key].resonances) ===
+        JSON.stringify(MEASURED_PROFILES[key].resonances) &&
+      BODY_PRESETS[key]?.bands === SPECTRAL_PROFILES[key].resonances &&
+      bodyBandsFor({ bodyType: "auto" }, SPECTRAL_PROFILES[key]) ===
+        SPECTRAL_PROFILES[key].resonances));
+  const hornBase = {
+    seed: 91, tempo: 100, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
+    scaleMode: "12tone", scalePreset: "major", tonicHz: 261.63, rootNotes: [0],
+    voiceMode: "fourier", spectralPartials: 24, spectralProfile: "french-horn",
+    excitationType: "blow", excitationHuman: 0, spectralResonanceAmount: 1,
+  };
+  const hornNote = (params) => {
+    const engine = new GenerationEngine(params); engine.initialise();
+    for (let i = 0; i < 24; i++) {
+      const note = engine.nextNote();
+      if (note && note.velocity > 0 && note.harmonicPartials) return note;
+    }
+    return null;
+  };
+  const hornAuto = hornNote({ ...hornBase, bodyType: "auto" });
+  const hornExplicit = hornNote({
+    ...hornBase, bodyType: "auto", bodyBands: MEASURED_PROFILES["french-horn"].resonances,
+  });
+  check("L6 horn auto and explicit fitted-body render paths are equivalent",
+    hornAuto && hornExplicit &&
+    JSON.stringify(hornAuto.bodyBands) === JSON.stringify(hornExplicit.bodyBands) &&
+    JSON.stringify(hornAuto.harmonicPartials.map(row => row.amp)) ===
+      JSON.stringify(hornExplicit.harmonicPartials.map(row => row.amp)));
   const ah = BODY_PRESETS["vowel-ah"].bands;
   check("vowel-ah body carries F1-F5 at the measured frequencies",
     ah.length === 5 && ah[0].freq === FORMANT_PRESETS.ah.f1 && ah[4].freq === FORMANT_PRESETS.ah.f5);
