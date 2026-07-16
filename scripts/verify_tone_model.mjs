@@ -241,6 +241,33 @@ console.log("T2: drive spectra, hardness, dynamic brightness");
     near(excitationSpectrum("pluck", 2, { position: 0.5, hardness: 1 }), 0, 1e-9));
   check("dynamic brightness grows with mode number",
     dynamicBrightness(1) === 0.5 && dynamicBrightness(8) > dynamicBrightness(4) && dynamicBrightness(32) > 2);
+
+  // T-025 / G7 consuming assertion: test the actual excitation-spectrum
+  // output, before the separate dynamic-brightness law, rather than merely
+  // checking that the latent hardness scalar moved.
+  const upperLowerDb = (type, velocity, coupling) => {
+    const hardness = velocityHardness(0.6, velocity, coupling);
+    let lowerEnergy = 0, upperEnergy = 0;
+    for (let n = 1; n <= 32; n++) {
+      const amplitude = excitationSpectrum(type, n, {
+        position: 0.07, hardness, freqHz: n * 261.63,
+      });
+      if (n <= 4) lowerEnergy += amplitude * amplitude;
+      if (n >= 8) upperEnergy += amplitude * amplitude;
+    }
+    return 10 * Math.log10(upperEnergy / lowerEnergy);
+  };
+  for (const type of ["strike", "pluck"]) {
+    const neutralSoft = upperLowerDb(type, 0.2, 0);
+    const neutralLoud = upperLowerDb(type, 1, 0);
+    const coupledSoft = upperLowerDb(type, 0.2, 1);
+    const coupledLoud = upperLowerDb(type, 1, 1);
+    check(`T-025 G7 ${type}: coupling 0 is spectrally neutral across velocity`,
+      Math.abs(neutralLoud - neutralSoft) <= 1e-12);
+    check(`T-025 G7 ${type}: coupling 1 raises upper/lower energy by at least 3 dB`,
+      coupledLoud - coupledSoft >= 3,
+      `${(coupledLoud - coupledSoft).toFixed(2)} dB`);
+  }
 }
 
 console.log("Sound Generator 2.0 neutral engine extensions");
