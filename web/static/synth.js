@@ -2707,6 +2707,14 @@ export class GenerationEngine {
       spectralMix: this.p.spectralMix ?? 0,
       excitationType: excType,
       excitationHuman: human,
+      // L4/L7: a blown note's airflow floor is an explicit, deterministic
+      // part of its spectral fingerprint.  The retired formant-only tone
+      // imperfection path cannot be the source of breath for Fourier winds.
+      // Human affects the continuous turbulence trace, never whether air is
+      // present at all.
+      toneBreathLevel: excType === "blow"
+        ? toneBreathLevelFor(excType, this.p.toneBreath, () => this.rng.next())
+        : 0,
       breathNoiseColor: this._clamp(this.p.breathNoiseColor ?? 0, -1, 1),
       breathLevelScale: this._clamp(this.p.breathLevelScale ?? 1, 0, 3),
       breathVelocityExponent: this._clamp(this.p.breathVelocityExponent ?? 1, 0, 2),
@@ -5026,12 +5034,13 @@ export class SynthEngine {
     }
   }
 
-  // Continuous breath-noise floor for blown excitation (T3): air is always
-  // audibly moving through a wind instrument; level follows the Human dial.
+  // Continuous breath-noise floor for blown excitation (T3/L4): air is
+  // always moving through a wind instrument. Its deterministic level follows
+  // airflow/inefficiency; Human lives in the continuous turbulence trace.
   _renderBlowFloor(note, t0, t1, env) {
     if (!this._noiseBuffer || !note.velocity || t1 - t0 < 0.15) return;
-    const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
-    if (human <= 0) return;
+    const airflow = this._clamp(note.toneBreathLevel ?? 0, 0, 1);
+    if (airflow <= 0) return;
     const src = this.ctx.createBufferSource();
     src.buffer = this._noiseBuffer;
     src.loop = true;
@@ -5042,7 +5051,7 @@ export class SynthEngine {
     bp.Q.value = 0.7;
     const g = this.ctx.createGain();
     const level = Math.max(0.0001,
-      breathVelocityGain(note.velocity, note.breathVelocityExponent) * human * 0.035 *
+      breathVelocityGain(note.velocity, note.breathVelocityExponent) * airflow * 0.2 *
       this._clamp(note.breathLevelScale ?? 1, 0, 3));
     const breathLead = (note.articulationCoupling || 0) > 0
       ? level * (note._articulationOnset?.breathLeadGain ?? 1)
@@ -5144,6 +5153,9 @@ export class SynthEngine {
   }
 
   _renderBreath(note, t0, t1, env) {
+    // Blown Fourier notes use the body-coloured, airflow-coupled floor above.
+    // Rendering this legacy layer as well would double their breath signal.
+    if ((note.excitationType || "") === "blow") return;
     const level = note.toneBreathLevel || 0;
     if (level <= 0 || !this._noiseBuffer) return;
     const src = this.ctx.createBufferSource();

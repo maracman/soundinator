@@ -290,6 +290,16 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     breathDraws === 0);
   check("L4 does not change non-blown tone-colour imperfection",
     toneBreathLevelFor("bow", .3, () => .5) === .15);
+  const breathEngine = new GenerationEngine({
+    seed: 91, voiceMode: "fourier", spectralProfile: "flute",
+    excitationType: "blow", excitationHuman: 0, toneBreath: .28,
+    spectralPartials: 16,
+  });
+  const breathFingerprint = breathEngine._spectralFingerprint(.4, 523.25, 0);
+  check("L7 Fourier winds carry fitted breath into the rendered note",
+    near(breathFingerprint.toneBreathLevel, .28, 1e-12));
+  check("L4 airflow remains present at Human zero",
+    breathFingerprint.excitationHuman === 0 && breathFingerprint.toneBreathLevel > 0);
   check("onset harmonic colour is neutral at zero",
     [1, 2, 8, 32].every(n => onsetSpectrumGain(n, 0) === 1));
   check("positive onset tilt brightens only the transient harmonic print",

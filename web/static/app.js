@@ -632,7 +632,7 @@ const PARAM_DESC = {
   toneColorProb: "Chance that a note receives sub-note tone-colour variation",
   toneFormantDrift: "Maximum probabilistic shift of formant positions",
   toneResonanceDrift: "Maximum probabilistic change in filter resonance",
-  toneBreath: "Amount of probabilistic breath/noise mixed into the tone",
+  toneBreath: "Airflow/breath level mixed into the tone; deterministic for blown instruments, with Human controlling continuous texture rather than gating",
   vibratoProb: "Chance that a connected phrase receives vibrato",
   vibratoDepth: "Mean vibrato depth in cents",
   vibratoDepthSd: "Standard deviation of vibrato depth, sampled once per vibrato cycle",
