@@ -12,7 +12,7 @@ from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, 
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.controllability import canonical_hash, perturbations, validate_audit_contract
-from scripts.tone_match.iterate import FreeParam, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability, _tripwire_gate
+from scripts.tone_match.iterate import FreeParam, ToneMatcher, _append_ledger, _dominant_residual, _floor_evidence, _params, _reference_set_id, _reference_variability, _tripwire_gate
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, seed_preset
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
@@ -151,11 +151,12 @@ def test_controllability_contract_asserts_exact_consumer_inputs():
     manifest = {"continuous": [{"key": "partialTilt", "min": -1, "max": 1,
                                  "default": 0}]}
     audit = {
-        "instrument": "grand-piano", "status": "clean",
+        "schemaVersion": 2, "instrument": "grand-piano", "status": "clean",
         "referenceContractHash": canonical_hash(references),
         "parameterManifestHash": canonical_hash(manifest),
         "weights": {"partials_db": 1, "vibrato": 0},
         "responders": {"partials_db": ["partialTilt"]},
+        "repeatability": {"status": "stable", "unstableFeatures": []},
     }
     validate_audit_contract(audit, instrument="grand-piano",
                             references=references, manifest=manifest)
@@ -165,6 +166,15 @@ def test_controllability_contract_asserts_exact_consumer_inputs():
     with pytest.raises(ValueError, match="has no responsive"):
         validate_audit_contract({**audit, "responders": {}}, instrument="grand-piano",
                                 references=references, manifest=manifest)
+    with pytest.raises(ValueError, match="repeat-render stability"):
+        validate_audit_contract({**audit, "schemaVersion": 1}, instrument="grand-piano",
+                                references=references, manifest=manifest)
+    with pytest.raises(ValueError, match="repeat-unstable"):
+        validate_audit_contract({
+            **audit,
+            "repeatability": {"status": "watch-metrics-zeroed",
+                              "unstableFeatures": ["partials_db"]},
+        }, instrument="grand-piano", references=references, manifest=manifest)
 
 
 def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
@@ -690,6 +700,52 @@ def test_tripwire_gate_reports_every_bar_with_no_silent_pass():
     assert not gate["passed"]
     table = tripwire_table_markdown(gate)
     assert "band-balance" in table and "FAIL" in table
+
+
+def test_near_zero_inharmonicity_uses_stretch_cents_instead_of_b_ratio():
+    ref = _bundle(partials=[1] * 40, B=0.0)
+    tiny = _bundle(partials=[1] * 40, B=1e-8)
+    stretched = _bundle(partials=[1] * 40, B=0.0004)
+
+    def bar(render):
+        result = compare_features(ref, render, weights_for_instrument("guitar"))
+        gate = evaluate_tripwires("guitar", [{
+            "register": "mid", "dynamic": "mf", "result": result,
+            "ref": ref, "render": render,
+        }])
+        return next(row for row in gate["bars"] if row["bar"] == "inharmonicity")
+
+    near_zero = bar(tiny)
+    assert near_zero["status"] == "pass"
+    assert near_zero["value"]["errorCents"] < 3
+    too_stretched = bar(stretched)
+    assert too_stretched["status"] == "fail"
+    assert too_stretched["value"]["errorCents"] > 3
+
+    nonzero_ref = _bundle(partials=[1] * 40, B=0.0002)
+    nonzero_render = _bundle(partials=[1] * 40, B=0.00025)
+    result = compare_features(nonzero_ref, nonzero_render,
+                              weights_for_instrument("guitar"))
+    gate = evaluate_tripwires("guitar", [{
+        "register": "mid", "dynamic": "mf", "result": result,
+        "ref": nonzero_ref, "render": nonzero_render,
+    }])
+    ordinary = next(row for row in gate["bars"] if row["bar"] == "inharmonicity")
+    assert ordinary["status"] == "pass"
+    assert ordinary["value"] == pytest.approx(1.25)
+
+
+def test_tone_matcher_reuses_exact_duplicate_candidate_objective(tmp_path):
+    matcher = ToneMatcher(
+        "guitar-nylon", {"partialTilt": 0.0}, [],
+        [FreeParam("partialTilt", -1, 1, 0)], tmp_path,
+        {"status": "insufficient-evidence"}, weights={"partials_db": 1.0})
+    fingerprint = iterate_module._candidate_fingerprint(
+        matcher.free, {"partialTilt": 0.0})
+    matcher._objective_cache[fingerprint] = 12.5
+    assert matcher.evaluate(np.asarray([0.0])) == 12.5
+    assert matcher.evaluations == []
+    assert not (tmp_path / "renders").exists()
 
 
 def test_bowed_dynamic_tilt_gate_rejects_static_dynamics():

@@ -98,6 +98,14 @@ def validate_audit_contract(audit: dict[str, Any], *, instrument: str,
         errors.append("free-parameter manifest changed after controllability audit")
     if audit.get("status") != "clean":
         errors.append(f"audit status is {audit.get('status')!r}, not 'clean'")
+    if int(audit.get("schemaVersion", 0)) < 2:
+        errors.append("repeat-render stability evidence is missing")
+    unstable = set(audit.get("repeatability", {}).get("unstableFeatures", []))
+    active_unstable = sorted(
+        feature for feature in unstable
+        if float(audit.get("weights", {}).get(feature, 0)) > 0)
+    if active_unstable:
+        errors.append(f"repeat-unstable features still carry weight: {active_unstable}")
     responders = audit.get("responders", {})
     for feature, weight in audit.get("weights", {}).items():
         if float(weight) > 0 and not responders.get(feature):
@@ -129,6 +137,12 @@ def _render(run_dir: Path, initial: dict[str, Any], references: list[dict[str, A
             variant_id = register_config(f"{spec.key}-probe-{index}",
                                          {**baseline, spec.key: value})
             comparisons[spec.key].append((base_id, variant_id))
+    # Chromium's offline graph may differ by a final PCM bit across contexts.
+    # Render every distinct baseline twice more so the audit can detect any
+    # feature extractor that amplifies that inaudible jitter into a loss.
+    for base_id in dict.fromkeys(pair[0] for pairs in comparisons.values() for pair in pairs):
+        for repeat in range(2):
+            configs[f"{base_id}-repeat-{repeat}"] = dict(configs[base_id])
 
     render_dir = run_dir / "renders"
     listen_dir = run_dir / "listen-controllability"
@@ -219,6 +233,40 @@ def run_audit(instrument: str, initial: dict[str, Any], references: list[dict[st
                 analysis_failures.append({"config": config_id,
                                           "probeIndex": probe_indices[probe_index],
                                           "path": str(path), "error": str(error)})
+    repeat_rows = []
+    repeat_means: dict[str, float] = {}
+    repeat_peaks: dict[str, float] = {}
+    base_ids = list(dict.fromkeys(
+        pair[0] for pairs in comparisons.values() for pair in pairs))
+    for base_id in base_ids:
+        for repeat in range(2):
+            repeat_id = f"{base_id}-repeat-{repeat}"
+            note_rows = [
+                compare_features(feature_cache[str(base)], feature_cache[str(other)])
+                for base, other in zip(paths[base_id], paths[repeat_id])
+                if str(base) in feature_cache and str(other) in feature_cache
+            ]
+            if not note_rows:
+                continue
+            means = {
+                feature: float(np.mean([row["normalized"][feature] for row in note_rows]))
+                for feature in note_rows[0]["normalized"]
+            }
+            peaks = {
+                feature: float(np.max([row["normalized"][feature] for row in note_rows]))
+                for feature in note_rows[0]["normalized"]
+            }
+            for feature in means:
+                repeat_means[feature] = max(repeat_means.get(feature, 0), means[feature])
+                repeat_peaks[feature] = max(repeat_peaks.get(feature, 0), peaks[feature])
+            repeat_rows.append({"baseline": base_id, "repeat": repeat_id,
+                                "meanPerceptualUnits": means,
+                                "peakPerceptualUnits": peaks})
+    unstable_features = sorted(
+        feature for feature in repeat_means
+        if repeat_means[feature] >= mean_threshold or
+        repeat_peaks[feature] >= peak_threshold
+    )
     parameter_table: dict[str, Any] = {}
     responders: dict[str, list[str]] = {}
     for spec in free:
@@ -260,7 +308,15 @@ def run_audit(instrument: str, initial: dict[str, Any], references: list[dict[st
     final_weights = dict(starting_weights)
     zero_weighted = []
     for feature, weight in starting_weights.items():
-        if float(weight) > 0 and not responders.get(feature):
+        if float(weight) > 0 and feature in unstable_features:
+            final_weights[feature] = 0.0
+            zero_weighted.append({
+                "feature": feature,
+                "reason": "repeat renders of identical parameters crossed the stability threshold",
+                "previousWeight": weight,
+                "status": "watch-metric",
+            })
+        elif float(weight) > 0 and not responders.get(feature):
             final_weights[feature] = 0.0
             zero_weighted.append({
                 "feature": feature,
@@ -301,7 +357,7 @@ def run_audit(instrument: str, initial: dict[str, Any], references: list[dict[st
             planned.append(row)
             control_failures.append(row)
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "instrument": instrument,
         "status": status,
         "createdAt": time.time(),
@@ -312,6 +368,13 @@ def run_audit(instrument: str, initial: dict[str, Any], references: list[dict[st
                        "peakPerceptualUnits": peak_threshold},
         "probeReferenceIndices": probe_indices,
         "analysisFailures": analysis_failures,
+        "repeatability": {
+            "status": "stable" if not unstable_features else "watch-metrics-zeroed",
+            "unstableFeatures": unstable_features,
+            "maxMeanPerceptualUnits": repeat_means,
+            "maxPeakPerceptualUnits": repeat_peaks,
+            "comparisons": repeat_rows,
+        },
         "controlFailures": control_failures,
         "parameters": parameter_table,
         "responders": {key: sorted(value) for key, value in responders.items()},
@@ -337,6 +400,14 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
     for key, row in report["parameters"].items():
         features = ", ".join(f"`{feature}`" for feature in row["responsiveFeatures"]) or "none"
         lines.append(f"| `{key}` | {features} |\n")
+    repeatability = report.get("repeatability", {})
+    lines.extend([
+        "\n## Repeat-render stability\n\n",
+        f"Status: **{repeatability.get('status', 'missing').upper()}**  \n",
+        "Unstable features: " +
+        (", ".join(f"`{feature}`" for feature in repeatability.get("unstableFeatures", []))
+         or "none") + "\n",
+    ])
     lines.extend(["\n## Weight policy\n\n",
                   "| Feature | Weight | Responsive parameters |\n|---|---:|---|\n"])
     for feature, weight in report["weights"].items():

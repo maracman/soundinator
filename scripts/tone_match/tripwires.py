@@ -21,6 +21,7 @@ from .score import (
     FeatureBundle,
     OCTAVE_CENTRES_HZ,
     band_balance_distance,
+    inharmonicity_comparison,
     octave_summary_db,
     weights_for_instrument,
 )
@@ -125,17 +126,27 @@ def evaluate_tripwires(instrument: str,
             rows.append(_row("vibrato", register, dynamic, None,
                              "rate ±0.3 Hz, depth ±30%", None))
 
-        # inharmonicity, where measured and where the family scores it
-        if weights.get("inharmonicity_log_ratio", 0) > 0 and ref.note.B:
-            factor = math.exp(abs(math.log(
-                max(render.note.B or 1e-8, 1e-8) / max(ref.note.B, 1e-8))))
-            rows.append(_row("inharmonicity", register, dynamic,
-                             round(factor, 3),
-                             f"within x{BARS['inharmonicity_factor']}",
-                             factor <= BARS["inharmonicity_factor"]))
+        # T-037: B ratios are ill-conditioned at zero. Near-harmonic
+        # references use absolute upper-mode stretch cents instead.
+        inharmonicity = inharmonicity_comparison(ref.note, render.note)
+        if weights.get("inharmonicity_log_ratio", 0) > 0 and \
+                inharmonicity["applicable"]:
+            if inharmonicity["kind"] == "cents":
+                rows.append(_row(
+                    "inharmonicity", register, dynamic,
+                    {"mode": inharmonicity["mode"],
+                     "errorCents": round(inharmonicity["errorCents"], 3)},
+                    "upper-mode stretch error <= 3 cents",
+                    inharmonicity["passed"]))
+            else:
+                rows.append(_row(
+                    "inharmonicity", register, dynamic,
+                    round(inharmonicity["factor"], 3),
+                    f"within x{BARS['inharmonicity_factor']}",
+                    inharmonicity["passed"]))
         else:
             rows.append(_row("inharmonicity", register, dynamic, None,
-                             f"within x{BARS['inharmonicity_factor']}", None))
+                             "3-cent near-zero error or within x1.5", None))
 
         # T-005 band balance (per register AND dynamic, never pooled)
         d_mean, d_max8 = band_balance_distance(ref, render)

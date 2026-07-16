@@ -45,6 +45,13 @@ class FreeParam:
     default: float
 
 
+def _candidate_fingerprint(free: list[FreeParam], params: dict[str, Any]) -> str:
+    payload = {spec.key: round(float(params[spec.key]), 12) for spec in free}
+    return hashlib.sha256(json.dumps(
+        payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()[:16]
+
+
 def _load(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
 
@@ -299,7 +306,9 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
                       f"`{residual['feature']}` at `{residual['meanPerceptualUnits']:.4f}` perceptual units.\n"])
     controllability = summary.get("controllability") or {}
     lines.extend(["\n## Controllability gate\n\n",
-                  f"Status: `{controllability.get('status', 'not-supplied')}`\n"])
+                  f"Status: `{controllability.get('status', 'not-supplied')}`  \n",
+                  f"Repeat-render stability: "
+                  f"`{controllability.get('repeatability', {}).get('status', 'not-supplied')}`\n"])
     if controllability.get("zeroWeighted"):
         lines.extend(["\n| Zero-weight watch metric | Reason |\n", "|---|---|\n"])
         for row in controllability["zeroWeighted"]:
@@ -389,6 +398,7 @@ class ToneMatcher:
         self.weights = weights
         self.evaluations: list[dict] = []
         self.best: dict | None = None
+        self._objective_cache: dict[str, float] = {}
 
     def decode(self, values: np.ndarray) -> dict:
         params = dict(self.initial)
@@ -398,6 +408,9 @@ class ToneMatcher:
 
     def evaluate(self, values: np.ndarray, *, retain_audio: bool = False) -> float:
         params = self.decode(values)
+        candidate_fingerprint = _candidate_fingerprint(self.free, params)
+        if candidate_fingerprint in self._objective_cache:
+            return self._objective_cache[candidate_fingerprint]
         index = len(self.evaluations)
         target = self.run_dir / "renders" / f"eval-{index:04d}"
         target.mkdir(parents=True, exist_ok=True)
@@ -475,6 +488,7 @@ class ToneMatcher:
         if not retain_audio and self.best and self.best["evaluation"] != index:
             for job in jobs:
                 Path(job["out"]).unlink(missing_ok=True)
+        self._objective_cache[candidate_fingerprint] = objective
         return objective
 
 
@@ -635,6 +649,7 @@ def main(argv: list[str] | None = None) -> int:
                    "referenceContractHash": controllability["referenceContractHash"],
                    "parameterManifestHash": controllability["parameterManifestHash"],
                    "zeroWeighted": controllability.get("zeroWeighted", []),
+                   "repeatability": controllability.get("repeatability", {}),
                } if controllability else {"status": "not-supplied"}),
                "constructionPassed": bool(best.get("construction", {}).get("passed")),
                "construction": best.get("construction", {}),

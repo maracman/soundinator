@@ -192,19 +192,6 @@ Composite loss: `2.888251`
 |---|---:|---:|
 | `spectralResonanceAmount` | 1.0 | not run |
 
-## guitar-nylon — iteration-pilot-03
-
-Composite loss: `7.504955`
-
-| Parameter | Fitted | ±10% sensitivity |
-|---|---:|---:|
-| `decaySecondRatio` | 1.0 | not run |
-| `decaySecondStage` | 0.7936401413399085 | not run |
-| `excitationPosition` | 0.13 | not run |
-| `partialTilt` | 0.0 | not run |
-| `spectralResonanceAmount` | 1.0 | not run |
-| `velocityHardnessCoupling` | 0.408288512677725 | not run |
-
 ## french-horn — wp5-french-horn-owner-l5-baseline
 
 Composite loss: `2.842461`
@@ -258,3 +245,14 @@ Composite loss: `2.517304`
 | `onsetScoopSettle` | 0.1502268 | not run |
 | `onsetScoopVelocitySlope` | -0.25 | not run |
 | `spectralResonanceAmount` | 0.5854814992176212 | not run |
+
+## guitar-nylon — iteration-stable-01
+
+Composite loss: `9.205591`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `excitationPosition` | 0.13 | not run |
+| `partialTilt` | 0.6677885819738671 | not run |
+| `spectralResonanceAmount` | 1.0 | not run |
+| `velocityHardnessCoupling` | 0.408288512677725 | not run |

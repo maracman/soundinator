@@ -482,6 +482,42 @@ def band_balance_distance(ref: FeatureBundle,
     return d_mean, d_max8
 
 
+def inharmonicity_comparison(ref: NoteAnalysis, render: NoteAnalysis) -> dict[str, Any]:
+    """T-037 stable inharmonicity comparison at a common resolved mode."""
+    ref_ok = np.flatnonzero(np.asarray(ref.partial_snr_ok, dtype=bool)[:40]) + 1
+    render_ok = np.flatnonzero(np.asarray(render.partial_snr_ok, dtype=bool)[:40]) + 1
+    if ref.B is None or render.B is None or not ref_ok.size or not render_ok.size:
+        return {"applicable": False, "mode": None, "kind": "insufficient-evidence"}
+    mode = int(min(ref_ok.max(), render_ok.max()))
+    if mode < 2:
+        return {"applicable": False, "mode": mode, "kind": "insufficient-evidence"}
+
+    def stretch_cents(B: float) -> float:
+        B = max(0.0, B)
+        return float(600 * math.log2((1 + B * mode * mode) / (1 + B)))
+
+    ref_cents = stretch_cents(float(ref.B))
+    render_cents = stretch_cents(float(render.B))
+    if ref_cents < 3.0:
+        error = abs(render_cents - ref_cents)
+        return {
+            "applicable": True, "mode": mode, "kind": "cents",
+            "refStretchCents": ref_cents, "renderStretchCents": render_cents,
+            "errorCents": error, "passed": error <= 3.0,
+            # Preserve the legacy feature key/normalizer while making three
+            # cents equal one perceptual unit.
+            "distance": error * PERCEPTUAL_UNITS["inharmonicity_log_ratio"] / 3.0,
+        }
+    factor = math.exp(abs(math.log(max(float(render.B), 1e-8) /
+                                   max(float(ref.B), 1e-8))))
+    return {
+        "applicable": True, "mode": mode, "kind": "factor",
+        "factor": factor, "passed": factor <= 1.5,
+        "distance": abs(math.log(max(float(render.B), 1e-8) /
+                                 max(float(ref.B), 1e-8))),
+    }
+
+
 def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[str, float] | None = None) -> dict[str, Any]:
     weights = {**DEFAULT_WEIGHTS, **(weights or {})}
     audible = np.maximum(ref.partial_db, render.partial_db) > -66
@@ -492,8 +528,7 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
     ra, rb = _paired(ref.note.band_t90, render.note.band_t90)
     attack = float(np.mean(np.abs(ra - rb)) * 1000) if ra.size else 0.0
     decay = _decay_distance(ref.note, render.note)
-    b_ref, b_render = ref.note.B or 0, render.note.B or 0
-    b_distance = abs(math.log(max(b_render, 1e-8) / max(b_ref, 1e-8))) if b_ref or b_render else 0.0
+    b_distance = float(inharmonicity_comparison(ref.note, render.note).get("distance", 0.0))
     number = lambda value, fallback=0.0: float(value) if isinstance(value, (int, float)) and np.isfinite(value) else fallback
     vibrato = _vibrato_distance(ref.note, render.note)
     nr, ns = ref.note.attack_noise or {}, render.note.attack_noise or {}

@@ -627,7 +627,7 @@ B=0 versus 20-cent upper-mode stretch fails; ordinary non-zero B still uses
 the factor gate; the violin baseline no longer names B as dominant merely
 because the denominator is zero.
 Affects: score.extract_features / tripwires inharmonicity bar / residual ranking.
-Status: analysis=pending bowed=incorporated (baseline evidence) engine=n/a
+Status: analysis=incorporated (shared cents-floor scorer + canonical tripwire consumer assertions landed on Agent C branch) bowed=incorporated (baseline evidence) engine=n/a struck/plucked=incorporated
 
 ### T-038 · Bow attack calibration separates amplitude rise from lock-in
 Author: Agent D / analysis · 2026-07-16 · Firewall: mechanism + method; values per instrument
@@ -683,3 +683,21 @@ every emitted bowed profile passes its dossier cluster before T-032 engine
 consumption is enabled.
 Affects: fit_fixed_body / profile generation gate / bowed corpus coverage.
 Status: analysis=pending bowed=blocked-analysis engine=pending T-032
+
+### T-041 · Repeat-render stability is part of the controllability contract
+Author: Agent C / struck-plucked · 2026-07-16 · Firewall: method-only
+Finding: Chromium offline renders with identical parameters may differ by
+one 16-bit PCM step. The audio delta is inaudible, but thresholded feature
+estimators can amplify it into material loss changes (observed on nylon
+guitar inharmonicity and decay). Every distinct audit baseline is therefore
+rendered twice more. A feature whose repeat distance crosses the same
+mean/peak controllability threshold is zero-weighted as a watch metric before
+fitting. Audit schema v2 carries the repeatability matrix and unstable-feature
+list; schema-v1 audits are invalid consumers. The optimizer also caches exact
+duplicate parameter vectors so Powell cannot score the same point twice.
+Consuming assertions: a schema-v1 audit is rejected; a repeat-unstable
+feature cannot retain positive weight; exact duplicate candidate vectors
+return the cached objective without another render; stable features remain
+eligible and the objective hash changes when weights are downgraded.
+Affects: controllability.py / iterate.py / objective IDs / every family.
+Status: analysis=incorporated struck/plucked=incorporated bowed=adapted engine=n/a
