@@ -86,6 +86,22 @@ def main():
                 "partials": [{"amp": round(p["amp"], 5), "spread": round(p["spread"], 3)}
                              for p in row.get("partials", [])],
             } for row in registers if isinstance(row, dict) and row.get("partials")]
+        strings = v.get("partialsByString")
+        if isinstance(strings, dict) and strings:
+            entry["partialsByString"] = {
+                course: [{
+                    "f0": row["f0"],
+                    "partialB": row.get("partialB"),
+                    "nNotes": row.get("nNotes"),
+                    "partials": [
+                        {"amp": round(p["amp"], 5),
+                         "spread": round(p["spread"], 3)}
+                        for p in row.get("partials", [])
+                    ],
+                } for row in rows if isinstance(row, dict) and row.get("partials")]
+                for course, rows in sorted(strings.items())
+                if isinstance(rows, list)
+            }
         attack_registers = (v.get("attack") or {}).get("byRegister")
         if isinstance(attack_registers, list) and attack_registers:
             entry["attackByRegister"] = [{

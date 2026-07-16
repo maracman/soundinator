@@ -7,13 +7,13 @@ import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, harmonic_frame_amps, onset_pitch_stats, validate_corpus_contract, vibrato_stats, vowel_from_filename
+from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.controllability import canonical_hash, perturbations, validate_audit_contract
 from scripts.tone_match.iterate import FreeParam, ToneMatcher, _append_ledger, _dominant_residual, _floor_evidence, _load_preset, _params, _reference_set_id, _reference_variability, _renderer_contract_hash, _tripwire_gate, _update_leaderboard
-from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, seed_preset
+from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_profile, compare_features, ltas_rolloff, octave_summary_db, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, tripwire_table_markdown
@@ -239,6 +239,16 @@ def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
     assert piano["dynamics"] == ("pp", "ff")
     assert len(nylon["anchors"]) >= 3
     assert nylon["source"].startswith("Philharmonia")
+    assert [row["string"] for row in nylon["anchors"]] == \
+        ["string6", "string3", "string1"]
+
+
+def test_t033_guitar_auto_course_uses_minimum_fret_and_24_fret_bound():
+    assert guitar_course_for_midi(40) == "string6"
+    assert guitar_course_for_midi(55) == "string3"
+    assert guitar_course_for_midi(64) == "string1"
+    assert guitar_course_for_midi(76) == "string1"
+    assert guitar_course_for_midi(89) is None
 
 
 def test_single_note_corpus_filenames_supply_trusted_pitch_anchors():
@@ -257,6 +267,11 @@ def test_guitar_measured_profile_uses_nominal_nylon_register_anchors():
         pytest.approx([82.407, 195.998, 659.255], abs=.001)
     assert {row["note"] for row in measured["guitar"]["notesAnalysed"]} == \
         {"E2", "G3", "E5"}
+    strings = measured["guitar"]["partialsByString"]
+    assert set(strings) == {"string6", "string3", "string1"}
+    assert [strings[key][0]["f0"] for key in ("string6", "string3", "string1")] == \
+        pytest.approx([82.407, 195.998, 659.255], abs=.001)
+    assert all(strings[key][0]["nNotes"] == 2 for key in strings)
 
 
 def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables():
@@ -275,6 +290,23 @@ def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables(
     assert seed["decaySecondStage"] == 0
     assert seed["spectralResonanceAmount"] == 1
     assert "partialB" not in seed
+
+
+def test_profile_rebase_refreshes_structural_anchors_but_keeps_fitted_controls():
+    fitted = {"params": {
+        "partialTilt": .34,
+        "attackNoiseLevel": .7,
+        "envelopeAttackByRegister": [{"f0": 120, "attack": .03}],
+    }}
+    refreshed = {
+        "partialTilt": 0,
+        "attackNoiseLevel": 1,
+        "envelopeAttackByRegister": [{"f0": 82.407, "attack": .028}],
+    }
+    rebased = rebase_fitted_preset(fitted, refreshed)
+    assert rebased["partialTilt"] == .34
+    assert rebased["attackNoiseLevel"] == .7
+    assert rebased["envelopeAttackByRegister"] == refreshed["envelopeAttackByRegister"]
 
 
 def test_dominant_residual_ignores_zero_weight_diagnostics():
@@ -399,9 +431,27 @@ def test_corpus_contract_requires_both_uppercase_sidecars(tmp_path):
     (folder / "C4-mf.wav").touch()
     with pytest.raises(ValueError, match="missing PROVENANCE.json"):
         validate_corpus_contract(str(tmp_path))
-    (folder / "PROVENANCE.json").write_text(json.dumps({"source": "public corpus"}))
+    (folder / "PROVENANCE.json").write_text(json.dumps({
+        "source": "public corpus",
+        "files": [{"file": "C4-mf.wav"}],
+    }))
     (folder / "COVERAGE.md").write_text("# Coverage\n\nlow/mf\n")
     assert validate_corpus_contract(str(tmp_path)) == ["clarinet"]
+    (folder / "D4-mf.wav").touch()
+    with pytest.raises(ValueError, match="acquisition snapshot is not atomic"):
+        validate_corpus_contract(str(tmp_path))
+
+
+def test_partial_profile_refresh_can_use_an_immutable_merge_base():
+    new = {"guitar": {"resonances": [], "resonancesFit": {},
+                      "partialsByString": {"string6": [{"f0": 82.4}]}}}
+    previous = {"guitar": {"resonances": [{"freq": 200}],
+                           "resonancesFit": {"method": "frozen"}},
+                "piano": {"partials": [1]}}
+    merged = merge_profile_sets(new, previous)
+    assert merged["guitar"]["resonances"] == [{"freq": 200}]
+    assert merged["guitar"]["resonancesFit"]["method"] == "frozen"
+    assert "piano" in merged
 
 
 def test_reference_variability_floor_uses_only_matching_take_groups():
@@ -514,6 +564,26 @@ def test_register_fit_retains_valid_notes_below_100_hz():
     anchors = fitted["partialsByRegister"]
     assert [row["f0"] for row in anchors] == [60.0, 80.0, 200.0]
     assert anchors[0]["partials"][1]["amp"] == .1
+
+
+def test_t033_string_tables_do_not_pool_other_courses():
+    notes = []
+    for f0, second_partial in (
+        (82.4069, .1), (82.4069, .1),
+        (195.9977, .8), (195.9977, .8),
+    ):
+        notes.append(_bundle(
+            f0=f0,
+            partials=[1, second_partial, .05, .02, .01, .005, .002, .001],
+        ).note)
+    fitted = aggregate_instrument(
+        notes, [], 8,
+        string_selector=lambda note: guitar_course_for_midi(
+            int(round(69 + 12 * np.log2(note.f0 / 440.0)))),
+    )
+    strings = fitted["partialsByString"]
+    assert strings["string6"][0]["partials"][1]["amp"] == pytest.approx(.1)
+    assert strings["string3"][0]["partials"][1]["amp"] == pytest.approx(.8)
 
 
 def test_profile_fit_retains_scoop_distribution_and_plosive_anticorrelation():

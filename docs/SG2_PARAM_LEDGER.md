@@ -324,3 +324,59 @@ Composite loss: `3.725441`
 | `partialTilt` | 0.3456418637007195 | not run |
 | `partialTransfer` | 0.06397533837347963 | not run |
 | `spectralResonanceAmount` | 1.2718360893291012 | not run |
+
+## guitar-nylon — pass09-corrected
+
+Composite loss: `3.317939`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseDirect` | 0.15292252568423373 | not run |
+| `attackNoiseLevel` | 0.31220299431803766 | not run |
+| `excitationPosition` | 0.11096717646718349 | not run |
+| `partialMaterial` | 0.05250099611423774 | not run |
+| `partialTilt` | 0.3456418637007195 | not run |
+| `partialTransfer` | 0.03444185374863304 | not run |
+| `spectralResonanceAmount` | 1.4938622157744734 | not run |
+
+## guitar-nylon — pass10-refine
+
+Composite loss: `3.317250`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseDirect` | 0.15292252568423373 | not run |
+| `attackNoiseLevel` | 0.3108349809789263 | not run |
+| `excitationPosition` | 0.11096717646718349 | not run |
+| `partialMaterial` | 0.05250099611423774 | not run |
+| `partialTilt` | 0.3456418637007195 | not run |
+| `partialTransfer` | 0.047962647141631135 | not run |
+| `spectralResonanceAmount` | 1.492994890336873 | not run |
+
+## guitar-nylon — pass11-decay-stable
+
+Composite loss: `3.152017`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseDirect` | 0.15292252568423373 | not run |
+| `attackNoiseLevel` | 0.3108349809789263 | not run |
+| `excitationPosition` | 0.11096717646718349 | not run |
+| `partialMaterial` | 0.05250099611423774 | not run |
+| `partialTilt` | 0.3456418637007195 | not run |
+| `partialTransfer` | 0.047962647141631135 | not run |
+| `spectralResonanceAmount` | 1.2850530124660247 | not run |
+
+## guitar-nylon — pass12-full-stable
+
+Composite loss: `3.723190`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseDirect` | 0.15292252568423373 | not run |
+| `attackNoiseLevel` | 0.4721359549995794 | not run |
+| `excitationPosition` | 0.11096717646718349 | not run |
+| `partialMaterial` | 0.05250099611423774 | not run |
+| `partialTilt` | 0.3456418637007195 | not run |
+| `partialTransfer` | 0.6180339887498948 | not run |
+| `spectralResonanceAmount` | 0.6246117974981071 | not run |

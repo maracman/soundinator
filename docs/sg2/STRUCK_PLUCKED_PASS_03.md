@@ -4,6 +4,11 @@ Date: 2026-07-16
 Scope: durable SG2 delivery migration, deterministic nylon recovery, and
 focused continuation passes 05–08.
 
+Superseded by `STRUCK_PLUCKED_PASS_04.md`: pass 08's plateau was real for its
+state, but a stale pre-profile-repair attack-register table was later found,
+corrected, and produced further accepted improvements. Pass 03 remains the
+incident-recovery record, not the current stop state.
+
 ## Outcome
 
 The iteration pipeline is operational and measuring error. All

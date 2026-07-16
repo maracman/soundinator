@@ -17,7 +17,13 @@ from typing import Any
 
 import numpy as np
 
-from scripts.fit_profiles_from_samples import analyse_note, load_mono, segment_notes, sf
+from scripts.fit_profiles_from_samples import (
+    analyse_note,
+    guitar_course_for_midi,
+    load_mono,
+    segment_notes,
+    sf,
+)
 from scripts.tone_match.paths import sg2_data_root
 
 
@@ -48,12 +54,15 @@ CAMPAIGNS: dict[str, dict[str, Any]] = {
         "excitation": "pluck",
         "anchors": [
             {"register": "low", "midi": 40,
+             "string": "string6",
              "p": "phil.guitar_E2_very-long_piano_normal.mp3",
              "f": "phil.guitar_E2_very-long_forte_normal.mp3"},
             {"register": "mid", "midi": 55,
+             "string": "string3",
              "p": "phil.guitar_G3_very-long_piano_normal.mp3",
              "f": "phil.guitar_G3_very-long_forte_normal.mp3"},
             {"register": "high", "midi": 76,
+             "string": "string1",
              "p": "phil.guitar_E5_very-long_piano_normal.mp3",
              "f": "phil.guitar_E5_very-long_forte_normal.mp3"},
         ],
@@ -178,6 +187,24 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any]) -> dict[str, Any
     return {key: value for key, value in seed.items() if value is not None}
 
 
+def rebase_fitted_preset(fitted: dict[str, Any],
+                         refreshed_seed: dict[str, Any]) -> dict[str, Any]:
+    """Carry fitted controls while refreshing profile-derived structural data."""
+    params = fitted.get("params") if isinstance(fitted.get("params"), dict) else fitted
+    if not isinstance(params, dict):
+        raise ValueError("fitted preset must be a parameter object or contain params")
+    rebased = dict(params)
+    # These anchors are generated from measured-profile pitch evidence and are
+    # not optimizer-owned. Keeping an old copy after a profile correction
+    # silently reintroduces the superseded register model.
+    for key in ("envelopeAttackByRegister",):
+        if key in refreshed_seed:
+            rebased[key] = refreshed_seed[key]
+        else:
+            rebased.pop(key, None)
+    return rebased
+
+
 def _take_pairs(instrument: str, corpus: Path) -> dict[str, Any]:
     if instrument == "guitar-nylon":
         proxies = [
@@ -197,7 +224,7 @@ def _take_pairs(instrument: str, corpus: Path) -> dict[str, Any]:
 
 
 def build(instrument: str, samples_root: Path, measured_path: Path,
-          output_root: Path) -> dict[str, Any]:
+          output_root: Path, rebase_state: Path | None = None) -> dict[str, Any]:
     spec = CAMPAIGNS[instrument]
     corpus = samples_root / spec["corpus"]
     coverage = corpus / "COVERAGE.md"
@@ -222,11 +249,25 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
                 "velocity": VELOCITY[dynamic], "dynamic": dynamic,
                 "register": anchor["register"], "durationSec": duration,
                 "articulation": spec["excitation"], "vibrato": "nonvib",
-                "floorGroup": f"{midi}|{dynamic}|{spec['excitation']}|{spec['source']}",
+                **({"string": anchor["string"]} if anchor.get("string") else {}),
+                "floorGroup": (
+                    f"{midi}|{dynamic}|{spec['excitation']}|"
+                    f"{anchor.get('string', 'unlabelled')}|{spec['source']}"
+                ),
                 "sourceClass": spec["source"], "sourceFile": source.name,
             })
+            if anchor.get("string") and guitar_course_for_midi(midi) != anchor["string"]:
+                raise RuntimeError(
+                    f"{source}: declared {anchor['string']} disagrees with "
+                    f"T-033 auto course {guitar_course_for_midi(midi)}"
+                )
     measured = json.loads(measured_path.read_text())
     initial = seed_preset(spec, measured)
+    if rebase_state is not None:
+        initial = rebase_fitted_preset(
+            json.loads(rebase_state.read_text()),
+            initial,
+        )
     pairs = _take_pairs(instrument, corpus)
     (output / "initial.json").write_text(json.dumps(initial, indent=2) + "\n")
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
@@ -240,6 +281,7 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
         "dynamics": sorted({row["dynamic"] for row in references}),
         "floorGroupsWithAlternates": 0,
         "humanisationEvidence": pairs["evidence"],
+        "rebasedFrom": str(rebase_state) if rebase_state else None,
         "fittingGate": "blocked-until-P5-and-controllability-clean",
     }
     (output / "BUILD.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -253,9 +295,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--samples", type=Path, default=data_root / "samples")
     parser.add_argument("--measured", type=Path, default=Path("web/static/measured_profiles.json"))
     parser.add_argument("--output", type=Path, default=data_root / "campaigns")
+    parser.add_argument(
+        "--rebase-state", type=Path,
+        help="carry fitted parameters from a best.json while refreshing "
+             "profile-derived structural anchors (single instrument only)",
+    )
     args = parser.parse_args(argv)
     instruments = args.instrument or list(CAMPAIGNS)
-    summaries = [build(name, args.samples, args.measured, args.output) for name in instruments]
+    if args.rebase_state and len(instruments) != 1:
+        parser.error("--rebase-state requires exactly one --instrument")
+    summaries = [
+        build(name, args.samples, args.measured, args.output, args.rebase_state)
+        for name in instruments
+    ]
     print(json.dumps(summaries, indent=2))
     return 0
 

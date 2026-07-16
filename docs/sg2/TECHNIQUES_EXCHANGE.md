@@ -571,13 +571,24 @@ only to its matching course table, and pooled fallback is emitted only when
 course coverage is below the declared minimum.
 Affects: partialsByRegister schema / engine table selection / WP-6 morph
 axis (SWAM exposes Alternate Fingering).
-Nylon evidence: pass 05 improved `3.493823→3.475820`, pass 06 improved
-`4.080068→4.060831`, and pass 07 improved `4.066990→3.725441`; pass 08 then
-tested all seven remaining shared spectrum/onset controls for 44 evaluations
-on the repeat-stable objective and produced no improvement
-(`3.470322→3.470322`). All six active mel cells remain above bar while
-construction is 11/11 and resources pass.
-Status: engine=pending (guitar extension above is ready for one-pass consumption) analysis=pending b68d67f (storage lands with the first per-string fit) struck/plucked=blocked-engine T-033 (global-control plateau demonstrated; rerun from durable pass-08 state after consumer lands)
+Analysis implementation (Agent C): the committed fitter groups guitar notes
+by the exact `auto` course law before aggregation and emits
+`partialsByString` arrays only with at least two notes of coverage. The nylon
+profile now carries `string6` E2, `string3` G3, and `string1` E5 tables
+(p/f evidence each); the JS profile generator preserves them. Campaign
+references carry the same course labels and floor groups. Consuming tests
+prove E2/G3 course spectra cannot pool into one another, sparse courses omit
+cleanly, and the strict corpus contract rejects audio not declared by the
+provenance snapshot.
+Nylon evidence: correcting stale profile-derived attack anchors reopened the
+search. Pass 09 improved `3.477841→3.317939` (4.60%); pass 10 improved the
+same stable objective to `3.317250`; pass 11 improved its decay-stable
+objective `3.163714→3.152017`; pass 12's fully repeat-stable objective
+improved `4.011533→3.723190` (7.19%) and active failures `15→14`. Pass 13
+then failed to beat the comparable stable-objective leader
+(`3.378844 > 3.317250`) after all seven global controls, while all six mel
+cells remained above bar. Construction is 11/11 and resources pass.
+Status: engine=pending (guitar extension above is ready for one-pass consumption) analysis=incorporated (course-labelled storage, generator, corpus atomicity and consuming tests) struck/plucked=blocked-engine T-033 (resume from durable accepted pass-12 full-objective state after consumer lands)
 
 ### T-034 · ENGINE SPEC (small): dynamic pitch flattening for bowed forte
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; value fitted per instrument; INSTRUMENT physics, not Human
