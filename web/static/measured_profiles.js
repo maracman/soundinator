@@ -30987,9 +30987,9 @@ export const MEASURED_PROFILES = {
     "spectralPartialsByRegisterDynamic": {
       "schemaVersion": 1,
       "handoff": "A-VOICE-05",
-      "evidenceSha256": "4dd80c25716c0054ab3c3cfa6866b8989c8bd438d36c45c6acfcec14fd1433ff",
+      "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "male8",
-      "interpolation": "log-f0 x velocity; clamp outside measured hull",
+      "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
       "rows": [
         {
           "register": "high",
@@ -33645,9 +33645,9 @@ export const MEASURED_PROFILES = {
     "spectralPartialsByRegisterDynamic": {
       "schemaVersion": 1,
       "handoff": "A-VOICE-05",
-      "evidenceSha256": "4dd80c25716c0054ab3c3cfa6866b8989c8bd438d36c45c6acfcec14fd1433ff",
+      "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "female5",
-      "interpolation": "log-f0 x velocity; clamp outside measured hull",
+      "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
       "rows": [
         {
           "register": "high",
@@ -36329,9 +36329,9 @@ export const MEASURED_PROFILES = {
     "spectralPartialsByRegisterDynamic": {
       "schemaVersion": 1,
       "handoff": "A-VOICE-05",
-      "evidenceSha256": "4dd80c25716c0054ab3c3cfa6866b8989c8bd438d36c45c6acfcec14fd1433ff",
+      "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "male3",
-      "interpolation": "log-f0 x velocity; clamp outside measured hull",
+      "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
       "rows": [
         {
           "register": "high",
@@ -37739,9 +37739,9 @@ export const MEASURED_PROFILES = {
     "spectralPartialsByRegisterDynamic": {
       "schemaVersion": 1,
       "handoff": "A-VOICE-05",
-      "evidenceSha256": "4dd80c25716c0054ab3c3cfa6866b8989c8bd438d36c45c6acfcec14fd1433ff",
+      "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "female1",
-      "interpolation": "log-f0 x velocity; clamp outside measured hull",
+      "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
       "rows": [
         {
           "register": "high",
