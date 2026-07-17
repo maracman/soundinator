@@ -91,6 +91,10 @@ PINNED_MEASUREMENT_KEYS = {
     "envelopeAttackByRegisterDynamic", "vibratoProb", "vibratoRate",
     "vibratoDepth", "vibratoRateSd", "vibratoDepthSd",
     "vibratoByRegisterDynamic", "bowNoise", "humanRanges",
+    # L16+L17+L18 piano anatomy is immutable measured identity.  Keep the
+    # fitted tables through every strongest-prior refresh; only their unity
+    # level controls remain ordinary preset parameters.
+    "damperByRegister", "preOnsetComponents", "envelopeAnomalyClasses",
 }
 
 

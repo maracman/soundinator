@@ -1416,9 +1416,14 @@ export function pinnedNoiseActivationReport(profile, params = {}, shipMode = tru
       ? component.engineContract.excitationTypes : [];
     const excitationApplicable = excitationTypes.length === 0 ||
       excitationTypes.includes(String(params.excitationType || ""));
-    const applicable = excitationApplicable &&
-      (component.engineContract?.explicitPresetActivationRequired !== true ||
-        Object.prototype.hasOwnProperty.call(params, control));
+    const explicitActivationPresent =
+      component.engineContract?.explicitPresetActivationRequired !== true ||
+      Object.prototype.hasOwnProperty.call(params, control);
+    // Applicability is a property of the selected excitation, not of whether
+    // the preset happened to include the required activation control.  Keeping
+    // those states separate makes a stale/omitted control fail the SHIP gate
+    // instead of disappearing from it as "not applicable".
+    const applicable = excitationApplicable;
     const componentClass = component.componentClass || component.id;
     const wind = componentClass === "windBreath" || component.id === "windBreath";
     const effectiveLevel = wind
@@ -1428,11 +1433,13 @@ export function pinnedNoiseActivationReport(profile, params = {}, shipMode = tru
       Math.max(...points.map(point => point.gainDb)) -
         Math.min(...points.map(point => point.gainDb)) >= 6;
     const active = !applicable || !shipMode ||
-      (effectiveLevel > 0 && envelope.independent && nonFlatPointEnvelope);
+      (explicitActivationPresent && effectiveLevel > 0 &&
+        envelope.independent && nonFlatPointEnvelope);
     return { id: component.id, componentClass: component.componentClass || component.id,
       control, level, effectiveLevel, independentEnvelope: envelope.independent,
       preOnsetLeadMs: pinnedNoiseLeadMsAt(component, Number(params.velocity) || .62),
-      pointEnvelopeCount: points.length, nonFlatPointEnvelope, applicable, active };
+      pointEnvelopeCount: points.length, nonFlatPointEnvelope,
+      explicitActivationPresent, applicable, active };
   });
 }
 
@@ -6677,7 +6684,12 @@ export class SynthEngine {
       const multiplier = partialFrequency(harmonic, 1, partialB, resClass,
         note.barModeRatioOffsetsCents);
       const freq = note.frequency * multiplier;
-      if (freq > this.ctx.sampleRate * 0.45 || freq > 16000) return;
+      // Glockenspiel identity includes measured upper audible bar modes in
+      // the 16.9--19 kHz region.  The former family-wide 16 kHz ceiling
+      // silently deleted those fitted modes.  Keep the legacy ceiling for
+      // every other resonator and admit bars only through 20 kHz/Nyquist.
+      const audibleCeiling = resClass === "bar" ? 20000 : 16000;
+      if (freq > this.ctx.sampleRate * 0.45 || freq > audibleCeiling) return;
       // Audibility cull: partials that can never rise above ~-66 dB of the
       // print are dead weight (typical live set stays at 20-40 oscillators).
       if (!partialIsAudible(Math.max(part.amp, part.mean), norm, harmonic,
@@ -6825,7 +6837,7 @@ export class SynthEngine {
         note.polarisationSplitCents, note.polarisationDecayRatio);
       const secondFreq = freq * modePlan.frequencyRatio;
       const secondAudible = modePlan.secondaryGain > 0 &&
-        secondFreq <= this.ctx.sampleRate * 0.45 && secondFreq <= 16000;
+        secondFreq <= this.ctx.sampleRate * 0.45 && secondFreq <= audibleCeiling;
       if (!secondAudible) modePlan = polarisationModePlan(1, 0, 0, 1);
       renderMode(freq, multiplier, modePlan.primaryGain, 1, false);
       if (secondAudible) {
@@ -6938,8 +6950,17 @@ export class SynthEngine {
     const articulationPeak = wind
       ? base * Math.max(.2, note._articulationOnset?.breathLeadGain ?? 1)
       : base;
-    const releaseStart = Math.max(settle, t1);
-    const releaseEnd = releaseStart + shape.releaseMs / 1000;
+    // Piano action evidence is a complete point envelope: it includes the
+    // measured release after the strike.  Do not sustain its final (roughly
+    // -60 dB) point until note-off as the continuous bow/wind components do.
+    const lastPointAt = points.length
+      ? Math.max(...points.map(point => Math.max(start,
+        t0 + point.timeMs / 1000)))
+      : settle;
+    const releaseStart = action && points.length >= 2
+      ? lastPointAt : Math.max(settle, t1);
+    const releaseEnd = releaseStart +
+      (action && points.length >= 2 ? .005 : shape.releaseMs / 1000);
 
     const src = this.ctx.createBufferSource();
     src.buffer = this._seededNoiseBuffer();

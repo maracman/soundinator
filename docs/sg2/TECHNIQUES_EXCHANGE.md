@@ -2258,3 +2258,37 @@ sung=incorporated-all-adult-voices-current-head. Tenor, soprano, bass and mezzo
 already carry all five measured consonant onset classes. Fresh pass-10 output
 audits on current HEAD pass activation and earn all five consonant weights for
 every voice, so there is no remaining adult-voice extension to infer.
+Status update — Agent C struck/plucked pass 19, 2026-07-18: T-067/T-068/T-069
+are incorporated and output-verified together for grand. The selected owner
+listening row carries all 23 L18 damper cells, one 41-point independent action
+component, six corrected anomaly classes, and non-neutral action/anomaly levels
+of one. PCM proves a 17.583 ms action lead, anomaly-off onset difference,
+−9.376 dB/s held decay with plateau fraction zero, velocity-dependent fitted
+release, and the MIDI-90 undamped firewall. The broadband evidence still does
+not identify a modal damper exponent, so it remains exactly zero/zero-weight.
+Identity/resource/variation gates still block leaderboard promotion.
+
+Status update — Agent C struck/plucked pass 19, 2026-07-18: T-033
+struck/plucked=incorporated-output-verified. Campaign seed/rebase no longer
+emits pooled spectral means that shadow nylon's measured `partialsByString`.
+At equal MIDI-64 pitch, string 6/3/1 produce distinct PCM hashes and normalized
+spectral separations of 12.717, 17.526, and 4.891 dB; their independent fitted
+B values reach the sounded fingerprint. The old blocked-engine T-033 status is
+resolved, while whole-instrument nylon identity remains unpromoted pending its
+post-consumer fit.
+
+Status update — Agent C struck/plucked pass 19, 2026-07-18: T-072
+struck/plucked=incorporated-output-pass. Bars alone admit fitted modes through
+20 kHz; all other resonator families retain the 16 kHz ceiling. A target-aware
+±35-cent narrowband estimator with a 3 dB local-prominence floor recovers every
+audible annex line, including MIDI79/mode6, MIDI96/mode4, and MIDI103/mode3.
+All ratio, 7.404 decay-hierarchy, centre-strike, six-mode-economy, and B=0
+gates pass. Generic identity and one-dynamic coverage still block promotion.
+
+Status update — Agent C struck/plucked pass 19, 2026-07-18: upright L17 remains
+evidence-blocked, now with an executable step-one hub contract at
+`sg2-data/analysis/struck-pass19/UPRIGHT_L17_STEP1_SCOUT.md`. The primary
+BiVib v0.9.1 scout checksum-verifies metadata/maps before the upright-only
+archive; first acceptance is MIDI36/60/84 × low/high with >=10 ms genuine
+recorded pre-roll. Trimmed, padded, lossy, corrupt, mixed-identity, or grand
+substitute rows are hard rejects.
