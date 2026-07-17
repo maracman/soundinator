@@ -108,6 +108,26 @@ def test_reacquired_chromatic_run_names_resolve_their_first_midi():
     assert _run_start_midi("AltoSax.NoVib.ff.Db3B3.aiff") == 49
     assert _run_start_midi("Horn.ff.Bb1B1.aiff") == 34
 
+
+def test_requested_blown_controls_have_controllability_probes():
+    from scripts.tone_match.controllability import BOWED_FREE_PARAMS
+    assert {
+        "breathLevelScale", "breathVelocityExponent", "breathTurbulence",
+        "breathBodyAmount", "onsetSpectrumTilt", "onsetSpectrumDecay",
+        "articulationVelocitySlope",
+    } <= set(BOWED_FREE_PARAMS)
+
+
+def test_failed_humanisation_fit_is_not_authorised_for_profile_consumption():
+    from scripts.tone_match.humanisation import _consume_profile_ranges
+    profiles = {"french-horn": {"partials": []}}
+    failed = {"decompositionTest": {"passed": False}, "ranges": {"x": 1}}
+    assert not _consume_profile_ranges(profiles, "french-horn", failed)
+    assert "humanRanges" not in profiles["french-horn"]
+    passed = {"decompositionTest": {"passed": True}, "ranges": {"x": 1}}
+    assert _consume_profile_ranges(profiles, "french-horn", passed)
+    assert profiles["french-horn"]["humanRanges"] is passed
+
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
     freqs = np.asarray([50.0, 100.0, 200.0, 10_000.0])
     power = np.asarray([
