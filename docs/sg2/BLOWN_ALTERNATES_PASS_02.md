@@ -105,11 +105,11 @@ vector and repeat-render noise floor in the run-local
 `accepted-criteria-steps.json` and the live
 `sg2-data/state/criteria-drift.json` matrix. Two flute steps from the aborted
 non-authoritative `blown-alternates-r2` renderer are excluded from the sealed
-state. At pass seal the matrix contains 76 accepted steps and 57 directed
+state. At merged-state seal the matrix contains 78 accepted steps and 58 directed
 transitions overall. This blown wave contributes 42 steps and 37 transitions
 (flute 11/10, clarinet 10/9, alto sax 6/5, trumpet 7/6, horn 8/7).
 
-Nine asymmetric edges clear the six-event/binomial threshold; 89 pairs remain
+Eleven asymmetric edges clear the six-event/binomial threshold; 86 pairs remain
 strong symmetric-coupling candidates. Two measured edges reverse the sparse
 theoretical order: `log_mel_db → inharmonicity_log_ratio` and
 `onset_scoop_cents → release_noise_db`. These disagreements remain visible;
