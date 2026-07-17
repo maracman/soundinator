@@ -1699,38 +1699,108 @@ function interpolatePartials(a, b, t) {
   });
 }
 
-function sourcePartialsAtF0(rows, fundamentalHz) {
-  const sorted = rows.slice().sort((a, b) =>
-    (a.f0Hz ?? a.f0) - (b.f0Hz ?? b.f0));
-  const hz = Math.max(1, Number(fundamentalHz) || 1);
-  let hi = sorted.findIndex(row => (row.f0Hz ?? row.f0) >= hz);
-  if (hi < 0) return (sorted[sorted.length - 1]?.partials || []).map(p => p?.amp ?? p);
-  if (hi === 0) return (sorted[0]?.partials || []).map(p => p?.amp ?? p);
-  const a = sorted[hi - 1], b = sorted[hi];
-  const af = a.f0Hz ?? a.f0, bf = b.f0Hz ?? b.f0;
-  const t = Math.max(0, Math.min(1, Math.log(hz / af) / Math.log(bf / af)));
-  return interpolatePartials(a.partials, b.partials, t);
+function sourcePointPartials(points, weights) {
+  return points.reduce((sum, point, index) =>
+    interpolatePartials(sum, point.partials, weights[index] /
+      Math.max(1e-12, weights.slice(0, index + 1).reduce((a, b) => a + b, 0))), []);
 }
 
-/** A-VOICE-05/T-065 pinned source surface: log-f0 then velocity interpolation. */
+/** A-VOICE-05/T-065: linear interpolation inside the joint measured hull. */
 export function sourcePartialsAt(surface, fundamentalHz, velocity) {
   const rows = Array.isArray(surface) ? surface
     : Array.isArray(surface?.rows) ? surface.rows : [];
   const usable = rows.filter(row => Number.isFinite(row?.velocity) &&
     Number.isFinite(row?.f0Hz ?? row?.f0) && Array.isArray(row?.partials));
   if (!usable.length) return null;
-  const velocities = [...new Set(usable.map(row => row.velocity))].sort((a, b) => a - b);
-  const byVelocity = velocities.map(anchor => ({
-    velocity: anchor,
-    partials: sourcePartialsAtF0(usable.filter(row => row.velocity === anchor), fundamentalHz),
+  const raw = usable.map(row => ({
+    x: Math.log(Math.max(1, row.f0Hz ?? row.f0)),
+    y: row.velocity,
+    partials: row.partials,
   }));
-  const v = Number.isFinite(velocity) ? velocity : velocities[0];
-  let hi = byVelocity.findIndex(row => row.velocity >= v);
-  if (hi < 0) return byVelocity[byVelocity.length - 1].partials;
-  if (hi === 0) return byVelocity[0].partials;
-  const a = byVelocity[hi - 1], b = byVelocity[hi];
-  const t = Math.max(0, Math.min(1, (v - a.velocity) / (b.velocity - a.velocity)));
-  return interpolatePartials(a.partials, b.partials, t);
+  const xs = raw.map(point => point.x), ys = raw.map(point => point.y);
+  const xMin = Math.min(...xs), xSpan = Math.max(...xs) - xMin;
+  const yMin = Math.min(...ys), ySpan = Math.max(...ys) - yMin;
+  const points = raw.map(point => ({ ...point,
+    nx: xSpan > 1e-12 ? (point.x - xMin) / xSpan : 0,
+    ny: ySpan > 1e-12 ? (point.y - yMin) / ySpan : 0,
+  }));
+  const query = {
+    nx: xSpan > 1e-12
+      ? (Math.log(Math.max(1, Number(fundamentalHz) || 1)) - xMin) / xSpan : 0,
+    ny: ySpan > 1e-12
+      ? ((Number.isFinite(velocity) ? velocity : yMin) - yMin) / ySpan : 0,
+  };
+  const exact = points.find(point =>
+    Math.abs(point.nx - query.nx) <= 1e-12 &&
+    Math.abs(point.ny - query.ny) <= 1e-12);
+  if (exact) return exact.partials.map(partial => partial?.amp ?? partial);
+  if (points.length === 1) {
+    return points[0].partials.map(partial => partial?.amp ?? partial);
+  }
+  // A one-dimensional measured hull (one velocity or one register) retains
+  // exact endpoint clamping without inventing a missing second dimension.
+  if (xSpan <= 1e-12 || ySpan <= 1e-12) {
+    const coordinate = xSpan > 1e-12 ? "nx" : "ny";
+    const q = query[coordinate];
+    const sorted = points.slice().sort((a, b) => a[coordinate] - b[coordinate]);
+    let hi = sorted.findIndex(point => point[coordinate] >= q);
+    if (hi < 0) return sorted[sorted.length - 1].partials.map(p => p?.amp ?? p);
+    if (hi === 0) return sorted[0].partials.map(p => p?.amp ?? p);
+    const a = sorted[hi - 1], b = sorted[hi];
+    const t = (q - a[coordinate]) / (b[coordinate] - a[coordinate]);
+    return interpolatePartials(a.partials, b.partials, t);
+  }
+  const barycentric = (a, b, c) => {
+    const denominator = (b.ny - c.ny) * (a.nx - c.nx) +
+      (c.nx - b.nx) * (a.ny - c.ny);
+    if (Math.abs(denominator) <= 1e-12) return null;
+    const wa = ((b.ny - c.ny) * (query.nx - c.nx) +
+      (c.nx - b.nx) * (query.ny - c.ny)) / denominator;
+    const wb = ((c.ny - a.ny) * (query.nx - c.nx) +
+      (a.nx - c.nx) * (query.ny - c.ny)) / denominator;
+    return { weights: [wa, wb, 1 - wa - wb], area: Math.abs(denominator) };
+  };
+  let local = null;
+  for (let i = 0; i < points.length - 2; i++) {
+    for (let j = i + 1; j < points.length - 1; j++) {
+      for (let k = j + 1; k < points.length; k++) {
+        const candidate = barycentric(points[i], points[j], points[k]);
+        if (!candidate || candidate.weights.some(weight => weight < -1e-10)) continue;
+        if (!local || candidate.area < local.area) {
+          local = { ...candidate, points: [points[i], points[j], points[k]] };
+        }
+      }
+    }
+  }
+  if (local) return sourcePointPartials(local.points, local.weights);
+
+  // Outside the convex hull, project to its nearest boundary segment. This
+  // is the sparse-passaggio firewall: never clamp each axis independently.
+  const cross = (o, a, b) =>
+    (a.nx - o.nx) * (b.ny - o.ny) - (a.ny - o.ny) * (b.nx - o.nx);
+  const sorted = points.slice().sort((a, b) => a.nx - b.nx || a.ny - b.ny);
+  const half = input => {
+    const hull = [];
+    for (const point of input) {
+      while (hull.length >= 2 && cross(
+        hull[hull.length - 2], hull[hull.length - 1], point) <= 0) hull.pop();
+      hull.push(point);
+    }
+    return hull;
+  };
+  const hull = half(sorted).slice(0, -1).concat(half(sorted.slice().reverse()).slice(0, -1));
+  let nearest = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const dx = b.nx - a.nx, dy = b.ny - a.ny;
+    const t = Math.max(0, Math.min(1,
+      ((query.nx - a.nx) * dx + (query.ny - a.ny) * dy) /
+      Math.max(1e-12, dx * dx + dy * dy)));
+    const d2 = (query.nx - a.nx - t * dx) ** 2 +
+      (query.ny - a.ny - t * dy) ** 2;
+    if (!nearest || d2 < nearest.d2) nearest = { a, b, t, d2 };
+  }
+  return interpolatePartials(nearest.a.partials, nearest.b.partials, nearest.t);
 }
 
 // Legacy conversion: the old spectralStretchCents pinned a quadratic cents
@@ -3687,6 +3757,9 @@ export class GenerationEngine {
       Array.isArray(explicitSourceSurface?.rows ?? explicitSourceSurface)
       ? explicitSourceSurface : profile.spectralPartialsByRegisterDynamic;
     const tableMeans = sourcePartialsAt(sourceSurface, fundamentalHz, velocity);
+    const tableOwnsDynamics = Boolean(tableMeans &&
+      typeof sourceSurface?.dynamicComposition === "string" &&
+      sourceSurface.dynamicComposition.includes("suppress generic spectralDynamicAmount"));
     const means = tableMeans ||
       (Array.isArray(this.p.spectralPartialMeans) ? this.p.spectralPartialMeans : []);
     const sds = Array.isArray(this.p.spectralPartialSds) ? this.p.spectralPartialSds : [];
@@ -3749,7 +3822,7 @@ export class GenerationEngine {
       const harmonic = i + 1;
       // Dynamic-brightness law (T2, audit A14): the per-partial dyn grids
       // are retired — louder playing brightens the top by one global law.
-      const dynamics = Math.pow(velocityRatio,
+      const dynamics = tableOwnsDynamics ? 1 : Math.pow(velocityRatio,
         dynamicBrightness(harmonic, this.p.dynamicBlare, velocityRatio) * dynamicsAmount);
       // Realised mode frequency (T1 law) — body resonances and hardness
       // rolloff both act on where the partial actually sits.

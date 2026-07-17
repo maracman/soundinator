@@ -47,7 +47,7 @@ from scripts.tone_match.sung_source_tables import (
     _emit_rows,
     synthetic_round_trip,
 )
-from scripts.tone_match.sung_source_audit import summarize_responses
+from scripts.tone_match.sung_source_audit import AUDIT_DURATION_SEC, summarize_responses
 from scripts.tone_match.sung_prior import (
     LEGACY_VOCAL_CRAFT,
     LEGACY_VOCAL_PRIOR_HASH,
@@ -402,6 +402,7 @@ def test_a_voice_05_contract_forbids_sparse_hull_extrapolation_and_dynamic_doubl
 
 
 def test_a_voice_05_output_audit_requires_partial_mel_and_band_responders():
+    assert AUDIT_DURATION_SEC - .25 - .10 >= 1.0
     rows = [{
         "pcmDistinct": True,
         "repeatNormalized": {

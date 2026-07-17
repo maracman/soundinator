@@ -1754,6 +1754,16 @@ voice, exceed nonzero feature-specific repeat floors, and represent independent
 intervention lineages. The quarantined cross-family inharmonicity/release-noise
 edge is not used for sung triage.
 
+Status update — Agent A engine pass, 2026-07-17: T-065/A-VOICE-05 final law
+engine=incorporated+output-audited. Sparse source rows now interpolate only
+inside the joint log-f0/velocity measured hull and project to its nearest
+boundary outside; a missing soprano corner is never manufactured. A singer
+table explicitly owns its observed dynamic source shape and suppresses the
+generic dynamic-brightness law, while blown residual tables retain their
+separately fitted composition. Fresh output audits name the table consumer as
+a clean responder for partial, log-mel and sustain band-balance features in
+tenor `9ba74296`, soprano `f30f2591`, bass `f04db298`, and mezzo `f06aa8d8`.
+
 Status update — Agent A engine pass, 2026-07-17: T-033/T-043
 engine=incorporated. Violin/cello auto selection uses the lowest playable
 string, guitar auto uses minimum fret with the lower-course tie break, explicit
