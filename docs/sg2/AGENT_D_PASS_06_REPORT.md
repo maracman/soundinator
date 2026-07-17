@@ -138,8 +138,9 @@ Verification on the final merged head:
 - `PYTHONPATH=src:. python -m pytest -q`: full suite passes.
 - `node scripts/render_note.mjs --verify`: pass, hash
   `13e2bb56723c9cfe79875ec3043492408907fff59aa5ac603db3e52938e61180`.
-- `scripts/sg2_listen_page.py`: rebuilt against the final shared renderer;
-  final path/link validation recorded at pass seal.
+- `scripts/sg2_listen_page.py`: 16 instruments rebuilt; 12 re-rendered. A
+  final page-only metadata seal reports 700 audio links, zero dead links and
+  zero missing placeholders at `sg2-data/listen.html`.
 
 Pending mandates:
 
