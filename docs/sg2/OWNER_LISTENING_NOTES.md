@@ -55,6 +55,42 @@ instrument's effective body equals its fitted bands. The horn improved
 despite this because its refit likely carries explicit `bodyBands` in
 params, bypassing the profile plumbing — verify that too.
 
+### L18 · Piano: artificial sustain — the held-key/damper envelope model (owner, 2026-07-17)
+Owner: "the piano settings are quite good but the samples have an
+artificial sustain that doesn't work for a struck instrument. The
+envelope needs to be properly modelled for a held key on a piano: string
+is struck and the damper is raised, then let go and the damper makes
+contact with the string."
+
+The correct struck envelope has NO sustain plateau, ever:
+1. **Strike** — hammer attack (ms-scale).
+2. **Hold phase = free decay** — damper raised; amplitude decays
+   continuously the entire time the key is held (the two-stage
+   prompt/aftersound law, G4/L16 machinery). A flat `envelopeSustain`
+   level is a category error for strike/pluck excitation — the "hold"
+   merely determines WHEN the damper returns, not a level to sustain.
+3. **Release = damper re-contact** — fast fitted damp (tens of ms;
+   frequency-dependent — dampers kill highs faster), fitted from the
+   tail-audit `hasRelease` takes (§9 d.13b machinery is exactly where
+   this lives). Optional L17-class component: damper contact
+   noise/thud on re-contact, extraction-gated.
+
+Requirements:
+- Engine: for strike/pluck excitation the envelope law replaces
+  sustain-plateau semantics with hold=free-decay + damper-release
+  (releaseDamping/decaySecondStage seams exist; the law must make a
+  flat plateau UNREACHABLE for struck ship presets, not merely
+  optional).
+- Analysis: fit hold-phase decay from the held Iowa takes (free decay
+  is already measured); fit damper damp-rate per register from
+  hasRelease rows.
+- Construction assertion: a struck ship-mode render's hold phase shows
+  monotonic decay matching the measured two-stage slopes — a plateau is
+  an automatic construction FAIL for the family.
+- Applies to the whole struck/plucked family (guitar/harp analogue:
+  finger/palm damping on release); values per instrument, mechanism
+  shared (firewall).
+
 ### L17 · Pre-onset noise-lead is a COMPONENT CLASS: wind breath = bow sound = piano action noise (owner, 2026-07-17)
 Owner: "the blown instruments, particularly the winds (flute, sax and
 clarinet), require a similar breath component that functions similarly to
