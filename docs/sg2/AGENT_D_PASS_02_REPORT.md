@@ -19,15 +19,18 @@ page, audition manifest, SHIP renders, accepted-criteria log, leaderboard, and
 
 ## Controllability re-audit
 
-The integrated-head audit is clean and repeat-stable at the canonical 0.05
-perceptual-unit threshold. Direct named responses are:
+The final shared-head audit
+`audit-agentd-pass02-controls-r4-final-head` is clean and repeat-stable at the
+canonical 0.05 perceptual-unit threshold. It binds scorer
+`sg2-score-release-tail-v4` and renderer contract `8b52f10893dd703f`.
+Direct named responses are:
 
 | Work item | Parameter → feature | Response | Verdict |
 |---|---|---:|---|
-| T-031 | `onsetWanderCents` → `onset_wander_cents` | 1.060422 | responsive |
+| T-031 | `onsetWanderCents` → `onset_wander_cents` | 1.060296 | responsive |
 | T-031 | `onsetWanderSettlePeriods` → `onset_scoop_settle_ms` | 7.382292 | responsive |
-| T-031 | `bowScratchLevel` → `onset_noise_db` | 0.512844 | responsive |
-| T-054 | `bowNoiseLevel` → `sustain_noise_db` | 4.151154 | responsive |
+| T-031 | `bowScratchLevel` → `onset_noise_db` | 0.512881 | responsive |
+| T-054 | `bowNoiseLevel` → `sustain_noise_db` | 4.151155 | responsive |
 | T-029 | `vibratoDepth` → `body_am_db` | 0.125634 | responsive |
 
 T-029 is no longer an absent consumer. Its physical construction gate remains

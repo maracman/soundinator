@@ -473,7 +473,8 @@ maximum over that body is 1.026 dB, so the original >=3 dB target remains a
 separate unexplained-residual analysis obligation rather than permission to
 amplify the measured body. bowed=blocked-analysis-contract, not blocked-engine.
 Status update — Agent D pass 02, 2026-07-17: bowed=incorporated-response.
-The integrated-head audit moves `body_am_db` by 0.125634 perceptual units for
+The final shared-head audit (renderer contract `8b52f10893dd703f`) moves
+`body_am_db` by 0.125634 perceptual units for
 `vibratoDepth`, above the 0.05 controllability threshold. The original 3 dB
 physical acceptance target remains an analysis residual exactly as Agent A
 classified it; it is no longer an absent-control or consumer blocker.
@@ -536,7 +537,7 @@ bowed=blocked-response-re-audit because Agent D's earlier perceptual-response
 audit must still be repeated against the integrated checkout.
 Status update — Agent D pass 02, 2026-07-17: bowed=incorporated-response,
 engine=incorporated. The integrated-head audit measures `onsetWanderCents` →
-`onset_wander_cents` = 1.0604 perceptual units and the context-gated
+`onset_wander_cents` = 1.0603 perceptual units and the context-gated
 `onsetWanderSettlePeriods` → `onset_scoop_settle_ms` = 7.3823; bow scratch
 also moves `onset_noise_db` by 0.5128. All exceed the 0.05 threshold.
 
@@ -998,7 +999,7 @@ project Python environment, `render_note --verify` passes at hash
 `d779e7469eacba1694bb608af4f14a77f3bfdab7036538edafef74d1bc63978e`.
 bowed=ready-re-audit, analysis=incorporated.
 Status update — Agent D pass 02, 2026-07-17: bowed=incorporated-response.
-The integrated-head audit measures `bowNoiseLevel` → `sustain_noise_db` =
+The final shared-head audit measures `bowNoiseLevel` → `sustain_noise_db` =
 4.1512 perceptual units with clean/stable repeatability and no uncontrolled
 weighted feature. T-054 is no longer a bowed controllability blocker.
 
