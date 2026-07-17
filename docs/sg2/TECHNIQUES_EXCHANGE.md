@@ -854,6 +854,46 @@ Status: analysis=incorporated (dedicated roles, corrected metric, external
 contract, clean isolated audit) engine=pending bowed=blocked-engine
 struck/plucked=n/a
 
+### T-054 · Cross-pitch harmonic residuals isolate pinned excitation noise
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: method + per-instrument data
+Finding: pitch-invariance is the noise-domain analogue of P2 body
+deconvolution. Remove f0-anchored harmonics note by note, then pool residual
+spectra only within the same dynamic, articulation, and source identity. The
+component common across pitches is excitation noise coloured by the fixed
+body; pitch-varying residue is harmonic leakage and must be flagged rather
+than fitted. A synthetic engine round trip is a hard trust gate before any
+real-corpus extraction.
+
+Violin result: 57 Iowa lossless arco/non-vibrato notes (19 each pp/mf/ff;
+sulG/sulD/sulA dense set plus raw-run sulE top-up) support one pinned
+200–14,400 Hz profile. Cross-dynamic correlations are 0.9607 pp–mf, 0.9358
+pp–ff, and 0.9579 mf–ff; median shape differences are 1.74–1.94 dB. The
+owner's volume-stable-shape hypothesis is confirmed. One notch-sensitive
+9.051 kHz row is rejected. Philharmonia MP3 is excluded because lossy coding
+corrupts the measured broadband floor. The fitted absolute level law is
+`velocity ** 0.9309`; pp NHR is about 4 dB higher than mf/ff, confirming the
+T-001 soft inefficiency sign. Per-source quiet-frame comparison gives at least
+15.388 dB p25 residual-to-background margin throughout the selected band.
+
+Engine spec: `violin.bowNoise.profile` is immutable measured data, never an
+optimiser dimension. Expose `bowNoiseLevel`; envelope-couple its seeded
+continuous level, consume fitted `bowNoiseVelocityExponent`, and route through
+the measured body at unity. Treat the pinned spectrum as the post-body target
+and deconvolve it once for the excitation filter so the body colour is not
+applied twice. Level zero is exact legacy identity. A level-one consuming
+render must recover the pinned spectrum within 2 dB median / 4 dB P95 and
+retain at least +2 dB pp-vs-ff relative NHR.
+
+Transfer: wind breath and sung breathiness fits adopt the same cross-pitch
+residual separator, while retaining their own corpus/source identities and
+fitted values. Do not transfer the violin table or exponent.
+
+Affects: harmonic residual analysis / measured profile schema / shared
+excitation-noise renderer / violin user controls / wind and sung fit methods.
+Status: analysis=incorporated (extractor, engine round-trip gate, Iowa table,
+generated profile, report) engine=pending bowed=blocked-engine
+blown=adapt-method sung=adapt-method struck/plucked=method-applicable
+
 ## Sung lane pass-01 disposition (Agent E, 2026-07-16)
 
 This table records the sung lane's required status on every existing entry

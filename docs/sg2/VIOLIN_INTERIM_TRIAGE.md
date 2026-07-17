@@ -54,7 +54,7 @@ inharmonicity quarantine remains valid only for that earlier baseline.
 | Spectral engine-data contract | 18 | Partial table 6, mel 6, band balance 6. T-033/T-043 remain blocking. |
 | Bow-attack engine-data contract | 6 | All six attack cells fail. High pp/ff measured intervals are disjoint, so register-only attack is insufficient. T-048 is blocking. |
 | Vibrato engine-data contract | 4 | Mid mf/f pass; low mf/f and high mf/f fail. Probability and depth plateau; one global rate cannot cover the measured 5.60–6.58 Hz and 7.62–37.93 cent table. T-047 is blocking. |
-| Bow-noise engine gap | 1 | `violin.pp-noise-rise = -5.09 dB`, requirement ≥ +2 dB. T-039. |
+| Bow-noise engine gap | 1 | L14/T-054 extraction is complete: pinned 200–14,400 Hz table plus fitted exponent 0.9309. The separate engine consumer and exposed level control remain pending. |
 | Vibrato body-AM engine gap | 1 | `violin.vibrato-body-am = 1.63 dB`, requirement ≥ 3 dB. T-029. |
 | Corpus/role gaps | **0** | T-044 is resolved from existing holdings. |
 | **Total** | **30** |  |
@@ -69,7 +69,8 @@ consumers:
 2. T-033/T-043: per-string/register/dynamic spectral tables.
 3. T-048/T-031: consume the register × dynamic bow-attack table; preserve
    harmonic-organisation lock-in.
-4. T-039: soft-dynamic sustained bow-noise law.
+4. T-054 (superseding the provisional T-039 violin spec): consume the pinned
+   body-routed bow profile, fitted soft-dynamic law, and user-facing level.
 5. T-029: instantaneous-frequency body FM→AM.
 
 The optimizer itself no longer aborts on an unanalysable candidate: such a

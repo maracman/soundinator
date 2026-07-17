@@ -99,6 +99,20 @@ def main():
         if isinstance(an, dict):
             entry["attackNoise"] = {k: round(x, 4) for k, x in an.items()
                                     if isinstance(x, (int, float))}
+        # L14: the sustained bow residual is a measured, pinned component.
+        # Keep its table and fitted level law intact; the optimiser may scale
+        # the component but must never mutate this spectral shape.
+        bow_noise = v.get("bowNoise")
+        if isinstance(bow_noise, dict) and bow_noise.get("profilePinned") is True:
+            entry["bowNoise"] = {
+                "method": bow_noise.get("method"),
+                "source": bow_noise.get("source"),
+                "bandHz": bow_noise.get("bandHz"),
+                "profilePinned": True,
+                "profile": bow_noise.get("profile", []),
+                "levelLaw": bow_noise.get("levelLaw", {}),
+                "engineContract": bow_noise.get("engineContract", {}),
+            }
         out[key] = entry
 
     DST.write_text(

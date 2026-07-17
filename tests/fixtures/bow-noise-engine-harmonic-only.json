@@ -1,0 +1,22 @@
+{
+  "seed": 141421,
+  "voiceMode": "fourier",
+  "spectralProfile": "violin",
+  "spectralMix": 1,
+  "spectralPartials": 64,
+  "excitationType": "blow",
+  "resonatorClass": "string",
+  "bodyType": "auto",
+  "excitationHuman": 0,
+  "toneBreath": 0,
+  "breathNoiseColor": 0,
+  "breathLevelScale": 1.5,
+  "breathVelocityExponent": 0,
+  "breathTurbulence": 0,
+  "breathBodyAmount": 1,
+  "vibratoProb": 0,
+  "vibratoDepth": 0,
+  "microDriftCentsSd": 0,
+  "spectralResonanceAmount": 1,
+  "reverbWet": 0
+}
