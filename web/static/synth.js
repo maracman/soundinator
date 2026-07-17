@@ -5659,7 +5659,8 @@ export class SynthEngine {
       }
     });
     this._schedulePartialAmplitudes(scheduled, note, t0, t1);
-    this._renderExcitationNoiseFloor(note, t0, t1, env);
+    if ((note.excitationType || "") === "blow") this._renderBlowFloor(note, t0, t1, env);
+    if ((note.excitationType || "") === "bow") this._renderPinnedBowNoise(note, t0, t1, env);
   }
 
   _seededNoiseBuffer() {
@@ -5809,18 +5810,10 @@ export class SynthEngine {
     }
   }
 
-  // T-001/T-039 shared continuous excitation-noise renderer. Bowed notes use
-  // the same seeded, envelope-coupled component boundary as blown airflow;
-  // T-054's pinned violin spectrum supplies bow-specific colour/body/level
-  // data, while the established blown branch below remains byte-for-byte the
-  // same DSP graph and keeps all wind-fitted values behind its family gate.
-  _renderExcitationNoiseFloor(note, t0, t1, env) {
-    const excitation = note.excitationType || "";
-    if (excitation === "bow") {
-      this._renderPinnedBowNoise(note, t0, t1, env);
-      return;
-    }
-    if (excitation !== "blow") return;
+  // Continuous breath-noise floor for blown excitation (T3/L4): air is
+  // always moving through a wind instrument. Its deterministic level follows
+  // airflow/inefficiency; Human lives in the continuous turbulence trace.
+  _renderBlowFloor(note, t0, t1, env) {
     if (!this._noiseBuffer || !note.velocity || t1 - t0 < 0.15) return;
     const airflow = this._clamp(note.toneBreathLevel ?? 0, 0, 1);
     if (airflow <= 0) return;

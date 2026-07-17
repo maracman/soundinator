@@ -13884,16 +13884,266 @@ export const MEASURED_PROFILES = {
       }
     },
     "humanRanges": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "instrument": "violin",
-      "method": "matched-take-human-only-differential-v1",
+      "method": "matched-take-human-only-differential-v2-double-dissociation",
       "evidence": {
         "basis": "true same-note/dynamic/articulation floor groups",
         "groups": 6,
         "takes": 14,
         "pairs": 10
       },
+      "qualification": {
+        "excitationPosition": {
+          "parameter": "excitationPosition",
+          "observable": "excitationPosition",
+          "unit": "fraction-of-string",
+          "pairsTested": 10,
+          "qualifiedPairs": 9,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRate": {
+          "parameter": "vibratoRate",
+          "observable": "vibratoRateHz",
+          "unit": "Hz",
+          "pairsTested": 10,
+          "qualifiedPairs": 1,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoDepth": {
+          "parameter": "vibratoDepth",
+          "observable": "vibratoDepthCents",
+          "unit": "cents",
+          "pairsTested": 10,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoOnsetDelayMs": {
+          "parameter": "vibratoOnsetDelayMs",
+          "observable": "vibratoOnsetDelayMs",
+          "unit": "ms",
+          "pairsTested": 10,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRampMs": {
+          "parameter": "vibratoRampMs",
+          "observable": "vibratoRampMs",
+          "unit": "ms",
+          "pairsTested": 10,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRateDrift": {
+          "parameter": "vibratoRateDrift",
+          "observable": "vibratoRateDriftHzPerSecond",
+          "unit": "Hz/s",
+          "pairsTested": 10,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "bowNoiseLevelDb": {
+          "parameter": "bowNoiseLevelDb",
+          "observable": "sustainNoiseDb",
+          "unit": "dB",
+          "pairsTested": 10,
+          "qualifiedPairs": 9,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "bowScratchLevelDb": {
+          "parameter": "bowScratchLevelDb",
+          "observable": "onsetNoiseDb",
+          "unit": "dB",
+          "pairsTested": 10,
+          "qualifiedPairs": 10,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "attackNoiseLevel": {
+          "parameter": "attackNoiseLevel",
+          "observable": "attackNoiseLevel",
+          "unit": "linear-ratio",
+          "pairsTested": 10,
+          "qualifiedPairs": 6,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "onsetWanderCents": {
+          "parameter": "onsetWanderCents",
+          "observable": "onsetWanderCents",
+          "unit": "cents",
+          "pairsTested": 10,
+          "qualifiedPairs": 8,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "onsetWanderSettleMs": {
+          "parameter": "onsetWanderSettleMs",
+          "observable": "onsetSettleMs",
+          "unit": "ms",
+          "pairsTested": 10,
+          "qualifiedPairs": 8,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        }
+      },
       "ranges": {
+        "excitationPosition": {
+          "status": "measured",
+          "unit": "fraction-of-string",
+          "centre": 0.06775,
+          "min": 0.0352,
+          "max": 0.1919,
+          "pairSpreadMedian": 0.06075,
+          "pairSpreadP90": 0.144,
+          "drawHalfRange": 0.101823,
+          "takes": 14,
+          "pairs": 10,
+          "qualification": {
+            "parameter": "excitationPosition",
+            "observable": "excitationPosition",
+            "unit": "fraction-of-string",
+            "pairsTested": 10,
+            "qualifiedPairs": 9,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          }
+        },
+        "vibratoRate": {
+          "status": "measured",
+          "unit": "Hz",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 4.731638,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.056666,
+          "drawHalfRange": 0.040069,
+          "takes": 14,
+          "pairs": 10,
+          "qualification": {
+            "parameter": "vibratoRate",
+            "observable": "vibratoRateHz",
+            "unit": "Hz",
+            "pairsTested": 10,
+            "qualifiedPairs": 1,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          }
+        },
+        "bowNoiseLevelDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -27.751744,
+          "min": -34.9149,
+          "max": -22.72882,
+          "pairSpreadMedian": 2.189232,
+          "pairSpreadP90": 5.171217,
+          "drawHalfRange": 3.656602,
+          "takes": 14,
+          "pairs": 10,
+          "qualification": {
+            "parameter": "bowNoiseLevelDb",
+            "observable": "sustainNoiseDb",
+            "unit": "dB",
+            "pairsTested": 10,
+            "qualifiedPairs": 9,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          }
+        },
+        "bowScratchLevelDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -19.412348,
+          "min": -28.515058,
+          "max": -4.044352,
+          "pairSpreadMedian": 5.72184,
+          "pairSpreadP90": 14.619187,
+          "drawHalfRange": 10.337326,
+          "takes": 14,
+          "pairs": 10,
+          "qualification": {
+            "parameter": "bowScratchLevelDb",
+            "observable": "onsetNoiseDb",
+            "unit": "dB",
+            "pairsTested": 10,
+            "qualifiedPairs": 10,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          }
+        },
+        "attackNoiseLevel": {
+          "status": "measured",
+          "unit": "linear-ratio",
+          "centre": 0.02665,
+          "min": 0.002875,
+          "max": 0.185423,
+          "pairSpreadMedian": 0.017487,
+          "pairSpreadP90": 0.133802,
+          "drawHalfRange": 0.094612,
+          "takes": 14,
+          "pairs": 10,
+          "qualification": {
+            "parameter": "attackNoiseLevel",
+            "observable": "attackNoiseLevel",
+            "unit": "linear-ratio",
+            "pairsTested": 10,
+            "qualifiedPairs": 6,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          }
+        },
+        "onsetWanderCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 26.078911,
+          "min": 3.192626,
+          "max": 183.46789,
+          "pairSpreadMedian": 21.664156,
+          "pairSpreadP90": 150.476978,
+          "drawHalfRange": 106.403291,
+          "takes": 14,
+          "pairs": 10,
+          "qualification": {
+            "parameter": "onsetWanderCents",
+            "observable": "onsetWanderCents",
+            "unit": "cents",
+            "pairsTested": 10,
+            "qualifiedPairs": 8,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          }
+        },
+        "onsetWanderSettleMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 70.69161,
+          "min": 0.0,
+          "max": 190.545351,
+          "pairSpreadMedian": 14.965986,
+          "pairSpreadP90": 151.097506,
+          "drawHalfRange": 106.842071,
+          "takes": 14,
+          "pairs": 10,
+          "qualification": {
+            "parameter": "onsetWanderSettleMs",
+            "observable": "onsetSettleMs",
+            "unit": "ms",
+            "pairsTested": 10,
+            "qualifiedPairs": 8,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          }
+        }
+      },
+      "spreadObservables": {
         "excitationPosition": {
           "status": "measured",
           "unit": "fraction-of-string",
@@ -14052,11 +14302,16 @@ export const MEASURED_PROFILES = {
         }
       },
       "decompositionTest": {
+        "verdict": "INCONCLUSIVE-MASKED",
         "passed": false,
         "pairs": 10,
         "failedPairs": 10,
         "rule": "after Human comb/level/tilt removal: partial and body residual <=3 dB; B <=1.5x (near-zero uses 3 cents); T60 <=1.5x",
-        "interpretation": "FAIL: take variation still requires identity movement"
+        "maskingFactors": [
+          "one or more per-take identity fits miss the \u00a73 core bars",
+          "one or more qualified Human consumers are unaudited or non-functional"
+        ],
+        "interpretation": "identity/renderer misfit masks the residual; no missing-Human-DOF claim is permitted"
       }
     }
   },

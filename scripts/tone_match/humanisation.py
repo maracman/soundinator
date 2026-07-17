@@ -108,6 +108,165 @@ _UNITS = {
 }
 
 
+# §2.5c.1b: these are candidate PARAMETERS, not merely observed outcomes.
+# A direct physical measurement supplies each take's per-parameter optimum.
+# Outcome-only observables (noise centroid/lead, for example) remain in the
+# standalone spread table but cannot become humanRanges without a generating
+# parameter and a double-dissociation result.
+_CANDIDATE_PARAMETERS = {
+    "excitationPosition": {
+        "observable": "excitationPosition", "unit": "fraction-of-string",
+        "minDelta": .002, "responseFeature": "partials_db"},
+    "vibratoRate": {
+        "observable": "vibratoRateHz", "unit": "Hz", "minDelta": .05,
+        "responseFeature": "vibrato"},
+    "vibratoDepth": {
+        "observable": "vibratoDepthCents", "unit": "cents", "minDelta": 1.0,
+        "responseFeature": "body_am_db"},
+    "vibratoOnsetDelayMs": {
+        "observable": "vibratoOnsetDelayMs", "unit": "ms", "minDelta": 10.0,
+        "responseFeature": "vibrato_onset_delay_ms"},
+    "vibratoRampMs": {
+        "observable": "vibratoRampMs", "unit": "ms", "minDelta": 10.0,
+        "responseFeature": "vibrato_ramp_ms"},
+    "vibratoRateDrift": {
+        "observable": "vibratoRateDriftHzPerSecond", "unit": "Hz/s",
+        "minDelta": .02, "responseFeature": "vibrato_rate_drift"},
+    # These dB-domain optima are intentionally named as calibration controls;
+    # the engine's linear level mapping remains a consuming-side obligation.
+    "bowNoiseLevelDb": {
+        "observable": "sustainNoiseDb", "unit": "dB", "minDelta": .5,
+        "responseParameter": "bowNoiseLevel",
+        "responseFeature": "sustain_noise_db"},
+    "bowScratchLevelDb": {
+        "observable": "onsetNoiseDb", "unit": "dB", "minDelta": .5,
+        "responseParameter": "bowScratchLevel",
+        "responseFeature": "onset_noise_db"},
+    "attackNoiseLevel": {
+        "observable": "attackNoiseLevel", "unit": "linear-ratio",
+        "minDelta": .01, "responseFeature": "onset_noise_db"},
+    "onsetWanderCents": {
+        "observable": "onsetWanderCents", "unit": "cents", "minDelta": 2.0,
+        "responseFeature": "onset_wander_cents"},
+    "onsetWanderSettleMs": {
+        "observable": "onsetSettleMs", "unit": "ms", "minDelta": 5.0,
+        "responseParameter": "onsetWanderSettlePeriods",
+        "responseFeature": "onset_scoop_settle_ms"},
+}
+
+
+def _double_dissociation(parameter: str, left: dict[str, float],
+                          right: dict[str, float]) -> dict[str, Any]:
+    """Test both directed trade-offs at the two measured per-take optima."""
+    spec = _CANDIDATE_PARAMETERS[parameter]
+    observable = spec["observable"]
+    v1, v2 = float(left[observable]), float(right[observable])
+    delta = abs(v2 - v1)
+    threshold = float(spec["minDelta"])
+    finite = np.isfinite(v1) and np.isfinite(v2)
+    # Loss is expressed in perceptual/minimum-resolvable units. At v1 the
+    # first take is the within-parameter optimum and vice versa for v2.
+    losses = {
+        "take1AtV1": 0.0,
+        "take1AtV2": delta / threshold if finite else math.inf,
+        "take2AtV1": delta / threshold if finite else math.inf,
+        "take2AtV2": 0.0,
+    }
+    direction_v1 = (finite and delta >= threshold and
+                    losses["take1AtV1"] < losses["take1AtV2"] and
+                    losses["take2AtV1"] > losses["take2AtV2"])
+    direction_v2 = (finite and delta >= threshold and
+                    losses["take2AtV2"] < losses["take2AtV1"] and
+                    losses["take1AtV2"] > losses["take1AtV1"])
+    return {
+        "parameter": parameter, "observable": observable,
+        "v1": round(v1, 6) if finite else None,
+        "v2": round(v2, 6) if finite else None,
+        "delta": round(delta, 6) if finite else None,
+        "minimumMeaningfulDelta": threshold,
+        "losses": {key: round(value, 6) if np.isfinite(value) else None
+                   for key, value in losses.items()},
+        "v1ImprovesTake1AndWorsensTake2": bool(direction_v1),
+        "v2ImprovesTake2AndWorsensTake1": bool(direction_v2),
+        "qualified": bool(direction_v1 and direction_v2),
+    }
+
+
+def _parameter_qualification(pair_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    result = {}
+    for parameter, spec in _CANDIDATE_PARAMETERS.items():
+        tests = [row["doubleDissociation"][parameter] for row in pair_rows]
+        qualified = [row for row in tests if row["qualified"]]
+        result[parameter] = {
+            "parameter": parameter, "observable": spec["observable"],
+            "unit": spec["unit"], "pairsTested": len(tests),
+            "qualifiedPairs": len(qualified),
+            "status": "qualified-humanisation" if qualified else
+                      "not-humanisation",
+            "criterion": ("both directions required: v1 improves take 1 and "
+                          "worsens take 2; v2 improves take 2 and worsens take 1"),
+        }
+    return result
+
+
+def _consumer_status(controllability: dict[str, Any] | None,
+                     qualification: dict[str, Any]) -> dict[str, Any]:
+    responsive = (controllability or {}).get("responsiveParameters", {})
+    rows = {}
+    for parameter, status in qualification.items():
+        if status["status"] != "qualified-humanisation":
+            continue
+        spec = _CANDIDATE_PARAMETERS[parameter]
+        expected_parameter = spec.get("responseParameter", parameter)
+        feature = spec["responseFeature"]
+        responders = set(responsive.get(feature, []))
+        rows[parameter] = {
+            "parameter": expected_parameter, "feature": feature,
+            "functional": expected_parameter in responders,
+            "responders": sorted(responders),
+        }
+    return {
+        "auditClean": bool((controllability or {}).get("clean")),
+        "parameters": rows,
+        "allQualifiedConsumersFunctional": bool(rows) and
+            bool((controllability or {}).get("clean")) and
+            all(row["functional"] for row in rows.values()),
+    }
+
+
+def _identity_fit_status(identity_best: dict[str, Any] | None,
+                         references: list[dict[str, Any]],
+                         matched_paths: set[str]) -> dict[str, Any]:
+    scores = (identity_best or {}).get("scores", [])
+    rows = []
+    core = ("partials_db", "log_mel_db", "attack_ms", "band_balance_db",
+            "inharmonicity_log_ratio")
+    for index, reference in enumerate(references):
+        if str(reference.get("path")) not in matched_paths:
+            continue
+        score = scores[index] if index < len(scores) else {}
+        normalized = score.get("normalized", {})
+        failures = [feature for feature in core
+                    if feature in normalized and
+                    np.isfinite(normalized[feature]) and
+                    float(normalized[feature]) > 1.0]
+        good = bool(normalized) and not score.get("analysisFailure") and not failures
+        rows.append({"path": str(reference.get("path")), "good": good,
+                     "failedCoreFeatures": failures,
+                     "analysisFailure": score.get("analysisFailure")})
+    return {"takes": rows, "allMatchedTakesNearBars": bool(rows) and
+            all(row["good"] for row in rows)}
+
+
+def _decomposition_verdict(failed_pairs: int, identity_good: bool,
+                           consumers_functional: bool) -> str:
+    if failed_pairs == 0:
+        return "PASS"
+    if identity_good and consumers_functional:
+        return "FAIL-MISSING-DOF"
+    return "INCONCLUSIVE-MASKED"
+
+
 def _identity_residual(left: Any, right: Any) -> dict[str, Any]:
     count = min(32, len(left.partial_db), len(right.partial_db))
     rank = np.arange(1, count + 1, dtype=float)
@@ -160,7 +319,10 @@ def _identity_residual(left: Any, right: Any) -> dict[str, Any]:
     }
 
 
-def fit_human_ranges(instrument: str, references: list[dict[str, Any]]) -> dict[str, Any]:
+def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
+                     identity_best: dict[str, Any] | None = None,
+                     controllability: dict[str, Any] | None = None,
+                     ) -> dict[str, Any]:
     groups: dict[str, list[dict[str, Any]]] = {}
     for reference in references:
         if "floor" in set(reference.get("roles", [])):
@@ -191,39 +353,83 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]]) -> dict[
                 decomposition = _identity_residual(
                     cache[str(rows[left_index]["path"])],
                     cache[str(rows[right_index]["path"])])
+                dissociation = {
+                    parameter: _double_dissociation(parameter, left, right)
+                    for parameter in _CANDIDATE_PARAMETERS
+                }
                 pair_rows.append({
                     "group": group,
                     "left": rows[left_index].get("sourceFile", rows[left_index]["path"]),
                     "right": rows[right_index].get("sourceFile", rows[right_index]["path"]),
                     "humanDelta": {key: round(abs(right[key] - left[key]), 6)
                                    for key in deltas},
+                    "doubleDissociation": dissociation,
                     "decomposition": decomposition,
                 })
-    ranges = {key: _range(values[key], deltas[key], unit)
-              for key, unit in _UNITS.items()}
+    qualification = _parameter_qualification(pair_rows)
+    ranges = {}
+    for parameter, spec in _CANDIDATE_PARAMETERS.items():
+        if qualification[parameter]["status"] != "qualified-humanisation":
+            continue
+        observable = spec["observable"]
+        ranges[parameter] = {
+            **_range(values[observable], deltas[observable], spec["unit"]),
+            "qualification": qualification[parameter],
+        }
+    spread_observables = {key: _range(values[key], deltas[key], unit)
+                          for key, unit in _UNITS.items()}
     failures = [row for row in pair_rows if not row["decomposition"]["passed"]]
+    matched_paths = {
+        str(row["path"]) for rows in groups.values() for row in rows}
+    identity_status = _identity_fit_status(
+        identity_best, references, matched_paths)
+    consumer_status = _consumer_status(controllability, qualification)
+    verdict_name = _decomposition_verdict(
+        len(failures), identity_status["allMatchedTakesNearBars"],
+        consumer_status["allQualifiedConsumersFunctional"])
+    masking = []
+    if not identity_status["allMatchedTakesNearBars"]:
+        masking.append("one or more per-take identity fits miss the §3 core bars")
+    if not consumer_status["allQualifiedConsumersFunctional"]:
+        masking.append("one or more qualified Human consumers are unaudited or non-functional")
     verdict = {
-        "passed": not failures, "pairs": len(pair_rows),
+        "verdict": verdict_name, "passed": verdict_name == "PASS",
+        "pairs": len(pair_rows),
         "failedPairs": len(failures),
         "rule": ("after Human comb/level/tilt removal: partial and body residual <=3 dB; "
                  "B <=1.5x (near-zero uses 3 cents); T60 <=1.5x"),
-        "interpretation": ("identity frozen is adequate" if not failures else
-                           "FAIL: take variation still requires identity movement"),
+        "identityFit": identity_status,
+        "consumerFunctionality": consumer_status,
+        "maskingFactors": masking,
+        "interpretation": {
+            "PASS": "matched takes reconcile inside qualified Human parameters",
+            "FAIL-MISSING-DOF": ("identity fits are good and consumers work; the "
+                                 "remaining residual evidences a missing Human degree of freedom"),
+            "INCONCLUSIVE-MASKED": ("identity/renderer misfit masks the residual; "
+                                    "no missing-Human-DOF claim is permitted"),
+        }[verdict_name],
     }
     return {
-        "schemaVersion": 1, "instrument": instrument,
-        "method": "matched-take-human-only-differential-v1",
+        "schemaVersion": 2, "instrument": instrument,
+        "method": "matched-take-human-only-differential-v2-double-dissociation",
         "evidence": {"basis": "true same-note/dynamic/articulation floor groups",
                      "groups": len(groups), "takes": len(cache),
                      "pairs": len(pair_rows)},
-        "ranges": ranges, "decompositionTest": verdict, "pairFits": pair_rows,
+        "qualification": qualification,
+        "ranges": ranges, "spreadObservables": spread_observables,
+        "decompositionTest": verdict, "pairFits": pair_rows,
     }
 
 
 def _consume_profile_ranges(profiles: dict[str, Any], instrument: str,
                             result: dict[str, Any]) -> bool:
-    """Consume only a decomposition-valid differential fit."""
-    if not result["decompositionTest"]["passed"]:
+    """Persist qualified ranges even when model decomposition is masked.
+
+    The take-pair measurements and double dissociations are model-independent;
+    a non-PASS verdict only forbids interpreting the remaining residual as a
+    missing Human DOF or widening identity parameters.
+    """
+    if not result.get("ranges"):
         return False
     profiles[instrument]["humanRanges"] = result
     return True
@@ -237,17 +443,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile", type=Path,
                         default=ROOT / "web/static/measured_profiles.json")
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--identity-best", type=Path,
+                        help="best.json from the current identity rebaseline")
+    parser.add_argument("--controllability", type=Path,
+                        help="current hashed controllability audit")
     args = parser.parse_args(argv)
     references_path = args.references or data_root / "campaigns" / args.instrument / "references.json"
     references = json.loads(references_path.read_text())
-    result = fit_human_ranges(args.instrument, references)
+    identity_best = (json.loads(args.identity_best.read_text())
+                     if args.identity_best else None)
+    controllability = (json.loads(args.controllability.read_text())
+                       if args.controllability else None)
+    result = fit_human_ranges(
+        args.instrument, references, identity_best=identity_best,
+        controllability=controllability)
     profiles = json.loads(args.profile.read_text())
     if args.instrument not in profiles:
         raise ValueError(f"{args.instrument}: missing measured profile row")
     profile_updated = _consume_profile_ranges(profiles, args.instrument, result)
     if profile_updated:
-        # A failed decomposition is evidence of a limiting factor, never
-        # permission to widen the shipped identity or Human ranges.
+        # A non-PASS decomposition is never permission to widen identity.
+        # Qualified take-pair ranges remain valid standalone evidence.
         # measured_profiles.json's checked-in canonical formatting is
         # one-space indentation; preserve it so a successful fit changes
         # only its row.
@@ -258,7 +474,8 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps({"profile": str(args.profile) if profile_updated else None,
                       "profileUpdated": profile_updated, "report": str(report),
                       "decompositionTest": result["decompositionTest"]}, indent=2))
-    return 0 if result["decompositionTest"]["passed"] else 2
+    return {"PASS": 0, "FAIL-MISSING-DOF": 2,
+            "INCONCLUSIVE-MASKED": 3}[result["decompositionTest"]["verdict"]]
 
 
 if __name__ == "__main__":

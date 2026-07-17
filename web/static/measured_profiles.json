@@ -32935,16 +32935,266 @@
    }
   },
   "humanRanges": {
-   "schemaVersion": 1,
+   "schemaVersion": 2,
    "instrument": "violin",
-   "method": "matched-take-human-only-differential-v1",
+   "method": "matched-take-human-only-differential-v2-double-dissociation",
    "evidence": {
     "basis": "true same-note/dynamic/articulation floor groups",
     "groups": 6,
     "takes": 14,
     "pairs": 10
    },
+   "qualification": {
+    "excitationPosition": {
+     "parameter": "excitationPosition",
+     "observable": "excitationPosition",
+     "unit": "fraction-of-string",
+     "pairsTested": 10,
+     "qualifiedPairs": 9,
+     "status": "qualified-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "vibratoRate": {
+     "parameter": "vibratoRate",
+     "observable": "vibratoRateHz",
+     "unit": "Hz",
+     "pairsTested": 10,
+     "qualifiedPairs": 1,
+     "status": "qualified-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "vibratoDepth": {
+     "parameter": "vibratoDepth",
+     "observable": "vibratoDepthCents",
+     "unit": "cents",
+     "pairsTested": 10,
+     "qualifiedPairs": 0,
+     "status": "not-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "vibratoOnsetDelayMs": {
+     "parameter": "vibratoOnsetDelayMs",
+     "observable": "vibratoOnsetDelayMs",
+     "unit": "ms",
+     "pairsTested": 10,
+     "qualifiedPairs": 0,
+     "status": "not-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "vibratoRampMs": {
+     "parameter": "vibratoRampMs",
+     "observable": "vibratoRampMs",
+     "unit": "ms",
+     "pairsTested": 10,
+     "qualifiedPairs": 0,
+     "status": "not-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "vibratoRateDrift": {
+     "parameter": "vibratoRateDrift",
+     "observable": "vibratoRateDriftHzPerSecond",
+     "unit": "Hz/s",
+     "pairsTested": 10,
+     "qualifiedPairs": 0,
+     "status": "not-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "bowNoiseLevelDb": {
+     "parameter": "bowNoiseLevelDb",
+     "observable": "sustainNoiseDb",
+     "unit": "dB",
+     "pairsTested": 10,
+     "qualifiedPairs": 9,
+     "status": "qualified-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "bowScratchLevelDb": {
+     "parameter": "bowScratchLevelDb",
+     "observable": "onsetNoiseDb",
+     "unit": "dB",
+     "pairsTested": 10,
+     "qualifiedPairs": 10,
+     "status": "qualified-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "attackNoiseLevel": {
+     "parameter": "attackNoiseLevel",
+     "observable": "attackNoiseLevel",
+     "unit": "linear-ratio",
+     "pairsTested": 10,
+     "qualifiedPairs": 6,
+     "status": "qualified-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "onsetWanderCents": {
+     "parameter": "onsetWanderCents",
+     "observable": "onsetWanderCents",
+     "unit": "cents",
+     "pairsTested": 10,
+     "qualifiedPairs": 8,
+     "status": "qualified-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    },
+    "onsetWanderSettleMs": {
+     "parameter": "onsetWanderSettleMs",
+     "observable": "onsetSettleMs",
+     "unit": "ms",
+     "pairsTested": 10,
+     "qualifiedPairs": 8,
+     "status": "qualified-humanisation",
+     "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+    }
+   },
    "ranges": {
+    "excitationPosition": {
+     "status": "measured",
+     "unit": "fraction-of-string",
+     "centre": 0.06775,
+     "min": 0.0352,
+     "max": 0.1919,
+     "pairSpreadMedian": 0.06075,
+     "pairSpreadP90": 0.144,
+     "drawHalfRange": 0.101823,
+     "takes": 14,
+     "pairs": 10,
+     "qualification": {
+      "parameter": "excitationPosition",
+      "observable": "excitationPosition",
+      "unit": "fraction-of-string",
+      "pairsTested": 10,
+      "qualifiedPairs": 9,
+      "status": "qualified-humanisation",
+      "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+     }
+    },
+    "vibratoRate": {
+     "status": "measured",
+     "unit": "Hz",
+     "centre": 0.0,
+     "min": 0.0,
+     "max": 4.731638,
+     "pairSpreadMedian": 0.0,
+     "pairSpreadP90": 0.056666,
+     "drawHalfRange": 0.040069,
+     "takes": 14,
+     "pairs": 10,
+     "qualification": {
+      "parameter": "vibratoRate",
+      "observable": "vibratoRateHz",
+      "unit": "Hz",
+      "pairsTested": 10,
+      "qualifiedPairs": 1,
+      "status": "qualified-humanisation",
+      "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+     }
+    },
+    "bowNoiseLevelDb": {
+     "status": "measured",
+     "unit": "dB",
+     "centre": -27.751744,
+     "min": -34.9149,
+     "max": -22.72882,
+     "pairSpreadMedian": 2.189232,
+     "pairSpreadP90": 5.171217,
+     "drawHalfRange": 3.656602,
+     "takes": 14,
+     "pairs": 10,
+     "qualification": {
+      "parameter": "bowNoiseLevelDb",
+      "observable": "sustainNoiseDb",
+      "unit": "dB",
+      "pairsTested": 10,
+      "qualifiedPairs": 9,
+      "status": "qualified-humanisation",
+      "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+     }
+    },
+    "bowScratchLevelDb": {
+     "status": "measured",
+     "unit": "dB",
+     "centre": -19.412348,
+     "min": -28.515058,
+     "max": -4.044352,
+     "pairSpreadMedian": 5.72184,
+     "pairSpreadP90": 14.619187,
+     "drawHalfRange": 10.337326,
+     "takes": 14,
+     "pairs": 10,
+     "qualification": {
+      "parameter": "bowScratchLevelDb",
+      "observable": "onsetNoiseDb",
+      "unit": "dB",
+      "pairsTested": 10,
+      "qualifiedPairs": 10,
+      "status": "qualified-humanisation",
+      "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+     }
+    },
+    "attackNoiseLevel": {
+     "status": "measured",
+     "unit": "linear-ratio",
+     "centre": 0.02665,
+     "min": 0.002875,
+     "max": 0.185423,
+     "pairSpreadMedian": 0.017487,
+     "pairSpreadP90": 0.133802,
+     "drawHalfRange": 0.094612,
+     "takes": 14,
+     "pairs": 10,
+     "qualification": {
+      "parameter": "attackNoiseLevel",
+      "observable": "attackNoiseLevel",
+      "unit": "linear-ratio",
+      "pairsTested": 10,
+      "qualifiedPairs": 6,
+      "status": "qualified-humanisation",
+      "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+     }
+    },
+    "onsetWanderCents": {
+     "status": "measured",
+     "unit": "cents",
+     "centre": 26.078911,
+     "min": 3.192626,
+     "max": 183.46789,
+     "pairSpreadMedian": 21.664156,
+     "pairSpreadP90": 150.476978,
+     "drawHalfRange": 106.403291,
+     "takes": 14,
+     "pairs": 10,
+     "qualification": {
+      "parameter": "onsetWanderCents",
+      "observable": "onsetWanderCents",
+      "unit": "cents",
+      "pairsTested": 10,
+      "qualifiedPairs": 8,
+      "status": "qualified-humanisation",
+      "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+     }
+    },
+    "onsetWanderSettleMs": {
+     "status": "measured",
+     "unit": "ms",
+     "centre": 70.69161,
+     "min": 0.0,
+     "max": 190.545351,
+     "pairSpreadMedian": 14.965986,
+     "pairSpreadP90": 151.097506,
+     "drawHalfRange": 106.842071,
+     "takes": 14,
+     "pairs": 10,
+     "qualification": {
+      "parameter": "onsetWanderSettleMs",
+      "observable": "onsetSettleMs",
+      "unit": "ms",
+      "pairsTested": 10,
+      "qualifiedPairs": 8,
+      "status": "qualified-humanisation",
+      "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+     }
+    }
+   },
+   "spreadObservables": {
     "excitationPosition": {
      "status": "measured",
      "unit": "fraction-of-string",
@@ -33103,11 +33353,243 @@
     }
    },
    "decompositionTest": {
+    "verdict": "INCONCLUSIVE-MASKED",
     "passed": false,
     "pairs": 10,
     "failedPairs": 10,
     "rule": "after Human comb/level/tilt removal: partial and body residual <=3 dB; B <=1.5x (near-zero uses 3 cents); T60 <=1.5x",
-    "interpretation": "FAIL: take variation still requires identity movement"
+    "identityFit": {
+     "takes": [
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/phil-floor-violin_Cs4_1_mezzo-piano_non-vibrato.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/phil-floor-violin_Cs4_long_mezzo-piano_non-vibrato.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_05_pianissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_1_pianissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_05_fortissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms",
+        "inharmonicity_log_ratio"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_1_fortissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_15_fortissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_05_pianissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_1_pianissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_05_fortissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "inharmonicity_log_ratio"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_1_fortissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "inharmonicity_log_ratio"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_15_fortissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [
+        "partials_db",
+        "log_mel_db",
+        "attack_ms"
+       ],
+       "analysisFailure": null
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_E6_05_pianissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [],
+       "analysisFailure": {
+        "referenceIndex": 24,
+        "reference": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_E6_05_pianissimo_arco-normal.wav",
+        "render": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/runs/violin/agentd-pass02-legacy-ship-r1/renders/eval-0000/note-24.wav",
+        "error": "no stable pitched note detected in /Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/runs/violin/agentd-pass02-legacy-ship-r1/renders/eval-0000/note-24.wav"
+       }
+      },
+      {
+       "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_E6_1_pianissimo_arco-normal.wav",
+       "good": false,
+       "failedCoreFeatures": [],
+       "analysisFailure": {
+        "referenceIndex": 25,
+        "reference": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_E6_1_pianissimo_arco-normal.wav",
+        "render": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/runs/violin/agentd-pass02-legacy-ship-r1/renders/eval-0000/note-25.wav",
+        "error": "no stable pitched note detected in /Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/runs/violin/agentd-pass02-legacy-ship-r1/renders/eval-0000/note-25.wav"
+       }
+      }
+     ],
+     "allMatchedTakesNearBars": false
+    },
+    "consumerFunctionality": {
+     "auditClean": true,
+     "parameters": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "feature": "partials_db",
+       "functional": false,
+       "responders": [
+        "bowNoiseLevel",
+        "bowScratchLevel",
+        "onsetWanderCents",
+        "vibratoDepth"
+       ]
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "feature": "vibrato",
+       "functional": false,
+       "responders": [
+        "vibratoDepth"
+       ]
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevel",
+       "feature": "sustain_noise_db",
+       "functional": true,
+       "responders": [
+        "bowNoiseLevel",
+        "vibratoDepth"
+       ]
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevel",
+       "feature": "onset_noise_db",
+       "functional": true,
+       "responders": [
+        "bowNoiseLevel",
+        "bowScratchLevel",
+        "onsetWanderCents",
+        "onsetWanderSettlePeriods",
+        "vibratoDepth"
+       ]
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "feature": "onset_noise_db",
+       "functional": false,
+       "responders": [
+        "bowNoiseLevel",
+        "bowScratchLevel",
+        "onsetWanderCents",
+        "onsetWanderSettlePeriods",
+        "vibratoDepth"
+       ]
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "feature": "onset_wander_cents",
+       "functional": true,
+       "responders": [
+        "bowNoiseLevel",
+        "bowScratchLevel",
+        "onsetWanderCents",
+        "onsetWanderSettlePeriods",
+        "vibratoDepth"
+       ]
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettlePeriods",
+       "feature": "onset_scoop_settle_ms",
+       "functional": true,
+       "responders": [
+        "onsetWanderSettlePeriods",
+        "vibratoDepth"
+       ]
+      }
+     },
+     "allQualifiedConsumersFunctional": false
+    },
+    "maskingFactors": [
+     "one or more per-take identity fits miss the \u00a73 core bars",
+     "one or more qualified Human consumers are unaudited or non-functional"
+    ],
+    "interpretation": "identity/renderer misfit masks the residual; no missing-Human-DOF claim is permitted"
    },
    "pairFits": [
     {
@@ -33128,6 +33610,195 @@
       "onsetWanderCents": 147.687644,
       "onsetSettleMs": 14.603175,
       "attackNoiseLevel": 0.147819
+     },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.1515,
+       "v2": 0.076,
+       "delta": 0.0755,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 37.75,
+        "take2AtV1": 37.75,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -27.196245,
+       "v2": -22.079938,
+       "delta": 5.116307,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 10.232614,
+        "take2AtV1": 10.232614,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -6.330485,
+       "v2": -14.802237,
+       "delta": 8.471752,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 16.943504,
+        "take2AtV1": 16.943504,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.195546,
+       "v2": 0.047728,
+       "delta": 0.147819,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 14.781851,
+        "take2AtV1": 14.781851,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 213.826993,
+       "v2": 66.139349,
+       "delta": 147.687644,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 73.843822,
+        "take2AtV1": 73.843822,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 76.9161,
+       "v2": 62.312925,
+       "delta": 14.603175,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 2.920635,
+        "take2AtV1": 2.920635,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
      },
      "decomposition": {
       "passed": false,
@@ -33169,6 +33840,195 @@
       "onsetSettleMs": 149.637188,
       "attackNoiseLevel": 0.015574
      },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.1515,
+       "v2": 0.03,
+       "delta": 0.1215,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 60.75,
+        "take2AtV1": 60.75,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -27.196245,
+       "v2": -23.078218,
+       "delta": 4.118027,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 8.236053,
+        "take2AtV1": 8.236053,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -6.330485,
+       "v2": 0.201325,
+       "delta": 6.53181,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 13.06362,
+        "take2AtV1": 13.06362,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.195546,
+       "v2": 0.179973,
+       "delta": 0.015574,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 1.55739,
+        "take2AtV1": 1.55739,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 213.826993,
+       "v2": 38.246009,
+       "delta": 175.580983,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 87.790492,
+        "take2AtV1": 87.790492,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 76.9161,
+       "v2": 226.553288,
+       "delta": 149.637188,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 29.927438,
+        "take2AtV1": 29.927438,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
+     },
      "decomposition": {
       "passed": false,
       "partialResidualDb": 8.0109,
@@ -33208,6 +34068,195 @@
       "onsetWanderCents": 27.89334,
       "onsetSettleMs": 164.240363,
       "attackNoiseLevel": 0.132245
+     },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.076,
+       "v2": 0.03,
+       "delta": 0.046,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 23.0,
+        "take2AtV1": 23.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -22.079938,
+       "v2": -23.078218,
+       "delta": 0.998281,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 1.996561,
+        "take2AtV1": 1.996561,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -14.802237,
+       "v2": 0.201325,
+       "delta": 15.003562,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 30.007124,
+        "take2AtV1": 30.007124,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.047728,
+       "v2": 0.179973,
+       "delta": 0.132245,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 13.224461,
+        "take2AtV1": 13.224461,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 66.139349,
+       "v2": 38.246009,
+       "delta": 27.89334,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 13.94667,
+        "take2AtV1": 13.94667,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 62.312925,
+       "v2": 226.553288,
+       "delta": 164.240363,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 32.848073,
+        "take2AtV1": 32.848073,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
      },
      "decomposition": {
       "passed": false,
@@ -33251,6 +34300,195 @@
       "onsetSettleMs": 62.063492,
       "attackNoiseLevel": 0.007711
      },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.176,
+       "v2": 0.163,
+       "delta": 0.013,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 6.5,
+        "take2AtV1": 6.5,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -26.121089,
+       "v2": -28.367062,
+       "delta": 2.245973,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 4.491947,
+        "take2AtV1": 4.491947,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -7.913436,
+       "v2": -16.057824,
+       "delta": 8.144388,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 16.288776,
+        "take2AtV1": 16.288776,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.029115,
+       "v2": 0.021404,
+       "delta": 0.007711,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.771064,
+        "take2AtV1": 0.771064,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 33.796397,
+       "v2": 18.361425,
+       "delta": 15.434972,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 7.717486,
+        "take2AtV1": 7.717486,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 171.156463,
+       "v2": 109.092971,
+       "delta": 62.063492,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 12.412698,
+        "take2AtV1": 12.412698,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
+     },
      "decomposition": {
       "passed": false,
       "partialResidualDb": 10.7491,
@@ -33292,6 +34530,195 @@
       "onsetWanderCents": 2.13674,
       "onsetSettleMs": 0.0,
       "attackNoiseLevel": 0.006258
+     },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.18,
+       "v2": 0.038,
+       "delta": 0.142,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 71.0,
+        "take2AtV1": 71.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -35.124661,
+       "v2": -34.801952,
+       "delta": 0.322709,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.645419,
+        "take2AtV1": 0.645419,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -31.258246,
+       "v2": -16.681768,
+       "delta": 14.576478,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 29.152956,
+        "take2AtV1": 29.152956,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.007155,
+       "v2": 0.013413,
+       "delta": 0.006258,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.625767,
+        "take2AtV1": 0.625767,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 1.803745,
+       "v2": 3.940485,
+       "delta": 2.13674,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 1.06837,
+        "take2AtV1": 1.06837,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      }
      },
      "decomposition": {
       "passed": false,
@@ -33335,6 +34762,195 @@
       "onsetSettleMs": 1.360544,
       "attackNoiseLevel": 0.019399
      },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.038,
+       "v2": 0.0385,
+       "delta": 0.0005,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.25,
+        "take2AtV1": 0.25,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -24.392741,
+       "v2": -26.50639,
+       "delta": 2.113649,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 4.227299,
+        "take2AtV1": 4.227299,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -18.898033,
+       "v2": -19.926663,
+       "delta": 1.02863,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 2.05726,
+        "take2AtV1": 2.05726,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.142795,
+       "v2": 0.123396,
+       "delta": 0.019399,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 1.939934,
+        "take2AtV1": 1.939934,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 159.232097,
+       "v2": 101.983329,
+       "delta": 57.248768,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 28.624384,
+        "take2AtV1": 28.624384,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 59.569161,
+       "v2": 60.929705,
+       "delta": 1.360544,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.272109,
+        "take2AtV1": 0.272109,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      }
+     },
      "decomposition": {
       "passed": false,
       "partialResidualDb": 4.411,
@@ -33376,6 +34992,195 @@
       "onsetWanderCents": 7.888584,
       "onsetSettleMs": 13.968254,
       "attackNoiseLevel": 0.040764
+     },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.038,
+       "v2": 0.0595,
+       "delta": 0.0215,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 10.75,
+        "take2AtV1": 10.75,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -24.392741,
+       "v2": -28.307243,
+       "delta": 3.914503,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 7.829005,
+        "take2AtV1": 7.829005,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -18.898033,
+       "v2": -23.809902,
+       "delta": 4.911869,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 9.823738,
+        "take2AtV1": 9.823738,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.142795,
+       "v2": 0.102032,
+       "delta": 0.040764,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 4.076387,
+        "take2AtV1": 4.076387,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 159.232097,
+       "v2": 167.120681,
+       "delta": 7.888584,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 3.944292,
+        "take2AtV1": 3.944292,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 59.569161,
+       "v2": 45.600907,
+       "delta": 13.968254,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 2.793651,
+        "take2AtV1": 2.793651,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
      },
      "decomposition": {
       "passed": false,
@@ -33419,6 +35224,195 @@
       "onsetSettleMs": 15.328798,
       "attackNoiseLevel": 0.021365
      },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.0385,
+       "v2": 0.0595,
+       "delta": 0.021,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 10.5,
+        "take2AtV1": 10.5,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -26.50639,
+       "v2": -28.307243,
+       "delta": 1.800853,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 3.601706,
+        "take2AtV1": 3.601706,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -19.926663,
+       "v2": -23.809902,
+       "delta": 3.883239,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 7.766478,
+        "take2AtV1": 7.766478,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.123396,
+       "v2": 0.102032,
+       "delta": 0.021365,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 2.136453,
+        "take2AtV1": 2.136453,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 101.983329,
+       "v2": 167.120681,
+       "delta": 65.137352,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 32.568676,
+        "take2AtV1": 32.568676,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 60.929705,
+       "v2": 45.600907,
+       "delta": 15.328798,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 3.06576,
+        "take2AtV1": 3.06576,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
+     },
      "decomposition": {
       "passed": false,
       "partialResidualDb": 3.7275,
@@ -33458,6 +35452,195 @@
       "onsetWanderCents": 1.709436,
       "onsetSettleMs": 13.333333,
       "attackNoiseLevel": 0.000547
+     },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.052,
+       "v2": 0.214,
+       "delta": 0.162,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 81.0,
+        "take2AtV1": 81.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 4.533306,
+       "v2": 5.099969,
+       "delta": 0.566663,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 11.333265,
+        "take2AtV1": 11.333265,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 5.726205,
+       "v2": 5.71845,
+       "delta": 0.007755,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.007755,
+        "take2AtV1": 0.007755,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 46.439909,
+       "v2": 46.439909,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -30.921697,
+       "v2": -33.054188,
+       "delta": 2.132491,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 4.264983,
+        "take2AtV1": 4.264983,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -27.037956,
+       "v2": -26.305472,
+       "delta": 0.732484,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 1.464968,
+        "take2AtV1": 1.464968,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.00252,
+       "v2": 0.003067,
+       "delta": 0.000547,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.054667,
+        "take2AtV1": 0.054667,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 8.623256,
+       "v2": 6.91382,
+       "delta": 1.709436,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.854718,
+        "take2AtV1": 0.854718,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 103.401361,
+       "v2": 116.734694,
+       "delta": 13.333333,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 2.666667,
+        "take2AtV1": 2.666667,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
      },
      "decomposition": {
       "passed": false,
@@ -33500,6 +35683,195 @@
       "onsetWanderCents": 1.89911,
       "onsetSettleMs": 23.922902,
       "attackNoiseLevel": 0.003032
+     },
+     "doubleDissociation": {
+      "excitationPosition": {
+       "parameter": "excitationPosition",
+       "observable": "excitationPosition",
+       "v1": 0.1695,
+       "v2": 0.0465,
+       "delta": 0.123,
+       "minimumMeaningfulDelta": 0.002,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 61.5,
+        "take2AtV1": 61.5,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "vibratoRate": {
+       "parameter": "vibratoRate",
+       "observable": "vibratoRateHz",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.05,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoDepth": {
+       "parameter": "vibratoDepth",
+       "observable": "vibratoDepthCents",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 1.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoOnsetDelayMs": {
+       "parameter": "vibratoOnsetDelayMs",
+       "observable": "vibratoOnsetDelayMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRampMs": {
+       "parameter": "vibratoRampMs",
+       "observable": "vibratoRampMs",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 10.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "vibratoRateDrift": {
+       "parameter": "vibratoRateDrift",
+       "observable": "vibratoRateDriftHzPerSecond",
+       "v1": 0.0,
+       "v2": 0.0,
+       "delta": 0.0,
+       "minimumMeaningfulDelta": 0.02,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.0,
+        "take2AtV1": 0.0,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "bowNoiseLevelDb": {
+       "parameter": "bowNoiseLevelDb",
+       "observable": "sustainNoiseDb",
+       "v1": -25.466724,
+       "v2": -31.132127,
+       "delta": 5.665403,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 11.330805,
+        "take2AtV1": 11.330805,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "bowScratchLevelDb": {
+       "parameter": "bowScratchLevelDb",
+       "observable": "onsetNoiseDb",
+       "v1": -22.855932,
+       "v2": -25.864475,
+       "delta": 3.008543,
+       "minimumMeaningfulDelta": 0.5,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 6.017086,
+        "take2AtV1": 6.017086,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      },
+      "attackNoiseLevel": {
+       "parameter": "attackNoiseLevel",
+       "observable": "attackNoiseLevel",
+       "v1": 0.021153,
+       "v2": 0.024184,
+       "delta": 0.003032,
+       "minimumMeaningfulDelta": 0.01,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.303172,
+        "take2AtV1": 0.303172,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "onsetWanderCents": {
+       "parameter": "onsetWanderCents",
+       "observable": "onsetWanderCents",
+       "v1": 7.004633,
+       "v2": 5.105523,
+       "delta": 1.89911,
+       "minimumMeaningfulDelta": 2.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 0.949555,
+        "take2AtV1": 0.949555,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": false,
+       "v2ImprovesTake2AndWorsensTake1": false,
+       "qualified": false
+      },
+      "onsetWanderSettleMs": {
+       "parameter": "onsetWanderSettleMs",
+       "observable": "onsetSettleMs",
+       "v1": 88.390023,
+       "v2": 64.46712,
+       "delta": 23.922902,
+       "minimumMeaningfulDelta": 5.0,
+       "losses": {
+        "take1AtV1": 0.0,
+        "take1AtV2": 4.78458,
+        "take2AtV1": 4.78458,
+        "take2AtV2": 0.0
+       },
+       "v1ImprovesTake1AndWorsensTake2": true,
+       "v2ImprovesTake2AndWorsensTake1": true,
+       "qualified": true
+      }
      },
      "decomposition": {
       "passed": false,

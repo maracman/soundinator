@@ -184,3 +184,12 @@ Required proof cases:
    adult SUNG source and transform.
 5. The assertion is exercised through the canonical runner used by
    `evaluate_construction`/`evaluate_tripwires`.
+
+Status update — Agent D pass 02, 2026-07-17: incorporated. The shared
+`assert_sung_family_firewall` runs in `iterate.py` before controllability or
+evaluation and the same check is exposed as the `*.family-firewall`
+construction assertion. It rejects non-sung fitted profiles, declared
+families, candidate/objective/leaderboard provenance and non-vocal priors;
+the pinned vocal legacy prior, same-singer sung rows, and explicitly
+transformed frozen adult sung parents pass. The proof cases are executable in
+`tests/test_tone_match.py`.

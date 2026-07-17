@@ -44,9 +44,14 @@ DEFAULT_WEIGHTS = {
     "band_balance_db": 1.0,
     "ltas_rolloff_db_oct": 1.0,
     "onset_lockin_periods": 1.0,
+    # Decision 13: corpus-gated sensors commissioned, but zero-weight until a
+    # responsible note-off control passes a fresh controllability audit.
+    "release_ring_ms": 0.0,
+    "release_damp_db_per_s": 0.0,
+    "release_noise_db": 0.0,
 }
 
-SCORER_CONTRACT_VERSION = "sg2-score-active-trajectories-v2"
+SCORER_CONTRACT_VERSION = "sg2-score-release-tail-v4"
 
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
@@ -69,18 +74,18 @@ _BOWED_P1_FEATURES = (
     "ltas_rolloff_db_oct", "onset_lockin_periods",
 )
 
-# §2.3 controllability audit verdicts (violin, 2026-07-16): these features
-# have NO generating engine parameter yet — body_am_db because the body EQ
-# does not track instantaneous frequency under vibrato (annex N1: the
-# FM->AM path is static per note), the vibrato-trajectory trio because the
-# renderer has no onset-delay/ramp/rate-drift controls (annex N4).  They
-# are WATCH METRICS (zero weight, still measured and reported) until the
-# filed engine specs land; re-run the audit to flip them back on.
+# §2.3 controllability audit verdicts. T-029 landed and the pass-02 direct
+# audit proves vibratoDepth moves body_am_db above the 0.05 threshold, so
+# body AM is active for bowed identity fitting. The trajectory trio still
+# has no generator. T-031 onset variation remains distributional-only: its
+# Human-designated controls are deliberately excluded from deterministic
+# single-take FIT-MODE even though the SHIP-MODE audit proves they respond.
 _BOWED_WATCH_METRICS = (
-    "body_am_db", "vibrato_onset_delay_ms", "vibrato_ramp_ms",
+    "vibrato_onset_delay_ms", "vibrato_ramp_ms",
     "vibrato_rate_drift",
-    # T-031 has measuring-side senses but no bowed wander/period-settle
-    # generator yet. The blown scoop shape is family-inapplicable to bow.
+    # T-031's generator now passes SHIP response audit. Its stochastic player
+    # dimensions remain zero-weight in deterministic identity FIT-MODE; the
+    # blown scoop shape is family-inapplicable to bow.
     "onset_wander_cents", "onset_lockin_periods",
     "onset_scoop_cents", "onset_scoop_settle_ms",
     # A held bowed note is continuously driven; the engine correctly
@@ -185,6 +190,9 @@ PERCEPTUAL_UNITS = {
     "band_balance_db": 3.0,       # L10/§3: 3 dB mean deviation = one unit
     "ltas_rolloff_db_oct": 4.0,   # C7: ±4 dB/oct tolerance = one unit
     "onset_lockin_periods": 9.0,  # C18: half the 18-period acceptance bound
+    "release_ring_ms": 100.0,
+    "release_damp_db_per_s": 6.0,
+    "release_noise_db": 3.0,
 }
 
 
@@ -204,6 +212,9 @@ class FeatureBundle:
     onset_lockin_periods: float | None = None   # aperiodic window / period
     band_balance_db: np.ndarray | None = None
     octave_balance_db: np.ndarray | None = None
+    release_ring_ms: float | None = None
+    release_damp_db_per_s: float | None = None
+    release_noise_db: float | None = None
 
 
 def band_profile(samples: np.ndarray, sample_rate: int) -> np.ndarray | None:
@@ -513,8 +524,10 @@ def extract_features(
     expected_f0_hz: float | None = None,
     trust_expected_f0: bool = False,
     force_percussive: bool | None = None,
+    release_expected: bool = False,
 ) -> FeatureBundle:
     samples, sample_rate = load_mono(str(path))
+    full_samples = samples
     if active_duration_s is None:
         note = analyse_audio_file(path, n_partials=max(64, n_partials),
                                   expected_f0_hz=expected_f0_hz,
@@ -554,6 +567,11 @@ def extract_features(
     third_octave = _fractional_octave_profile(samples, sample_rate,
                                               THIRD_OCTAVE_CENTRES, 3)
     octave = _fractional_octave_profile(samples, sample_rate, OCTAVE_CENTRES, 1)
+    release_features = None
+    if release_expected:
+        from .tail_audit import analyse_tail_samples
+        release_features = analyse_tail_samples(
+            full_samples, sample_rate).get("releaseFeatures")
     return FeatureBundle(note, partial_db, _resample_time(mel_db),
                          _resample_time(centroid)[0], sustain_noise_db, onset_tilt,
                          onset_noise_db, onset_noise_centroid_oct, noise_lead_ms,
@@ -561,7 +579,13 @@ def extract_features(
                          ltas_rolloff_db_oct=ltas_rolloff(profile),
                          onset_lockin_periods=lockin_periods,
                          band_balance_db=third_octave,
-                         octave_balance_db=octave)
+                         octave_balance_db=octave,
+                         release_ring_ms=(release_features or {}).get(
+                             "releaseRingMs"),
+                         release_damp_db_per_s=(release_features or {}).get(
+                             "releaseDampDbPerSecond"),
+                         release_noise_db=(release_features or {}).get(
+                             "releaseNoiseDb"))
 
 
 def _paired(values_a: dict, values_b: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -747,6 +771,18 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
             abs(render.onset_lockin_periods - ref.onset_lockin_periods)
             if ref.onset_lockin_periods is not None and
             render.onset_lockin_periods is not None else 0.0),
+        "release_ring_ms": (
+            abs(render.release_ring_ms - ref.release_ring_ms)
+            if ref.release_ring_ms is not None and
+            render.release_ring_ms is not None else 0.0),
+        "release_damp_db_per_s": (
+            abs(render.release_damp_db_per_s - ref.release_damp_db_per_s)
+            if ref.release_damp_db_per_s is not None and
+            render.release_damp_db_per_s is not None else 0.0),
+        "release_noise_db": (
+            abs(render.release_noise_db - ref.release_noise_db)
+            if ref.release_noise_db is not None and
+            render.release_noise_db is not None else 0.0),
     }
     normalized = {key: values[key] / PERCEPTUAL_UNITS[key] for key in values}
     active_weight = sum(weights[key] for key in values if weights[key] > 0)

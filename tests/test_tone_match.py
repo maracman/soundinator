@@ -12,7 +12,14 @@ import scripts.tone_match.struck_plucked_prep as struck_prep_module
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
-from scripts.tone_match.assertions import ConstructionSample, SUNG_DERIVED_PRESETS, SUNG_SECTION_TYPES, evaluate_construction, normalize_instrument
+from scripts.tone_match.assertions import (
+    ConstructionSample,
+    SUNG_DERIVED_PRESETS,
+    SUNG_SECTION_TYPES,
+    assert_sung_family_firewall,
+    evaluate_construction,
+    normalize_instrument,
+)
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.controllability import (
     canonical_hash,
@@ -39,6 +46,7 @@ from scripts.tone_match.iterate import (
     _reference_set_id,
     _reference_render_params_override,
     _reference_variability,
+    _render_ship_variants,
     _renderer_contract_hash,
     _technique_exchange_statuses,
     _tripwire_gate,
@@ -119,15 +127,96 @@ def test_requested_blown_controls_have_controllability_probes():
     } <= set(BOWED_FREE_PARAMS)
 
 
-def test_failed_humanisation_fit_is_not_authorised_for_profile_consumption():
+def test_qualified_human_ranges_survive_a_masked_decomposition():
     from scripts.tone_match.humanisation import _consume_profile_ranges
     profiles = {"french-horn": {"partials": []}}
-    failed = {"decompositionTest": {"passed": False}, "ranges": {"x": 1}}
-    assert not _consume_profile_ranges(profiles, "french-horn", failed)
+    empty = {"decompositionTest": {"verdict": "INCONCLUSIVE-MASKED"},
+             "ranges": {}}
+    assert not _consume_profile_ranges(profiles, "french-horn", empty)
     assert "humanRanges" not in profiles["french-horn"]
-    passed = {"decompositionTest": {"passed": True}, "ranges": {"x": 1}}
-    assert _consume_profile_ranges(profiles, "french-horn", passed)
-    assert profiles["french-horn"]["humanRanges"] is passed
+    masked = {"decompositionTest": {"verdict": "INCONCLUSIVE-MASKED"},
+              "ranges": {"excitationPosition": {"status": "measured"}}}
+    assert _consume_profile_ranges(profiles, "french-horn", masked)
+    assert profiles["french-horn"]["humanRanges"] is masked
+
+
+def test_human_candidate_requires_double_dissociation_in_both_directions():
+    from scripts.tone_match.humanisation import _double_dissociation
+    left = {"excitationPosition": .08}
+    right = {"excitationPosition": .14}
+    qualified = _double_dissociation("excitationPosition", left, right)
+    assert qualified["v1ImprovesTake1AndWorsensTake2"]
+    assert qualified["v2ImprovesTake2AndWorsensTake1"]
+    assert qualified["qualified"]
+    same = _double_dissociation(
+        "excitationPosition", left, {"excitationPosition": .0805})
+    assert not same["qualified"]
+
+
+def test_human_decomposition_verdict_is_three_valued():
+    from scripts.tone_match.humanisation import _decomposition_verdict
+    assert _decomposition_verdict(0, False, False) == "PASS"
+    assert _decomposition_verdict(2, True, True) == "FAIL-MISSING-DOF"
+    assert _decomposition_verdict(2, False, True) == "INCONCLUSIVE-MASKED"
+    assert _decomposition_verdict(2, True, False) == "INCONCLUSIVE-MASKED"
+
+
+def test_criteria_drift_records_directed_tradeoffs_and_asymmetry():
+    from scripts.tone_match.criteria_drift import directed_drift, rebuild_state
+    first = {"partials_db": 2.0, "attack_ms": 1.0}
+    second = {"partials_db": 1.0, "attack_ms": 1.5}
+    drift = directed_drift(first, second, {
+        "partials_db": .01, "attack_ms": .01})
+    assert drift["improved"] == ["partials_db"]
+    assert drift["degraded"] == ["attack_ms"]
+    assert drift["events"] == ["partials_db⊣attack_ms"]
+    steps = [{
+        "id": f"violin:r:{index}",
+        "featureLossVector": second,
+        "driftFromPrevious": drift,
+    } for index in range(6)]
+    state = rebuild_state(steps)
+    cell = state["asymmetryMatrix"]["partials_db"]["attack_ms"]
+    assert cell["improveLeftDegradeRight"] == 6
+    assert cell["significantEdge"]
+    assert state["measuredEdges"][0]["from"] == "partials_db"
+
+
+def test_criteria_drift_ignores_changes_inside_repeat_noise_floor():
+    from scripts.tone_match.criteria_drift import directed_drift
+    assert directed_drift(
+        {"partials_db": 1.0, "attack_ms": 1.0},
+        {"partials_db": .99, "attack_ms": 1.01},
+        {"partials_db": .02, "attack_ms": .02}) is None
+
+
+def test_tail_audit_distinguishes_full_release_from_truncation_and_phrases():
+    from scripts.tone_match.tail_audit import analyse_tail_samples, phrase_take
+    sample_rate = 8_000
+    t = np.arange(sample_rate) / sample_rate
+    decay = np.exp(-14 * np.maximum(0, t - .35))
+    released = np.sin(2 * np.pi * 220 * t) * decay
+    full = analyse_tail_samples(released, sample_rate)
+    assert full["hasRelease"]
+    assert full["releaseFeatures"]["releaseRingMs"] >= 0
+    truncated = analyse_tail_samples(
+        np.sin(2 * np.pi * 220 * t), sample_rate)
+    assert not truncated["hasRelease"]
+    assert truncated["releaseFeatures"] is None
+    assert phrase_take({"sourceFile": "violin_C4_phrase_legato.wav"})
+
+
+def test_release_features_are_corpus_gated_and_zero_weight_pending_audit():
+    weights = weights_for_instrument("violin")
+    for feature in ("release_ring_ms", "release_damp_db_per_s",
+                    "release_noise_db"):
+        assert weights[feature] == 0.0
+    reference = _bundle(); rendered = _bundle()
+    reference.release_ring_ms = 100.0; rendered.release_ring_ms = 600.0
+    comparison = compare_features(reference, rendered, weights)
+    assert comparison["features"]["release_ring_ms"] == 500.0
+    assert comparison["composite"] == pytest.approx(
+        compare_features(reference, reference, weights)["composite"])
 
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
     freqs = np.asarray([50.0, 100.0, 200.0, 10_000.0])
@@ -604,6 +693,16 @@ def test_t031_bowed_controls_are_auditable_but_not_identity_fit_dimensions():
     assert _mode_params(params, "ship")["onsetWanderCents"] == 80
 
 
+def test_bowed_audit_declares_conditional_settle_and_t054_level_control():
+    manifest = json.loads((
+        iterate_module.ROOT / "scripts/tone_match/manifest.json").read_text())
+    rows = {row["key"]: row for row in manifest["continuous"]}
+    assert rows["onsetWanderSettlePeriods"]["auditContext"] == {
+        "onsetWanderCents": 80.0}
+    assert rows["bowNoiseLevel"]["min"] == 0.0
+    assert rows["bowNoiseLevel"]["max"] == 2.0
+
+
 def test_distributional_variation_gate_is_two_sided(monkeypatch):
     variability = {"status": "measured", "groups": [{
         "group": "same-note", "referenceIndices": [0],
@@ -625,6 +724,23 @@ def test_distributional_variation_gate_is_two_sided(monkeypatch):
         variability, {0: [0.0, 10.0, 20.0]}, {"vibrato": 1})
     assert not sloppy["passed"]
     assert sloppy["groups"][0]["checks"][0]["status"] == "too-much"
+
+
+def test_ship_variants_record_one_failed_note_without_aborting(tmp_path, monkeypatch):
+    monkeypatch.setattr(iterate_module.subprocess, "run", lambda *_args, **_kwargs:
+                        SimpleNamespace(returncode=0, stdout="", stderr=""))
+    monkeypatch.setattr(iterate_module, "extract_features", lambda path, **_kwargs:
+                        (_ for _ in ()).throw(ValueError("unpitched"))
+                        if "note-1.wav" in str(path) else str(path))
+    monkeypatch.setattr(iterate_module, "_distributional_variation_gate",
+                        lambda *_args, **_kwargs: {"passed": False,
+                                                   "status": "insufficient-evidence"})
+    result = _render_ship_variants(
+        tmp_path, "candidate", "violin", {"excitationType": "bow"},
+        [{"midi": 60}, {"midi": 72}], {}, {}, 2, repo_root=tmp_path)
+    assert len(result["analysisFailures"]) == 2
+    assert {row["referenceIndex"] for row in result["analysisFailures"]} == {1}
+    assert result["primaryRenderDirectory"].endswith("variant-00")
 
 
 def test_legacy_baseline_is_mandatory_leaderboard_entry_one(tmp_path, monkeypatch):
@@ -661,6 +777,57 @@ def test_sung_section_aliases_and_derived_rows_follow_decision_12():
     ids = {row["id"] for row in derived["assertions"]}
     assert "basso-profondo.derived-parent" in ids
     assert "basso-profondo.glottal-law" not in ids
+
+
+def test_sung_family_firewall_rejects_non_sung_objective_and_seed_sources():
+    for source in ("violin", "cello", "trumpet"):
+        with pytest.raises(ValueError, match="family firewall"):
+            assert_sung_family_firewall("tenor", {
+                "sg2Family": "sung", "spectralProfile": "voice-tenor",
+                "candidateTable": {"instrument": source},
+            })
+    with pytest.raises(ValueError, match="objective row"):
+        assert_sung_family_firewall(
+            "tenor", {"sg2Family": "sung", "spectralProfile": "voice-tenor"},
+            references=[{"singer": "male2", "family": "bowed"}],
+        )
+
+
+def test_sung_family_firewall_accepts_vocal_legacy_and_same_singer_prior():
+    report = assert_sung_family_firewall(
+        "tenor", {
+            "sg2Family": "sung", "spectralProfile": "voice-tenor",
+            "primarySinger": "male2",
+            "fittedFrom": {"family": "sung", "singer": "male2"},
+        },
+        references=[{"singer": "male2", "voiceClass": "tenor"}],
+        prior={"source": "vocal", "family": "sung"},
+    )
+    assert report["passed"] and report["singers"] == ["male2"]
+    with pytest.raises(ValueError, match="does not match objective singer"):
+        assert_sung_family_firewall(
+            "tenor", {"sg2Family": "sung", "spectralProfile": "voice-tenor",
+                      "primarySinger": "male3"},
+            references=[{"singer": "male2", "voiceClass": "tenor"}],
+        )
+
+
+def test_sung_family_firewall_derived_classes_need_frozen_sung_parent_and_transform():
+    assert assert_sung_family_firewall("boy soprano", {
+        "sg2Family": "sung", "spectralProfile": "voice-soprano",
+        "derivedFrom": "frozen-sung-voice-soprano",
+        "boyMorphology": {"tractScale": .84},
+    })["passed"]
+    assert assert_sung_family_firewall("basso profondo", {
+        "sg2Family": "sung", "spectralProfile": "voice-bass",
+        "derivedFrom": "frozen-sung-voice-bass",
+        "bassoMorphology": {"tractScale": 1.08},
+    })["passed"]
+    with pytest.raises(ValueError, match="frozen sung soprano"):
+        assert_sung_family_firewall("boy soprano", {
+            "sg2Family": "sung", "spectralProfile": "voice-soprano",
+            "derivedFrom": "violin", "boyMorphology": {"tractScale": .84},
+        })
 
 
 def test_l9_articulation_velocity_slope_is_in_canonical_manifest():
@@ -938,6 +1105,8 @@ def test_blown_scoring_does_not_fit_stiff_string_inharmonicity():
     string = weights_for_instrument("violin")
     assert blown["inharmonicity_log_ratio"] == 0
     assert string["inharmonicity_log_ratio"] == 1
+    assert string["body_am_db"] == 1
+    assert string["onset_wander_cents"] == 0
     assert weights_for_instrument("trumpet", {"noise": .5})["noise"] == .5
 
 

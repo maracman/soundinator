@@ -137,8 +137,19 @@ def main():
             entry["humanRanges"] = {
                 key: human_ranges[key] for key in (
                     "schemaVersion", "instrument", "method", "evidence",
-                    "ranges", "decompositionTest") if key in human_ranges
+                    "qualification", "ranges", "spreadObservables")
+                if key in human_ranges
             }
+            decomposition = human_ranges.get("decompositionTest")
+            if isinstance(decomposition, dict):
+                # Runtime consumers need the verdict, not workstation paths
+                # or per-take diagnostic payloads retained in the JSON report.
+                entry["humanRanges"]["decompositionTest"] = {
+                    key: decomposition[key] for key in (
+                        "verdict", "passed", "pairs", "failedPairs", "rule",
+                        "maskingFactors", "interpretation")
+                    if key in decomposition
+                }
         out[key] = entry
 
     DST.write_text(

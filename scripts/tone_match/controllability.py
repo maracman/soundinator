@@ -86,6 +86,7 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "onsetWanderCents": (0.0, 80.0, 0.0),
     "onsetWanderSettlePeriods": (12.0, 24.0, 0.0),
     "bowScratchLevel": (0.0, 1.0, 0.0),
+    "bowNoiseLevel": (0.0, 1.0, 0.0),
 }
 
 SUNG_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
@@ -231,6 +232,7 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             **({"expected_f0_hz": expected} if expected is not None else {}),
             **({"trust_expected_f0": True, "force_percussive": True}
                if struck else {}),
+            "release_expected": bool(ref.get("releaseEligible")),
         }
 
     ref_bundles = [extract_features(ref["path"], **analysis_kwargs(ref))
