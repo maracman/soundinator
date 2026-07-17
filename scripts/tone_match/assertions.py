@@ -1018,13 +1018,32 @@ def evaluate_construction(
                             None if singer is None else float(singer) >= 0, singer, "singerFormantAmount fitted (zero allowed)",
                             strict_evidence=strict_evidence))
         sync = _param(params, "voiceBreathSync")
-        reference_noise = [s.reference.note.attack_noise.get("level", 0) for s in sample_list
-                           if s.reference and isinstance(s.reference.note.attack_noise, dict)]
-        needs_sync = bool(reference_noise) and float(np.median(reference_noise)) >= .02
+        reference_sync = [float(s.reference.pitch_sync_breath_db)
+                          for s in sample_list if s.reference and
+                          s.reference.pitch_sync_breath_db is not None and
+                          np.isfinite(s.reference.pitch_sync_breath_db)]
+        rendered_sync = [float(s.render.pitch_sync_breath_db)
+                         for s in sample_list
+                         if s.render.pitch_sync_breath_db is not None and
+                         np.isfinite(s.render.pitch_sync_breath_db)]
+        reference_median = (float(np.median(reference_sync))
+                            if reference_sync else None)
+        rendered_median = (float(np.median(rendered_sync))
+                           if rendered_sync else None)
+        needs_sync = reference_median is not None and reference_median >= 6
+        breath_consumed = (
+            sync is not None and reference_median is not None and
+            rendered_median is not None and
+            ((float(sync) > 0 and rendered_median >= 6)
+             if needs_sync else float(sync) >= 0)
+        )
         rows.append(_result(f"{name}.pitch-sync-breath", "Breath component is pitch-synchronous rather than a static bed",
-                            None if sync is None else (float(sync) > 0 if needs_sync else float(sync) >= 0),
-                            {"voiceBreathSync": sync, "referenceNoiseMedian": float(np.median(reference_noise)) if reference_noise else None},
-                            "voiceBreathSync > 0 when reference noise level >= 0.02; zero otherwise allowed",
+                            breath_consumed,
+                            {"voiceBreathSync": sync,
+                             "referencePitchSyncBreathDb": reference_median,
+                             "renderPitchSyncBreathDb": rendered_median,
+                             "observable": "pitch_sync_breath_db"},
+                            "rendered pitch_sync_breath_db >= 6 dB and voiceBreathSync > 0 when lossless reference prominence >= 6 dB; measured zero otherwise allowed",
                             strict_evidence=strict_evidence))
         if name in {"tenor", "bass"}:
             low, high = ((2700, 3300) if name == "tenor" else (2300, 2600))

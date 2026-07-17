@@ -198,6 +198,7 @@ def compare_rendered_vowel_body_transfer(
     max_frequency_hz: float = 8000.0,
     median_tolerance_db: float = 1.5,
     correlation_floor: float = 0.85,
+    audibility_floor_db: float = -50.0,
 ) -> dict:
     """Compare the rendered body transfer with its fitted band law.
 
@@ -213,7 +214,7 @@ def compare_rendered_vowel_body_transfer(
     count = min(len(body), len(bypass), len(common))
     harmonics = np.arange(1, count + 1, dtype=float)
     frequencies = harmonics * float(f0_hz)
-    valid = (
+    candidate = (
         common[:count]
         & np.isfinite(body[:count])
         & np.isfinite(bypass[:count])
@@ -221,11 +222,25 @@ def compare_rendered_vowel_body_transfer(
         & (bypass[:count] > 1e-6)
         & (frequencies <= max_frequency_hz)
     )
+    # T-058 pass-09 diagnosis: the analyser can mark source-table tails as
+    # numerically SNR-valid even when they sit 50-90 dB below either note's
+    # peak.  Their ratio is then governed by FFT leakage/normalisation, not by
+    # audible body transfer.  Require audibility in BOTH members of the pair;
+    # otherwise an inaudible source tail can manufacture a body failure.
+    relative_floor = 10 ** (float(audibility_floor_db) / 20)
+    body_threshold = max(float(np.max(body[:count])) * relative_floor, 1e-6)
+    bypass_threshold = max(float(np.max(bypass[:count])) * relative_floor, 1e-6)
+    valid = (candidate & (body[:count] >= body_threshold) &
+             (bypass[:count] >= bypass_threshold))
     if np.count_nonzero(valid) < 6:
         return {
             "passed": False,
             "reason": "fewer than six common audible harmonics",
             "commonHarmonics": int(np.count_nonzero(valid)),
+            "commonHarmonicsBeforeAudibilityFloor": int(np.count_nonzero(candidate)),
+            "audibilityFloorDb": float(audibility_floor_db),
+            "bodyAmplitudeThreshold": body_threshold,
+            "bypassAmplitudeThreshold": bypass_threshold,
             "medianShapeErrorDb": None,
             "shapeCorrelation": None,
         }
@@ -248,6 +263,10 @@ def compare_rendered_vowel_body_transfer(
         "passed": passed,
         "reason": None if passed else "rendered body transfer misses fitted bands",
         "commonHarmonics": int(np.count_nonzero(valid)),
+        "commonHarmonicsBeforeAudibilityFloor": int(np.count_nonzero(candidate)),
+        "audibilityFloorDb": float(audibility_floor_db),
+        "bodyAmplitudeThreshold": body_threshold,
+        "bypassAmplitudeThreshold": bypass_threshold,
         "medianShapeErrorDb": median_error,
         "p95ShapeErrorDb": float(np.percentile(error, 95)),
         "shapeCorrelation": correlation,
