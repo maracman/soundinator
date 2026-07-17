@@ -40,8 +40,11 @@ ALIASES = {
     "acoustic guitar": "guitar", "classical guitar": "guitar",
     "guitar-nylon": "guitar", "nylon-string acoustic guitar": "guitar",
     "nylon-string-acoustic-guitar": "guitar",
-    "male voice": "tenor", "male tenor": "tenor", "basso profondo": "contrabass",
-    "oktavist": "contrabass", "bass voice": "contrabass", "mezzo soprano": "mezzo-soprano",
+    "male voice": "tenor", "male tenor": "tenor", "voice-tenor": "tenor",
+    "basso profondo": "contrabass", "oktavist": "contrabass",
+    "bass voice": "bass", "voice-bass": "bass",
+    "mezzo soprano": "mezzo-soprano", "voice-mezzo": "mezzo-soprano",
+    "voice-soprano": "soprano",
     "boy soprano": "boy-soprano", "treble": "boy-soprano",
 }
 
@@ -50,7 +53,8 @@ FAMILY = {
     "trumpet": "blown", "french-horn": "blown",
     "violin": "bowed", "cello": "bowed",
     "piano": "struck-plucked", "guitar": "struck-plucked",
-    "tenor": "sung", "contrabass": "sung", "mezzo-soprano": "sung",
+    "soprano": "sung", "mezzo-soprano": "sung", "tenor": "sung",
+    "bass": "sung", "contrabass": "sung",
     "boy-soprano": "sung",
 }
 
@@ -231,8 +235,9 @@ def _topology_assertions(instrument: str, params: dict[str, Any], strict: bool) 
     expected_excitation = {
         "violin": "bow", "cello": "bow", "piano": "strike", "guitar": "pluck", "flute": "blow",
         "clarinet": "blow", "alto-sax": "blow", "tenor-sax": "blow",
-        "trumpet": "blow", "french-horn": "blow", "tenor": "blow",
-        "contrabass": "blow", "mezzo-soprano": "blow", "boy-soprano": "blow",
+        "trumpet": "blow", "french-horn": "blow", "soprano": "blow",
+        "mezzo-soprano": "blow", "tenor": "blow", "bass": "blow",
+        "contrabass": "blow", "boy-soprano": "blow",
     }.get(instrument)
     expected_resonator = {
         "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "openTube",
@@ -820,13 +825,15 @@ def evaluate_construction(
                             {"voiceBreathSync": sync, "referenceNoiseMedian": float(np.median(reference_noise)) if reference_noise else None},
                             "voiceBreathSync > 0 when reference noise level >= 0.02; zero otherwise allowed",
                             strict_evidence=strict_evidence))
-        if name in {"tenor", "contrabass"}:
-            prominence = [_band_prominence(s.render, 2700, 3300) for s in sample_list]
+        if name in {"tenor", "bass", "contrabass"}:
+            low_hz, high_hz = (2300, 2600) if name in {"bass", "contrabass"} else (2700, 3300)
+            prominence = [_band_prominence(s.render, low_hz, high_hz) for s in sample_list]
             prominence = [x for x in prominence if np.isfinite(x)]
             median = float(np.median(prominence)) if prominence else None
-            rows.append(_result(f"{name}.singer-formant-band", "Carrying voice has a fixed-Hz 3 kHz cluster",
+            rows.append(_result(f"{name}.singer-formant-band", "Carrying voice has its class-specific fixed-Hz cluster",
                                 None if median is None else median >= -6, median,
-                                "2.7-3.3 kHz prominence >= -6 dB vs flanks", strict_evidence=strict_evidence))
+                                f"{low_hz/1000:.1f}-{high_hz/1000:.1f} kHz prominence >= -6 dB vs flanks",
+                                strict_evidence=strict_evidence))
         if name == "boy-soprano":
             morphology = params.get("boyMorphology") if isinstance(params.get("boyMorphology"), dict) else {}
             tract = morphology.get("tractScale")

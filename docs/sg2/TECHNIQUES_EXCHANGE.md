@@ -995,6 +995,7 @@ evidence supplies them.
 | T-046 | n/a — violin rebaseline result |
 | T-047 | adapted — vibrato may require singer-specific register × dynamic tables after the first adult fit |
 | T-048 | rejected — bowed harmonic-organisation attack is not the voice-onset contract |
+| T-054 | adapted — use the cross-pitch residual method for singer-specific aspiration; never transfer violin values |
 
 ### T-049 · Corpus labels are identity evidence, not convenient folder names
 Author: sung lane · 2026-07-16 · Firewall: process/data contract
@@ -1069,3 +1070,35 @@ as the corpus-fitted class; derived rows carry no quantitative PASS claim and
 name the frozen source preset plus morphology transform.
 Affects: sung target registry / report gates / morphology provenance / WP-8.
 Status: sung=incorporated analysis=ack-required engine=n/a
+
+### T-055 · A craft prior and deterministic fit mode are separate contracts
+Author: sung lane · 2026-07-17 · Firewall: method/process
+Finding: deterministic fitting does not justify starting a voice from neutral
+zeros. The legacy `vocal` craft prior supplies the established envelope,
+aspiration, humanisation and vibrato idioms; fitted per-singer source and
+per-vowel body evidence overlays that prior. FIT mode temporarily zeroes the
+stochastic probabilities and humanisation for measurement, while SHIP mode
+restores the inherited craft values and uses a fresh seed. The prior is pinned
+by legacy commit, preset path and a canonical parameter hash.
+Consuming assertions: every emitted SUNG fit names the pinned legacy prior;
+FIT renders are deterministic; SHIP renders retain nonzero envelope,
+humanisation and vibrato probabilities; the scored file is never substituted
+for the listening file; a neutral-zero initializer fails preflight.
+Affects: sung_prior.py / sung_fit.py / sung_audition.py / provenance.
+Status: sung=incorporated analysis=consumer-added engine=n/a
+
+### T-056 · Spoken consonants require an explicit sung adaptation layer
+Author: sung lane · 2026-07-17 · Firewall: evidence semantics
+Finding: phone-aligned LibriSpeech supplies useful consonant burst, duration,
+VOT and formant-transition observations, but they are spoken measurements.
+Annex S31–S33 provides directional sung adaptation: shorten the consonant and
+voiceless VOT, compress the transition, and schedule the vowel nucleus on the
+beat. The adapted table is a provisional generator prior until sung consonant
+recordings validate it; it is not direct sung reference evidence.
+Consuming assertions: output keeps spoken and adapted fields distinct; the
+adaptation coefficients and corpus provenance enter the hash; all consonant
+feature weights are zero until the generator controls pass a fresh
+controllability audit; disabling the layer is PCM-identical to the current
+renderer.
+Affects: sung_consonants.py / A-VOICE-03 / D-VOICE-02 / onset objective.
+Status: sung=incorporated analysis=spec-filed engine=spec-filed-zero-weight

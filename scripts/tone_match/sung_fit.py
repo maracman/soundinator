@@ -16,6 +16,7 @@ from scripts.tone_match.sung_features import (
     fit_pooled_source_vowel_bodies,
     vowel_regions_for_class,
 )
+from scripts.tone_match.sung_prior import LEGACY_VOCAL_CRAFT, prior_provenance
 
 
 PROFILE_BY_CLASS = {
@@ -130,14 +131,23 @@ def fit_campaign(references_path: Path, output_root: Path) -> dict:
         if note.vibrato:
             vibrato_analyses.append(note.vibrato)
     present_vibrato = [row for row in vibrato_analyses if row.get("present")]
-    vibrato_rate = _median([row.get("rate") for row in present_vibrato], 5.5)
-    vibrato_depth = _median([row.get("depth") for row in present_vibrato], 40.0)
+    vibrato_rate = _median(
+        [row.get("rate") for row in present_vibrato],
+        LEGACY_VOCAL_CRAFT["vibratoRate"],
+    )
+    vibrato_depth = _median(
+        [row.get("depth") for row in present_vibrato],
+        LEGACY_VOCAL_CRAFT["vibratoDepth"],
+    )
 
     source_amps = [row["amp"] for row in fit["sourcePartials"]]
+    # §2.4c: the fitted source/body overlays the strongest known craft layer.
+    # Never initialise a voice from neutral zeros merely because the current
+    # analyser does not measure a craft parameter.
     base = {
+        **LEGACY_VOCAL_CRAFT,
         "seed": 7331,
         "sg2Family": "sung",
-        "voiceMode": "fourier",
         "spectralProfile": PROFILE_BY_CLASS[voice_class],
         "spectralMix": 1.0,
         "spectralPartials": len(source_amps),
@@ -148,13 +158,13 @@ def fit_campaign(references_path: Path, output_root: Path) -> dict:
         "partialB": 0.0,
         "bodyType": "auto",
         "spectralResonanceAmount": 1.0,
+        # New G6 laws stay neutral until this singer's corpus can fit them;
+        # neutrality does not erase the inherited envelope/breath/vibrato craft.
         "glottalTilt": 0.0,
         "singerFormantAmount": 0.0,
         "voiceBreathSync": 0.0,
         "bodyArticulation": 0.0,
-        "excitationHuman": 0.0,
-        "toneBreath": 0.0,
-        "vibratoProb": 1.0 if present_vibrato else 0.0,
+        "vibratoProb": 1.0 if present_vibrato else LEGACY_VOCAL_CRAFT["vibratoProb"],
         "vibratoRate": round(vibrato_rate, 4),
         "vibratoDepth": round(vibrato_depth, 4),
         "spectralDynamicAmount": 0.8,
@@ -181,6 +191,7 @@ def fit_campaign(references_path: Path, output_root: Path) -> dict:
         "vibratoReferences": len(vibrato_rows),
         "vibratoAnalysed": len(vibrato_analyses),
         "baseParams": base,
+        "legacyPrior": prior_provenance(),
     }
     (output_root / "SOURCE_VOWEL_FIT.json").write_text(
         json.dumps(payload, indent=2) + "\n"
