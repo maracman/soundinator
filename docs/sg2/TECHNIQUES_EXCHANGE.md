@@ -1764,6 +1764,59 @@ violin plateau interpretation.
 Status: analysis=incorporated bowed=measured-fixedHz-class
 engine=pending-generic-T-069-bowed-consumer L18=blocked-labelled-bow-lift-evidence
 
+### T-072 · ENGINE SPEC (Agent A): bar modes own decay and strike-position laws
+Author: Agent C / struck-plucked · 2026-07-17 · Firewall: bar mechanism; values per instrument/preset
+Finding: the first gated glockenspiel extraction validates the existing
+free-bar ratios and recovers six G5–C8 sounding anchors without using string
+stiffness. The corpus median T60(mode 1)/T60(mode 2) is 12.3427, while the
+centre-strike mode-2 dip is visible in the lower three anchors. The generic
+renderer has neither a per-mode T60 consumer nor a free-bar mode-shape
+position consumer. Its `partialFrequency` also applies B after the bar ratio,
+contrary to T-027; the campaign pins B to zero but that is not an engine
+firewall.
+
+Engine contract:
+1. Consume pinned `barModeT60ByRegister[]` rows
+   `{f0,t60Seconds[6]}`. Interpolate each positive mode T60 in log-f0/log-T60;
+   null modes fall back to the current material law. An absent table is exact
+   legacy identity. These held-note decays precede note-off and are independent
+   of release damping and harmonic ADSR sustain.
+2. For `resonatorClass=bar`, interpret `excitationPosition` through normalized
+   free-free beam mode shapes, not `sin(n*pi*x)`. Centre position must suppress
+   mode 2 by at least 6 dB relative to modes 1/3. A pinned short-term
+   `barStrikePositionWeights[6]` override may carry direct fitted levels;
+   absent override retains the new mode-shape law. Seeded strike-point wander
+   remains scaled only by Human and is exactly absent at Human=0.
+3. T-027's `barModeRatioOffsetsCents` remains the sole modal-frequency trim.
+   `partialFrequency` must ignore B for bar (or assert B=0 before scheduling);
+   bar PCM and ratios must be identical for B=0 and B>0.
+
+Consuming assertions: absent T60 table preserves the golden bar fixture;
+setting mode T60s `[3,.3,.2,...]` recovers each decay within 10% and gives a
+mode-1/mode-2 ratio >=5; changing one mode leaves every other frequency and
+decay unchanged; centre/edge position moves the fitted level pattern without
+moving frequencies; string/membrane/bore PCM is unchanged; B cannot move bar
+modes. The bar-specific audit keeps ratio, decay and strike-shape weights zero
+until these responders exist.
+
+Affects: bar gain automation / excitation position law / partialFrequency B
+firewall / structured manifest / glockenspiel construction gates.
+Status: engine=pending-Agent-A analysis=incorporated-gated-first-fit
+struck/plucked=blocked-bar-controls (B excluded, not bent)
+
+Status update — Agent C pass 17, 2026-07-17: T-068 upright pre-roll is now
+exhaustively classified across all 69 landed files. Available pre-roll spans
+0.000–6.984 ms; 69/69 are below the >=10 ms L17 extraction threshold, so no
+honest upright subset exists. This strengthens rather than relaxes the
+existing `blocked-piano-schema-adapter-and-profile-activation` status: grand
+activation remains Agent A's task and no grand values transfer to upright.
+
+Status update — Agent C pass 17 pre-merge chase, 2026-07-17: T-067 remained
+`engine=pending-Agent-A`; T-068 remained incorporated only at the generic
+consumer with its piano point-envelope adapter/preset activation pending; and
+T-069 remains `engine=pending-Agent-A`. No neutral/default value was activated
+while those consumers are incomplete.
+
 Status update — Agent A engine pass, 2026-07-17: T-065/A-VOICE-05 final law
 engine=incorporated+output-audited. Sparse source rows now interpolate only
 inside the joint log-f0/velocity measured hull and project to its nearest
@@ -1846,3 +1899,36 @@ attack-noise do not. Decomposition therefore remains `INCONCLUSIVE-MASKED`;
 distribution remains blocked on those consumers plus the two-sided seeded
 spread gate. Status: analysis=F13-incorporated bowed=response-audited-4of9
 engine=native-episode-partial distribution=blocked-consumers+two-sided-gate
+
+Status update — Agent C pass 17 post-merge chase, 2026-07-17: the held
+strike/pluck L18 law is now incorporated at shared commit `b4ff0c4`; nylon is
+therefore reopened for a renderer-hash-specific residual re-audit. T-068's
+piano point-envelope adapter/preset activation and T-069's anomaly consumer
+are still pending on the merged head and remain neutral.
+
+Status update — Agent C pass 17 final dependency reconciliation, 2026-07-17:
+T-067 held strike/pluck L18=`engine=incorporated b4ff0c4`; T-068
+`engine=incorporated-generic-L17-consumer` but
+`struck/plucked=blocked-piano-point-envelope-adapter-and-preset-activation`;
+T-069=`engine=pending-Agent-A`; T-072=`engine=pending-Agent-A` with the
+bar-specific objective at zero weight. Nylon's fresh post-L18 audit is clean
+at objective `151b91aa63c04c54`, manifest `340412ce5aa8a9ca`, renderer
+`3629da50977f0fc1`; no stale pre-L18 audit is consumed.
+
+Status update — Agent C pass 17 completed, 2026-07-17: crash residue was
+retained only after its exact glock render was reproduced and the full suite
+passed. Nylon's nine-key post-L18 search reduced the deterministic fit loss
+from `4.616871` to `4.338724` (6.03%), chiefly by moving
+`excitationPosition` from 0.12 to 0.090031. It did not enter the leaderboard:
+`guitar.double-decay` still fails, all 18 spectral tripwires still fail, and
+the corpus has no repeated pitch/dynamic groups. Under F13, those six distinct
+register/dynamic cells remain full-strength evidence for deterministic mean,
+register and dynamic objectives; they do not identify per-note stochastic
+spread, so no Human range is fitted or inferred. The named next work item is
+per-cell/course spectral control or T-028 contact-time consumption. The
+activated glock first render independently fails ratio, per-mode T60 and
+centre-strike gates while passing six-mode economy and campaign B=0; T-072
+therefore remains the honest bar-control blocker. Harp's current-profile audit
+was interrupted before a contract and its saved baseline predates profile
+activation, so it is preserved as superseded evidence and is not consumed for
+fitting.

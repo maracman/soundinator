@@ -163,6 +163,11 @@ def weights_for_instrument(instrument: str | None,
     if (instrument or "").strip().lower() in _STRUCK_PLUCKED_INSTRUMENTS:
         for key in _STRUCK_FIREWALL_FEATURES:
             weights[key] = 0.0
+    if normalized_instrument == "glockenspiel":
+        # A bar has a non-harmonic mode table, not stiff-string dispersion.
+        # Keep the generic diagnostic visible but never let it steer a bar
+        # fit; the dedicated bar-mode gate owns modal-frequency scoring.
+        weights["inharmonicity_log_ratio"] = 0.0
     if (instrument or "").strip().lower() in _SUNG_INSTRUMENTS:
         for key in _SUNG_WATCH_METRICS:
             weights[key] = 0.0
@@ -892,8 +897,13 @@ def quantitative_tripwires(ref: FeatureBundle, render: FeatureBundle,
                               "rate within 0.5 Hz; depth within 25%", vibrato_pass))
 
     b_ref, b_render = ref.note.B or 0, render.note.B or 0
-    if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
+    normalized_instrument = (instrument or "").strip().lower()
+    if normalized_instrument in _BLOWN_INSTRUMENTS:
         b_pass, b_observed = None, {"reason": "not a stiff-string observable for blown excitation"}
+    elif normalized_instrument == "glockenspiel":
+        b_pass, b_observed = None, {
+            "reason": "bar mode ratios are scored by the dedicated bar gate; string B is forbidden"
+        }
     elif b_ref > 0:
         factor = max(b_render, 1e-12) / b_ref
         b_pass, b_observed = 1 / 1.5 <= factor <= 1.5, {"factor": factor}
