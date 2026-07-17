@@ -115,13 +115,13 @@ and `23485d97346e60f633825a6db55b90a455e1ab20f4a8c97f77b5ca455b7426b4`.
 The leaderboard and `state/{violin,cello}/leaderboard.json` backstops were
 refreshed; neither candidate is promoted.
 
-Live exchange snapshot: 81 entries, source SHA-256
-`3eebbdf9e66f03aeecc9d8021c40899dcdca7747087ee0562751bda53c9b15f3`,
+Live exchange snapshot: 82 entries, source SHA-256
+`e91cf6841519a9b43b04c464b92b4d541929822d69a5ccc6af22f2f8bf075b4f`,
 artifact SHA-256
-`90c98e4c62370e31a46b2a39bfaa850b1dc1472349ea612a7fbaf7d19a3c1d79`.  
-Fresh owner listening page rebuilt at engine `1f24b79` with build seed
-`1784315585`; `sg2-data/listen.html` SHA-256 is
-`f53a9cf3d075577fc2ad9093789882badaa7b57d81e522a5a7dec887e0057621`.
+`93b912d5af5f4715d5965a06d79fa8f12cce4c8cab425c48178792065399500a`.
+Fresh owner listening page rebuilt at combined head `fce31f4` with build seed
+`1784316093`; `sg2-data/listen.html` SHA-256 is
+`32eda8428d601200ae554224a53f59abccfe1d34b4a4f568ca49789b78944762`.
 The unpromoted 64-rank experimental auditions remain separately available in
 the pass-09 run directories; the global page correctly retains verified
 leaderboard/pinned-component SHIP rows.  
@@ -130,8 +130,9 @@ Final verification is green: `npm test` 11/11 PASS;
 `PYTHONPATH=src:. .venv/bin/python -m pytest -q` full suite PASS; and
 `PYTHON=.venv/bin/python node scripts/render_note.mjs --verify` PASS at
 renderer hash
-`22622734125e89718d57499ba1399fcaac4cac8eff3a821e37a2b51236768a73`.  
-Shared merge: PENDING.
+`84fda9348e06379e1d71f0ea2f91438cafac45b7893044ae38783159fafe8b2c`.
+Shared merge: the green combined Agent D head is merged once at pass end into
+`codex/sg2-l4-l5-engine`; the merge commit is recorded in the final handoff.
 
 ## Pending mandates
 

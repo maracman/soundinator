@@ -589,7 +589,7 @@ fails the ordinary identity set. Their run-local listening pages are:
 - `sg2-data/runs/cello/agentd-pass09-source64-audit/listen-cello-agentd-pass09-source64-audit.html`
   (seed 2095425142).
 
-The canonical `sg2-data/listen.html` was freshly rebuilt at engine `1f24b79`
-with build seed 1784315585 and retains the verified leaderboard/pinned SHIP
+The canonical `sg2-data/listen.html` was freshly rebuilt at combined head
+`fce31f4` with build seed 1784316093 and retains the verified leaderboard/pinned SHIP
 rows. This separation prevents a useful source diagnostic from being mistaken
 for an identity freeze.
