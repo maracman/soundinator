@@ -7,35 +7,56 @@ import argparse
 import html
 import json
 from pathlib import Path
+import secrets
 import subprocess
 
 import numpy as np
 
+from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
+from scripts.tone_match.controllability import objective_contract_hash
 from scripts.tone_match.score import (
     compare_features,
     extract_features,
-    weights_for_instrument,
 )
 from scripts.tone_match.sung_features import vowel_classification_gate
+from scripts.tone_match.sung_prior import params_for_mode
+from scripts.tone_match.tripwires import (
+    aggregate_by_cell,
+    evaluate_tripwires,
+    required_cells_by_bar,
+)
 
 
-ZERO_WEIGHT_WATCHES = {
-    "decay_log_ratio",
-    "inharmonicity_log_ratio",
-    "vibrato",
-    "vibrato_onset_delay_ms",
-    "vibrato_ramp_ms",
-    "vibrato_rate_drift",
-    "body_am_db",
-    "noise_lead_ms",
-    "onset_scoop_cents",
-    "onset_scoop_settle_ms",
-    "onset_wander_cents",
-    "onset_lockin_periods",
-}
+def _consume_audit(path: Path, voice_class: str, references: list[dict]) -> dict:
+    if not path.exists():
+        raise ValueError(f"missing sung controllability audit: {path}")
+    audit = json.loads(path.read_text())
+    weights = audit.get("finalWeights") or {}
+    errors = []
+    if audit.get("instrument") != voice_class:
+        errors.append(f"instrument {audit.get('instrument')!r} != {voice_class!r}")
+    if audit.get("objectiveHash") != objective_contract_hash(voice_class, references, weights):
+        errors.append("reference/weight objective hash mismatch")
+    if not audit.get("clean"):
+        errors.append("audit is not clean")
+    uncontrolled = [
+        feature for feature, weight in weights.items()
+        if float(weight) > 0 and not audit.get("responsiveParameters", {}).get(feature)
+    ]
+    if uncontrolled:
+        errors.append(f"positive-weight features lack responders: {uncontrolled}")
+    if errors:
+        raise ValueError("invalid sung controllability contract: " + "; ".join(errors))
+    return audit
 
 
-def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: Path) -> dict:
+def build(
+    references_path: Path,
+    fit_root: Path,
+    output_root: Path,
+    repo_root: Path,
+    audit_path: Path,
+) -> dict:
     references = json.loads(references_path.read_text())
     voice_classes = {row.get("voiceClass") for row in references}
     if len(voice_classes) != 1:
@@ -47,39 +68,63 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
         "mezzo-soprano": "voice-mezzo",
         "soprano": "voice-soprano",
     }[voice_class]
-    selected = [
-        row for row in references
-        if row.get("technique") == "straight"
-        and "spectral" in row.get("roles", [])
-    ]
+    singer_ids = {row.get("singer") for row in references}
+    if len(singer_ids) != 1:
+        raise ValueError(f"audition requires exactly one identity singer, found {singer_ids}")
+    selected = [row for row in references if "spectral" in row.get("roles", [])]
+    audit = _consume_audit(audit_path, voice_class, selected)
     selected.sort(key=lambda row: ("aeiou".index(row["vowel"]),
-                                   ("low", "mid", "high").index(row["register"])))
-    if len(selected) != 15:
-        raise ValueError(f"expected 15 straight vowel/register rows, found {len(selected)}")
+                                   ("low", "mid", "high").index(row["register"]),
+                                   row.get("velocity", 0), row["sourceFile"]))
+    required_cells = {
+        (row["vowel"], row["register"], row["dynamic"]) for row in selected
+    }
+    if len({row["vowel"] for row in selected}) != 5 or \
+            len({row["register"] for row in selected}) < 3 or \
+            len({row["dynamic"] for row in selected}) < 2:
+        raise ValueError(
+            "sung gate evidence must span five vowels, three registers and two dynamics"
+        )
 
     output_root.mkdir(parents=True, exist_ok=True)
-    renders = output_root / "renders"
-    renders.mkdir(exist_ok=True)
+    fit_renders = output_root / "fit-renders"
+    ship_renders = output_root / "ship-renders"
+    fit_renders.mkdir(exist_ok=True)
+    ship_renders.mkdir(exist_ok=True)
     jobs = []
     manifest = []
+    ship_seed_base = secrets.randbits(30)
     for index, row in enumerate(selected):
         params = json.loads((fit_root / f"initial-{row['vowel']}.json").read_text())
-        params["vibratoProb"] = 0.0
-        out = renders / f"{index:02d}-{row['register']}_{row['vowel']}.wav"
+        fit_params = params_for_mode(params, "fit")
+        ship_params = params_for_mode(params, "ship", seed=ship_seed_base + index)
+        fit_out = fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
+        ship_out = ship_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
         jobs.append({
-            "params": params,
+            "params": fit_params,
             "midi": row["midi"],
             "velocity": row["velocity"],
             "durationSec": row["durationSec"],
             "sampleRate": row.get("sampleRate", 44100),
-            "out": str(out),
+            "out": str(fit_out),
+        })
+        jobs.append({
+            "params": ship_params,
+            "midi": row["midi"],
+            "velocity": row["velocity"],
+            "durationSec": row["durationSec"],
+            "sampleRate": row.get("sampleRate", 44100),
+            "out": str(ship_out),
         })
         manifest.append({
-            "label": f"{voice_class} /{row['vowel']}/ {row['register']} MIDI {row['midi']}",
+            "label": f"{voice_class} /{row['vowel']}/ {row['register']} {row['dynamic']} MIDI {row['midi']}",
             "vowel": row["vowel"],
             "register": row["register"],
+            "dynamic": row["dynamic"],
             "reference": row["path"],
-            "render": str(out),
+            "fitRender": str(fit_out),
+            "render": str(ship_out),
+            "shipSeed": ship_seed_base + index,
             "sourceFile": row["sourceFile"],
         })
     jobs_path = output_root / "jobs.json"
@@ -89,10 +134,10 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
         cwd=repo_root, check=True,
     )
 
-    weights = weights_for_instrument(voice_class)
-    for feature in ZERO_WEIGHT_WATCHES:
-        weights[feature] = 0.0
+    weights = dict(audit["finalWeights"])
     score_rows = []
+    tripwire_notes = []
+    construction_samples = []
     rendered_formants: dict[str, dict[str, tuple[float, float]]] = {}
     for row, trial in zip(selected, manifest):
         try:
@@ -100,7 +145,7 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
                 trial["reference"], expected_f0_hz=row["expectedF0Hz"]
             )
             rendered = extract_features(
-                trial["render"], active_duration_s=row["durationSec"],
+                trial["fitRender"], active_duration_s=row["durationSec"],
                 expected_f0_hz=row["expectedF0Hz"],
             )
         except (ValueError, RuntimeError) as exc:
@@ -120,19 +165,27 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
             continue
         score = compare_features(reference, rendered, weights)
         formants = rendered.note.formants
-        if len(formants) >= 2:
+        if len(formants) >= 2 and row.get("technique") == "straight":
             rendered_formants.setdefault(row["vowel"], {})[row["register"]] = (
                 float(formants[0]), float(formants[1])
             )
-        reference_attack = [
-            float(value.get("t90", 0) if isinstance(value, dict) else value)
-            for value in reference.note.band_t90.values()
-        ]
-        attack_tolerance_ms = max(
-            20.0,
-            .30 * (float(np.mean(reference_attack)) * 1000
-                   if reference_attack else 0.0),
-        )
+        roles = frozenset(row.get("roles", []))
+        construction_samples.append(ConstructionSample(
+            render=rendered,
+            reference=reference,
+            register=row["register"],
+            dynamic=row["dynamic"],
+            velocity=row["velocity"],
+            roles=roles,
+        ))
+        tripwire_notes.append({
+            "register": row["register"],
+            "dynamic": row["dynamic"],
+            "roles": sorted(roles),
+            "result": score,
+            "ref": reference,
+            "render": rendered,
+        })
         score_rows.append({
             "label": trial["label"],
             "vowel": row["vowel"],
@@ -143,13 +196,28 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
             "features": score["features"],
             "normalized": score["normalized"],
             "weights": score["weights"],
-            "gates": {
-                "partials": score["features"]["partials_db"] <= 3.0,
-                "mel": score["features"]["log_mel_db"] <= 4.0,
-                "attack": score["features"]["attack_ms"] <= attack_tolerance_ms,
-            },
         })
     vowel_gate = vowel_classification_gate(rendered_formants, voice_class)
+    source_fit = json.loads((fit_root / "SOURCE_VOWEL_FIT.json").read_text())
+    construction = evaluate_construction(
+        voice_class,
+        construction_samples,
+        params=source_fit["baseParams"],
+        strict_evidence=True,
+    )
+    raw_tripwires = evaluate_tripwires(
+        voice_class, tripwire_notes, weights=weights
+    )
+    coverage_contract = required_cells_by_bar(references, raw_tripwires["activeBars"])
+    tripwires = {
+        **raw_tripwires,
+        "coverageContract": coverage_contract,
+        **aggregate_by_cell(
+            raw_tripwires,
+            required_cells_by_bar=coverage_contract,
+            family="sung",
+        ),
+    }
     composites = [
         row["composite"] for row in score_rows
         if row["composite"] is not None
@@ -161,15 +229,24 @@ def build(references_path: Path, fit_root: Path, output_root: Path, repo_root: P
         "meanComposite": float(np.mean(composites)) if composites else None,
         "scoredRows": sum(row["composite"] is not None for row in score_rows),
         "rejectedRows": sum(row["composite"] is None for row in score_rows),
-        "gateCounts": {
-            key: {
-                "pass": sum(row["gates"].get(key, False) for row in score_rows),
-                "total": sum(key in row["gates"] for row in score_rows),
-            }
-            for key in ("partials", "mel", "attack")
-        },
+        "requiredVowelRegisterDynamicCells": len(required_cells),
+        "construction": construction,
+        "tripwires": tripwires,
         "vowelClassification": vowel_gate,
         "weights": weights,
+        "controllability": {
+            "path": str(audit_path),
+            "objectiveHash": audit["objectiveHash"],
+            "manifestHash": audit["manifestHash"],
+            "clean": audit["clean"],
+            "zeroWeighted": audit.get("zeroWeighted", []),
+        },
+        "legacyPrior": source_fit.get("legacyPrior"),
+        "renderModes": {
+            "scoring": "fit",
+            "listening": "ship",
+            "shipSeedBase": ship_seed_base,
+        },
     }
     (output_root / "audition-manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n"
@@ -205,7 +282,7 @@ def _write_html(
         rows.append(
             "<tr>"
             f"<td><b>/{html.escape(trial['vowel'])}/</b></td>"
-            f"<td>{html.escape(trial['register'])}</td>"
+            f"<td>{html.escape(trial['register'])} / {html.escape(trial['dynamic'])}</td>"
             f"<td><audio controls preload='none' src='file://{html.escape(trial['reference'])}'></audio></td>"
             f"<td><audio controls preload='none' src='file://{html.escape(trial['render'])}'></audio></td>"
             f"<td>{composite}</td>"
@@ -218,7 +295,7 @@ def _write_html(
         "table{border-collapse:collapse;width:100%}td,th{padding:7px;border-bottom:1px solid #333}"
         "audio{width:240px;height:32px}</style>"
         f"<h1>SG2 {html.escape(voice_class)} — pooled source + per-vowel bodies</h1>"
-        "<p>Interim baseline. Straight-tone rows are grouped by vowel and register; production gates remain active.</p>"
+        "<p>SHIP-MODE performance renders (fresh seeds). Scores are computed separately from deterministic FIT-MODE renders.</p>"
         "<table><tr><th>Vowel</th><th>Register</th><th>Reference</th><th>Render</th>"
         "<th>Composite</th><th>Partial / mel dB</th></tr>"
         + "".join(rows) + "</table>",
@@ -232,11 +309,16 @@ def main() -> None:
     parser.add_argument("--fit-root", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    parser.add_argument("--controllability", type=Path, required=True)
     args = parser.parse_args()
-    summary = build(args.references, args.fit_root, args.out, args.repo_root)
+    summary = build(
+        args.references, args.fit_root, args.out, args.repo_root,
+        args.controllability,
+    )
     print(json.dumps({
         "meanComposite": summary["meanComposite"],
-        "gateCounts": summary["gateCounts"],
+        "constructionPassed": summary["construction"]["passed"],
+        "tripwirePassed": summary["tripwires"]["strictPassed"],
         "vowelClassification": {
             "passed": summary["vowelClassification"]["passed"],
             "passedRows": summary["vowelClassification"]["passedRows"],

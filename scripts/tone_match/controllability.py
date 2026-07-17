@@ -68,6 +68,21 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "bowScratchLevel": (0.0, 1.0, 0.0),
 }
 
+SUNG_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
+    # Structured per-vowel bodies remain a follow-up audit. These continuous
+    # controls cover the pooled vocal source and performance layer.
+    "glottalTilt": (0.0, 0.5, 0.0),
+    "singerFormantAmount": (0.0, 0.7, 0.0),
+    "voiceBreathSync": (0.0, 0.6, 0.0),
+    "toneBreath": (0.03, 0.18, 0.0),
+    "excitationHuman": (0.0, 0.6, 0.0),
+    "attackNoiseLevel": (0.14, 0.55, 0.0),
+    "partialTilt": (0.0, 0.35, 0.0),
+    "partialTransfer": (0.2, 0.5, 0.0),
+    "spectralResonanceAmount": (1.0, 0.5, 0.0),
+    "spectralDynamicAmount": (0.8, 1.25, 0.0),
+}
+
 
 def _canonical_hash(value: Any) -> str:
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
@@ -161,7 +176,12 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             })
     _render_batch(jobs, repo_root)
 
-    ref_bundles = [extract_features(ref["path"]) for ref in references]
+    # SUNG analysis is anchored to the corpus annotation so a tracker mode
+    # switch cannot masquerade as a parameter response.
+    ref_bundles = [
+        extract_features(ref["path"], expected_f0_hz=ref.get("expectedF0Hz"))
+        for ref in references
+    ]
     weights = weights_for_instrument(instrument)
     render_cache: dict[tuple[str, int], Any] = {}
 
@@ -171,7 +191,9 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             render_cache[key] = extract_features(
                 renders / f"{name}-{ref_index}.wav",
                 active_duration_s=references[ref_index].get(
-                    "durationSec", 1.5))
+                    "durationSec", 1.5),
+                expected_f0_hz=references[ref_index].get("expectedF0Hz"),
+            )
         return render_cache[key]
 
     def distances(name: str) -> dict[str, list[float]]:
@@ -393,29 +415,55 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path,
                         default=Path(__file__).with_name("manifest.json"))
     parser.add_argument("--keys",
-                        help="comma-separated free keys; defaults to the bowed audit set")
+                        help="comma-separated free keys; defaults by instrument family")
     args = parser.parse_args(argv)
     references = json.loads(args.references.read_text())
     campaign_seed = json.loads(args.initial.read_text())
     from .legacy_prior import resolve_legacy_prior
     baseline, legacy_prior = resolve_legacy_prior(args.instrument, campaign_seed)
+    sung_instruments = {
+        "soprano", "mezzo-soprano", "tenor", "bass",
+        "voice-soprano", "voice-mezzo", "voice-tenor", "voice-bass",
+    }
+    available = (SUNG_FREE_PARAMS if args.instrument.strip().lower()
+                 in sung_instruments else BOWED_FREE_PARAMS)
+    objective_references = (
+        [row for row in references if "spectral" in row.get("roles", [])]
+        if args.instrument.strip().lower() in sung_instruments else references
+    )
+    if not objective_references:
+        parser.error("references contain no rows with the spectral role")
     keys = (list(dict.fromkeys(key.strip() for key in args.keys.split(",")
                               if key.strip()))
-            if args.keys else list(BOWED_FREE_PARAMS))
-    unknown = [key for key in keys if key not in BOWED_FREE_PARAMS]
+            if args.keys else list(available))
+    unknown = [key for key in keys if key not in available]
     if unknown:
         parser.error(f"no perturbation specification for: {', '.join(unknown)}")
-    free_params = {key: BOWED_FREE_PARAMS[key] for key in keys}
+    free_params = {key: available[key] for key in keys}
     contract = _manifest_contract(json.loads(args.manifest.read_text()), baseline, keys)
     seen: dict[str, dict[str, Any]] = {}
-    for row in references:
-        seen.setdefault(f"{row.get('register')}|{row.get('dynamic')}", row)
+    analysis_rejects = []
+    for row in objective_references:
+        key = f"{row.get('register')}|{row.get('dynamic')}"
+        if key in seen:
+            continue
+        try:
+            extract_features(
+                row["path"], expected_f0_hz=row.get("expectedF0Hz")
+            )
+        except (ValueError, RuntimeError) as exc:
+            analysis_rejects.append({"path": row.get("path"), "error": str(exc)})
+            continue
+        seen[key] = row
     subset = list(seen.values())[:6]
+    if not subset:
+        parser.error("no pitch-anchored objective reference can be analysed")
     audit = run_audit(args.instrument, baseline, subset, args.output,
                       args.repo_root, free_params=free_params,
-                      objective_references=references,
+                      objective_references=objective_references,
                       manifest_contract=contract)
     audit["legacyPrior"] = legacy_prior
+    audit["auditReferenceSelectionRejects"] = analysis_rejects
     (args.output / "controllability.json").write_text(
         json.dumps(audit, indent=1) + "\n")
     print(json.dumps({"clean": audit["clean"],
