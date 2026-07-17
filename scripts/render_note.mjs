@@ -160,16 +160,27 @@ async function renderJobs(jobs, { retainPcm = true } = {}) {
         : baseParams;
       const rendered = await page.evaluate(async ({ params, options }) => {
         const { renderNoteOffline } = await import("/render-note.js");
-        const buffer = await renderNoteOffline(params, options);
-        return {
-          sampleRate: buffer.sampleRate,
-          channels: Array.from({ length: buffer.numberOfChannels }, (_, i) => Array.from(buffer.getChannelData(i))),
-        };
+        const { MEASURED_PROFILES } = await import("/measured_profiles.js");
+        const profile = MEASURED_PROFILES[params.spectralProfile];
+        const savedHumanRanges = profile?.humanRanges;
+        if (options.omitMeasuredHumanRanges && profile) delete profile.humanRanges;
+        try {
+          const buffer = await renderNoteOffline(params, options);
+          return {
+            sampleRate: buffer.sampleRate,
+            channels: Array.from({ length: buffer.numberOfChannels }, (_, i) => Array.from(buffer.getChannelData(i))),
+          };
+        } finally {
+          if (options.omitMeasuredHumanRanges && profile) {
+            profile.humanRanges = savedHumanRanges;
+          }
+        }
       }, { params, options: {
         midi: Number(job.midi ?? 60), velocity: Number(job.velocity ?? 0.62),
         durationSec: Number(job.durationSec ?? job.duration ?? 1.5),
         sampleRate: Number(job.sampleRate ?? 48000),
         preRollSec: Number(job.preRollSec ?? 0),
+        omitMeasuredHumanRanges: job.omitMeasuredHumanRanges === true,
       } });
       const wav = wavBytes(rendered.channels, rendered.sampleRate);
       if (job.out) await writeFile(job.out, wav);
@@ -259,16 +270,28 @@ async function main() {
           envelopeSustainSd: 0, envelopeRelease: .02, reverbWet: 0 },
         midi: 60, velocity: .72, durationSec: 8, sampleRate: 12000,
       });
+      const t074HumanZero = (spectralProfile, omitMeasuredHumanRanges = false) => ({
+        params: { spectralProfile, excitationType: "bow", seed: 74074,
+          spectralPartials: 32, spectralMix: 1, excitationHuman: 0,
+          vibratoProb: 0, bowScratchLevel: 0, attackNoiseLevel: 1,
+          reverbWet: 0 },
+        midi: spectralProfile === "cello" ? 48 : 69,
+        velocity: .62, durationSec: .75, sampleRate: 24000,
+        omitMeasuredHumanRanges,
+      });
       const [a, b, inert, coupled, bowLegacy, bowOff, bowOnA, bowOnB,
         syncLegacy, syncZero, syncLow, syncHigh, syncBody,
         windSilent, windActiveA, windActiveB,
-        strikeSustainLow, strikeSustainHigh, pluckSustainLow, pluckSustainHigh] =
+        strikeSustainLow, strikeSustainHigh, pluckSustainLow, pluckSustainHigh,
+        violinHumanZero, violinPrior, celloHumanZero, celloPrior] =
         await renderJobs([job, job, inertJob, coupledJob,
           bowBase, bowZero, bowEnabled, bowEnabled,
           breathOmitted, breathZero, breathSyncLow, breathSyncHigh, breathBody,
           windOff, windOn, windOn,
           l18Base("strike", .05), l18Base("strike", 1),
-          l18Base("pluck", .05), l18Base("pluck", 1)]);
+          l18Base("pluck", .05), l18Base("pluck", 1),
+          t074HumanZero("violin"), t074HumanZero("violin", true),
+          t074HumanZero("cello"), t074HumanZero("cello", true)]);
       const pcmDiff = (left, right) => {
         let maxDiff = 0, meanDiff = 0, count = 0;
         for (let ch = 0; ch < left.channels.length; ch++) {
@@ -309,6 +332,15 @@ async function main() {
       const bowConsumerDiff = pcmDiff(bowOff, bowOnA);
       if (bowConsumerDiff.meanDiff <= 1e-7) {
         throw new Error(`pinned bow-noise consumer is silent: mean diff ${bowConsumerDiff.meanDiff}`);
+      }
+      for (const [instrument, humanZero, strongestPrior] of [
+        ["violin", violinHumanZero, violinPrior],
+        ["cello", celloHumanZero, celloPrior],
+      ]) {
+        const identity = pcmDiff(humanZero, strongestPrior);
+        if (identity.maxDiff > 1 / 32768) {
+          throw new Error(`T-074 ${instrument} Human 0 changed strongest-prior PCM: ${JSON.stringify(identity)}`);
+        }
       }
       const windRepeatDiff = pcmDiff(windActiveA, windActiveB);
       if (windRepeatDiff.maxDiff > 1 / 32768) {
