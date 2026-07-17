@@ -33,6 +33,7 @@ from scripts.tone_match.sung_consonants import (
 from scripts.tone_match.sung_consonant_audit import audit as audit_consonant_generator
 from scripts.tone_match.sung_exchange_status import extract as extract_exchange
 from scripts.tone_match.sung_pass_state import _selection_key
+from scripts.tone_match.sung_spectral_triage import fit_global_dynamic_amount
 from scripts.tone_match.sung_prior import (
     LEGACY_VOCAL_CRAFT,
     LEGACY_VOCAL_PRIOR_HASH,
@@ -339,6 +340,48 @@ def test_sung_leaderboard_closes_strict_cells_before_composite():
         }
 
     assert _selection_key(entry(4, 9.0)) < _selection_key(entry(5, 1.0))
+
+
+def test_sung_leaderboard_orders_partial_before_downstream_spectral_cells():
+    def entry(partial, mel, partial_residual=0.0):
+        return {
+            "meanComposite": 1.0,
+            "gates": {
+                "construction": {"counts": {"fail": 0}},
+                "strictTripwires": {
+                    "requiredFail": partial + mel, "requiredMissing": 0,
+                    "byBar": {
+                        "partial-table": {"fail": partial, "missing": 0,
+                                          "meanNormalizedResidual": partial_residual},
+                        "mel-spectrogram": {"fail": mel, "missing": 0},
+                    },
+                },
+                "vowelBodyConsumption": {"requiredRows": 10, "passedRows": 10},
+                "vowelClassification": {"requiredRows": 10, "passedRows": 10},
+                "humanisation": {"passed": False},
+            },
+        }
+
+    assert _selection_key(entry(0, 3)) < _selection_key(entry(1, 0))
+    assert _selection_key(entry(1, 3, 1.0)) < _selection_key(entry(1, 0, 2.0))
+
+
+def test_sung_dynamic_scalar_is_recovered_from_debodied_source_rows():
+    amount = 0.65
+    source = -7.0 * np.log2(np.arange(1, 25))
+    rows = []
+    for velocity, dynamic in ((.2, "pp"), (.62, "mf"), (.92, "ff")):
+        exponent = .5 * np.log2(1 + np.arange(1, 25))
+        dynamic_db = 20 * exponent * np.log10(velocity / .62) * amount
+        for vowel in "aeiou":
+            rows.append({
+                "vowel": vowel, "register": "mid", "dynamic": dynamic,
+                "velocity": velocity, "sourceId": vowel,
+                "sourceDb": source + dynamic_db,
+            })
+    result = fit_global_dynamic_amount(rows)
+    assert result["spectralDynamicAmount"] == pytest.approx(amount, abs=.013)
+    assert result["medianPartialErrorDb"] < 1e-6
 
 
 def test_listening_page_uses_selected_sung_ship_manifest(tmp_path):

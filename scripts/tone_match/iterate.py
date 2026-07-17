@@ -47,6 +47,7 @@ from .criteria_drift import (
     repeat_noise_floor,
 )
 from .legacy_prior import canonical_hash, resolve_legacy_prior
+from .humanisation import ship_human_overrides
 from .paths import sg2_data_root
 from .score import (
     SCORER_CONTRACT_VERSION,
@@ -93,9 +94,8 @@ HUMAN_ONLY_PARAM_KEYS = {
 
 # Feature-domain consequences of the §2.5c Human-designated parameter set.
 HUMAN_VARIATION_FEATURES = {
-    "partials_db",  # bow/strike position and drive variation
-    "vibrato", "noise", "sustain_noise_db", "onset_tilt_db_oct",
-    "onset_scoop_cents", "onset_scoop_settle_ms",
+    "partials_db", "vibrato", "noise", "sustain_noise_db",
+    "onset_tilt_db_oct", "onset_scoop_cents", "onset_scoop_settle_ms",
     "vibrato_onset_delay_ms", "vibrato_ramp_ms", "vibrato_rate_drift",
     "body_am_db", "onset_noise_db", "onset_noise_centroid_oct",
     "noise_lead_ms", "onset_wander_cents",
@@ -150,6 +150,9 @@ def _distributional_variation_gate(
     variability: dict[str, Any],
     rendered_variants: dict[int, list[Any]],
     weights: dict[str, float] | None = None,
+    eligible_groups: set[str] | None = None,
+    eligible_features: set[str] | None = None,
+    watch_features: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Two-sided §2.5c.6 gate over seeded ship-mode feature spreads.
 
@@ -163,6 +166,12 @@ def _distributional_variation_gate(
                     "reason", "no measured take-pair spread")}
     groups: list[dict[str, Any]] = []
     for measured_group in variability.get("groups", []):
+        if (eligible_groups is not None and
+                measured_group["group"] not in eligible_groups):
+            groups.append({"group": measured_group["group"],
+                           "variantPairCount": 0, "checks": [],
+                           "passed": False, "status": "not-qualified-pair"})
+            continue
         pair_rows: list[dict[str, float]] = []
         for reference_index in measured_group.get("referenceIndices", []):
             variants = rendered_variants.get(int(reference_index), [])
@@ -172,7 +181,8 @@ def _distributional_variation_gate(
                         variants[left], variants[right], weights)["features"])
         checks = []
         measured_features = measured_group.get("floorFeatures", {})
-        for feature in sorted(HUMAN_VARIATION_FEATURES & set(measured_features)):
+        feature_domain = eligible_features or HUMAN_VARIATION_FEATURES
+        for feature in sorted(feature_domain & set(measured_features)):
             target = float(measured_features.get(feature) or 0.0)
             values = [float(row[feature]) for row in pair_rows
                       if feature in row and np.isfinite(row[feature])]
@@ -183,14 +193,22 @@ def _distributional_variation_gate(
             upper = target * VARIATION_UPPER_RATIO
             status = "pass" if lower <= observed <= upper else (
                 "too-little" if observed < lower else "too-much")
+            watch_reason = (watch_features or {}).get(feature)
+            if watch_reason:
+                status = "watch-unreachable"
             checks.append({"feature": feature, "measuredSpread": target,
                            "shipSpread": observed, "lower": lower,
-                           "upper": upper, "status": status})
+                           "upper": upper, "status": status,
+                           **({"watchReason": watch_reason}
+                              if watch_reason else {})})
+        scored_checks = [row for row in checks
+                         if row["status"] != "watch-unreachable"]
         groups.append({"group": measured_group["group"],
                        "variantPairCount": len(pair_rows), "checks": checks,
-                       "passed": bool(checks) and all(
-                           row["status"] == "pass" for row in checks)})
-    evidenced = [group for group in groups if group["checks"]]
+                       "passed": bool(scored_checks) and all(
+                           row["status"] == "pass" for row in scored_checks)})
+    evidenced = [group for group in groups if any(
+        row["status"] != "watch-unreachable" for row in group["checks"])]
     if not evidenced:
         return {"status": "insufficient-evidence", "passed": False,
                 "groups": groups,
@@ -471,13 +489,17 @@ def _render_ship_variants(
     count: int,
     *,
     repo_root: Path = ROOT,
+    ship_calibration: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if count < 2:
         raise ValueError("distributional gate requires at least two ship variants")
     target = run_dir / "ship-mode" / label
     target.mkdir(parents=True, exist_ok=True)
     ship_params = _mode_params(params, SHIP_MODE)
+    if ship_calibration:
+        ship_params["shipHumanCalibration"] = ship_calibration
     params_path = target / "params.json"
+    human_range_overrides = []
     jobs_path = target / "jobs.json"
     if jobs_path.exists():
         existing_params = _load(params_path)
@@ -488,22 +510,48 @@ def _render_ship_variants(
             raise ValueError(f"{target}: resumed SHIP job count does not match requested contract")
         seeds = [int(jobs[index * len(references)]["seed"])
                  for index in range(count)]
+        for variant_index in range(count):
+            for reference_index in range(len(references)):
+                job = jobs[variant_index * len(references) + reference_index]
+                human_range_overrides.append({
+                    "variantIndex": variant_index,
+                    "referenceIndex": reference_index,
+                    "seed": int(job["seed"]),
+                    "overrides": {key: value for key, value in
+                                  job.get("paramsOverride", {}).items()
+                                  if key != "performanceRole"},
+                })
     else:
         params_path.write_text(json.dumps(ship_params, indent=2) + "\n")
-        seeds = [secrets.randbits(31) for _ in range(count)]
+        calibrated_seeds = ((ship_calibration or {}).get("seeds") or [])
+        seeds = ([int(seed) for seed in calibrated_seeds[:count]]
+                 if len(calibrated_seeds) >= count else
+                 [secrets.randbits(31) for _ in range(count)])
         jobs = []
         for variant_index, seed in enumerate(seeds):
             variant_dir = target / f"variant-{variant_index:02d}"
             variant_dir.mkdir(parents=True, exist_ok=True)
             for reference_index, reference in enumerate(references):
+                note_seed = seed + reference_index * 104_729
+                performance_override = ship_human_overrides(
+                    ship_params, midi=reference.get("midi", 60), seed=note_seed)
                 jobs.append({
                     "paramsFile": str(params_path), "midi": reference.get("midi", 60),
                     "velocity": reference.get("velocity", .62),
                     "durationSec": reference.get("durationSec", 1.5),
                     "sampleRate": reference.get("sampleRate", 48_000),
-                    "seed": seed + reference_index * 104_729,
-                    "paramsOverride": _reference_render_params_override(reference),
+                    "seed": note_seed,
+                    "paramsOverride": {
+                        **_reference_render_params_override(reference),
+                        **performance_override,
+                    },
                     "out": str(variant_dir / f"note-{reference_index}.wav"),
+                })
+                human_range_overrides.append({
+                    "variantIndex": variant_index,
+                    "referenceIndex": reference_index,
+                    "seed": note_seed,
+                    "overrides": performance_override,
                 })
         jobs_path.write_text(json.dumps(jobs, indent=2) + "\n")
     pending = [job for job in jobs
@@ -536,9 +584,20 @@ def _render_ship_variants(
                     "render": str(path),
                     "error": str(error),
                 })
-    gate = _distributional_variation_gate(variability, rendered, weights)
+    pair_fits = ((ship_params.get("humanRanges") or {}).get("pairFits") or [])
+    qualified_groups = {
+        str(row["group"]) for row in pair_fits
+        if isinstance(row, dict) and row.get("group")
+    }
+    gate = _distributional_variation_gate(
+        variability, rendered, weights,
+        eligible_groups=qualified_groups or None,
+        eligible_features=set((ship_calibration or {}).get(
+            "directFeatures", [])) or None,
+        watch_features=(ship_calibration or {}).get("watchFeatures"))
     payload = {"mode": SHIP_MODE, "variantCount": count, "seeds": seeds,
                "paramsHash": canonical_hash(ship_params), "gate": gate,
+               "humanRangeOverrides": human_range_overrides,
                "analysisFailures": analysis_failures,
                "primaryRenderDirectory": str(target / "variant-00")}
     (target / "variation-gate.json").write_text(json.dumps(payload, indent=2) + "\n")
@@ -1203,6 +1262,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--keys", help="comma-separated free keys; default is every applicable continuous key")
     parser.add_argument("--budget", type=int, default=200)
     parser.add_argument("--ship-variants", type=int, default=DEFAULT_SHIP_VARIANTS)
+    parser.add_argument("--ship-human", type=float,
+                        help="evidence-backed SHIP Human setting; FIT mode still zeros it")
+    parser.add_argument("--ship-calibration", type=Path,
+                        help="measured SHIP draw-scale calibration JSON")
     parser.add_argument("--run", default=time.strftime("%Y%m%d-%H%M%S"))
     parser.add_argument("--resume", action="store_true",
                         help="resume a contract-identical interrupted run directory")
@@ -1212,8 +1275,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=ROOT,
                         help="engine checkout used for headless renders")
     args = parser.parse_args(argv)
+    ship_calibration = (_load(args.ship_calibration)
+                        if args.ship_calibration else None)
     campaign_seed = _load_preset(args.initial)
     initial, prior = resolve_legacy_prior(args.instrument, campaign_seed)
+    if args.ship_human is not None:
+        if not 0 <= args.ship_human <= 1:
+            parser.error("--ship-human must be in [0, 1]")
+        initial["excitationHuman"] = float(args.ship_human)
+        prior["calibratedShipHuman"] = float(args.ship_human)
+        prior["resolvedParameterHash"] = canonical_hash(initial)
+        prior["resolvedHash"] = prior["resolvedParameterHash"]
     references, manifest = _load(args.references), _load(args.manifest)
     # T-012 consuming-side assertion: an owner-rejected take must never be
     # scored, floored, or hashed into the objective id.
@@ -1296,14 +1368,14 @@ def main(argv: list[str] | None = None) -> int:
     legacy_ship = _render_ship_variants(
         run_dir, "legacy-baseline", args.instrument, baseline_best["params"],
         references, variability, scoring_weights, args.ship_variants,
-        repo_root=args.repo_root)
+        repo_root=args.repo_root, ship_calibration=ship_calibration)
     legacy_entry = _ensure_legacy_baseline(
         args.instrument, run_dir, baseline_best, reference_set, prior,
         legacy_ship["gate"])
     candidate_ship = _render_ship_variants(
         run_dir, "candidate", args.instrument, best["params"], references,
         variability, scoring_weights, args.ship_variants,
-        repo_root=args.repo_root)
+        repo_root=args.repo_root, ship_calibration=ship_calibration)
     render_artifacts = _build_listening_page(
         run_dir, args.instrument, best, references, candidate_ship)
     candidate_improved, previous_best_loss = _update_leaderboard(

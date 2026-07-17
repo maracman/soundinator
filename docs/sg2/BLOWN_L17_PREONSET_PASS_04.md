@@ -128,7 +128,7 @@ audits and work items are durable beside those backstops.
 
 ## Exchange, listening and pending mandates
 
-T-064 is generated from the live exchange as engine/analysis incorporated for
+T-066 is generated from the live exchange as engine/analysis incorporated for
 all three winds, bowed legacy-compatible, and a method handoff for sung and
 struck/plucked. The full generated snapshot is
 `sg2-data/state/agent-a-pass04-exchange-statuses.json`.

@@ -621,7 +621,16 @@ improved `4.011533→3.723190` (7.19%) and active failures `15→14`. Pass 13
 then failed to beat the comparable stable-objective leader
 (`3.378844 > 3.317250`) after all seven global controls, while all six mel
 cells remained above bar. Construction is 11/11 and resources pass.
-Status: engine=pending (guitar extension above is ready for one-pass consumption) analysis=incorporated (course-labelled storage, generator, corpus atomicity and consuming tests) struck/plucked=blocked-engine T-033 (resume from durable accepted pass-12 full-objective state after consumer lands)
+Agent D pass-03 bowed delivery: the checked-in violin and cello profiles now
+carry all four explicit `sul*` table sets. The exact bowed selection law,
+playability bounds, fallback rule, `partialB` requirement, and five engine
+consuming assertions are filed in `BOWED_ENGINE_HANDOFFS.md`. Analysis tests
+prove that only explicitly labelled bowed takes enter the selected string
+table and that string groups do not pool.
+Status: engine=pending-Agent-A (guitar and bowed contracts are ready for
+one-pass consumption) analysis=incorporated (course/sul-labelled storage,
+generator, corpus atomicity and consuming tests) struck/plucked=blocked-engine
+T-033 bowed=blocked-engine T-033
 
 ### T-034 · ENGINE SPEC (small): dynamic pitch flattening for bowed forte
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; value fitted per instrument; INSTRUMENT physics, not Human
@@ -844,7 +853,7 @@ own same-string reference direction without changing the absent-table
 fallback.
 Affects: profile schema / strings_prep / stringSelect / spectral table
 consumer / partial, mel, and band gates.
-Status: analysis=pending engine=pending bowed=blocked T-033
+Status: analysis=incorporated engine=pending-Agent-A bowed=blocked T-033
 struck/plucked=adapted (string/course identity, no bow selection semantics)
 
 ### T-044 · Bowed strict coverage is role-declared and corpus-backed
@@ -1302,6 +1311,13 @@ matrix to 78 accepted steps, 58 transitions, 11 significant edges, and 86
 symmetric-coupling candidates; the blown contribution remains 42/37 and both
 wrong-renderer flute rows remain absent.
 
+Status update — Agent E sung pass 05, 2026-07-17: T-059
+sung=adapted-one-step-no-edge-claimed. The render-domain candidate records the
+ordered partial → mel → attack → band-balance intervention and the leaderboard
+compares the complete hard-cell outcome before composite. This pass contains
+only one accepted intervention per identity, so it does not fabricate a drift
+edge or update the cross-run asymmetry matrix.
+
 ### T-060 · Release scoring is gated by mechanically audited full tails
 Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-corpus labels
 Finding: release and damping features are invalid on truncated references and
@@ -1319,12 +1335,16 @@ Blown may adopt the method with its own corpus labels.
 Status: analysis=incorporated bowed=incorporated
 struck/plucked=adapt-method sung=adapt-method engine=pending-control
 
-Status update — Agent E sung pass 05, 2026-07-17: T-059
-sung=adapted-one-step-no-edge-claimed. The render-domain candidate records the
-ordered partial → mel → attack → band-balance intervention and the leaderboard
-compares the complete hard-cell outcome before composite. This pass contains
-only one accepted intervention per identity, so it does not fabricate a drift
-edge or update the cross-run asymmetry matrix.
+Status update — Agent D pass 03, 2026-07-17: `releaseDamping` is now a
+manifested bowed free control. A fresh hashed violin audit consumed every 17
+mechanically eligible full-tail row in the rebuilt manifest (a strict
+superset of the 14 known at pass start). It retained all three release
+weights: ring response 10.3 units, damping-slope response 50.094 units, and
+release-noise response 32.3372 units, with `releaseDamping` the best responder
+for each. Independent repeats were stable for all three. Bowed release
+features are therefore released at weight 1; corpus gating remains mandatory.
+Status: analysis=incorporated bowed=incorporated+released
+struck/plucked=adapt-method sung=adapt-method engine=incorporated-bowed-control
 
 ### T-062 · Human-range candidates and consumers are excitation-specific
 Author: Agent A / blown-engine · 2026-07-17 · Firewall: method + engine plumbing
@@ -1376,7 +1396,7 @@ all family campaign adapters.
 Status: engine=incorporated `b5f91b7` analysis=pending-review
 struck/plucked=adapt-method sung=adapt-method bowed=adapt-method
 
-### T-064 · Pinned pre-onset noise is a component contract, not a tone-ADSR colour
+### T-066 · Pinned pre-onset noise is a component contract, not a tone-ADSR colour
 Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-instrument data
 Finding: L14's cross-pitch residual separator generalises to L17 only when the
 output retains four independent measured parts: pinned spectrum, established
@@ -1423,3 +1443,47 @@ tone-model verifier proves measured positive pre-onset placement, independent
 component envelope consumption, separate pp/ff pinned spectra, non-neutral
 factory-preset activation, and engine-wide activation coverage for all three
 wind profiles plus violin's legacy bow adapter.
+
+### T-064 · Envelope-anomaly classes may transfer to sung onsets, not values
+Author: owner L16 / sung lane disposition · 2026-07-17 · Firewall: mechanism only
+Finding: L16's separation of baseline envelope behaviour from systematically
+deviant frequency envelopes can apply later to sung onset components (for
+example a consonant burst or glottal-onset harmonic whose boost decays faster
+than the sustained source). Piano's velocity gates, frequency assignments and
+decay values do not transfer. Sung adoption requires its own per-partial onset
+tracks, cross-note fixed-Hz versus harmonic-rank separation, synthetic
+round-trip, and licensed sung-onset evidence; A-VOICE-03 remains zero-weight
+until its consumer lands, so no envelope-anomaly fit is activated now.
+Consuming assertions: absent layer is PCM-identical; class assignments are
+pinned measurements rather than optimiser variables; a future sung row must
+prove onset-only decay without changing sustained vowel-body transfer.
+Affects: future sung-onset analysis / A-VOICE-03 composition / onset objective.
+Status: sung=adapted-later-onset-only analysis=pending-family-evidence engine=pending-neutral-consumer
+
+### T-065 · Sung passaggio and dynamics require a consuming source-table law
+Author: sung lane · 2026-07-17 · Firewall: mechanism; values per primary singer
+Finding: the renderer's profile-level register tables are bypassed by explicit
+sung `spectralPartialMeans`, while one global dynamic-brightness scalar cannot
+express the measured source changes. After exact vowel-body subtraction, a
+register × dynamic counterfactual lowers median partial error by 34.6–52.7%
+across soprano, tenor, bass and mezzo. Per SUNG_PREFLIGHT V0.1/V0.4, those
+residuals belong to one shared glottal source table, never five vowel sources.
+Consuming assertions: A-VOICE-05 endpoint/interpolation/clamp tests; absent
+table PCM identity; `/a/` and `/i/` share pre-body source partials; T-058 body
+transfer remains exact; fresh controllability responders precede weighting.
+Affects: sung source schema / `_spectralFingerprint` / partial, mel and
+band-balance gates / passaggio construction.
+Status: sung=spec-filed-with-consuming-assertion analysis=pending-pinned-emitter engine=pending
+
+Status update — Agent E sung pass 06, 2026-07-17: T-059
+sung=incorporated-three-accepted-transitions. Soprano, bass and mezzo
+corpus-fitted dynamic-scalar steps entered their run-local accepted-step logs
+and the shared asymmetry matrix with complete feature vectors and repeat-noise
+floors. Tenor's lower-composite trial worsened the upstream partial criterion,
+so it was rejected and is absent from the matrix as required.
+
+Status update — Agent E pass-06 final shared-head sync, 2026-07-17: T-064
+sung=adapted-later-onset-only-base-consumer-landed. Shared head `b5f91b7`
+lands A-VOICE-03's neutral, provenance-gated consonant consumer after the sung
+fit completed. No licensed sung consonant evidence or envelope-anomaly class
+was activated; anomaly-specific analysis and decay law remain pending.

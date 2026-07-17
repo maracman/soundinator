@@ -6,6 +6,7 @@ import { accessSync, constants } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import process from "node:process";
+import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
@@ -30,7 +31,20 @@ async function loadChromium() {
 
 const chromium = await loadChromium();
 
-const ROOT_URL = process.env.SG2_URL || "http://127.0.0.1:8765";
+let rootUrl = process.env.SG2_URL || null;
+
+async function reserveLoopbackPort() {
+  return await new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.unref();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const port = typeof address === "object" && address ? address.port : null;
+      probe.close(error => error ? reject(error) : resolve(port));
+    });
+  });
+}
 
 function usage(message = "") {
   if (message) console.error(message);
@@ -56,8 +70,9 @@ function parseArgs(argv) {
 }
 
 async function serverReady() {
+  if (!rootUrl) return false;
   try {
-    const response = await fetch(`${ROOT_URL}/index.html`);
+    const response = await fetch(`${rootUrl}/index.html`);
     return response.ok;
   } catch {
     return false;
@@ -65,11 +80,22 @@ async function serverReady() {
 }
 
 async function ensureServer() {
-  if (await serverReady()) return null;
+  // An explicit SG2_URL is an intentionally managed server. Otherwise every
+  // renderer owns a fresh loopback port so concurrent worktrees cannot reuse
+  // or block one another's checkout-bound web assets.
+  if (rootUrl) {
+    for (let i = 0; i < 600; i++) {
+      if (await serverReady()) return null;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error(`timed out waiting for managed server ${rootUrl}`);
+  }
+  const port = await reserveLoopbackPort();
+  rootUrl = `http://127.0.0.1:${port}`;
   let bundledPython = false;
   try { accessSync(".venv/bin/python", constants.X_OK); bundledPython = true; } catch {}
   const python = process.env.PYTHON || (bundledPython ? ".venv/bin/python" : "python3");
-  const child = spawn(python, ["-m", "synthesiser.web.server"], {
+  const child = spawn(python, ["-m", "synthesiser.web.server", "--port", String(port)], {
     cwd: fileURLToPath(new URL("..", import.meta.url)),
     env: { ...process.env, PYTHONPATH: "src" },
     stdio: ["ignore", "ignore", "pipe"],
@@ -77,13 +103,13 @@ async function ensureServer() {
   let errorText = "";
   child.stderr.on("data", chunk => { errorText += chunk; });
   child.on("error", error => { errorText += error.message; });
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 600; i++) {
     if (await serverReady()) return child;
     if (child.exitCode != null) throw new Error(`dev server exited (${child.exitCode}): ${errorText}`);
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   child.kill();
-  throw new Error(`timed out waiting for ${ROOT_URL}`);
+  throw new Error(`timed out waiting for ${rootUrl}`);
 }
 
 function wavBytes(channels, sampleRate) {
@@ -125,7 +151,7 @@ async function renderJobs(jobs, { retainPcm = true } = {}) {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
-    await page.goto(`${ROOT_URL}/index.html`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${rootUrl}/index.html`, { waitUntil: "domcontentloaded" });
     const results = [];
     for (const job of jobs) {
       const baseParams = await paramsFor(job);

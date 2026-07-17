@@ -93,6 +93,8 @@ GUITAR_OPEN_MIDI = {
     "string2": 59,
     "string1": 64,
 }
+BOWED_STRING_RE = re.compile(r"(?:^|[._-])(sul[CGDAE])(?:[._-]|$)",
+                             re.IGNORECASE)
 
 
 def engine_t60(freq_hz: float, material: float) -> float:
@@ -158,6 +160,20 @@ def guitar_course_for_midi(midi: int, max_fret: int = 24) -> str | None:
     if not playable:
         return None
     return min(playable)[2]
+
+
+def bowed_string_from_filename(filename: str) -> str | None:
+    """Return the exact Iowa bowed-string identity carried by a take.
+
+    T-033 forbids inferring a string from pitch during analysis: overlapping
+    stopped-note ranges make the same MIDI valid on multiple strings.  Only
+    an explicit corpus label may contribute to a per-string table.
+    """
+    match = BOWED_STRING_RE.search(os.path.basename(filename))
+    if not match:
+        return None
+    suffix = match.group(1)[3:].upper()
+    return f"sul{suffix}"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -2150,6 +2166,8 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
     if instrument_name == "guitar":
         string_selector = lambda note: guitar_course_for_midi(
             int(round(69 + 12 * math.log2(note.f0 / 440.0))))
+    elif instrument_name in {"violin", "cello"}:
+        string_selector = lambda note: bowed_string_from_filename(note.file)
     agg = aggregate_instrument(notes, vib_notes, n_partials,
                                body_stability_gate=AIR_JET_BODY_GATE.get(instrument_name),
                                body_diagnostic_centres_hz=
@@ -2186,7 +2204,10 @@ def merge_profile_sets(out: dict, previous: dict) -> dict:
             continue
         # A sparse single-note refresh can replace corrupt pitch/spectral
         # evidence without pretending it also re-measured the body.
-        for key in ("resonances", "resonancesFit"):
+        # These are independently fitted campaign contracts.  A spectral /
+        # body regeneration must not silently erase them merely because this
+        # analyser does not re-run the differential/noise extractor (F3/F4).
+        for key in ("resonances", "resonancesFit", "humanRanges", "bowNoise"):
             if not profile.get(key) and prior.get(key):
                 profile[key] = prior[key]
     for inst, profile in previous.items():
