@@ -2,6 +2,7 @@
 
 Date: 2026-07-18  
 Lane: Agent A / engine + blown  
+Pass first merged to shared at: `3ca100a`
 Exit state: **§2.5(b), named limiting factor**; no ship, preset promotion, or freeze claim
 
 ## Outcome
@@ -165,8 +166,13 @@ is bound to source SHA-256
 `cb695c4eba08239833f0cd367b453001bceb67dda7a7b6df7ff35f2d0f57c34a`
 and stored at `sg2-data/state/agent-a-pass08-exchange-statuses.json` (snapshot
 SHA-256 `117fd32039e56ba9f4d7cfbbfd53878dba064ce7b54a4a744f92296d7c3075ea`).
-The global owner page is rebuilt at pass end; its final exact-head hash and
-shared integration commit are recorded in the durable pass summary.
+The global owner page was rebuilt for all 16 instruments on exact shared head
+`3ca100a`. Twelve non-manifest instruments were freshly rendered with one
+build seed through the project Python 3.12 environment; no render-failure row
+remains. `listen.html` SHA-256 is
+`cb228eb7c724d7b40aa20202f97e301d718086b276aa024f8cb5efa1c32448c6`.
+The final report and shared integration commits are recorded in the durable
+pass summary.
 
 - `npm test`: PASS, 11/11;
 - `node scripts/verify_tone_model.mjs`: PASS, all tone-model assertions;
