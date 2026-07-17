@@ -3060,16 +3060,44 @@ export function measuredHumanDelta(episode, observable) {
   return 0;
 }
 
-/** T-063 bowed level adapters. The fitted dB observables are deltas around
- * the strongest-prior identity controls, never a second absolute episode. */
+export function measuredHumanSample(episode, observable) {
+  if (!episode?.samples || !episode?.observables) return null;
+  for (const [parameter, name] of Object.entries(episode.observables)) {
+    const sample = Number(episode.samples[parameter]);
+    if (name === observable && Number.isFinite(sample)) return sample;
+  }
+  return null;
+}
+
+/** T-063/T-074 bowed level adapters. Sustained bow noise is a dB delta
+ * around the strongest-prior control. Scratch is different: its prior is
+ * deliberately exact-neutral, so a triggered episode maps the stored
+ * absolute dB sample to a gain relative to the pinned attack-noise component.
+ * With no episode the prior remains untouched, including exact zero. */
 export function bowedHumanLevels(bowNoiseLevel, bowScratchLevel, episode) {
   const scaleDb = (base, observable) => Math.max(0, Math.min(2,
     (Number(base) || 0) * Math.pow(10,
       measuredHumanDelta(episode, observable) / 20)));
+  const scratchDb = measuredHumanSample(episode, "onsetNoiseDb");
   return {
     bowNoiseLevel: scaleDb(bowNoiseLevel, "sustainNoiseDb"),
-    bowScratchLevel: scaleDb(bowScratchLevel, "onsetNoiseDb"),
+    bowScratchLevel: scratchDb == null
+      ? Math.max(0, Math.min(2, Number(bowScratchLevel) || 0))
+      : Math.max(0, Math.min(2, Math.pow(10, scratchDb / 20))),
   };
+}
+
+/** T-074: fitted attack-noise Human ranges are transient/sustain ratios,
+ * while the renderer's attackNoise.level is a burst-peak gain. The profile
+ * fitter owns the established ratio x10 calibration; apply it once to the
+ * episode delta after the profile/parameter scale has resolved. Other
+ * excitation families retain their previous raw-delta adapter. */
+export function measuredAttackNoiseLevel(baseLevel, excitationType, episode) {
+  const base = Math.max(0, Number(baseLevel) || 0);
+  const delta = measuredHumanDelta(episode, "attackNoiseLevel");
+  if (!delta) return base;
+  const calibration = excitationType === "bow" ? 10 : 1;
+  return Math.max(0, base + delta * calibration);
 }
 
 // ─── Global space designer (Q6) ─────────────────────────────
@@ -4003,9 +4031,12 @@ export class GenerationEngine {
       vibratoDepth: episodeActivates
         ? episodeDepth : Math.max(0, baseDepth + episodeDepth),
       vibratoDepthSd: fitted ? 0 : this.p.vibratoDepthSd ?? 0,
-      vibratoRate: episodeActivates
-        ? Math.max(.1, episodeRate || fitted?.rate || this.p.vibratoRate || 5.5)
-        : Math.max(.1, (fitted?.rate ?? this.p.vibratoRate ?? 5.5) + episodeRate),
+      // Even when measured depth activates a prior-off episode, rate remains
+      // a differential around the strongest-prior rate. Treating the delta
+      // as an absolute rate inverted T-074's encoded direction whenever the
+      // prior rate exceeded the measured width.
+      vibratoRate: Math.max(.1,
+        (fitted?.rate ?? this.p.vibratoRate ?? 5.5) + episodeRate),
       vibratoRateSd: fitted ? 0 : this.p.vibratoRateSd ?? 0,
       vibratoOnsetDelayMs: Math.max(0,
         measuredHumanDelta(humanEpisode, "vibratoOnsetDelayMs")),
@@ -4212,10 +4243,12 @@ export class GenerationEngine {
         Number(measuredAttackNoise.decay) || Infinity,
         Math.max(.005, lockinStaggerMs / 1000)) }
       : measuredAttackNoise;
-    const attackNoiseDelta = measuredHumanDelta(humanEpisode, "attackNoiseLevel");
-    if (attackNoise && attackNoiseDelta) {
-      attackNoise = { ...attackNoise, level: Math.max(0,
-        Number(attackNoise.level || 0) + attackNoiseDelta) };
+    if (attackNoise) {
+      const episodeLevel = measuredAttackNoiseLevel(
+        attackNoise.level, excType, humanEpisode);
+      if (episodeLevel !== attackNoise.level) {
+        attackNoise = { ...attackNoise, level: episodeLevel };
+      }
     }
     const pinnedNoiseComponents = Object.fromEntries(
       pinnedNoiseComponentsFor(profile).map(component => [component.id, {

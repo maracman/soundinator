@@ -147,3 +147,26 @@ Required consuming assertions:
 - rerun the six-cell native-episode audit after all five land. Until then the
   decomposition verdict remains `INCONCLUSIVE-MASKED`; no missing-DOF claim or
   identity widening is permitted.
+
+Pass-07 engine receipt — Agent A, 2026-07-18: all five isolated consumers are
+now incorporated. The assertion harness hash-pins the exact violin and cello
+contracts, varies one measured support at a time, retains only the physical
+vibrato-depth prerequisite, and checks encoded direction above 0.05. Activated
+vibrato rate remains a differential around the strongest-prior rate; cello
+depth drives the renderer's body-AM automation; cello onset delay moves the
+first tracked cycle within 20 ms and zero is the exact prior path; scratch maps
+the triggered absolute dB sample out of its exact-zero prior; and bowed attack
+ratio deltas receive the established x10 calibration once after profile scaling.
+The offline renderer also proves Human 0 PCM identity for both instruments with
+the Human contract present versus removed.
+
+The six-cell cello aggregate rerun is clean and repeat-stable at
+`sg2-data/campaigns/cello/audit-agent-a-pass07-t074/controllability.json`
+(SHA-256 `66074715b58faf53d2fb73728201c7e5a4a44ac576e55a4bd4b2de28b0ec1a96`),
+renderer `9b18b3bb7bfc75eb`, Human contract `701f65c47237a5ae`. Aggregate
+`excitationHuman` now moves vibrato by 1.7799 and body AM by 2.1367 perceptual
+units; the intentionally causal isolated assertions remain authoritative for
+delay, scratch and attack rather than attributing a mixed episode to them.
+Both checked-in violin and cello decomposition verdicts remain
+`INCONCLUSIVE-MASKED`: consumer completion does not repair the still-failing
+identity decomposition or authorise width changes/missing-DOF claims.

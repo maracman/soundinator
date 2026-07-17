@@ -2136,7 +2136,9 @@ assertions are filed in `BOWED_ENGINE_HANDOFFS.md`.
 Affects: measuredHumanEpisode / bowedHumanLevels / vibrato episode prerequisites /
 attack-noise calibration / §2.5c decomposition gate.
 Status: analysis=incorporated bowed=audited-4of9+masked
-engine=pending-five-isolated-adapters sung=adapt-method struck/plucked=adapt-method
+engine=incorporated-five-isolated-adapters+human0-pcm-identity
+distribution=six-cell-rerun-clean+decomposition-still-masked
+sung=adapt-method struck/plucked=adapt-method
 
 Status update — Agent C struck/plucked pass 18, 2026-07-17: T-068 and T-069
 are now incorporated and preset-active for grand piano. The lossless point
