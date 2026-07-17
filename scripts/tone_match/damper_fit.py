@@ -129,12 +129,15 @@ def build_reference(report_path: Path, output: Path,
                 })
                 continue
             midi_anchor = float(np.median([row["midi"] for row in members]))
+            velocity_anchor = float(np.median([row["velocity"] for row in members]))
             cells.append({
                 "register": register, "dynamic": dynamic,
                 "midiSpan": [midi_low, midi_high],
                 "velocitySpan": [velocity_low, velocity_high],
                 "status": "measured", "takes": len(members),
                 "midiAnchor": round(midi_anchor, 3),
+                "velocityAnchorMidi": round(velocity_anchor, 3),
+                "velocityAnchor": round(velocity_anchor / 127.0, 6),
                 "f0": round(440 * 2 ** ((midi_anchor - 69) / 12), 4),
                 "observedPostKneeDbPerSecond": _percentiles([
                     row["observedPostKneeDbPerSecond"] for row in members]),
