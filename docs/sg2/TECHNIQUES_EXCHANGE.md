@@ -2214,6 +2214,50 @@ balance remain masked downstream diagnostics. T-069 may consume the retained
 nylon transient rows, but it may not waive or down-rank that partial-table
 failure.
 
+Status update — Agent E sung pass 10, 2026-07-17: T-058
+sung=incorporated-current-head-consumer-10of10. The six pass-09 losses were
+analysis plumbing: tenor `/i/ low-mf` and `/u/ low-mf`, soprano `/u/ low-mf`,
+bass `/o/ mid-mf` and `/u/ low-mf`, and mezzo `/o/ mid-mf` were dominated by
+numerically valid but inaudible source-table tails. The paired consumer now
+uses a symmetric -50 dB common audibility floor and a dedicated downstream-
+neutral body-on/body-bypass render pair. Bass `/a/ mid-mf` additionally had a
+real fit defect: F2=1023.755 Hz missed the annex floor, so the constrained fit
+moved only F2 to 1034 Hz and preserved the source law. Fresh renderer
+`9b18b3bb7bfc75eb` auditions pass emitted-body and vowel identity 10/10 for
+tenor, soprano, bass and mezzo.
+
+Status update — Agent E sung pass 10, 2026-07-17: T-067
+sung=incorporated-weighted-current-head analysis=incorporated-room-screened.
+The canonical frame-local complex-STFT harmonic subtraction and multiband
+residual-envelope observable passes its synthetic round trip, partial-muted
+engine audit and octave test. Forty lossless reference rows (10 per adult
+voice) survive the room-tail screen; medians are 20.642 dB tenor, 18.585 dB
+soprano, 23.887 dB bass and 20.755 dB mezzo. Renderer-bound calibration seeds
+`voiceBreathSync` at 0.16/0.12/0.27/0.17 respectively. Both the four narrow
+audits and the four ordinary identity audits are clean and repeat-stable with
+`pitch_sync_breath_db` weight 1, a `voiceBreathSync` responder and no
+uncontrolled weighted feature. The deterministic candidate construction
+therefore passes breath for all four voices; room-suspected residuals remain
+excluded rather than modelled. This renderer-bound 10-row-per-voice selection
+supersedes pass-07's broad watch-only room scan for activation: the historical
+room-suspected rows remain excluded evidence, while the later balanced clean
+subset is the corpus consumed by the weighted objective.
+
+Status update — Agent E sung pass 10, 2026-07-17: T-065
+sung=incorporated-current-head-strict-refinement. The measured joint
+register×dynamic source law remains the only source surface and the refiner
+pools reference-minus-render partial residuals across vowels before applying
+bounded existing-cell corrections. Current-head active/absent audits are
+clean for partial, log-mel and band balance in all four voices. The strict
+candidate lowers canonical required-cell partial residual to 5.803 tenor,
+6.330 soprano, 5.642 bass and 4.893 mezzo, but none reaches the 3 dB aggregate bar;
+later tiers and §2.5c therefore remain masked and no Human range is widened.
+
+Status update — Agent E sung pass 10, 2026-07-17: T-064
+sung=incorporated-all-adult-voices-current-head. Tenor, soprano, bass and mezzo
+already carry all five measured consonant onset classes. Fresh pass-10 output
+audits on current HEAD pass activation and earn all five consonant weights for
+every voice, so there is no remaining adult-voice extension to infer.
 Status update — Agent C struck/plucked pass 19, 2026-07-18: T-067/T-068/T-069
 are incorporated and output-verified together for grand. The selected owner
 listening row carries all 23 L18 damper cells, one 41-point independent action

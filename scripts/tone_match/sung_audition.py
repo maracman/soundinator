@@ -100,8 +100,11 @@ def _body_audit_params(fit_params: dict, *, bypass: bool = False) -> dict:
         "bodyBands": [] if bypass else fit_params.get("bodyBands", []),
         "partialTransfer": 0.0,
         "toneBreath": 0.0,
+        "voiceBreathSync": 0.0,
         "attackNoiseLevel": 0.0,
         "vibratoProb": 0.0,
+        "consonantClass": "none",
+        "consonantStrength": 0.0,
         "spectralCullThreshold": 0.0001,
     }
 
@@ -146,8 +149,10 @@ def build(
 
     output_root.mkdir(parents=True, exist_ok=True)
     fit_renders = output_root / "fit-renders"
+    body_transfer_renders = output_root / "body-transfer-renders"
     ship_renders = output_root / "ship-renders"
     fit_renders.mkdir(exist_ok=True)
+    body_transfer_renders.mkdir(exist_ok=True)
     ship_renders.mkdir(exist_ok=True)
     jobs = []
     manifest = []
@@ -164,10 +169,16 @@ def build(
         bypass_params = _body_audit_params(fit_params, bypass=True)
         ship_params = params_for_mode(params, "ship", seed=ship_seed_base + index)
         fit_out = fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
-        body_audit_out = (fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}-body-audit-v2.wav"
-                          if row["register"] in {"low", "mid"} else None)
-        bypass_out = (fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}-body-bypass.wav"
-                      if row["register"] in {"low", "mid"} else None)
+        body_audit_out = (
+            body_transfer_renders /
+            f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}-body-on.wav"
+            if row["register"] in {"low", "mid"} else None
+        )
+        bypass_out = (
+            body_transfer_renders /
+            f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}-body-bypass.wav"
+            if row["register"] in {"low", "mid"} else None
+        )
         ship_out = ship_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
         jobs.append({
             "params": fit_params,
@@ -243,6 +254,7 @@ def build(
             rendered = extract_features(
                 trial["fitRender"], active_duration_s=row["durationSec"],
                 expected_f0_hz=row["expectedF0Hz"],
+                measure_pitch_sync_breath=True,
             )
         except (ValueError, RuntimeError) as exc:
             render_error = str(exc)
@@ -303,7 +315,8 @@ def build(
 
         try:
             reference = extract_features(
-                trial["reference"], expected_f0_hz=row["expectedF0Hz"]
+                trial["reference"], expected_f0_hz=row["expectedF0Hz"],
+                measure_pitch_sync_breath=True,
             )
             if rendered is None:
                 raise ValueError(render_error or "render analysis unavailable")
@@ -476,6 +489,7 @@ def build(
         "legacyPrior": source_fit.get("legacyPrior"),
         "renderModes": {
             "scoring": "fit",
+            "bodyTransfer": "fit-harmonic-only",
             "listening": "not-rendered-scoring-only" if scoring_only else "ship",
             "shipSeedBase": ship_seed_base,
         },
