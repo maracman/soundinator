@@ -217,6 +217,10 @@ async function main() {
         params: { spectralProfile: "voice-mezzo", excitationType: "blow",
           seed: 61061, spectralPartials: 32, spectralMix: 1,
           spectralPartialMeans: mutedPartials, spectralPartialSds: mutedPartials,
+          // A-VOICE-05 profile tables now win over legacy means. An explicit
+          // empty surface selects the exact absent-table fallback so this
+          // fixture continues to isolate breath-envelope synchrony.
+          spectralPartialsByRegisterDynamic: { rows: [] },
           toneBreath: 1, breathLevelScale: 1, breathTurbulence: 0,
           breathBodyAmount: 0, excitationHuman: 0, vibratoProb: 0,
           envelopeAttack: .005, envelopeDecay: .01, envelopeSustain: 1,
@@ -246,13 +250,25 @@ async function main() {
       const windOff = windBase;
       const windOn = { ...windBase,
         params: { ...windBase.params, windBreathLevel: 1 } };
+      const l18Base = (excitationType, sustain) => ({
+        params: { spectralProfile: excitationType === "strike" ? "piano" : "guitar",
+          excitationType, seed: 18066, spectralPartials: 12, spectralMix: 1,
+          excitationHuman: 0, vibratoProb: 0, polarisationAmount: 0,
+          attackNoiseLevel: 0, envelopeAttack: .004, envelopeAttackSd: 0,
+          envelopeDecay: .01, envelopeDecaySd: 0, envelopeSustain: sustain,
+          envelopeSustainSd: 0, envelopeRelease: .02, reverbWet: 0 },
+        midi: 60, velocity: .72, durationSec: 8, sampleRate: 12000,
+      });
       const [a, b, inert, coupled, bowLegacy, bowOff, bowOnA, bowOnB,
         syncLegacy, syncZero, syncLow, syncHigh, syncBody,
-        windSilent, windActiveA, windActiveB] =
+        windSilent, windActiveA, windActiveB,
+        strikeSustainLow, strikeSustainHigh, pluckSustainLow, pluckSustainHigh] =
         await renderJobs([job, job, inertJob, coupledJob,
           bowBase, bowZero, bowEnabled, bowEnabled,
           breathOmitted, breathZero, breathSyncLow, breathSyncHigh, breathBody,
-          windOff, windOn, windOn]);
+          windOff, windOn, windOn,
+          l18Base("strike", .05), l18Base("strike", 1),
+          l18Base("pluck", .05), l18Base("pluck", 1)]);
       const pcmDiff = (left, right) => {
         let maxDiff = 0, meanDiff = 0, count = 0;
         for (let ch = 0; ch < left.channels.length; ch++) {
@@ -311,6 +327,37 @@ async function main() {
       }
       if (!(windToneT0 > .02 && preEnergy > Math.max(1e-10, offPreEnergy * 4))) {
         throw new Error(`L17 wind component did not audibly precede harmonic t0: lead ${windToneT0}, on ${preEnergy}, off ${offPreEnergy}`);
+      }
+      const holdMetrics = (render) => {
+        const samples = render.channels[0], sr = render.sampleRate;
+        const window = Math.round(.25 * sr);
+        const levels = [];
+        for (let start = Math.round(.25 * sr); start + window < Math.min(samples.length, 7.9 * sr); start += window) {
+          let energy = 0;
+          for (let i = start; i < start + window; i++) energy += samples[i] ** 2;
+          levels.push(10 * Math.log10(Math.max(1e-20, energy / window)));
+        }
+        const peak = Math.max(...levels);
+        const active = levels.filter(level => level >= peak - 60);
+        const slopes = active.slice(1).map((level, index) =>
+          (level - active[index]) / .25);
+        return {
+          slopeDbPerSecond: (active[active.length - 1] - active[0]) /
+            Math.max(.25, (active.length - 1) * .25),
+          plateauFraction: slopes.filter(slope => Math.abs(slope) <= .15).length /
+            Math.max(1, slopes.length),
+        };
+      };
+      for (const [type, low, high] of [["strike", strikeSustainLow, strikeSustainHigh],
+        ["pluck", pluckSustainLow, pluckSustainHigh]]) {
+        const identity = pcmDiff(low, high);
+        if (identity.maxDiff > 1 / 32768) {
+          throw new Error(`L18 ${type} envelopeSustain changed PCM: ${JSON.stringify(identity)}`);
+        }
+        const hold = holdMetrics(low);
+        if (!(hold.slopeDbPerSecond <= -.3 && hold.plateauFraction < .5)) {
+          throw new Error(`L18 ${type} rendered hold plateau: ${JSON.stringify(hold)}`);
+        }
       }
       const syncZeroDiff = pcmDiff(syncLegacy, syncZero);
       if (syncZeroDiff.maxDiff > 1 / 32768) {

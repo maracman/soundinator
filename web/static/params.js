@@ -493,6 +493,9 @@ export const DEFAULTS = {
   vibratoRate: 5.5,
   vibratoRateSd: 0.7,
   spectralProfile: "violin",
+  // T-033: automatic physical string/course selection, or an explicit
+  // instrument-valid sul*/string* key. Per-string tables remain pinned data.
+  stringSelect: "auto",
   // Tone v2 excitation (T2): how energy enters the resonator. Defaults
   // match the default profile (violin); choosing a profile re-seats them.
   excitationType: "bow",
@@ -555,6 +558,10 @@ export const DEFAULTS = {
   spectralSpread: 0.45,
   spectralPartialMeans: null,
   spectralPartialSds: null,
+  // A-VOICE-05 / T-065: pinned register x dynamic source rows. null consumes
+  // the measured profile table when one exists; absent everywhere preserves
+  // the legacy explicit-means/register path exactly.
+  spectralPartialsByRegisterDynamic: null,
   spectralPartialDyns: null,
   spectralPartialRegs: null,
   spectralDynamicAmount: 0.8,
@@ -570,6 +577,9 @@ export const DEFAULTS = {
   // Independent note-off damping: 0 preserves the material ring; 1 models
   // firm damper/hand contact without changing the held-note decay law.
   releaseDamping: 0,
+  // L18/T-066: pinned note-off damper-contact rows. The serialized ADSR
+  // sustain remains for migration but cannot sustain strike/pluck modes.
+  damperByRegister: null,
   polarisationAmount: 0,
   polarisationSplitCents: 0,
   polarisationDecayRatio: 1,
