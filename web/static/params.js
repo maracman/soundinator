@@ -564,6 +564,9 @@ export const DEFAULTS = {
   // the measured profile table when one exists; absent everywhere preserves
   // the legacy explicit-means/register path exactly.
   spectralPartialsByRegisterDynamic: null,
+  // Optional instrument-owned multiplier rows for the pinned wind-breath
+  // component: {f0Hz, velocity, levelScale}. Null is exact-neutral.
+  windBreathLevelByRegisterDynamic: null,
   spectralPartialDyns: null,
   spectralPartialRegs: null,
   spectralDynamicAmount: 0.8,
