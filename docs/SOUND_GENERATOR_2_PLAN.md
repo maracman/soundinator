@@ -486,6 +486,16 @@ stopping floor (§2.5). Additionally:
    sound by construction. Store the fitted ranges in the measured profile
    (`humanRanges`), consumed by the per-note draw machinery; ledger the
    spreads alongside sensitivities.
+4b. **Per-dimension evidence doctrine (owner oversight, 2026-07-17 —
+   F13)**: when ideal pairs are unavailable, evidence strength is judged
+   PER DIMENSION against the goal, never blanket-labelled. Repeat takes
+   that differ in duration or codec are FULL-STRENGTH evidence for
+   duration-robust dimensions (onset wander/lead, articulation level,
+   bow-position comb, vibrato rate/depth); within-run adjacent-note
+   deltas (register-trend removed) are the PRIMARY measure of per-note
+   variation — the quantity the synth actually ships; only genuinely
+   affected dimensions (e.g. MP3-derived noise-floor levels) carry the
+   weaker-evidence flag. Cello applies this doctrine now.
 4. **Pair sources**: Philharmonia multi-takes, vib/nonvib pairs, VocalSet
    repetitions; where no true duplicate exists, adjacent-semitone takes
    with the register trend removed are the fallback proxy (per the
