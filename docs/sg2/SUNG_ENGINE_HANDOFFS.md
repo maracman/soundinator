@@ -246,3 +246,57 @@ families, candidate/objective/leaderboard provenance and non-vocal priors;
 the pinned vocal legacy prior, same-singer sung rows, and explicitly
 transformed frozen adult sung parents pass. The proof cases are executable in
 `tests/test_tone_match.py`.
+
+## A-VOICE-05 · Register × dynamic sung-source tables (Agent A, BLOCKS strict spectral cells)
+
+Problem: all tenor, soprano and bass partial-table cells remain strict failures
+after the lawful pooled-source correction and a corpus-fitted
+`spectralDynamicAmount`. The same is true for mezzo outside the A-VOICE-04
+construction blocker. The existing renderer can interpolate a measured
+profile's `partialsByRegister`, but `_spectralFingerprint` then unconditionally
+prefers explicit sung `spectralPartialMeans` at every harmonic. Sung params
+therefore have no consuming path for their measured passaggio/register source
+change, nor for source-shape changes across pp/mf/ff. A single global dynamic
+exponent is measurably insufficient.
+
+Pass-06 evidence: after subtracting the exact emitted vowel body, replacing one
+pooled source with a register × dynamic counterfactual reduces median partial
+error by 39.9% tenor, 34.6% soprano, 52.7% bass and 46.4% mezzo. These tables
+are diagnostic and were not folded into vowel bodies or unrelated identity
+macros. The mechanism is required by SUNG_PREFLIGHT V0.4 and annex S4/S5; its
+values remain per singer.
+
+Contract:
+
+1. Add one neutral-when-absent param/profile surface for pinned sung source
+   rows, e.g. `spectralPartialsByRegisterDynamic`, with each row carrying a
+   measured f0/register anchor, velocity anchor and partial amplitudes.
+2. Resolve/interpolate the source table before vowel body response, glottal
+   tilt and performance variation. All vowels of one fitted singer consume the
+   same table; the law must never create per-vowel source identities.
+3. Interpolate in log-f0 and velocity, clamp outside the measured hull to the
+   nearest row, and retain `spectralPartialMeans` as the exact absent-table
+   fallback. Table entries are pinned analysis output, never free optimiser
+   dimensions.
+4. The engine/profile schema carries provenance plus passaggio anchors. A
+   fitted table is not considered delivered until explicit params override the
+   generic measured-profile fallback through this consumer.
+
+Consuming assertions:
+
+1. Table absent is PCM-identical to the current explicit-means path.
+2. Two synthetic register anchors with opposite second-harmonic amplitudes
+   produce the expected endpoint partial ratios and a log-f0 midpoint between
+   them; above/below-range notes clamp to the nearest anchor.
+3. Two velocity anchors similarly interpolate at mf without changing f0,
+   resonator ratios, or the selected vowel-body bands.
+4. Rendering `/a/` and `/i/` with the same source-table row proves identical
+   pre-body source partials while the body-on/bypass transfer remains the exact
+   vowel law (T-058).
+5. A fresh sung controllability audit names the table consumer as a responder
+   for `partials_db`, `log_mel_db` and `band_balance_db`; no table-derived
+   feature receives weight before that audit.
+
+Owner: Agent A / engine. Analysis supplies pinned rows only after synthetic
+round-trip validation. Sung disposition: spec filed; no identity parameter was
+bent to emulate the missing law.

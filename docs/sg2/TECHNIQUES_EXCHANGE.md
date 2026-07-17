@@ -1299,3 +1299,41 @@ ordered partial → mel → attack → band-balance intervention and the leaderb
 compares the complete hard-cell outcome before composite. This pass contains
 only one accepted intervention per identity, so it does not fabricate a drift
 edge or update the cross-run asymmetry matrix.
+
+### T-062 · Envelope-anomaly classes may transfer to sung onsets, not values
+Author: owner L16 / sung lane disposition · 2026-07-17 · Firewall: mechanism only
+Finding: L16's separation of baseline envelope behaviour from systematically
+deviant frequency envelopes can apply later to sung onset components (for
+example a consonant burst or glottal-onset harmonic whose boost decays faster
+than the sustained source). Piano's velocity gates, frequency assignments and
+decay values do not transfer. Sung adoption requires its own per-partial onset
+tracks, cross-note fixed-Hz versus harmonic-rank separation, synthetic
+round-trip, and licensed sung-onset evidence; A-VOICE-03 remains zero-weight
+until its consumer lands, so no envelope-anomaly fit is activated now.
+Consuming assertions: absent layer is PCM-identical; class assignments are
+pinned measurements rather than optimiser variables; a future sung row must
+prove onset-only decay without changing sustained vowel-body transfer.
+Affects: future sung-onset analysis / A-VOICE-03 composition / onset objective.
+Status: sung=adapted-later-onset-only analysis=pending-family-evidence engine=pending-neutral-consumer
+
+### T-063 · Sung passaggio and dynamics require a consuming source-table law
+Author: sung lane · 2026-07-17 · Firewall: mechanism; values per primary singer
+Finding: the renderer's profile-level register tables are bypassed by explicit
+sung `spectralPartialMeans`, while one global dynamic-brightness scalar cannot
+express the measured source changes. After exact vowel-body subtraction, a
+register × dynamic counterfactual lowers median partial error by 34.6–52.7%
+across soprano, tenor, bass and mezzo. Per SUNG_PREFLIGHT V0.1/V0.4, those
+residuals belong to one shared glottal source table, never five vowel sources.
+Consuming assertions: A-VOICE-05 endpoint/interpolation/clamp tests; absent
+table PCM identity; `/a/` and `/i/` share pre-body source partials; T-058 body
+transfer remains exact; fresh controllability responders precede weighting.
+Affects: sung source schema / `_spectralFingerprint` / partial, mel and
+band-balance gates / passaggio construction.
+Status: sung=spec-filed-with-consuming-assertion analysis=pending-pinned-emitter engine=pending
+
+Status update — Agent E sung pass 06, 2026-07-17: T-059
+sung=incorporated-three-accepted-transitions. Soprano, bass and mezzo
+corpus-fitted dynamic-scalar steps entered their run-local accepted-step logs
+and the shared asymmetry matrix with complete feature vectors and repeat-noise
+floors. Tenor's lower-composite trial worsened the upstream partial criterion,
+so it was rejected and is absent from the matrix as required.
