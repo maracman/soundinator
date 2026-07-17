@@ -130,7 +130,7 @@ audio-equivalent engine head `aaf01bf`, with no render failures. Its
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: PASS;
 - `PYTHON=../../../.venv/bin/python node scripts/render_note.mjs --verify`:
   PASS, PCM SHA-256
-  `b7fc9dc5df034c2a0144731450b8593ddf788f970dd118f6600271b0f0e6cba8`;
+  `18abfcbf08d26a5cf2f9b1fc6f132bf41217b4ab31d140057e281ac83a5a21b4`;
 - leaderboard/state byte comparison and `git diff --check`: PASS.
 
 The engine change was merged to the shared branch during the pass; this
