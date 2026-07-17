@@ -471,7 +471,12 @@ def ship_human_overrides(params: dict[str, Any], *, midi: float,
     midi_scales = by_midi.get(str(int(round(float(midi)))), {})
 
     def scale(key: str) -> float:
-        return max(0.0, float(midi_scales.get(key, 1.0)))
+        value = float(midi_scales.get(key, 1.0))
+        # A reference with too few audible partials cannot identify the
+        # excitation-position comb and is recorded as NaN by the evidence
+        # fitter.  That missing datum must not leak into renderer JSON; the
+        # global measured range remains valid, so use its neutral MIDI scale.
+        return max(0.0, value) if np.isfinite(value) else 1.0
 
     def row(key: str) -> dict[str, Any] | None:
         value = ranges.get(key)

@@ -20,6 +20,9 @@ import {
   glottalSourceGain,
   velocityHardness,
   twoStageDecayPlan,
+  damperByRegisterAt,
+  damperT60Seconds,
+  struckEnvelopePlan,
   polarisationModePlan,
   polarisationBeatHz,
   attackNoiseRouting,
@@ -38,6 +41,9 @@ import {
   bowedEnvelopeAttackRenderSeconds,
   resolveAttackNoise,
   registerProfileAt,
+  resolveStringSelection,
+  stringProfileAt,
+  sourcePartialsAt,
   humanFluctuationTrace,
   humanPartialShape,
   transferCoupling,
@@ -366,6 +372,40 @@ console.log("T-B2: material damping is a law over real Hz");
     partialIsAudible(0, 1, 8, 0.01));
 }
 
+console.log("L18/T-066 struck hold and damper semantics");
+{
+  for (const excitationType of ["strike", "pluck"]) {
+    const low = struckEnvelopePlan(excitationType, .004, .05);
+    const high = struckEnvelopePlan(excitationType, .004, 1);
+    check(`L18 ${excitationType} envelopeSustain cannot create a hold plateau`,
+      low.sustainIgnored && high.sustainIgnored && low.holdGain === high.holdGain);
+  }
+  check("L18 bow/blow retain their exact sustain semantics",
+    !struckEnvelopePlan("bow", .08, .73).sustainIgnored &&
+    near(struckEnvelopePlan("bow", .08, .73).holdGain, .73, 1e-12) &&
+    near(struckEnvelopePlan("blow", .03, .81).holdGain, .81, 1e-12));
+  const damperRows = [
+    { f0: 110, dampDbPerSecondAtFundamental: 120, frequencyExponent: .5 },
+    { f0: 440, dampDbPerSecondAtFundamental: 240, frequencyExponent: 1 },
+  ];
+  const middleDamper = damperByRegisterAt(damperRows, 220);
+  check("L18 damper table interpolates in log-f0 and clamps outside evidence",
+    near(middleDamper.dampDbPerSecondAtFundamental, 180, 1e-12) &&
+    damperByRegisterAt(damperRows, 55).dampDbPerSecondAtFundamental === 120 &&
+    damperByRegisterAt(damperRows, 880).dampDbPerSecondAtFundamental === 240);
+  check("L18 positive frequency exponent damps high modes faster",
+    damperT60Seconds(middleDamper, 1760, 220) <
+    damperT60Seconds(middleDamper, 220, 220));
+  check("L18 mode 1 receives the same free-decay law as every upper mode",
+    twoStageDecayPlan(220, .7, 1, 4).earlyT60 > 0 &&
+    twoStageDecayPlan(1760, .7, 1, 4).earlyT60 > 0);
+  const damperEngine = new GenerationEngine({ seed: 19, spectralProfile: "piano",
+    excitationType: "strike", damperByRegister: damperRows, spectralPartials: 8 });
+  const damperNote = damperEngine._spectralFingerprint(.7, 220);
+  check("L18 fitted damper rows reach the sounded-note renderer contract",
+    damperNote.damperByRegister === damperRows);
+}
+
 console.log("T-021: coupled polarisation modes");
 {
   const amplitude = 0.37;
@@ -497,6 +537,111 @@ console.log("Engine wiring (fingerprint carries the v2 resonator fields)");
     for (let i = 0; i < 24 && !note2; i++) { const n = engine2.nextNote(); if (n && n.velocity > 0 && n.harmonicPartials) note2 = n; }
     check("explicit partialB param wins", note2 && near(note2.partialB, 5e-4, 1e-15));
   }
+}
+
+console.log("T-033 per-string + pinned register × dynamic source surfaces");
+{
+  check("T-033 violin auto chooses the lowest covering string",
+    resolveStringSelection("violin", 76, "auto") === "sulG" &&
+    resolveStringSelection("violin", 80, "auto") === "sulD");
+  check("T-033 cello auto observes its independent open-string layout",
+    resolveStringSelection("cello", 57, "auto") === "sulC" &&
+    resolveStringSelection("cello", 61, "auto") === "sulG");
+  check("T-033 guitar auto minimises fret and favours the lower course on ties",
+    resolveStringSelection("guitar", 64, "auto") === "string1" &&
+    resolveStringSelection("guitar", 69, "auto") === "string1");
+  const opposite = {
+    partials: [{ amp: 1, spread: 0 }, { amp: 1, spread: 0 }],
+    performance: { partialB: 0 },
+    partialsByRegister: [{ f0: 440, partialB: 1e-5,
+      partials: Array.from({ length: 12 }, (_, i) => ({ amp: i < 4 ? 1 : .1, spread: 0 })) }],
+    partialsByString: {
+      sulA: [{ f0: 880, partialB: 2e-4,
+        partials: Array.from({ length: 12 }, (_, i) => ({ amp: i < 4 ? 1 : .05, spread: 0 })) }],
+      sulE: [{ f0: 880, partialB: 8e-4,
+        partials: Array.from({ length: 12 }, (_, i) => ({ amp: i < 4 ? .05 : 1, spread: 0 })) }],
+    },
+  };
+  const sulA = stringProfileAt(opposite, "violin", 880, "sulA");
+  const sulE = stringProfileAt(opposite, "violin", 880, "sulE");
+  const hiLoDb = row => 10 * Math.log10(
+    row.partials.slice(7).reduce((s, p) => s + p.amp ** 2, 0) /
+    row.partials.slice(0, 4).reduce((s, p) => s + p.amp ** 2, 0));
+  check("T-033 same-pitch sulA/sulE tables move high/low energy in the encoded direction",
+    hiLoDb(sulE) - hiLoDb(sulA) >= 3);
+  check("T-033 selected per-string partialB travels with its amplitude table",
+    sulA.partialB === 2e-4 && sulE.partialB === 8e-4);
+  const noStrings = { partials: opposite.partials,
+    partialsByRegister: opposite.partialsByRegister, performance: opposite.performance };
+  check("T-033 absent per-string data is the exact pooled fallback",
+    JSON.stringify(stringProfileAt(noStrings, "violin", 440, "auto")) ===
+    JSON.stringify(registerProfileAt(noStrings, 440)));
+  check("T-033 unplayable and wrong-instrument explicit keys reject",
+    (() => { try { resolveStringSelection("violin", 55, "sulE"); return false; } catch { return true; } })() &&
+    (() => { try { resolveStringSelection("cello", 57, "sulE"); return false; } catch { return true; } })());
+
+  const surface = { rows: [
+    { f0Hz: 100, velocity: .2, partials: [1, .2, .4] },
+    { f0Hz: 400, velocity: .2, partials: [1, .8, .4] },
+    { f0Hz: 100, velocity: 1, partials: [1, .4, .8] },
+    { f0Hz: 400, velocity: 1, partials: [1, 1.2, .8] },
+  ] };
+  check("A-VOICE-05 register endpoints, log-f0 midpoint and clamps are exact",
+    near(sourcePartialsAt(surface, 100, .2)[1], .2, 1e-12) &&
+    near(sourcePartialsAt(surface, 200, .2)[1], .5, 1e-12) &&
+    near(sourcePartialsAt(surface, 20, .2)[1], .2, 1e-12) &&
+    near(sourcePartialsAt(surface, 800, .2)[1], .8, 1e-12));
+  check("A-VOICE-05 velocity interpolation changes source shape without changing pitch",
+    near(sourcePartialsAt(surface, 100, .6)[2], .6, 1e-12));
+  for (const voice of ["voice-tenor", "voice-bass", "voice-mezzo", "voice-soprano"]) {
+    check(`A-VOICE-05 ${voice} pinned table reaches the engine profile`,
+      SPECTRAL_PROFILES[voice]?.spectralPartialsByRegisterDynamic?.rows?.length > 0);
+  }
+  const sourceEngine = new GenerationEngine({
+    seed: 9, spectralProfile: "voice-tenor", spectralPartials: 12,
+    spectralPartialsByRegisterDynamic: surface, spectralPartialMeans: [1, .01, .01],
+    excitationHuman: 0, bodyArticulation: 1, bodyType: "vocal",
+  });
+  const aSource = sourceEngine._spectralFingerprint(.2, 100, 0, { x: 0, y: 0 });
+  const iSource = sourceEngine._spectralFingerprint(.2, 100, 0, { x: 1, y: 1 });
+  check("A-VOICE-05 explicit table overrides generic means and is vowel-independent pre-body",
+    near(aSource.harmonicPartials[1].sourceAmp, .2, 1e-12) &&
+    near(iSource.harmonicPartials[1].sourceAmp, .2, 1e-12));
+  check("A-VOICE-05 vowel body still acts after the shared source row",
+    aSource.harmonicPartials.some((part, i) =>
+      Math.abs(part.mean - iSource.harmonicPartials[i].mean) > 1e-6));
+  const absentA = new GenerationEngine({ seed: 11, spectralProfile: "vocal",
+    spectralPartials: 8, spectralPartialMeans: [1, .3, .1], excitationHuman: 0 });
+  const absentB = new GenerationEngine({ seed: 11, spectralProfile: "vocal",
+    spectralPartials: 8, spectralPartialMeans: [1, .3, .1],
+    spectralPartialsByRegisterDynamic: null, excitationHuman: 0 });
+  check("A-VOICE-05 absent table is exact legacy explicit-means identity",
+    JSON.stringify(absentA._spectralFingerprint(.62, 220).harmonicPartials) ===
+    JSON.stringify(absentB._spectralFingerprint(.62, 220).harmonicPartials));
+
+  for (const instrument of ["flute", "clarinet", "alto-sax", "trumpet", "french-horn"]) {
+    const fitted = SPECTRAL_PROFILES[instrument]?.spectralPartialsByRegisterDynamic;
+    const cells = new Set((fitted?.rows || []).map(row =>
+      `${row.register}|${row.dynamic}`));
+    check(`blown sustain ${instrument} has all six pinned annex cells`,
+      ["low", "mid", "high"].every(register =>
+        ["pp", "ff"].every(dynamic => cells.has(`${register}|${dynamic}`))));
+    check(`blown sustain ${instrument} resolves every evidence anchor exactly`,
+      fitted.rows.every(row => sourcePartialsAt(
+        fitted, row.f0Hz, row.velocity).every((amp, index) =>
+          near(amp, row.partials[index], 1e-12))));
+  }
+  const fluteSurface = SPECTRAL_PROFILES.flute.spectralPartialsByRegisterDynamic;
+  const fluteAnchor = fluteSurface.rows.find(row =>
+    row.register === "mid" && row.dynamic === "ff");
+  const blownSource = new GenerationEngine({
+    seed: 12, spectralProfile: "flute", excitationType: "blow",
+    spectralPartials: 16, spectralPartialMeans: Array(16).fill(.001),
+    excitationHuman: 0,
+  })._spectralFingerprint(fluteAnchor.velocity, fluteAnchor.f0Hz);
+  check("blown pinned source table overrides pooled scalar means before body",
+    blownSource.harmonicPartials.every((part, index) =>
+      near(part.sourceAmp, fluteAnchor.partials[index], 1e-12)));
 }
 
 console.log("T-B1: excitation position comb kills the right partials (measured)");
