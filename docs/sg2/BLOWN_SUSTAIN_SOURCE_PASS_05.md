@@ -152,7 +152,7 @@ Pass-end verification:
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q` — PASS;
 - `PYTHON=../../../.venv/bin/python node scripts/render_note.mjs --verify` —
   PASS, PCM hash
-  `01cdeb76545687020b66a48a62c1b16f1d066904d34296d778c76fa5598ab9dc`;
+  `043d9e62cf100926463781493228396f3cd7068119e9d21c4b475d3793c875da`;
 - calibration JSON validation and `git diff --check` — PASS.
 
 The bare host `python3` renderer check initially met the macOS 3.9
