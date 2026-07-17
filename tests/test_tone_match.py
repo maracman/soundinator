@@ -1307,6 +1307,24 @@ def test_single_note_checklist_marks_campaign_evidence_not_applicable():
     assert {row["status"] for row in result["assertions"]} <= {"pass", "fail", "not-applicable"}
 
 
+def test_l18_harp_and_bar_require_impulsive_not_sustained_envelopes():
+    samples = [ConstructionSample(_bundle(percussive=True),
+                                  _bundle(percussive=True),
+                                  register, .62, .62)
+               for register in ("low", "mid", "high")]
+    for instrument, resonator in (("harp", "string"),
+                                  ("glockenspiel", "bar")):
+        result = evaluate_construction(
+            instrument, samples,
+            params={"excitationType": "pluck" if instrument == "harp" else "strike",
+                    "resonatorClass": resonator},
+            strict_evidence=True,
+        )
+        by_id = {row["id"]: row for row in result["assertions"]}
+        assert by_id[f"{instrument}.impulsive-envelope"]["status"] == "pass"
+        assert f"{instrument}.sustained-envelope" not in by_id
+
+
 def test_l18_struck_construction_fails_any_ship_hold_plateau():
     samples = []
     for register in ("low", "mid", "high"):

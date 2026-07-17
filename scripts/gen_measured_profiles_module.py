@@ -159,7 +159,9 @@ def main():
             entry["damperByRegister"] = [{
                 key: row[key] for key in (
                     "f0", "dampDbPerSecondAtFundamental", "frequencyExponent",
-                    "midi", "nNotes", "evidenceCount", "undampedAboveF0",
+                    "midi", "register", "dynamic", "velocityAnchor",
+                    "velocityAnchorMidi", "nNotes", "evidenceCount", "p10",
+                    "p90", "frequencyExponentStatus", "undampedAboveF0",
                     "source") if row.get(key) is not None
             } for row in damper_registers if isinstance(row, dict) and
                 all(isinstance(row.get(key), (int, float)) for key in

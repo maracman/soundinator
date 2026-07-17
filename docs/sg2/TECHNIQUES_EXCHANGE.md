@@ -2062,6 +2062,60 @@ proof therefore still cannot earn breath weight or a nonzero adult-voice
 `voiceBreathSync` value. With every identity strict aggregate cell failing,
 §2.5c remains `INCONCLUSIVE-MASKED` and no Human range is widened.
 
+Status update — Agent A engine pass 06, 2026-07-17: T-068
+engine=incorporated-point-envelope-adapter-`fd40124`
+struck/plucked=incorporated-grand-preset-active. The legacy piano-anatomy
+`preOnsetComponents[]` row now adapts into the generic pinned-component seam
+without reducing its literal -150..+50 ms pp/ff point envelopes or its 22-row
+dynamic spectrum. The Piano Foundation and grand campaign preset explicitly
+activate `pianoActionNoiseLevel=1`; T-007 rejects flat/reduced envelopes and
+proves the component, nonzero control and independent scheduling reach the
+sounded-note fingerprint. Upright remains evidence-limited: no missing pre-roll
+row is inferred or transferred.
+
+Status update — Agent A engine pass 06, 2026-07-17: T-069
+engine=incorporated-`fd40124` struck/plucked=incorporated-corrected-L16-active.
+The corrected positive onset-boost harmonic-rank and fixed-6400-Hz assignments
+are installed as pinned transient classes. They are velocity-coupled, decay
+back toward the unmodified held baseline, are exact-neutral at level zero, and
+cannot move a frequency or rewrite L18. The grand preset activates level one;
+its focused audit is clean at objective `4a867d8f089f7e16`, manifest
+`f564a2007ad0e9bf`, renderer `010a6139859ef420`.
+
+Status update — Agent A engine pass 06, 2026-07-17: T-067
+engine=incorporated-333-take-damper-profile-`fd40124`
+struck/plucked=incorporated-grand-L18-profile-active. All 333 landed
+`zenph.sta_*` key-release takes contribute per-MIDI robust contact-rate rows;
+the across-register exponent is 0.100430 and per-row evidence counts sum to
+333. MIDI 90+ is a hard physical-undamped sentinel: note-off retains the
+already-scheduled natural string decay and never extrapolates a lower damper.
+T-007 proves MIDI 87 is damped, MIDI 90 is undamped/Infinity at the contact-law
+seam, and the Piano Foundation consumes the exact profile table.
+
+Status update — Agent A engine pass 06, 2026-07-17: T-072
+engine=incorporated-bar-consumers-`fd40124`
+struck/plucked=incorporated-controls-live-gate-still-failing-one-weak-ratio-cell.
+The bar class now consumes profile-owned per-register ratio offsets and
+per-mode held T60, uses free-free beam strike-position shapes, retains null-T60
+material fallbacks, and forces B to zero before its sole frequency trim. The
+post-consumer controllability contract is clean at objective
+`4d4f2dabe5197a86`, manifest `497d68499b5c00ce`; sounded output clears the
+7.404 mode-1/mode-2 hierarchy, centre-strike dip, six-mode economy and B=0
+gates. Ratios pass 11/12 scored mode-2/3 cells; C7 mode 3 remains below the
+render analyser's leakage floor and leaves the aggregate live-audio ratio gate
+honestly failing. The scheduled-frequency T-007 assertion is exact for all six
+modes and B=0/B>0 is identical.
+
+Status update — Agent A blown continuation pass 06, 2026-07-17: T-059
+engine=n/a analysis=incorporated-upstream-partial-tilt-no-promotion. A fresh
+flute `partialTilt` audit is clean/stable at objective `d30648e15e6cc119`,
+manifest `a579e74e30d52b3b`. Five bounded evaluations found a lower composite
+loss at 3.715898 but it retained 32 gate failures; the hierarchy-selected
+31-failure row has worse composite 3.828890 and still fails construction,
+strict tripwires and two-sided SHIP variation. No leaderboard row is promoted;
+the next work remains a register/dynamic partial cell, not downstream breath
+polish or mutation of the pinned source surface.
+
 Status update — Agent D bowed/analysis pass 06, 2026-07-17: T-073
 analysis=F13-per-dimension-grades-incorporated. Cello emits 47 lossless
 adjacent pairs as grade A for note-local dimensions and retains all 12 matched
@@ -2083,3 +2137,41 @@ Affects: measuredHumanEpisode / bowedHumanLevels / vibrato episode prerequisites
 attack-noise calibration / §2.5c decomposition gate.
 Status: analysis=incorporated bowed=audited-4of9+masked
 engine=pending-five-isolated-adapters sung=adapt-method struck/plucked=adapt-method
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: T-068 and T-069
+are now incorporated and preset-active for grand piano. The lossless point
+envelope is preserved rather than reduced to an ADSR, corrected L16 classes
+are consumed as onset-only excess above their own early law, and the exact
+two-control grand responder audit is clean with no uncontrolled weighted
+feature. Upright remains evidence-blocked: exhaustive audit of all 69 landed
+files finds 0/69 with the required >=10 ms true pre-roll (range 0.000-6.984
+ms), and no grand action value transfers.
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: the L18 Zenph
+handoff is incorporated as `sg2-piano-engine-handoffs-v2`. All 333 verified
+damped takes become 23 measured register x dynamic contact cells after
+subtracting the velocity-matched OLPC legato free-decay baseline. Treble-pp is
+the sole missing cell. The broadband report does not identify a per-mode
+frequency exponent, so the consumer holds it neutral/zero-weight rather than
+misreading rate-vs-register as mode damping. MIDI 90+ bypasses contact and
+continues natural free decay; it never clamps the last damped row upward.
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: T-072 is
+incorporated. The integrated glock render now passes the mode-1/mode-2 T60
+hierarchy (median ratio 7.404), all-anchor centre-strike mode-2 dip, six-mode
+economy and B=0 firewall. The 35-cent ratio gate still fails for upper audible
+modes around 16.9-19 kHz, so no bar leaderboard row is promoted. The
+pre-T-072 safe four-key search improved loss only 0.48% and cleared no strict
+gate. Harp's fresh current-profile audit is clean; its hierarchy-first search
+clears one strict failure via pluck position but improves composite only
+0.013%. The construction checklist now correctly treats both harp and bars as
+L18 impulsive/free-decaying families rather than demanding sustained notes.
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: nylon's corrected
+L16 triage finds ten valid transient classes (five harmonic-rank, five fixed
+Hz), but they do not explain its 18 spectral failures. All six middle-half
+partial cells fail while all six attack cells pass, so the mandatory hierarchy
+stops at steady per-course/register/dynamic partial identity; mel and band
+balance remain masked downstream diagnostics. T-069 may consume the retained
+nylon transient rows, but it may not waive or down-rank that partial-table
+failure.
