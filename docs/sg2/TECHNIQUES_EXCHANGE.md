@@ -1883,3 +1883,31 @@ therefore remains the honest bar-control blocker. Harp's current-profile audit
 was interrupted before a contract and its saved baseline predates profile
 activation, so it is preserved as superseded evidence and is not consumed for
 fitting.
+
+Status update — Agent E sung pass 09, 2026-07-17: T-065
+sung=incorporated-current-head-output-audited. After syncing the activated
+harp/glock profile payload, all evidence was rebound to renderer contract
+`3629da50977f0fc1`. The final A-VOICE-05 consumer is clean for partial,
+log-mel and sustain band-balance output in soprano, tenor, bass and mezzo; the
+four identity minimum-responder audits are also clean and repeat-stable. The
+source-law comparator lowers both composite and the first unresolved partial
+residual tier for every voice, so the canonical upstream-first selection rule
+promotes all four `pass09-source-law-strict` rows. No strict aggregate cell
+passes, so these remain interim failing leaders rather than ship candidates.
+
+Status update — Agent E sung pass 09, 2026-07-17: T-058
+sung=incorporated-next-limiting-factor. The promoted source law regresses the
+paired emitted-body/vowel assertion from 10/10 to tenor 8/10, soprano 9/10,
+bass 7/10 and mezzo 9/10. This lower-tier regression cannot veto an improvement
+at the still-failing partial tier, but it is the named next fitting target:
+source and vowel body must be co-consumed without losing the measured source
+shape or the vowel identity. No F13 fallback is invoked; all deterministic
+identity rows retain full-strength licensed spectral and paired-body evidence.
+
+Status update — Agent E sung pass 09, 2026-07-17: T-067
+sung=values-neutral-weight-zero analysis=pending-unimplemented. No current-head
+analysis observable, synthetic residual-envelope round trip, corpus measurement
+or fresh responder exists for `pitch_sync_breath_db`; the engine-only consumer
+proof therefore still cannot earn breath weight or a nonzero adult-voice
+`voiceBreathSync` value. With every identity strict aggregate cell failing,
+§2.5c remains `INCONCLUSIVE-MASKED` and no Human range is widened.
