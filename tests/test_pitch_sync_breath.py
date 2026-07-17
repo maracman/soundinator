@@ -11,6 +11,7 @@ import soundfile as sf
 from scripts.fit_profiles_from_samples import NoteAnalysis
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.pitch_sync_breath import (
+    fit_sync_seed_curve,
     measure_pitch_sync_breath_file,
     synthetic_roundtrip,
     validate_engine_pairs,
@@ -95,3 +96,22 @@ def test_t067_partial_muted_same_seed_engine_pair_consumes_octave(tmp_path):
     assert result["status"] == "pass"
     assert all(result["checks"].values())
 
+
+def test_t067_log_sync_calibration_uses_only_monotone_point_two_to_point_six():
+    curve = [
+        {"voiceBreathSync": 0.0, "pitchSyncBreathDb": 4.6},
+        {"voiceBreathSync": 0.2, "pitchSyncBreathDb": 21.866},
+        {"voiceBreathSync": 0.4, "pitchSyncBreathDb": 26.740},
+        {"voiceBreathSync": 0.6, "pitchSyncBreathDb": 28.839},
+        # Deliberately non-monotone and excluded from the inversion.
+        {"voiceBreathSync": 0.8, "pitchSyncBreathDb": 25.962},
+    ]
+    result = fit_sync_seed_curve(curve, {
+        "tenor": 20.642, "soprano": 18.585,
+        "bass": 23.887, "mezzo-soprano": 20.755,
+    })
+    assert result["monotoneFitDomain"] == [0.2, 0.6]
+    assert result["provisionalVoiceBreathSync"] == {
+        "tenor": .16, "soprano": .12, "bass": .27,
+        "mezzo-soprano": .17,
+    }

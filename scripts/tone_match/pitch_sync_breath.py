@@ -14,6 +14,7 @@ is labelled separately and the measured breath window excludes that tail.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -417,6 +418,7 @@ def validate_engine_pairs(sync_zero_low: Path, sync_enabled_low: Path,
                           sync_enabled_high: Path, *, f0_low_hz: float,
                           f0_high_hz: float, seed: int,
                           render_manifest: Path,
+                          repo_root: Path = Path("."),
                           sync_amount: float = .8) -> dict[str, Any]:
     """Consume partial-muted same-seed sync 0/.8 renders at two octaves."""
     zero = measure_pitch_sync_breath_file(
@@ -444,9 +446,11 @@ def validate_engine_pairs(sync_zero_low: Path, sync_enabled_low: Path,
         "highPeakWithin2Percent": expected_pitch_errors[1] <= .02,
         "octavePeakDoublesWithin2Percent": octave_ratio_error <= .02,
     }
+    from .iterate import _renderer_contract_hash
     return {
-        "schema": "sg2-pitch-sync-breath-engine-audit-v1",
+        "schema": "sg2-pitch-sync-breath-engine-audit-v2",
         "status": "pass" if all(checks.values()) else "fail",
+        "rendererContractHash": _renderer_contract_hash(repo_root),
         "provenance": {"seed": seed, "syncZero": 0.0,
                        "syncEnabled": sync_amount,
                        "partialsMuted": True,
@@ -457,6 +461,93 @@ def validate_engine_pairs(sync_zero_low: Path, sync_enabled_low: Path,
         "low": low,
         "zero": zero,
         "high": high,
+    }
+
+
+def fit_sync_seed_curve(curve: list[dict[str, float]],
+                        reference_medians: dict[str, float]) -> dict[str, Any]:
+    """Invert the monotone .2-.6 engine curve in log-sync space."""
+    monotone = [row for row in curve
+                if .2 <= float(row["voiceBreathSync"]) <= .6]
+    if len(monotone) != 3:
+        raise ValueError("sync calibration requires the .2/.4/.6 curve rows")
+    sync = np.asarray([row["voiceBreathSync"] for row in monotone], dtype=float)
+    prominence = np.asarray([row["pitchSyncBreathDb"] for row in monotone],
+                            dtype=float)
+    if not np.all(np.diff(prominence) > 0):
+        raise ValueError(".2-.6 sync calibration branch is not monotone")
+    slope, intercept = np.polyfit(np.log10(sync), prominence, 1)
+    raw = {
+        voice: float(np.clip(10 ** ((target - intercept) / slope), 0, .6))
+        for voice, target in reference_medians.items()
+    }
+    return {
+        "model": "pitchSyncBreathDb = slope * log10(voiceBreathSync) + intercept",
+        "monotoneFitDomain": [0.2, 0.6],
+        "slope": float(slope),
+        "intercept": float(intercept),
+        "rawVoiceBreathSync": raw,
+        "provisionalVoiceBreathSync": {
+            voice: round(value, 2) for voice, value in raw.items()
+        },
+    }
+
+
+def calibrate_engine_curve(engine_dir: Path, corpus_dir: Path) -> dict[str, Any]:
+    """Bind the measured engine curve and provisional singer seeds."""
+    engine_audit_path = engine_dir / "AUDIT.json"
+    engine_audit = json.loads(engine_audit_path.read_text())
+    if engine_audit.get("status") != "pass" or not engine_audit.get(
+            "rendererContractHash"):
+        raise ValueError("current renderer-bound engine AUDIT.json is required")
+    names = {
+        0.0: "sync-zero-low.wav", .2: "sync-02-low.wav",
+        .4: "sync-04-low.wav", .6: "sync-06-low.wav",
+        .8: "sync-enabled-low.wav",
+    }
+    curve = []
+    for amount, name in names.items():
+        observation = measure_pitch_sync_breath_file(
+            engine_dir / name, 220.0, partials_muted=True)
+        curve.append({
+            "voiceBreathSync": amount,
+            "pitchSyncBreathDb": observation["pitchSyncBreathDb"],
+            "peakHz": observation["modulation"]["peakHz"],
+        })
+    corpus_files = {
+        "tenor": corpus_dir / "tenor.json",
+        "soprano": corpus_dir / "soprano.json",
+        "bass": corpus_dir / "bass.json",
+        "mezzo-soprano": corpus_dir / "mezzo.json",
+    }
+    reference_medians, corpus_hashes = {}, {}
+    for voice, path in corpus_files.items():
+        payload = json.loads(path.read_text())
+        if payload.get("status") != "pass":
+            raise ValueError(f"corpus pitch-sync evidence is not pass: {path}")
+        reference_medians[voice] = float(
+            payload["pitchSyncBreathDb"]["median"])
+        corpus_hashes[voice] = hashlib.sha256(path.read_bytes()).hexdigest()
+    fit = fit_sync_seed_curve(curve, reference_medians)
+    return {
+        "schema": "sg2-pitch-sync-breath-calibration-v2",
+        "status": "provisional-seed-calibration",
+        "rendererContractHash": engine_audit["rendererContractHash"],
+        "engineAudit": str(engine_audit_path),
+        "engineAuditSha256": hashlib.sha256(
+            engine_audit_path.read_bytes()).hexdigest(),
+        "corpusAuditSha256": corpus_hashes,
+        "seed": 61061,
+        "midi": 57,
+        "f0Hz": 220.0,
+        "partialsMuted": True,
+        "sameSeedCurve": curve,
+        "mapping": fit,
+        "warning": ("0.8 is excluded from inversion if its adjacent/floor "
+                    "denominator makes the measured curve non-monotone; "
+                    "candidate FIT scoring and construction decide acceptance"),
+        "referenceMediansDb": reference_medians,
+        "provisionalVoiceBreathSync": fit["provisionalVoiceBreathSync"],
     }
 
 
@@ -486,12 +577,17 @@ def main(argv: list[str] | None = None) -> int:
     engine.add_argument("--f0-high", type=float, required=True)
     engine.add_argument("--seed", type=int, required=True)
     engine.add_argument("--render-manifest", type=Path, required=True)
+    engine.add_argument("--repo-root", type=Path, default=Path("."))
     engine.add_argument("--output", type=Path)
     corpus = sub.add_parser("corpus")
     corpus.add_argument("--references", type=Path, required=True)
     corpus.add_argument("--voice-class", required=True)
     corpus.add_argument("--max-rows", type=int, default=10)
     corpus.add_argument("--output", type=Path)
+    calibrate = sub.add_parser("calibrate")
+    calibrate.add_argument("--engine-dir", type=Path, required=True)
+    calibrate.add_argument("--corpus-dir", type=Path, required=True)
+    calibrate.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     if args.command == "synthetic":
         result = synthetic_roundtrip()
@@ -503,11 +599,13 @@ def main(argv: list[str] | None = None) -> int:
             args.sync_zero_low, args.sync_enabled_low,
             args.sync_enabled_high, f0_low_hz=args.f0_low,
             f0_high_hz=args.f0_high, seed=args.seed,
-            render_manifest=args.render_manifest)
-    else:
+            render_manifest=args.render_manifest, repo_root=args.repo_root)
+    elif args.command == "corpus":
         result = measure_corpus_manifest(
             args.references, voice_class=args.voice_class,
             max_rows=args.max_rows)
+    else:
+        result = calibrate_engine_curve(args.engine_dir, args.corpus_dir)
     _write(args.output, result)
     return 0 if result.get("status", "pass") == "pass" else 1
 

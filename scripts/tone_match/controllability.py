@@ -556,6 +556,11 @@ def main(argv: list[str] | None = None) -> int:
         if (engine_evidence.get("status") != "pass" or
                 not all(engine_evidence.get("checks", {}).values())):
             evidence_errors.append("engine partial-muted octave audit is not pass")
+        from .iterate import _renderer_contract_hash
+        current_renderer = _renderer_contract_hash(args.repo_root)
+        if engine_evidence.get("rendererContractHash") != current_renderer:
+            evidence_errors.append(
+                "engine pitch-sync audit is bound to a stale renderer")
         if corpus_evidence.get("status") != "pass":
             evidence_errors.append("lossless corpus audit is not pass")
         if corpus_evidence.get("voiceClass") != expected_voice:
