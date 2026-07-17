@@ -1815,3 +1815,21 @@ T-069=`engine=pending-Agent-A`; T-072=`engine=pending-Agent-A` with the
 bar-specific objective at zero weight. Nylon's fresh post-L18 audit is clean
 at objective `151b91aa63c04c54`, manifest `340412ce5aa8a9ca`, renderer
 `3629da50977f0fc1`; no stale pre-L18 audit is consumed.
+
+Status update — Agent C pass 17 completed, 2026-07-17: crash residue was
+retained only after its exact glock render was reproduced and the full suite
+passed. Nylon's nine-key post-L18 search reduced the deterministic fit loss
+from `4.616871` to `4.338724` (6.03%), chiefly by moving
+`excitationPosition` from 0.12 to 0.090031. It did not enter the leaderboard:
+`guitar.double-decay` still fails, all 18 spectral tripwires still fail, and
+the corpus has no repeated pitch/dynamic groups. Under F13, those six distinct
+register/dynamic cells remain full-strength evidence for deterministic mean,
+register and dynamic objectives; they do not identify per-note stochastic
+spread, so no Human range is fitted or inferred. The named next work item is
+per-cell/course spectral control or T-028 contact-time consumption. The
+activated glock first render independently fails ratio, per-mode T60 and
+centre-strike gates while passing six-mode economy and campaign B=0; T-072
+therefore remains the honest bar-control blocker. Harp's current-profile audit
+was interrupted before a contract and its saved baseline predates profile
+activation, so it is preserved as superseded evidence and is not consumed for
+fitting.
