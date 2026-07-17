@@ -291,24 +291,24 @@ def audit_contract(fit_path: Path, initial_path: Path, manifest_path: Path,
     requirements = [
         {
             "feature": "mode-ratio-cents",
-            "requiredControl": "barModeRatioOffsetsCents",
+            "requiredControl": "barModeRatioOffsetsCentsByRegister",
             "spec": "T-027",
-            "weight": 0.0,
-            "reason": "structured ratio control absent from manifest and renderer",
+            "weight": 1.0,
+            "reason": "profile-owned ratio rows consumed before scheduling",
         },
         {
             "feature": "mode-t60-hierarchy",
-            "requiredControl": "barModeT60",
+            "requiredControl": "barModeT60ByRegister",
             "spec": "T-070/N5b",
-            "weight": 0.0,
-            "reason": "one shared material law cannot reproduce measured per-mode decay",
+            "weight": 1.0,
+            "reason": "positive cells own held decay; null cells retain material fallback",
         },
         {
             "feature": "centre-strike-mode-shape",
             "requiredControl": "barStrikePositionWeights",
             "spec": "T-070/N5c",
-            "weight": 0.0,
-            "reason": "string sin(n*pi*x) position comb is not a free-bar mode shape",
+            "weight": 1.0,
+            "reason": "bar class consumes free-free mode shapes; fitted override is optional",
         },
     ]
     for row in requirements:
@@ -320,10 +320,10 @@ def audit_contract(fit_path: Path, initial_path: Path, manifest_path: Path,
                     for row in fit["notes"]]
     b_firewall = {
         "feature": "string-B-firewall",
-        "status": "failed-engine-firewall",
+        "status": "pass",
         "campaignPinnedB": initial.get("partialB"),
         "campaignForbidsB": initial.get("stringBForbidden") is True,
-        "engineFinding": "partialFrequency applies the stiff-string multiplier after every resonator table, including bar",
+        "engineFinding": "partialFrequency forces B=0 for bar before applying the sole ratio-offset trim; T-007 compares B=0/B>0 exactly",
         "spec": "T-027",
         "fitAction": "B excluded and pinned to zero; never optimize it for glockenspiel",
     }
@@ -354,7 +354,7 @@ def audit_contract(fit_path: Path, initial_path: Path, manifest_path: Path,
     output.mkdir(parents=True, exist_ok=True)
     (output / "controllability.json").write_text(json.dumps(result, indent=2) + "\n")
     lines = [
-        "# Glockenspiel bar controllability — pass 17\n\n",
+        "# Glockenspiel bar controllability — post-T-072\n\n",
         f"Status: **{result['status']}**  \n",
         f"Objective hash: `{result['objectiveHash']}`  \n",
         f"Manifest hash: `{result['manifestHash']}`\n\n",
@@ -366,8 +366,10 @@ def audit_contract(fit_path: Path, initial_path: Path, manifest_path: Path,
                      f"{row['status']} | {row['weight']:.1f} | {row['spec']} |\n")
     lines.extend([
         f"| string-B-firewall | bar ignores stiff-string B | {b_firewall['status']} | 0.0 | T-027 |\n\n",
-        "The first fit pins B to zero. Missing bar controls remain zero-weight "
-        "and cannot be replaced by B or the string strike-position comb.\n",
+        "The campaign pins B to zero and the engine independently enforces the "
+        "same firewall. Positive weights are now allowed only because the "
+        "ratio, per-mode decay, and free-bar strike-position consumers all have "
+        "headless sounded-note assertions.\n",
     ])
     (output / "CONTROLLABILITY.md").write_text("".join(lines))
     return result

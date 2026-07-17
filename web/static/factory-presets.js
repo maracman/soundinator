@@ -47,6 +47,8 @@ const profileSounds = [
       ? { toneBreath: 0.03, windBreathLevel: 1 } : {}),
     ...(excitationType === "bow" && spectralProfile === "violin"
       ? { bowNoiseLevel: 1 } : {}),
+    ...(excitationType === "strike" && spectralProfile === "piano"
+      ? { pianoActionNoiseLevel: 1, envelopeAnomalyLevel: 1 } : {}),
     envelopeAttack: excitationType === "strike" ? 0.006 : 0.06,
     envelopeRelease: excitationType === "strike" ? 0.28 : 0.28,
   }));
@@ -153,7 +155,7 @@ const acousticSounds = [
 const resonatorSounds = [
   ["glass-thread", "Glass Thread", "Thin, long-ringing bright harmonics.", "piano", 0.62, 0.72, 0.05, ["glass", "bright", "ringing"]],
   ["wooden-pluck", "Wooden Pluck", "Short, warm plucked resonance.", "cello", 0.25, 0.52, 0.82, ["wood", "pluck", "warm"]],
-  ["metal-bar", "Metal Bar", "Hard-struck, metallic upper partials.", "piano", 0.92, 0.58, 0.10, ["metal", "strike", "bright"]],
+  ["metal-bar", "Metal Bar", "Hard-struck measured glockenspiel bar modes.", "glockenspiel", 0.92, 0.58, 0.10, ["metal", "strike", "measured"]],
   ["hollow-tube", "Hollow Tube", "Odd-weighted, low-pressure tube tone.", "clarinet", 0.32, -0.22, 0.48, ["tube", "hollow", "dark"]],
   ["membrane-bloom", "Membrane Bloom", "Rounded struck body with a slow release.", "piano", 0.52, -0.06, 0.40, ["membrane", "round", "percussive"]],
   ["amber-string", "Amber String", "Low-mid string warmth with a gentle bloom.", "cello", 0.40, -0.18, 0.42, ["string", "warm", "ambient"]],
@@ -165,6 +167,7 @@ const resonatorSounds = [
   sound(`factory-sub-${id}`, name, description, tags, {
     voiceMode: "fourier", spectralProfile, spectralMix: 0.86,
     excitationType: "strike", excitationPosition: 0.16, excitationHardness,
+    ...(id === "metal-bar" ? { resonatorClass: "bar", partialB: 0 } : {}),
     partialTilt, partialOddEven: spectralProfile === "clarinet" ? 0.45 : 0,
     partialMaterial, spectralStretchCents: id.includes("piano") || id.includes("glass") ? 8 : 0,
     envelopeAttack: 0.008, envelopeDecay: 0.12, envelopeSustain: 0.28, envelopeRelease: 0.32,
