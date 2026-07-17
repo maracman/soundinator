@@ -56,6 +56,10 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     # L17 pinned wind component: audit two active levels. Zero remains an
     # engine identity endpoint, but is forbidden by the SHIP activation gate.
     "windBreathLevel": (1.0, 0.25, 0.0),
+    # T-069 piano-only adapters. Generic family audits omit these via their
+    # explicit key sets; the grand-piano audit selects both active endpoints.
+    "pianoActionNoiseLevel": (1.0, 0.25, 0.0),
+    "envelopeAnomalyLevel": (1.0, 0.25, 0.0),
     "breathNoiseColor": (0.0, 0.6, 0.0),
     "breathLevelScale": (1.0, 2.2, 0.0),
     "breathVelocityExponent": (1.0, 0.25, 0.0),

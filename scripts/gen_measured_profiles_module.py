@@ -159,7 +159,8 @@ def main():
             entry["damperByRegister"] = [{
                 key: row[key] for key in (
                     "f0", "dampDbPerSecondAtFundamental", "frequencyExponent",
-                    "nNotes", "source") if row.get(key) is not None
+                    "midi", "nNotes", "evidenceCount", "undampedAboveF0",
+                    "source") if row.get(key) is not None
             } for row in damper_registers if isinstance(row, dict) and
                 all(isinstance(row.get(key), (int, float)) for key in
                     ("f0", "dampDbPerSecondAtFundamental", "frequencyExponent"))]
@@ -200,6 +201,30 @@ def main():
                 }
             if kept_components:
                 entry["pinnedNoiseComponents"] = kept_components
+        # T-069: piano anatomy uses its original list schema. Preserve literal
+        # L17 point envelopes and L16 pinned class assignments; synth.js owns
+        # the generic runtime adapter and must see every measured point.
+        pre_onset = v.get("preOnsetComponents")
+        if isinstance(pre_onset, list) and pre_onset:
+            entry["preOnsetComponents"] = pre_onset
+        anomalies = v.get("envelopeAnomalyClasses")
+        if isinstance(anomalies, list) and anomalies:
+            entry["envelopeAnomalyClasses"] = anomalies
+        # T-072: these are structured per-mode rows, not harmonic partial
+        # parameters. Keep null cells so the renderer can invoke its exact
+        # material-law fallback for only the unmeasured modes.
+        bar_ratios = v.get("barModeRatioOffsetsCentsByRegister")
+        if isinstance(bar_ratios, list) and bar_ratios:
+            entry["barModeRatioOffsetsCentsByRegister"] = bar_ratios
+        bar_t60 = v.get("barModeT60ByRegister")
+        if isinstance(bar_t60, list) and bar_t60:
+            entry["barModeT60ByRegister"] = bar_t60
+        bar_weights = v.get("barStrikePositionWeights")
+        if isinstance(bar_weights, list) and bar_weights:
+            entry["barStrikePositionWeights"] = bar_weights
+        engine_handoffs = (v.get("provenance") or {}).get("engineHandoffs")
+        if isinstance(engine_handoffs, dict):
+            entry["engineHandoffs"] = engine_handoffs
         # §2.5c/T-007: calibrated player-variation ranges are engine-facing
         # measured data.  Preserve the complete physical-unit contract so a
         # consumer assertion can reject absent or silently ignored ranges.

@@ -241,11 +241,21 @@ def main():
             "onset with the same-seed vowel-only output.</p>",
             "<table><tr><th>Class</th><th>Vowel-only onset</th><th>Consonant onset</th></tr>",
         ]
+        def aux_cell(path):
+            if not path: return "<td class=dim>—</td>"
+            cands = [path] if os.path.isabs(path) else [
+                os.path.normpath(os.path.join(os.path.dirname(manifest_path), path)),
+                os.path.normpath(os.path.join(SG2, path))]
+            if "sg2-data/" in str(path):
+                cands.append(os.path.join(os.path.dirname(SG2), str(path)[str(path).index("sg2-data/"):]))
+            for c in cands:
+                if os.path.exists(c):
+                    return f"<td><audio controls preload=none src='file://{html.escape(str(c))}'></audio></td>"
+            return "<td class=dim>missing</td>"
         for row in manifest["rows"]:
             body.append(
                 f"<tr><td><b>{html.escape(row['label'])}</b></td>"
-                f"<td><audio controls preload=none src='file://{html.escape(baseline)}'></audio></td>"
-                f"<td><audio controls preload=none src='file://{html.escape(row['render'])}'></audio></td></tr>"
+                f"{aux_cell(baseline)}{aux_cell(row['render'])}</tr>"
             )
         body.append("</table>")
         sections.append("\n".join(body))

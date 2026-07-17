@@ -368,6 +368,8 @@ export const DEFAULTS = {
   bowNoiseLevel: 0,
   bowNoiseVelocityExponent: null,
   windBreathLevel: 0,
+  pianoActionNoiseLevel: 0,
+  envelopeAnomalyLevel: 0,
   onsetScoopDepthCents: 0,
   onsetScoopSettle: 0.06,
   onsetScoopRearticulatedScale: 0.35,
@@ -580,6 +582,11 @@ export const DEFAULTS = {
   // L18/T-066: pinned note-off damper-contact rows. The serialized ADSR
   // sustain remains for migration but cannot sustain strike/pluck modes.
   damperByRegister: null,
+  // T-072: profile-owned per-mode bar controls. null is exact legacy and
+  // lets a measured glock/mallet profile supply its structured rows.
+  barModeRatioOffsetsCentsByRegister: null,
+  barModeT60ByRegister: null,
+  barStrikePositionWeights: null,
   polarisationAmount: 0,
   polarisationSplitCents: 0,
   polarisationDecayRatio: 1,
@@ -602,6 +609,7 @@ export const DEFAULTS = {
   spectralDriftDepth: 0.35,
   spectralDriftRate: 6,
   spectralStretchCents: 0,
+  resonatorClass: "string",
   envelopeProb: 0.35,
   envelopeRange: 0.2,
   envelopeAttack: 0.008,
