@@ -32,6 +32,9 @@ import {
   registerAttackNoiseAt,
   registerAttackStaggerAt,
   registerEnvelopeAttackAt,
+  vibratoByRegisterDynamicAt,
+  envelopeAttackByRegisterDynamicAt,
+  bowedEnvelopeAttackRenderSeconds,
   resolveAttackNoise,
   registerProfileAt,
   humanFluctuationTrace,
@@ -104,6 +107,111 @@ console.log("WP-3 register attack timing");
     near(registerEnvelopeAttackAt([
       { f0: 80, attack: .16 }, { f0: 320, attack: .08 },
     ], 160), .12, 1e-9));
+}
+
+console.log("T-047/T-048 bowed register × dynamic performance tables");
+{
+  const velocityFor = { pp: .2, mf: .62, f: .82, ff: .92 };
+  const vibratoRows = [
+    { register: "low", dynamic: "mf", midi: 55, prob: 1, rate: 6.57959, depth: 12.154593 },
+    { register: "low", dynamic: "f", midi: 55, prob: 1, rate: 5.598633, depth: 7.618154 },
+    { register: "mid", dynamic: "mf", midi: 76, prob: 1, rate: 5.617357, depth: 33.992736 },
+    { register: "mid", dynamic: "f", midi: 76, prob: 1, rate: 5.699966, depth: 34.118302 },
+    { register: "high", dynamic: "mf", midi: 93, prob: 1, rate: 6.251575, depth: 37.934735 },
+    { register: "high", dynamic: "f", midi: 93, prob: 1, rate: 6.333295, depth: 34.986902 },
+  ];
+  const attackRows = [
+    { register: "low", dynamic: "pp", midi: 55, f0: 194.92764,
+      attack: .286848, meanBandT90Ms: 286.848, onsetLockinPeriods: 0 },
+    { register: "low", dynamic: "ff", midi: 55, f0: 195.536277,
+      attack: .19527, meanBandT90Ms: 195.27, onsetLockinPeriods: 15.891487 },
+    { register: "mid", dynamic: "pp", midi: 79, f0: 796.029364,
+      attack: .20311, meanBandT90Ms: 203.11, onsetLockinPeriods: 0 },
+    { register: "mid", dynamic: "ff", midi: 79, f0: 770.304262,
+      attack: .261489, meanBandT90Ms: 261.489, onsetLockinPeriods: 0 },
+    { register: "high", dynamic: "pp", midi: 88, f0: 1322.216963,
+      attack: .059508, meanBandT90Ms: 59.508, onsetLockinPeriods: 15.350907 },
+    { register: "high", dynamic: "ff", midi: 88, f0: 1356.54611,
+      attack: .228231, meanBandT90Ms: 228.231, onsetLockinPeriods: 0 },
+  ];
+  check("T-047 every emitted vibrato cell resolves exactly at its anchor",
+    vibratoRows.every(row => {
+      const f0 = 440 * Math.pow(2, (row.midi - 69) / 12);
+      const got = vibratoByRegisterDynamicAt(
+        vibratoRows, f0, velocityFor[row.dynamic]);
+      return got && near(got.prob, row.prob, 1e-9) &&
+        near(got.rate, row.rate, 1e-9) && near(got.depth, row.depth, 1e-9);
+    }));
+  check("T-048 every emitted attack cell resolves exactly at its anchor",
+    attackRows.every(row => {
+      const got = envelopeAttackByRegisterDynamicAt(
+        attackRows, row.f0, velocityFor[row.dynamic]);
+      return got && near(got.attack, row.attack, 1e-9) &&
+        near(got.meanBandT90Ms, row.meanBandT90Ms, 1e-9) &&
+        got.onsetLockinPeriods <= 18;
+    }));
+  const lowF0 = 440 * Math.pow(2, (55 - 69) / 12);
+  const fittedVibrato = new GenerationEngine({
+    seed: 470, spectralProfile: "violin", excitationType: "bow",
+    vibratoByRegisterDynamic: vibratoRows,
+    performanceRole: "vibrato",
+    vibratoProb: .25, vibratoRate: 4, vibratoDepth: 3,
+  })._subNoteVariation(.62, lowF0, 0, null);
+  check("T-047 fitted table reaches the sounded-note vibrato fields",
+    fittedVibrato.vibratoProb === 1 &&
+    near(fittedVibrato.vibratoRate, vibratoRows[0].rate, 1e-9) &&
+    near(fittedVibrato.vibratoDepth, vibratoRows[0].depth * 1.25, 1e-9) &&
+    fittedVibrato.vibratoRateSd === 0 && fittedVibrato.vibratoDepthSd === 0);
+  const nonVibratoRole = new GenerationEngine({
+    seed: 470, spectralProfile: "violin", excitationType: "bow",
+    vibratoByRegisterDynamic: vibratoRows, performanceRole: "non-vibrato",
+    vibratoProb: .25,
+  })._subNoteVariation(.62, lowF0, 0, null);
+  check("T-047 declared non-vibrato roles stay deterministic and clean",
+    nonVibratoRole.vibratoProb === 0 &&
+    near(nonVibratoRole.vibratoRate, vibratoRows[0].rate, 1e-9));
+  const scalarVibrato = new GenerationEngine({
+    seed: 470, spectralProfile: "violin", excitationType: "bow",
+    vibratoProb: .25, vibratoRate: 4, vibratoDepth: 3,
+    vibratoRateSd: .2, vibratoDepthSd: .7,
+  })._subNoteVariation(.62, lowF0, 0, null);
+  check("T-047 absent table is the exact scalar fallback",
+    scalarVibrato.vibratoProb === .25 && scalarVibrato.vibratoRate === 4 &&
+    scalarVibrato.vibratoDepth === 3 && scalarVibrato.vibratoRateSd === .2 &&
+    scalarVibrato.vibratoDepthSd === .7);
+  check("T-047 removing the table restores a failing low-cell scalar",
+    Math.abs(scalarVibrato.vibratoRate - vibratoRows[0].rate) > .3 ||
+    Math.abs(scalarVibrato.vibratoDepth - vibratoRows[0].depth) >
+      vibratoRows[0].depth * .3);
+  const fittedAttack = new GenerationEngine({
+    seed: 480, spectralProfile: "violin", excitationType: "bow",
+    envelopeAttackByRegisterDynamic: attackRows,
+    envelopeAttack: .053, envelopeAttackSd: 0, envelopeProb: 0,
+  })._subNoteVariation(.15, attackRows[0].f0, 0, null);
+  check("T-048 fitted attack reaches the sounded-note envelope",
+    near(fittedAttack.envelopeAttack,
+      bowedEnvelopeAttackRenderSeconds(attackRows[0].attack), 1e-9));
+  check("T-048 short/long band-T90 targets receive the pinned render calibration",
+    near(bowedEnvelopeAttackRenderSeconds(.059508), .0774, .001) &&
+    bowedEnvelopeAttackRenderSeconds(.286848) > .48);
+  check("T-048 lock-in evidence caps the legacy partial-onset stagger",
+    fittedAttack.attackStaggerMs === 0 && fittedAttack.attackNoise.decay === .005);
+  const scalarAttack = new GenerationEngine({
+    seed: 480, spectralProfile: "violin", excitationType: "bow",
+    envelopeAttack: .053, envelopeAttackSd: 0, envelopeProb: 0,
+  })._subNoteVariation(.15, attackRows[0].f0, 0, null);
+  check("T-048 absent table is the exact scalar/register fallback",
+    scalarAttack.envelopeAttack === .053);
+  const blownFirewall = new GenerationEngine({
+    seed: 480, spectralProfile: "clarinet", excitationType: "blow",
+    envelopeAttackByRegisterDynamic: attackRows,
+    vibratoByRegisterDynamic: vibratoRows,
+    envelopeAttack: .053, envelopeAttackSd: 0, envelopeProb: 0,
+    vibratoProb: .2, vibratoRate: 4.5, vibratoDepth: 8,
+  })._subNoteVariation(.15, attackRows[0].f0, 0, null);
+  check("T-047/T-048 bowed tables are firewalled from blown notes",
+    blownFirewall.envelopeAttack === .053 && blownFirewall.vibratoProb === .2 &&
+    blownFirewall.vibratoRate === 4.5 && blownFirewall.vibratoDepth === 8);
 }
 
 console.log("T-B3: stiff-string inharmonicity law");
