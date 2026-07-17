@@ -148,10 +148,10 @@ shared branch.
 
 - `npm test`: 11/11 PASS.
 - `node scripts/verify_tone_model.mjs`: all tone-model assertions PASS.
-- `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: 214/214 PASS.
-- `PORT=8897 SG2_URL=http://127.0.0.1:8897 ... node scripts/render_note.mjs --verify`:
+- `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: 215/215 PASS.
+- `PYTHON=../../../.venv/bin/python node scripts/render_note.mjs --verify`:
   PASS, renderer hash
-  `b479fbef58634ff93e2123cd548a4d69ad611933e837910aad20cbafa0a0f624`.
+  `ee86c33025c937f1b8324660927d49efb4cc6903d308242b2457d585b13f8092`.
 - `python3 scripts/sg2_listen_page.py`: PASS.
 
 ## Pending mandates and exit state

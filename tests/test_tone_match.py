@@ -55,12 +55,11 @@ from scripts.tone_match.iterate import (
 )
 from scripts.tone_match.legacy_prior import resolve_legacy_prior
 from scripts.tone_match.humanisation import fit_excitation_position, ship_human_overrides
-from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, rebase_fitted_preset, seed_preset
+from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, STRUCK_OBJECTIVE_ROLES, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, iowa_filename_span, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
 from scripts.tone_match.build_campaign import _run_start_midi
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
-from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 
 
@@ -576,17 +575,32 @@ def test_profile_rebase_refreshes_structural_anchors_but_keeps_fitted_controls()
     fitted = {"params": {
         "partialTilt": .34,
         "attackNoiseLevel": .7,
+        "excitationHuman": .1,
+        "_sg2Mode": "ship",
+        "_sg2Prior": {"mode": "ship", "resolvedHash": "old"},
         "envelopeAttackByRegister": [{"f0": 120, "attack": .03}],
     }}
     refreshed = {
         "partialTilt": 0,
         "attackNoiseLevel": 1,
+        "excitationHuman": 0,
+        "_sg2Mode": "fit",
+        "_sg2Prior": {"mode": "fit", "resolvedHash": "new"},
         "envelopeAttackByRegister": [{"f0": 82.407, "attack": .028}],
     }
     rebased = rebase_fitted_preset(fitted, refreshed)
     assert rebased["partialTilt"] == .34
     assert rebased["attackNoiseLevel"] == .7
+    assert rebased["excitationHuman"] == 0
+    assert rebased["_sg2Mode"] == "fit"
+    assert rebased["_sg2Prior"] == refreshed["_sg2Prior"]
     assert rebased["envelopeAttackByRegister"] == refreshed["envelopeAttackByRegister"]
+
+
+def test_struck_campaign_roles_use_the_shared_tripwire_taxonomy():
+    assert reference_roles({"roles": list(STRUCK_OBJECTIVE_ROLES)}) == {
+        "spectral", "onset",
+    }
 
 
 def test_dominant_residual_ignores_zero_weight_diagnostics():
