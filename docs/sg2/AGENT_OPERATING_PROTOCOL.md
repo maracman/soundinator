@@ -98,3 +98,5 @@ note it for WP-9/WP-10, move on.
    (ship-mode, fresh seeds).
 6. Summary: §2.5 exit state, work items, `OWNER DECISION NEEDED` block if
    any, prior-row + hash, flagged pending mandates.
+
+| F13 | Spec-literalism: a fetch declared take-pair evidence "unobtainable" and downgraded to proxy labels, when goal-level analysis showed the obtained takes were FULL-STRENGTH evidence for the dimensions that matter (duration-robust axes; per-note variation measured directly by within-run deltas) | **Specs are means; goals govern.** When a specification is unobtainable or a fallback is invoked, STOP and re-derive from the stated aim (the L-note/plan goal): identify per-dimension what the alternative evidence genuinely supports at full strength, what it weakens, and the best goal-serving path — then proceed with THAT analysis recorded. "Downgrade-and-proceed" without a goal-level re-derivation is a violation. Applies to the hub as much as the lanes |
