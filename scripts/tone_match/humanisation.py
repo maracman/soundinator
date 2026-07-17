@@ -220,6 +220,15 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]]) -> dict[
     }
 
 
+def _consume_profile_ranges(profiles: dict[str, Any], instrument: str,
+                            result: dict[str, Any]) -> bool:
+    """Consume only a decomposition-valid differential fit."""
+    if not result["decompositionTest"]["passed"]:
+        return False
+    profiles[instrument]["humanRanges"] = result
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instrument", required=True)
@@ -235,14 +244,19 @@ def main(argv: list[str] | None = None) -> int:
     profiles = json.loads(args.profile.read_text())
     if args.instrument not in profiles:
         raise ValueError(f"{args.instrument}: missing measured profile row")
-    profiles[args.instrument]["humanRanges"] = result
-    # measured_profiles.json's checked-in canonical formatting is one-space
-    # indentation; preserve it so a differential fit changes only its row.
-    args.profile.write_text(json.dumps(profiles, indent=1) + "\n")
+    profile_updated = _consume_profile_ranges(profiles, args.instrument, result)
+    if profile_updated:
+        # A failed decomposition is evidence of a limiting factor, never
+        # permission to widen the shipped identity or Human ranges.
+        # measured_profiles.json's checked-in canonical formatting is
+        # one-space indentation; preserve it so a successful fit changes
+        # only its row.
+        args.profile.write_text(json.dumps(profiles, indent=1) + "\n")
     report = args.report or data_root / "campaigns" / args.instrument / "humanisation-fit.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps({"profile": str(args.profile), "report": str(report),
+    print(json.dumps({"profile": str(args.profile) if profile_updated else None,
+                      "profileUpdated": profile_updated, "report": str(report),
                       "decompositionTest": result["decompositionTest"]}, indent=2))
     return 0 if result["decompositionTest"]["passed"] else 2
 

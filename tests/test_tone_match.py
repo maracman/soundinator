@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
+import scripts.tone_match.struck_plucked_prep as struck_prep_module
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
@@ -36,6 +37,7 @@ from scripts.tone_match.iterate import (
     _mode_params,
     _params,
     _reference_set_id,
+    _reference_render_params_override,
     _reference_variability,
     _renderer_contract_hash,
     _technique_exchange_statuses,
@@ -48,6 +50,7 @@ from scripts.tone_match.humanisation import fit_excitation_position
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
+from scripts.tone_match.build_campaign import _run_start_midi
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
@@ -99,6 +102,32 @@ def test_band_balance_distance_and_tripwires_expose_octave_tilt():
     by_name = {row["name"]: row for row in gates["rows"]}
     assert by_name["band-balance-mean"]["status"] == "pass"
     assert by_name["band-balance-max-octave"]["status"] == "fail"
+
+
+def test_reacquired_chromatic_run_names_resolve_their_first_midi():
+    assert _run_start_midi("BbClar.pp.D3B3.aiff") == 50
+    assert _run_start_midi("AltoSax.NoVib.ff.Db3B3.aiff") == 49
+    assert _run_start_midi("Horn.ff.Bb1B1.aiff") == 34
+
+
+def test_requested_blown_controls_have_controllability_probes():
+    from scripts.tone_match.controllability import BOWED_FREE_PARAMS
+    assert {
+        "breathLevelScale", "breathVelocityExponent", "breathTurbulence",
+        "breathBodyAmount", "onsetSpectrumTilt", "onsetSpectrumDecay",
+        "articulationVelocitySlope",
+    } <= set(BOWED_FREE_PARAMS)
+
+
+def test_failed_humanisation_fit_is_not_authorised_for_profile_consumption():
+    from scripts.tone_match.humanisation import _consume_profile_ranges
+    profiles = {"french-horn": {"partials": []}}
+    failed = {"decompositionTest": {"passed": False}, "ranges": {"x": 1}}
+    assert not _consume_profile_ranges(profiles, "french-horn", failed)
+    assert "humanRanges" not in profiles["french-horn"]
+    passed = {"decompositionTest": {"passed": True}, "ranges": {"x": 1}}
+    assert _consume_profile_ranges(profiles, "french-horn", passed)
+    assert profiles["french-horn"]["humanRanges"] is passed
 
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
     freqs = np.asarray([50.0, 100.0, 200.0, 10_000.0])
@@ -351,11 +380,33 @@ def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
     piano = STRUCK_CAMPAIGNS["grand-piano"]
     nylon = STRUCK_CAMPAIGNS["guitar-nylon"]
     assert len(piano["anchors"]) >= 5
+    assert [row["midi"] for row in piano["anchors"]] == [24, 36, 60, 84, 108]
     assert piano["dynamics"] == ("pp", "ff")
     assert len(nylon["anchors"]) >= 3
     assert nylon["source"].startswith("Philharmonia")
     assert [row["string"] for row in nylon["anchors"]] == \
         ["string6", "string3", "string1"]
+
+
+def test_declared_single_piano_note_wins_even_over_nearby_tracker_mode(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        struck_prep_module, "load_mono",
+        lambda _path: (np.ones(4_800, dtype=float) * .1, 48_000))
+    monkeypatch.setattr(
+        struck_prep_module, "segment_notes",
+        lambda *_args, **_kwargs: [(0, 4_800)])
+    monkeypatch.setattr(
+        struck_prep_module, "analyse_note",
+        lambda *_args, **_kwargs: SimpleNamespace(f0=1094.219))
+    _samples, _rate, f0, evidence = struck_prep_module.select_note(
+        tmp_path / "Piano.pp.C6.aiff", 84)
+    assert f0 == pytest.approx(1046.502261, rel=1e-6)
+    assert evidence == {
+        "method": "filename-nominal-anchor",
+        "rawDetectedF0": 1094.219,
+        "rawDetectedMidi": 85,
+    }
 
 
 def test_t033_guitar_auto_course_uses_minimum_fret_and_24_fret_bound():
@@ -473,13 +524,33 @@ def test_legacy_prior_uses_pinned_tag_craft_and_measured_overlay():
         "vibratoRate": 6.125, "bodyBands": [{"freq": 280, "gain": .4}],
     })
     assert prior["tag"] == "sg2-legacy"
-    assert prior["commit"].startswith("e8d3ac1")
+    assert prior["commit"] == "e8d3ac123c0f1c2647c4dbf03d48934b1966564d"
+    assert prior["blobs"]["web/static/synth.js"] == \
+        "ea9ed79adbb2412bf2078f1a68af68374f76a017"
     assert prior["source"] == "violin"
     assert resolved["excitationHuman"] == pytest.approx(.4)
     assert resolved["envelopeAttack"] == pytest.approx(.085)
     assert resolved["vibratoRate"] == pytest.approx(6.125)  # measured wins
     assert resolved["bodyBands"] == [{"freq": 280, "gain": .4}]
     assert len(prior["rowHash"]) == len(prior["resolvedParameterHash"]) == 64
+
+
+def test_nylon_prior_uses_piano_craft_with_separate_fit_and_ship_human():
+    topology = {
+        "sg2Family": "struck-plucked", "spectralProfile": "guitar",
+        "excitationType": "pluck", "resonatorClass": "string",
+    }
+    fitted, fit_prior = resolve_legacy_prior(
+        "guitar-nylon", topology, mode="fit")
+    shipped, ship_prior = resolve_legacy_prior(
+        "guitar-nylon", topology, mode="ship")
+    assert fit_prior["row"] == \
+        "guitar-nylon ← legacy piano craft adapted to pluck"
+    assert fit_prior["source"] == ship_prior["source"] == "piano"
+    assert fitted["excitationType"] == shipped["excitationType"] == "pluck"
+    assert fitted["excitationHuman"] == 0
+    assert shipped["excitationHuman"] > 0
+    assert fit_prior["resolvedHash"] != ship_prior["resolvedHash"]
 
 
 def test_fit_mode_zeros_human_draws_without_stripping_ship_craft():
@@ -628,6 +699,46 @@ def test_alto_sax_owner_notes_are_construction_gates():
     })
     by_id = {row["id"]: row["status"] for row in fitted["assertions"]}
     assert all(by_id[key] == "pass" for key in owner_ids)
+
+
+@pytest.mark.parametrize("instrument", ["clarinet", "french-horn"])
+def test_f5_breath_laws_scope_close_requested_blown_families(instrument):
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+               for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+    base = {
+        "excitationType": "blow", "resonatorClass": "conicalTube", "dynamicBlare": .2,
+        "breathVelocityExponent": 1, "breathTurbulence": 0, "breathBodyAmount": 0,
+    }
+    owner_ids = {f"{instrument}.soft-breath-law", f"{instrument}.turbulence-law",
+                 f"{instrument}.body-coloured-air"}
+    failed = evaluate_construction(instrument, samples, params=base)
+    failed_ids = {row["id"] for row in failed["assertions"] if row["status"] == "fail"}
+    assert owner_ids <= failed_ids
+    fitted = evaluate_construction(instrument, samples, params={
+        **base, "breathVelocityExponent": .5, "breathTurbulence": .2,
+        "breathBodyAmount": .4,
+    })
+    by_id = {row["id"]: row["status"] for row in fitted["assertions"]}
+    assert all(by_id[key] == "pass" for key in owner_ids)
+
+
+@pytest.mark.parametrize("instrument", ["trumpet", "french-horn"])
+def test_f5_onset_spectrum_scope_closes_requested_blown_families(instrument):
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+               for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+    base = {
+        "excitationType": "blow", "resonatorClass": "conicalTube", "dynamicBlare": .2,
+        "onsetSpectrumTilt": 0, "onsetSpectrumDecay": .06,
+    }
+    assertion_id = f"{instrument}.onset-spectrum-law"
+    failed = evaluate_construction(instrument, samples, params=base)
+    by_id = {row["id"]: row["status"] for row in failed["assertions"]}
+    assert by_id[assertion_id] == "fail"
+    fitted = evaluate_construction(instrument, samples, params={
+        **base, "onsetSpectrumTilt": .2,
+    })
+    by_id = {row["id"]: row["status"] for row in fitted["assertions"]}
+    assert by_id[assertion_id] == "pass"
 
 
 def test_boy_morphology_requires_scaled_formants_to_reach_body_stage():
@@ -1140,6 +1251,9 @@ def test_bowed_p1_features_have_zero_weight_for_blown():
     from scripts.tone_match.score import _BOWED_WATCH_METRICS
     blown = weights_for_instrument("clarinet")
     bowed = weights_for_instrument("violin")
+    # T-005 is active for the rebuilt blown objective; the rebaseline gives
+    # it a fresh reference-set id rather than comparing unlike leaderboards.
+    assert blown["band_balance_db"] == 1.0
     for key in _BOWED_P1_FEATURES:
         assert blown[key] == 0.0
         if key in _BOWED_WATCH_METRICS:
@@ -1257,6 +1371,21 @@ def test_reference_roles_define_bar_specific_coverage_without_floor_leakage():
     assert reference_roles({}) == {"spectral", "onset", "vibrato"}
     with pytest.raises(ValueError, match="unknown reference roles"):
         reference_roles({"roles": ["mystery"]})
+
+
+def test_reference_render_override_declares_vibrato_role_without_role_leakage():
+    assert _reference_render_params_override({"roles": ["vibrato"]}) == {
+        "performanceRole": "vibrato",
+    }
+    assert _reference_render_params_override({"roles": ["spectral", "onset"]}) == {
+        "performanceRole": "non-vibrato",
+    }
+    assert _reference_render_params_override({"roles": ["floor"]}) == {
+        "performanceRole": "non-vibrato",
+    }
+    # Legacy references without explicit roles retain their existing all-role
+    # interpretation and therefore still exercise the vibrato scorer.
+    assert _reference_render_params_override({}) == {"performanceRole": "vibrato"}
 
 
 def test_bowed_construction_uses_spectral_and_vibrato_roles_separately():
@@ -1442,6 +1571,11 @@ def test_tone_matcher_penalizes_unanalysable_candidate_without_aborting(
     monkeypatch.setattr(iterate_module, "extract_features", features)
     objective = matcher.evaluate(np.asarray([0.0]))
     record = matcher.evaluations[0]
+    jobs = json.loads((tmp_path / "renders" / "eval-0000" / "jobs.json").read_text())
+    assert [job["paramsOverride"] for job in jobs] == [
+        {"performanceRole": "non-vibrato"},
+        {"performanceRole": "non-vibrato"},
+    ]
     assert np.isfinite(objective)
     assert len(record["analysisFailures"]) == 1
     assert record["scores"][0]["composite"] == 100.0

@@ -465,6 +465,13 @@ Status update — Agent D, 2026-07-17: engine=incorporated `fdebff6`
 analysis=incorporated bowed=blocked-audit (engine unit law passes; final
 offline scorer re-audit cannot be accepted while the shared render verifier
 is red on T-054)
+Status update — Agent A, 2026-07-17: engine=incorporated `fdebff6`
+(instantaneous vibrato/wander frequency drives body-gain automation at >=100
+Hz; static notes retain the exact legacy graph). The pinned violin body and
+18-cent swing produce 0.794 dB in the current consumer audit; the theoretical
+maximum over that body is 1.026 dB, so the original >=3 dB target remains a
+separate unexplained-residual analysis obligation rather than permission to
+amplify the measured body. bowed=blocked-analysis-contract, not blocked-engine.
 
 ### T-030 · ENGINE SPEC: vibrato trajectory controls (delay, ramp, rate drift)
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; values per instrument
@@ -516,6 +523,12 @@ Status update — Agent D response audit, 2026-07-17: engine=blocked-headless
 `d31d8d205e704191`: all three controls stay below the 0.05 perceptual-unit
 threshold; `onset_wander_cents` max response 0.00060, so the WebAudio control
 has no canonical offline-render consumer yet)
+Status update — Agent A, 2026-07-17: engine=incorporated `895c048` (seeded
+two-sign wander, period-scaled settle and articulation-coloured scratch reach
+the browser renderer; Human 0 and every non-bow path are exact-neutral).
+F4 headless consumers and the current isolated browser render verifier pass;
+bowed=blocked-response-re-audit because Agent D's earlier perceptual-response
+audit must still be repeated against the integrated checkout.
 
 ### T-032 · Exact laws for the two body contracts (closes T-010's request)
 Author: bowed lane · 2026-07-16 · Firewall: method + per-instrument data
@@ -721,6 +734,10 @@ Affects: excitation-noise renderer / DEFAULTS aliases / bowed manifest /
 `*.pp-noise-rise`.
 Status: engine=pending analysis=incorporated (NHR senses and sign gate)
 bowed=blocked-engine
+Status update — Agent A, 2026-07-17: engine=incorporated `8f7efef` through
+the shared excitation-noise renderer. F4 proves sublinear velocity raises
+relative pp NHR without changing the harmonic core, and changing bow controls
+leaves a blown render PCM-identical. bowed=ready-rebaseline.
 
 ### T-040 · Bowed body generation must evidence the low signature modes
 Author: Agent D / analysis · 2026-07-16 · Firewall: method + per-instrument data
@@ -880,6 +897,11 @@ bit-identical to the scalar path.
 Affects: measured profile/seed schema / vibrato note law / bowed campaign.
 Status: analysis=incorporated (external contract + seed emitted)
 engine=pending bowed=blocked-engine struck/plucked=n/a
+Status update — Agent A, 2026-07-17: engine=incorporated `2b7cb50` (log-f0 ×
+dynamic interpolation, role-declared deterministic presence, exact scalar
+fallback, and blown firewall). All six contract renders meet rate ±0.3 Hz and
+depth ±30%; removing the table restores a low-cell scalar failure.
+bowed=ready-rebaseline.
 
 ### T-048 · ENGINE SPEC: bowed attack consumes register × dynamic evidence
 Author: Agent D / bowed-analysis · 2026-07-16 · Firewall: mechanism + data
@@ -908,6 +930,10 @@ attack-t90 and onset-lockin gates.
 Status: analysis=incorporated (dedicated roles, corrected metric, external
 contract, clean isolated audit) engine=pending bowed=blocked-engine
 struck/plucked=n/a
+Status update — Agent A, 2026-07-17: engine=incorporated `2b7cb50`. All six
+contract renders meet band-T90 tolerance and remain <=18 lock-in periods;
+the absent-table path is the exact scalar/register fallback and blown notes
+do not consume the bowed table. bowed=ready-rebaseline.
 
 ### T-054 · Cross-pitch harmonic residuals isolate pinned excitation noise
 Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: method + per-instrument data
@@ -954,6 +980,13 @@ bow-noise mean delta about 5.35e-8) bowed=blocked-engine analysis=incorporated
 Status update — Agent D integration re-audit, 2026-07-17: engine=blocked-verifier
 `fdebff6` (shared tip still fails the same required verifier at about 4.63e-8
 mean delta) bowed=blocked-engine analysis=incorporated
+Status update — Agent A, 2026-07-17: engine=incorporated `ed49beb`; the pinned
+37-row post-body target, deterministic deconvolution FIR, fitted level law and
+unity measured-body routing have F4 consumers. The earlier verifier result was
+served from another checkout: on an isolated current-checkout port with the
+project Python environment, `render_note --verify` passes at hash
+`d779e7469eacba1694bb608af4f14a77f3bfdab7036538edafef74d1bc63978e`.
+bowed=ready-re-audit, analysis=incorporated.
 
 ## Sung lane pass-01 disposition (Agent E, 2026-07-16)
 
@@ -1123,3 +1156,35 @@ run-report contracts / cello proxy basis.
 Status: analysis=incorporated `913cc4b` bowed=incorporated
 engine=blocked T-031/T-054 headless verification sung=adapt-method
 struck/plucked=adapt-method
+
+### T-056 · A craft prior and deterministic fit mode are separate contracts
+Author: sung lane · 2026-07-17 · Firewall: method/process
+Finding: deterministic fitting does not justify starting a voice from neutral
+zeros. The legacy `vocal` craft prior supplies the established envelope,
+aspiration, humanisation and vibrato idioms; fitted per-singer source and
+per-vowel body evidence overlays that prior. FIT mode temporarily zeroes the
+stochastic probabilities and humanisation for measurement, while SHIP mode
+restores the inherited craft values and uses a fresh seed. The prior is pinned
+by legacy commit, preset path and a canonical parameter hash.
+Consuming assertions: every emitted SUNG fit names the pinned legacy prior;
+FIT renders are deterministic; SHIP renders retain nonzero envelope,
+humanisation and vibrato probabilities; the scored file is never substituted
+for the listening file; a neutral-zero initializer fails preflight.
+Affects: sung_prior.py / sung_fit.py / sung_audition.py / provenance.
+Status: sung=incorporated analysis=consumer-added engine=n/a
+
+### T-057 · Spoken consonants require an explicit sung adaptation layer
+Author: sung lane · 2026-07-17 · Firewall: evidence semantics
+Finding: phone-aligned LibriSpeech supplies useful consonant burst, duration,
+VOT and formant-transition observations, but they are spoken measurements.
+Annex S31–S33 provides directional sung adaptation: shorten the consonant and
+voiceless VOT, compress the transition, and schedule the vowel nucleus on the
+beat. The adapted table is a provisional generator prior until sung consonant
+recordings validate it; it is not direct sung reference evidence.
+Consuming assertions: output keeps spoken and adapted fields distinct; the
+adaptation coefficients and corpus provenance enter the hash; all consonant
+feature weights are zero until the generator controls pass a fresh
+controllability audit; disabling the layer is PCM-identical to the current
+renderer.
+Affects: sung_consonants.py / A-VOICE-03 / D-VOICE-02 / onset objective.
+Status: sung=incorporated analysis=spec-filed engine=spec-filed-zero-weight

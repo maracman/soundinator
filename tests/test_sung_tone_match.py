@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from scripts.tone_match.assertions import normalize_instrument
 from scripts.tone_match.sung_features import (
     SungObservation,
     fit_pooled_source_vowel_bodies,
@@ -10,6 +11,19 @@ from scripts.tone_match.sung_features import (
 )
 from scripts.tone_match.sung_prep import VOICE_CLASSES, parse_vocalset_file, register_for_f0
 from scripts.tone_match.sung_fit import fit_campaign
+from scripts.tone_match.sung_consonants import (
+    CONSONANT_FEATURE_WEIGHTS,
+    SungAdaptationPolicy,
+    adapt_spoken_measurement,
+    parse_phone_tier,
+)
+from scripts.tone_match.sung_prior import (
+    LEGACY_VOCAL_CRAFT,
+    LEGACY_VOCAL_PRIOR_HASH,
+    params_for_mode,
+    prior_provenance,
+)
+from scripts.tone_match.tripwires import reference_roles
 
 
 def test_vocalset_parser_carries_identity_vowel_and_technique():
@@ -32,13 +46,19 @@ def test_register_prior_straddles_passaggio():
 
 def test_standard_section_voice_classes_are_first_class():
     assert VOICE_CLASSES["bass"] == {"male8"}
-    assert VOICE_CLASSES["soprano"] == {"female2", "female6"}
+    assert VOICE_CLASSES["soprano"] == {
+        "female1", "female2", "female3", "female4", "female6", "female7", "female9"
+    }
     assert "male7" not in VOICE_CLASSES["tenor"]
     assert register_for_f0("bass", 260) == "mid"
     assert register_for_f0("soprano", 880) == "high"
     assert vowel_regions_for_class("soprano")["i"][0][0] > (
         vowel_regions_for_class("mezzo-soprano")["i"][0][0]
     )
+    assert normalize_instrument("voice-soprano") == "soprano"
+    assert normalize_instrument("voice-mezzo") == "mezzo-soprano"
+    assert normalize_instrument("voice-tenor") == "tenor"
+    assert normalize_instrument("voice-bass") == "bass"
 
 
 def test_vowel_gate_uses_class_scaled_regions():
@@ -107,3 +127,49 @@ def test_identity_fit_rejects_cross_singer_manifest(tmp_path):
         assert "exactly one singer" in str(exc)
     else:
         raise AssertionError("cross-singer identity manifest was accepted")
+
+
+def test_legacy_vocal_prior_keeps_craft_and_splits_fit_ship_modes():
+    provenance = prior_provenance()
+    assert provenance["tag"] == "sg2-legacy"
+    assert provenance["parameterHash"] == LEGACY_VOCAL_PRIOR_HASH
+    assert LEGACY_VOCAL_CRAFT["excitationHuman"] > 0
+    assert LEGACY_VOCAL_CRAFT["envelopeProb"] > 0
+    assert LEGACY_VOCAL_CRAFT["toneBreath"] > 0
+    assert LEGACY_VOCAL_CRAFT["vibratoProb"] > 0
+    fit = params_for_mode(LEGACY_VOCAL_CRAFT, "fit")
+    ship = params_for_mode(LEGACY_VOCAL_CRAFT, "ship", seed=991)
+    assert fit["excitationHuman"] == fit["envelopeProb"] == fit["vibratoProb"] == 0
+    assert ship["excitationHuman"] == LEGACY_VOCAL_CRAFT["excitationHuman"]
+    assert ship["envelopeProb"] == LEGACY_VOCAL_CRAFT["envelopeProb"]
+    assert ship["seed"] == 991
+
+
+def test_spoken_to_sung_adaptation_is_directional_and_zero_weighted():
+    policy = SungAdaptationPolicy()
+    common = {
+        "spokenDurationMs": 100.0,
+        "spokenVotMs": 60.0,
+        "spokenTransitionMs": 80.0,
+    }
+    voiceless = adapt_spoken_measurement({**common, "voiced": False}, policy)
+    voiced = adapt_spoken_measurement({**common, "voiced": True}, policy)
+    assert voiceless["durationMs"] < common["spokenDurationMs"]
+    assert voiceless["votMs"] < common["spokenVotMs"]
+    assert voiced["votMs"] > common["spokenVotMs"]
+    assert voiceless["anchor"] == "vowel-on-beat"
+    assert set(CONSONANT_FEATURE_WEIGHTS.values()) == {0.0}
+
+
+def test_humanisation_role_is_explicit_but_not_a_quantitative_bar():
+    assert reference_roles({"roles": ["humanisation"]}) == {"humanisation"}
+
+
+def test_phone_tier_parser_reads_only_phone_intervals(tmp_path):
+    grid = tmp_path / "x.TextGrid"
+    grid.write_text(
+        'name = "words"\nintervals [1]:\n xmin = 0\n xmax = 1\n text = "day"\n'
+        'name = "phones"\nintervals [1]:\n xmin = 0.1\n xmax = 0.2\n text = "D"\n'
+        'intervals [2]:\n xmin = 0.2\n xmax = 0.5\n text = "EY1"\n'
+    )
+    assert [row["phone"] for row in parse_phone_tier(grid)] == ["D", "EY1"]

@@ -39,7 +39,7 @@ function usage(message = "") {
   node scripts/render_note.mjs --batch jobs.json
   node scripts/render_note.mjs --verify
 
-Batch JSON is an array of {params|paramsFile,midi,velocity,durationSec,sampleRate,out}.`);
+Batch JSON is an array of {params|paramsFile,paramsOverride,midi,velocity,durationSec,sampleRate,out}.`);
   process.exit(message ? 2 : 0);
 }
 
@@ -112,10 +112,13 @@ function wavBytes(channels, sampleRate) {
 }
 
 async function paramsFor(job) {
-  if (job.params && typeof job.params === "object") return job.params;
+  let base;
+  if (job.params && typeof job.params === "object") base = job.params;
   const path = job.paramsFile || job.params;
-  if (!path) return {};
-  return JSON.parse(await readFile(path, "utf8"));
+  if (base == null) base = path ? JSON.parse(await readFile(path, "utf8")) : {};
+  const override = job.paramsOverride && typeof job.paramsOverride === "object"
+    ? job.paramsOverride : {};
+  return { ...base, ...override };
 }
 
 async function renderJobs(jobs) {

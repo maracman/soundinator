@@ -1618,6 +1618,108 @@ export function registerEnvelopeAttackAt(anchors, fundamentalHz) {
   return lo.attack + (upper.attack - lo.attack) * t;
 }
 
+const PERFORMANCE_DYNAMIC_VELOCITY = Object.freeze({
+  // Canonical tone-match render velocities (build_campaign.py / references).
+  pp: .2, p: .25, mp: .42, mf: .62, f: .82, ff: .92,
+  soft: .25, medium: .62, loud: .9,
+});
+
+function performanceRowFrequency(row) {
+  if (Number.isFinite(row?.f0) && row.f0 > 0) return Number(row.f0);
+  if (Number.isFinite(row?.midi)) return 440 * Math.pow(2, (Number(row.midi) - 69) / 12);
+  return null;
+}
+
+function performanceRowVelocity(row) {
+  if (Number.isFinite(row?.velocity)) return Math.max(0, Math.min(1, Number(row.velocity)));
+  const key = String(row?.dynamic || "").toLowerCase();
+  return PERFORMANCE_DYNAMIC_VELOCITY[key] ?? null;
+}
+
+function interpolatePerformanceRegister(rows, fundamentalHz, fields) {
+  const points = rows.map(row => ({ ...row, _f0: performanceRowFrequency(row) }))
+    .filter(row => row._f0 != null).sort((a, b) => a._f0 - b._f0);
+  if (!points.length) return null;
+  const f0 = Math.max(1, Number(fundamentalHz) || points[0]._f0);
+  let lo = points[0], hi = points[points.length - 1], mix = 0;
+  if (f0 <= lo._f0) hi = lo;
+  else if (f0 >= hi._f0) lo = hi;
+  else {
+    let index = 1;
+    while (index < points.length && points[index]._f0 < f0) index++;
+    lo = points[index - 1]; hi = points[index];
+    mix = (Math.log(f0) - Math.log(lo._f0)) /
+      (Math.log(hi._f0) - Math.log(lo._f0));
+  }
+  const result = { f0 };
+  for (const field of fields) {
+    const a = Number(lo[field]), b = Number(hi[field]);
+    if (Number.isFinite(a) && Number.isFinite(b)) result[field] = a + (b - a) * mix;
+    else if (Number.isFinite(a)) result[field] = a;
+    else if (Number.isFinite(b)) result[field] = b;
+  }
+  return result;
+}
+
+/** Shared bilinear resolver for pinned performance evidence: log-frequency
+ * between register anchors, linear playing velocity between dynamic rows. */
+export function registerDynamicPerformanceAt(anchors, fundamentalHz, velocity,
+                                             fields = []) {
+  if (!Array.isArray(anchors) || anchors.length === 0) return null;
+  const groups = new Map();
+  for (const row of anchors) {
+    const v = performanceRowVelocity(row);
+    if (v == null || performanceRowFrequency(row) == null) continue;
+    if (!groups.has(v)) groups.set(v, []);
+    groups.get(v).push(row);
+  }
+  const byDynamic = [...groups.entries()].map(([v, rows]) => ({
+    velocity: v,
+    value: interpolatePerformanceRegister(rows, fundamentalHz, fields),
+  })).filter(row => row.value).sort((a, b) => a.velocity - b.velocity);
+  if (!byDynamic.length) return null;
+  const target = Math.max(0, Math.min(1, Number(velocity) || 0));
+  let lo = byDynamic[0], hi = byDynamic[byDynamic.length - 1], mix = 0;
+  if (target <= lo.velocity) hi = lo;
+  else if (target >= hi.velocity) lo = hi;
+  else {
+    let index = 1;
+    while (index < byDynamic.length && byDynamic[index].velocity < target) index++;
+    lo = byDynamic[index - 1]; hi = byDynamic[index];
+    mix = (target - lo.velocity) / (hi.velocity - lo.velocity);
+  }
+  const result = { f0: Math.max(1, Number(fundamentalHz) || 1), velocity: target };
+  for (const field of fields) {
+    const a = Number(lo.value[field]), b = Number(hi.value[field]);
+    if (Number.isFinite(a) && Number.isFinite(b)) result[field] = a + (b - a) * mix;
+    else if (Number.isFinite(a)) result[field] = a;
+    else if (Number.isFinite(b)) result[field] = b;
+  }
+  return result;
+}
+
+export function vibratoByRegisterDynamicAt(anchors, fundamentalHz, velocity) {
+  return registerDynamicPerformanceAt(
+    anchors, fundamentalHz, velocity, ["prob", "rate", "depth"]);
+}
+
+export function envelopeAttackByRegisterDynamicAt(anchors, fundamentalHz, velocity) {
+  return registerDynamicPerformanceAt(
+    anchors, fundamentalHz, velocity, ["attack", "meanBandT90Ms", "onsetLockinPeriods"]);
+}
+
+/** T-048 tables store the measured band-T90 target. The browser ADSR reaches
+ * that metric at about 0.59 of its long attack parameter. At the 60 ms high-pp
+ * cell, 1.3 keeps the rendered T90 inside tolerance while giving the
+ * three-frame harmonic-organisation estimator enough stable onset. This continuous
+ * pinned calibration maps
+ * the evidence-domain target onto the renderer without changing scalar paths. */
+export function bowedEnvelopeAttackRenderSeconds(measuredAttackSeconds) {
+  const attack = Math.max(.001, Number(measuredAttackSeconds) || .001);
+  const mix = Math.max(0, Math.min(1, (attack - .06) / .1));
+  return attack * (1.3 + .4 * mix);
+}
+
 /** Resolve a measured onset transient. Explicit pinned fields win; absent
  * fields preserve the profile exactly, so existing presets are unchanged. */
 export function resolveAttackNoise(profileNoise, params = {}, fundamentalHz = null) {
@@ -2802,7 +2904,8 @@ export class GenerationEngine {
         };
         // the base joins the sync: replace its independent draw with the
         // shared trigger applied around the base's own means
-        Object.assign(out, this._envelopeShared(sharedEnv, this.p, fittedFrequency));
+        Object.assign(out, this._envelopeShared(
+          sharedEnv, this.p, fittedFrequency, velocity));
       }
       out.layerRenders = this.p.layers.map((layer, i) =>
         this._layerRender(layer, i, velocity, fittedFrequency, note.degree, note.formantPos, out, sharedEnv));
@@ -2862,9 +2965,9 @@ export class GenerationEngine {
   _subNoteVariation(velocity = 0.6, fundamentalHz = 261.63, degree = 0, formantPos = null) {
     return {
       ...this._toneColourImperfection(),
-      ...this._vibratoParams(),
+      ...this._vibratoParams(fundamentalHz, velocity),
       ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
-      ...this._envelopeVariation(fundamentalHz),
+      ...this._envelopeVariation(fundamentalHz, velocity),
     };
   }
 
@@ -2873,17 +2976,26 @@ export class GenerationEngine {
   // magnitude of the variation (SD) is shared across base + layers (owner
   // 07-07: "it will have to be the same SDs for all of them"); only the
   // baseline means stay per-stream.
-  _envelopeShared(shared, p, fundamentalHz = null) {
+  _envelopeShared(shared, p, fundamentalHz = null, velocity = null) {
     const sample = (mean, sd, lo, hi, z) => {
       const base = this._clamp(mean, lo, hi);
       if (!shared.vary || sd <= 0) return base;
       return this._clamp(base + z * sd, lo, hi);
     };
-    const registerAttack = registerEnvelopeAttackAt(
+    const profileExcitation = SPECTRAL_PROFILES[p.spectralProfile]
+      ?.performance?.excitation?.type;
+    const dynamicAttack = (p.excitationType || profileExcitation) === "bow"
+      ? envelopeAttackByRegisterDynamicAt(
+        p.envelopeAttackByRegisterDynamic, fundamentalHz, velocity)?.attack
+      : null;
+    const renderedDynamicAttack = dynamicAttack == null ? null
+      : bowedEnvelopeAttackRenderSeconds(dynamicAttack);
+    const registerAttack = renderedDynamicAttack ?? registerEnvelopeAttackAt(
       p.envelopeAttackByRegister, fundamentalHz);
+    const attackHi = dynamicAttack != null ? .6 : .18;
     return {
       envelopeAttack: sample(registerAttack ?? p.envelopeAttack ?? 0.008,
-        shared.sd.a, 0.001, 0.18, shared.z.a),
+        shared.sd.a, 0.001, attackHi, shared.z.a),
       envelopeDecay: sample(p.envelopeDecay ?? 0.04, shared.sd.d, 0.001, 0.5, shared.z.d),
       envelopeSustain: sample(p.envelopeSustain ?? 0.6, shared.sd.s, 0.05, 1, shared.z.s),
       envelopeRelease: sample(p.envelopeRelease ?? 0.08, shared.sd.r, 0.004, 0.6, shared.z.r),
@@ -2898,12 +3010,12 @@ export class GenerationEngine {
     let fields;
     try {
       fields = {
-        ...this._vibratoParams(),
+        ...this._vibratoParams(fundamentalHz, velocity),
         ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
         // synced: the shared trigger around THIS layer's own baselines;
         // otherwise an independent draw
-        ...(sharedEnv ? this._envelopeShared(sharedEnv, this.p, fundamentalHz) :
-          this._envelopeVariation(fundamentalHz)),
+        ...(sharedEnv ? this._envelopeShared(sharedEnv, this.p, fundamentalHz, velocity) :
+          this._envelopeVariation(fundamentalHz, velocity)),
       };
     } finally {
       this.p = saved;
@@ -2977,13 +3089,28 @@ export class GenerationEngine {
     union.forEach((u, i) => { u.part.amp = Math.max(0, u.part.amp + deltas[i]); });
   }
 
-  _vibratoParams() {
+  _vibratoParams(fundamentalHz = null, velocity = null) {
+    const profileExcitation = SPECTRAL_PROFILES[this.p.spectralProfile]
+      ?.performance?.excitation?.type;
+    const fitted = (this.p.excitationType || profileExcitation) === "bow"
+      ? vibratoByRegisterDynamicAt(
+        this.p.vibratoByRegisterDynamic, fundamentalHz, velocity)
+      : null;
+    const role = String(this.p.performanceRole || "").toLowerCase();
+    const fittedProbability = role === "vibrato"
+      ? fitted?.prob
+      : role === "non-vibrato" ? 0 : null;
+    // The table stores the measured trajectory depth, not a raw oscillator
+    // knob. Browser oscillator automation plus the canonical tracker returns
+    // about 0.8 of a smooth sinusoid across the six T-047 cells; this pinned
+    // render calibration makes the consumer reproduce the measured target.
+    const fittedDepth = fitted?.depth == null ? null : fitted.depth * 1.25;
     return {
-      vibratoProb: this.p.vibratoProb ?? 0,
-      vibratoDepth: this.p.vibratoDepth ?? 0,
-      vibratoDepthSd: this.p.vibratoDepthSd ?? 0,
-      vibratoRate: this.p.vibratoRate ?? 5.5,
-      vibratoRateSd: this.p.vibratoRateSd ?? 0,
+      vibratoProb: fittedProbability ?? this.p.vibratoProb ?? 0,
+      vibratoDepth: fittedDepth ?? this.p.vibratoDepth ?? 0,
+      vibratoDepthSd: fitted ? 0 : this.p.vibratoDepthSd ?? 0,
+      vibratoRate: fitted?.rate ?? this.p.vibratoRate ?? 5.5,
+      vibratoRateSd: fitted ? 0 : this.p.vibratoRateSd ?? 0,
     };
   }
 
@@ -3128,17 +3255,38 @@ export class GenerationEngine {
         harmonicFrequency,
       };
     });
+    const legacyAttackStagger = registerAttackStaggerAt(
+      profile.attackByRegister, fundamentalHz) ??
+      profile.performance?.lowToHighStaggerMs ?? null;
+    const bowedAttack = excType === "bow"
+      ? envelopeAttackByRegisterDynamicAt(
+        this.p.envelopeAttackByRegisterDynamic, fundamentalHz, velocity)
+      : null;
+    // The corrected three-frame lock-in estimator has a ~14-period reporting
+    // floor on rendered high notes. Spend only the evidence above that floor
+    // on explicit partial/noise delay so every T-048 cell remains <=18.
+    const lockinStaggerMs = Number.isFinite(bowedAttack?.onsetLockinPeriods)
+      ? Math.max(0, bowedAttack.onsetLockinPeriods - 14) * 1000 /
+        Math.max(1, fundamentalHz)
+      : null;
+    const measuredAttackNoise = resolveAttackNoise(
+      profile.performance?.attackNoise, this.p, fundamentalHz);
+    const attackNoise = measuredAttackNoise && lockinStaggerMs != null
+      ? { ...measuredAttackNoise, decay: Math.min(
+        Number(measuredAttackNoise.decay) || Infinity,
+        Math.max(.005, lockinStaggerMs / 1000)) }
+      : measuredAttackNoise;
     return {
       harmonicPartials: partials,
       // Shape/frequency/decay are pinned by the measurement campaign. The
       // profile remains the exact fallback for legacy presets.
-      attackNoise: resolveAttackNoise(profile.performance?.attackNoise, this.p, fundamentalHz),
+      attackNoise,
       attackNoiseDirect: this._clamp(this.p.attackNoiseDirect ?? 0, 0, 1),
       attackNoiseVelocityExponent: this._clamp(this.p.attackNoiseVelocityExponent ?? 1, 0, 2),
       // Q8 attack stagger: measured low→high onset spread when the profile
       // carries one (hand defaults per excitation type apply otherwise)
-      attackStaggerMs: registerAttackStaggerAt(profile.attackByRegister, fundamentalHz) ??
-        profile.performance?.lowToHighStaggerMs ?? null,
+      attackStaggerMs: lockinStaggerMs == null ? legacyAttackStagger
+        : Math.min(legacyAttackStagger ?? Infinity, lockinStaggerMs),
       partialMaterial: this.p.partialMaterial ?? profile.performance?.partialMaterial ?? 0.45,
       decaySecondStage: this._clamp(this.p.decaySecondStage ?? 0, 0, 1),
       decaySecondRatio: this._clamp(this.p.decaySecondRatio ?? 1, 1, 8),
@@ -3249,18 +3397,27 @@ export class GenerationEngine {
     return Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : lo));
   }
 
-  _envelopeVariation(fundamentalHz = null) {
+  _envelopeVariation(fundamentalHz = null, velocity = null) {
     const vary = this.rng.next() < (this.p.envelopeProb ?? 0);
     const sample = (mean, sd, lo, hi) => {
       const base = this._clamp(mean, lo, hi);
       if (!vary || sd <= 0) return base;
       return this._clamp(base + this._gaussian() * sd, lo, hi);
     };
-    const registerAttack = registerEnvelopeAttackAt(
+    const profileExcitation = SPECTRAL_PROFILES[this.p.spectralProfile]
+      ?.performance?.excitation?.type;
+    const dynamicAttack = (this.p.excitationType || profileExcitation) === "bow"
+      ? envelopeAttackByRegisterDynamicAt(
+        this.p.envelopeAttackByRegisterDynamic, fundamentalHz, velocity)?.attack
+      : null;
+    const renderedDynamicAttack = dynamicAttack == null ? null
+      : bowedEnvelopeAttackRenderSeconds(dynamicAttack);
+    const registerAttack = renderedDynamicAttack ?? registerEnvelopeAttackAt(
       this.p.envelopeAttackByRegister, fundamentalHz);
+    const attackHi = dynamicAttack != null ? .6 : .18;
     return {
       envelopeAttack: sample(registerAttack ?? this.p.envelopeAttack ?? 0.008,
-        this.p.envelopeAttackSd ?? 0.006, 0.001, 0.18),
+        this.p.envelopeAttackSd ?? 0.006, 0.001, attackHi),
       envelopeDecay: sample(this.p.envelopeDecay ?? 0.04, this.p.envelopeDecaySd ?? 0.018, 0.001, 0.5),
       envelopeSustain: sample(this.p.envelopeSustain ?? 0.6, this.p.envelopeSustainSd ?? 0.08, 0.05, 1),
       envelopeRelease: sample(this.p.envelopeRelease ?? 0.08, this.p.envelopeReleaseSd ?? 0.035, 0.004, 0.6),
@@ -5743,7 +5900,8 @@ export class SynthEngine {
     const g = this.ctx.createGain();
     const velocityGain = attackNoiseVelocityGain(note.velocity, note.attackNoiseVelocityExponent);
     const articulationGain = note._articulationOnset?.transientGain ?? 1;
-    const peak = Math.max(0.0001, velocityGain * articulationGain * (an.level || 0.2) * 0.3);
+    const peak = Math.max(0.0001,
+      velocityGain * articulationGain * (an.level ?? 0.2) * 0.3);
     const decay = Math.max(0.015, an.decay || 0.05);
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(peak, t0 + 0.005);

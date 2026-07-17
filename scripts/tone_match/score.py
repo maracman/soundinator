@@ -69,11 +69,6 @@ _BOWED_P1_FEATURES = (
     "ltas_rolloff_db_oct", "onset_lockin_periods",
 )
 
-# T-005 band balance (RESEARCH_SUSTAIN_BALANCE 5.a).  The machinery serves
-# every family; the blown lane flips this weight on when it re-baselines its
-# leaderboards (its objective ids reset at that point anyway).
-_PENDING_BLOWN_FEATURES = ("band_balance_db",)
-
 # §2.3 controllability audit verdicts (violin, 2026-07-16): these features
 # have NO generating engine parameter yet — body_am_db because the body EQ
 # does not track instantaneous frequency under vibrato (annex N1: the
@@ -94,6 +89,20 @@ _BOWED_WATCH_METRICS = (
     "decay_log_ratio",
 )
 _BOWED_INSTRUMENTS = {"violin", "cello"}
+
+_SUNG_INSTRUMENTS = {
+    "soprano", "mezzo-soprano", "tenor", "bass",
+    "voice-soprano", "voice-mezzo", "voice-tenor", "voice-bass",
+}
+
+# Preflight V1 senses remain visible, but features whose shared generator has
+# not passed a sung controllability audit cannot steer an identity fit (F11).
+_SUNG_WATCH_METRICS = (
+    "decay_log_ratio", "inharmonicity_log_ratio", "vibrato",
+    "vibrato_onset_delay_ms", "vibrato_ramp_ms", "vibrato_rate_drift",
+    "body_am_db", "noise_lead_ms", "onset_scoop_cents",
+    "onset_scoop_settle_ms", "onset_wander_cents", "onset_lockin_periods",
+)
 
 # IEC 61260-1 nominal 1/3-octave centres, 100 Hz … 10 kHz (21 bands), and
 # the octave summaries built from consecutive triples (125 … 8k centres).
@@ -136,13 +145,14 @@ def weights_for_instrument(instrument: str | None,
         weights["inharmonicity_log_ratio"] = 0.0
         for key in _BOWED_P1_FEATURES:
             weights[key] = 0.0
-        for key in _PENDING_BLOWN_FEATURES:
-            weights[key] = 0.0
     if (instrument or "").strip().lower() in _BOWED_INSTRUMENTS:
         for key in _BOWED_WATCH_METRICS:
             weights[key] = 0.0
     if (instrument or "").strip().lower() in _STRUCK_PLUCKED_INSTRUMENTS:
         for key in _STRUCK_FIREWALL_FEATURES:
+            weights[key] = 0.0
+    if (instrument or "").strip().lower() in _SUNG_INSTRUMENTS:
+        for key in _SUNG_WATCH_METRICS:
             weights[key] = 0.0
     if overrides:
         weights.update(overrides)
