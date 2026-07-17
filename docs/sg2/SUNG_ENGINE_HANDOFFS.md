@@ -104,6 +104,59 @@ Consuming-side assertions:
 6. A preset cannot enable the layer without provenance naming a QC'd licensed
    consonant corpus; until then every consonant score weight is zero.
 
+## A-VOICE-04 · Pitch-synchronous breath in the Fourier/blow path (Agent A, BLOCKS mezzo)
+
+Problem: the current `voiceBreathSync` oscillator exists only in
+`_renderBreath`, but `_renderBreath` returns immediately for every
+`excitationType=blow` note.  All canonical sung presets use the Fourier/blow
+path, whose actual breath consumer is `_renderBlowFloor`; that consumer carries
+`voiceBreathSync` on the note but never reads it.  The parameter therefore
+audits dead and the mezzo/tenor `*.pitch-sync-breath` construction item cannot
+be closed by setting a JSON value.  This is a concrete F4/T-007 consumption
+gap, not a fit choice.
+
+Engine contract:
+
+- Keep `voiceBreathSync` in [0,1], default 0.  Zero must leave the current
+  blown-floor fingerprint, node graph and PCM bit-compatible.
+- In `_renderBlowFloor`, use nonzero `voiceBreathSync` to amplitude-modulate
+  the existing body-routed breath noise at the note's instantaneous glottal
+  pulse rate.  The modulation remains an airflow component: it follows the
+  same ADSR, breath velocity/inefficiency law, turbulence trace and vowel body
+  route already consumed by the floor.
+- Modulation depth is monotonic in `voiceBreathSync`, bounded so the noise gain
+  never changes sign and never creates a separate pitched sine.  A starting
+  bound of 0.65 × the local breath gain at sync=1 preserves the legacy
+  `_renderBreath` scale; Agent A may tighten it from the audio assertion.
+- The pulse rate follows onset approach, f0 wander and vibrato scheduling used
+  by the harmonic source.  A static oscillator fixed at the nominal MIDI f0 is
+  insufficient when the source pitch moves.
+- Do not add a second noise source.  This law modulates the one T-001/L4
+  airflow floor, so breath body colour and soft-dynamic ratio remain composed.
+
+Consuming-side assertions (required in the same Agent A landing):
+
+1. A Fourier/blow sung render with `voiceBreathSync=0` is byte-identical to the
+   pre-change PCM for a fixed seed; wind presets with the neutral default are
+   unchanged.
+2. With harmonic partials muted for measurement, sync=0 has no significant
+   noise-envelope line at f0 while sync=0.8 produces one: envelope modulation
+   at tracked instantaneous f0 is at least 6 dB above the adjacent side bins
+   and at least 6 dB above the same-seed sync=0 render.
+3. Re-render at two pitches an octave apart; the measured modulation peak also
+   doubles within 2%, proving pitch consumption rather than a fixed-rate LFO.
+4. Add/land the analysis observable `pitch_sync_breath_db`; a fresh sung
+   controllability audit must name `voiceBreathSync` as a responder before the
+   feature receives nonzero weight.  The construction assertion consumes this
+   rendered value, not merely `voiceBreathSync > 0` in params.
+5. A body-on/body-bypass breath pair changes noise colour by the selected
+   vowel-band transfer while retaining the same modulation frequency, proving
+   composition with the existing body-routed floor.
+
+Defaults-neutral proof: `voiceBreathSync=0` does not create an oscillator or
+automation event.  The new branch is opt-in and affects no non-sung preset
+unless it explicitly enables the already-public parameter.
+
 ## D-VOICE-01 · Sung scorer/runner contracts (Agent D)
 
 Required shared-analysis changes; Agent E will not edit these unilaterally:
