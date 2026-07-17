@@ -256,6 +256,75 @@ def compare_rendered_vowel_body_transfer(
     }
 
 
+def classify_rendered_vowel_body_transfer(
+    body_partial_amps: Iterable[float],
+    bypass_partial_amps: Iterable[float],
+    common_partial_mask: Iterable[bool],
+    *,
+    f0_hz: float,
+    vowel_bodies: dict[str, dict],
+    voice_class: str,
+    amount: float = 1.0,
+) -> dict:
+    """Classify a rendered vowel from its measured body transfer.
+
+    Raw LPC is not a calibrated formant estimator for a sparse additive
+    source: its poles lock to individual pitch harmonics and may disappear
+    entirely at high f0.  The paired FIT render supplies the missing
+    source/body separation without reading the requested vowel label.  This
+    classifier compares that measured transfer against *all* installed vowel
+    bodies, chooses the closest emitted law, and then independently requires
+    the winning body's F1/F2 centres to remain inside the annex region.  The
+    latter prevents a self-fitted body from redefining its own vowel box.
+    """
+
+    regions = vowel_regions_for_class(voice_class)
+    candidates = {}
+    for vowel in VOWELS:
+        body = vowel_bodies.get(vowel) or {}
+        result = compare_rendered_vowel_body_transfer(
+            body_partial_amps,
+            bypass_partial_amps,
+            common_partial_mask,
+            f0_hz=f0_hz,
+            bands=body.get("bands", []),
+            amount=amount,
+        )
+        candidates[vowel] = result
+    eligible = {
+        vowel: row for vowel, row in candidates.items()
+        if row.get("medianShapeErrorDb") is not None
+        and np.isfinite(row["medianShapeErrorDb"])
+    }
+    classified = min(
+        eligible,
+        key=lambda vowel: (
+            eligible[vowel]["medianShapeErrorDb"],
+            -float(eligible[vowel].get("shapeCorrelation") or -1),
+        ),
+        default=None,
+    )
+    centres = (vowel_bodies.get(classified) or {}).get("formantsHz", []) \
+        if classified else []
+    in_annex = False
+    if len(centres) >= 2 and classified in regions:
+        f1_box, f2_box = regions[classified]
+        in_annex = bool(
+            f1_box[0] <= float(centres[0]) <= f1_box[1]
+            and f2_box[0] <= float(centres[1]) <= f2_box[1]
+        )
+    winning = candidates.get(classified, {}) if classified else {}
+    return {
+        "method": "paired-harmonic-transfer-all-vowel-models",
+        "classifiedAs": classified,
+        "formantsHz": [float(x) for x in centres[:2]] if len(centres) >= 2 else None,
+        "annexRegionPassed": in_annex,
+        "passed": bool(classified and winning.get("passed") and in_annex),
+        "candidates": candidates,
+        "rawLpcApplicability": "diagnostic-only-sparse-harmonic-root-bias",
+    }
+
+
 def _band_width_octaves(freq_hz: float, bandwidth_hz: float) -> float:
     """Convert approximate -3 dB bandwidth to engine Gaussian sigma octaves."""
 
@@ -436,6 +505,7 @@ __all__ = [
     "SungObservation",
     "VOWELS",
     "classify_vowel",
+    "classify_rendered_vowel_body_transfer",
     "compare_rendered_vowel_body_transfer",
     "fit_pooled_source_vowel_bodies",
     "vowel_classification_gate",

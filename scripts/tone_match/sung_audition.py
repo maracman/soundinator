@@ -20,6 +20,7 @@ from scripts.tone_match.score import (
     extract_features,
 )
 from scripts.tone_match.sung_features import (
+    classify_rendered_vowel_body_transfer,
     compare_rendered_vowel_body_transfer,
     vowel_classification_gate,
 )
@@ -29,6 +30,31 @@ from scripts.tone_match.tripwires import (
     evaluate_tripwires,
     required_cells_by_bar,
 )
+
+
+def _render_jobs_resumable(jobs: list[dict], jobs_path: Path, repo_root: Path) -> None:
+    """Render in bounded browser lifetimes and reuse complete PCM outputs."""
+
+    pending = []
+    for job in jobs:
+        output = Path(job["out"])
+        try:
+            with output.open("rb") as handle:
+                valid = output.stat().st_size > 44 and handle.read(4) == b"RIFF"
+        except FileNotFoundError:
+            valid = False
+        if not valid:
+            pending.append(job)
+    # OfflineAudioContext graphs accumulate inside a browser page.  Bounded
+    # chunks keep the five-vowel FIT/bypass/SHIP campaign resumable and avoid
+    # the sharp slowdown seen after roughly one browser-lifetime of renders.
+    for offset in range(0, len(pending), 48):
+        chunk = jobs_path.with_name(f"jobs-pending-{offset // 48:03d}.json")
+        chunk.write_text(json.dumps(pending[offset:offset + 48], indent=2) + "\n")
+        subprocess.run(
+            ["node", "scripts/render_note.mjs", "--batch", str(chunk)],
+            cwd=repo_root, check=True,
+        )
 
 
 def _consume_audit(path: Path, voice_class: str, references: list[dict]) -> dict:
@@ -67,6 +93,7 @@ def build(
     repo_root: Path,
     audit_path: Path,
     reuse_renders: bool = False,
+    scoring_only: bool = False,
 ) -> dict:
     references = json.loads(references_path.read_text())
     voice_classes = {row.get("voiceClass") for row in references}
@@ -136,14 +163,15 @@ def build(
                 "sampleRate": row.get("sampleRate", 44100),
                 "out": str(bypass_out),
             })
-        jobs.append({
-            "params": ship_params,
-            "midi": row["midi"],
-            "velocity": row["velocity"],
-            "durationSec": row["durationSec"],
-            "sampleRate": row.get("sampleRate", 44100),
-            "out": str(ship_out),
-        })
+        if not scoring_only:
+            jobs.append({
+                "params": ship_params,
+                "midi": row["midi"],
+                "velocity": row["velocity"],
+                "durationSec": row["durationSec"],
+                "sampleRate": row.get("sampleRate", 44100),
+                "out": str(ship_out),
+            })
         manifest.append({
             "label": f"{voice_class} /{row['vowel']}/ {row['register']} {row['dynamic']} MIDI {row['midi']}",
             "vowel": row["vowel"],
@@ -152,7 +180,7 @@ def build(
             "reference": row["path"],
             "fitRender": str(fit_out),
             "bodyBypassRender": str(bypass_out) if bypass_out is not None else None,
-            "render": str(ship_out),
+            "render": str(fit_out if scoring_only else ship_out),
             "shipSeed": ship_seed_base + index,
             "sourceFile": row["sourceFile"],
         })
@@ -165,10 +193,7 @@ def build(
                 f"cannot reuse renders; {len(missing)} outputs are missing, first: {missing[0]}"
             )
     else:
-        subprocess.run(
-            ["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],
-            cwd=repo_root, check=True,
-        )
+        _render_jobs_resumable(jobs, jobs_path, repo_root)
 
     weights = dict(audit["finalWeights"])
     score_rows = []
@@ -216,6 +241,15 @@ def build(
                     bands=vowel_bodies[row["vowel"]]["bands"],
                     amount=1.0,
                 ))
+                transfer["classifier"] = classify_rendered_vowel_body_transfer(
+                    rendered.note.partial_amps,
+                    bypass.note.partial_amps,
+                    common_mask,
+                    f0_hz=row["expectedF0Hz"],
+                    vowel_bodies=vowel_bodies,
+                    voice_class=voice_class,
+                    amount=1.0,
+                )
             except (ValueError, RuntimeError) as exc:
                 transfer.update({
                     "passed": False,
@@ -223,6 +257,12 @@ def build(
                     "commonHarmonics": 0,
                     "medianShapeErrorDb": None,
                     "shapeCorrelation": None,
+                    "classifier": {
+                        "method": "paired-harmonic-transfer-all-vowel-models",
+                        "classifiedAs": None,
+                        "passed": False,
+                        "reason": str(exc),
+                    },
                 })
             body_transfer_rows.append(transfer)
 
@@ -314,6 +354,35 @@ def build(
         "rows": required_transfer_rows,
         "allEvidenceRows": body_transfer_rows,
     }
+    classifier_rows = [{
+        "vowel": row["vowel"],
+        "register": row["register"],
+        "classifiedAs": (row.get("classifier") or {}).get("classifiedAs"),
+        "formantsHz": (row.get("classifier") or {}).get("formantsHz"),
+        "annexRegionPassed": bool(
+            (row.get("classifier") or {}).get("annexRegionPassed")
+        ),
+        "passed": bool(
+            (row.get("classifier") or {}).get("passed")
+            and (row.get("classifier") or {}).get("classifiedAs") == row["vowel"]
+        ),
+        "candidates": (row.get("classifier") or {}).get("candidates", {}),
+    } for row in required_transfer_rows]
+    calibrated_classifier = {
+        "voiceClass": voice_class,
+        "method": "paired-harmonic-transfer-all-vowel-models",
+        "passed": len(classifier_rows) == 10 and all(
+            row["passed"] for row in classifier_rows
+        ),
+        "passedRows": sum(row["passed"] for row in classifier_rows),
+        "requiredRows": 10,
+        "rows": classifier_rows,
+        "calibration": {
+            "reference": "RESEARCH_SUNG_REALISM annex F1/F2 regions",
+            "rawLpcApplicability": "diagnostic-only-sparse-harmonic-root-bias",
+            "sourceCancellation": "paired body-on/body-bypass FIT renders",
+        },
+    }
     # The paired render proves which fitted F1/F2 body reached audio.  Those
     # emitted centres must still land inside the annex class-scaled regions;
     # fitting a centre never grants permission to redefine its own box.
@@ -354,7 +423,13 @@ def build(
         "tripwires": tripwires,
         "vowelClassification": vowel_gate,
         "vowelBodyConsumption": body_consumption,
-        "lpcVowelClassificationWatch": lpc_vowel_gate,
+        "vowelClassifierWatch": calibrated_classifier,
+        "lpcVowelClassificationWatch": {
+            **lpc_vowel_gate,
+            "method": "legacy-raw-lpc",
+            "applicability": "diagnostic-only-sparse-harmonic-root-bias",
+            "authoritative": False,
+        },
         "weights": weights,
         "controllability": {
             "path": str(audit_path),
@@ -366,7 +441,7 @@ def build(
         "legacyPrior": source_fit.get("legacyPrior"),
         "renderModes": {
             "scoring": "fit",
-            "listening": "ship",
+            "listening": "not-rendered-scoring-only" if scoring_only else "ship",
             "shipSeedBase": ship_seed_base,
         },
     }
@@ -436,10 +511,14 @@ def main() -> None:
         "--reuse-renders", action="store_true",
         help="rescore an existing complete FIT/SHIP render set",
     )
+    parser.add_argument(
+        "--scoring-only", action="store_true",
+        help="omit SHIP renders for a non-listening comparator run",
+    )
     args = parser.parse_args()
     summary = build(
         args.references, args.fit_root, args.out, args.repo_root,
-        args.controllability, args.reuse_renders,
+        args.controllability, args.reuse_renders, args.scoring_only,
     )
     print(json.dumps({
         "meanComposite": summary["meanComposite"],

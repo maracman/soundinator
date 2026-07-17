@@ -63,8 +63,22 @@ def params_for_ref(params, ref):
     v = ref.get("vowel")
     return by_vowel.get(v) or next(iter(by_vowel.values()))
 
+def selected_audition_manifest(best):
+    """Return reference→SHIP audio for a leaderboard-selected sung audition."""
+    scores = best.get("scoresPath") if isinstance(best, dict) else None
+    if not scores:
+        return {}
+    manifest = os.path.join(os.path.dirname(scores), "audition-manifest.json")
+    if not os.path.exists(manifest):
+        return {}
+    return {
+        row["reference"]: row["render"]
+        for row in json.load(open(manifest))
+        if row.get("reference") and row.get("render")
+    }
+
 def resolve_best(inst):
-    """Return (params, label) or (None, None)."""
+    """Return (params, label, selected audition audio by reference)."""
     lb_path = f"{SG2}/{inst}/leaderboard.json"
     for cand in (lb_path, f"{SG2}/state/{inst}/leaderboard.json"):
         if os.path.exists(cand):
@@ -74,12 +88,12 @@ def resolve_best(inst):
         best = (json.load(open(lb_path)).get("best") or {})
         run = best.get("run") or best.get("runId") or best.get("name") or "?"
         p = unwrap(best)
-        if p: return p, f"{run} (leaderboard)"
+        if p: return p, f"{run} (leaderboard)", selected_audition_manifest(best)
         for cand in (f"{SG2}/state/{inst}/{run}/best.json",
                      f"{SG2}/runs/{inst}/{run}/best.json"):
             if os.path.exists(cand):
                 p = unwrap(json.load(open(cand)))
-                if p: return p, f"{run} (leaderboard)"
+                if p: return p, f"{run} (leaderboard)", selected_audition_manifest(best)
     # newest best.json anywhere under the instrument's dirs (incl. runs/ and state/)
     cands = []
     for base in (f"{SG2}/{inst}", f"{SG2}/runs/{inst}", f"{SG2}/state/{inst}"):
@@ -87,8 +101,8 @@ def resolve_best(inst):
             if "best.json" in files: cands.append(os.path.join(root, "best.json"))
     for cand in sorted(cands, key=os.path.getmtime, reverse=True):
         p = unwrap(json.load(open(cand)))
-        if p: return p, f"{os.path.basename(os.path.dirname(cand))} (newest best)"
-    return None, None
+        if p: return p, f"{os.path.basename(os.path.dirname(cand))} (newest best)", {}
+    return None, None, {}
 
 def baseline_params(inst, refs):
     profile = {"piano-grand": "piano", "guitar-nylon": "guitar"}.get(inst, inst)
@@ -100,6 +114,7 @@ def baseline_params(inst, refs):
 
 # §2.5c.6(c): every build is a fresh seeded performance unless --cached.
 FRESH = "--cached" not in sys.argv
+PAGE_ONLY = "--page-only" in sys.argv
 BUILD_SEED = int(time.time()) if FRESH else None
 
 def render_if_stale(inst, params, refs, commit, profile_hash):
@@ -134,28 +149,33 @@ def main():
                    if os.path.exists(f"{SG2}/campaigns/{d}/references.json"))
     for inst in insts:
         refs = json.load(open(f"{SG2}/campaigns/{inst}/references.json"))
-        params, label = resolve_best(inst)
+        params, label, audition_audio = resolve_best(inst)
         tag, style = (label, "background:#2a3d2a;color:#9fd89f") if params else \
                      ("BASELINE — no fitted preset yet", "background:#3d332a;color:#d8bd9f")
         if not params: params = baseline_params(inst, refs)
         try:
-            if render_if_stale(inst, params, refs, commit, profile_hash):
+            if not PAGE_ONLY and not audition_audio and render_if_stale(
+                    inst, params, refs, commit, profile_hash):
                 rendered.append(inst)
         except subprocess.CalledProcessError as e:
             sections.append(f"<h2>{inst}</h2><p class=dim>render failed: {html.escape(str(e))}</p>")
             continue
-        rows = sorted(((f"{inst}/listen-live/note-{i}.wav", r) for i, r in enumerate(refs)
-                       if r.get("role") in (None, "spectral", "onset", "vibrato")),
+        rows = sorted(((audition_audio.get(r.get("path"),
+                                           f"{inst}/listen-live/note-{i}.wav"), r)
+                       for i, r in enumerate(refs)
+                       if (r.get("path") in audition_audio if audition_audio else
+                           r.get("role") in (None, "spectral", "onset", "vibrato"))),
                       key=lambda p: (p[1].get("vowel", ""), p[1]["midi"], p[1].get("dynamic", ""), p[1].get("string", "")))
         body = [f"<h2>{inst}<span class=tag style='{style}'>{html.escape(tag)}</span></h2>"
                 "<table><tr><th>Note</th><th>Register · dynamic</th><th>Reference (real)</th>"
                 "<th>Render (synth)</th><th class=dim>Source</th></tr>"]
         for w, r in rows:
             extra = "".join(f"{r[k]} · " for k in ("vowel", "string") if r.get(k))
+            render_path = w if os.path.isabs(w) else f"{SG2}/{w}"
             body.append(
                 f"<tr><td><b>{nname(r['midi'])}</b></td><td>{extra}{r['register']} · {r['dynamic']}</td>"
                 f"<td><audio controls preload=none src='file://{r['path']}'></audio></td>"
-                f"<td><audio controls preload=none src='file://{SG2}/{html.escape(w)}'></audio></td>"
+                f"<td><audio controls preload=none src='file://{html.escape(render_path)}'></audio></td>"
                 f"<td class=dim>{html.escape(r.get('sourceFile',''))}</td></tr>")
         body.append("</table>")
         sections.append("\n".join(body))

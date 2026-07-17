@@ -43,7 +43,7 @@ The same rule applies to the other four instruments. Qualified take-pair
 ranges remain standalone measured evidence, as they do for the 7/11 violin
 precedent, but cannot widen identity.
 
-The current candidate registry is bow-centric: several qualified rows use
+The current candidate registry is bow-centric (T-062): several qualified rows use
 bow-specific names or consumers (`bowNoiseLevelDb`, `bowScratchLevelDb`, and
 bow-only onset wander) for blown observations. Only `excitationPosition` is
 functional in each refreshed blown audit. The engine therefore does not

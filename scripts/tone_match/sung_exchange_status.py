@@ -30,7 +30,10 @@ def extract(path: Path) -> dict:
             entries.append({
                 "id": match.group(1),
                 "title": match.group(2),
-                "sungStatus": statuses[-1].rstrip(".,;)"),
+                # A later append-only ``Status update — ...: T-nnn`` may sit
+                # before the next heading. It belongs to its named ID, not to
+                # the enclosing heading; STATUS_UPDATE applies it below.
+                "sungStatus": statuses[0].rstrip(".,;)"),
             })
     by_id = {entry["id"]: entry for entry in entries}
     for technique_id, status in STATUS_UPDATE.findall(text):
