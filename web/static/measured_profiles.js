@@ -12131,6 +12131,182 @@ export const MEASURED_PROFILES = {
         "shapeOptimiserMutable": false,
         "velocityLaw": "amplitude = bowNoiseLevel * velocity ** bowNoiseVelocityExponent"
       }
+    },
+    "humanRanges": {
+      "schemaVersion": 1,
+      "instrument": "violin",
+      "method": "matched-take-human-only-differential-v1",
+      "evidence": {
+        "basis": "true same-note/dynamic/articulation floor groups",
+        "groups": 6,
+        "takes": 14,
+        "pairs": 10
+      },
+      "ranges": {
+        "excitationPosition": {
+          "status": "measured",
+          "unit": "fraction-of-string",
+          "centre": 0.06775,
+          "min": 0.0352,
+          "max": 0.1919,
+          "pairSpreadMedian": 0.06075,
+          "pairSpreadP90": 0.144,
+          "drawHalfRange": 0.101823,
+          "takes": 14,
+          "pairs": 10
+        },
+        "vibratoRateHz": {
+          "status": "measured",
+          "unit": "Hz",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 4.731638,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.056666,
+          "drawHalfRange": 0.040069,
+          "takes": 14,
+          "pairs": 10
+        },
+        "vibratoDepthCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 5.721164,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.000775,
+          "drawHalfRange": 0.000548,
+          "takes": 14,
+          "pairs": 10
+        },
+        "vibratoOnsetDelayMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 46.439909,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.0,
+          "drawHalfRange": 0.0,
+          "takes": 14,
+          "pairs": 10
+        },
+        "vibratoRampMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.0,
+          "drawHalfRange": 0.0,
+          "takes": 14,
+          "pairs": 10
+        },
+        "vibratoRateDriftHzPerSecond": {
+          "status": "measured",
+          "unit": "Hz/s",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.0,
+          "drawHalfRange": 0.0,
+          "takes": 14,
+          "pairs": 10
+        },
+        "sustainNoiseDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -27.751744,
+          "min": -34.9149,
+          "max": -22.72882,
+          "pairSpreadMedian": 2.189232,
+          "pairSpreadP90": 5.171217,
+          "drawHalfRange": 3.656602,
+          "takes": 14,
+          "pairs": 10
+        },
+        "onsetNoiseDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -19.412348,
+          "min": -28.515058,
+          "max": -4.044352,
+          "pairSpreadMedian": 5.72184,
+          "pairSpreadP90": 14.619187,
+          "drawHalfRange": 10.337326,
+          "takes": 14,
+          "pairs": 10
+        },
+        "onsetNoiseCentroidOct": {
+          "status": "measured",
+          "unit": "octaves",
+          "centre": 0.351588,
+          "min": -0.190849,
+          "max": 1.49886,
+          "pairSpreadMedian": 0.441822,
+          "pairSpreadP90": 0.793159,
+          "drawHalfRange": 0.560848,
+          "takes": 14,
+          "pairs": 10
+        },
+        "noiseLeadMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 34.829932,
+          "min": 0.0,
+          "max": 108.553288,
+          "pairSpreadMedian": 23.219955,
+          "pairSpreadP90": 94.040816,
+          "drawHalfRange": 66.496899,
+          "takes": 14,
+          "pairs": 10
+        },
+        "onsetWanderCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 26.078911,
+          "min": 3.192626,
+          "max": 183.46789,
+          "pairSpreadMedian": 21.664156,
+          "pairSpreadP90": 150.476978,
+          "drawHalfRange": 106.403291,
+          "takes": 14,
+          "pairs": 10
+        },
+        "onsetSettleMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 70.69161,
+          "min": 0.0,
+          "max": 190.545351,
+          "pairSpreadMedian": 14.965986,
+          "pairSpreadP90": 151.097506,
+          "drawHalfRange": 106.842071,
+          "takes": 14,
+          "pairs": 10
+        },
+        "attackNoiseLevel": {
+          "status": "measured",
+          "unit": "linear-ratio",
+          "centre": 0.02665,
+          "min": 0.002875,
+          "max": 0.185423,
+          "pairSpreadMedian": 0.017487,
+          "pairSpreadP90": 0.133802,
+          "drawHalfRange": 0.094612,
+          "takes": 14,
+          "pairs": 10
+        }
+      },
+      "decompositionTest": {
+        "passed": false,
+        "pairs": 10,
+        "failedPairs": 10,
+        "rule": "after Human comb/level/tilt removal: partial and body residual <=3 dB; B <=1.5x (near-zero uses 3 cents); T60 <=1.5x",
+        "interpretation": "FAIL: take variation still requires identity movement"
+      }
     }
   },
   "voice-bass": {

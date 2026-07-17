@@ -293,9 +293,19 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         {"key": key, "baseline": values[0], "perturbed": values[1]}
         for key, values in sorted(free_params.items())
     ]
-    audit = {"schemaVersion": 2, "instrument": instrument,
+    # T-024: bind the audit to every input whose drift invalidates its
+    # response matrix.  Keep the original objective/manifest hashes for the
+    # iterate.py handoff and publish the explicit component hashes as well.
+    from .iterate import _renderer_contract_hash  # local: avoids import cycle
+    from .score import SCORER_CONTRACT_VERSION
+    audit = {"schemaVersion": 3, "instrument": instrument,
              "status": "clean" if not uncontrolled else "not-clean",
              "threshold": RESPONSE_THRESHOLD,
+             "scorerContractVersion": SCORER_CONTRACT_VERSION,
+             "rendererContractHash": _renderer_contract_hash(repo_root),
+             "referenceContractHash": canonical_hash(objective_references),
+             "parameterManifestHash": canonical_hash(manifest_contract),
+             "initialPresetHash": canonical_hash(baseline_params),
              "objectiveHash": objective_contract_hash(
                  instrument, objective_references, final_weights),
              "manifestHash": manifest_contract_hash(manifest_contract),
@@ -316,6 +326,8 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
              "zeroWeighted": zero_weighted,
              "matrix": matrix, "verdicts": verdicts,
              "responsiveParameters": responsive,
+             "responders": responsive,
+             "weights": final_weights,
              "watchMetrics": watch_metrics,
              "uncontrolledWeightedFeatures": uncontrolled,
              "clean": not uncontrolled}
@@ -362,7 +374,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="comma-separated free keys; defaults to the bowed audit set")
     args = parser.parse_args(argv)
     references = json.loads(args.references.read_text())
-    baseline = json.loads(args.initial.read_text())
+    campaign_seed = json.loads(args.initial.read_text())
+    from .legacy_prior import resolve_legacy_prior
+    baseline, legacy_prior = resolve_legacy_prior(args.instrument, campaign_seed)
     keys = (list(dict.fromkeys(key.strip() for key in args.keys.split(",")
                               if key.strip()))
             if args.keys else list(BOWED_FREE_PARAMS))
@@ -379,6 +393,9 @@ def main(argv: list[str] | None = None) -> int:
                       args.repo_root, free_params=free_params,
                       objective_references=references,
                       manifest_contract=contract)
+    audit["legacyPrior"] = legacy_prior
+    (args.output / "controllability.json").write_text(
+        json.dumps(audit, indent=1) + "\n")
     print(json.dumps({"clean": audit["clean"],
                       "repeatability": audit["repeatability"]["status"],
                       "unstableFeatures": audit["repeatability"][

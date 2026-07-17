@@ -129,6 +129,16 @@ def main():
                 "levelLaw": bow_noise.get("levelLaw", {}),
                 "engineContract": bow_noise.get("engineContract", {}),
             }
+        # §2.5c/T-007: calibrated player-variation ranges are engine-facing
+        # measured data.  Preserve the complete physical-unit contract so a
+        # consumer assertion can reject absent or silently ignored ranges.
+        human_ranges = v.get("humanRanges")
+        if isinstance(human_ranges, dict) and human_ranges.get("ranges"):
+            entry["humanRanges"] = {
+                key: human_ranges[key] for key in (
+                    "schemaVersion", "instrument", "method", "evidence",
+                    "ranges", "decompositionTest") if key in human_ranges
+            }
         out[key] = entry
 
     DST.write_text(

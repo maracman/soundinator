@@ -40,18 +40,25 @@ ALIASES = {
     "acoustic guitar": "guitar", "classical guitar": "guitar",
     "guitar-nylon": "guitar", "nylon-string acoustic guitar": "guitar",
     "nylon-string-acoustic-guitar": "guitar",
-    "male voice": "tenor", "male tenor": "tenor", "basso profondo": "contrabass",
-    "oktavist": "contrabass", "bass voice": "contrabass", "mezzo soprano": "mezzo-soprano",
+    "male voice": "tenor", "male tenor": "tenor",
+    "voice-tenor": "tenor", "voice-bass": "bass",
+    "voice-mezzo": "mezzo-soprano", "voice-soprano": "soprano",
+    "basso profondo": "basso-profondo", "contrabass": "basso-profondo",
+    "oktavist": "basso-profondo", "bass voice": "bass",
+    "mezzo soprano": "mezzo-soprano",
     "boy soprano": "boy-soprano", "treble": "boy-soprano",
 }
+
+SUNG_SECTION_TYPES = frozenset({"soprano", "mezzo-soprano", "tenor", "bass"})
+SUNG_DERIVED_PRESETS = {"basso-profondo": "bass", "boy-soprano": "soprano"}
 
 FAMILY = {
     "flute": "blown", "clarinet": "blown", "alto-sax": "blown", "tenor-sax": "blown",
     "trumpet": "blown", "french-horn": "blown",
     "violin": "bowed", "cello": "bowed",
     "piano": "struck-plucked", "guitar": "struck-plucked",
-    "tenor": "sung", "contrabass": "sung", "mezzo-soprano": "sung",
-    "boy-soprano": "sung",
+    "soprano": "sung", "mezzo-soprano": "sung", "tenor": "sung",
+    "bass": "sung", "basso-profondo": "sung", "boy-soprano": "sung",
 }
 
 _DYNAMIC_LEVELS = {
@@ -231,8 +238,9 @@ def _topology_assertions(instrument: str, params: dict[str, Any], strict: bool) 
     expected_excitation = {
         "violin": "bow", "cello": "bow", "piano": "strike", "guitar": "pluck", "flute": "blow",
         "clarinet": "blow", "alto-sax": "blow", "tenor-sax": "blow",
-        "trumpet": "blow", "french-horn": "blow", "tenor": "blow",
-        "contrabass": "blow", "mezzo-soprano": "blow", "boy-soprano": "blow",
+        "trumpet": "blow", "french-horn": "blow", "soprano": "blow",
+        "mezzo-soprano": "blow", "tenor": "blow", "bass": "blow",
+        "basso-profondo": "blow", "boy-soprano": "blow",
     }.get(instrument)
     expected_resonator = {
         "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "openTube",
@@ -795,7 +803,7 @@ def evaluate_construction(
                                 None if air_med is None else air_med >= -9, air_med,
                                 "75-130 Hz prominence >= -9 dB vs flanks where measurable", strict_evidence=strict_evidence))
 
-    if FAMILY.get(name) == "sung":
+    if name in SUNG_SECTION_TYPES:
         tilt_values = [_tilt_db_per_octave(s.render) for s in sample_list]
         tilt_values = [x for x in tilt_values if np.isfinite(x)]
         tilt = float(np.median(tilt_values)) if tilt_values else None
@@ -806,11 +814,10 @@ def evaluate_construction(
         rows.append(_result(f"{name}.glottal-law", "Glottal tilt law is explicitly fitted",
                             None if glottal is None else -1 <= float(glottal) <= 1, glottal, "glottalTilt fitted in [-1, 1] (zero is admissible)",
                             strict_evidence=strict_evidence))
-        if name != "boy-soprano":
-            singer = _param(params, "singerFormantAmount")
-            rows.append(_result(f"{name}.singer-formant-law", "Singer-formant body control is explicitly fitted",
-                                None if singer is None else float(singer) >= 0, singer, "singerFormantAmount fitted (zero allowed)",
-                                strict_evidence=strict_evidence))
+        singer = _param(params, "singerFormantAmount")
+        rows.append(_result(f"{name}.singer-formant-law", "Singer-formant body control is explicitly fitted",
+                            None if singer is None else float(singer) >= 0, singer, "singerFormantAmount fitted (zero allowed)",
+                            strict_evidence=strict_evidence))
         sync = _param(params, "voiceBreathSync")
         reference_noise = [s.reference.note.attack_noise.get("level", 0) for s in sample_list
                            if s.reference and isinstance(s.reference.note.attack_noise, dict)]
@@ -820,15 +827,34 @@ def evaluate_construction(
                             {"voiceBreathSync": sync, "referenceNoiseMedian": float(np.median(reference_noise)) if reference_noise else None},
                             "voiceBreathSync > 0 when reference noise level >= 0.02; zero otherwise allowed",
                             strict_evidence=strict_evidence))
-        if name in {"tenor", "contrabass"}:
-            prominence = [_band_prominence(s.render, 2700, 3300) for s in sample_list]
+        if name in {"tenor", "bass"}:
+            low, high = ((2700, 3300) if name == "tenor" else (2300, 2600))
+            prominence = [_band_prominence(s.render, low, high) for s in sample_list]
             prominence = [x for x in prominence if np.isfinite(x)]
             median = float(np.median(prominence)) if prominence else None
-            rows.append(_result(f"{name}.singer-formant-band", "Carrying voice has a fixed-Hz 3 kHz cluster",
+            rows.append(_result(f"{name}.singer-formant-band", "Carrying voice has its class-specific fixed-Hz cluster",
                                 None if median is None else median >= -6, median,
-                                "2.7-3.3 kHz prominence >= -6 dB vs flanks", strict_evidence=strict_evidence))
+                                f"{low/1000:.1f}-{high/1000:.1f} kHz prominence >= -6 dB vs flanks",
+                                strict_evidence=strict_evidence))
+
+    if name in SUNG_DERIVED_PRESETS:
+        expected_parent = SUNG_DERIVED_PRESETS[name]
+        morphology_key = "boyMorphology" if name == "boy-soprano" else "bassoMorphology"
+        morphology = params.get(morphology_key) if isinstance(
+            params.get(morphology_key), dict) else {}
+        declared_parent = params.get("derivedFrom") or morphology.get("sourcePreset")
+        rows.append(_result(
+            f"{name}.derived-parent", "Derived preset names its frozen fitted parent",
+            None if declared_parent is None else expected_parent in str(declared_parent).lower(),
+            declared_parent, f"derived from frozen fitted {expected_parent} preset",
+            strict_evidence=strict_evidence))
+        transform = morphology.get("transform") or params.get("morphologyTransform")
+        rows.append(_result(
+            f"{name}.derived-transform", "Derived preset carries a frozen morphology transform",
+            None if transform is None else bool(transform), transform,
+            "non-empty morphology derivation recipe; no quantitative fitted-target claim",
+            strict_evidence=strict_evidence))
         if name == "boy-soprano":
-            morphology = params.get("boyMorphology") if isinstance(params.get("boyMorphology"), dict) else {}
             tract = morphology.get("tractScale")
             base_formants = np.asarray(morphology.get("baseFormantsHz", []), dtype=float)
             child_formants = np.asarray(morphology.get("scaledFormantsHz", []), dtype=float)
@@ -846,23 +872,21 @@ def evaluate_construction(
                 scale_consistent = ratio_ok and applied
             rows.append(_result("boy-soprano.tract-scale", "Child morphology shortens the adult vocal tract",
                                 None if tract is None else .75 <= float(tract) <= .9, tract,
-                                "boyMorphology.tractScale in [0.75, 0.90], then fit vowel-wise", strict_evidence=strict_evidence))
+                                "boyMorphology.tractScale in [0.75, 0.90]", strict_evidence=strict_evidence))
             rows.append(_result("boy-soprano.formant-scaling", "Scaled formants implement the declared tract morphology",
                                 scale_consistent, observed_ratios,
                                 "at least 3 scaled/base formants within 12% of 1/tractScale and applied as bodyBands",
-                                strict_evidence=strict_evidence))
-            singer = _param(params, "singerFormantAmount")
-            rows.append(_result("boy-soprano.no-adult-singer-cluster", "Adult male singer-formant boost is not imposed",
-                                None if singer is None else float(singer) <= .35, singer,
-                                "singerFormantAmount <= 0.35 unless a child reference demonstrates otherwise",
                                 strict_evidence=strict_evidence))
 
     failed = [row for row in rows if row["status"] == "fail"]
     missing = [row for row in rows if row["status"] == "not-applicable"]
     return {
-        "checklistVersion": 1,
+        "checklistVersion": 2,
         "instrument": name,
         "family": FAMILY.get(name),
+        "targetClass": ("fitted-section" if name in SUNG_SECTION_TYPES else
+                        "derived-preset" if name in SUNG_DERIVED_PRESETS else
+                        "fitted-instrument"),
         "passed": not failed and (not strict_evidence or not missing),
         "counts": {
             "pass": sum(row["status"] == "pass" for row in rows),
@@ -873,4 +897,5 @@ def evaluate_construction(
     }
 
 
-__all__ = ["ConstructionSample", "evaluate_construction", "normalize_instrument"]
+__all__ = ["ConstructionSample", "SUNG_DERIVED_PRESETS", "SUNG_SECTION_TYPES",
+           "evaluate_construction", "normalize_instrument"]
