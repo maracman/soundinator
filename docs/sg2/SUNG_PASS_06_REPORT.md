@@ -119,10 +119,10 @@ pending; no value was invented after the spectral fit.
 
 | Voice | Objective hash | Manifest hash | Repeatability | Clean |
 |---|---|---|---|---|
-| Tenor | `b6d4a7fe678e2af3` | `a579e74e30d52b3b` | stable | yes |
-| Soprano | `fd6c4e9cf0facd4e` | `a579e74e30d52b3b` | unstable watch zeroed | yes |
-| Bass | `ba8081c6e2063ac0` | `a579e74e30d52b3b` | stable | yes |
-| Mezzo | `570e3a53d5189bb3` | `a579e74e30d52b3b` | stable | yes |
+| Tenor | `b6d4a7fe678e2af3` | `3ce7106e74cde4b9` | stable | yes |
+| Soprano | `fd6c4e9cf0facd4e` | `3ce7106e74cde4b9` | unstable watch zeroed | yes |
+| Bass | `ba8081c6e2063ac0` | `3ce7106e74cde4b9` | stable | yes |
+| Mezzo | `570e3a53d5189bb3` | `3ce7106e74cde4b9` | stable | yes |
 
 After merging the advancing shared head, all audits were refreshed and all ten
 objective-comparator score sets were revalidated without metric drift. The
