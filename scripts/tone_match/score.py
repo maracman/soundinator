@@ -51,7 +51,7 @@ DEFAULT_WEIGHTS = {
     "release_noise_db": 0.0,
 }
 
-SCORER_CONTRACT_VERSION = "sg2-score-release-tail-v5"
+SCORER_CONTRACT_VERSION = "sg2-score-release-tail-struck-hold-v6"
 
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
@@ -223,6 +223,47 @@ class FeatureBundle:
     release_ring_ms: float | None = None
     release_damp_db_per_s: float | None = None
     release_noise_db: float | None = None
+    hold_decay_db_per_s: float | None = None
+    hold_plateau_fraction: float | None = None
+
+
+def hold_decay_metrics(samples: np.ndarray, sample_rate: int) -> dict[str, float] | None:
+    """Measure whether an active struck-note hold is still decaying (L18).
+
+    The metric deliberately ignores the attack and the final 10% of the
+    supplied active interval.  A 250 ms sliding regression then asks how much
+    of the hold is effectively flat.  Natural piano aftersound can be slow,
+    but it is not a literal ADSR plateau: the median slope must remain
+    negative and a majority of the hold may not sit within +/-0.15 dB/s.
+    """
+    values = np.asarray(samples, dtype=float)
+    frame = max(64, round(.020 * sample_rate))
+    hop = max(32, round(.010 * sample_rate))
+    if values.size < frame * 12:
+        return None
+    frames = np.lib.stride_tricks.sliding_window_view(values, frame)[::hop]
+    rms = np.sqrt(np.mean(frames * frames, axis=1) + 1e-20)
+    peak_index = int(np.argmax(rms))
+    db = 20 * np.log10(np.maximum(rms / max(float(np.max(rms)), 1e-12), 1e-8))
+    start = peak_index + max(3, round(.120 / (hop / sample_rate)))
+    end = min(len(db), max(start, round(len(db) * .90)))
+    if end - start < 12:
+        return None
+    times = np.arange(start, end, dtype=float) * hop / sample_rate
+    hold = db[start:end]
+    overall = float(np.polyfit(times, hold, 1)[0])
+    window = max(5, round(.250 / (hop / sample_rate)))
+    slopes: list[float] = []
+    for index in range(0, len(hold) - window + 1, max(1, window // 4)):
+        local_t = times[index:index + window]
+        local_db = hold[index:index + window]
+        slopes.append(float(np.polyfit(local_t, local_db, 1)[0]))
+    plateau = (float(np.mean(np.abs(slopes) <= .15)) if slopes else 1.0)
+    return {
+        "slopeDbPerSecond": overall,
+        "plateauFraction": plateau,
+        "holdDropDb": float(hold[0] - hold[-1]),
+    }
 
 
 def band_profile(samples: np.ndarray, sample_rate: int) -> np.ndarray | None:
@@ -580,6 +621,7 @@ def extract_features(
         from .tail_audit import analyse_tail_samples
         release_features = analyse_tail_samples(
             full_samples, sample_rate).get("releaseFeatures")
+    hold_features = hold_decay_metrics(samples, sample_rate)
     return FeatureBundle(note, partial_db, _resample_time(mel_db),
                          _resample_time(centroid)[0], sustain_noise_db, onset_tilt,
                          onset_noise_db, onset_noise_centroid_oct, noise_lead_ms,
@@ -593,7 +635,11 @@ def extract_features(
                          release_damp_db_per_s=(release_features or {}).get(
                              "releaseDampDbPerSecond"),
                          release_noise_db=(release_features or {}).get(
-                             "releaseNoiseDb"))
+                             "releaseNoiseDb"),
+                         hold_decay_db_per_s=(hold_features or {}).get(
+                             "slopeDbPerSecond"),
+                         hold_plateau_fraction=(hold_features or {}).get(
+                             "plateauFraction"))
 
 
 def _paired(values_a: dict, values_b: dict) -> tuple[np.ndarray, np.ndarray]:

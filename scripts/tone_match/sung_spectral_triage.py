@@ -62,6 +62,7 @@ def _reference_residuals(analysed: list[dict[str, Any]],
             "register": reference["register"],
             "dynamic": reference["dynamic"],
             "velocity": float(reference["velocity"]),
+            "f0Hz": f0_hz,
             "sourceId": reference.get("sourceFile"),
             "sourceDb": source_db,
         })

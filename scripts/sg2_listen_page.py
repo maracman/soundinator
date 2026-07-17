@@ -213,6 +213,28 @@ def main():
                 f"<td class=dim>{html.escape(r.get('sourceFile',''))}</td></tr>")
         body.append("</table>")
         sections.append("\n".join(body))
+    auxiliary = []
+    for manifest in Path(SG2, "runs").glob("**/consonant-listening-manifest.json"):
+        auxiliary.append((manifest.stat().st_mtime, manifest))
+    if auxiliary:
+        _mtime, manifest_path = max(auxiliary)
+        manifest = json.load(open(manifest_path))
+        baseline = manifest["baseline"]
+        body = [
+            f"<h2>{html.escape(manifest['title'])}<span class=tag "
+            "style='background:#3d382a;color:#e7ce88'>AUXILIARY FIT — NOT IDENTITY LEADER</span></h2>",
+            f"<p class=dim>{html.escape(manifest['status'])}; compare each fitted "
+            "onset with the same-seed vowel-only output.</p>",
+            "<table><tr><th>Class</th><th>Vowel-only onset</th><th>Consonant onset</th></tr>",
+        ]
+        for row in manifest["rows"]:
+            body.append(
+                f"<tr><td><b>{html.escape(row['label'])}</b></td>"
+                f"<td><audio controls preload=none src='file://{html.escape(baseline)}'></audio></td>"
+                f"<td><audio controls preload=none src='file://{html.escape(row['render'])}'></audio></td></tr>"
+            )
+        body.append("</table>")
+        sections.append("\n".join(body))
     stamp = time.strftime("%Y-%m-%d %H:%M")
     page = ("<!doctype html><meta charset='utf-8'><title>SG2 listening — render vs reference</title>"
             "<style>body{font-family:system-ui;margin:2em;background:#141518;color:#e8e8e8}"

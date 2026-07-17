@@ -171,6 +171,16 @@ corpus-fitted nonzero values remain pending, so construction stays failing at
 the neutral value; this is now an analysis/activation task rather than a
 missing engine consumer.
 
+Pass-07 analysis contract (T-067): Agent E keeps every fitted
+`voiceBreathSync` value at zero until Agent D's observable performs harmonic
+subtraction on lossless sung references, measures the tracked-f0 prominence of
+the residual-noise envelope against adjacent bins and the same-band noise
+floor, and passes a synthetic amplitude-modulated-noise round trip. The same
+observable must measure partial-muted same-seed engine pairs at two octave-
+separated pitches before it can receive weight. Room-suspected residuals are
+reported separately. This is the requested analysis-side observable, not a
+parameter-value proposal.
+
 ## D-VOICE-01 · Sung scorer/runner contracts (Agent D)
 
 Required shared-analysis changes; Agent E will not edit these unilaterally:
@@ -314,3 +324,12 @@ Consuming assertions:
 Owner: Agent A / engine. Analysis supplies pinned rows only after synthetic
 round-trip validation. Sung disposition: spec filed; no identity parameter was
 bent to emulate the missing law.
+
+Pass-07 evidence status: `scripts/tone_match/sung_source_tables.py` now emits
+the pinned one-source-per-singer tables for every available cell: tenor 9/9,
+soprano 7/7, bass 9/9 and mezzo 9/9. A synthetic known-source + two-vowel-body
+round trip recovers the emitted source shape to `2.16e-6 dB`. Soprano's
+high-register hull is sparse and remains clamped/interpolated only from
+measured anchors; no missing high-register dynamic row was invented. The
+engine consumer and its fresh partial/mel/band controllability audit remain
+Agent A work.

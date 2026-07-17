@@ -57,7 +57,7 @@ All 11 positive probes exhibit the same discontinuous release-noise penalty.
 The shared scalar can shorten the rendered ring, but it cannot reproduce the
 mixture of zero/short/long reference rings and the independent residual-noise
 tail. This is the pass exit limiting factor: a register/dynamic harmonic/body
-release law is required before another meaningful search; T-067 separately
+release law is required before another meaningful search; T-070 separately
 lands the bow-component release path. The raw `release_noise_db` reference is also a recorded
 tail/room floor, so it must not be interpreted as a pure physical bow-release
 amplitude. r5 remains sacred and unchanged.
@@ -75,7 +75,7 @@ The 57-note Iowa profile reports pooled medians of 127.710 ms lead/swell,
 0 ms peak offset, 23.220 ms settle and -4.206 dB sustain below peak. Separate
 pp/mf/ff distributions remain in the profile; 36 tails are marked censored
 and 21 have measurable component endings. Concurrent shared commit `3b17222`
-landed the generic L17 renderer during pass-end integration. T-067 adapts the
+landed the generic L17 renderer during pass-end integration. T-070 adapts the
 legacy violin profile to that schema, and a new tone-model assertion proves
 the measured positive lead, independent envelope and nonzero release reach
 the renderer. This does not make `releaseDamping` a bow-noise release law.
@@ -133,7 +133,7 @@ for causal triage:
 
 The validation verdict is scorer-tracking artefact. The raw edge stays in the
 matrix for auditability but is quarantined from the working causal hierarchy.
-T-068 requires active-feature admission, nonzero feature-specific repeat
+T-071 requires active-feature admission, nonzero feature-specific repeat
 floors and intervention-lineage deduplication before re-promotion.
 
 ## Leaderboard, backstop, hashes and exit state
@@ -158,7 +158,7 @@ pass-04 row is added. The bow analysis artifact hash is
   scorer still required.
 - Cello session outcome: `evidence-improvement`; low A0 anchor landed, matched
   Human takes remain pending before optimisation resumes.
-- T-033 remains pending Agent A; T-067's shared L17 bow consumer is complete.
+- T-033 remains pending Agent A; T-070's shared L17 bow consumer is complete.
 - Strict §3, resource and vibrato/body-AM obligations remain visible.
 - OWNER DECISION NEEDED: none.
 
@@ -167,8 +167,8 @@ pass-04 row is added. The bow analysis artifact hash is
 - `npm test`: 11/11 PASS.
 - `node scripts/verify_tone_model.mjs`: all tone-model assertions PASS,
   including measured violin bow-component envelope consumption.
-- `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: 223/223 PASS.
+- `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: 229/229 PASS.
 - `PYTHON=../../../.venv/bin/python node scripts/render_note.mjs --verify`:
   PASS, renderer hash
-  `0f945f10c333d73201afcccf2df6736262d40d9c22a5b40a1497dad1b93e76c8`.
+  `07cadbaf6f9275259bb21b0c81d472d93fffd535ca2ad3126cd4f0a59cbd83c2`.
 - `PYTHON=../../../.venv/bin/python python3 scripts/sg2_listen_page.py`: PASS.

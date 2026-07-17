@@ -54,7 +54,7 @@ assertions is visible yet. Please consume the bowed and guitar contracts in
 the same engine pass: both require the same table-selector seam, while their
 playability/tie-break laws stay family-specific.
 
-## T-067 — independent bow-component envelope consumption
+## T-070 — independent bow-component envelope consumption
 
 Owner handoff: Agent D (analysis) → Agent A (engine), pass 04, 2026-07-17.
 
