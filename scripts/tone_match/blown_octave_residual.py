@@ -135,6 +135,7 @@ def extract_stable_residual_files(
     *,
     f0_hz: float,
     active_duration_s: float | None = None,
+    component_class: str = "air",
 ) -> dict[str, Any]:
     reference, reference_rate = load_mono(str(reference_path))
     rendered, render_rate = load_mono(str(render_path))
@@ -150,7 +151,9 @@ def extract_stable_residual_files(
         "referenceSampleRate": reference_rate,
         "renderSampleRate": render_rate,
         "activeDurationSec": active_duration_s,
-        "measurementStage": "final-sustain-after-harmonic-source-and-air",
+        "measurementStage": (
+            f"final-sustain-after-harmonic-source-and-{component_class}"),
+        "independentComponentClass": component_class,
         "roomHandling": (
             "active sustain only; onset and release/tail excluded; no room "
             "component is inferred or fitted"),
@@ -188,6 +191,7 @@ def apply_residual_to_params(
     dynamic: str,
     gain: float,
     cap_db: float = 3.0,
+    component_class: str = "air",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Apply a bounded correction to exactly one existing source cell."""
     if evidence.get("status") != "pass":
@@ -204,16 +208,22 @@ def apply_residual_to_params(
             f"found {len(matches)}")
     row = matches[0]
     partials = np.asarray(row.get("partials", []), dtype=float)
-    if partials.size < 2 or partials[0] <= 0:
+    if partials.size < 2 or not np.any(partials > 0):
         raise ValueError("selected source row has no normalisable partial table")
+    if component_class == "air" and partials[0] <= 0:
+        raise ValueError("air source row has no normalisable fundamental")
     f0 = float(row.get("f0Hz") or evidence["f0Hz"])
     raw_db = _partial_correction_db(
         evidence, f0 * np.arange(1, partials.size + 1), cap_db=cap_db)
     bounded_db = gain * raw_db
     corrected = partials * 10 ** (bounded_db / 20)
     corrected[partials <= 0] = 0.0
-    corrected /= corrected[0]
-    # Record the effective correction after first-partial normalisation.
+    normalization_anchor = (
+        float(corrected[0]) if component_class == "air"
+        else float(np.max(corrected)))
+    corrected /= normalization_anchor
+    # Record the effective correction after the source's native
+    # normalisation convention is restored.
     effective_db = np.zeros_like(corrected)
     active = partials > 0
     effective_db[active] = 20 * np.log10(
@@ -221,10 +231,18 @@ def apply_residual_to_params(
     evidence_hash = hashlib.sha256(json.dumps(
         evidence, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     row["partials"] = [round(float(value), 8) for value in corrected]
-    row["activationStatus"] = "bounded-post-source-post-air-octave-correction"
-    row["postSourceAirOctaveCorrection"] = {
+    row["activationStatus"] = (
+        f"bounded-post-source-post-{component_class}-octave-correction")
+    correction_key = (
+        "postSourceAirOctaveCorrection" if component_class == "air"
+        else "postSourceBowOctaveCorrection" if component_class == "bow"
+        else "postSourceComponentOctaveCorrection")
+    row[correction_key] = {
         "schema": SCHEMA,
         "startingSurface": "selected-fit-cumulative-surface",
+        "independentComponentClass": component_class,
+        "normalizationAnchor": (
+            "fundamental" if component_class == "air" else "row-peak"),
         "evidenceSha256": evidence_hash,
         "gain": float(gain),
         "capDb": float(cap_db),
@@ -246,6 +264,9 @@ def apply_residual_to_params(
         "airSurfaceChanged": (
             candidate.get("windBreathLevelByRegisterDynamic") !=
             params.get("windBreathLevelByRegisterDynamic")),
+        "independentComponentClass": component_class,
+        "normalizationAnchor": (
+            "fundamental" if component_class == "air" else "row-peak"),
         "medianAbsEffectiveDb": float(np.median(np.abs(effective_db[active]))),
         "maxAbsEffectiveDb": float(np.max(np.abs(effective_db[active]))),
         "evidenceSha256": evidence_hash,
@@ -266,7 +287,7 @@ def _synth_note(partials: np.ndarray, *, sample_rate: int, duration_s: float,
     return (tone + air) * np.maximum(ramp, 0.0)
 
 
-def synthetic_roundtrip() -> dict[str, Any]:
+def synthetic_roundtrip(*, component_class: str = "air") -> dict[str, Any]:
     """Prove recovery on a known harmonic source plus independent air."""
     sample_rate, duration_s, f0 = 24_000, 2.4, 500.0
     count = 16
@@ -307,7 +328,9 @@ def synthetic_roundtrip() -> dict[str, Any]:
             extracted["status"] == "pass" and
             float(np.mean(np.abs(after))) <= .35 and
             float(np.max(np.abs(after))) <= .75) else "fail",
-        "includesIndependentAir": True,
+        "includesIndependentAir": component_class == "air",
+        "includesIndependentComponent": True,
+        "independentComponentClass": component_class,
         "injectedDbByPartial": injected_db.tolist(),
         "appliedDbByPartial": applied_db.tolist(),
         "meanAbsResidualBeforeDb": float(np.mean(np.abs(before))),
@@ -336,11 +359,13 @@ def main() -> None:
     parser.add_argument("--duration-sec", type=float)
     parser.add_argument("--gain", type=float, default=.5)
     parser.add_argument("--cap-db", type=float, default=3.0)
+    parser.add_argument("--component-class", choices=("air", "bow"),
+                        default="air")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--evidence-out", type=Path)
     args = parser.parse_args()
     if args.synthetic_out:
-        result = synthetic_roundtrip()
+        result = synthetic_roundtrip(component_class=args.component_class)
         args.synthetic_out.parent.mkdir(parents=True, exist_ok=True)
         args.synthetic_out.write_text(json.dumps(result, indent=2) + "\n")
         print(json.dumps(result, indent=2))
@@ -357,7 +382,8 @@ def main() -> None:
         raise ValueError("synthetic round-trip evidence is absent, stale, or failing")
     evidence = extract_stable_residual_files(
         args.reference, args.render, f0_hz=args.f0_hz,
-        active_duration_s=args.duration_sec)
+        active_duration_s=args.duration_sec,
+        component_class=args.component_class)
     evidence["syntheticRoundtrip"] = {
         "path": str(args.synthetic_evidence.resolve()),
         "sha256": _sha(args.synthetic_evidence),
@@ -392,13 +418,20 @@ def main() -> None:
         }
     candidate, audit = apply_residual_to_params(
         params, evidence, register=args.register, dynamic=args.dynamic,
-        gain=args.gain, cap_db=args.cap_db)
+        gain=args.gain, cap_db=args.cap_db,
+        component_class=args.component_class)
     evidence["application"] = audit
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.evidence_out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(candidate, indent=2) + "\n")
     args.evidence_out.write_text(json.dumps(evidence, indent=2) + "\n")
-    print(json.dumps({"candidate": str(args.out), "evidence": evidence}, indent=2))
+    print(json.dumps({
+        "candidate": str(args.out),
+        "evidence": str(args.evidence_out),
+        "status": evidence["status"],
+        "stableBands": int(sum(bool(value) for value in evidence["stableBands"])),
+        "application": audit,
+    }, indent=2))
 
 
 if __name__ == "__main__":
