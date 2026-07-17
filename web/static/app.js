@@ -669,6 +669,8 @@ const PARAM_DESC = {
   onsetWanderCents: "Bowed-onset pitch wander in cents at full Human: seeded starts may fall below or above pitch, then settle; 0 is neutral and never creates the blown scoop",
   onsetWanderSettlePeriods: "Bowed-onset lock-in duration in nominal f0 periods, so low cello starts legitimately take more milliseconds than high violin starts",
   bowScratchLevel: "Level of the period-scaled broadband bow-contact scratch; 0 preserves the legacy onset and fitted values use the shared articulation draw",
+  bowNoiseLevel: "Level of the separately measured sustained bow-hair residual; violin uses the pinned L14 spectrum and 0 is exact legacy identity",
+  bowNoiseVelocityExponent: "Pinned bow-noise velocity exponent; lower than 1 retains relatively more bow noise at pianissimo without reshaping its measured spectrum",
   onsetScoopDepthCents: "Measured maximum phrase-start pitch approach from below for weak articulation at full Human; Human 0 hits pitch exactly and depth 0 disables the fitted scoop model",
   onsetScoopSettle: "Measured time for an onset pitch scoop to settle onto the target",
   onsetScoopRearticulatedScale: "Scoop depth retained for a separately tongued note inside a phrase; legato always has zero scoop",
@@ -9088,7 +9090,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetWanderCents","onsetWanderSettlePeriods","bowScratchLevel","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetWanderCents","onsetWanderSettlePeriods","bowScratchLevel","bowNoiseLevel","bowNoiseVelocityExponent","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
     "dynamicBlare","decaySecondStage","decaySecondRatio","releaseDamping","polarisationAmount","polarisationSplitCents","polarisationDecayRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
@@ -14424,6 +14426,8 @@ function chInspectorHTML(p) {
           ${controlRow("onsetWanderCents", "Bow onset wander", p.onsetWanderCents ?? 0, 0, 120, 1)}
           ${controlRow("onsetWanderSettlePeriods", "Bow lock-in periods", p.onsetWanderSettlePeriods ?? 12, 2, 30, 1)}
           ${controlRow("bowScratchLevel", "Bow scratch level", p.bowScratchLevel ?? 0, 0, 2, 0.01)}
+          ${controlRow("bowNoiseLevel", "Sustained bow noise", p.bowNoiseLevel ?? 0, 0, 2, 0.01)}
+          ${controlRow("bowNoiseVelocityExponent", "Bow-noise velocity", p.bowNoiseVelocityExponent ?? 0.9309, 0, 2, 0.01)}
           ${controlRow("onsetScoopDepthCents", "Scoop depth (cents)", p.onsetScoopDepthCents ?? 0, 0, 180, 1)}
           ${controlRow("onsetScoopSettle", "Scoop settle", p.onsetScoopSettle ?? 0.06, 0.015, 0.35, 0.005)}
           ${controlRow("onsetScoopRearticulatedScale", "Inside-phrase scoop", p.onsetScoopRearticulatedScale ?? 0.35, 0, 1, 0.01)}

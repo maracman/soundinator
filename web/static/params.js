@@ -362,6 +362,8 @@ export const DEFAULTS = {
   onsetWanderCents: 0,
   onsetWanderSettlePeriods: 12,
   bowScratchLevel: 0,
+  bowNoiseLevel: 0,
+  bowNoiseVelocityExponent: null,
   onsetScoopDepthCents: 0,
   onsetScoopSettle: 0.06,
   onsetScoopRearticulatedScale: 0.35,
