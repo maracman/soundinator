@@ -51,7 +51,7 @@ DEFAULT_WEIGHTS = {
     "release_noise_db": 0.0,
 }
 
-SCORER_CONTRACT_VERSION = "sg2-score-struck-hold-l18-v5"
+SCORER_CONTRACT_VERSION = "sg2-score-release-tail-struck-hold-v6"
 
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
@@ -150,9 +150,17 @@ def weights_for_instrument(instrument: str | None,
         weights["inharmonicity_log_ratio"] = 0.0
         for key in _BOWED_P1_FEATURES:
             weights[key] = 0.0
-    if (instrument or "").strip().lower() in _BOWED_INSTRUMENTS:
+    normalized_instrument = (instrument or "").strip().lower()
+    if normalized_instrument in _BOWED_INSTRUMENTS:
         for key in _BOWED_WATCH_METRICS:
             weights[key] = 0.0
+    if normalized_instrument == "violin":
+        # T-060: the releaseDamping consumer is live and pass 03 audits all
+        # mechanically eligible full-tail violin rows.  Other bowed
+        # instruments remain at zero until their own tail audit passes.
+        for key in ("release_ring_ms", "release_damp_db_per_s",
+                    "release_noise_db"):
+            weights[key] = 1.0
     if (instrument or "").strip().lower() in _STRUCK_PLUCKED_INSTRUMENTS:
         for key in _STRUCK_FIREWALL_FEATURES:
             weights[key] = 0.0

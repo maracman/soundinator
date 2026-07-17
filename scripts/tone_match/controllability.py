@@ -87,6 +87,7 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "onsetWanderSettlePeriods": (12.0, 24.0, 0.0),
     "bowScratchLevel": (0.0, 1.0, 0.0),
     "bowNoiseLevel": (0.0, 1.0, 0.0),
+    "releaseDamping": (0.0, 1.0, 0.0),
 }
 
 SUNG_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
@@ -472,11 +473,20 @@ def main(argv: list[str] | None = None) -> int:
                         default=Path(__file__).with_name("manifest.json"))
     parser.add_argument("--keys",
                         help="comma-separated free keys; defaults by instrument family")
+    parser.add_argument("--ship-human", type=float,
+                        help="override calibrated SHIP Human before hashing the baseline")
     args = parser.parse_args(argv)
     references = json.loads(args.references.read_text())
     campaign_seed = json.loads(args.initial.read_text())
     from .legacy_prior import resolve_legacy_prior
     baseline, legacy_prior = resolve_legacy_prior(args.instrument, campaign_seed)
+    if args.ship_human is not None:
+        if not 0 <= args.ship_human <= 1:
+            parser.error("--ship-human must be in [0, 1]")
+        baseline["excitationHuman"] = float(args.ship_human)
+        legacy_prior["calibratedShipHuman"] = float(args.ship_human)
+        legacy_prior["resolvedParameterHash"] = _canonical_hash(baseline)
+        legacy_prior["resolvedHash"] = legacy_prior["resolvedParameterHash"]
     sung_instruments = {
         "soprano", "mezzo-soprano", "tenor", "bass",
         "voice-soprano", "voice-mezzo", "voice-tenor", "voice-bass",
@@ -517,7 +527,13 @@ def main(argv: list[str] | None = None) -> int:
             analysis_rejects.append({"path": row.get("path"), "error": str(exc)})
             continue
         seen[key] = row
-    subset = list(seen.values()) if struck else list(seen.values())[:6]
+    if "releaseDamping" in keys:
+        # T-060: release activation is evidenced by every mechanically
+        # audited full-tail row, not the first register/dynamic exemplar.
+        subset = [row for row in objective_references
+                  if bool(row.get("releaseEligible"))]
+    else:
+        subset = list(seen.values()) if struck else list(seen.values())[:6]
     if not subset:
         parser.error("no pitch-anchored objective reference can be analysed")
     audit = run_audit(args.instrument, baseline, subset, args.output,

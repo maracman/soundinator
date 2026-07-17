@@ -512,3 +512,13 @@ The body and late-decay comparison is explicitly provisional because the
 upright was captured in a UK medium room at player position. No same-note
 repeat exists (`rr1` only), so this pair does not claim a measured
 reference-variability floor or a frozen humanisation distribution.
+
+## violin — agentd-pass03-human-release-r5
+
+Composite loss: `22.581497`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `bowNoiseLevel` | 0.7639320225002102 | not run |
+| `releaseDamping` | 0.0 | not run |
+| `vibratoDepth` | 25.143 | not run |

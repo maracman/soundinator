@@ -53,6 +53,35 @@ def _entry(scores_path: Path, fit_root: Path, kind: str, number: int) -> dict[st
     tripwires = scores["tripwires"]
     strict_pass = sum(row.get("status") == "pass" for row in tripwires["cells"])
     strict_fail = sum(row.get("status") == "fail" for row in tripwires["cells"])
+    feature_for_bar = {
+        "partial-table": "partials_db",
+        "mel-spectrogram": "log_mel_db",
+        "attack-t90": "attack_ms",
+        "band-balance": "band_balance_db",
+    }
+    strict_by_bar = {
+        bar: {
+            "pass": sum(row.get("status") == "pass" for row in tripwires["cells"]
+                        if row.get("bar") == bar),
+            "fail": sum(row.get("status") == "fail" for row in tripwires["cells"]
+                        if row.get("bar") == bar),
+            "missing": sum(row.get("status") not in {"pass", "fail"}
+                           for row in tripwires["cells"]
+                           if row.get("bar") == bar),
+            "meanNormalizedResidual": (
+                sum(float(row["normalized"][feature_for_bar[bar]])
+                    for row in scores.get("rows", [])
+                    if isinstance(row.get("normalized", {}).get(feature_for_bar[bar]),
+                                  (int, float)))
+                / max(1, sum(
+                    isinstance(row.get("normalized", {}).get(feature_for_bar[bar]),
+                               (int, float))
+                    for row in scores.get("rows", [])
+                ))
+            ),
+        }
+        for bar in ("partial-table", "mel-spectrogram", "attack-t90", "band-balance")
+    }
     vowel = scores["vowelClassification"]
     consumption = scores.get("vowelBodyConsumption", {
         "passed": False,
@@ -78,6 +107,7 @@ def _entry(scores_path: Path, fit_root: Path, kind: str, number: int) -> dict[st
             "requiredPass": strict_pass,
             "requiredFail": strict_fail,
             "requiredMissing": len(tripwires["strictMissingCells"]),
+            "byBar": strict_by_bar,
         },
         "vowelBodyConsumption": {
             "passed": bool(consumption["passed"]),
@@ -137,10 +167,21 @@ def _selection_key(entry: dict[str, Any]) -> tuple[float, ...]:
     gates = entry["gates"]
     construction = gates["construction"]["counts"]
     strict = gates["strictTripwires"]
+    by_bar = strict.get("byBar", {})
+    ordered_strict = tuple(
+        value
+        for bar in ("partial-table", "mel-spectrogram", "attack-t90", "band-balance")
+        for value in (
+            float(by_bar.get(bar, {}).get("fail", 0)
+                  + by_bar.get(bar, {}).get("missing", 0)),
+            float(by_bar.get(bar, {}).get("meanNormalizedResidual", 0)),
+        )
+    )
     body = gates["vowelBodyConsumption"]
     vowel = gates["vowelClassification"]
     return (
         float(construction.get("fail", 0)),
+        *ordered_strict,
         float(strict["requiredFail"] + strict["requiredMissing"]),
         float(body["requiredRows"] - body["passedRows"]),
         float(vowel["requiredRows"] - vowel["passedRows"]),
@@ -200,16 +241,26 @@ def finalize(
     instrument: str,
     baseline_scores: Path,
     baseline_fit: Path,
+    incumbent_scores: Path | None,
+    incumbent_fit: Path | None,
     candidate_scores: Path | None,
     candidate_fit: Path | None,
     runs_root: Path,
     state_root: Path,
 ) -> dict[str, Any]:
     entries = [_entry(baseline_scores, baseline_fit, "legacy-baseline", 1)]
+    if incumbent_scores is not None:
+        if incumbent_fit is None:
+            raise ValueError("--incumbent-fit is required with --incumbent-scores")
+        entries.append(_entry(
+            incumbent_scores, incumbent_fit, "incumbent", len(entries) + 1,
+        ))
     if candidate_scores is not None:
         if candidate_fit is None:
             raise ValueError("--candidate-fit is required with --candidate-scores")
-        entries.append(_entry(candidate_scores, candidate_fit, "candidate", 2))
+        entries.append(_entry(
+            candidate_scores, candidate_fit, "candidate", len(entries) + 1,
+        ))
 
     objective_hashes = {entry["objectiveHash"] for entry in entries}
     if len(objective_hashes) != 1:
@@ -240,8 +291,9 @@ def finalize(
         "objective": f"sung-canonical-{best['objectiveHash']}",
         "objectiveHash": best["objectiveHash"],
         "selectionRule": (
-            "construction failures, strict failed/missing cells, emitted-body "
-            "rows, vowel rows, humanisation, then lower comparable composite"
+            "construction failures; strict partial, mel, attack and band-balance "
+            "failed/missing cells plus residual at each criteria tier; total strict cells; "
+            "emitted-body rows, vowel rows, humanisation, then comparable composite"
         ),
         "runs": entries,
         "legacyBaseline": legacy,
@@ -271,6 +323,8 @@ def main() -> None:
     parser.add_argument("--instrument", required=True)
     parser.add_argument("--baseline-scores", type=Path, required=True)
     parser.add_argument("--baseline-fit", type=Path, required=True)
+    parser.add_argument("--incumbent-scores", type=Path)
+    parser.add_argument("--incumbent-fit", type=Path)
     parser.add_argument("--candidate-scores", type=Path)
     parser.add_argument("--candidate-fit", type=Path)
     parser.add_argument("--runs-root", type=Path, required=True)
@@ -278,6 +332,7 @@ def main() -> None:
     args = parser.parse_args()
     board = finalize(
         args.instrument, args.baseline_scores, args.baseline_fit,
+        args.incumbent_scores, args.incumbent_fit,
         args.candidate_scores, args.candidate_fit, args.runs_root,
         args.state_root,
     )

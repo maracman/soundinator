@@ -1,0 +1,23 @@
+{
+ "schemaVersion": 1,
+ "instrument": "violin",
+ "sourceRun": "agentd-pass03-human-release-r3",
+ "basis": "emitted candidate SHIP spread divided by the matched dissociation-qualified MIDI-61 floor spread",
+ "seeds": [1393135337, 1598020263, 771721678, 1540158786, 333626006, 57026745, 1431895815, 1504759029],
+ "directFeatures": ["partials_db", "vibrato", "sustain_noise_db", "onset_noise_db", "onset_scoop_settle_ms", "onset_wander_cents"],
+ "watchFeatures": {
+  "onset_noise_db": "r4 saturated scratch and raised bow draw but reached only 0.274x measured; actuator span is below the 0.5x gate floor",
+  "onset_wander_cents": "r4 reduced the fitted wander draw to 0.04x but intrinsic seeded spread remained 2.458x measured; engine floor exceeds the 2x gate ceiling"
+ },
+ "byMidi": {
+  "61": {
+   "excitationPosition": 0.8,
+   "vibratoRate": 1.0,
+   "bowNoiseLevelDb": 1.1,
+   "bowScratchLevelDb": 10.0,
+   "attackNoiseLevel": 3.4,
+   "onsetWanderCents": 0.04,
+   "onsetWanderSettleMs": 1.0
+  }
+ }
+}
