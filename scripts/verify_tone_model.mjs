@@ -27,6 +27,8 @@ import {
   breathVelocityGain,
   toneBreathLevelFor,
   onsetSpectrumGain,
+  bowOnsetWanderPlan,
+  bowScratchPlan,
   registerAttackNoiseAt,
   registerAttackStaggerAt,
   registerEnvelopeAttackAt,
@@ -408,6 +410,54 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     [1, 2, 8, 32].every(n => onsetSpectrumGain(n, 0) === 1));
   check("positive onset tilt brightens only the transient harmonic print",
     onsetSpectrumGain(16, .5) > onsetSpectrumGain(2, .5));
+  const seeded = (seed) => () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const bowSigns = Array.from({ length: 16 }, (_, seed) => bowOnsetWanderPlan(
+    seeded(Math.imul(seed + 1, 0x9e3779b9) >>> 0), {
+      excitationType: "bow", human: 1, articulationStrength: .2,
+      depthCents: 60, settlePeriods: 12, frequency: 440,
+    }).cents);
+  check("T-031 bow onset wander produces both seeded signs",
+    bowSigns.some(value => value < 0) && bowSigns.some(value => value > 0));
+  check("T-031 bow Human 0 and every non-bow onset remain exact pitch",
+    bowOnsetWanderPlan(seeded(1), {
+      excitationType: "bow", human: 0, articulationStrength: .2,
+      depthCents: 120, settlePeriods: 12, frequency: 440,
+    }).cents === 0 &&
+    bowOnsetWanderPlan(seeded(1), {
+      excitationType: "blow", human: 1, articulationStrength: .2,
+      depthCents: 120, settlePeriods: 12, frequency: 440,
+    }).cents === 0);
+  const scratchBase = { level: .2, freq: 1000, q: .84, decay: .08 };
+  const floated = bowScratchPlan(scratchBase, {
+    excitationType: "bow", articulationStrength: .2, level: 1,
+    durationPeriods: 12, frequency: 220,
+  });
+  const accented = bowScratchPlan(scratchBase, {
+    excitationType: "bow", articulationStrength: .9, level: 1,
+    durationPeriods: 12, frequency: 220,
+  });
+  const highScratch = bowScratchPlan(scratchBase, {
+    excitationType: "bow", articulationStrength: .2, level: 1,
+    durationPeriods: 12, frequency: 440,
+  });
+  check("T-031 scratch colour flips around the measured centroid with articulation",
+    floated.freq > scratchBase.freq && accented.freq < scratchBase.freq);
+  check("T-031 scratch lock-in is period-scaled across pitch",
+    near(floated.decay, highScratch.decay * 2, 1e-12));
+  check("T-031 scratch is bow-only and level zero is exact legacy identity",
+    bowScratchPlan(scratchBase, { excitationType: "blow", level: 1 }) === null &&
+    bowScratchPlan(scratchBase, { excitationType: "bow", level: 0 }) === null);
+  const bowFingerprint = new GenerationEngine({
+    seed: 901, voiceMode: "fourier", spectralProfile: "violin",
+    excitationType: "bow", excitationHuman: 1, onsetWanderCents: 48,
+    onsetWanderSettlePeriods: 10, bowScratchLevel: .8,
+  })._spectralFingerprint(.4, 440, 0);
+  check("T-031 fitted bow controls reach the render fingerprint",
+    bowFingerprint.excitationType === "bow" && bowFingerprint.onsetWanderCents === 48 &&
+    bowFingerprint.onsetWanderSettlePeriods === 10 && bowFingerprint.bowScratchLevel === .8);
 }
 
 console.log("T2: engine excitation transform (normalised against profile default)");

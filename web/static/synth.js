@@ -1724,7 +1724,8 @@ export function articulationOnsetPlan(nextRandom, options = {}) {
   const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
     Number.isFinite(Number(value)) ? Number(value) : lo));
   const coupling = clamp(options.coupling ?? 0, 0, 1);
-  if (coupling <= 0) return {
+  const forceLatent = options.forceLatent === true;
+  if (coupling <= 0 && !forceLatent) return {
     strength: 0.5, transientGain: 1, breathLeadGain: 1,
     scoopCents: 0, scoopSettleSec: 0,
   };
@@ -1763,6 +1764,66 @@ export function articulationOnsetPlan(nextRandom, options = {}) {
     strength, transientGain, breathLeadGain,
     scoopCents: -Math.min(180, depth),
     scoopSettleSec: depth >= 1 ? settle : 0,
+  };
+}
+
+/** T-031: a bowed onset wanders to either side of nominal pitch while the
+ * string locks into Helmholtz motion. This is deliberately not the blown
+ * scoop: sign is seeded per note, duration is measured in f0 periods, and
+ * Human 0 / non-bow / legato are exact identities. Articulation strength is
+ * the shared latent sampled by articulationOnsetPlan; strong starts settle
+ * cleanly while weak starts expose more of the fitted wander. */
+export function bowOnsetWanderPlan(nextRandom, options = {}) {
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
+    Number.isFinite(Number(value)) ? Number(value) : lo));
+  if (options.excitationType !== "bow" || options.legato) {
+    return { cents: 0, settleSec: 0, settlePeriods: 0 };
+  }
+  const human = clamp(options.human ?? 0, 0, 1);
+  const depth = clamp(options.depthCents ?? 0, 0, 120);
+  if (human <= 0 || depth <= 0) {
+    return { cents: 0, settleSec: 0, settlePeriods: 0 };
+  }
+  const strength = clamp(options.articulationStrength ?? .5, 0, 1);
+  const periods = clamp(options.settlePeriods ?? 12, 2, 30);
+  const frequency = Math.max(1, Number(options.frequency) || 261.63);
+  const draw = typeof nextRandom === "function" ? nextRandom() : .5;
+  // C20/C21: prolonged-period starts may sit flat while multiple-slip
+  // starts may flicker sharp. The sign is therefore a seeded class draw,
+  // never a fixed approach from below.
+  const sign = draw < .5 ? -1 : 1;
+  const cents = sign * depth * human * (1 - strength);
+  return {
+    cents,
+    settleSec: periods / frequency,
+    settlePeriods: periods,
+  };
+}
+
+/** T-031: reinterpret the measured bow attack residual as period-scaled
+ * broadband scratch. The shared articulation latent controls its colour:
+ * a weak/floated start is higher-centroid surface whistle, while a strong
+ * accent is lower-centroid crackle. Disabled/non-bow calls return null so
+ * the legacy attack-noise object and blown render remain untouched. */
+export function bowScratchPlan(attackNoise, options = {}) {
+  if (options.excitationType !== "bow" || !attackNoise) return null;
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
+    Number.isFinite(Number(value)) ? Number(value) : lo));
+  const amount = clamp(options.level ?? 0, 0, 2);
+  if (amount <= 0) return null;
+  const strength = clamp(options.articulationStrength ?? .5, 0, 1);
+  const periods = clamp(options.durationPeriods ?? 12, 2, 30);
+  const frequency = Math.max(1, Number(options.frequency) || 261.63);
+  const baseFreq = Math.max(80, Number(attackNoise.freq) || 1000);
+  const colourOctaves = (.5 - strength) * 1.2;
+  return {
+    ...attackNoise,
+    level: Math.max(0, Number(attackNoise.level) || 0) * amount,
+    freq: baseFreq * Math.pow(2, colourOctaves),
+    q: clamp(attackNoise.q ?? .84, .3, 1.2),
+    decay: periods / frequency,
+    durationPeriods: periods,
+    enabled: true,
   };
 }
 
@@ -2868,6 +2929,9 @@ export class GenerationEngine {
       articulationStrength: this._clamp(this.p.articulationStrength ?? 0.5, 0, 1),
       articulationVariation: this._clamp(this.p.articulationVariation ?? 0, 0, 1),
       articulationVelocitySlope: this._clamp(this.p.articulationVelocitySlope ?? 0, -1.5, 1.5),
+      onsetWanderCents: this._clamp(this.p.onsetWanderCents ?? 0, 0, 120),
+      onsetWanderSettlePeriods: this._clamp(this.p.onsetWanderSettlePeriods ?? 12, 2, 30),
+      bowScratchLevel: this._clamp(this.p.bowScratchLevel ?? 0, 0, 2),
       onsetScoopDepthCents: this._clamp(this.p.onsetScoopDepthCents ?? 0, 0, 180),
       onsetScoopSettle: this._clamp(this.p.onsetScoopSettle ?? 0.06, 0.015, 0.35),
       onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),
@@ -4767,6 +4831,8 @@ export class SynthEngine {
     // L5/L5b: one seeded articulation draw controls plosive strength, breath
     // lead and fitted pitch scoop together. Presets that have not opted in
     // retain the exact Q8 class-based scoop for compatibility.
+    const bowedOnsetEnabled = note.excitationType === "bow" &&
+      ((note.onsetWanderCents || 0) > 0 || (note.bowScratchLevel || 0) > 0);
     note._articulationOnset = articulationOnsetPlan(
       () => this._nextRandom(), {
         coupling: note.articulationCoupling,
@@ -4783,6 +4849,7 @@ export class SynthEngine {
         velocitySlope: note.onsetScoopVelocitySlope,
         phraseStart: note.phraseStart,
         legato: note.legatoFromPrevious,
+        forceLatent: bowedOnsetEnabled,
       });
     note._scoopCents = (note.articulationCoupling || 0) > 0
       ? note._articulationOnset.scoopCents
@@ -4790,6 +4857,23 @@ export class SynthEngine {
     note._scoopSettleSec = (note.articulationCoupling || 0) > 0
       ? note._articulationOnset.scoopSettleSec
       : 0;
+    note._bowOnsetWander = bowOnsetWanderPlan(
+      () => this._nextRandom(), {
+        excitationType: note.excitationType,
+        human: note.excitationHuman,
+        articulationStrength: note._articulationOnset.strength,
+        depthCents: note.onsetWanderCents,
+        settlePeriods: note.onsetWanderSettlePeriods,
+        frequency: note.frequency,
+        legato: note.legatoFromPrevious,
+      });
+    note._bowScratch = bowScratchPlan(note.attackNoise, {
+      excitationType: note.excitationType,
+      articulationStrength: note._articulationOnset.strength,
+      level: note.bowScratchLevel,
+      durationPeriods: note.onsetWanderSettlePeriods,
+      frequency: note.frequency,
+    });
     note._wanderEvents = f0WanderTrace(() => this._nextRandom(), note.duration, note.excitationHuman);
     const dispatch = (n) => {
       if (this._voiceMode === "formant" || this._voiceMode === "fourier") {
@@ -4939,17 +5023,24 @@ export class SynthEngine {
       ? scoopCents * Math.max(0, 1 - (time - t0) / atk)
       : 0;
     const wander = note._wanderEvents || [];
+    const bowOnset = note._bowOnsetWander || { cents: 0, settleSec: 0 };
+    const bowOnsetAt = (time) => bowOnset.cents
+      ? bowOnset.cents * Math.max(0, 1 - (time - t0) / Math.max(.001, bowOnset.settleSec))
+      : 0;
     const wanderAt = (time) => {
       let c = 0;
       for (const p of wander) { if (p.time <= time - t0) c = p.cents; else break; }
       return c;
     };
     let events = note._vibratoEvents || [];
-    if (!events.length && (scoopCents || wander.length)) {
+    if (!events.length && (scoopCents || bowOnset.cents || wander.length)) {
       // no vibrato timeline to ride — synthesize ramp points for the
       // imperfections themselves
       const pts = [t0];
       if (scoopCents) for (const f of [0.25, 0.5, 0.75, 1]) pts.push(t0 + atk * f);
+      if (bowOnset.cents) {
+        for (const f of [0.25, 0.5, 0.75, 1]) pts.push(t0 + bowOnset.settleSec * f);
+      }
       for (const p of wander) pts.push(t0 + p.time);
       pts.push(t0 + (note.duration || 0.2));
       events = [...new Set(pts)].sort((a, b) => a - b).map(time => ({ time, cents: 0 }));
@@ -4962,7 +5053,8 @@ export class SynthEngine {
       return target;
     };
     const valueAt = (time, cents = 0) =>
-      baseAt(time) * Math.pow(2, (cents + scoopAt(time) + wanderAt(time)) / 1200);
+      baseAt(time) * Math.pow(2,
+        (cents + scoopAt(time) + bowOnsetAt(time) + wanderAt(time)) / 1200);
 
     if (events.length > 0) {
       param.setValueAtTime(valueAt(t0, events[0].cents), t0);
@@ -5317,7 +5409,7 @@ export class SynthEngine {
    * spectrum cannot.
    */
   _renderAttackNoise(note, t0, env, out) {
-    const an = note.attackNoise;
+    const an = note._bowScratch?.enabled ? note._bowScratch : note.attackNoise;
     if (!an || !this._noiseBuffer || !note.velocity) return;
     const src = this.ctx.createBufferSource();
     src.buffer = this._noiseBuffer;
