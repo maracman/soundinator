@@ -37,6 +37,11 @@ from .score import (
 
 # Response below this (perceptual units) counts as "does not move it".
 RESPONSE_THRESHOLD = 0.05
+STRUCK_INSTRUMENTS = {
+    "piano", "piano-grand", "grand-piano", "piano-upright",
+    "upright-piano", "guitar", "guitar-nylon", "guitar-steel",
+    "harp", "glockenspiel", "marimba", "xylophone", "vibraphone",
+}
 
 # Free continuous parameters audited for the bowed campaign: the manifest's
 # continuous tier plus vibrato dials (vibrato features need a vibrato
@@ -195,11 +200,7 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             })
     _render_batch(jobs, repo_root)
 
-    struck = instrument.strip().lower() in {
-        "piano", "piano-grand", "grand-piano", "piano-upright",
-        "upright-piano", "guitar", "guitar-nylon", "guitar-steel",
-        "harp", "glockenspiel", "marimba", "xylophone", "vibraphone",
-    }
+    struck = instrument.strip().lower() in STRUCK_INSTRUMENTS
 
     def analysis_kwargs(ref: dict[str, Any]) -> dict[str, Any]:
         expected = ref.get("expectedF0Hz")
@@ -476,19 +477,24 @@ def main(argv: list[str] | None = None) -> int:
     contract = _manifest_contract(manifest_document, baseline, keys)
     seen: dict[str, dict[str, Any]] = {}
     analysis_rejects = []
+    struck = args.instrument.strip().lower() in STRUCK_INSTRUMENTS
     for row in objective_references:
         key = f"{row.get('register')}|{row.get('dynamic')}"
         if key in seen:
             continue
         try:
+            expected = row.get("expectedF0Hz")
+            if expected is None and struck:
+                expected = 440.0 * 2 ** ((float(row.get("midi", 60)) - 69) / 12)
             extract_features(
-                row["path"], expected_f0_hz=row.get("expectedF0Hz")
+                row["path"], expected_f0_hz=expected,
+                trust_expected_f0=struck, force_percussive=struck,
             )
         except (ValueError, RuntimeError) as exc:
             analysis_rejects.append({"path": row.get("path"), "error": str(exc)})
             continue
         seen[key] = row
-    subset = list(seen.values())[:6]
+    subset = list(seen.values()) if struck else list(seen.values())[:6]
     if not subset:
         parser.error("no pitch-anchored objective reference can be analysed")
     audit = run_audit(args.instrument, baseline, subset, args.output,
