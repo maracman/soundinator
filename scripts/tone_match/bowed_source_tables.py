@@ -198,25 +198,16 @@ def build(instrument: str, references_path: Path, jobs_path: Path,
         "paramsSha256": _sha(params_path),
         "referencesSha256": _sha(references_path),
         "rows": rows,
-        "activationEligible": len(accepted_cells) == 6,
-        "activationRule": (
-            "the current renderer's dynamic-ownership flag is table-wide; emit no "
-            "mixed accepted/neutral table. All six cells must clear their upstream "
-            "hierarchy audits before candidate consumption"),
     }
     table["evidenceSha256"] = hashlib.sha256(json.dumps(
         table, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    candidate = dict(params)
-    if table["activationEligible"]:
-        candidate["spectralPartialsByRegisterDynamic"] = {
+    candidate = {
+        **params,
+        "spectralPartialsByRegisterDynamic": {
             key: table[key] for key in (
                 "schemaVersion", "handoff", "evidenceSha256", "interpolation",
-                "dynamicComposition", "rows")}
-    else:
-        candidate["spectralSourceAttempt"] = {
-            "handoff": table["handoff"], "evidenceSha256": table["evidenceSha256"],
-            "status": "not-consumed-mixed-cell-activation-forbidden",
-        }
+                "dynamicComposition", "rows")},
+    }
     return table, candidate
 
 
@@ -321,16 +312,25 @@ def build_deconvolved(
         "emittedBodyLowestF0Hz": lowest_f0_hz,
         "referencesSha256": _sha(references_path),
         "rows": rows,
+        "activationEligible": len(accepted_cells) == 6,
+        "activationRule": (
+            "the current renderer's dynamic-ownership flag is table-wide; emit no "
+            "mixed accepted/neutral table. All six cells must clear their upstream "
+            "hierarchy audits before candidate consumption"),
     }
     table["evidenceSha256"] = hashlib.sha256(json.dumps(
         table, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    candidate = {
-        **params,
-        "spectralPartialsByRegisterDynamic": {
+    candidate = dict(params)
+    if table["activationEligible"]:
+        candidate["spectralPartialsByRegisterDynamic"] = {
             key: table[key] for key in (
                 "schemaVersion", "handoff", "evidenceSha256", "interpolation",
-                "dynamicComposition", "rows")},
-    }
+                "dynamicComposition", "rows")}
+    else:
+        candidate["spectralSourceAttempt"] = {
+            "handoff": table["handoff"], "evidenceSha256": table["evidenceSha256"],
+            "status": "not-consumed-mixed-cell-activation-forbidden",
+        }
     return table, candidate
 
 
