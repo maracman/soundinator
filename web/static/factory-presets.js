@@ -9,6 +9,10 @@ const fixture = { seed: 20260710, beats: 16 };
 
 function preset({ id, name, section, family = null, description, tags = [], roles = [],
   parameters, moduleIds = [], brief = null }) {
+  const shipParameters = parameters?.spectralProfile === "piano" &&
+    parameters?.excitationType === "strike"
+    ? { pianoActionNoiseLevel: 1, envelopeAnomalyLevel: 1, ...parameters }
+    : parameters;
   return {
     id, name, section, family, description, tags, roles, moduleIds,
     kind: section === "full" ? "patch" : "module",
@@ -17,7 +21,7 @@ function preset({ id, name, section, family = null, description, tags = [], role
       metrics: { minSoundedNotes: 1, maxRestRatio: 0.95 },
       fixtures: fixture,
     },
-    parameters,
+    parameters: shipParameters,
   };
 }
 

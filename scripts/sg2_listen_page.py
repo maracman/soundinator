@@ -126,6 +126,30 @@ def resolve_pinned_ship_candidate(inst):
         raise RuntimeError(f"{inst}: activation audit contains no active component")
     return params, "blown-l17-ship-r5 (verified SHIP candidate)", {}
 
+def resolve_complete_struck_ship_candidate(inst):
+    """Prefer a PCM-verified L16+L17+L18 struck SHIP candidate.
+
+    A pass report may select the exact preset used by its output audit without
+    rewriting an older identity leaderboard.  Every named mechanism must have
+    passed independently; a partial or stale report is a hard error rather
+    than a silent fallback to the legacy preset.
+    """
+    audit_path = f"{SG2}/state/{inst}/complete-struck-ship-pass19.json"
+    if not os.path.exists(audit_path): return None
+    audit = json.load(open(audit_path))
+    params_path = audit.get("paramsFile")
+    required = ("actionNoiseLead", "anomalyClasses", "freeDecayHold",
+                "fittedDamperRelease")
+    gates = audit.get("gates") or {}
+    if (not audit.get("passed") or not params_path or
+            not os.path.exists(params_path) or
+            not all(gates.get(key) is True for key in required)):
+        raise RuntimeError(f"{inst}: invalid complete struck SHIP audit")
+    params = unwrap(json.load(open(params_path)))
+    if not params:
+        raise RuntimeError(f"{inst}: complete struck SHIP params are not renderable")
+    return params, audit.get("label", "pass19 L16+L17+L18 (PCM verified)"), {}
+
 def baseline_params(inst, refs):
     profile = {"piano-grand": "piano", "guitar-nylon": "guitar"}.get(inst, inst)
     exc = {"violin": "bow", "cello": "bow", "harp": "pluck", "glockenspiel": "strike",
@@ -182,7 +206,8 @@ def main():
     for inst in insts:
         refs = json.load(open(f"{SG2}/campaigns/{inst}/references.json"))
         params, label, audition_audio = resolve_best(inst)
-        pinned_ship = resolve_pinned_ship_candidate(inst)
+        pinned_ship = (resolve_complete_struck_ship_candidate(inst) or
+                       resolve_pinned_ship_candidate(inst))
         if pinned_ship: params, label, audition_audio = pinned_ship
         tag, style = (label, "background:#2a3d2a;color:#9fd89f") if params else \
                      ("BASELINE — no fitted preset yet", "background:#3d332a;color:#d8bd9f")
