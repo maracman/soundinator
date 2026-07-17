@@ -49,6 +49,7 @@ from scripts.tone_match.humanisation import fit_excitation_position
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
+from scripts.tone_match.build_campaign import _run_start_midi
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
@@ -100,6 +101,12 @@ def test_band_balance_distance_and_tripwires_expose_octave_tilt():
     by_name = {row["name"]: row for row in gates["rows"]}
     assert by_name["band-balance-mean"]["status"] == "pass"
     assert by_name["band-balance-max-octave"]["status"] == "fail"
+
+
+def test_reacquired_chromatic_run_names_resolve_their_first_midi():
+    assert _run_start_midi("BbClar.pp.D3B3.aiff") == 50
+    assert _run_start_midi("AltoSax.NoVib.ff.Db3B3.aiff") == 49
+    assert _run_start_midi("Horn.ff.Bb1B1.aiff") == 34
 
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
     freqs = np.asarray([50.0, 100.0, 200.0, 10_000.0])
@@ -1201,6 +1208,9 @@ def test_bowed_p1_features_have_zero_weight_for_blown():
     from scripts.tone_match.score import _BOWED_WATCH_METRICS
     blown = weights_for_instrument("clarinet")
     bowed = weights_for_instrument("violin")
+    # T-005 is active for the rebuilt blown objective; the rebaseline gives
+    # it a fresh reference-set id rather than comparing unlike leaderboards.
+    assert blown["band_balance_db"] == 1.0
     for key in _BOWED_P1_FEATURES:
         assert blown[key] == 0.0
         if key in _BOWED_WATCH_METRICS:
