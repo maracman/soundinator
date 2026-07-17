@@ -3,6 +3,8 @@
 // integrity). Run: node scripts/verify_tone_model.mjs — exits non-zero on
 // any failure. Wired into CI next to node --check.
 
+import { createHash } from "node:crypto";
+
 import {
   RESONATOR_CLASSES,
   resonatorRatio,
@@ -82,9 +84,12 @@ import {
   spaceProximityDb,
   SPECTRAL_PROFILES,
   GenerationEngine,
+  SynthEngine,
   layerMixPlan,
   measuredHumanEpisode,
   measuredHumanDelta,
+  measuredHumanSample,
+  measuredAttackNoiseLevel,
   bowedHumanLevels,
   consonantProvenanceReady,
   consonantGesturePlan,
@@ -123,9 +128,10 @@ console.log("Measured SHIP episodes + sung onset consumers");
       measured.deltas.bowNoiseLevelDb);
   const bowedLevels = bowedHumanLevels(1, 1, {
     deltas: { noise: 6, scratch: -6 },
+    samples: { noise: -24, scratch: -6 },
     observables: { noise: "sustainNoiseDb", scratch: "onsetNoiseDb" },
   });
-  check("T-063 bowed noise/scratch consume the one native episode exactly once",
+  check("T-063/T-074 bowed noise delta and absolute scratch consume one episode",
     near(bowedLevels.bowNoiseLevel, Math.pow(10, 6 / 20), 1e-12) &&
     near(bowedLevels.bowScratchLevel, Math.pow(10, -6 / 20), 1e-12));
   let episodeDraw = 0;
@@ -184,6 +190,182 @@ console.log("Measured SHIP episodes + sung onset consumers");
   check("A-VOICE-03 nasal and fricative resolve distinct pitched/unpitched controls",
     nasal.consonantClass === "nasal" && nasal.nasalZeroHz === 1800 &&
     fricative.consonantClass === "fricative" && fricative.fricativeHz === 6000);
+}
+
+console.log("T-074 isolated bowed measured-Human adapters");
+{
+  const canonicalise = (value) => Array.isArray(value)
+    ? value.map(canonicalise)
+    : value && typeof value === "object"
+      ? Object.fromEntries(Object.keys(value).sort().map(key =>
+          [key, canonicalise(value[key])]))
+      : value;
+  const contractHash = (value) => createHash("sha256")
+    .update(JSON.stringify(canonicalise(value))).digest("hex").slice(0, 16);
+  const expectedHashes = {
+    violin: "fe732ab20272e2d6",
+    cello: "8c08050d43c4ff69",
+  };
+  for (const instrument of ["violin", "cello"]) {
+    const contract = MEASURED_PROFILES[instrument].humanRanges;
+    check(`T-074 ${instrument} exact Human contract is hash-pinned`,
+      contractHash(contract) === expectedHashes[instrument],
+      contractHash(contract));
+    check(`T-074 ${instrument} decomposition remains masked`,
+      contract.decompositionTest?.verdict === "INCONCLUSIVE-MASKED" &&
+      contract.decompositionTest?.passed === false);
+  }
+
+  // Force the measured support endpoints while keeping only the named causal
+  // range plus explicit physical prerequisites. This is deliberately an
+  // isolated controllability intervention, not a replacement SHIP draw law.
+  const isolatedEpisode = (instrument, parameter, high, prerequisites = []) => {
+    const contract = MEASURED_PROFILES[instrument].humanRanges;
+    const range = contract.ranges[parameter];
+    if (!range) return null;
+    const centre = Number(range.centre);
+    const sample = Number(high ? range.max : range.min);
+    const deltas = { [parameter]: sample - centre };
+    const samples = { [parameter]: sample };
+    const observables = {
+      [parameter]: range.qualification?.observable || parameter,
+    };
+    prerequisites.forEach((row, index) => {
+      const key = `__prerequisite_${index}`;
+      deltas[key] = Number(row.delta) || 0;
+      samples[key] = Number(row.sample ?? row.delta) || 0;
+      observables[key] = row.observable;
+    });
+    return {
+      method: "T-074-hash-pinned-isolated-endpoint",
+      schemaVersion: contract.schemaVersion,
+      instrument, amount: 1, deltas, samples, observables,
+    };
+  };
+  const vibratoFields = (instrument, episode, overrides = {}) =>
+    new GenerationEngine({
+      seed: 7407, voiceMode: "fourier", spectralProfile: instrument,
+      excitationType: "bow", performanceRole: "non-vibrato",
+      vibratoProb: 0, vibratoDepth: 0, vibratoRate: 5.5,
+      ...overrides,
+    })._vibratoParams(220, .62, episode);
+  const vibratoEvents = (note) => {
+    const renderer = new SynthEngine();
+    renderer._engine = { rng: { next: () => .25 } };
+    return renderer._buildVibratoEvents(
+      { ...note, legatoFromPrevious: false }, 0, 1.2);
+  };
+
+  // Violin's current contract qualifies rate but not depth/delay; use only a
+  // local positive-depth prerequisite. Cello qualifies all three. No cello
+  // fitted value is ever copied into the violin assertion.
+  for (const instrument of ["violin", "cello"]) {
+    const localDepth = instrument === "cello"
+      ? MEASURED_PROFILES.cello.humanRanges.ranges.vibratoDepth.drawHalfRange
+      : MEASURED_PROFILES.violin.humanRanges.spreadObservables
+        .vibratoDepthCents.max;
+    const prerequisite = [{ observable: "vibratoDepthCents",
+      delta: Math.max(1, localDepth), sample: Math.max(1, localDepth) }];
+    const lowEpisode = isolatedEpisode(
+      instrument, "vibratoRate", false, prerequisite);
+    const highEpisode = isolatedEpisode(
+      instrument, "vibratoRate", true, prerequisite);
+    const low = vibratoFields(instrument, lowEpisode);
+    const high = vibratoFields(instrument, highEpisode);
+    check(`T-074 ${instrument} isolated rate episode is active`,
+      low.vibratoProb === 1 && high.vibratoProb === 1 &&
+      near(low.vibratoDepth, high.vibratoDepth, 1e-12));
+    check(`T-074 ${instrument} measured rate endpoint moves in encoded direction`,
+      high.vibratoRate - low.vibratoRate > .05,
+      `${low.vibratoRate} -> ${high.vibratoRate}`);
+  }
+
+  const depthLowEpisode = isolatedEpisode("cello", "vibratoDepth", false);
+  const depthHighEpisode = isolatedEpisode("cello", "vibratoDepth", true);
+  const depthBase = { performanceRole: "vibrato", vibratoProb: 1,
+    vibratoDepth: 1, vibratoRate: 5.5 };
+  const depthLow = vibratoFields("cello", depthLowEpisode, depthBase);
+  const depthHigh = vibratoFields("cello", depthHighEpisode, depthBase);
+  const bodyAmSpanDb = (fields) => {
+    const events = vibratoEvents(fields);
+    const points = bodyAmAutomationEvents({
+      bodyBands: [{ freq: 238, gain: 4, width: .08 }], bodyAmount: 1,
+      duration: 1.2, _vibratoEvents: events, _wanderEvents: [],
+    }, 220, 0, 1.2, 1, 100);
+    const levels = points.map(point => 20 * Math.log10(point.gain));
+    return Math.max(...levels) - Math.min(...levels);
+  };
+  const depthLowAm = bodyAmSpanDb(depthLow);
+  const depthHighAm = bodyAmSpanDb(depthHigh);
+  check("T-074 cello isolated positive depth crosses body-AM response threshold",
+    (depthHighAm - depthLowAm) / 2 > .05 && depthHighAm > depthLowAm,
+    `${depthLowAm.toFixed(4)} -> ${depthHighAm.toFixed(4)} dB`);
+
+  const delayPrerequisite = [{ observable: "vibratoDepthCents",
+    delta: 12, sample: 12 }];
+  const delayLowEpisode = isolatedEpisode(
+    "cello", "vibratoOnsetDelayMs", false, delayPrerequisite);
+  const delayHighEpisode = isolatedEpisode(
+    "cello", "vibratoOnsetDelayMs", true, delayPrerequisite);
+  const delayLow = vibratoFields("cello", delayLowEpisode);
+  const delayHigh = vibratoFields("cello", delayHighEpisode);
+  const firstTracked = (events) => events.find(event => Math.abs(event.cents) > .05)?.time;
+  const firstLow = firstTracked(vibratoEvents(delayLow));
+  const firstHigh = firstTracked(vibratoEvents(delayHigh));
+  const encodedDelay = delayHigh.vibratoOnsetDelayMs - delayLow.vibratoOnsetDelayMs;
+  check("T-074 cello onset delay moves first tracked vibrato within 20 ms",
+    firstHigh > firstLow && Math.abs((firstHigh - firstLow) * 1000 - encodedDelay) <= 20,
+    `${((firstHigh - firstLow) * 1000).toFixed(3)} ms vs ${encodedDelay.toFixed(3)} ms`);
+  const zeroDelayPrior = vibratoFields("cello", null, {
+    performanceRole: "vibrato", vibratoProb: 1, vibratoDepth: 12,
+  });
+  const zeroDelayEpisode = vibratoFields("cello", delayLowEpisode, {
+    performanceRole: "vibrato", vibratoProb: 1, vibratoDepth: 0,
+  });
+  check("T-074 cello delay zero is the exact prior event path",
+    JSON.stringify(vibratoEvents(zeroDelayPrior)) ===
+      JSON.stringify(vibratoEvents(zeroDelayEpisode)));
+
+  for (const instrument of ["violin", "cello"]) {
+    const scratchLowEpisode = isolatedEpisode(
+      instrument, "bowScratchLevelDb", false);
+    const scratchHighEpisode = isolatedEpisode(
+      instrument, "bowScratchLevelDb", true);
+    const scratchLow = bowedHumanLevels(1, 0, scratchLowEpisode).bowScratchLevel;
+    const scratchHigh = bowedHumanLevels(1, 0, scratchHighEpisode).bowScratchLevel;
+    check(`T-074 ${instrument} absolute scratch sample escapes the zero prior`,
+      scratchLow > 0 && scratchHigh > scratchLow &&
+      near(scratchHigh, Math.pow(10,
+        measuredHumanSample(scratchHighEpisode, "onsetNoiseDb") / 20), 1e-12));
+    check(`T-074 ${instrument} scratch feature moves above 0.05`,
+      20 * Math.log10(scratchHigh / scratchLow) / 3 > .05);
+    check(`T-074 ${instrument} no episode preserves exact-zero scratch`,
+      bowedHumanLevels(1, 0, null).bowScratchLevel === 0);
+
+    const attackLowEpisode = isolatedEpisode(
+      instrument, "attackNoiseLevel", false);
+    const attackHighEpisode = isolatedEpisode(
+      instrument, "attackNoiseLevel", true);
+    const baseNoise = resolveAttackNoise(
+      SPECTRAL_PROFILES[instrument].performance.attackNoise,
+      { attackNoiseLevel: 1 }, 220);
+    const attackLow = measuredAttackNoiseLevel(
+      baseNoise.level, "bow", attackLowEpisode);
+    const attackHigh = measuredAttackNoiseLevel(
+      baseNoise.level, "bow", attackHighEpisode);
+    const highDelta = measuredHumanDelta(attackHighEpisode, "attackNoiseLevel");
+    check(`T-074 ${instrument} attack ratio consumes x10 exactly once`,
+      near(attackHigh, baseNoise.level + highDelta * 10, 1e-12));
+    check(`T-074 ${instrument} isolated attack-noise feature crosses 0.05`,
+      attackHigh > attackLow &&
+      20 * Math.log10(attackHigh / Math.max(1e-12, attackLow)) / 3 > .05,
+      `${attackLow} -> ${attackHigh}`);
+    check(`T-074 ${instrument} no episode preserves attack strongest prior`,
+      measuredAttackNoiseLevel(baseNoise.level, "bow", null) === baseNoise.level);
+  }
+  check("T-074 violin does not invent cello-only depth/delay ranges",
+    !("vibratoDepth" in MEASURED_PROFILES.violin.humanRanges.ranges) &&
+    !("vibratoOnsetDelayMs" in MEASURED_PROFILES.violin.humanRanges.ranges));
 }
 
 console.log("Sub-note base layer mixing");

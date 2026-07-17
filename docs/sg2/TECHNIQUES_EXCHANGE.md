@@ -2082,4 +2082,6 @@ assertions are filed in `BOWED_ENGINE_HANDOFFS.md`.
 Affects: measuredHumanEpisode / bowedHumanLevels / vibrato episode prerequisites /
 attack-noise calibration / §2.5c decomposition gate.
 Status: analysis=incorporated bowed=audited-4of9+masked
-engine=pending-five-isolated-adapters sung=adapt-method struck/plucked=adapt-method
+engine=incorporated-five-isolated-adapters+human0-pcm-identity
+distribution=six-cell-rerun-clean+decomposition-still-masked
+sung=adapt-method struck/plucked=adapt-method
