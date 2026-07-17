@@ -31,6 +31,7 @@ from .score import hold_decay_metrics
 
 SCHEMA = "sg2-piano-anatomy-v1"
 VALIDATION_SCHEMA = "sg2-piano-anatomy-validation-v1"
+PRE_ROLL_SCHEMA = "sg2-piano-action-pre-roll-audit-v1"
 BANDS_PER_OCTAVE = 6
 
 
@@ -320,6 +321,68 @@ def _action_component(meta_rows: list[tuple[dict[str, Any], dict[str, Any]]]) ->
     }
 
 
+def _available_pre_roll(samples: np.ndarray, sample_rate: int,
+                        expected_f0_hz: float) -> dict[str, Any]:
+    """Measure the recording lead available before action/strike energy.
+
+    L17 needs at least 10 ms before the first broadband event so background
+    and the start of the action transient are both observable.  Harmonic tone
+    onset is reported separately; it cannot rescue a file whose action event
+    was already clipped at the file boundary.
+    """
+    frame = max(32, round(.005 * sample_rate))
+    hop = max(16, round(.001 * sample_rate))
+    raw_rms = np.sqrt(signal.convolve(samples * samples, np.ones(frame) / frame,
+                                      mode="same") + 1e-20)[::hop]
+    peak = float(np.max(raw_rms))
+    active = np.flatnonzero(raw_rms >= peak * 10 ** (-35 / 20))
+    broadband_onset = float(active[0] * hop / sample_rate) if active.size else 0.0
+    freqs, times, power = _action_stft(samples, sample_rate)
+    tone_onset = _tone_onset(freqs, times, power, expected_f0_hz)
+    available_ms = 1000 * broadband_onset
+    return {
+        "availablePreRollMs": round(available_ms, 3),
+        "harmonicToneOnsetMs": round(1000 * tone_onset, 3),
+        "usableForL17": bool(broadband_onset >= .010),
+        "requirement": "at least 10 ms before first broadband action/strike event",
+    }
+
+
+def audit_pre_roll(samples_root: Path, provenance_path: Path,
+                   output: Path) -> dict[str, Any]:
+    provenance = json.loads(provenance_path.read_text())
+    rows = []
+    for source in provenance.get("files", []):
+        path = samples_root / source["file"]
+        if not path.exists():
+            rows.append({"sourceFile": source["file"], "midi": source.get("midi"),
+                         "dynamic": source.get("dynamic"), "status": "missing"})
+            continue
+        samples, sample_rate = _load(path)
+        midi = int(source["midi"])
+        expected = 440 * 2 ** ((midi - 69) / 12)
+        measured = _available_pre_roll(samples, sample_rate, expected)
+        rows.append({"sourceFile": source["file"], "midi": midi,
+                     "note": source.get("note"), "dynamic": source.get("dynamic"),
+                     "roundRobin": source.get("roundRobin"), "status": "measured",
+                     **measured})
+    usable = [row for row in rows if row.get("usableForL17")]
+    deficient = [row for row in rows if row.get("status") == "measured" and
+                 not row.get("usableForL17")]
+    result = {
+        "schema": PRE_ROLL_SCHEMA, "instrument": "piano-upright",
+        "criterion": "availablePreRollMs >= 10 before first broadband action/strike event",
+        "filesAudited": len(rows), "usableCount": len(usable),
+        "deficientCount": len(deficient), "missingCount": sum(
+            row.get("status") == "missing" for row in rows),
+        "usableSubset": [row["sourceFile"] for row in usable],
+        "rows": rows,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2) + "\n")
+    return result
+
+
 def _damper_frequency_exponent(samples: np.ndarray, sample_rate: int, f0: float,
                                knee_sec: float) -> tuple[float | None, list[dict[str, float]]]:
     rates = []
@@ -584,6 +647,10 @@ def _parser() -> argparse.ArgumentParser:
     extract_parser.add_argument("--validation", type=Path, required=True)
     extract_parser.add_argument("--output", type=Path, required=True)
     extract_parser.add_argument("--instrument", required=True)
+    pre_roll_parser = sub.add_parser("pre-roll-audit")
+    pre_roll_parser.add_argument("--samples", type=Path, required=True)
+    pre_roll_parser.add_argument("--provenance", type=Path, required=True)
+    pre_roll_parser.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -591,6 +658,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "validate":
         result = validate(args.output)
+    elif args.command == "pre-roll-audit":
+        result = audit_pre_roll(args.samples, args.provenance, args.output)
     else:
         result = extract(args.references, args.samples, args.validation,
                          args.output, args.instrument)
