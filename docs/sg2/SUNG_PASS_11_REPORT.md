@@ -8,7 +8,7 @@ Exit state: §2.5 state **(a)** — four measurable current-objective improvemen
 ## Outcome
 
 All four adult voices advance on the first unresolved spectral tier under the
-current renderer contract `f372b082535b9826`. Relative to freshly regenerated
+current renderer contract `c40eb906eba5422b`. Relative to freshly regenerated
 pass-10 incumbents, required-cell partial residual improves by 0.106 dB tenor,
 0.114 dB soprano, 0.249 dB bass and 0.140 dB mezzo. Log-mel and band balance
 also improve in every voice. Construction, emitted-body consumption and vowel
@@ -23,14 +23,17 @@ shipped or audited presets.
 
 Pass 10 was already merged to shared at `a16a851`. The branch fast-forwarded
 to that exact shared head before pass-11 work began. The earlier provider-
-capacity relaunch had regenerated current-renderer identity audits for
+capacity relaunch had regenerated then-current-renderer identity audits for
 soprano, bass and mezzo but stopped after rendering tenor and before writing
-its audit. Tenor was completed from the current checkout; all four audits are
-clean, repeat-stable and renderer-bound.
+its audit. Tenor was completed, after which shared advanced through Agent D's
+bowed-preset activation at `f7aa81b`. That shared head was merged and every
+authoritative comparator, T-067 audit, source audit, consonant audit and
+identity audit was regenerated under `c40eb906eba5422b`; all four identity
+audits are clean, repeat-stable and renderer-bound.
 
 The pass-10 score artifacts were produced under renderer contract
 `9b18b3bb7bfc75eb`. They were not relabelled. Legacy, incumbent and candidate
-comparators were all regenerated under `f372b082535b9826` before leaderboard
+comparators were all regenerated under `c40eb906eba5422b` before leaderboard
 selection.
 
 ## Cumulative source-refinement repair
@@ -57,18 +60,18 @@ identity and all vowel bodies remain unchanged.
 
 | Voice / entry | Composite | Construction | Strict cells | Body | Vowel | Human | Overall |
 |---|---:|---|---|---|---|---|---|
-| Tenor legacy | **3.683373** | FAIL 10/11 | FAIL 0 pass / 36 fail / 0 missing | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Tenor incumbent | 3.784670 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Tenor pass-11 | 3.757834 | **PASS 11/11** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
-| Soprano legacy | 4.464870 | FAIL 9/10 | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Soprano incumbent | 4.107888 | **PASS 10/10** | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Soprano pass-11 | **4.101214** | **PASS 10/10** | FAIL 0 / 27 / 1 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
-| Bass legacy | **3.436264** | FAIL 10/11 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Bass incumbent | 3.452843 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Bass pass-11 | 3.437820 | **PASS 11/11** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
-| Mezzo legacy | **3.733587** | FAIL 9/10 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Mezzo incumbent | 3.747836 | **PASS 10/10** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Mezzo pass-11 | 3.743455 | **PASS 10/10** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
+| Tenor legacy | **3.683092** | FAIL 10/11 | FAIL 0 pass / 36 fail / 0 missing | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Tenor incumbent | 3.784624 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Tenor pass-11 | 3.757564 | **PASS 11/11** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
+| Soprano legacy | 4.464865 | FAIL 9/10 | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Soprano incumbent | 4.108071 | **PASS 10/10** | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Soprano pass-11 | **4.101409** | **PASS 10/10** | FAIL 0 / 27 / 1 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
+| Bass legacy | **3.436373** | FAIL 10/11 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Bass incumbent | 3.452769 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Bass pass-11 | 3.437736 | **PASS 11/11** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
+| Mezzo legacy | **3.733598** | FAIL 9/10 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Mezzo incumbent | 3.748144 | **PASS 10/10** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Mezzo pass-11 | 3.743200 | **PASS 10/10** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL** |
 
 Soprano high/p band balance remains missing evidence, not a fitted failure.
 Legacy rows fail construction because the frozen craft preset does not satisfy
@@ -78,10 +81,10 @@ the evidence-earned pitch-synchronous breath assertion.
 
 | Voice | Composite incumbent → candidate | Partial residual | Log-mel residual | Band residual | Decision |
 |---|---:|---:|---:|---:|---|
-| Tenor | 3.784670 → **3.757834** | 5.802612 → **5.696844** | 3.144306 → **3.090795** | 3.560649 → **3.509171** | promote interim leader |
-| Soprano | 4.107888 → **4.101214** | 6.329832 → **6.215640** | 3.590627 → **3.548396** | 4.311586 → **4.257156** | promote interim leader |
-| Bass | 3.452843 → **3.437820** | 5.642414 → **5.393154** | 3.025528 → **2.890725** | 3.396594 → **3.287182** | promote interim leader |
-| Mezzo | 3.747836 → **3.743455** | 4.893438 → **4.753703** | 3.352723 → **3.256060** | 3.955658 → **3.908629** | promote interim leader |
+| Tenor | 3.784624 → **3.757564** | 5.802613 → **5.696848** | 3.144316 → **3.090797** | 3.560661 → **3.509181** | promote interim leader |
+| Soprano | 4.108071 → **4.101409** | 6.329836 → **6.215647** | 3.590629 → **3.548350** | 4.311564 → **4.257172** | promote interim leader |
+| Bass | 3.452769 → **3.437736** | 5.642421 → **5.393149** | 3.025524 → **2.890723** | 3.396596 → **3.287176** | promote interim leader |
+| Mezzo | 3.748144 → **3.743200** | 4.893439 → **4.753695** | 3.352721 → **3.256049** | 3.955652 → **3.908621** | promote interim leader |
 
 Attack changes are −0.013 dB-equivalent units for bass and +0.003–0.004 for
 the other voices, below the improvement on the controlling partial tier. The
@@ -99,10 +102,10 @@ dB tenor, 18.585184 soprano, 23.887340 bass and 20.754777 mezzo.
 All four ordinary identity audits retain `pitch_sync_breath_db=1`, a
 `voiceBreathSync` responder, stable repeats and zero uncontrolled weighted
 features. Their SHA-256 values are tenor
-`657819b1aee6af7c8df7d5eeace257e508edeede3bd8feed4d63c24cc45d8caa`,
-soprano `52f34b7468ec13651ec05084d200369f82e83bfcf4d87e73a372d8e9fc439d80`,
-bass `8a16bbff93f564728c0ef36c262a0317786b1e41d0debdef1ea0baf99894079e`
-and mezzo `356a1adec08c2e2d42237bcbdb9572cbe7e4bf12cdcd8779bd02892abe494c53`.
+`97376f1035c939867ee1a7d394e11908c756ec8f306903ffd140282995e3b62c`,
+soprano `f0d0a3f58cf0656305fa2e9ecd3d509493befa846049d479aeb5f00a192f2d73`,
+bass `98bf62e816b9dda41303e2b869ed6caab924dab768a84552a362a19ed64c4bd6`
+and mezzo `52bd4ec08939d379fd1dd1e98da0b439b2da6f1b7ac4d0fd59713623315a7954`.
 
 ## Body/vowel and consonant enumeration
 
@@ -114,10 +117,10 @@ spectral residual.
 All four adult voices already carry the five measured sung-adapted consonant
 classes. Current output audits still pass activation and retain all five
 weights. Audit SHA-256 values are tenor
-`b48918ba1758c1683ed5a7fca168596330e4de8b81d98d736c605ff6e7ddae2c`,
-soprano `1cd6d87ae583e13ba975339d27749c802b7bcc436ff919b0dffa1767d81daa98`,
-bass `df6d9ebfe548873866b6cb2c73661c22618cfe08ed02d972267750ef8a2e7529`
-and mezzo `4d1c3d1c1d568acab1548d50cbef340f75624325c00c4e9f2d4b96c2ca163aba`.
+`7d14f487f8c577d33ea2599ac50b0c0084be6f4fa6b44b5e678247b72a2d0336`,
+soprano `79eda326ea2422b04f0c0e64e36d156799f95f1712633cc089845caf416c83c4`,
+bass `6db10adfaa593b3821b2b0e189b518acfd7b5ab574acf95097abb76335ee6f38`
+and mezzo `62b2cf2871a67cda962fc1e51127c15e5873ceae596344952430d09be7a31733`.
 There is no remaining adult voice to extend and no cross-family value transfer.
 
 ## Prior, artifacts and pending mandate
@@ -128,14 +131,14 @@ tag `sg2-legacy`, commit
 `8b1047dfbe83d6ba`.
 
 Pass snapshot internal SHA-256 is
-`20937dcfb960e8c1bd547787e0e23daa8391e93b8cd53553bda41b07172973e5`.
+`6425de7d20e4e8d5d96d6942af0f18b6d434e24ab736b77bb67629cbacd3558a`.
 Controllability table internal SHA-256 is
-`e3e2a6e2b9d8bc10cf7a920c4c46e37ecf965274d48339186cf8ffa74b36e59d`.
+`0ca06dc7d5edcbfa0b3d719a734cfa45253fdc2ae31226420df746ec0ca96f79`.
 Final exchange source SHA-256 is
-`9f7aa12349cf3d810bab4bdb125b5d2e64f75817347a202b67b9497acb8714f9`.
+`790053bee941029e98e976b4d24e0447fbdeaa2075a3f644cbd3749e41281885`.
 Leaderboard and `best.json` backstops are copied under
 `sg2-data/state/voice-*`; candidate SHIP manifests contain fresh seeds and the
-16-instrument listening page was rebuilt from shared head `a16a851`.
+16-instrument listening page was rebuilt from the merged shared renderer head.
 
 Flagged pending mandate: §2.5c differential fitting and the two-sided seeded
 distribution gate must run immediately when deterministic identity first
@@ -151,7 +154,7 @@ The required landing suite passes:
 - `node scripts/verify_tone_model.mjs` — all tone-model v2 assertions pass
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q` — pass
 - `PYTHON="$PWD/../../../.venv/bin/python" node scripts/render_note.mjs --verify`
-  — pass, `03cd2d3fa40734cac3ab933e95c0688ef65327f29d11f985993dd00d79ba327d`
+  — pass, `82ef39ee1d6d8d9d22feb768b9a6d673ba270a8ca8c771d2e5eead2c0148e253`
 
 The limiting factor is now precisely bounded: every active source cell moves
 the partial objective in the correct direction, but the remaining cross-vowel
