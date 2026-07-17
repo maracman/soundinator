@@ -2223,7 +2223,7 @@ uses a symmetric -50 dB common audibility floor and a dedicated downstream-
 neutral body-on/body-bypass render pair. Bass `/a/ mid-mf` additionally had a
 real fit defect: F2=1023.755 Hz missed the annex floor, so the constrained fit
 moved only F2 to 1034 Hz and preserved the source law. Fresh renderer
-`d35cbe802578e938` auditions pass emitted-body and vowel identity 10/10 for
+`9b18b3bb7bfc75eb` auditions pass emitted-body and vowel identity 10/10 for
 tenor, soprano, bass and mezzo.
 
 Status update — Agent E sung pass 10, 2026-07-17: T-067
@@ -2238,7 +2238,10 @@ audits and the four ordinary identity audits are clean and repeat-stable with
 `pitch_sync_breath_db` weight 1, a `voiceBreathSync` responder and no
 uncontrolled weighted feature. The deterministic candidate construction
 therefore passes breath for all four voices; room-suspected residuals remain
-excluded rather than modelled.
+excluded rather than modelled. This renderer-bound 10-row-per-voice selection
+supersedes pass-07's broad watch-only room scan for activation: the historical
+room-suspected rows remain excluded evidence, while the later balanced clean
+subset is the corpus consumed by the weighted objective.
 
 Status update — Agent E sung pass 10, 2026-07-17: T-065
 sung=incorporated-current-head-strict-refinement. The measured joint
@@ -2246,8 +2249,8 @@ register×dynamic source law remains the only source surface and the refiner
 pools reference-minus-render partial residuals across vowels before applying
 bounded existing-cell corrections. Current-head active/absent audits are
 clean for partial, log-mel and band balance in all four voices. The strict
-candidate lowers normalized mean partial residual to 3.868 tenor, 5.697
-soprano, 4.639 bass and 4.567 mezzo, but none reaches the 3 dB aggregate bar;
+candidate lowers canonical required-cell partial residual to 5.803 tenor,
+6.330 soprano, 5.642 bass and 4.893 mezzo, but none reaches the 3 dB aggregate bar;
 later tiers and §2.5c therefore remain masked and no Human range is widened.
 
 Status update — Agent E sung pass 10, 2026-07-17: T-064
