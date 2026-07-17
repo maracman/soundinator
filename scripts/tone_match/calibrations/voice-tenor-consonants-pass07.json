@@ -4,9 +4,9 @@
   "scope": "first-consonant-onset-classes",
   "status": "fitted-spoken-fallback-provisional-sung-adaptation",
   "sourceFitSha256": "16d5382ef9c97fcc43e788b51411e49cc5a6d860cce2c3ef17ae381c9aa39b29",
-  "objectiveHash": "02788f43c9bd8e74",
-  "controllabilityAuditSha256": "97ba947720c6107a195bbcd3001dc67d488c0f175cdb4abb29364b9a9ddf548c",
-  "rendererSha256": "ae6610a990f2e4c66a619a3a16223e58c1bc27200ddd26553bad4d037fec2bf8",
+  "objectiveHash": "33db98179f237a02",
+  "controllabilityAuditSha256": "b0f7f7e39b3623bcc338fbc74c6ca7c3c6138c9ffd67bc646f6cb2ab5537d635",
+  "rendererSha256": "dae86a8fc19f34f896c7a61c1276a19c1f9da71fb0438b3fcc48bbf67795a32b",
   "featureWeights": {
     "consonant_burst_centroid_hz": 1.0,
     "consonant_burst_duration_ms": 1.0,
@@ -64,17 +64,17 @@
     "vowelOnlyToClassRelativeDifferenceDb": {
       "plosive": -34.1128,
       "nasal": -23.4919,
-      "fricative": -34.4324
+      "fricative": -34.4325
     },
     "featurePerturbationRelativeDifferenceDb": {
       "consonant_burst_centroid_hz": -37.1574,
-      "consonant_burst_duration_ms": -37.622,
-      "consonant_vot_ms": -23.534,
+      "consonant_burst_duration_ms": -37.6219,
+      "consonant_vot_ms": -23.5341,
       "consonant_f1_transition_hz_s": -27.9659,
-      "consonant_f2_transition_hz_s": -37.1585
+      "consonant_f2_transition_hz_s": -37.1584
     },
     "provenanceGateNeutral": true,
-    "repeatNoiseFloorRelativeDifferenceDb": -96.7743
+    "repeatNoiseFloorRelativeDifferenceDb": -95.0419
   },
   "activation": "available to tenor consonant-onset renders; not a replacement for the vowel-only identity leaderboard entry"
 }

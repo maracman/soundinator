@@ -171,7 +171,7 @@ corpus-fitted nonzero values remain pending, so construction stays failing at
 the neutral value; this is now an analysis/activation task rather than a
 missing engine consumer.
 
-Pass-07 analysis contract (T-066): Agent E keeps every fitted
+Pass-07 analysis contract (T-067): Agent E keeps every fitted
 `voiceBreathSync` value at zero until Agent D's observable performs harmonic
 subtraction on lossless sung references, measures the tracked-f0 prominence of
 the residual-noise envelope against adjacent bins and the same-band noise

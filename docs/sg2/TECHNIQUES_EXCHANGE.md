@@ -1505,7 +1505,7 @@ singer source identity. Soprano's sparse high-register hull is explicit; no
 missing dynamic row is guessed. Agent A's consumer and its fresh responders
 still precede activation.
 
-### T-066 · Pitch-synchronous sung breath needs a rendered residual-envelope observable
+### T-067 · Pitch-synchronous sung breath needs a rendered residual-envelope observable
 Author: sung lane / A-VOICE-04 coordination request to Agent D · 2026-07-17 · Firewall: method; values per singer
 Finding: A-VOICE-04 now audibly consumes `voiceBreathSync` in the Fourier/blow
 path, but parameter presence and an engine-only partial-muted check are not a
