@@ -1237,6 +1237,26 @@ Human evidence but cannot calibrate female1's identity; tenor, female1 soprano
 and female5 mezzo all remain above the deterministic reconstruction/strict
 tripwire bars, so no identity is eligible for differential widening this pass.
 
+### T-061 · ENGINE SPEC: Fourier sung breath must consume pitch synchrony
+Author: sung lane · 2026-07-17 · Firewall: mechanism (sung; neutral elsewhere)
+Finding: `voiceBreathSync` is carried into a Fourier/blow note, but its only
+reader is the legacy `_renderBreath` path, which returns immediately for blow.
+The canonical sung consumer is `_renderBlowFloor`, so every soprano/mezzo/
+tenor/bass preset currently has static blown-floor breath regardless of the
+sync value.  A-VOICE-04 specifies one body-routed airflow floor amplitude-
+modulated at instantaneous f0; it explicitly composes with the existing
+velocity, turbulence, articulation and vowel-body laws.  This is the named
+blocker for mezzo construction, not permission to mark the param nonzero.
+Consuming assertions: sync zero is pre-change PCM-identical; with harmonic
+partials muted, sync 0.8 places a noise-envelope line at tracked f0 at least
+6 dB above adjacent bins and the same-seed zero render; doubling played pitch
+doubles the measured modulation peak within 2%; `pitch_sync_breath_db` must
+name `voiceBreathSync` as a responder in a fresh audit before weighting; a
+body-on/bypass pair changes breath colour without changing pulse frequency.
+Affects: `_renderBlowFloor` / voiceBreathSync / sung construction and
+controllability / A-VOICE-04.
+Status: sung=spec-filed-with-consuming-assertion engine=pending analysis=pending-consumer
+
 ### T-059 · Accepted-step criterion drift builds an empirical validation hierarchy
 Author: Agent D / analysis · 2026-07-17 · Firewall: method/process
 Finding: a scalar optimiser loss hides which empirical criteria trade off.
@@ -1272,3 +1292,10 @@ Affects: corpus builders / tail_audit.py / score.py / controllability hashes.
 Blown may adopt the method with its own corpus labels.
 Status: analysis=incorporated bowed=incorporated
 struck/plucked=adapt-method sung=adapt-method engine=pending-control
+
+Status update — Agent E sung pass 05, 2026-07-17: T-059
+sung=adapted-one-step-no-edge-claimed. The render-domain candidate records the
+ordered partial → mel → attack → band-balance intervention and the leaderboard
+compares the complete hard-cell outcome before composite. This pass contains
+only one accepted intervention per identity, so it does not fabricate a drift
+edge or update the cross-run asymmetry matrix.

@@ -10,6 +10,7 @@ from scripts.tone_match.score import SCORER_CONTRACT_VERSION
 from scripts.tone_match.sung_audition import _consume_audit
 from scripts.tone_match.sung_features import (
     SungObservation,
+    classify_rendered_vowel_body_transfer,
     compare_rendered_vowel_body_transfer,
     fit_pooled_source_vowel_bodies,
     vowel_classification_gate,
@@ -29,6 +30,9 @@ from scripts.tone_match.sung_consonants import (
     adapt_spoken_measurement,
     parse_phone_tier,
 )
+from scripts.tone_match.sung_consonant_audit import audit as audit_consonant_generator
+from scripts.tone_match.sung_exchange_status import extract as extract_exchange
+from scripts.tone_match.sung_pass_state import _selection_key
 from scripts.tone_match.sung_prior import (
     LEGACY_VOCAL_CRAFT,
     LEGACY_VOCAL_PRIOR_HASH,
@@ -36,6 +40,7 @@ from scripts.tone_match.sung_prior import (
     prior_provenance,
 )
 from scripts.tone_match.tripwires import reference_roles
+from scripts.sg2_listen_page import selected_audition_manifest
 
 
 def test_vocalset_parser_carries_identity_vowel_and_technique():
@@ -120,6 +125,48 @@ def test_rendered_vowel_body_transfer_consumes_exact_fitted_shape():
         f0_hz=f0, bands=bands,
     )
     assert not wrong["passed"]
+
+
+def test_paired_transfer_classifier_compares_all_vowels_and_keeps_annex_box():
+    f0 = 130.8128
+    frequencies = f0 * np.arange(1, 49)
+    centres = {
+        "a": (768.0, 1333.0),
+        "e": (580.0, 1799.0),
+        "i": (342.0, 2322.0),
+        "o": (497.0, 910.0),
+        "u": (378.0, 997.0),
+    }
+    bodies = {}
+    for vowel, pair in centres.items():
+        bodies[vowel] = {
+            "formantsHz": list(pair),
+            "bands": [
+                {"freq": pair[0], "gain": 1.1, "width": 0.13},
+                {"freq": pair[1], "gain": 0.8, "width": 0.16},
+            ],
+        }
+    source = np.exp(-0.08 * np.arange(48))
+    log2_gain = np.zeros(48)
+    for band in bodies["e"]["bands"]:
+        log2_gain += band["gain"] * np.exp(
+            -0.5 * (np.log2(frequencies / band["freq"]) / band["width"]) ** 2
+        )
+    render = source * np.clip(2 ** log2_gain, 0.2, 4.5)
+    result = classify_rendered_vowel_body_transfer(
+        render, source, np.ones(48, dtype=bool),
+        f0_hz=f0, vowel_bodies=bodies, voice_class="tenor",
+    )
+    assert result["passed"]
+    assert result["classifiedAs"] == "e"
+    assert result["annexRegionPassed"]
+
+    bodies["e"]["formantsHz"][1] = 4000.0
+    result = classify_rendered_vowel_body_transfer(
+        render, source, np.ones(48, dtype=bool),
+        f0_hz=f0, vowel_bodies=bodies, voice_class="tenor",
+    )
+    assert not result["passed"]
 
 
 def test_soprano_above_passaggio_scale_role_is_explicit_and_firewalled():
@@ -243,3 +290,65 @@ def test_phone_tier_parser_reads_only_phone_intervals(tmp_path):
         'intervals [2]:\n xmin = 0.2\n xmax = 0.5\n text = "EY1"\n'
     )
     assert [row["phone"] for row in parse_phone_tier(grid)] == ["D", "EY1"]
+
+
+def test_consonant_audit_keeps_weights_zero_when_generator_consumer_is_absent(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "web/static").mkdir(parents=True)
+    (repo / "scripts").mkdir()
+    (repo / "web/static/params.js").write_text("consonantClass")
+    (repo / "web/static/synth.js").write_text("")
+    (repo / "scripts/verify_tone_model.mjs").write_text("")
+    fit = tmp_path / "fit.json"
+    fit.write_text(json.dumps({
+        "featureWeights": CONSONANT_FEATURE_WEIGHTS,
+        "classes": {name: {"count": 8} for name in ("plosive", "nasal", "fricative")},
+    }))
+    result = audit_consonant_generator(repo, fit, tmp_path / "audit.json")
+    assert result["status"] == "blocked-generator-consumer-absent"
+    assert not result["generatorLanded"]
+    assert result["zeroWeightSafe"]
+    assert result["tenorOnsetFit"] == "not-run-generator-consumer-absent"
+
+
+def test_exchange_status_update_is_applied_only_to_its_named_id(tmp_path):
+    exchange = tmp_path / "exchange.md"
+    exchange.write_text(
+        "### T-001 · First\nStatus: sung=incorporated\n\n"
+        "Status update — lane: T-002\nsung=blocked\n\n"
+        "### T-002 · Second\nStatus: sung=pending\n"
+    )
+    entries = {row["id"]: row for row in extract_exchange(exchange)["entries"]}
+    assert entries["T-001"]["sungStatus"] == "incorporated"
+    assert entries["T-002"]["sungStatus"] == "blocked"
+
+
+def test_sung_leaderboard_closes_strict_cells_before_composite():
+    def entry(strict_fail, composite):
+        return {
+            "meanComposite": composite,
+            "gates": {
+                "construction": {"counts": {"fail": 0}},
+                "strictTripwires": {
+                    "requiredFail": strict_fail, "requiredMissing": 0,
+                },
+                "vowelBodyConsumption": {"requiredRows": 10, "passedRows": 10},
+                "vowelClassification": {"requiredRows": 10, "passedRows": 10},
+                "humanisation": {"passed": False},
+            },
+        }
+
+    assert _selection_key(entry(4, 9.0)) < _selection_key(entry(5, 1.0))
+
+
+def test_listening_page_uses_selected_sung_ship_manifest(tmp_path):
+    run = tmp_path / "run"
+    run.mkdir()
+    scores = run / "baseline-scores.json"
+    scores.write_text("{}")
+    (run / "audition-manifest.json").write_text(json.dumps([
+        {"reference": "/real/a.wav", "render": "/ship/a.wav"},
+    ]))
+    assert selected_audition_manifest({"scoresPath": str(scores)}) == {
+        "/real/a.wav": "/ship/a.wav",
+    }

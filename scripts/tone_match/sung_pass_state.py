@@ -26,7 +26,7 @@ def _canonical_hash(payload: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _fit_summary(fit_root: Path) -> tuple[dict[str, Any], str]:
+def _fit_summary(fit_root: Path) -> tuple[dict[str, Any], str, dict[str, Any]]:
     source_fit = _load(fit_root / "SOURCE_VOWEL_FIT.json")
     bundle = {
         vowel: _load(fit_root / f"initial-{vowel}.json")
@@ -43,12 +43,12 @@ def _fit_summary(fit_root: Path) -> tuple[dict[str, Any], str]:
         "vibratoAnalysed": source_fit["vibratoAnalysed"],
         "medianAbsDb": fit["roundTripMedianAbsDb"],
         "p95AbsDb": fit["roundTripP95AbsDb"],
-    }, _canonical_hash(bundle))
+    }, _canonical_hash(bundle), bundle)
 
 
 def _entry(scores_path: Path, fit_root: Path, kind: str, number: int) -> dict[str, Any]:
     scores = _load(scores_path)
-    fit, bundle_hash = _fit_summary(fit_root)
+    fit, bundle_hash, params_by_vowel = _fit_summary(fit_root)
     construction = scores["construction"]
     tripwires = scores["tripwires"]
     strict_pass = sum(row.get("status") == "pass" for row in tripwires["cells"])
@@ -107,7 +107,17 @@ def _entry(scores_path: Path, fit_root: Path, kind: str, number: int) -> dict[st
         "gates": gates,
         "lpcVowelClassificationWatch": scores.get(
             "lpcVowelClassificationWatch", scores["vowelClassification"]),
+        "vowelClassifierWatch": scores.get("vowelClassifierWatch", {
+            "passed": False,
+            "passedRows": 0,
+            "requiredRows": 10,
+            "method": "not-available-in-legacy-row",
+        }),
         "sourceBodyFit": fit,
+        # The global listening-page resolver consumes this top-level wrapper.
+        # Keeping all five presets avoids silently auditioning a generic vocal
+        # fallback when the leaderboard entry is otherwise fully canonical.
+        "paramsByVowel": params_by_vowel,
         "presetBundleHash": bundle_hash[:16],
         "scoresPath": str(scores_path),
         "objectiveHash": scores["controllability"]["objectiveHash"],
@@ -121,12 +131,31 @@ def _gate_mark(gate: dict[str, Any]) -> str:
     return "PASS" if gate["passed"] else "FAIL"
 
 
+def _selection_key(entry: dict[str, Any]) -> tuple[float, ...]:
+    """Apply the sung criteria hierarchy before the scalar composite."""
+
+    gates = entry["gates"]
+    construction = gates["construction"]["counts"]
+    strict = gates["strictTripwires"]
+    body = gates["vowelBodyConsumption"]
+    vowel = gates["vowelClassification"]
+    return (
+        float(construction.get("fail", 0)),
+        float(strict["requiredFail"] + strict["requiredMissing"]),
+        float(body["requiredRows"] - body["passedRows"]),
+        float(vowel["requiredRows"] - vowel["passedRows"]),
+        float(not gates["humanisation"]["passed"]),
+        float(entry["meanComposite"]),
+    )
+
+
 def _write_run_report(path: Path, entry: dict[str, Any]) -> None:
     gates = entry["gates"]
     construction = gates["construction"]
     tripwires = gates["strictTripwires"]
     consumption = gates["vowelBodyConsumption"]
     vowel = gates["vowelClassification"]
+    classifier = entry["vowelClassifierWatch"]
     lines = [
         f"# {entry['instrument']} — {entry['run']}",
         "",
@@ -147,14 +176,21 @@ def _write_run_report(path: Path, entry: dict[str, Any]) -> None:
          f"{consumption['passedRows']}/{consumption['requiredRows']} |"),
         (f"| Vowel classification | {_gate_mark(vowel)} — "
          f"{vowel['passedRows']}/{vowel['requiredRows']} |"),
+        (f"| Calibrated vowel classifier watch | "
+         f"{'PASS' if classifier.get('passed') else 'FAIL'} — "
+         f"{classifier.get('passedRows', 0)}/{classifier.get('requiredRows', 10)}; "
+         f"{classifier.get('method', 'unknown')} |"),
         "| §2.5c differential Human fit | NOT RUN — deterministic identity unstable |",
         f"| Overall | {'PASS' if entry['shipEligible'] else '**FAIL**'} |",
         "",
         (f"Mean composite: `{entry['meanComposite']:.6f}` over "
          f"{entry['scoredRows']} scored rows; {entry['rejectedRows']} rejects."),
         "",
-        ("The raw LPC vowel estimate remains a watch metric and is not allowed "
-         "to override the paired body-on/body-bypass consuming assertion."),
+        ("The raw LPC estimate is retained as a diagnostic-only sparse-harmonic "
+         "measurement.  The calibrated classifier compares paired body-on/body-"
+         "bypass audio against every installed vowel model, then independently "
+         "checks the winning F1/F2 centres against the annex boxes.  Neither "
+         "watch can override the emitted-body consuming assertion."),
         "",
     ]
     path.write_text("\n".join(lines))
@@ -178,15 +214,15 @@ def finalize(
     objective_hashes = {entry["objectiveHash"] for entry in entries}
     if len(objective_hashes) != 1:
         raise ValueError(f"leaderboard entries are not objective-comparable: {objective_hashes}")
-    # Gate count is primary.  Composite breaks ties only inside the same hash.
-    best = min(entries, key=lambda entry: (entry["gateFailures"], entry["meanComposite"]))
+    # Construction and strict cell closure outrank the scalar composite.  This
+    # keeps an empirically useful hard-gate improvement from being discarded
+    # merely because a lower-priority average moved slightly in the other
+    # direction.
+    best = min(entries, key=_selection_key)
     legacy = entries[0]
     for entry in entries:
-        entry["beatsLegacy"] = (
-            entry["gateFailures"] < legacy["gateFailures"]
-            or (entry["gateFailures"] == legacy["gateFailures"]
-                and entry["meanComposite"] < legacy["meanComposite"])
-        )
+        entry["selectionKey"] = list(_selection_key(entry))
+        entry["beatsLegacy"] = _selection_key(entry) < _selection_key(legacy)
         entry["isLeader"] = entry is best
 
     board_path = runs_root / instrument / "leaderboard.json"
@@ -203,7 +239,10 @@ def finalize(
         "instrument": instrument,
         "objective": f"sung-canonical-{best['objectiveHash']}",
         "objectiveHash": best["objectiveHash"],
-        "selectionRule": "fewest hard-gate failures, then lower comparable composite",
+        "selectionRule": (
+            "construction failures, strict failed/missing cells, emitted-body "
+            "rows, vowel rows, humanisation, then lower comparable composite"
+        ),
         "runs": entries,
         "legacyBaseline": legacy,
         "best": best,
