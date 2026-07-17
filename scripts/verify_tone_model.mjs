@@ -44,6 +44,7 @@ import {
   bodyAmountFor,
   bodyLogGainAt,
   bodyResponse,
+  bodyAmAutomationEvents,
   bodyResponsesForPartials,
   bowNoiseBodyFilterDbAt,
   bowNoisePreBodyGainDbAt,
@@ -728,6 +729,37 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
   ) / bodyResponse(ah, f, 1);
   check("vibrato swing produces AM on a body slope, stillness at the peak",
     dAt(slopeF) > 5 * dAt(730), `slope ${dAt(slopeF).toFixed(4)} vs peak ${dAt(730).toFixed(4)}`);
+
+  const fmT0 = 12;
+  const fmT1 = 14;
+  const fmEvents = Array.from({ length: 221 }, (_, i) => {
+    const time = fmT0 + (fmT1 - fmT0) * i / 220;
+    return { time, cents: 18 * Math.sin(2 * Math.PI * 5.5 * (time - fmT0)) };
+  });
+  const fmNote = {
+    bodyBands: [{ freq: 1210, gain: 5, width: .08 }],
+    bodyAmount: 1,
+    duration: fmT1 - fmT0,
+    _vibratoEvents: fmEvents,
+    _wanderEvents: [{ time: .75, cents: 3 }],
+  };
+  const bodyAm = bodyAmAutomationEvents(fmNote, 1115, fmT0, fmT1, 1, 100);
+  const amDb = bodyAm.map(e => 20 * Math.log10(e.gain));
+  const maxBodyStep = Math.max(...bodyAm.slice(1).map((e, i) => e.time - bodyAm[i].time));
+  check("T-029 body-AM consumer updates at least 100 times per second",
+    bodyAm.length >= 201 && maxBodyStep <= .0100001,
+    `${bodyAm.length} points, max step ${maxBodyStep}`);
+  check("T-029 instantaneous-frequency body gain is audible across 18-cent vibrato",
+    Math.max(...amDb) - Math.min(...amDb) >= 3,
+    `${(Math.max(...amDb) - Math.min(...amDb)).toFixed(3)} dB`);
+  const wanderBefore = bodyAm.filter(e => e.time < fmT0 + .75).at(-1);
+  const wanderAt = bodyAm.find(e => near(e.time, fmT0 + .75, 1e-9));
+  check("T-029 body-AM consumes the shared wander trajectory",
+    wanderBefore && wanderAt && wanderAt.frequency > wanderBefore.frequency,
+    `${wanderBefore?.frequency} -> ${wanderAt?.frequency}`);
+  check("T-029 static body notes preserve the exact legacy graph",
+    bodyAmAutomationEvents({ ...fmNote, _vibratoEvents: [], _wanderEvents: [] },
+      1115, fmT0, fmT1).length === 0);
 
   // Audit A7: the per-partial reg grids are dead
   const GEN5 = {

@@ -879,6 +879,95 @@ export function bodyResponse(bands, freqHz, amount) {
   return Math.max(0.2, Math.min(4.5, Math.pow(2, logGain)));
 }
 
+function interpolatedPitchCentsAt(events, time) {
+  if (!Array.isArray(events) || events.length === 0) return 0;
+  if (time <= events[0].time) return Number(events[0].cents) || 0;
+  for (let i = 1; i < events.length; i++) {
+    const right = events[i];
+    if (time > right.time) continue;
+    const left = events[i - 1];
+    const span = Math.max(1e-9, right.time - left.time);
+    const mix = Math.max(0, Math.min(1, (time - left.time) / span));
+    return (Number(left.cents) || 0) * (1 - mix) +
+      (Number(right.cents) || 0) * mix;
+  }
+  return Number(events[events.length - 1].cents) || 0;
+}
+
+/** T-029: body gain follows the same instantaneous-frequency gestures as the
+ * oscillator. The returned points are consumed directly as AudioParam
+ * automation; static notes return no points, preserving the old graph exactly.
+ * A 100 Hz minimum grid meets the per-audio-block contract while explicit
+ * wander steps are retained at their exact times. */
+export function bodyAmAutomationEvents(note, modeFrequency, t0, t1,
+                                       modeMultiplier = 1, updateHz = 100) {
+  const bands = note?.bodyBands;
+  const amount = Number(note?.bodyAmount) || 0;
+  if (!Array.isArray(bands) || bands.length === 0 || amount <= 0 || !(t1 > t0)) return [];
+
+  const vibrato = Array.isArray(note?._vibratoEvents) ? note._vibratoEvents : [];
+  const wander = Array.isArray(note?._wanderEvents) ? note._wanderEvents : [];
+  const bowOnset = note?._bowOnsetWander || { cents: 0, settleSec: 0 };
+  const scoopCents = Number(note?._scoopCents) || 0;
+  const fittedSettle = Number(note?._scoopSettleSec) || 0;
+  const attack = Math.min((Number(note?.duration) || .2) * .4,
+    fittedSettle > 0 ? fittedSettle : Math.max(.015, Number(note?.envelopeAttack) || .02));
+  const slide = Math.max(0, Math.min(Number(note?.slideDuration) || 0,
+    (Number(note?.duration) || 0) * .8));
+  const target = Math.max(1, Number(modeFrequency) || 1);
+  const from = note?.legatoFromPrevious && Number(note?.slideFromFrequency) > 0
+    ? Math.max(1, Number(note.slideFromFrequency) * modeMultiplier)
+    : target;
+  const hasFm = vibrato.length > 1 || wander.length > 0 ||
+    Math.abs(Number(bowOnset.cents) || 0) > 1e-12 ||
+    Math.abs(scoopCents) > 1e-12 ||
+    (slide > .001 && Math.abs(from - target) > .01);
+  if (!hasFm) return [];
+
+  const wanderAt = (time) => {
+    let cents = 0;
+    for (const point of wander) {
+      if (t0 + (Number(point.time) || 0) <= time) cents = Number(point.cents) || 0;
+      else break;
+    }
+    return cents;
+  };
+  const baseAt = (time) => {
+    if (slide > .001 && time < t0 + slide && Math.abs(from - target) > .01) {
+      const progress = Math.max(0, Math.min(1, (time - t0) / slide));
+      return from * Math.pow(target / from, progress);
+    }
+    return target;
+  };
+  const frequencyAt = (time) => {
+    const scoop = scoopCents
+      ? scoopCents * Math.max(0, 1 - (time - t0) / Math.max(.001, attack))
+      : 0;
+    const onset = Number(bowOnset.cents) || 0;
+    const bow = onset
+      ? onset * Math.max(0, 1 - (time - t0) /
+        Math.max(.001, Number(bowOnset.settleSec) || 0))
+      : 0;
+    const cents = interpolatedPitchCentsAt(vibrato, time) + scoop + bow + wanderAt(time);
+    return baseAt(time) * Math.pow(2, cents / 1200);
+  };
+
+  const rate = Math.max(100, Number(updateHz) || 100);
+  const steps = Math.max(1, Math.ceil((t1 - t0) * rate));
+  const times = new Set([t0, t1]);
+  for (let i = 1; i < steps; i++) times.add(t0 + (t1 - t0) * i / steps);
+  for (const point of wander) {
+    const time = t0 + (Number(point.time) || 0);
+    if (time > t0 && time < t1) times.add(time);
+  }
+  const nominal = bodyResponse(bands, target, amount);
+  return [...times].sort((a, b) => a - b).map(time => ({
+    time,
+    frequency: frequencyAt(time),
+    gain: bodyResponse(bands, frequencyAt(time), amount) / nominal,
+  }));
+}
+
 // Width of the band that contributes most strongly at a partial frequency.
 // T-032 publishes Gaussian sigma in log2 octaves and this exact FWHM law.
 export function bodyFwhmHzAt(bands, freqHz) {
@@ -5314,7 +5403,6 @@ export class SynthEngine {
       const onsetDelay = note.legatoFromPrevious
         ? 0
         : partialOnsetDelay(harmonic, note.excitationType, note.attackStaggerMs);
-      const vibEvents = note._vibratoEvents || [];
       // Material damping law, tone v2 (T1): each partial decays with the
       // instrument's T60 at that partial's REAL frequency (audits A2/A3) —
       // a 4 kHz mode rings the same whether it is n=4 of a high note or
@@ -5327,31 +5415,17 @@ export class SynthEngine {
         // FM→AM through the body (T5): every polarisation mode traverses
         // the same body law. Close modes may sit on slightly different parts
         // of a ridge, but neither gets a separate body implementation.
-        if (vibEvents.length > 2 && note.bodyBands && note.bodyBands.length &&
-            (note.bodyAmount || 0) > 0) {
-          const r0 = bodyResponse(note.bodyBands, modeFreq, note.bodyAmount);
-          let minC = 0, maxC = 0;
-          for (const e of vibEvents) {
-            if (e.cents < minC) minC = e.cents;
-            if (e.cents > maxC) maxC = e.cents;
+        const bodyEvents = bodyAmAutomationEvents(
+          note, modeFreq, t0, t1, modeFreq / Math.max(1, note.frequency), 100);
+        if (bodyEvents.length > 1 && bodyEvents.some(e => Math.abs(e.gain - 1) > 1e-12)) {
+          const am = this.ctx.createGain();
+          am.gain.setValueAtTime(bodyEvents[0].gain, bodyEvents[0].time);
+          for (let k = 1; k < bodyEvents.length; k++) {
+            const e = bodyEvents[k];
+            am.gain.linearRampToValueAtTime(e.gain, e.time);
           }
-          const rHi = bodyResponse(note.bodyBands,
-            modeFreq * Math.pow(2, maxC / 1200), note.bodyAmount);
-          const rLo = bodyResponse(note.bodyBands,
-            modeFreq * Math.pow(2, minC / 1200), note.bodyAmount);
-          if (Math.abs(rHi - rLo) / r0 > 0.03) {
-            const am = this.ctx.createGain();
-            am.gain.setValueAtTime(1, t0);
-            const stride = Math.max(1, Math.ceil(vibEvents.length / 96));
-            for (let k = 1; k < vibEvents.length; k += stride) {
-              const e = vibEvents[k];
-              const r = bodyResponse(note.bodyBands,
-                modeFreq * Math.pow(2, e.cents / 1200), note.bodyAmount);
-              am.gain.linearRampToValueAtTime(r / r0, e.time);
-            }
-            gainNode.connect(am);
-            tail = am;
-          }
+          gainNode.connect(am);
+          tail = am;
         }
         return tail;
       };
