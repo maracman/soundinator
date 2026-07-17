@@ -478,29 +478,44 @@ def _render_ship_variants(
     target.mkdir(parents=True, exist_ok=True)
     ship_params = _mode_params(params, SHIP_MODE)
     params_path = target / "params.json"
-    params_path.write_text(json.dumps(ship_params, indent=2) + "\n")
-    seeds = [secrets.randbits(31) for _ in range(count)]
-    jobs = []
-    for variant_index, seed in enumerate(seeds):
-        variant_dir = target / f"variant-{variant_index:02d}"
-        variant_dir.mkdir(parents=True, exist_ok=True)
-        for reference_index, reference in enumerate(references):
-            jobs.append({
-                "paramsFile": str(params_path), "midi": reference.get("midi", 60),
-                "velocity": reference.get("velocity", .62),
-                "durationSec": reference.get("durationSec", 1.5),
-                "sampleRate": reference.get("sampleRate", 48_000),
-                "seed": seed + reference_index * 104_729,
-                "paramsOverride": _reference_render_params_override(reference),
-                "out": str(variant_dir / f"note-{reference_index}.wav"),
-            })
     jobs_path = target / "jobs.json"
-    jobs_path.write_text(json.dumps(jobs, indent=2) + "\n")
-    process = subprocess.run(
-        ["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],
-        cwd=repo_root, text=True, capture_output=True)
-    if process.returncode:
-        raise RuntimeError(process.stderr or process.stdout)
+    if jobs_path.exists():
+        existing_params = _load(params_path)
+        if canonical_hash(existing_params) != canonical_hash(ship_params):
+            raise ValueError(f"{target}: resumed SHIP params do not match saved contract")
+        jobs = _load(jobs_path)
+        if len(jobs) != count * len(references):
+            raise ValueError(f"{target}: resumed SHIP job count does not match requested contract")
+        seeds = [int(jobs[index * len(references)]["seed"])
+                 for index in range(count)]
+    else:
+        params_path.write_text(json.dumps(ship_params, indent=2) + "\n")
+        seeds = [secrets.randbits(31) for _ in range(count)]
+        jobs = []
+        for variant_index, seed in enumerate(seeds):
+            variant_dir = target / f"variant-{variant_index:02d}"
+            variant_dir.mkdir(parents=True, exist_ok=True)
+            for reference_index, reference in enumerate(references):
+                jobs.append({
+                    "paramsFile": str(params_path), "midi": reference.get("midi", 60),
+                    "velocity": reference.get("velocity", .62),
+                    "durationSec": reference.get("durationSec", 1.5),
+                    "sampleRate": reference.get("sampleRate", 48_000),
+                    "seed": seed + reference_index * 104_729,
+                    "paramsOverride": _reference_render_params_override(reference),
+                    "out": str(variant_dir / f"note-{reference_index}.wav"),
+                })
+        jobs_path.write_text(json.dumps(jobs, indent=2) + "\n")
+    pending = [job for job in jobs
+               if not Path(job["out"]).exists() or Path(job["out"]).stat().st_size <= 44]
+    if pending:
+        pending_path = target / "jobs-pending.json"
+        pending_path.write_text(json.dumps(pending, indent=2) + "\n")
+        process = subprocess.run(
+            ["node", "scripts/render_note.mjs", "--batch", str(pending_path)],
+            cwd=repo_root, text=True, capture_output=True)
+        if process.returncode:
+            raise RuntimeError(process.stderr or process.stdout)
     rendered: dict[int, list[Any]] = {index: [] for index in range(len(references))}
     analysis_failures: list[dict[str, Any]] = []
     for variant_index in range(count):
@@ -1189,6 +1204,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--budget", type=int, default=200)
     parser.add_argument("--ship-variants", type=int, default=DEFAULT_SHIP_VARIANTS)
     parser.add_argument("--run", default=time.strftime("%Y%m%d-%H%M%S"))
+    parser.add_argument("--resume", action="store_true",
+                        help="resume a contract-identical interrupted run directory")
     parser.add_argument("--skip-sensitivity", action="store_true")
     parser.add_argument("--limiting-factor", help="evidenced plateau cause when this run neither improves nor reaches the floor")
     parser.add_argument("--work-item", help="concrete fix to file for --limiting-factor")
@@ -1225,28 +1242,49 @@ def main(argv: list[str] | None = None) -> int:
     variability = _reference_variability(
         references, weights=scoring_weights, instrument=args.instrument)
     run_dir = DEFAULT_RUN_ROOT / args.instrument / args.run
-    run_dir.mkdir(parents=True, exist_ok=False)
-    (run_dir / "resolved-legacy-prior.json").write_text(json.dumps({
-        "prior": prior, "params": initial}, indent=2) + "\n")
-    (run_dir / "run.json").write_text(json.dumps({
-        **vars(args), "legacyPrior": prior, "renderModes": [FIT_MODE, SHIP_MODE],
-    }, indent=2, default=str) + "\n")
+    if args.resume:
+        if not run_dir.is_dir():
+            raise ValueError(f"cannot resume missing run directory: {run_dir}")
+        saved_prior = _load(run_dir / "resolved-legacy-prior.json")
+        if canonical_hash(saved_prior) != canonical_hash({"prior": prior, "params": initial}):
+            raise ValueError(f"{run_dir}: resumed legacy prior does not match saved contract")
+    else:
+        run_dir.mkdir(parents=True, exist_ok=False)
+        (run_dir / "resolved-legacy-prior.json").write_text(json.dumps({
+            "prior": prior, "params": initial}, indent=2) + "\n")
+        (run_dir / "run.json").write_text(json.dumps({
+            **vars(args), "legacyPrior": prior, "renderModes": [FIT_MODE, SHIP_MODE],
+        }, indent=2, default=str) + "\n")
     matcher = ToneMatcher(args.instrument, initial, references, free, run_dir,
                           repo_root=args.repo_root, weights=scoring_weights,
                           variability=variability,
                           criteria_noise_floor=repeat_noise_floor(controllability))
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
-    matcher.evaluate(x0, retain_audio=True)
+    if args.resume:
+        matcher.evaluations = _load(run_dir / "loss_curve.json")
+        matcher.best = _load(run_dir / "best.json")
+        for row in matcher.evaluations:
+            fingerprint = _candidate_fingerprint(free, row["params"])
+            matcher._objective_cache[fingerprint] = (row["objective"], row["loss"])
+    else:
+        matcher.evaluate(x0, retain_audio=True)
     baseline = matcher.evaluations[0]["loss"]
-    baseline_best = dict(matcher.best or matcher.evaluations[0])
+    baseline_best = dict(matcher.evaluations[0])
     baseline_floor = _floor_evidence(variability, baseline_best)
     if baseline_floor["status"] == "demonstrated":
         result = SimpleNamespace(success=True,
                                  message="baseline is at the reference-variability floor")
     else:
-        result = minimize(matcher.evaluate, x0, method="Powell", bounds=bounds,
-                          options={"maxfev": max(1, args.budget - 1), "ftol": .01, "xtol": .002})
+        remaining = max(0, args.budget - len(matcher.evaluations))
+        if remaining:
+            start = np.asarray([matcher.best["params"].get(p.key, p.default)
+                                for p in free]) if args.resume else x0
+            result = minimize(matcher.evaluate, start, method="Powell", bounds=bounds,
+                              options={"maxfev": remaining, "ftol": .01, "xtol": .002})
+        else:
+            result = SimpleNamespace(success=True,
+                                     message="resumed evaluation budget already complete")
     best = matcher.best or {"loss": baseline, "params": initial}
     sensitivity = {} if args.skip_sensitivity else _sensitivity(matcher, best)
     best = matcher.best or best

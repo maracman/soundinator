@@ -25,6 +25,7 @@ import {
   attackNoiseRouting,
   attackNoiseVelocityGain,
   breathVelocityGain,
+  pitchSynchronousBreathDepth,
   toneBreathLevelFor,
   onsetSpectrumGain,
   bowOnsetWanderPlan,
@@ -61,6 +62,11 @@ import {
   SPECTRAL_PROFILES,
   GenerationEngine,
   layerMixPlan,
+  measuredHumanEpisode,
+  measuredHumanDelta,
+  consonantProvenanceReady,
+  consonantGesturePlan,
+  consonantTransitionGain,
 } from "../web/static/synth.js";
 import { MEASURED_PROFILES } from "../web/static/measured_profiles.js";
 
@@ -70,6 +76,85 @@ const check = (name, cond, detail = "") => {
   else { failures++; console.error(`FAIL  ${name}${detail ? " — " + detail : ""}`); }
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+console.log("Measured SHIP episodes + sung onset consumers");
+{
+  let zeroDraws = 0;
+  const neutral = measuredHumanEpisode(
+    MEASURED_PROFILES.flute.humanRanges, 0, () => { zeroDraws++; return .9; });
+  check("§2.5c Human 0 is exact and consumes no episode RNG",
+    neutral === null && zeroDraws === 0);
+  const measured = measuredHumanEpisode(
+    MEASURED_PROFILES.flute.humanRanges, 1, (() => {
+      const draws = [0, ...Array(20).fill(1)];
+      return () => draws.shift() ?? 1;
+    })());
+  const posRange = MEASURED_PROFILES.flute.humanRanges.ranges.excitationPosition;
+  check("§2.5c width comes verbatim from measured drawHalfRange",
+    measured.drawHalfRanges.excitationPosition === posRange.drawHalfRange);
+  check("§2.5c bounded episode never exceeds measured support",
+    measured.samples.excitationPosition >= posRange.min &&
+    measured.samples.excitationPosition <= posRange.max);
+  check("§2.5c engine adapter consumes physical observables, not bow-specific labels",
+    measuredHumanDelta(measured, "sustainNoiseDb") ===
+      measured.deltas.bowNoiseLevelDb);
+  let episodeDraw = 0;
+  const skipped = measuredHumanEpisode(
+    MEASURED_PROFILES.flute.humanRanges, .35, () => ++episodeDraw === 1 ? .8 : 1);
+  check("§2.5c Human controls episode occurrence, not measured width",
+    skipped === null && episodeDraw === 1);
+  check("all five blown profiles carry consumable measured episodes",
+    ["flute", "clarinet", "alto-sax", "trumpet", "french-horn"].every(key => {
+      const episode = measuredHumanEpisode(
+        MEASURED_PROFILES[key].humanRanges, 1, () => .75);
+      return episode?.instrument === key &&
+        Number.isFinite(episode.deltas.excitationPosition);
+    }));
+
+  check("A-VOICE-04 sync zero is an exact depth identity",
+    pitchSynchronousBreathDepth(.2, 0) === 0);
+  check("A-VOICE-04 modulation is monotonic and remains below local gain",
+    pitchSynchronousBreathDepth(.2, .8) > pitchSynchronousBreathDepth(.2, .4) &&
+    pitchSynchronousBreathDepth(.2, 1) < .2);
+
+  // Spell out the complete A-VOICE-03 engine schema here so the queued
+  // activation audit proves both consumer and consuming-side assertion.
+  const consonantParams = {
+    consonantClass: "plosive", consonantPlace: "alveolar",
+    consonantVoiced: false, consonantStrength: .8,
+    consonantBurstHz: 4200, consonantBurstDurationMs: 24,
+    consonantVotMs: 28, consonantF2LocusHz: 1800,
+    consonantTransitionMs: 55, consonantNasalZeroHz: 1800,
+    consonantFricativeHz: 6000, consonantPreBeatMs: 20,
+    consonantProvenance: { source: "LibriSpeech adapted", license: "CC BY 4.0", qc: true },
+  };
+  check("A-VOICE-03 licence/QC provenance gate accepts complete provenance",
+    consonantProvenanceReady(consonantParams.consonantProvenance));
+  check("A-VOICE-03 none/zero remains neutral",
+    !consonantGesturePlan({ ...consonantParams, consonantClass: "none" }, .5).enabled &&
+    !consonantGesturePlan({ ...consonantParams, consonantStrength: 0 }, .5).enabled);
+  check("A-VOICE-03 cannot enable without licensed/QC provenance",
+    consonantGesturePlan({ ...consonantParams, consonantProvenance: null }, .5).reason ===
+      "missing-licensed-qc-provenance");
+  const weak = consonantGesturePlan(consonantParams, .2);
+  const strong = consonantGesturePlan(consonantParams, .8);
+  check("A-VOICE-03 shared articulation latent strengthens consonant and cleans onset",
+    strong.strength > weak.strength && strong.transientGain > weak.transientGain &&
+    strong.breathLeadGain < weak.breathLeadGain && strong.scoopScale < weak.scoopScale);
+  check("A-VOICE-03 requested VOT and burst controls are consumed",
+    near(strong.votSec, .028, 1e-12) && near(strong.burstSec, .024, 1e-12) &&
+    strong.burstHz === 4200);
+  check("A-VOICE-03 F1/F2 transition settles exactly onto sustained vowel body",
+    consonantTransitionGain(250, strong, 0) > 1 &&
+    consonantTransitionGain(1800, strong, 0) > 1 &&
+    consonantTransitionGain(250, strong, 1) === 1 &&
+    consonantTransitionGain(1800, strong, 1) === 1);
+  const nasal = consonantGesturePlan({ ...consonantParams, consonantClass: "nasal" }, .5);
+  const fricative = consonantGesturePlan({ ...consonantParams, consonantClass: "fricative" }, .5);
+  check("A-VOICE-03 nasal and fricative resolve distinct pitched/unpitched controls",
+    nasal.consonantClass === "nasal" && nasal.nasalZeroHz === 1800 &&
+    fricative.consonantClass === "fricative" && fricative.fricativeHz === 6000);
+}
 
 console.log("Sub-note base layer mixing");
 {

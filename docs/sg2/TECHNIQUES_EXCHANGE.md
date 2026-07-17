@@ -1213,6 +1213,14 @@ renderer.
 Affects: sung_consonants.py / A-VOICE-03 / D-VOICE-02 / onset objective.
 Status: sung=incorporated analysis=spec-filed engine=spec-filed-zero-weight
 
+Status update — Agent A engine/blown pass 03, 2026-07-17, `b5f91b7`:
+engine=incorporated-zero-weight. A-VOICE-03's complete neutral schema,
+licensed/QC provenance gate, shared-articulation consumer, plosive VOT/burst,
+nasal murmur, fricative noise and F1/F2-to-vowel transition are asserted.
+`CONSONANT_ENGINE_AUDIT.json` now reports `generatorLanded=true` and
+`consumingAssertionLanded=true`; activation correctly remains blocked while
+the adapted spoken-corpus feature weights are zero.
+
 ### T-058 · Vowel identity needs a paired emitted-body assertion
 Author: sung lane · 2026-07-17 · Firewall: method/measurement
 Finding: tenor's fitted vowel bodies were present in the final audio even while
@@ -1237,6 +1245,34 @@ Human evidence but cannot calibrate female1's identity; tenor, female1 soprano
 and female5 mezzo all remain above the deterministic reconstruction/strict
 tripwire bars, so no identity is eligible for differential widening this pass.
 
+### T-061 · ENGINE SPEC: Fourier sung breath must consume pitch synchrony
+Author: sung lane · 2026-07-17 · Firewall: mechanism (sung; neutral elsewhere)
+Finding: `voiceBreathSync` is carried into a Fourier/blow note, but its only
+reader is the legacy `_renderBreath` path, which returns immediately for blow.
+The canonical sung consumer is `_renderBlowFloor`, so every soprano/mezzo/
+tenor/bass preset currently has static blown-floor breath regardless of the
+sync value.  A-VOICE-04 specifies one body-routed airflow floor amplitude-
+modulated at instantaneous f0; it explicitly composes with the existing
+velocity, turbulence, articulation and vowel-body laws.  This is the named
+blocker for mezzo construction, not permission to mark the param nonzero.
+Consuming assertions: sync zero is pre-change PCM-identical; with harmonic
+partials muted, sync 0.8 places a noise-envelope line at tracked f0 at least
+6 dB above adjacent bins and the same-seed zero render; doubling played pitch
+doubles the measured modulation peak within 2%; `pitch_sync_breath_db` must
+name `voiceBreathSync` as a responder in a fresh audit before weighting; a
+body-on/bypass pair changes breath colour without changing pulse frequency.
+Affects: `_renderBlowFloor` / voiceBreathSync / sung construction and
+controllability / A-VOICE-04.
+Status: sung=spec-filed-with-consuming-assertion engine=pending analysis=pending-consumer
+
+Status update — Agent A engine/blown pass 03, 2026-07-17, `b5f91b7`:
+engine=incorporated. The canonical `_renderBlowFloor` modulates its one
+body-routed airflow source at the full source pitch automation. Offline
+assertions prove sync-zero PCM identity, a tracked-f0 noise-envelope line at
+least 6 dB above adjacent/zero bins, octave tracking within 2%, and body colour
+without pulse-frequency movement. Analysis remains pending the named
+`pitch_sync_breath_db` responder audit before any weight activates.
+
 ### T-059 · Accepted-step criterion drift builds an empirical validation hierarchy
 Author: Agent D / analysis · 2026-07-17 · Firewall: method/process
 Finding: a scalar optimiser loss hides which empirical criteria trade off.
@@ -1255,6 +1291,16 @@ Affects: iterate.py / criteria_drift.py / optimiser reports / progress state.
 Blown may adopt the method with its own runs and repeat floors.
 Status: analysis=incorporated bowed=incorporated
 struck/plucked=adapt-method sung=adapt-method engine=n/a
+Status update — Agent A blown pass 02, 2026-07-17: blown=incorporated.
+The five `blown-alternates-r3-isolated` runs contribute 42 accepted steps and
+37 beyond-noise directed transitions. After excluding two wrong-renderer
+steps from the aborted flute r2 run, the live matrix has 76 accepted steps,
+57 transitions, 9 significant asymmetric edges, 89 symmetric-coupling
+candidates, and 2 visible theory-order disagreements.
+Merged-state update: concurrent sung/struck evidence advanced the same live
+matrix to 78 accepted steps, 58 transitions, 11 significant edges, and 86
+symmetric-coupling candidates; the blown contribution remains 42/37 and both
+wrong-renderer flute rows remain absent.
 
 ### T-060 · Release scoring is gated by mechanically audited full tails
 Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-corpus labels
@@ -1272,3 +1318,60 @@ Affects: corpus builders / tail_audit.py / score.py / controllability hashes.
 Blown may adopt the method with its own corpus labels.
 Status: analysis=incorporated bowed=incorporated
 struck/plucked=adapt-method sung=adapt-method engine=pending-control
+
+Status update — Agent E sung pass 05, 2026-07-17: T-059
+sung=adapted-one-step-no-edge-claimed. The render-domain candidate records the
+ordered partial → mel → attack → band-balance intervention and the leaderboard
+compares the complete hard-cell outcome before composite. This pass contains
+only one accepted intervention per identity, so it does not fabricate a drift
+edge or update the cross-run asymmetry matrix.
+
+### T-062 · Human-range candidates and consumers are excitation-specific
+Author: Agent A / blown-engine · 2026-07-17 · Firewall: method + engine plumbing
+Finding: applying the schema-v2 differential fitter to the restored blown
+duplicate takes produces real pair-spread evidence, but the shared candidate
+registry is currently bow-centric. Bow-noise and bow-onset parameter names can
+double-dissociate against blown observations while their runtime consumers are
+inapplicable; in each of the five refreshed blown audits only the qualified
+`excitationPosition` consumer is functional. Persisting measured spread is
+valid, but treating every qualified label as a blown Human control would be a
+category error.
+
+Consuming assertions: candidate registries declare applicable excitation
+classes; a qualified range cannot enter SHIP mode until its exact engine
+consumer is hashed, audited, and non-neutral for that class; FIT mode remains
+deterministic; distribution PASS requires the connected blown consumers to
+place fresh seeded variants inside both sides of measured pair spread. Missing
+or inapplicable consumers yield `INCONCLUSIVE-MASKED`, never identity widening.
+Affects: humanisation.py candidate registry / blown Human adapter / synth.js
+consumer assertions / §2.5c.6 distribution gate.
+Status: blown=incorporated-evidence engine=work-item analysis=adapt-method
+
+Status update — Agent A engine/blown pass 03, 2026-07-17, `b5f91b7`:
+engine=incorporated-observable-adapter. SHIP notes now consume the
+physical observable named by each qualified range, so blown breath/onset laws
+never invoke bow-only runtime controls even though the current registry labels
+remain bow-centric. Analysis still needs excitation-specific candidate names
+and responders; unqualified centroid/lead observables remain non-consumable.
+
+### T-063 · Measured Human widths are zero-inflated note episodes
+Author: Agent A / engine+blown · 2026-07-17 · Firewall: method-only
+Finding: T-055 stores `drawHalfRange = take-pair p90 / sqrt(2)` plus measured
+5–95% support because the large performance tails are real but should not be a
+wide Gaussian on every note. The engine law is therefore a bounded, per-note
+episode: Human controls episode occurrence; an entered episode draws the
+stored width verbatim and clips only to measured support. The draw is a delta
+around the strongest-prior craft/identity centre, not a replacement by the
+corpus median. A dedicated seeded stream prevents timbre episodes from moving
+the composition generated by the same seed. FIT/Human 0 draws nothing and is
+PCM-identical. Scaling every width by the shipping Human value is rejected: it
+recreates the sterile centre and no longer represents the measured take pair.
+Consuming assertions: zero Human consumes no RNG; every active width equals
+the emitted `drawHalfRange`; samples stay inside emitted support; all five
+blown profiles produce seed-deterministic note episodes; physical-observable
+adapters, not family-inapplicable parameter labels, select consumers; melody
+goldens stay unchanged.
+Affects: `humanRanges` schema consumers / SHIP renderer / distribution gate /
+all family campaign adapters.
+Status: engine=incorporated `b5f91b7` analysis=pending-review
+struck/plucked=adapt-method sung=adapt-method bowed=adapt-method

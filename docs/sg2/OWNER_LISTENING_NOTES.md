@@ -55,6 +55,132 @@ instrument's effective body equals its fitted bands. The horn improved
 despite this because its refit likely carries explicit `bodyBands` in
 params, bypassing the profile plumbing — verify that too.
 
+### L18 · Piano: artificial sustain — the held-key/damper envelope model (owner, 2026-07-17)
+Owner: "the piano settings are quite good but the samples have an
+artificial sustain that doesn't work for a struck instrument. The
+envelope needs to be properly modelled for a held key on a piano: string
+is struck and the damper is raised, then let go and the damper makes
+contact with the string."
+
+The correct struck envelope has NO sustain plateau, ever:
+1. **Strike** — hammer attack (ms-scale).
+2. **Hold phase = free decay** — damper raised; amplitude decays
+   continuously the entire time the key is held (the two-stage
+   prompt/aftersound law, G4/L16 machinery). A flat `envelopeSustain`
+   level is a category error for strike/pluck excitation — the "hold"
+   merely determines WHEN the damper returns, not a level to sustain.
+3. **Release = damper re-contact** — fast fitted damp (tens of ms;
+   frequency-dependent — dampers kill highs faster), fitted from the
+   tail-audit `hasRelease` takes (§9 d.13b machinery is exactly where
+   this lives). Optional L17-class component: damper contact
+   noise/thud on re-contact, extraction-gated.
+
+Requirements:
+- Engine: for strike/pluck excitation the envelope law replaces
+  sustain-plateau semantics with hold=free-decay + damper-release
+  (releaseDamping/decaySecondStage seams exist; the law must make a
+  flat plateau UNREACHABLE for struck ship presets, not merely
+  optional).
+- Analysis: fit hold-phase decay from the held Iowa takes (free decay
+  is already measured); fit damper damp-rate per register from
+  hasRelease rows.
+- Construction assertion: a struck ship-mode render's hold phase shows
+  monotonic decay matching the measured two-stage slopes — a plateau is
+  an automatic construction FAIL for the family.
+- Applies to the whole struck/plucked family (guitar/harp analogue:
+  finger/palm damping on release); values per instrument, mechanism
+  shared (firewall).
+
+### L17 · Pre-onset noise-lead is a COMPONENT CLASS: wind breath = bow sound = piano action noise (owner, 2026-07-17)
+Owner: "the blown instruments, particularly the winds (flute, sax and
+clarinet), require a similar breath component that functions similarly to
+the bow sound we mentioned before. It is much more audible in the piano
+samples. And it can, in the same way as the bow sound, precede the onset
+of the tone."
+
+Unification: the L14 bow extraction defined a component class — a
+per-instrument PINNED noise component, extracted by cross-pitch residual
+commonality, body-routed, with its own level control, capable of
+PRECEDING tone onset. The owner names three members: bow-hair scratch
+(done for violin), WIND BREATH (flute/sax/clarinet — extraction never
+run), and PIANO ACTION NOISE (the audibly clearest case in the reference
+recordings — key/hammer mechanism noise leading the strike).
+
+Requirements:
+1. Run the L14 extraction for wind breath (per instrument, per dynamic,
+   cross-pitch, lossless sources only, synthetic round-trip before real
+   data). The blown campaigns' existing breath laws (levels, exponents)
+   remain; what's new is the PINNED measured spectrum replacing generic
+   noise, and the PRE-ONSET placement fitted from the references'
+   noise-lead measurements (`noise_lead_ms` sense already exists).
+2. Piano action noise: run the same extraction on the piano corpus
+   (struck lane); it naturally composes with the L16 envelope-anomaly
+   work (action noise is the pre-onset member of that family). Its
+   audibility in the references makes piano the best validation case
+   for the extraction method itself.
+3. Engine: the pre-onset placement must be a real capability — the
+   component may begin BEFORE the tone's t0 (the engine's noise-lead /
+   attackNoiseDirect machinery is the seam; verify a pinned component
+   can lead the harmonic onset by the measured lead time, per-note
+   drawn from the articulation latent per L5b/T-002).
+4. Preset-level activation assertion (per the violin L14 lesson): a
+   preset whose profile carries a pinned pre-onset component must emit
+   it audibly in ship-mode — never silent-by-default.
+5. **Each component has its OWN ENVELOPE (owner addendum, 2026-07-17):
+   "the blown sound as well as the string sound would have its own
+   envelope properties."** The component's temporal shape — pre-onset
+   swell, peak placement relative to tone onset, settle-to-floor, and
+   its own release — is FITTED from the references per component per
+   instrument (the same envelope-track machinery as L16), never merely
+   slaved to the harmonic tone's ADSR. T-001's airflow-coupling
+   (component follows the amplitude envelope) becomes ONE TERM of the
+   fitted component envelope, not the whole law: bow scratch peaks at
+   lock-in then settles; breath leads, swells, and rides; piano action
+   noise is a self-contained transient. Extraction therefore emits
+   spectrum + level law + ENVELOPE SHAPE per component; the engine
+   consumer must support an independent per-component envelope; the
+   activation assertion (item 4) checks the envelope is applied, not
+   just the level.
+
+### L16 · Piano: envelope-anomalous frequencies — OWNER EXTRACTION PROTOCOL #2 (2026-07-17)
+Owner: "the piano specifically has resonances that have a different volume
+of attack and decay... characteristic frequencies that come out when the
+note is struck more forcefully, that are louder on the onset and decay
+more rapidly, in the higher end. Rather than isolating the characteristic
+frequency like we did in the bow sound, pull out certain
+frequencies/harmonics that have DIFFERENT ENVELOPE BEHAVIOURS to the
+baseline, and modulate the envelope for these frequencies or ranges."
+
+This is the envelope-domain sibling of L14 (which isolated a
+pitch-invariant SPECTRUM; this isolates envelope-behaviour-DEVIANT
+frequencies). Known physics candidates it should surface: hammer
+nonlinearity components, longitudinal/phantom modes (annex-deferred gap),
+duplex/aliquot strings, soundboard rings — all velocity-gated,
+onset-loud, fast-decaying, upper-spectrum.
+
+Protocol (struck lane = campaign owner; analysis lane = machinery;
+engine = consumer):
+1. Per-note, per-partial envelope tracks (onset peak, early decay rate,
+   late decay rate) — much already measured (bandT90, partial T60s).
+2. Fit the instrument's BASELINE envelope law (T60(f) + two-stage) and
+   compute each partial's/band's residual deviation from it.
+3. Classify systematically deviant frequencies: onset-boost magnitude,
+   excess decay rate, and their VELOCITY dependence (present/louder at
+   ff, reduced at pp — fit the gate curve, don't assume binary).
+4. Cross-note commonality determines the engine home: deviants at
+   FIXED Hz across notes → body/soundboard-class component; deviants by
+   HARMONIC RANK → excitation/hammer-class component. Do not guess —
+   the same separation logic as excitor/body deconvolution.
+5. Engine consumption: an envelope-deviation layer — per-partial or
+   per-band attack-boost × fast-decay envelope class, velocity-coupled,
+   neutral at 0, values PINNED from measurement (optimiser never
+   free-fits the class assignments).
+6. Extractor validated by synthetic round-trip before real data
+   (protocol §4 rule, as with L14).
+Applies beyond piano wherever envelope-anomalous components exist
+(guitar pick transients, harp near-board plucks) — mechanism transfers,
+values never (firewall).
+
 ### L14 · Violin still very bad — OWNER EXTRACTION PROTOCOL: isolate the bow sound as its own component
 Owner (2026-07-17), method prescribed in full: "find the bow sound,
 extract all the partials to have it as its own separate control. I
