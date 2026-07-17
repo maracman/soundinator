@@ -203,13 +203,27 @@ def main():
         body = [f"<h2>{inst}<span class=tag style='{style}'>{html.escape(tag)}</span></h2>"
                 "<table><tr><th>Note</th><th>Register · dynamic</th><th>Reference (real)</th>"
                 "<th>Render (synth)</th><th class=dim>Source</th></tr>"]
+        def audio_cell(path, base=None):
+            """Absolute-resolved player, or a dim placeholder — never a dead link.
+            Relative reference paths resolve against their campaign dir, then SG2."""
+            if not path: return "<td class=dim>—</td>"
+            cands = [path] if os.path.isabs(path) else [
+                os.path.normpath(os.path.join(base or SG2, path)),
+                os.path.normpath(os.path.join(SG2, path)),
+                os.path.normpath(os.path.join(SG2, "campaigns", inst, path))]
+            if "sg2-data/" in path:  # wandering-relative agent paths: re-root at the data dir
+                cands.append(os.path.join(os.path.dirname(SG2), path[path.index("sg2-data/"):]))
+            for c in cands:
+                if os.path.exists(c):
+                    return f"<td><audio controls preload=none src='file://{html.escape(c)}'></audio></td>"
+            return "<td class=dim>missing</td>"
+        camp_dir = f"{SG2}/campaigns/{inst}"
         for w, r in rows:
             extra = "".join(f"{r[k]} · " for k in ("vowel", "string") if r.get(k))
-            render_path = w if os.path.isabs(w) else f"{SG2}/{w}"
             body.append(
                 f"<tr><td><b>{nname(r['midi'])}</b></td><td>{extra}{r['register']} · {r['dynamic']}</td>"
-                f"<td><audio controls preload=none src='file://{r['path']}'></audio></td>"
-                f"<td><audio controls preload=none src='file://{html.escape(render_path)}'></audio></td>"
+                f"{audio_cell(r.get('path'), camp_dir)}"
+                f"{audio_cell(w)}"
                 f"<td class=dim>{html.escape(r.get('sourceFile',''))}</td></tr>")
         body.append("</table>")
         sections.append("\n".join(body))
@@ -227,11 +241,21 @@ def main():
             "onset with the same-seed vowel-only output.</p>",
             "<table><tr><th>Class</th><th>Vowel-only onset</th><th>Consonant onset</th></tr>",
         ]
+        def aux_cell(path):
+            if not path: return "<td class=dim>—</td>"
+            cands = [path] if os.path.isabs(path) else [
+                os.path.normpath(os.path.join(os.path.dirname(manifest_path), path)),
+                os.path.normpath(os.path.join(SG2, path))]
+            if "sg2-data/" in str(path):
+                cands.append(os.path.join(os.path.dirname(SG2), str(path)[str(path).index("sg2-data/"):]))
+            for c in cands:
+                if os.path.exists(c):
+                    return f"<td><audio controls preload=none src='file://{html.escape(str(c))}'></audio></td>"
+            return "<td class=dim>missing</td>"
         for row in manifest["rows"]:
             body.append(
                 f"<tr><td><b>{html.escape(row['label'])}</b></td>"
-                f"<td><audio controls preload=none src='file://{html.escape(baseline)}'></audio></td>"
-                f"<td><audio controls preload=none src='file://{html.escape(row['render'])}'></audio></td></tr>"
+                f"{aux_cell(baseline)}{aux_cell(row['render'])}</tr>"
             )
         body.append("</table>")
         sections.append("\n".join(body))
