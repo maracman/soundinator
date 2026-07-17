@@ -2320,3 +2320,27 @@ not use this method to hide a failing within-run or cross-run distribution.
 Affects: residual component extraction / cross-pitch pooling / source-run provenance.
 Status: analysis=incorporated bowed=incorporated-cello-L14
 engine=n/a-method-only sung=adapt-method struck/plucked=adapt-method
+
+### T-077 · Register/dynamic air level is a bounded source-edge probe, not a body substitute
+Author: Agent A / engine + blown · 2026-07-18 · Firewall: mechanism only; values per instrument
+Finding: a scalar flute `windBreathLevel` sweep moved the active
+`band_balance_db` criterion but exposed incompatible register preferences.
+The engine now accepts an optional measured-hull
+`windBreathLevelByRegisterDynamic` surface whose rows contain `f0Hz`,
+`velocity`, and `levelScale`; its joint log-f0 × velocity interpolation
+multiplies the existing master air level, and absence is exact identity. A
+flute-only mid/ff scale of 0.70 reduced that construction cell from
+3.070/6.251 dB mean/max to 3.031/5.845 dB and improved the cross-run composite
+from 3.193881 to 3.186308 while preserving the other anchors. A lower 0.45
+row worsened the mean to 3.120 dB even as the maximum fell to 5.601 dB.
+Neither row cleared the 3 dB mean bar, so no fitted surface was promoted into
+the factory preset and no body/source value was inferred from this probe.
+Consuming rule: use this surface only when independent register × dynamic air
+evidence exists; retain a scalar master, exact-null identity, measured-hull
+interpolation, and an instrument-owned table. When a bounded row reaches this
+non-monotonic plateau, extract a stable post-source/post-air octave residual
+before considering a body refit.
+Affects: blown excitation level / register-dynamic interpolation / band-balance triage.
+Status: engine=incorporated (`cb50b68`, shared `4810c30`)
+blown=incorporated-limiting-factor analysis=adapt-method
+sung=adapt-method-if-independently-measured bowed=n/a struck/plucked=n/a
