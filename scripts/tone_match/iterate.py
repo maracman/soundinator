@@ -79,6 +79,7 @@ HUMAN_ONLY_PARAM_KEYS = {
     "vibratoRateSd", "vibratoDepthSd", "toneFormantDrift",
     "toneResonanceDrift", "microDriftCentsSd", "microDriftCentsRange",
     "microDriftCentsPerSecond",
+    "onsetWanderCents", "onsetWanderSettlePeriods", "bowScratchLevel",
 }
 
 # Feature-domain consequences of the §2.5c Human-designated parameter set.
