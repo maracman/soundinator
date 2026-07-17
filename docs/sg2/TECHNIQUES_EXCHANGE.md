@@ -1439,3 +1439,40 @@ sung=adapted-later-onset-only-base-consumer-landed. Shared head `b5f91b7`
 lands A-VOICE-03's neutral, provenance-gated consonant consumer after the sung
 fit completed. No licensed sung consonant evidence or envelope-anomaly class
 was activated; anomaly-specific analysis and decay law remain pending.
+
+Status update — Agent E sung pass 07, 2026-07-17: T-064
+sung=incorporated-base-consonant-fit-anomaly-still-neutral. The A-VOICE-03
+output audit now proves fitted tenor plosive, nasal and fricative onsets differ
+from the same-seed vowel-only output, while burst/VOT/transition perturbations
+all respond. This activates only the base consonant gesture. L16 envelope-
+anomaly classes remain neutral because no sung onset envelope-class extraction
+or synthetic round trip exists.
+
+Status update — Agent E sung pass 07, 2026-07-17: T-065
+sung=pinned-evidence-ready-engine-consumer-pending. A synthetic known-source +
+two-fixed-vowel-body round trip passes at 2.16e-6 dB maximum shape error. The
+emitter supplies every available register/dynamic source cell for tenor 9/9,
+soprano 7/7, bass 9/9 and mezzo 9/9, pooled across vowels under one primary-
+singer source identity. Soprano's sparse high-register hull is explicit; no
+missing dynamic row is guessed. Agent A's consumer and its fresh responders
+still precede activation.
+
+### T-066 · Pitch-synchronous sung breath needs a rendered residual-envelope observable
+Author: sung lane / A-VOICE-04 coordination request to Agent D · 2026-07-17 · Firewall: method; values per singer
+Finding: A-VOICE-04 now audibly consumes `voiceBreathSync` in the Fourier/blow
+path, but parameter presence and an engine-only partial-muted check are not a
+corpus fit. Define `pitch_sync_breath_db` on a LOSSLESS sung reference by (1)
+tracking f0, (2) subtracting the harmonic reconstruction using the L14/T-054
+cross-pitch residual discipline, (3) extracting the residual-noise amplitude
+envelope, and (4) measuring modulation-spectrum prominence at tracked f0
+relative to adjacent side bins and the same-band floor. Suspected room-decay
+residuals remain separately labelled and never become breath. Validate first
+on synthetic body-filtered noise with known f0 modulation: recovered peak
+frequency within 2% and prominence within 1 dB. Then consume partial-muted,
+same-seed sync=0/sync=0.8 renders at two pitches an octave apart: enabled
+prominence at least 6 dB above adjacent bins and the zero render, with the peak
+doubling within 2%. Only after the real reference measurement and a fresh
+controllability audit may `pitch_sync_breath_db` receive weight or any adult
+voice receive nonzero `voiceBreathSync`.
+Affects: A-VOICE-04 / sung_features or shared analysis / construction breath row / tenor,bass,mezzo activation.
+Status: sung=spec-filed-values-neutral analysis=pending-review engine=incorporated-base-consumer

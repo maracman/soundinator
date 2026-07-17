@@ -34,6 +34,7 @@ from scripts.tone_match.sung_consonant_audit import audit as audit_consonant_gen
 from scripts.tone_match.sung_exchange_status import extract as extract_exchange
 from scripts.tone_match.sung_pass_state import _selection_key
 from scripts.tone_match.sung_spectral_triage import fit_global_dynamic_amount
+from scripts.tone_match.sung_source_tables import _emit_rows, synthetic_round_trip
 from scripts.tone_match.sung_prior import (
     LEGACY_VOCAL_CRAFT,
     LEGACY_VOCAL_PRIOR_HASH,
@@ -310,6 +311,28 @@ def test_consonant_audit_keeps_weights_zero_when_generator_consumer_is_absent(tm
     assert not result["generatorLanded"]
     assert result["zeroWeightSafe"]
     assert result["tenorOnsetFit"] == "not-run-generator-consumer-absent"
+
+
+def test_a_voice_05_source_emitter_pools_vowels_without_creating_vowel_sources():
+    residuals = []
+    for vowel in "ai":
+        residuals.append({
+            "vowel": vowel, "register": "mid", "dynamic": "mf",
+            "velocity": .62, "f0Hz": 220.0,
+            "sourceId": f"/{vowel}.wav",
+            "sourceDb": np.asarray([0.0, -6.0, -12.0, -18.0]),
+        })
+    rows = _emit_rows(residuals)
+    assert len(rows) == 1
+    assert rows[0]["vowels"] == ["a", "i"]
+    assert rows[0]["partials"] == pytest.approx([1.0, .50118723, .25118864, .12589254])
+    assert rows[0]["nNotes"] == 2
+
+
+def test_a_voice_05_source_emitter_passes_synthetic_body_deconvolution_round_trip():
+    result = synthetic_round_trip()
+    assert result["passed"]
+    assert result["maxAbsShapeErrorDb"] <= result["toleranceDb"]
 
 
 def test_exchange_status_update_is_applied_only_to_its_named_id(tmp_path):
