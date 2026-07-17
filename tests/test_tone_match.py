@@ -677,11 +677,14 @@ def test_glock_first_render_gate_hashes_and_reports_missing_bar_controls(
         lambda jobs, _root: Path(jobs[0]["out"]).touch())
     monkeypatch.setattr(bar_modes_module, "_load",
                         lambda _path: (np.zeros(64), 48_000))
-    monkeypatch.setattr(bar_modes_module, "analyse_bar", lambda *_args: {
+    monkeypatch.setattr(bar_modes_module, "analyse_bar", lambda *_args, **_kwargs: {
         "modes": [
-            {"mode": 1, "offsetCents": 0, "t60Seconds": 4, "levelDb": 0},
-            {"mode": 2, "offsetCents": 0, "t60Seconds": 3, "levelDb": -3},
-            {"mode": 3, "offsetCents": 0, "t60Seconds": 2, "levelDb": -1},
+            {"mode": 1, "baseRatio": 1, "offsetCents": 0,
+             "t60Seconds": 4, "levelDb": 0, "localProminenceDb": 12},
+            {"mode": 2, "baseRatio": BAR_RATIOS[1], "offsetCents": 0,
+             "t60Seconds": 3, "levelDb": -3, "localProminenceDb": 12},
+            {"mode": 3, "baseRatio": BAR_RATIOS[2], "offsetCents": 0,
+             "t60Seconds": 2, "levelDb": -1, "localProminenceDb": 12},
         ],
     })
 
@@ -691,6 +694,7 @@ def test_glock_first_render_gate_hashes_and_reports_missing_bar_controls(
     assert result["status"] == "fail"
     assert result["gates"] == {
         "modeRatios2To3Within35Cents": False,
+        "upperAudibleModeRatiosWithin35Cents": False,
         "mode1ToMode2T60RatioMedian": pytest.approx(4 / 3, abs=1e-4),
         "mode1ToMode2T60RatioAtLeast5": False,
         "centreStrikeMode2DipAllMeasured": False,
@@ -760,6 +764,27 @@ def test_bar_mode_extractor_never_exposes_string_b_and_recovers_ratios():
     assert all("partialB" not in row for row in fit["modes"])
 
 
+def test_bar_output_estimator_tracks_pinned_upper_mode_not_broadband_distractor():
+    sample_rate = 48_000
+    times = np.arange(sample_rate) / sample_rate
+    f0 = 784.0
+    target_offset = -100.0
+    target_frequency = f0 * BAR_RATIOS[2] * 2 ** (target_offset / 1200)
+    distractor_frequency = f0 * BAR_RATIOS[2]
+    samples = (
+        np.sin(2 * np.pi * f0 * times) +
+        .6 * np.sin(2 * np.pi * target_frequency * times) +
+        1.2 * np.sin(2 * np.pi * distractor_frequency * times)
+    ) * np.exp(-times * 2)
+    broad = analyse_bar(samples, sample_rate, f0, max_modes=3)
+    targeted = analyse_bar(samples, sample_rate, f0, max_modes=3,
+                           expected_offsets_cents={3: target_offset})
+    assert abs(broad["modes"][2]["offsetCents"]) < 3
+    assert targeted["modes"][2]["offsetCents"] == pytest.approx(
+        target_offset, abs=2)
+    assert targeted["modes"][2]["localProminenceDb"] >= 3
+
+
 def test_l17_pre_roll_audit_uses_first_broadband_event_not_tone_onset():
     sample_rate = 48_000
     samples = np.zeros(round(.2 * sample_rate))
@@ -785,12 +810,20 @@ def test_guitar_measured_profile_uses_nominal_nylon_register_anchors():
 
 
 def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables():
+    component = {"component": "pianoActionNoise", "profilePinned": True,
+                 "level": 1, "envelope": {"points": []}}
+    anomaly = {"home": "harmonicRank", "ranks": [1], "onsetBoostDb": 3}
+    damper = {"f0": 110, "velocityAnchor": .2,
+              "dampDbPerSecondAtFundamental": 300, "frequencyExponent": 0}
     measured = {"piano": {
         "performance": {"attackNoise": {"freq": 800, "q": .8, "decay": .1}},
         "material": {"suggestedMaterial": .2},
         "attack": {"byRegister": [{"f0": 110, "envelopeAttack": .02}]},
         "resonances": [{"freq": 200, "gain": 2, "width": 1}] * 3,
         "partialsByRegister": [{"f0": 110, "partials": [1]}],
+        "damperByRegister": [damper],
+        "preOnsetComponents": [component],
+        "envelopeAnomalyClasses": [anomaly],
         "partialB": .001,
     }}
     seed = seed_preset(STRUCK_CAMPAIGNS["grand-piano"], measured)
@@ -800,6 +833,26 @@ def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables(
     assert seed["decaySecondStage"] == 0
     assert seed["spectralResonanceAmount"] == 1
     assert "partialB" not in seed
+    assert "spectralPartialMeans" not in seed
+    assert seed["damperByRegister"] == [damper]
+    assert seed["preOnsetComponents"] == [component]
+    assert seed["envelopeAnomalyClasses"] == [anomaly]
+    assert seed["pianoActionNoiseLevel"] == 1
+    assert seed["envelopeAnomalyLevel"] == 1
+
+
+def test_nylon_seed_does_not_shadow_t033_course_tables_with_pooled_means():
+    measured = {"guitar": {
+        "partials": [{"amp": 1}, {"amp": .5}],
+        "partialsByString": {
+            "string6": [{"f0": 82.407, "partials": [{"amp": 1}, {"amp": .1}]}],
+            "string1": [{"f0": 659.255, "partials": [{"amp": 1}, {"amp": .9}]}],
+        },
+        "performance": {},
+    }}
+    seed = seed_preset(STRUCK_CAMPAIGNS["guitar-nylon"], measured)
+    assert seed["spectralProfile"] == "guitar"
+    assert "spectralPartialMeans" not in seed
 
 
 def test_upright_alias_consumes_piano_construction_and_struck_scoring_policy():
@@ -832,6 +885,8 @@ def test_profile_rebase_refreshes_structural_anchors_but_keeps_fitted_controls()
         "_sg2Mode": "ship",
         "_sg2Prior": {"mode": "ship", "resolvedHash": "old"},
         "envelopeAttackByRegister": [{"f0": 120, "attack": .03}],
+        "spectralPartialMeans": [1, .5],
+        "pianoActionNoiseLevel": 0,
     }}
     refreshed = {
         "partialTilt": 0,
@@ -840,6 +895,9 @@ def test_profile_rebase_refreshes_structural_anchors_but_keeps_fitted_controls()
         "_sg2Mode": "fit",
         "_sg2Prior": {"mode": "fit", "resolvedHash": "new"},
         "envelopeAttackByRegister": [{"f0": 82.407, "attack": .028}],
+        "damperByRegister": [{"f0": 110, "dampDbPerSecondAtFundamental": 300,
+                              "frequencyExponent": 0}],
+        "pianoActionNoiseLevel": 1,
     }
     rebased = rebase_fitted_preset(fitted, refreshed)
     assert rebased["partialTilt"] == .34
@@ -848,6 +906,9 @@ def test_profile_rebase_refreshes_structural_anchors_but_keeps_fitted_controls()
     assert rebased["_sg2Mode"] == "fit"
     assert rebased["_sg2Prior"] == refreshed["_sg2Prior"]
     assert rebased["envelopeAttackByRegister"] == refreshed["envelopeAttackByRegister"]
+    assert rebased["damperByRegister"] == refreshed["damperByRegister"]
+    assert rebased["pianoActionNoiseLevel"] == 1
+    assert "spectralPartialMeans" not in rebased
 
 
 def test_struck_campaign_roles_use_the_shared_tripwire_taxonomy():
