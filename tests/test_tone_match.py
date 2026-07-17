@@ -58,7 +58,13 @@ from scripts.tone_match.iterate import (
     _write_run_report,
 )
 from scripts.tone_match.legacy_prior import resolve_legacy_prior
-from scripts.tone_match.bowed_source_tables import _string_partials
+from scripts.tone_match.bowed_source_tables import (
+    _string_partials,
+    body_gain_db,
+    deconvolve_source,
+    synthetic_deconvolution_round_trip,
+)
+from scripts.tone_match.bowed_body_audit import _audit_params as bowed_body_audit_params
 from scripts.tone_match.humanisation import fit_excitation_position, ship_human_overrides
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, STRUCK_OBJECTIVE_ROLES, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, iowa_filename_span, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
@@ -2485,6 +2491,39 @@ def test_deconvolution_mask_equals_emission_mask_round_trip():
         log_ratio = np.log(ratio)
         worst = max(worst, float(np.ptp(log_ratio)))   # scale-free shape error
     assert worst < .25, worst
+
+
+def test_bowed_per_cell_source_deconvolution_passes_synthetic_round_trip():
+    validation = synthetic_deconvolution_round_trip()
+    assert validation["status"] == "pass"
+    assert validation["maximumShapeErrorDb"] <= .01
+
+    frequencies = 82.4 * np.arange(1, 17)
+    source = np.arange(1, 17, dtype=float) ** -1.1
+    source /= source.max()
+    bands = [{"freq": 210.8, "gain": .5264, "width": .1904}]
+    observed = 20 * np.log10(source) + body_gain_db(bands, frequencies)
+    recovered = deconvolve_source(observed, frequencies, bands)
+    error = 20 * np.log10(recovered / source)
+    error -= np.median(error)
+    assert np.max(np.abs(error)) < 1e-8
+
+
+def test_cello_t058_body_audit_holds_source_and_neutralises_confounds():
+    params = {
+        "bodyBands": [{"freq": 210.8, "gain": .5264, "width": .1904}],
+        "spectralPartialsByRegisterDynamic": {"rows": [{"f0Hz": 65.8}]},
+        "partialTransfer": .2, "attackNoiseLevel": .3, "bowNoiseLevel": .4,
+        "bowScratchLevel": .1, "vibratoProb": .8, "excitationHuman": .5,
+    }
+    body = bowed_body_audit_params(params, bypass=False)
+    bypass = bowed_body_audit_params(params, bypass=True)
+    assert body["spectralPartialsByRegisterDynamic"] is \
+        bypass["spectralPartialsByRegisterDynamic"]
+    assert body["bodyBands"] == params["bodyBands"] and bypass["bodyBands"] == []
+    for key in ("partialTransfer", "attackNoiseLevel", "bowNoiseLevel",
+                "bowScratchLevel", "vibratoProb", "excitationHuman", "reverbWet"):
+        assert body[key] == bypass[key] == 0.0
 
 
 def _mode_locked_tone(f0, dominant_harmonic, sr=44_100, duration=1.2,
