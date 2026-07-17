@@ -45,6 +45,7 @@ from scripts.tone_match.tripwires import (
     required_cells_by_bar,
 )
 from scripts.tone_match.paths import sg2_data_root
+from scripts.tone_match.tail_audit import audit_references
 from scripts.fit_profiles_from_samples import (
     analyse_note,
     estimate_f0,
@@ -801,6 +802,7 @@ def build_string_references(instrument: str, samples_root: Path,
             if len(used) >= 2:
                 catalogue_groups.append({**group, "files": used})
 
+    references = audit_references(references)
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
     coverage_weights = weights_for_instrument(instrument)
     active_coverage_bars = {

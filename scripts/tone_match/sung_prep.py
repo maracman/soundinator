@@ -24,6 +24,7 @@ import numpy as np
 import soundfile as sf
 
 from scripts.fit_profiles_from_samples import load_mono, segment_notes
+from scripts.tone_match.tail_audit import audit_references
 
 
 AUDIO_RE = re.compile(
@@ -378,6 +379,7 @@ def build_references(
         },
     }
     output_root.mkdir(parents=True, exist_ok=True)
+    references = audit_references(references)
     (output_root / "references.json").write_text(
         json.dumps(references, indent=2) + "\n", encoding="utf-8"
     )

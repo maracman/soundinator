@@ -30,12 +30,21 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
-from .assertions import ConstructionSample, evaluate_construction
+from .assertions import (
+    ConstructionSample,
+    assert_sung_family_firewall,
+    evaluate_construction,
+)
 from .audition import build as build_audition
 from .controllability import (
     canonical_hash as audit_contract_hash,
     objective_contract_hash,
     manifest_contract_hash,
+)
+from .criteria_drift import (
+    feature_loss_vector,
+    persist_accepted_step,
+    repeat_noise_floor,
 )
 from .legacy_prior import canonical_hash, resolve_legacy_prior
 from .paths import sg2_data_root
@@ -493,15 +502,29 @@ def _render_ship_variants(
     if process.returncode:
         raise RuntimeError(process.stderr or process.stdout)
     rendered: dict[int, list[Any]] = {index: [] for index in range(len(references))}
+    analysis_failures: list[dict[str, Any]] = []
     for variant_index in range(count):
         for reference_index, reference in enumerate(references):
             path = target / f"variant-{variant_index:02d}" / f"note-{reference_index}.wav"
-            rendered[reference_index].append(extract_features(
-                path, active_duration_s=reference.get("durationSec", 1.5),
-                **_feature_analysis_kwargs(instrument, reference)))
+            try:
+                rendered[reference_index].append(extract_features(
+                    path, active_duration_s=reference.get("durationSec", 1.5),
+                    release_expected=bool(reference.get("releaseEligible", False)),
+                    **_feature_analysis_kwargs(instrument, reference)))
+            except ValueError as error:
+                # A single unpitched/failed ship render must not erase the
+                # usable distributional evidence or the listening artefact.
+                # Keep the failure visible and exclude that take only.
+                analysis_failures.append({
+                    "variantIndex": variant_index,
+                    "referenceIndex": reference_index,
+                    "render": str(path),
+                    "error": str(error),
+                })
     gate = _distributional_variation_gate(variability, rendered, weights)
     payload = {"mode": SHIP_MODE, "variantCount": count, "seeds": seeds,
                "paramsHash": canonical_hash(ship_params), "gate": gate,
+               "analysisFailures": analysis_failures,
                "primaryRenderDirectory": str(target / "variant-00")}
     (target / "variation-gate.json").write_text(json.dumps(payload, indent=2) + "\n")
     return payload
@@ -748,12 +771,15 @@ class ToneMatcher:
     def __init__(self, instrument: str, initial: dict, references: list[dict],
                  free: list[FreeParam], run_dir: Path, repo_root: Path = ROOT,
                  weights: dict[str, float] | None = None,
-                 variability: dict[str, Any] | None = None):
+                 variability: dict[str, Any] | None = None,
+                 criteria_noise_floor: dict[str, float] | None = None):
         self.instrument, self.initial, self.references, self.free = instrument, initial, references, free
         self.run_dir = run_dir
         self.repo_root = repo_root
         self.weights = weights or weights_for_instrument(instrument)
         self.variability = variability or {}
+        self.criteria_noise_floor = criteria_noise_floor or {}
+        self.criteria_drift_state: dict[str, Any] | None = None
         self.evaluations: list[dict] = []
         self.best: dict | None = None
         self._objective_cache: dict[str, tuple[float, float]] = {}
@@ -811,11 +837,15 @@ class ToneMatcher:
                     "trust_expected_f0": True,
                     "force_percussive": True,
                 }
-            reference_bundle = extract_features(ref["path"], **analysis_kwargs)
+            reference_bundle = extract_features(
+                ref["path"], release_expected=bool(ref.get("releaseEligible")),
+                **analysis_kwargs)
             try:
                 render_bundle = extract_features(
                     job["out"], active_duration_s=ref.get(
-                        "durationSec", 1.5), **analysis_kwargs)
+                        "durationSec", 1.5),
+                    release_expected=bool(ref.get("releaseEligible")),
+                    **analysis_kwargs)
             except ValueError as error:
                 failure = {
                     "referenceIndex": ref_index,
@@ -882,11 +912,13 @@ class ToneMatcher:
         )
         gate_penalty = 100.0 * gate_failures
         objective = loss + gate_penalty
+        criterion_vector = feature_loss_vector(scores)
         record = {"evaluation": index, "loss": loss, "params": params,
                   "renderMode": FIT_MODE,
                   "objective": objective, "gateFailures": gate_failures,
                   "analysisFailures": analysis_failures,
                   "construction": construction, "tripwires": tripwires,
+                  "featureLossVector": criterion_vector,
                   "scores": scores}
         self.evaluations.append(record)
         (self.run_dir / "loss_curve.json").write_text(json.dumps(self.evaluations, indent=2) + "\n")
@@ -897,8 +929,12 @@ class ToneMatcher:
                          "gateFailures": gate_failures,
                          "analysisFailures": analysis_failures,
                          "construction": construction, "tripwires": tripwires,
+                         "featureLossVector": criterion_vector,
                          "scores": scores}
             (self.run_dir / "best.json").write_text(json.dumps(self.best, indent=2) + "\n")
+            self.criteria_drift_state = persist_accepted_step(
+                self.run_dir, self.instrument, index, gate_failures, loss,
+                criterion_vector, self.criteria_noise_floor)
         if not retain_audio and self.best and self.best["evaluation"] != index:
             for job in jobs:
                 Path(job["out"]).unlink(missing_ok=True)
@@ -1166,6 +1202,10 @@ def main(argv: list[str] | None = None) -> int:
     # scored, floored, or hashed into the objective id.
     from .exclusions import assert_no_excluded
     assert_no_excluded(references, f"{args.instrument} campaign manifest")
+    # D-VOICE-03: fitted presets, prior seeds and objective rows cross the
+    # sung boundary only after their provenance has been checked.
+    assert_sung_family_firewall(
+        args.instrument, initial, references=references, prior=prior)
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
     if args.ship_variants < 2:
@@ -1193,7 +1233,8 @@ def main(argv: list[str] | None = None) -> int:
     }, indent=2, default=str) + "\n")
     matcher = ToneMatcher(args.instrument, initial, references, free, run_dir,
                           repo_root=args.repo_root, weights=scoring_weights,
-                          variability=variability)
+                          variability=variability,
+                          criteria_noise_floor=repeat_noise_floor(controllability))
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
@@ -1286,6 +1327,7 @@ def main(argv: list[str] | None = None) -> int:
                "shipVariantCount": args.ship_variants,
                "distributionalVariationGate": candidate_ship["gate"],
                "legacyDistributionalVariationGate": legacy_ship["gate"],
+               "criteriaDrift": matcher.criteria_drift_state,
                "exchangeStatuses": _technique_exchange_statuses(),
                "leaderboardState": {"isLeader": improved,
                                     "candidateWouldLead": candidate_improved,

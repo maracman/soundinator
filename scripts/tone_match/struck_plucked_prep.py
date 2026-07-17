@@ -26,6 +26,7 @@ from scripts.fit_profiles_from_samples import (
 )
 from scripts.tone_match.paths import sg2_data_root
 from scripts.tone_match.legacy_prior import resolve_legacy_prior
+from scripts.tone_match.tail_audit import audit_references
 
 
 VELOCITY = {"pp": 0.2, "p": 0.28, "f": 0.82, "ff": 0.92}
@@ -288,6 +289,7 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
     (output / "ship-prior.json").write_text(json.dumps(ship_prior, indent=2) + "\n")
     (output / "prior.json").write_text(
         json.dumps(ship_prior["_sg2Prior"], indent=2) + "\n")
+    references = audit_references(references)
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
     (output / "take-pairs.json").write_text(json.dumps(pairs, indent=2) + "\n")
     summary = {

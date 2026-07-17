@@ -9,7 +9,9 @@ four ``docs/sg2/DOSSIER_*.md`` files.
 
 from __future__ import annotations
 
+import json
 import math
+import re
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -52,6 +54,13 @@ ALIASES = {
 SUNG_SECTION_TYPES = frozenset({"soprano", "mezzo-soprano", "tenor", "bass"})
 SUNG_DERIVED_PRESETS = {"basso-profondo": "bass", "boy-soprano": "soprano"}
 
+_NON_SUNG_PROFILES = frozenset({
+    "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "horn",
+    "french-horn", "violin", "cello", "piano", "grand-piano", "guitar",
+    "guitar-nylon", "guitar-steel", "harp", "glockenspiel", "marimba",
+    "xylophone", "vibraphone",
+})
+
 FAMILY = {
     "flute": "blown", "clarinet": "blown", "alto-sax": "blown", "tenor-sax": "blown",
     "trumpet": "blown", "french-horn": "blown",
@@ -71,6 +80,122 @@ def normalize_instrument(name: str) -> str:
     key = name.strip().lower().replace("_", "-")
     key = " ".join(key.split())
     return ALIASES.get(key, key.replace(" ", "-"))
+
+
+def sung_family_firewall(
+    instrument: str,
+    params: dict[str, Any] | None,
+    *,
+    references: Iterable[dict[str, Any]] | None = None,
+    prior: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Reject non-sung fitted state before a sung objective is evaluated.
+
+    Neutral engine mechanisms and common parameter *names* are allowed.  The
+    firewall acts only on declared provenance, fitted profiles, candidate
+    tables, and objective rows, so a bowed/brass preset cannot seed a voice
+    merely because its fields happen to be schema-compatible.
+    """
+    name = normalize_instrument(instrument)
+    if FAMILY.get(name) != "sung":
+        return {"passed": True, "applicable": False, "violations": []}
+
+    preset = params or {}
+    violations: list[dict[str, Any]] = []
+
+    def reject(field: str, value: Any, reason: str) -> None:
+        violations.append({"field": field, "value": value, "reason": reason})
+
+    for key in ("sg2Family", "sourceFamily", "fittedFamily", "candidateFamily",
+                "objectiveFamily"):
+        value = preset.get(key)
+        if value is not None and str(value).strip().lower() != "sung":
+            reject(key, value, "declared family is not sung")
+
+    profile = str(preset.get("spectralProfile", "")).strip().lower()
+    if profile in _NON_SUNG_PROFILES:
+        reject("spectralProfile", profile, "non-sung fitted spectral profile")
+
+    provenance_fields = (
+        "fittedFrom", "seededFrom", "candidateTable", "objectiveRows",
+        "leaderboardSource", "presetSource",
+    )
+    for key in provenance_fields:
+        value = preset.get(key)
+        if value is None:
+            continue
+        text = json.dumps(value, sort_keys=True).lower() if not isinstance(value, str) else value.lower()
+        for token in sorted(_NON_SUNG_PROFILES):
+            if re.search(rf"(^|[^a-z]){re.escape(token)}([^a-z]|$)", text):
+                reject(key, value, f"imports fitted state from {token}")
+                break
+
+    prior_value = prior or (preset.get("legacyPrior")
+                            if isinstance(preset.get("legacyPrior"), dict) else None)
+    if prior_value:
+        source = str(prior_value.get("source", "")).strip().lower()
+        family = str(prior_value.get("family", "")).strip().lower()
+        if source and source not in {"vocal", "voice", "sung", name}:
+            reject("legacyPrior.source", source, "legacy prior is not vocal/sung")
+        if family and family != "sung":
+            reject("legacyPrior.family", family, "legacy prior family is not sung")
+
+    singers = {str(row.get("singer")) for row in references or [] if row.get("singer")}
+    for index, row in enumerate(references or []):
+        family = row.get("sg2Family", row.get("family"))
+        if family is not None and str(family).strip().lower() != "sung":
+            reject(f"references[{index}].family", family,
+                   "objective row declares a non-sung family")
+        row_profile = str(row.get("spectralProfile", "")).strip().lower()
+        if row_profile in _NON_SUNG_PROFILES:
+            reject(f"references[{index}].spectralProfile", row_profile,
+                   "objective row imports a non-sung fitted profile")
+
+    source_singer = preset.get("primarySinger", preset.get("singer"))
+    fitted_from = preset.get("fittedFrom")
+    if source_singer is None and isinstance(fitted_from, dict):
+        source_singer = fitted_from.get("singer")
+    if (source_singer is not None and singers and name not in SUNG_DERIVED_PRESETS
+            and str(source_singer) not in singers):
+        reject("primarySinger", source_singer,
+               f"sung seed does not match objective singer(s) {sorted(singers)}")
+
+    if name in SUNG_DERIVED_PRESETS:
+        expected_parent = SUNG_DERIVED_PRESETS[name]
+        derived = str(preset.get("derivedFrom", "")).strip().lower()
+        morphology_key = "boyMorphology" if name == "boy-soprano" else "bassoMorphology"
+        morphology = preset.get(morphology_key)
+        if expected_parent not in derived or not any(
+                token in derived for token in ("voice", "sung", "vocal")):
+            reject("derivedFrom", derived,
+                   f"derived preset must name frozen sung {expected_parent} parent")
+        if not isinstance(morphology, dict) or not morphology:
+            reject(morphology_key, morphology,
+                   "derived sung preset requires an explicit morphology transform")
+
+    return {
+        "passed": not violations,
+        "applicable": True,
+        "instrument": name,
+        "singers": sorted(singers),
+        "violations": violations,
+    }
+
+
+def assert_sung_family_firewall(
+    instrument: str,
+    params: dict[str, Any] | None,
+    *,
+    references: Iterable[dict[str, Any]] | None = None,
+    prior: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    report = sung_family_firewall(
+        instrument, params, references=references, prior=prior)
+    if not report["passed"]:
+        details = "; ".join(
+            f"{row['field']}: {row['reason']}" for row in report["violations"])
+        raise ValueError(f"sung family firewall rejected {instrument}: {details}")
+    return report
 
 
 def _json_value(value: Any) -> Any:
@@ -275,6 +400,15 @@ def evaluate_construction(
     sample_list = list(samples)
     params = params or {}
     rows = _topology_assertions(name, params, strict_evidence)
+    firewall = sung_family_firewall(name, params)
+    if firewall["applicable"]:
+        rows.append(_result(
+            f"{name}.family-firewall",
+            "Sung fitted state is isolated from non-sung families",
+            firewall["passed"], firewall["violations"],
+            "only vocal/sung presets, priors, candidate tables, and objective rows",
+            strict_evidence=True,
+        ))
 
     registers = _register_groups(sample_list)
     dynamic_values = {_dynamic_value(row) for row in sample_list if _dynamic_value(row) is not None}

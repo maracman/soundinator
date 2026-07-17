@@ -472,6 +472,11 @@ Hz; static notes retain the exact legacy graph). The pinned violin body and
 maximum over that body is 1.026 dB, so the original >=3 dB target remains a
 separate unexplained-residual analysis obligation rather than permission to
 amplify the measured body. bowed=blocked-analysis-contract, not blocked-engine.
+Status update — Agent D pass 02, 2026-07-17: bowed=incorporated-response.
+The integrated-head audit moves `body_am_db` by 0.125634 perceptual units for
+`vibratoDepth`, above the 0.05 controllability threshold. The original 3 dB
+physical acceptance target remains an analysis residual exactly as Agent A
+classified it; it is no longer an absent-control or consumer blocker.
 
 ### T-030 · ENGINE SPEC: vibrato trajectory controls (delay, ramp, rate drift)
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; values per instrument
@@ -529,6 +534,11 @@ the browser renderer; Human 0 and every non-bow path are exact-neutral).
 F4 headless consumers and the current isolated browser render verifier pass;
 bowed=blocked-response-re-audit because Agent D's earlier perceptual-response
 audit must still be repeated against the integrated checkout.
+Status update — Agent D pass 02, 2026-07-17: bowed=incorporated-response,
+engine=incorporated. The integrated-head audit measures `onsetWanderCents` →
+`onset_wander_cents` = 1.0604 perceptual units and the context-gated
+`onsetWanderSettlePeriods` → `onset_scoop_settle_ms` = 7.3823; bow scratch
+also moves `onset_noise_db` by 0.5128. All exceed the 0.05 threshold.
 
 ### T-032 · Exact laws for the two body contracts (closes T-010's request)
 Author: bowed lane · 2026-07-16 · Firewall: method + per-instrument data
@@ -987,6 +997,10 @@ served from another checkout: on an isolated current-checkout port with the
 project Python environment, `render_note --verify` passes at hash
 `d779e7469eacba1694bb608af4f14a77f3bfdab7036538edafef74d1bc63978e`.
 bowed=ready-re-audit, analysis=incorporated.
+Status update — Agent D pass 02, 2026-07-17: bowed=incorporated-response.
+The integrated-head audit measures `bowNoiseLevel` → `sustain_noise_db` =
+4.1512 perceptual units with clean/stable repeatability and no uncontrolled
+weighted feature. T-054 is no longer a bowed controllability blocker.
 
 ## Sung lane pass-01 disposition (Agent E, 2026-07-16)
 
@@ -1156,6 +1170,15 @@ run-report contracts / cello proxy basis.
 Status: analysis=incorporated `913cc4b` bowed=incorporated
 engine=blocked T-031/T-054 headless verification sung=adapt-method
 struck/plucked=adapt-method
+Status update — Agent D pass 02, 2026-07-17: T-055 is rerun under the amended
+§2.5c.2 scheme and is `INCONCLUSIVE-MASKED`, not a missing-DOF finding. All
+10 pairs retain residuals, but every matched identity fit misses at least one
+core bar and one or more qualified consumers are not yet demonstrated. The
+§2.5c.1b double-dissociation test qualifies 7/11 candidates (bow position,
+vibrato rate, bow noise, bow scratch, attack noise, onset wander and settle);
+the four non-qualifiers remain measured observables and cannot widen Human.
+engine=incorporated for T-031/T-054; bowed=incorporated-method with identity
+masking explicitly retained.
 
 ### T-056 · A craft prior and deterministic fit mode are separate contracts
 Author: sung lane · 2026-07-17 · Firewall: method/process
@@ -1188,3 +1211,39 @@ controllability audit; disabling the layer is PCM-identical to the current
 renderer.
 Affects: sung_consonants.py / A-VOICE-03 / D-VOICE-02 / onset objective.
 Status: sung=incorporated analysis=spec-filed engine=spec-filed-zero-weight
+
+### T-058 · Accepted-step criterion drift builds an empirical validation hierarchy
+Author: Agent D / analysis · 2026-07-17 · Firewall: method/process
+Finding: a scalar optimiser loss hides which empirical criteria trade off.
+Every accepted best-so-far step now retains its complete normalised feature
+loss vector. A directed `A⊣B` event is logged only when A improves and B
+degrades beyond their repeat-render noise floors. Counts accumulate across
+runs/instruments in an asymmetry matrix; statistically one-sided relationships
+form the measured working hierarchy, while strong symmetric relationships are
+reported as scorer-redundancy candidates. The theoretical ordering remains a
+sparse-evidence/tie-break fallback and disagreements stay visible.
+Consuming assertions: rejected optimiser steps never enter the matrix; the
+run-local accepted-step log and `sg2-data/state/criteria-drift.json` contain
+the same step IDs; changes within repeat noise emit no event; no measured edge
+is claimed before the minimum event count and binomial threshold are met.
+Affects: iterate.py / criteria_drift.py / optimiser reports / progress state.
+Blown may adopt the method with its own runs and repeat floors.
+Status: analysis=incorporated bowed=incorporated
+struck/plucked=adapt-method sung=adapt-method engine=n/a
+
+### T-059 · Release scoring is gated by mechanically audited full tails
+Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-corpus labels
+Finding: release and damping features are invalid on truncated references and
+phrase/legato takes confound note-off with future transition modelling. The
+mechanical tail audit labels every reference `hasRelease`, `phraseTake`, and
+`releaseEligible`; only full-tail, non-phrase single notes expose ring time,
+damping slope and release-floor measurements. Phrase transitions remain
+explicitly `future-unscored`. Release loudness is not introduced.
+Consuming assertions: campaign builders run the same audit used for existing
+manifests; the scorer computes release features only when `releaseEligible`;
+all three weights remain exactly zero until a responsible note-off control
+passes a fresh controllability audit.
+Affects: corpus builders / tail_audit.py / score.py / controllability hashes.
+Blown may adopt the method with its own corpus labels.
+Status: analysis=incorporated bowed=incorporated
+struck/plucked=adapt-method sung=adapt-method engine=pending-control

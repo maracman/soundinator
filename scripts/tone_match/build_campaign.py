@@ -20,6 +20,7 @@ import numpy as np
 from scripts.fit_profiles_from_samples import analyse_note, load_mono, segment_notes, sf
 from scripts.tone_match.exclusions import is_excluded
 from scripts.tone_match.paths import sg2_data_root
+from scripts.tone_match.tail_audit import audit_references
 
 
 VELOCITY = {"pp": 0.2, "ff": 0.92}
@@ -352,6 +353,7 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
     measured = json.loads(measured_path.read_text())
     initial = _seed(instrument, measured)
     (output / "initial.json").write_text(json.dumps(initial, indent=2) + "\n")
+    references = audit_references(references)
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
     summary = {"instrument": instrument, "output": str(output), "references": len(references),
                "floorGroups": sum(1 for group in {row["floorGroup"] for row in references}
