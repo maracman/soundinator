@@ -102,6 +102,20 @@ BODY_REFERENCE_RUNS: dict[str, list[dict[str, Any]]] = {
         {"string": "sulD", "midis": tuple(range(62, 70))},
         {"string": "sulA", "midis": tuple(range(72, 75))},
     ],
+    # Cello A0/B1 body modes sit below the region resolved by the original
+    # pooled fit.  Complementary Iowa runs cover these chromatic targets even
+    # though no one filename contains the whole set.  Fundamentals plus the
+    # first four harmonics densely tile 80--300 Hz, giving the fixed-Hz body
+    # separator evidence on both sides of the expected low-air resonance.
+    "cello": [
+        {"string": "sulC", "midis": tuple(range(36, 48))},
+        {"string": "sulG", "midis": tuple(range(43, 51))},
+    ],
+}
+
+BODY_TILING_HZ: dict[str, tuple[float, float]] = {
+    "violin": (250.0, 600.0),
+    "cello": (80.0, 300.0),
 }
 
 # Philharmonia note names of the campaign anchor pitches (for the catalogue
@@ -579,21 +593,22 @@ def build_string_references(instrument: str, samples_root: Path,
                         "role": "fixed-body",
                     })
 
+    tile_low, tile_high = BODY_TILING_HZ.get(instrument, (250.0, 600.0))
     partial_tile = sorted(
         partial
         for row in body_references
         for rank in range(1, 5)
-        if 250 <= (partial := row["expectedF0Hz"] * rank) <= 600
+        if tile_low <= (partial := row["expectedF0Hz"] * rank) <= tile_high
     )
     tile_summary = None
     if partial_tile:
         tile_gaps = [
-            partial_tile[0] - 250,
+            partial_tile[0] - tile_low,
             *np.diff(partial_tile),
-            600 - partial_tile[-1],
+            tile_high - partial_tile[-1],
         ]
         tile_summary = {
-            "targetHz": [250, 600],
+            "targetHz": [tile_low, tile_high],
             "points": len(partial_tile),
             "lowestHz": round(partial_tile[0], 1),
             "highestHz": round(partial_tile[-1], 1),

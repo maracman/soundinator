@@ -21,7 +21,7 @@ import numpy as np
 from scipy import signal
 import soundfile as sf
 
-from scripts.tone_match.strings_prep import select_chromatic_segments
+from scripts.tone_match.strings_prep import select_chromatic_across_runs
 
 
 DYNAMICS = ("pp", "mf", "ff")
@@ -38,6 +38,160 @@ class Spectrum:
     noise_power_db: float | None = None
     harmonic_power_db: float | None = None
     nhr_db: float | None = None
+
+
+def component_envelope_stats(samples: np.ndarray, sample_rate: int,
+                             f0: float) -> dict[str, float | None]:
+    """Fit the L17.5 temporal envelope of the non-harmonic bow component.
+
+    The same f0 comb used by the spectral separator is applied per STFT
+    frame.  Timing is therefore measured on residual bow energy, not on the
+    harmonic note's RMS envelope.  Values are amplitude-domain ratios so the
+    engine can multiply them by the independently fitted level law.
+    """
+    nperseg = min(1024, max(256, 1 << int(math.floor(
+        math.log2(max(256, len(samples) // 8))))))
+    noverlap = nperseg - max(64, nperseg // 8)
+    freqs, times, stft = signal.stft(
+        np.asarray(samples, dtype=float), fs=sample_rate, window="hann",
+        nperseg=nperseg, noverlap=noverlap, boundary=None, padded=False)
+    if times.size < 12:
+        raise ValueError("audio segment is too short for component-envelope extraction")
+    power = np.abs(stft) ** 2
+    harmonic = harmonic_mask(freqs, f0, 35.0)
+    usable = (freqs >= DEFAULT_BAND_HZ[0]) & (freqs <= DEFAULT_BAND_HZ[1])
+    residual_track = np.sum(power[usable & ~harmonic], axis=0)
+    harmonic_track = np.sum(power[usable & harmonic], axis=0)
+    kernel = min(9, len(times) // 2 * 2 - 1)
+    if kernel >= 3:
+        residual_track = signal.medfilt(residual_track, kernel)
+        harmonic_track = signal.medfilt(harmonic_track, kernel)
+    epsilon = np.finfo(float).tiny
+
+    def onset_index(track: np.ndarray) -> int:
+        floor = float(np.percentile(track, 5))
+        ceiling = float(np.percentile(track, 90))
+        threshold = floor + .12 * max(epsilon, ceiling - floor)
+        above = np.flatnonzero(track >= threshold)
+        return int(above[0]) if above.size else 0
+
+    harmonic_onset = onset_index(harmonic_track)
+    residual_onset = onset_index(residual_track)
+    onset_time = float(times[harmonic_onset])
+    early_end = int(np.searchsorted(times, onset_time + .45))
+    early_end = max(harmonic_onset + 1, min(len(times), early_end))
+    peak_index = harmonic_onset + int(np.argmax(
+        residual_track[harmonic_onset:early_end]))
+    middle = residual_track[len(times) * 2 // 5:len(times) * 7 // 10]
+    sustain_power = float(np.median(middle)) if middle.size else float(
+        np.median(residual_track))
+    peak_power = float(residual_track[peak_index])
+    settle_threshold = max(sustain_power * 1.2, peak_power * .55)
+    settled = np.flatnonzero(
+        residual_track[peak_index:] <= settle_threshold)
+    settle_index = (peak_index + int(settled[0])) if settled.size else peak_index
+
+    # Release is admitted only when the final residual falls at least 12 dB
+    # below its middle-note level.  Otherwise the source is a cropped bow and
+    # the independent release remains explicitly unmeasured.
+    release_ms: float | None = None
+    if float(np.median(residual_track[-max(3, len(times) // 10):])) <= \
+            sustain_power * 10 ** (-12 / 10):
+        above = np.flatnonzero(residual_track >= sustain_power * .7)
+        below = np.flatnonzero(residual_track <= sustain_power * .1)
+        if above.size and below.size:
+            release_start = int(above[-1])
+            release_end_rows = below[below > release_start]
+            if release_end_rows.size:
+                release_ms = max(0.0, float(
+                    times[int(release_end_rows[0])] - times[release_start]) * 1000)
+
+    return {
+        "preOnsetLeadMs": max(0.0, float(
+            times[harmonic_onset] - times[residual_onset]) * 1000),
+        "attackMs": max(0.0, float(
+            times[peak_index] - times[residual_onset]) * 1000),
+        "peakOffsetMs": float(times[peak_index] - times[harmonic_onset]) * 1000,
+        "peakGain": math.sqrt(max(epsilon, peak_power) /
+                              max(epsilon, sustain_power)),
+        "settleMs": max(0.0, float(
+            times[settle_index] - times[peak_index]) * 1000),
+        "sustainGain": 1.0,
+        "releaseMs": release_ms,
+    }
+
+
+def validate_component_envelope_roundtrip() -> dict[str, Any]:
+    """Synthetic trust gate for the temporal residual-envelope extractor."""
+    sample_rate = 48_000
+    duration = 1.8
+    t = np.arange(round(sample_rate * duration)) / sample_rate
+    harmonic_env = np.clip((t - .20) / .025, 0, 1)
+    harmonic_env *= np.where(t < 1.45, 1, np.exp(-35 * (t - 1.45)))
+    harmonic = (.7 * np.sin(2 * np.pi * 440 * t) +
+                .35 * np.sin(2 * np.pi * 880 * t)) * harmonic_env
+    attack = np.clip((t - .14) / .08, 0, 1)
+    settle = np.where(t < .22, 1, .42 + .58 * np.exp(-18 * (t - .22)))
+    release = np.where(t < 1.45, 1, np.exp(-32 * (t - 1.45)))
+    envelope = attack * settle * release
+    rng = np.random.default_rng(54017)
+    mixed = harmonic + rng.standard_normal(len(t)) * envelope * .055
+    measured = component_envelope_stats(mixed, sample_rate, 440)
+    checks = {
+        "preOnsetLeadMs": abs(float(measured["preOnsetLeadMs"]) - 60) <= 35,
+        "peakOffsetMs": abs(float(measured["peakOffsetMs"]) - 20) <= 35,
+        "settleMs": 0 <= float(measured["settleMs"]) <= 220,
+        "releaseMs": measured["releaseMs"] is not None and
+                     0 <= float(measured["releaseMs"]) <= 220,
+    }
+    return {
+        "schema": "sg2-component-envelope-validation-v1",
+        "status": "pass" if all(checks.values()) else "fail",
+        "injected": {"preOnsetLeadMs": 60, "peakOffsetMs": 20,
+                     "releaseStartSec": 1.45},
+        "measured": {key: (round(float(value), 3)
+                            if isinstance(value, (int, float)) else value)
+                     for key, value in measured.items()},
+        "checks": checks,
+    }
+
+
+def _fit_component_envelope(records: list[dict[str, Any]]) -> dict[str, Any]:
+    validation = validate_component_envelope_roundtrip()
+    if validation["status"] != "pass":
+        raise RuntimeError(f"synthetic component-envelope validation failed: {validation}")
+    rows = []
+    for record in records:
+        stats = component_envelope_stats(
+            record["samples"], record["sampleRate"], record["f0Hz"])
+        rows.append({"dynamic": record["dynamic"], "string": record["string"],
+                     "midi": record.get("midi"), **stats})
+
+    def pooled(members: list[dict[str, Any]]) -> dict[str, float | None]:
+        result: dict[str, float | None] = {}
+        for key in ("preOnsetLeadMs", "attackMs", "peakOffsetMs", "peakGain",
+                    "settleMs", "sustainGain", "releaseMs"):
+            values = [float(row[key]) for row in members if row.get(key) is not None]
+            result[key] = round(float(np.median(values)), 3) if values else None
+        return result
+
+    return {
+        "schema": "sg2-component-envelope-v1",
+        "method": "per-frame f0-comb residual power; median pooled across pitches and strings",
+        "validation": validation,
+        "notes": len(rows),
+        "releaseMeasuredNotes": sum(row["releaseMs"] is not None for row in rows),
+        "values": pooled(rows),
+        "byDynamic": {dynamic: pooled([
+            row for row in rows if row["dynamic"] == dynamic])
+            for dynamic in DYNAMICS},
+        "engineContract": {
+            "independentFromHarmonicAdsr": True,
+            "airflowEnvelopeIsMultiplicativeTermOnly": True,
+            "preOnsetCapable": True,
+            "releaseOptionalWhenUnmeasured": True,
+        },
+    }
 
 
 def load_mono(path: Path) -> tuple[np.ndarray, int]:
@@ -212,11 +366,10 @@ def load_iowa_records(body_references: Path, samples_root: Path) -> list[dict[st
                for row in rows]
     for dynamic in DYNAMICS:
         matches = sorted(samples_root.glob(f"Violin.arco.{dynamic}.sulE.*.aiff"))
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one Iowa sulE {dynamic} run, found {matches}")
-        source = matches[0]
-        for midi, segment, sample_rate, _, f0, cents in select_chromatic_segments(
-                source, SULE_TARGETS):
+        if not matches:
+            raise RuntimeError(f"expected Iowa sulE {dynamic} runs, found none")
+        for (midi, segment, sample_rate, _, f0, cents,
+             source) in select_chromatic_across_runs(matches, SULE_TARGETS):
             records.append({"path": f"{source}#MIDI{midi}", "dynamic": dynamic,
                             "string": "sulE", "f0Hz": float(f0), "midi": midi,
                             "pitchErrorCents": round(float(cents), 2),
@@ -332,6 +485,7 @@ def extract_iowa(body_references: Path, samples_root: Path, validation: Path,
               "gainDb": round(float(pooled_shape[i]), 3)}
              for i in np.where(in_band & ~rejected & np.isfinite(pooled_shape))[0]]
     law = _fit_level_law(dynamic_rows)
+    component_envelope = _fit_component_envelope(records)
     stable = all(row["correlation"] >= 0.9 and row["medianAbsDb"] <= 3.0
                  for row in dynamic_comparisons)
     median_coverage = np.nanmedian(np.asarray(
@@ -375,6 +529,7 @@ def extract_iowa(body_references: Path, samples_root: Path, validation: Path,
         "dynamicShapeComparisons": dynamic_comparisons,
         "crossPitchGroups": group_stats,
         "levelLaw": law,
+        "componentEnvelope": component_envelope,
         "artifactScreen": {
             "harmonicMaskCents": [25, 35, 50], "welchNfft": [2048, 4096, 8192],
             "vibrato": "Iowa arco non-vibrato only; no vibrato smear admitted",
@@ -397,7 +552,7 @@ def extract_iowa(body_references: Path, samples_root: Path, validation: Path,
                                         "bandEvidence",
                                         "profilePinned", "profile", "shapeStableAcrossDynamics",
                                         "dynamicShapeComparisons", "levelLaw", "artifactScreen",
-                                        "engineContract")}
+                                        "componentEnvelope", "engineContract")}
         measured.write_text(json.dumps(measured_data, indent=1) + "\n")
     return result
 

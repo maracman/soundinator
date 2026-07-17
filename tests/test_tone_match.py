@@ -205,6 +205,13 @@ def test_tail_audit_distinguishes_full_release_from_truncation_and_phrases():
     assert phrase_take({"sourceFile": "violin_C4_phrase_legato.wav"})
 
 
+def test_bow_component_envelope_extractor_passes_synthetic_roundtrip():
+    from scripts.tone_match.bow_noise import validate_component_envelope_roundtrip
+    validation = validate_component_envelope_roundtrip()
+    assert validation["status"] == "pass"
+    assert all(validation["checks"].values())
+
+
 def test_release_features_are_corpus_gated_and_weighted_after_bowed_audit():
     weights = weights_for_instrument("violin")
     for feature in ("release_ring_ms", "release_damp_db_per_s",
@@ -2297,6 +2304,19 @@ def test_violin_body_reference_runs_tile_low_signature_region():
     assert partials[0] <= 295
     assert partials[-1] >= 585
     assert max(np.diff(partials)) < 50
+
+
+def test_cello_body_reference_runs_tile_low_a0_region():
+    runs = BODY_REFERENCE_RUNS["cello"]
+    assert {row["string"] for row in runs} == {"sulC", "sulG"}
+    fundamentals = [440 * 2 ** ((midi - 69) / 12)
+                    for row in runs for midi in row["midis"]]
+    partials = sorted(freq * rank for freq in fundamentals
+                      for rank in range(1, 5)
+                      if 80 <= freq * rank <= 300)
+    assert partials[0] <= 83
+    assert partials[-1] >= 293
+    assert max(np.diff(partials)) < 17
 
 
 def test_bowed_seed_pins_measured_body_and_unity_reconstruction():

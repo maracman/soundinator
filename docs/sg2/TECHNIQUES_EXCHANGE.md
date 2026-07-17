@@ -1395,3 +1395,50 @@ Affects: `humanRanges` schema consumers / SHIP renderer / distribution gate /
 all family campaign adapters.
 Status: engine=incorporated `b5f91b7` analysis=pending-review
 struck/plucked=adapt-method sung=adapt-method bowed=adapt-method
+
+Status update — Agent D bowed pass 04, 2026-07-17: T-033 remains
+`engine=pending-Agent-A`, with both guitar and bowed contracts ready for the
+same table-selection seam. The live Agent A pass-04 snapshot still records
+`bowed=blocked-engine T-033`. The bowed profile and the five exact consuming
+assertions are refreshed in `BOWED_ENGINE_HANDOFFS.md`; no engine completion
+is claimed.
+
+### T-064 · Bow excitation needs an independent measured component envelope
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: mechanism + per-instrument values
+Finding: L17.5 applies to bowed excitation as directly as to breath. A
+per-frame f0-comb residual extractor now measures bow-component lead, attack,
+peak offset/gain, settle, sustain and eligible release separately from the
+harmonic note envelope. A synthetic injection passes all four timing checks;
+57 Iowa violin notes show a pooled 121.905 ms pre-onset lead and 16 rows with
+measurable component release. The current engine instead connects bow-noise
+gain to the main note envelope, so the measured component time law is stored
+but not yet audible.
+Consuming assertions: the bow residual moves with its own onset/peak/settle
+table while harmonic ADSR is unchanged; positive lead emits residual before
+harmonic onset; airflow remains a multiplicative term; measured release
+shapes only residual after note-off; absent data are bit-identical fallback.
+Affects: bowNoise.componentEnvelope / bowed excitation gain automation /
+release scoring / L17.5.
+Status: analysis=incorporated bowed=blocked-engine-component-envelope
+engine=pending-Agent-A struck/plucked=adapt-method sung=adapt-method
+
+### T-065 · Drift edges require independent, active evidence before causal use
+Author: Agent D / analysis · 2026-07-17 · Firewall: method-only
+Finding: validation of the first promoted edge,
+`inharmonicity_log_ratio ⊣ release_noise_db` (18 vs 7, p=0.0432853),
+finds scorer-tracking artefact rather than a physical hierarchy. Eleven of 18
+forward events come from blown instruments where string inharmonicity is not
+an active physical control. Seven violin events repeat nearly the same
+calibration intervention across r1-r5, so they are not independent trials.
+Most blown release-floor movements are numerical changes of 1e-6 to 1e-3
+against a default zero feature-specific repeat floor. Only one guitar event
+has a material release-noise change. Partial-frequency stretch has no
+credible mechanism for causing a recorded room/tail noise floor.
+Consuming rule: retain the raw matrix edge for auditability but quarantine it
+from causal triage. Re-promotion requires both features active for the source
+instrument, a nonzero feature-specific repeat floor, and deduplication by
+intervention lineage; then the binomial test is rerun.
+Affects: criteria_drift.py evidence admission / optimiser reports / empirical
+hierarchy interpretation.
+Status: analysis=validation-incorporated+edge-quarantined
+bowed=incorporated engine=n/a struck/plucked=adapt-method sung=adapt-method
