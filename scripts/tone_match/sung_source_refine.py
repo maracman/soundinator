@@ -56,6 +56,45 @@ def _surface(calibration: dict[str, Any], voice_class: str) -> dict[str, Any]:
     }
 
 
+def _starting_surface(source_fit: dict[str, Any], calibration: dict[str, Any],
+                      voice_class: str) -> tuple[dict[str, Any], str]:
+    """Prefer the selected fit's cumulative surface over the seed handoff.
+
+    The calibration remains the authority for source identity and interpolation
+    semantics.  Once a render-domain correction has been selected, however,
+    the next pass must refine that surface rather than silently resetting to
+    the original calibration rows.
+    """
+
+    calibrated = _surface(calibration, voice_class)
+    current = source_fit.get("baseParams", {}).get(
+        "spectralPartialsByRegisterDynamic"
+    )
+    if not current:
+        return calibrated, "calibration-seed"
+    for key in ("sourceIdentity", "interpolation", "dynamicComposition"):
+        if current.get(key) != calibrated.get(key):
+            raise ValueError(
+                f"selected fit source surface changed {key}: "
+                f"{current.get(key)!r} != {calibrated.get(key)!r}"
+            )
+    return json.loads(json.dumps(current)), "selected-fit-cumulative-surface"
+
+
+def _render_path(trial: dict[str, Any], baseline_run: Path) -> Path:
+    """Resolve a FIT render after a renderer-suffix quarantine/rename."""
+
+    recorded = Path(trial["fitRender"])
+    if recorded.exists():
+        return recorded
+    relocated = baseline_run / "fit-renders" / recorded.name
+    if relocated.exists():
+        return relocated
+    # Return the recorded path so the analyser supplies its native, actionable
+    # missing/invalid-audio error and the caller records that rejected row.
+    return recorded
+
+
 def refine(
     references_path: Path,
     fit_root: Path,
@@ -78,10 +117,14 @@ def refine(
         raise ValueError(f"source refinement requires one voice class: {voice_classes}")
     voice_class = next(iter(voice_classes))
     calibration = json.loads(calibration_path.read_text())
-    surface = _surface(calibration, voice_class)
+    source_fit = json.loads((fit_root / "SOURCE_VOWEL_FIT.json").read_text())
+    surface, starting_surface = _starting_surface(
+        source_fit, calibration, voice_class,
+    )
 
     by_cell: dict[tuple[str, str], list[list[float]]] = {}
     analysed_rows = 0
+    rejected_rows = []
     for row, trial in zip(references, manifest):
         try:
             reference = analyse_audio_file(
@@ -89,10 +132,17 @@ def refine(
                 expected_f0_hz=row["expectedF0Hz"],
             )
             rendered = analyse_audio_file(
-                trial["fitRender"], n_partials=64,
+                _render_path(trial, baseline_run), n_partials=64,
                 expected_f0_hz=row["expectedF0Hz"],
             )
-        except (ValueError, RuntimeError):
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            rejected_rows.append({
+                "sourceFile": row.get("sourceFile"),
+                "register": row.get("register"),
+                "dynamic": row.get("dynamic"),
+                "vowel": row.get("vowel"),
+                "reason": str(exc),
+            })
             continue
         count = min(len(reference.partial_amps), len(rendered.partial_amps), 64)
         valid = (
@@ -167,7 +217,6 @@ def refine(
             **source_row["pass10Correction"],
         })
 
-    source_fit = json.loads((fit_root / "SOURCE_VOWEL_FIT.json").read_text())
     base = dict(source_fit["baseParams"])
     base["spectralPartialsByRegisterDynamic"] = surface
     output_root.mkdir(parents=True, exist_ok=True)
@@ -185,7 +234,9 @@ def refine(
             "baselineRun": str(baseline_run),
             "sourceCalibration": str(calibration_path),
             "voiceClass": voice_class,
+            "startingSurface": starting_surface,
             "analysedRows": analysed_rows,
+            "rejectedRows": rejected_rows,
             "oneSourcePerSinger": True,
             "jointHullLawChanged": False,
             "vowelBodiesChanged": False,

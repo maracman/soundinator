@@ -2293,6 +2293,35 @@ archive; first acceptance is MIDI36/60/84 × low/high with >=10 ms genuine
 recorded pre-roll. Trimmed, padded, lossy, corrupt, mixed-identity, or grand
 substitute rows are hard rejects.
 
+Status update — Agent E sung pass 11, 2026-07-18: T-065
+sung=incorporated-cumulative-current-head-refinement. The source-cell refiner
+now starts from the selected fit's already-corrected joint-hull surface instead
+of silently resetting to the pass-07 calibration seed, and it relocates FIT
+renders after renderer-suffix quarantine while retaining every rejected-row
+reason. Fresh `de30a803305d06c4` comparators improve required-cell partial
+residual 5.803→5.697 tenor, 6.330→6.216 soprano, 5.642→5.393 bass and
+4.893→4.754 mezzo. Log-mel and band balance also improve in all four voices;
+construction and T-058 body/vowel consumption remain fully clean. No partial
+cell clears the 3 dB all-row aggregate, so §2.5c remains
+`INCONCLUSIVE-MASKED` and no Human range is widened.
+
+Status update — Agent E sung pass 11, 2026-07-18: T-067
+sung=incorporated-weighted-current-head analysis=incorporated-room-screened.
+Agent D's balanced clean-subset verdict remains the consumable room-residual
+decision: ten lossless, room-screened rows per adult voice carry the weighted
+observable, while historical room-like rows remain excluded watch evidence.
+The engine audit and all four ordinary identity audits were regenerated under
+renderer contract `de30a803305d06c4`; `pitch_sync_breath_db` retains weight 1,
+`voiceBreathSync` remains its responder, repeatability is stable and no
+weighted feature is uncontrolled.
+
+Status update — Agent E sung pass 11, 2026-07-18: T-064
+sung=incorporated-all-adult-voices-current-head. Current output audits still
+activate all five measured consonant classes for tenor, soprano, bass and
+mezzo. The family enumeration is therefore complete: there is no remaining
+adult voice to extend, and consonant values remain the voice-owned sung
+adaptations rather than cross-family defaults.
+
 Status update — Agent D bowed/analysis pass 08, 2026-07-18: T-075
 analysis=incorporated-gates-cleared bowed=incorporated-cello-L14-profile-pinned.
 The exact-body paired audit now passes 6/6 after excluding ratios unless both
