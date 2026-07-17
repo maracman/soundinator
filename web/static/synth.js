@@ -2178,8 +2178,24 @@ export function envelopeAnomalyAutomationEvents(classes, harmonic,
   }));
 }
 
-/** L18: interpolate measured note-off damper contact in log-register space. */
-export function damperByRegisterAt(rows, fundamentalHz) {
+function damperRegisterRungAt(entries, hz) {
+  let hi = entries.findIndex(row => row.f0 >= hz);
+  if (hi < 0) return { ...entries[entries.length - 1], f0: hz };
+  if (hi === 0) return { ...entries[0], f0: hz };
+  const a = entries[hi - 1], b = entries[hi];
+  const t = Math.max(0, Math.min(1, Math.log(hz / a.f0) / Math.log(b.f0 / a.f0)));
+  return {
+    f0: hz,
+    dampDbPerSecondAtFundamental: a.dampDbPerSecondAtFundamental +
+      (b.dampDbPerSecondAtFundamental - a.dampDbPerSecondAtFundamental) * t,
+    frequencyExponent: a.frequencyExponent +
+      (b.frequencyExponent - a.frequencyExponent) * t,
+  };
+}
+
+/** L18: interpolate matched-legato-subtracted damper contact in log-register
+ * space within each measured dynamic, then linearly across playing velocity. */
+export function damperByRegisterAt(rows, fundamentalHz, velocity = .62) {
   const entries = Array.isArray(rows) ? rows.filter(row =>
     Number.isFinite(row?.f0) &&
     Number.isFinite(row?.dampDbPerSecondAtFundamental) &&
@@ -2193,17 +2209,32 @@ export function damperByRegisterAt(rows, fundamentalHz) {
       hz >= undampedAboveF0 * (1 - 1e-9)) {
     return { undamped: true, undampedAboveF0 };
   }
-  let hi = entries.findIndex(row => row.f0 >= hz);
-  if (hi < 0) return { ...entries[entries.length - 1] };
-  if (hi === 0) return { ...entries[0] };
-  const a = entries[hi - 1], b = entries[hi];
-  const t = Math.max(0, Math.min(1, Math.log(hz / a.f0) / Math.log(b.f0 / a.f0)));
+  const dynamicEntries = entries.filter(row => Number.isFinite(row?.velocityAnchor));
+  if (!dynamicEntries.length) return damperRegisterRungAt(entries, hz);
+  const grouped = new Map();
+  for (const row of dynamicEntries) {
+    const key = String(row.dynamic || row.velocityAnchor);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  }
+  const rungs = [...grouped.values()].map(group => ({
+    velocity: group[0].velocityAnchor,
+    row: damperRegisterRungAt(group.slice().sort((a, b) => a.f0 - b.f0), hz),
+  })).sort((a, b) => a.velocity - b.velocity);
+  const v = Math.max(0, Math.min(1, Number(velocity) || 0));
+  if (v <= rungs[0].velocity) return rungs[0].row;
+  if (v >= rungs[rungs.length - 1].velocity) return rungs[rungs.length - 1].row;
+  let hi = 1;
+  while (hi < rungs.length && rungs[hi].velocity < v) hi++;
+  const a = rungs[hi - 1], b = rungs[hi];
+  const t = (v - a.velocity) / Math.max(1e-9, b.velocity - a.velocity);
   return {
     f0: hz,
-    dampDbPerSecondAtFundamental: a.dampDbPerSecondAtFundamental +
-      (b.dampDbPerSecondAtFundamental - a.dampDbPerSecondAtFundamental) * t,
-    frequencyExponent: a.frequencyExponent +
-      (b.frequencyExponent - a.frequencyExponent) * t,
+    velocity: v,
+    dampDbPerSecondAtFundamental: a.row.dampDbPerSecondAtFundamental +
+      (b.row.dampDbPerSecondAtFundamental - a.row.dampDbPerSecondAtFundamental) * t,
+    frequencyExponent: a.row.frequencyExponent +
+      (b.row.frequencyExponent - a.row.frequencyExponent) * t,
   };
 }
 
@@ -6720,7 +6751,8 @@ export class SynthEngine {
         // L18: the held resonator never reaches an ADSR plateau. At note-off
         // freeze the instantaneous free-decay value and start the independent
         // damper/contact tail. Positive measured exponents damp highs first.
-        const damper = damperByRegisterAt(note.damperByRegister, note.frequency);
+        const damper = damperByRegisterAt(
+          note.damperByRegister, note.frequency, note.velocity);
         const fittedDamperT60 = damperT60Seconds(damper, modeFreq, note.frequency);
         const fallbackDamperT60 = Math.max(.005, releaseRingSeconds(
           note.partialMaterial, note.frequency, note.releaseDamping));
@@ -7225,7 +7257,8 @@ export class SynthEngine {
     // Q8 release ring: material keeps the resonator ringing past note-off
     // at its own T60 instead of the envelope's hard cut (renderers extend
     // their oscillator stop times by note._ringSec to let the tail sound).
-    const damper = damperByRegisterAt(note.damperByRegister, note.frequency);
+    const damper = damperByRegisterAt(
+      note.damperByRegister, note.frequency, note.velocity);
     const fittedDamperT60 = damperT60Seconds(damper, note.frequency, note.frequency);
     const naturalRing = releaseRingSeconds(
       note.partialMaterial, note.frequency, note.releaseDamping);
