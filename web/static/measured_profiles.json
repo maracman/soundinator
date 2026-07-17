@@ -28840,6 +28840,598 @@
     "shapeOptimiserMutable": false,
     "velocityLaw": "amplitude = bowNoiseLevel * velocity ** bowNoiseVelocityExponent"
    }
+  },
+  "humanRanges": {
+   "schemaVersion": 1,
+   "instrument": "violin",
+   "method": "matched-take-human-only-differential-v1",
+   "evidence": {
+    "basis": "true same-note/dynamic/articulation floor groups",
+    "groups": 6,
+    "takes": 14,
+    "pairs": 10
+   },
+   "ranges": {
+    "excitationPosition": {
+     "status": "measured",
+     "unit": "fraction-of-string",
+     "centre": 0.06775,
+     "min": 0.0352,
+     "max": 0.1919,
+     "pairSpreadMedian": 0.06075,
+     "pairSpreadP90": 0.144,
+     "drawHalfRange": 0.101823,
+     "takes": 14,
+     "pairs": 10
+    },
+    "vibratoRateHz": {
+     "status": "measured",
+     "unit": "Hz",
+     "centre": 0.0,
+     "min": 0.0,
+     "max": 4.731638,
+     "pairSpreadMedian": 0.0,
+     "pairSpreadP90": 0.056666,
+     "drawHalfRange": 0.040069,
+     "takes": 14,
+     "pairs": 10
+    },
+    "vibratoDepthCents": {
+     "status": "measured",
+     "unit": "cents",
+     "centre": 0.0,
+     "min": 0.0,
+     "max": 5.721164,
+     "pairSpreadMedian": 0.0,
+     "pairSpreadP90": 0.000775,
+     "drawHalfRange": 0.000548,
+     "takes": 14,
+     "pairs": 10
+    },
+    "vibratoOnsetDelayMs": {
+     "status": "measured",
+     "unit": "ms",
+     "centre": 0.0,
+     "min": 0.0,
+     "max": 46.439909,
+     "pairSpreadMedian": 0.0,
+     "pairSpreadP90": 0.0,
+     "drawHalfRange": 0.0,
+     "takes": 14,
+     "pairs": 10
+    },
+    "vibratoRampMs": {
+     "status": "measured",
+     "unit": "ms",
+     "centre": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "pairSpreadMedian": 0.0,
+     "pairSpreadP90": 0.0,
+     "drawHalfRange": 0.0,
+     "takes": 14,
+     "pairs": 10
+    },
+    "vibratoRateDriftHzPerSecond": {
+     "status": "measured",
+     "unit": "Hz/s",
+     "centre": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "pairSpreadMedian": 0.0,
+     "pairSpreadP90": 0.0,
+     "drawHalfRange": 0.0,
+     "takes": 14,
+     "pairs": 10
+    },
+    "sustainNoiseDb": {
+     "status": "measured",
+     "unit": "dB",
+     "centre": -27.751744,
+     "min": -34.9149,
+     "max": -22.72882,
+     "pairSpreadMedian": 2.189232,
+     "pairSpreadP90": 5.171217,
+     "drawHalfRange": 3.656602,
+     "takes": 14,
+     "pairs": 10
+    },
+    "onsetNoiseDb": {
+     "status": "measured",
+     "unit": "dB",
+     "centre": -19.412348,
+     "min": -28.515058,
+     "max": -4.044352,
+     "pairSpreadMedian": 5.72184,
+     "pairSpreadP90": 14.619187,
+     "drawHalfRange": 10.337326,
+     "takes": 14,
+     "pairs": 10
+    },
+    "onsetNoiseCentroidOct": {
+     "status": "measured",
+     "unit": "octaves",
+     "centre": 0.351588,
+     "min": -0.190849,
+     "max": 1.49886,
+     "pairSpreadMedian": 0.441822,
+     "pairSpreadP90": 0.793159,
+     "drawHalfRange": 0.560848,
+     "takes": 14,
+     "pairs": 10
+    },
+    "noiseLeadMs": {
+     "status": "measured",
+     "unit": "ms",
+     "centre": 34.829932,
+     "min": 0.0,
+     "max": 108.553288,
+     "pairSpreadMedian": 23.219955,
+     "pairSpreadP90": 94.040816,
+     "drawHalfRange": 66.496899,
+     "takes": 14,
+     "pairs": 10
+    },
+    "onsetWanderCents": {
+     "status": "measured",
+     "unit": "cents",
+     "centre": 26.078911,
+     "min": 3.192626,
+     "max": 183.46789,
+     "pairSpreadMedian": 21.664156,
+     "pairSpreadP90": 150.476978,
+     "drawHalfRange": 106.403291,
+     "takes": 14,
+     "pairs": 10
+    },
+    "onsetSettleMs": {
+     "status": "measured",
+     "unit": "ms",
+     "centre": 70.69161,
+     "min": 0.0,
+     "max": 190.545351,
+     "pairSpreadMedian": 14.965986,
+     "pairSpreadP90": 151.097506,
+     "drawHalfRange": 106.842071,
+     "takes": 14,
+     "pairs": 10
+    },
+    "attackNoiseLevel": {
+     "status": "measured",
+     "unit": "linear-ratio",
+     "centre": 0.02665,
+     "min": 0.002875,
+     "max": 0.185423,
+     "pairSpreadMedian": 0.017487,
+     "pairSpreadP90": 0.133802,
+     "drawHalfRange": 0.094612,
+     "takes": 14,
+     "pairs": 10
+    }
+   },
+   "decompositionTest": {
+    "passed": false,
+    "pairs": 10,
+    "failedPairs": 10,
+    "rule": "after Human comb/level/tilt removal: partial and body residual <=3 dB; B <=1.5x (near-zero uses 3 cents); T60 <=1.5x",
+    "interpretation": "FAIL: take variation still requires identity movement"
+   },
+   "pairFits": [
+    {
+     "group": "55|ff|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_G3_05_fortissimo_arco-normal.mp3",
+     "right": "violin_G3_1_fortissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.0755,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 5.116307,
+      "onsetNoiseDb": 8.471752,
+      "onsetNoiseCentroidOct": 0.418292,
+      "noiseLeadMs": 23.219955,
+      "onsetWanderCents": 147.687644,
+      "onsetSettleMs": 14.603175,
+      "attackNoiseLevel": 0.147819
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 9.8395,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 13,
+       "kind": "factor",
+       "factor": 4545.010383740173,
+       "passed": false,
+       "distance": 8.421785291260273
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "55|ff|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_G3_05_fortissimo_arco-normal.mp3",
+     "right": "violin_G3_15_fortissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.1215,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 4.118027,
+      "onsetNoiseDb": 6.53181,
+      "onsetNoiseCentroidOct": 0.347728,
+      "noiseLeadMs": 92.879819,
+      "onsetWanderCents": 175.580983,
+      "onsetSettleMs": 149.637188,
+      "attackNoiseLevel": 0.015574
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 8.0109,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 13,
+       "kind": "factor",
+       "factor": 457.29730945734804,
+       "passed": false,
+       "distance": 6.125333747107117
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "55|ff|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_G3_1_fortissimo_arco-normal.mp3",
+     "right": "violin_G3_15_fortissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.046,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 0.998281,
+      "onsetNoiseDb": 15.003562,
+      "onsetNoiseCentroidOct": 0.76602,
+      "noiseLeadMs": 69.659864,
+      "onsetWanderCents": 27.89334,
+      "onsetSettleMs": 164.240363,
+      "attackNoiseLevel": 0.132245
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 6.5558,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 31,
+       "kind": "cents",
+       "refStretchCents": 0.0,
+       "renderStretchCents": 0.08258715297714497,
+       "errorCents": 0.08258715297714497,
+       "passed": true,
+       "distance": 0.011162069636741198
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "55|pp|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_G3_05_pianissimo_arco-normal.mp3",
+     "right": "violin_G3_1_pianissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.013,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 2.245973,
+      "onsetNoiseDb": 8.144388,
+      "onsetNoiseCentroidOct": 0.239067,
+      "noiseLeadMs": 23.219955,
+      "onsetWanderCents": 15.434972,
+      "onsetSettleMs": 62.063492,
+      "attackNoiseLevel": 0.007711
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 10.7491,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 29,
+       "kind": "cents",
+       "refStretchCents": 0.0,
+       "renderStretchCents": 0.0,
+       "errorCents": 0.0,
+       "passed": true,
+       "distance": 0.0
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "61|mezzo-piano|arco|unlabelled|Philharmonia|0.5s",
+     "left": "phil.violin_Cs4_1_mezzo-piano_non-vibrato.mp3",
+     "right": "phil.violin_Cs4_long_mezzo-piano_non-vibrato.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.142,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 0.322709,
+      "onsetNoiseDb": 14.576478,
+      "onsetNoiseCentroidOct": 1.037417,
+      "noiseLeadMs": 104.489796,
+      "onsetWanderCents": 2.13674,
+      "onsetSettleMs": 0.0,
+      "attackNoiseLevel": 0.006258
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 3.5831,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 18,
+       "kind": "cents",
+       "refStretchCents": 0.31328931814560823,
+       "renderStretchCents": 0.0,
+       "errorCents": 0.31328931814560823,
+       "passed": true,
+       "distance": 0.042342629083680715
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "72|ff|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_C5_05_fortissimo_arco-normal.mp3",
+     "right": "violin_C5_1_fortissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.0005,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 2.113649,
+      "onsetNoiseDb": 1.02863,
+      "onsetNoiseCentroidOct": 0.107089,
+      "noiseLeadMs": 0.0,
+      "onsetWanderCents": 57.248768,
+      "onsetSettleMs": 1.360544,
+      "attackNoiseLevel": 0.019399
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 4.411,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 31,
+       "kind": "cents",
+       "refStretchCents": 0.0,
+       "renderStretchCents": 64.97760633247337,
+       "errorCents": 64.97760633247337,
+       "passed": false,
+       "distance": 8.782050725402021
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "72|ff|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_C5_05_fortissimo_arco-normal.mp3",
+     "right": "violin_C5_15_fortissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.0215,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 3.914503,
+      "onsetNoiseDb": 4.911869,
+      "onsetNoiseCentroidOct": 0.572442,
+      "noiseLeadMs": 0.0,
+      "onsetWanderCents": 7.888584,
+      "onsetSettleMs": 13.968254,
+      "attackNoiseLevel": 0.040764
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 5.316,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 33,
+       "kind": "cents",
+       "refStretchCents": 0.0,
+       "renderStretchCents": 0.0,
+       "errorCents": 0.0,
+       "passed": true,
+       "distance": 0.0
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "72|ff|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_C5_1_fortissimo_arco-normal.mp3",
+     "right": "violin_C5_15_fortissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.021,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 1.800853,
+      "onsetNoiseDb": 3.883239,
+      "onsetNoiseCentroidOct": 0.465353,
+      "noiseLeadMs": 0.0,
+      "onsetWanderCents": 65.137352,
+      "onsetSettleMs": 15.328798,
+      "attackNoiseLevel": 0.021365
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 3.7275,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 31,
+       "kind": "factor",
+       "factor": 8120.898583401639,
+       "passed": false,
+       "distance": 9.002196090013525
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "72|pp|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_C5_05_pianissimo_arco-normal.mp3",
+     "right": "violin_C5_1_pianissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.162,
+      "vibratoRateHz": 0.566663,
+      "vibratoDepthCents": 0.007755,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 2.132491,
+      "onsetNoiseDb": 0.732484,
+      "onsetNoiseCentroidOct": 0.538357,
+      "noiseLeadMs": 81.269841,
+      "onsetWanderCents": 1.709436,
+      "onsetSettleMs": 13.333333,
+      "attackNoiseLevel": 0.000547
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 10.2058,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 27,
+       "kind": "cents",
+       "refStretchCents": 0.0,
+       "renderStretchCents": 0.0,
+       "errorCents": 0.0,
+       "passed": true,
+       "distance": 0.0
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    },
+    {
+     "group": "88|pp|arco-normal|unlabelled|PhilCat|0.5s",
+     "left": "violin_E6_05_pianissimo_arco-normal.mp3",
+     "right": "violin_E6_1_pianissimo_arco-normal.mp3",
+     "humanDelta": {
+      "excitationPosition": 0.123,
+      "vibratoRateHz": 0.0,
+      "vibratoDepthCents": 0.0,
+      "vibratoOnsetDelayMs": 0.0,
+      "vibratoRampMs": 0.0,
+      "vibratoRateDriftHzPerSecond": 0.0,
+      "sustainNoiseDb": 5.665403,
+      "onsetNoiseDb": 3.008543,
+      "onsetNoiseCentroidOct": 0.23099,
+      "noiseLeadMs": 23.219955,
+      "onsetWanderCents": 1.89911,
+      "onsetSettleMs": 23.922902,
+      "attackNoiseLevel": 0.003032
+     },
+     "decomposition": {
+      "passed": false,
+      "partialResidualDb": 3.7097,
+      "bodyResidualDb": null,
+      "inharmonicity": {
+       "applicable": true,
+       "mode": 15,
+       "kind": "cents",
+       "refStretchCents": 0.3387079236774869,
+       "renderStretchCents": 3.304676187952182,
+       "errorCents": 2.965968264274695,
+       "passed": true,
+       "distance": 0.40086554763984134
+      },
+      "decayT60Ratio": null,
+      "limits": {
+       "partialResidualDb": 3.0,
+       "bodyResidualDb": 3.0,
+       "inharmonicityFactor": 1.5,
+       "decayT60Ratio": 1.5
+      }
+     }
+    }
+   ]
   }
  },
  "voice-bass": {
