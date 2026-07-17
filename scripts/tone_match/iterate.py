@@ -17,6 +17,8 @@ import argparse
 import hashlib
 import json
 import math
+import re
+import secrets
 import subprocess
 import tempfile
 import time
@@ -30,7 +32,12 @@ from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
 from .audition import build as build_audition
-from .controllability import objective_contract_hash, manifest_contract_hash
+from .controllability import (
+    canonical_hash as audit_contract_hash,
+    objective_contract_hash,
+    manifest_contract_hash,
+)
+from .legacy_prior import canonical_hash, resolve_legacy_prior
 from .paths import sg2_data_root
 from .score import (
     SCORER_CONTRACT_VERSION,
@@ -59,6 +66,31 @@ RENDERER_CONTRACT_FILES = (
 )
 MEASURABLE_REL_IMPROVEMENT = 1e-3
 ANALYSIS_FAILURE_LOSS = 100.0
+FIT_MODE = "fit"
+SHIP_MODE = "ship"
+DEFAULT_SHIP_VARIANTS = 8
+VARIATION_LOWER_RATIO = 0.5
+VARIATION_UPPER_RATIO = 2.0
+
+# These are performance-distribution dimensions, not identity-fit controls.
+# They remain in the ship preset at their legacy or §2.5c-fitted values.
+HUMAN_ONLY_PARAM_KEYS = {
+    "excitationHuman", "articulationVariation", "envelopeAttackSd",
+    "vibratoRateSd", "vibratoDepthSd", "toneFormantDrift",
+    "toneResonanceDrift", "microDriftCentsSd", "microDriftCentsRange",
+    "microDriftCentsPerSecond",
+    "onsetWanderCents", "onsetWanderSettlePeriods", "bowScratchLevel",
+}
+
+# Feature-domain consequences of the §2.5c Human-designated parameter set.
+HUMAN_VARIATION_FEATURES = {
+    "partials_db",  # bow/strike position and drive variation
+    "vibrato", "noise", "sustain_noise_db", "onset_tilt_db_oct",
+    "onset_scoop_cents", "onset_scoop_settle_ms",
+    "vibrato_onset_delay_ms", "vibrato_ramp_ms", "vibrato_rate_drift",
+    "body_am_db", "onset_noise_db", "onset_noise_centroid_oct",
+    "noise_lead_ms", "onset_wander_cents",
+}
 
 
 @dataclass
@@ -92,10 +124,79 @@ def _load_preset(path: str | Path) -> dict[str, Any]:
     return value
 
 
-def _renderer_contract_hash() -> str:
+def _mode_params(params: dict[str, Any], mode: str) -> dict[str, Any]:
+    """Resolve one preset into deterministic identity-fit or full ship mode."""
+    if mode not in {FIT_MODE, SHIP_MODE}:
+        raise ValueError(f"unknown render mode {mode!r}")
+    resolved = dict(params)
+    resolved["sg2RenderMode"] = mode
+    if mode == FIT_MODE:
+        for key in HUMAN_ONLY_PARAM_KEYS:
+            if key in resolved or key == "excitationHuman":
+                resolved[key] = 0.0
+    return resolved
+
+
+def _distributional_variation_gate(
+    variability: dict[str, Any],
+    rendered_variants: dict[int, list[Any]],
+    weights: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """Two-sided §2.5c.6 gate over seeded ship-mode feature spreads.
+
+    The single-take objective is deliberately absent.  Only variant↔variant
+    distances are compared with measured take↔take distances, so reducing
+    Human cannot improve a single-reference score.
+    """
+    if variability.get("status") != "measured":
+        return {"status": "insufficient-evidence", "passed": False,
+                "groups": [], "reason": variability.get(
+                    "reason", "no measured take-pair spread")}
+    groups: list[dict[str, Any]] = []
+    for measured_group in variability.get("groups", []):
+        pair_rows: list[dict[str, float]] = []
+        for reference_index in measured_group.get("referenceIndices", []):
+            variants = rendered_variants.get(int(reference_index), [])
+            for left in range(len(variants)):
+                for right in range(left + 1, len(variants)):
+                    pair_rows.append(compare_features(
+                        variants[left], variants[right], weights)["features"])
+        checks = []
+        measured_features = measured_group.get("floorFeatures", {})
+        for feature in sorted(HUMAN_VARIATION_FEATURES & set(measured_features)):
+            target = float(measured_features.get(feature) or 0.0)
+            values = [float(row[feature]) for row in pair_rows
+                      if feature in row and np.isfinite(row[feature])]
+            if target <= 1e-9 or not values:
+                continue
+            observed = float(np.median(values))
+            lower = target * VARIATION_LOWER_RATIO
+            upper = target * VARIATION_UPPER_RATIO
+            status = "pass" if lower <= observed <= upper else (
+                "too-little" if observed < lower else "too-much")
+            checks.append({"feature": feature, "measuredSpread": target,
+                           "shipSpread": observed, "lower": lower,
+                           "upper": upper, "status": status})
+        groups.append({"group": measured_group["group"],
+                       "variantPairCount": len(pair_rows), "checks": checks,
+                       "passed": bool(checks) and all(
+                           row["status"] == "pass" for row in checks)})
+    evidenced = [group for group in groups if group["checks"]]
+    if not evidenced:
+        return {"status": "insufficient-evidence", "passed": False,
+                "groups": groups,
+                "reason": "take pairs expose no measurable Human-designated feature spread"}
+    passed = all(group["passed"] for group in evidenced)
+    return {"status": "pass" if passed else "fail", "passed": passed,
+            "lowerRatio": VARIATION_LOWER_RATIO,
+            "upperRatio": VARIATION_UPPER_RATIO, "groups": groups}
+
+
+def _renderer_contract_hash(repo_root: Path | None = None) -> str:
+    repo_root = repo_root or ROOT
     digest = hashlib.sha256()
     for relative in RENDERER_CONTRACT_FILES:
-        path = ROOT / relative
+        path = repo_root / relative
         digest.update(str(relative).encode())
         digest.update(b"\0")
         digest.update(path.read_bytes())
@@ -329,9 +430,77 @@ def _benchmark_resources(run_dir: Path, instrument: str, best: dict[str, Any]) -
     return _load(output_path)
 
 
+def _feature_analysis_kwargs(instrument: str, reference: dict[str, Any]) -> dict[str, Any]:
+    struck = instrument.strip().lower() in {
+        "piano", "grand-piano", "upright-piano", "guitar",
+        "guitar-nylon", "guitar-steel", "harp", "glockenspiel",
+    }
+    if not struck:
+        return {}
+    expected = 440.0 * 2 ** ((float(reference.get("midi", 60)) - 69) / 12)
+    return {"expected_f0_hz": expected, "trust_expected_f0": True,
+            "force_percussive": True}
+
+
+def _render_ship_variants(
+    run_dir: Path,
+    label: str,
+    instrument: str,
+    params: dict[str, Any],
+    references: list[dict[str, Any]],
+    variability: dict[str, Any],
+    weights: dict[str, float],
+    count: int,
+    *,
+    repo_root: Path = ROOT,
+) -> dict[str, Any]:
+    if count < 2:
+        raise ValueError("distributional gate requires at least two ship variants")
+    target = run_dir / "ship-mode" / label
+    target.mkdir(parents=True, exist_ok=True)
+    ship_params = _mode_params(params, SHIP_MODE)
+    params_path = target / "params.json"
+    params_path.write_text(json.dumps(ship_params, indent=2) + "\n")
+    seeds = [secrets.randbits(31) for _ in range(count)]
+    jobs = []
+    for variant_index, seed in enumerate(seeds):
+        variant_dir = target / f"variant-{variant_index:02d}"
+        variant_dir.mkdir(parents=True, exist_ok=True)
+        for reference_index, reference in enumerate(references):
+            jobs.append({
+                "paramsFile": str(params_path), "midi": reference.get("midi", 60),
+                "velocity": reference.get("velocity", .62),
+                "durationSec": reference.get("durationSec", 1.5),
+                "sampleRate": reference.get("sampleRate", 48_000),
+                "seed": seed + reference_index * 104_729,
+                "out": str(variant_dir / f"note-{reference_index}.wav"),
+            })
+    jobs_path = target / "jobs.json"
+    jobs_path.write_text(json.dumps(jobs, indent=2) + "\n")
+    process = subprocess.run(
+        ["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],
+        cwd=repo_root, text=True, capture_output=True)
+    if process.returncode:
+        raise RuntimeError(process.stderr or process.stdout)
+    rendered: dict[int, list[Any]] = {index: [] for index in range(len(references))}
+    for variant_index in range(count):
+        for reference_index, reference in enumerate(references):
+            path = target / f"variant-{variant_index:02d}" / f"note-{reference_index}.wav"
+            rendered[reference_index].append(extract_features(
+                path, active_duration_s=reference.get("durationSec", 1.5),
+                **_feature_analysis_kwargs(instrument, reference)))
+    gate = _distributional_variation_gate(variability, rendered, weights)
+    payload = {"mode": SHIP_MODE, "variantCount": count, "seeds": seeds,
+               "paramsHash": canonical_hash(ship_params), "gate": gate,
+               "primaryRenderDirectory": str(target / "variant-00")}
+    (target / "variation-gate.json").write_text(json.dumps(payload, indent=2) + "\n")
+    return payload
+
+
 def _build_listening_page(run_dir: Path, instrument: str, best: dict[str, Any],
-                          references: list[dict[str, Any]]) -> dict[str, Any]:
-    render_dir = run_dir / "renders" / f"eval-{int(best['evaluation']):04d}"
+                          references: list[dict[str, Any]],
+                          ship_render: dict[str, Any]) -> dict[str, Any]:
+    render_dir = Path(ship_render["primaryRenderDirectory"])
     manifest = [{
         "label": f"{instrument} · {reference.get('register', '?')} · {reference.get('dynamic', '?')}",
         "instrument": instrument, "reference": reference["path"],
@@ -342,7 +511,8 @@ def _build_listening_page(run_dir: Path, instrument: str, best: dict[str, Any],
     listen_path = run_dir / f"listen-{instrument}-{run_dir.name}.html"
     build_audition(str(manifest_path), str(listen_path))
     return {"bestRenderDirectory": str(render_dir), "listeningPage": str(listen_path),
-            "auditionManifest": str(manifest_path)}
+            "auditionManifest": str(manifest_path), "mode": SHIP_MODE,
+            "seed": ship_render["seeds"][0]}
 
 
 def _technique_exchange_statuses() -> list[dict[str, str]]:
@@ -350,16 +520,44 @@ def _technique_exchange_statuses() -> list[dict[str, str]]:
     if not path.exists():
         return [{"id": "exchange", "title": "techniques exchange",
                  "engine": "FAIL: file missing from branch"}]
-    statuses, current_id, title = [], None, ""
+    statuses, current_id, title, body = [], None, "", []
+
+    def flush() -> None:
+        if not current_id:
+            return
+        lanes = {key: "missing" for key in
+                 ("engine", "analysis", "bowed", "sung", "struck/plucked")}
+        pattern = re.compile(
+            r"(?:^|\s)(engine|analysis|bowed|sung|struck/plucked)="
+            r"(.*?)(?=\s(?:engine|analysis|bowed|sung|struck/plucked)=|$)")
+        status_chunks: list[str] = []
+        current_chunk = ""
+        for line in body:
+            if line.startswith("Status"):
+                if current_chunk:
+                    status_chunks.append(current_chunk)
+                current_chunk = line
+            elif current_chunk and not line:
+                status_chunks.append(current_chunk)
+                current_chunk = ""
+            elif current_chunk:
+                current_chunk += " " + line
+        if current_chunk:
+            status_chunks.append(current_chunk)
+        for chunk in status_chunks:
+            for match in pattern.finditer(chunk):
+                lanes[match.group(1)] = match.group(2).strip()
+        statuses.append({"id": current_id, "title": title, **lanes})
+
     for line in path.read_text().splitlines():
         if line.startswith("### T-"):
+            flush()
             heading = line[4:].strip()
             current_id, _, title = heading.partition(" · ")
-        elif current_id and line.startswith("Status:"):
-            engine = line.split("engine=", 1)[1].split(" analysis=", 1)[0].strip() \
-                if "engine=" in line else "missing"
-            statuses.append({"id": current_id, "title": title, "engine": engine})
-            current_id = None
+            body = []
+        elif current_id:
+            body.append(line.strip())
+    flush()
     return statuses
 
 
@@ -373,6 +571,34 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
              f"Construction gate: `{'pass' if summary['constructionPassed'] else 'fail'}`  \n",
              f"§3 tripwire gate: `{'pass' if summary.get('tripwirePassed', summary.get('automatedGatePassed')) else 'fail'}`  \n",
              f"Reference-variability status: `{floor['status']}`\n\n"]
+    prior = summary.get("legacyPrior", {})
+    lines.extend([
+        "## §2.4c strongest prior\n\n",
+        f"Lookup row: `{prior.get('instrument', 'missing')}` → "
+        f"`{prior.get('source', prior.get('parent', 'missing'))}` "
+        f"(`{prior.get('kind', 'missing')}`).  \n",
+        f"Anchor: `{prior.get('tag') or 'derived-parent'}` / "
+        f"`{prior.get('commit') or prior.get('declaredParent', 'missing')}`  \n",
+        f"Prior row hash: `{prior.get('rowHash', 'missing')}`  \n",
+        f"Resolved parameter hash: `{prior.get('resolvedParameterHash', 'missing')}`\n\n",
+        "FIT-MODE supplies the deterministic single-take objective; "
+        "SHIP-MODE supplies leaderboard/listening renders.\n\n",
+    ])
+    variation = summary.get("distributionalVariationGate", {})
+    lines.extend([
+        "## §2.5c.6 distributional variation gate\n\n",
+        f"Verdict: **{str(variation.get('status', 'missing')).upper()}**; "
+        f"seeded ship variants: `{summary.get('shipVariantCount', 0)}`.\n\n",
+        "| Take-pair group | Feature | Measured spread | Ship spread | Range | Verdict |\n",
+        "|---|---|---:|---:|---:|:---:|\n",
+    ])
+    for group in variation.get("groups", []):
+        for check in group.get("checks", []):
+            lines.append(
+                f"| `{group['group']}` | `{check['feature']}` | "
+                f"{check['measuredSpread']:.4f} | {check['shipSpread']:.4f} | "
+                f"{check['lower']:.4f}–{check['upper']:.4f} | "
+                f"{check['status'].upper()} |\n")
     controllability = summary.get("controllability")
     if controllability:
         lines.extend(["## Controllability contract\n\n",
@@ -463,9 +689,12 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
         else:
             lines.append(f"| `{key}` | {summary['bestParams'].get(key)} | not run | not run | not run |\n")
     lines.extend(["\n## Techniques exchange statuses\n\n",
-                  "| Entry | Engine/blown status |\n|---|---|\n"])
+                  "| Entry | Engine | Analysis | Bowed | Sung | Struck/plucked |\n"
+                  "|---|---|---|---|---|---|\n"])
     for row in summary.get("exchangeStatuses", []):
-        lines.append(f"| `{row['id']}` {row['title']} | {row['engine']} |\n")
+        lines.append(f"| `{row['id']}` {row['title']} | {row['engine']} | "
+                     f"{row['analysis']} | {row['bowed']} | {row['sung']} | "
+                     f"{row['struck/plucked']} |\n")
     board = summary["leaderboardState"]
     lines.extend(["\n## Leaderboard state\n\n",
                   f"Reference set: `{summary['referenceSet']}`. Current run is "
@@ -479,12 +708,15 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("".join(lines), encoding="utf-8")
 
 
-def _params(manifest: dict, initial: dict, only: list[str] | None) -> list[FreeParam]:
+def _params(manifest: dict, initial: dict, only: list[str] | None,
+            *, mode: str = FIT_MODE) -> list[FreeParam]:
     """Resolve free parameters while retaining an explicit campaign order."""
     result: dict[str, FreeParam] = {}
     excitation = initial.get("excitationType")
     family = initial.get("sg2Family")
     for row in manifest["continuous"]:
+        if mode == FIT_MODE and row["key"] in HUMAN_ONLY_PARAM_KEYS:
+            continue
         if only and row["key"] not in only:
             continue
         applies = row.get("appliesTo")
@@ -526,12 +758,13 @@ class ToneMatcher:
         target = self.run_dir / "renders" / f"eval-{index:04d}"
         target.mkdir(parents=True, exist_ok=True)
         params_path = target / "params.json"
-        params_path.write_text(json.dumps(params, indent=2) + "\n")
+        fit_params = _mode_params(params, FIT_MODE)
+        params_path.write_text(json.dumps(fit_params, indent=2) + "\n")
         jobs = []
         for ref_index, ref in enumerate(self.references):
             articulation_seed = None
-            if float(params.get("articulationCoupling", 0) or 0) > 0:
-                articulation_seed = int(params.get("seed", 7331)) + ref_index * 104729
+            if float(fit_params.get("articulationCoupling", 0) or 0) > 0:
+                articulation_seed = int(fit_params.get("seed", 7331)) + ref_index * 104729
             jobs.append({"paramsFile": str(params_path), "midi": ref.get("midi", 60),
                          "velocity": ref.get("velocity", .62), "durationSec": ref.get("durationSec", 1.5),
                          "sampleRate": ref.get("sampleRate", 48000),
@@ -632,7 +865,8 @@ class ToneMatcher:
         )
         gate_penalty = 100.0 * gate_failures
         objective = loss + gate_penalty
-        record = {"evaluation": index, "loss": loss, "params": {p.key: params[p.key] for p in self.free},
+        record = {"evaluation": index, "loss": loss, "params": params,
+                  "renderMode": FIT_MODE,
                   "objective": objective, "gateFailures": gate_failures,
                   "analysisFailures": analysis_failures,
                   "construction": construction, "tripwires": tripwires,
@@ -641,7 +875,8 @@ class ToneMatcher:
         (self.run_dir / "loss_curve.json").write_text(json.dumps(self.evaluations, indent=2) + "\n")
         if self.best is None or (gate_failures, loss) < (
                 self.best["gateFailures"], self.best["loss"]):
-            self.best = {"loss": loss, "objective": objective, "params": params, "evaluation": index,
+            self.best = {"loss": loss, "objective": objective, "params": params,
+                         "renderMode": FIT_MODE, "evaluation": index,
                          "gateFailures": gate_failures,
                          "analysisFailures": analysis_failures,
                          "construction": construction, "tripwires": tripwires,
@@ -673,11 +908,16 @@ def _sensitivity(matcher: ToneMatcher, best: dict) -> dict[str, Any]:
 
 def _reference_set_id(references: list[dict[str, Any]],
                       instrument: str | None = None,
-                      weights: dict[str, float] | None = None) -> str:
+                      weights: dict[str, float] | None = None,
+                      prior_hash: str | None = None,
+                      repo_root: Path = ROOT) -> str:
     """Identify the scored objective so unlike manifests are never ranked."""
     objective = {
         "references": references,
         "weights": weights or weights_for_instrument(instrument),
+        "priorHash": prior_hash,
+        "scorerContractVersion": SCORER_CONTRACT_VERSION,
+        "rendererContractHash": _renderer_contract_hash(repo_root),
     }
     canonical = json.dumps(objective, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
@@ -691,7 +931,9 @@ def _free_manifest_contract(free: list[FreeParam]) -> list[dict[str, Any]]:
 def _consume_controllability_audit(path: Path, instrument: str,
                                    references: list[dict[str, Any]],
                                    free: list[FreeParam],
-                                   starting_weights: dict[str, float]) -> dict[str, Any]:
+                                   starting_weights: dict[str, float],
+                                   initial: dict[str, Any] | None = None,
+                                   repo_root: Path = ROOT) -> dict[str, Any]:
     if not path.exists():
         raise ValueError(f"missing controllability audit: {path}")
     audit = _load(path)
@@ -708,8 +950,19 @@ def _consume_controllability_audit(path: Path, instrument: str,
         errors.append("reference objective hash mismatch")
     if audit.get("manifestHash") != expected_manifest:
         errors.append("free-parameter manifest hash mismatch")
-    if int(audit.get("schemaVersion", 0)) < 2:
+    if int(audit.get("schemaVersion", 0)) < 3:
         errors.append("repeat-render stability evidence is missing")
+    if audit.get("referenceContractHash") != audit_contract_hash(references):
+        errors.append("reference manifest contract hash mismatch")
+    if audit.get("parameterManifestHash") != audit_contract_hash(
+            _free_manifest_contract(free)):
+        errors.append("parameter manifest contract hash mismatch")
+    if initial is not None and audit.get("initialPresetHash") != audit_contract_hash(initial):
+        errors.append("initial preset contract hash mismatch")
+    if audit.get("scorerContractVersion") != SCORER_CONTRACT_VERSION:
+        errors.append("scorer contract version mismatch")
+    if audit.get("rendererContractHash") != _renderer_contract_hash(repo_root):
+        errors.append("renderer contract hash mismatch")
     if set(final_weights) != set(starting_weights):
         errors.append("final scoring weight keys mismatch")
     invalid_weights = sorted(
@@ -739,8 +992,65 @@ def _consume_controllability_audit(path: Path, instrument: str,
     return audit
 
 
+def _leaderboard_entry(run_dir: Path, best: dict, reference_set: str, *,
+                       kind: str = "candidate",
+                       variation_gate: dict[str, Any] | None = None,
+                       prior: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "run": run_dir.name, "kind": kind, "loss": best["loss"],
+        "params": best["params"], "time": time.time(),
+        "referenceSet": reference_set, "renderMode": SHIP_MODE,
+        "fitModeLoss": best["loss"], "variationGate": variation_gate,
+        "prior": prior,
+        "constructionPassed": bool(best.get("construction", {}).get("passed")),
+        "constructionFailures": int(best.get("construction", {}).get(
+            "counts", {}).get("fail", 0)),
+        "tripwirePassed": bool(best.get("tripwires", {}).get("strictPassed")),
+        "tripwireFailures": int(
+            sum(row.get("status") == "fail"
+                for row in best.get("tripwires", {}).get("cells", [])) +
+            len(best.get("tripwires", {}).get("strictMissingCells", []))),
+        "gateFailures": int(best.get("gateFailures", 0)),
+    }
+
+
+def _write_leaderboard(instrument: str, board: dict[str, Any]) -> None:
+    board_path = DEFAULT_RUN_ROOT / instrument / "leaderboard.json"
+    board_path.parent.mkdir(parents=True, exist_ok=True)
+    board_path.write_text(json.dumps(board, indent=2) + "\n")
+    backstop = STATE_ROOT / instrument / "leaderboard.json"
+    backstop.parent.mkdir(parents=True, exist_ok=True)
+    backstop.write_text(json.dumps(board, indent=2) + "\n")
+
+
+def _ensure_legacy_baseline(instrument: str, run_dir: Path, best: dict,
+                            reference_set: str, prior: dict[str, Any],
+                            variation_gate: dict[str, Any]) -> dict[str, Any]:
+    """Persist the mandatory founding baseline as leaderboard entry #1."""
+    board_path = DEFAULT_RUN_ROOT / instrument / "leaderboard.json"
+    board = _load(board_path) if board_path.exists() else {
+        "schemaVersion": 2, "instrument": instrument, "runs": []}
+    existing = next((row for row in board.get("runs", [])
+                     if row.get("referenceSet") == reference_set and
+                     row.get("kind") == "legacy-baseline"), None)
+    if existing is None:
+        existing = _leaderboard_entry(
+            run_dir, best, reference_set, kind="legacy-baseline",
+            variation_gate=variation_gate, prior=prior)
+        existing["entryNumber"] = 1
+        board.setdefault("runs", []).insert(0, existing)
+    board.setdefault("legacyBaselineByReferenceSet", {})[reference_set] = existing
+    board.setdefault("bestByReferenceSet", {}).setdefault(reference_set, existing)
+    board.setdefault("best", existing)
+    _write_leaderboard(instrument, board)
+    return existing
+
+
 def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
-                        reference_set: str, *, persist: bool = True) -> tuple[bool, float | None]:
+                        reference_set: str, *, persist: bool = True,
+                        variation_gate: dict[str, Any] | None = None,
+                        prior: dict[str, Any] | None = None,
+                        require_ship_gate: bool = False) -> tuple[bool, float | None]:
     """Compare a candidate with the board, optionally recording it.
 
     Invalid stops and filed plateaus must not become fitted presets merely
@@ -756,24 +1066,25 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
                                                 row["loss"])) \
         if comparable else None
     previous_loss = float(previous["loss"]) if previous and "loss" in previous else None
-    entry = {"run": run_dir.name, "loss": best["loss"], "params": best["params"], "time": time.time(),
-             "referenceSet": reference_set,
-             "constructionPassed": bool(best.get("construction", {}).get("passed")),
-             "constructionFailures": int(best.get("construction", {}).get("counts", {}).get("fail", 0)),
-             "tripwirePassed": bool(best.get("tripwires", {}).get("strictPassed")),
-             "tripwireFailures": int(
-                 sum(row.get("status") == "fail"
-                     for row in best.get("tripwires", {}).get("cells", [])) +
-                 len(best.get("tripwires", {}).get("strictMissingCells", []))),
-             "gateFailures": int(best.get("gateFailures", 0))}
+    entry = _leaderboard_entry(
+        run_dir, best, reference_set, variation_gate=variation_gate, prior=prior)
+    legacy = next((row for row in comparable
+                   if row.get("kind") == "legacy-baseline"), None)
+    ship_eligible = (not require_ship_gate or
+                     bool((variation_gate or {}).get("passed")))
+    beats_legacy = (legacy is None or entry["loss"] < float(legacy["loss"]) *
+                    (1.0 - MEASURABLE_REL_IMPROVEMENT))
+    entry["shipEligible"] = ship_eligible
+    entry["beatsLegacyComposite"] = beats_legacy
+    entry["ownerEar"] = "pending"
     if previous is None:
         current = entry
-        improved = True
+        improved = ship_eligible and beats_legacy
     else:
         previous_gates = previous.get(
             "gateFailures", previous.get("constructionFailures", 0))
         entry_gates = entry.get("gateFailures", entry.get("constructionFailures", 0))
-        improved = (
+        improved = ship_eligible and beats_legacy and (
             entry_gates < previous_gates or
             (entry_gates == previous_gates and
              entry["loss"] < previous["loss"] *
@@ -782,14 +1093,9 @@ def _update_leaderboard(instrument: str, run_dir: Path, best: dict,
         current = entry if improved else previous
     if persist:
         board["runs"].append(entry)
-        board["runs"].sort(key=lambda row: (
-            row.get("referenceSet", ""),
-            row.get("gateFailures", row.get("constructionFailures", 0)),
-            row["loss"]))
         board.setdefault("bestByReferenceSet", {})[reference_set] = current
         board["best"] = current
-        board_path.parent.mkdir(parents=True, exist_ok=True)
-        board_path.write_text(json.dumps(board, indent=2) + "\n")
+        _write_leaderboard(instrument, board)
     return improved, previous_loss
 
 
@@ -820,22 +1126,24 @@ def _append_ledger(instrument: str, run_dir: Path, best: dict, sensitivity: dict
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instrument", required=True)
-    parser.add_argument("--initial", required=True, help="initial/pinned preset JSON")
+    parser.add_argument("--initial", required=True,
+                        help="campaign measured/pinned seed; §2.4c prior is applied automatically")
     parser.add_argument("--references", required=True, help="reference-note manifest JSON")
     parser.add_argument("--manifest", default=str(Path(__file__).with_name("manifest.json")))
-    parser.add_argument("--controllability", help="clean audit JSON for this exact instrument/reference/manifest")
+    parser.add_argument("--controllability",
+                        help="hashed controllability.json; defaults to the campaign audit")
     parser.add_argument("--keys", help="comma-separated free keys; default is every applicable continuous key")
     parser.add_argument("--budget", type=int, default=200)
+    parser.add_argument("--ship-variants", type=int, default=DEFAULT_SHIP_VARIANTS)
     parser.add_argument("--run", default=time.strftime("%Y%m%d-%H%M%S"))
     parser.add_argument("--skip-sensitivity", action="store_true")
     parser.add_argument("--limiting-factor", help="evidenced plateau cause when this run neither improves nor reaches the floor")
     parser.add_argument("--work-item", help="concrete fix to file for --limiting-factor")
-    parser.add_argument("--controllability",
-                        help="hashed controllability.json; defaults to the campaign audit")
     parser.add_argument("--repo-root", type=Path, default=ROOT,
                         help="engine checkout used for headless renders")
     args = parser.parse_args(argv)
-    initial = _load_preset(args.initial)
+    campaign_seed = _load_preset(args.initial)
+    initial, prior = resolve_legacy_prior(args.instrument, campaign_seed)
     references, manifest = _load(args.references), _load(args.manifest)
     # T-012 consuming-side assertion: an owner-rejected take must never be
     # scored, floored, or hashed into the objective id.
@@ -843,6 +1151,8 @@ def main(argv: list[str] | None = None) -> int:
     assert_no_excluded(references, f"{args.instrument} campaign manifest")
     if bool(args.limiting_factor) != bool(args.work_item):
         parser.error("--limiting-factor and --work-item must be supplied together")
+    if args.ship_variants < 2:
+        parser.error("--ship-variants must be at least 2")
     starting_weights = weights_for_instrument(args.instrument)
     only = list(dict.fromkeys(key.strip() for key in args.keys.split(",") if key.strip())) if args.keys else None
     free = _params(manifest, initial, only)
@@ -852,14 +1162,18 @@ def main(argv: list[str] | None = None) -> int:
                   DEFAULT_RUN_ROOT / "campaigns" / args.instrument /
                   "audit" / "controllability.json")
     controllability = _consume_controllability_audit(
-        audit_path, args.instrument, references, free, starting_weights)
+        audit_path, args.instrument, references, free, starting_weights,
+        initial=initial, repo_root=args.repo_root)
     scoring_weights = controllability["finalWeights"]
     variability = _reference_variability(
-        references, weights=scoring_weights)
+        references, weights=scoring_weights, instrument=args.instrument)
     run_dir = DEFAULT_RUN_ROOT / args.instrument / args.run
     run_dir.mkdir(parents=True, exist_ok=False)
-    (run_dir / "run.json").write_text(
-        json.dumps(vars(args), indent=2, default=str) + "\n")
+    (run_dir / "resolved-legacy-prior.json").write_text(json.dumps({
+        "prior": prior, "params": initial}, indent=2) + "\n")
+    (run_dir / "run.json").write_text(json.dumps({
+        **vars(args), "legacyPrior": prior, "renderModes": [FIT_MODE, SHIP_MODE],
+    }, indent=2, default=str) + "\n")
     matcher = ToneMatcher(args.instrument, initial, references, free, run_dir,
                           repo_root=args.repo_root, weights=scoring_weights,
                           variability=variability)
@@ -867,7 +1181,8 @@ def main(argv: list[str] | None = None) -> int:
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
     baseline = matcher.evaluations[0]["loss"]
-    baseline_floor = _floor_evidence(variability, matcher.best or matcher.evaluations[0])
+    baseline_best = dict(matcher.best or matcher.evaluations[0])
+    baseline_floor = _floor_evidence(variability, baseline_best)
     if baseline_floor["status"] == "demonstrated":
         result = SimpleNamespace(success=True,
                                  message="baseline is at the reference-variability floor")
@@ -879,36 +1194,58 @@ def main(argv: list[str] | None = None) -> int:
     best = matcher.best or best
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
     resource = _benchmark_resources(run_dir, args.instrument, best)
-    render_artifacts = _build_listening_page(run_dir, args.instrument, best, references)
     reference_set = _reference_set_id(
-        references, args.instrument, weights=scoring_weights)
-    improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
-    if improved:
-        _append_ledger(args.instrument, run_dir, best, sensitivity, free)
+        references, args.instrument, weights=scoring_weights,
+        prior_hash=prior["resolvedParameterHash"], repo_root=args.repo_root)
+    legacy_ship = _render_ship_variants(
+        run_dir, "legacy-baseline", args.instrument, baseline_best["params"],
+        references, variability, scoring_weights, args.ship_variants,
+        repo_root=args.repo_root)
+    legacy_entry = _ensure_legacy_baseline(
+        args.instrument, run_dir, baseline_best, reference_set, prior,
+        legacy_ship["gate"])
+    candidate_ship = _render_ship_variants(
+        run_dir, "candidate", args.instrument, best["params"], references,
+        variability, scoring_weights, args.ship_variants,
+        repo_root=args.repo_root)
+    render_artifacts = _build_listening_page(
+        run_dir, args.instrument, best, references, candidate_ship)
+    candidate_improved, previous_best_loss = _update_leaderboard(
+        args.instrument, run_dir, best, reference_set, persist=False,
+        variation_gate=candidate_ship["gate"], prior=prior,
+        require_ship_gate=True)
     floor = _floor_evidence(variability, best)
+    if floor["status"] == "demonstrated" and not candidate_ship["gate"]["passed"]:
+        floor = {**floor, "status": "above-floor",
+                 "variationGateBlocked": True}
     relative_improvement = ((baseline - best["loss"]) / max(abs(baseline), 1e-12))
     measurable_loss_improvement = (
-        improved and relative_improvement >= MEASURABLE_REL_IMPROVEMENT)
-    gate_improvement = (
-        improved and previous_best_loss is not None and
-        not measurable_loss_improvement)
+        candidate_improved and relative_improvement >= MEASURABLE_REL_IMPROVEMENT)
     if floor["status"] == "demonstrated":
         outcome = {"state": "reference-variability-floor"}
-    elif gate_improvement:
-        outcome = {"state": "gate-improvement"}
     elif measurable_loss_improvement:
         outcome = {"state": "improvement"}
     elif args.limiting_factor and args.work_item:
         item_path = _file_work_item(args.instrument, run_dir, args.limiting_factor, args.work_item)
         outcome = {"state": "limiting-factor", "limitingFactor": args.limiting_factor,
                    "workItem": args.work_item, "workItemFile": str(item_path)}
+    elif not candidate_ship["gate"]["passed"]:
+        factor = ("ship-mode variation is not inside the measured two-sided "
+                  "take-pair spread")
+        action = ("run/refresh the §2.5c differential fit and its humanRanges, "
+                  "then re-audit the responsible engine consumers")
+        item_path = _file_work_item(args.instrument, run_dir, factor, action)
+        outcome = {"state": "limiting-factor", "limitingFactor": factor,
+                   "workItem": action, "workItemFile": str(item_path)}
     else:
         outcome = {"state": "invalid-stop",
                    "reason": "no measurable raw composite improvement, floor demonstration, or filed limiting factor"}
     improved = False
     if outcome["state"] in {"improvement", "reference-variability-floor"}:
         improved, previous_best_loss = _update_leaderboard(
-            args.instrument, run_dir, best, reference_set, persist=True)
+            args.instrument, run_dir, best, reference_set, persist=True,
+            variation_gate=candidate_ship["gate"], prior=prior,
+            require_ship_gate=True)
         if improved:
             _append_ledger(args.instrument, run_dir, best, sensitivity, free)
             _snapshot_best(args.instrument, run_dir, best)
@@ -917,16 +1254,6 @@ def main(argv: list[str] | None = None) -> int:
                "evaluations": len(matcher.evaluations), "optimizer": {"success": bool(result.success), "message": str(result.message)},
                "leaderboardImproved": improved, "previousBestLoss": previous_best_loss,
                "referenceSet": reference_set,
-               "controllability": ({
-                   "status": controllability["status"],
-                   "referenceContractHash": controllability["referenceContractHash"],
-                   "parameterManifestHash": controllability["parameterManifestHash"],
-                   "initialPresetHash": controllability["initialPresetHash"],
-                   "scorerContractVersion": controllability["scorerContractVersion"],
-                   "rendererContractHash": controllability["rendererContractHash"],
-                   "zeroWeighted": controllability.get("zeroWeighted", []),
-                   "repeatability": controllability.get("repeatability", {}),
-               } if controllability else {"status": "not-supplied"}),
                "constructionPassed": bool(best.get("construction", {}).get("passed")),
                "tripwirePassed": bool(best.get("tripwires", {}).get("strictPassed")),
                "tripwires": best.get("tripwires", {}),
@@ -937,6 +1264,11 @@ def main(argv: list[str] | None = None) -> int:
                "sensitivity": sensitivity,
                "freeParameters": [spec.key for spec in free],
                "bestParams": best.get("params", {}),
+               "legacyPrior": prior,
+               "legacyBaseline": legacy_entry,
+               "shipVariantCount": args.ship_variants,
+               "distributionalVariationGate": candidate_ship["gate"],
+               "legacyDistributionalVariationGate": legacy_ship["gate"],
                "exchangeStatuses": _technique_exchange_statuses(),
                "leaderboardState": {"isLeader": improved,
                                     "candidateWouldLead": candidate_improved,

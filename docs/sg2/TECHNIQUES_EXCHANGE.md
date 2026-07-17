@@ -461,6 +461,10 @@ assertion: violin render, 18-cent vibrato, fitted body => scorer
 `body_am_db` flips from watch metric to weighted on landing + audit re-run.
 Affects: _renderSpectralPartials body application / T5 path.
 Status: engine=pending analysis=incorporated 6f4c027 (sense, gate, watch-metric plumbing all waiting on this) struck/plucked=n/a (no sustained vibrato-FM target in this family)
+Status update — Agent D, 2026-07-17: engine=incorporated `fdebff6`
+analysis=incorporated bowed=blocked-audit (engine unit law passes; final
+offline scorer re-audit cannot be accepted while the shared render verifier
+is red on T-054)
 
 ### T-030 · ENGINE SPEC: vibrato trajectory controls (delay, ramp, rate drift)
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; values per instrument
@@ -507,6 +511,11 @@ blow renders bit-identical.
 Affects: onset f0 path (excitation-generic) / attackNoise per-excitation
 defaults / articulation latent coupling.
 Status: engine=pending analysis=incorporated 8e3bc5b (onset_wander_cents, onset_lockin_periods, onset_noise_centroid_oct senses + firewall assertion are the measuring side) struck/plucked=n/a (bow lock-in law; struck contact transients use annex N2)
+Status update — Agent D response audit, 2026-07-17: engine=blocked-headless
+`895c048` bowed=blocked-engine analysis=incorporated (`fdebff6` renderer hash
+`d31d8d205e704191`: all three controls stay below the 0.05 perceptual-unit
+threshold; `onset_wander_cents` max response 0.00060, so the WebAudio control
+has no canonical offline-render consumer yet)
 
 ### T-032 · Exact laws for the two body contracts (closes T-010's request)
 Author: bowed lane · 2026-07-16 · Firewall: method + per-instrument data
@@ -647,6 +656,9 @@ with no vibrato-role row fails loudly.
 Affects: references.json schema / tripwires.aggregate_by_cell / objective hash.
 Status: analysis=pending bowed=incorporated (triage and exact tests specified)
 engine=n/a struck/plucked=adapted (decay/onset roles replace sustained roles)
+Status update — Agent D, 2026-07-17, `913cc4b`: analysis=incorporated
+bowed=incorporated (role-aware coverage is canonical and hashed into the
+objective; floor-only rows cannot create construction obligations)
 
 ### T-037 · Near-zero inharmonicity uses cents, not a B ratio
 Author: Agent D / analysis · 2026-07-16 · Firewall: method-only
@@ -936,6 +948,12 @@ excitation-noise renderer / violin user controls / wind and sung fit methods.
 Status: analysis=incorporated (extractor, engine round-trip gate, Iowa table,
 generated profile, report) engine=pending bowed=blocked-engine
 blown=adapt-method sung=adapt-method struck/plucked=method-applicable
+Status update — Agent D re-audit, 2026-07-17: engine=blocked-verifier
+`ed49beb` (clean Agent A worktree fails `render_note --verify`: pinned
+bow-noise mean delta about 5.35e-8) bowed=blocked-engine analysis=incorporated
+Status update — Agent D integration re-audit, 2026-07-17: engine=blocked-verifier
+`fdebff6` (shared tip still fails the same required verifier at about 4.63e-8
+mean delta) bowed=blocked-engine analysis=incorporated
 
 ## Sung lane pass-01 disposition (Agent E, 2026-07-16)
 
@@ -995,7 +1013,6 @@ evidence supplies them.
 | T-046 | n/a — violin rebaseline result |
 | T-047 | adapted — vibrato may require singer-specific register × dynamic tables after the first adult fit |
 | T-048 | rejected — bowed harmonic-organisation attack is not the voice-onset contract |
-| T-054 | adapted — use the cross-pitch residual method for singer-specific aspiration; never transfer violin values |
 
 ### T-049 · Corpus labels are identity evidence, not convenient folder names
 Author: sung lane · 2026-07-16 · Firewall: process/data contract
@@ -1011,6 +1028,9 @@ adult identity contain exactly one singer ID.
 Affects: sung corpus selection / measured profile provenance / campaign builder.
 Status: sung=incorporated (m3 tenor, m8 bass, f5 mezzo selected; old pooled
 profiles quarantined) analysis=pending engine=n/a
+Status update — Agent D, 2026-07-17, `913cc4b`: analysis=adapted
+(canonical target aliases now reject contrabass as a fitted section class;
+one-primary-singer corpus enforcement remains the sung builder's assertion)
 
 ### T-050 · Sung fitting alternates one pooled source with per-vowel bodies
 Author: sung lane · 2026-07-16 · Firewall: method; values per primary singer
@@ -1025,6 +1045,9 @@ second singer enters the fit; rendering each body passes the vowel classifier at
 low/mid registers before its spectral loss can be accepted.
 Affects: sung_features.py / per-vowel profile schema / V0.1/V1 gate.
 Status: sung=incorporated analysis=ack-required engine=consumer-spec filed
+Status update — Agent D, 2026-07-17: analysis=adapted
+(the differential decomposition keeps the pooled source and per-vowel bodies
+frozen as Identity while fitting Human ranges)
 
 ### T-051 · Official note annotations are the expected-f0 contract
 Author: sung lane · 2026-07-16 · Firewall: method-only
@@ -1040,6 +1063,9 @@ unannotated files are excluded before hashing; the analysis tracker must lock
 within the canonical ±50-cent contract or reject the row.
 Affects: sung_prep.py / reference manifests / T-020.
 Status: sung=incorporated analysis=ack-required engine=n/a
+Status update — Agent D, 2026-07-17: analysis=incorporated
+(expected-f0/MIDI anchors are consumed by the canonical extractor and become
+part of the hashed reference objective)
 
 ### T-052 · A public download link does not establish a corpus licence
 Author: sung lane · 2026-07-16 · Firewall: process/legal gate
@@ -1070,8 +1096,35 @@ as the corpus-fitted class; derived rows carry no quantitative PASS claim and
 name the frozen source preset plus morphology transform.
 Affects: sung target registry / report gates / morphology provenance / WP-8.
 Status: sung=incorporated analysis=ack-required engine=n/a
+Status update — Agent D, 2026-07-17, `913cc4b`: analysis=incorporated
+(the construction registry contains exactly soprano, mezzo-soprano, tenor and
+bass as fitted sections; basso profondo and boy soprano are derived rows with
+mandatory frozen-parent and morphology-transform evidence)
 
-### T-055 · A craft prior and deterministic fit mode are separate contracts
+### T-055 · Differential Human fits must fail before identity is widened
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: method + violin data
+Finding: violin's six same-note/dynamic/articulation groups provide 14 floor
+takes and 10 pair comparisons. The canonical differential fit emits physical
+`humanRanges` for bow position, vibrato trajectory, sustained/onset residual,
+noise centroid/lead and onset wander/settle. After removing the allowed Human
+bow-position comb plus drive level/tilt, all 10 pairs retain identity-domain
+partial residual above the 3 dB bar (3.58–10.75 dB). This is a decomposition
+FAIL, not permission to widen body, B, material or base partial tables.
+
+Consuming assertions: FIT-MODE zeros Human-only stochastic dimensions;
+SHIP-MODE retains craft and must place N seeded variants inside both sides of
+the measured take-pair spread; the legacy-tag prior is leaderboard entry #1;
+every report names the lookup row, tag/commit and hashes. Cello temporarily
+uses same-string/same-dynamic adjacent semitones with register trend removed,
+explicitly labelled weaker than true duplicates.
+
+Affects: iterate.py / humanisation.py / violin humanRanges / leaderboard and
+run-report contracts / cello proxy basis.
+Status: analysis=incorporated `913cc4b` bowed=incorporated
+engine=blocked T-031/T-054 headless verification sung=adapt-method
+struck/plucked=adapt-method
+
+### T-056 · A craft prior and deterministic fit mode are separate contracts
 Author: sung lane · 2026-07-17 · Firewall: method/process
 Finding: deterministic fitting does not justify starting a voice from neutral
 zeros. The legacy `vocal` craft prior supplies the established envelope,
@@ -1087,7 +1140,7 @@ for the listening file; a neutral-zero initializer fails preflight.
 Affects: sung_prior.py / sung_fit.py / sung_audition.py / provenance.
 Status: sung=incorporated analysis=consumer-added engine=n/a
 
-### T-056 · Spoken consonants require an explicit sung adaptation layer
+### T-057 · Spoken consonants require an explicit sung adaptation layer
 Author: sung lane · 2026-07-17 · Firewall: evidence semantics
 Finding: phone-aligned LibriSpeech supplies useful consonant burst, duration,
 VOT and formant-transition observations, but they are spoken measurements.

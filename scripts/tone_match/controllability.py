@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -62,12 +63,14 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "vibratoProb": (1.0, 0.0, 0.0),
     "vibratoDepth": (18.0, 40.0, 0.0),
     "vibratoRate": (5.5, 6.5, 0.0),
+    "onsetWanderCents": (0.0, 80.0, 0.0),
+    "onsetWanderSettlePeriods": (12.0, 24.0, 0.0),
+    "bowScratchLevel": (0.0, 1.0, 0.0),
 }
 
 SUNG_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
-    # Per-vowel body bands are a structured follow-up audit.  These scalar
-    # controls cover the pooled source and performance layer without importing
-    # another family's fitted values.
+    # Structured per-vowel bodies remain a follow-up audit. These continuous
+    # controls cover the pooled vocal source and performance layer.
     "glottalTilt": (0.0, 0.5, 0.0),
     "singerFormantAmount": (0.0, 0.7, 0.0),
     "voiceBreathSync": (0.0, 0.6, 0.0),
@@ -135,20 +138,21 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
               free_params: dict[str, tuple[float, float, float]] | None = None,
               objective_references: list[dict[str, Any]] | None = None,
               manifest_contract: list[dict[str, Any]] | None = None,
-              zero_uncontrollable: bool = False,
               ) -> dict[str, Any]:
     free_params = free_params or BOWED_FREE_PARAMS
     output_dir.mkdir(parents=True, exist_ok=True)
     renders = output_dir / "renders"
     renders.mkdir(exist_ok=True)
 
-    # variant parameter sets: base + one per perturbed param
-    variants: dict[str, dict[str, Any]] = {"__base__": dict(baseline_params)}
+    # Variant parameter sets: one fully specified base plus one changed key.
+    # Building the base first prevents early variants from omitting defaults
+    # belonging to later keys in the manifest.
+    base_params = dict(baseline_params)
     for key, (base_value, perturbed, _alt) in free_params.items():
-        params = dict(baseline_params)
-        params[key] = base_value
-        variants["__base__"].setdefault(key, base_value)
-        perturbed_params = dict(variants["__base__"])
+        base_params.setdefault(key, base_value)
+    variants: dict[str, dict[str, Any]] = {"__base__": base_params}
+    for key, (_base_value, perturbed, _alt) in free_params.items():
+        perturbed_params = dict(base_params)
         perturbed_params[key] = perturbed
         variants[key] = perturbed_params
     # T-041: repeat the exact baseline in independent offline render
@@ -172,14 +176,10 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             })
     _render_batch(jobs, repo_root)
 
-    # Sung feature extraction is pitch-anchored.  Without the corpus MIDI/F0
-    # contract, an octave/subharmonic tracker error can make a parameter look
-    # responsive merely by moving the estimator to a different harmonic.
+    # SUNG analysis is anchored to the corpus annotation so a tracker mode
+    # switch cannot masquerade as a parameter response.
     ref_bundles = [
-        extract_features(
-            ref["path"],
-            expected_f0_hz=ref.get("expectedF0Hz"),
-        )
+        extract_features(ref["path"], expected_f0_hz=ref.get("expectedF0Hz"))
         for ref in references
     ]
     weights = weights_for_instrument(instrument)
@@ -267,16 +267,21 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     for key in free_params:
         perturbed = distances(key)
         matrix[key] = {}
+        direct_rows = []
+        for ref_index in np.flatnonzero(base_ok):
+            try:
+                direct_rows.append(compare_features(
+                    render_bundle("__base__", int(ref_index)),
+                    render_bundle(key, int(ref_index)), weights))
+            except ValueError:
+                continue
         for feature in base:
-            base_vals = np.asarray(base[feature], dtype=float)[base_ok]
-            pert_vals = np.asarray(perturbed[feature], dtype=float)[base_ok]
-            deltas = pert_vals - base_vals
-            finite = deltas[np.isfinite(deltas)]
-            # analysis failures are recorded separately, NOT as responses:
-            # knife-edge references fail under unrelated perturbations (the
-            # seeded noise realisation shifts), and folding that into the
-            # response matrix marked every feature "controllable".
-            matrix[key][feature] = float(np.max(np.abs(finite))) if finite.size else 0.0
+            finite = [float(row["normalized"][feature]) for row in direct_rows
+                      if np.isfinite(row["normalized"].get(feature, math.nan))]
+            # T-007/T-024: controllability is the direct perceptual response
+            # to one changed parameter, not a difference between two
+            # reference losses (which can cancel around an equidistant take).
+            matrix[key][feature] = max(finite, default=0.0)
         any_pert = np.asarray(perturbed[next(iter(base))], dtype=float)[base_ok]
         render_failures[key] = int(np.isnan(any_pert).sum())
 
@@ -289,6 +294,22 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "feature": feature,
             "previousWeight": final_weights[feature],
             "reason": "repeat renders crossed the controllability threshold",
+            "status": "watch-metric",
+        })
+        final_weights[feature] = 0.0
+
+    responsive = {
+        feature: sorted(key for key in matrix
+                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
+        for feature in DEFAULT_WEIGHTS
+    }
+    for feature, weight in sorted(final_weights.items()):
+        if float(weight) <= 0 or responsive.get(feature):
+            continue
+        zero_weighted.append({
+            "feature": feature,
+            "previousWeight": weight,
+            "reason": "no audited free parameter crossed the response threshold",
             "status": "watch-metric",
         })
         final_weights[feature] = 0.0
@@ -309,30 +330,6 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "status": status,
         })
 
-    if zero_uncontrollable:
-        # §2.3 option (a): an audited feature with no responder becomes an
-        # explicit zero-weight watch metric.  Keep the pre-zero evidence in
-        # zeroWeighted so a later engine consumer can reactivate it only after
-        # a fresh audit.
-        for verdict in verdicts:
-            if verdict["status"] != "UNCONTROLLABLE":
-                continue
-            feature = verdict["feature"]
-            zero_weighted.append({
-                "feature": feature,
-                "previousWeight": final_weights[feature],
-                "reason": "no free sung parameter crossed the controllability threshold",
-                "status": "watch-metric",
-            })
-            final_weights[feature] = 0.0
-            verdict["weight"] = 0.0
-            verdict["status"] = "watch-metric"
-
-    responsive = {
-        feature: sorted(key for key in matrix
-                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
-        for feature in DEFAULT_WEIGHTS
-    }
     watch_metrics = [v["feature"] for v in verdicts if v["status"] == "watch-metric"]
     uncontrolled = [v["feature"] for v in verdicts if v["status"] == "UNCONTROLLABLE"]
     objective_references = objective_references or references
@@ -340,9 +337,19 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         {"key": key, "baseline": values[0], "perturbed": values[1]}
         for key, values in sorted(free_params.items())
     ]
-    audit = {"schemaVersion": 2, "instrument": instrument,
+    # T-024: bind the audit to every input whose drift invalidates its
+    # response matrix.  Keep the original objective/manifest hashes for the
+    # iterate.py handoff and publish the explicit component hashes as well.
+    from .iterate import _renderer_contract_hash  # local: avoids import cycle
+    from .score import SCORER_CONTRACT_VERSION
+    audit = {"schemaVersion": 3, "instrument": instrument,
              "status": "clean" if not uncontrolled else "not-clean",
              "threshold": RESPONSE_THRESHOLD,
+             "scorerContractVersion": SCORER_CONTRACT_VERSION,
+             "rendererContractHash": _renderer_contract_hash(repo_root),
+             "referenceContractHash": _canonical_hash(objective_references),
+             "parameterManifestHash": _canonical_hash(manifest_contract),
+             "initialPresetHash": _canonical_hash(baseline_params),
              "objectiveHash": objective_contract_hash(
                  instrument, objective_references, final_weights),
              "manifestHash": manifest_contract_hash(manifest_contract),
@@ -363,6 +370,8 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
              "zeroWeighted": zero_weighted,
              "matrix": matrix, "verdicts": verdicts,
              "responsiveParameters": responsive,
+             "responders": responsive,
+             "weights": final_weights,
              "watchMetrics": watch_metrics,
              "uncontrolledWeightedFeatures": uncontrolled,
              "clean": not uncontrolled}
@@ -407,20 +416,23 @@ def main(argv: list[str] | None = None) -> int:
                         default=Path(__file__).with_name("manifest.json"))
     parser.add_argument("--keys",
                         help="comma-separated free keys; defaults by instrument family")
-    parser.add_argument("--zero-uncontrollable", action="store_true",
-                        help="mechanically demote features with no responder to zero-weight watches")
     args = parser.parse_args(argv)
     references = json.loads(args.references.read_text())
-    objective_references = [
-        row for row in references if "spectral" in row.get("roles", [])
-    ]
-    if not objective_references:
-        parser.error("references contain no rows with the spectral role")
-    baseline = json.loads(args.initial.read_text())
-    available = (SUNG_FREE_PARAMS if args.instrument.strip().lower() in {
+    campaign_seed = json.loads(args.initial.read_text())
+    from .legacy_prior import resolve_legacy_prior
+    baseline, legacy_prior = resolve_legacy_prior(args.instrument, campaign_seed)
+    sung_instruments = {
         "soprano", "mezzo-soprano", "tenor", "bass",
         "voice-soprano", "voice-mezzo", "voice-tenor", "voice-bass",
-    } else BOWED_FREE_PARAMS)
+    }
+    available = (SUNG_FREE_PARAMS if args.instrument.strip().lower()
+                 in sung_instruments else BOWED_FREE_PARAMS)
+    objective_references = (
+        [row for row in references if "spectral" in row.get("roles", [])]
+        if args.instrument.strip().lower() in sung_instruments else references
+    )
+    if not objective_references:
+        parser.error("references contain no rows with the spectral role")
     keys = (list(dict.fromkeys(key.strip() for key in args.keys.split(",")
                               if key.strip()))
             if args.keys else list(available))
@@ -445,16 +457,15 @@ def main(argv: list[str] | None = None) -> int:
         seen[key] = row
     subset = list(seen.values())[:6]
     if not subset:
-        parser.error("no pitch-anchored spectral reference can be analysed")
+        parser.error("no pitch-anchored objective reference can be analysed")
     audit = run_audit(args.instrument, baseline, subset, args.output,
                       args.repo_root, free_params=free_params,
                       objective_references=objective_references,
-                      manifest_contract=contract,
-                      zero_uncontrollable=args.zero_uncontrollable)
+                      manifest_contract=contract)
+    audit["legacyPrior"] = legacy_prior
     audit["auditReferenceSelectionRejects"] = analysis_rejects
     (args.output / "controllability.json").write_text(
-        json.dumps(audit, indent=1) + "\n"
-    )
+        json.dumps(audit, indent=1) + "\n")
     print(json.dumps({"clean": audit["clean"],
                       "repeatability": audit["repeatability"]["status"],
                       "unstableFeatures": audit["repeatability"][

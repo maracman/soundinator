@@ -879,6 +879,95 @@ export function bodyResponse(bands, freqHz, amount) {
   return Math.max(0.2, Math.min(4.5, Math.pow(2, logGain)));
 }
 
+function interpolatedPitchCentsAt(events, time) {
+  if (!Array.isArray(events) || events.length === 0) return 0;
+  if (time <= events[0].time) return Number(events[0].cents) || 0;
+  for (let i = 1; i < events.length; i++) {
+    const right = events[i];
+    if (time > right.time) continue;
+    const left = events[i - 1];
+    const span = Math.max(1e-9, right.time - left.time);
+    const mix = Math.max(0, Math.min(1, (time - left.time) / span));
+    return (Number(left.cents) || 0) * (1 - mix) +
+      (Number(right.cents) || 0) * mix;
+  }
+  return Number(events[events.length - 1].cents) || 0;
+}
+
+/** T-029: body gain follows the same instantaneous-frequency gestures as the
+ * oscillator. The returned points are consumed directly as AudioParam
+ * automation; static notes return no points, preserving the old graph exactly.
+ * A 100 Hz minimum grid meets the per-audio-block contract while explicit
+ * wander steps are retained at their exact times. */
+export function bodyAmAutomationEvents(note, modeFrequency, t0, t1,
+                                       modeMultiplier = 1, updateHz = 100) {
+  const bands = note?.bodyBands;
+  const amount = Number(note?.bodyAmount) || 0;
+  if (!Array.isArray(bands) || bands.length === 0 || amount <= 0 || !(t1 > t0)) return [];
+
+  const vibrato = Array.isArray(note?._vibratoEvents) ? note._vibratoEvents : [];
+  const wander = Array.isArray(note?._wanderEvents) ? note._wanderEvents : [];
+  const bowOnset = note?._bowOnsetWander || { cents: 0, settleSec: 0 };
+  const scoopCents = Number(note?._scoopCents) || 0;
+  const fittedSettle = Number(note?._scoopSettleSec) || 0;
+  const attack = Math.min((Number(note?.duration) || .2) * .4,
+    fittedSettle > 0 ? fittedSettle : Math.max(.015, Number(note?.envelopeAttack) || .02));
+  const slide = Math.max(0, Math.min(Number(note?.slideDuration) || 0,
+    (Number(note?.duration) || 0) * .8));
+  const target = Math.max(1, Number(modeFrequency) || 1);
+  const from = note?.legatoFromPrevious && Number(note?.slideFromFrequency) > 0
+    ? Math.max(1, Number(note.slideFromFrequency) * modeMultiplier)
+    : target;
+  const hasFm = vibrato.length > 1 || wander.length > 0 ||
+    Math.abs(Number(bowOnset.cents) || 0) > 1e-12 ||
+    Math.abs(scoopCents) > 1e-12 ||
+    (slide > .001 && Math.abs(from - target) > .01);
+  if (!hasFm) return [];
+
+  const wanderAt = (time) => {
+    let cents = 0;
+    for (const point of wander) {
+      if (t0 + (Number(point.time) || 0) <= time) cents = Number(point.cents) || 0;
+      else break;
+    }
+    return cents;
+  };
+  const baseAt = (time) => {
+    if (slide > .001 && time < t0 + slide && Math.abs(from - target) > .01) {
+      const progress = Math.max(0, Math.min(1, (time - t0) / slide));
+      return from * Math.pow(target / from, progress);
+    }
+    return target;
+  };
+  const frequencyAt = (time) => {
+    const scoop = scoopCents
+      ? scoopCents * Math.max(0, 1 - (time - t0) / Math.max(.001, attack))
+      : 0;
+    const onset = Number(bowOnset.cents) || 0;
+    const bow = onset
+      ? onset * Math.max(0, 1 - (time - t0) /
+        Math.max(.001, Number(bowOnset.settleSec) || 0))
+      : 0;
+    const cents = interpolatedPitchCentsAt(vibrato, time) + scoop + bow + wanderAt(time);
+    return baseAt(time) * Math.pow(2, cents / 1200);
+  };
+
+  const rate = Math.max(100, Number(updateHz) || 100);
+  const steps = Math.max(1, Math.ceil((t1 - t0) * rate));
+  const times = new Set([t0, t1]);
+  for (let i = 1; i < steps; i++) times.add(t0 + (t1 - t0) * i / steps);
+  for (const point of wander) {
+    const time = t0 + (Number(point.time) || 0);
+    if (time > t0 && time < t1) times.add(time);
+  }
+  const nominal = bodyResponse(bands, target, amount);
+  return [...times].sort((a, b) => a - b).map(time => ({
+    time,
+    frequency: frequencyAt(time),
+    gain: bodyResponse(bands, frequencyAt(time), amount) / nominal,
+  }));
+}
+
 // Width of the band that contributes most strongly at a partial frequency.
 // T-032 publishes Gaussian sigma in log2 octaves and this exact FWHM law.
 export function bodyFwhmHzAt(bands, freqHz) {
@@ -928,6 +1017,149 @@ export function bodyResponsesForPartials(bands, frequencies, amount,
     return logGain + (capped - logGain) * mix;
   });
   return limited.map(logGain => Math.max(0.2, Math.min(4.5, Math.pow(2, logGain))));
+}
+
+/** T-054: interpolate the immutable measured post-body bow-noise table in
+ * log-frequency/dB space. Outside its evidence band the component is silent;
+ * no extrapolated broadband floor is invented. */
+export function bowNoiseProfileGainDbAt(rows, freqHz) {
+  if (!Array.isArray(rows) || rows.length === 0) return -120;
+  const points = rows.filter(row => Number.isFinite(row?.freqHz) && row.freqHz > 0 &&
+      Number.isFinite(row?.gainDb)).slice().sort((a, b) => a.freqHz - b.freqHz);
+  const frequency = Number(freqHz);
+  if (!points.length || !Number.isFinite(frequency) ||
+      frequency < points[0].freqHz || frequency > points[points.length - 1].freqHz) return -120;
+  if (frequency === points[0].freqHz) return points[0].gainDb;
+  let hi = 1;
+  while (hi < points.length && points[hi].freqHz < frequency) hi++;
+  if (hi >= points.length) return points[points.length - 1].gainDb;
+  const lo = points[hi - 1], upper = points[hi];
+  const t = (Math.log(frequency) - Math.log(lo.freqHz)) /
+    (Math.log(upper.freqHz) - Math.log(lo.freqHz));
+  return lo.gainDb + (upper.gainDb - lo.gainDb) * t;
+}
+
+/** Magnitude of the exact peaking-biquad law used to body-route excitation
+ * noise. This lets the pinned post-body target be deconvolved against the
+ * same filter implementation the WebAudio graph consumes. */
+export function peakingBiquadMagnitudeDb(freqHz, centreHz, q, gainDb,
+                                         sampleRate = 48000) {
+  const sr = Math.max(8000, Number(sampleRate) || 48000);
+  const frequency = Math.max(1, Math.min(sr * .499, Number(freqHz) || 1));
+  const centre = Math.max(20, Math.min(sr * .49, Number(centreHz) || 1000));
+  const quality = Math.max(.3, Math.min(12, Number(q) || 1));
+  const gain = Math.max(-24, Math.min(24, Number(gainDb) || 0));
+  if (Math.abs(gain) <= 1e-12) return 0;
+  const A = Math.pow(10, gain / 40);
+  const w0 = 2 * Math.PI * centre / sr;
+  const alpha = Math.sin(w0) / (2 * quality);
+  const a0 = 1 + alpha / A;
+  const b0 = (1 + alpha * A) / a0;
+  const b1 = (-2 * Math.cos(w0)) / a0;
+  const b2 = (1 - alpha * A) / a0;
+  const a1 = (-2 * Math.cos(w0)) / a0;
+  const a2 = (1 - alpha / A) / a0;
+  const w = 2 * Math.PI * frequency / sr;
+  const c1 = Math.cos(w), s1 = Math.sin(w);
+  const c2 = Math.cos(2 * w), s2 = Math.sin(2 * w);
+  const nr = b0 + b1 * c1 + b2 * c2;
+  const ni = -b1 * s1 - b2 * s2;
+  const dr = 1 + a1 * c1 + a2 * c2;
+  const di = -a1 * s1 - a2 * s2;
+  const magnitude = Math.sqrt((nr * nr + ni * ni) /
+    Math.max(1e-24, dr * dr + di * di));
+  return 20 * Math.log10(Math.max(1e-12, magnitude));
+}
+
+export function bowNoiseBodyFilterDbAt(bands, freqHz, sampleRate = 48000,
+                                       amount = 1) {
+  if (!Array.isArray(bands) || amount <= 0) return 0;
+  let total = 0;
+  for (const band of bands) {
+    if (!Number.isFinite(band?.freq) || !Number.isFinite(band?.gain)) continue;
+    const q = Math.max(.3, Math.min(12, 1 / Math.max(.08, band.width || .3)));
+    total += peakingBiquadMagnitudeDb(freqHz, band.freq, q,
+      band.gain * 6 * amount, sampleRate);
+  }
+  return total;
+}
+
+/** The pinned table is already body-coloured. Deconvolve the measured body
+ * once here; the audio graph then routes the excitation through that body at
+ * unity, reconstructing the measurement rather than applying colour twice. */
+export function bowNoisePreBodyGainDbAt(rows, measuredBodyBands, freqHz,
+                                        sampleRate = 48000) {
+  return bowNoiseProfileGainDbAt(rows, freqHz) -
+    bowNoiseBodyFilterDbAt(measuredBodyBands, freqHz, sampleRate, 1);
+}
+
+export function bowNoiseVelocityGain(velocity, exponent = 1) {
+  const v = Math.max(.01, Math.min(1, Number(velocity) || 0));
+  const e = Math.max(0, Math.min(2, Number.isFinite(exponent) ? exponent : 1));
+  // The shared note envelope already contributes one power of velocity.
+  // Compensate it so the complete path follows the fitted v**e law exactly.
+  return Math.pow(v, e - 1);
+}
+
+/** Radix-2 inverse FFT used once per context/profile to turn the measured
+ * pre-body magnitude response into a deterministic FIR. */
+function inverseFftInPlace(real, imag) {
+  const n = real.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [real[i], real[j]] = [real[j], real[i]];
+      [imag[i], imag[j]] = [imag[j], imag[i]];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const angle = 2 * Math.PI / len;
+    const wLenR = Math.cos(angle), wLenI = Math.sin(angle);
+    for (let i = 0; i < n; i += len) {
+      let wr = 1, wi = 0;
+      for (let j = 0; j < len / 2; j++) {
+        const uR = real[i + j], uI = imag[i + j];
+        const k = i + j + len / 2;
+        const vR = real[k] * wr - imag[k] * wi;
+        const vI = real[k] * wi + imag[k] * wr;
+        real[i + j] = uR + vR; imag[i + j] = uI + vI;
+        real[k] = uR - vR; imag[k] = uI - vI;
+        const nextR = wr * wLenR - wi * wLenI;
+        wi = wr * wLenI + wi * wLenR; wr = nextR;
+      }
+    }
+  }
+  for (let i = 0; i < n; i++) { real[i] /= n; imag[i] /= n; }
+}
+
+export function buildBowNoiseImpulse(rows, measuredBodyBands, sampleRate = 48000,
+                                     length = 2048) {
+  const n = Math.max(256, 1 << Math.round(Math.log2(Math.max(256, length))));
+  const real = new Float64Array(n), imag = new Float64Array(n);
+  for (let k = 1; k < n / 2; k++) {
+    const frequency = k * sampleRate / n;
+    const gainDb = bowNoisePreBodyGainDbAt(rows, measuredBodyBands,
+      frequency, sampleRate);
+    const magnitude = Math.pow(10, Math.max(-120, Math.min(30, gainDb)) / 20);
+    // Start from zero phase, then centre and window the impulse below. The
+    // source is stationary sustain noise, so the resulting short group delay
+    // carries no pitched-onset timing information.
+    real[k] = magnitude;
+    real[n - k] = magnitude;
+  }
+  inverseFftInPlace(real, imag);
+  const causal = new Float64Array(n);
+  let energy = 0;
+  for (let i = 0; i < n; i++) {
+    const shifted = real[(i + n / 2) % n];
+    const window = .5 - .5 * Math.cos(2 * Math.PI * i / (n - 1));
+    causal[i] = shifted * window;
+    energy += causal[i] * causal[i];
+  }
+  const norm = Math.sqrt(Math.max(1e-18, energy));
+  return Float32Array.from(causal, value => value / norm);
 }
 
 // ── Per-instrument performance character ─────────────────────
@@ -1077,6 +1309,9 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
   }
   if (Array.isArray(m.attackByRegister) && m.attackByRegister.length) {
     prof.attackByRegister = m.attackByRegister;
+  }
+  if (m.bowNoise?.profilePinned === true && Array.isArray(m.bowNoise.profile)) {
+    prof.bowNoise = m.bowNoise;
   }
   // The fitted body (including an explicit empty omission) was resolved
   // before BODY_PRESETS construction above. Never re-merge it here: a
@@ -1724,7 +1959,8 @@ export function articulationOnsetPlan(nextRandom, options = {}) {
   const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
     Number.isFinite(Number(value)) ? Number(value) : lo));
   const coupling = clamp(options.coupling ?? 0, 0, 1);
-  if (coupling <= 0) return {
+  const forceLatent = options.forceLatent === true;
+  if (coupling <= 0 && !forceLatent) return {
     strength: 0.5, transientGain: 1, breathLeadGain: 1,
     scoopCents: 0, scoopSettleSec: 0,
   };
@@ -1763,6 +1999,66 @@ export function articulationOnsetPlan(nextRandom, options = {}) {
     strength, transientGain, breathLeadGain,
     scoopCents: -Math.min(180, depth),
     scoopSettleSec: depth >= 1 ? settle : 0,
+  };
+}
+
+/** T-031: a bowed onset wanders to either side of nominal pitch while the
+ * string locks into Helmholtz motion. This is deliberately not the blown
+ * scoop: sign is seeded per note, duration is measured in f0 periods, and
+ * Human 0 / non-bow / legato are exact identities. Articulation strength is
+ * the shared latent sampled by articulationOnsetPlan; strong starts settle
+ * cleanly while weak starts expose more of the fitted wander. */
+export function bowOnsetWanderPlan(nextRandom, options = {}) {
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
+    Number.isFinite(Number(value)) ? Number(value) : lo));
+  if (options.excitationType !== "bow" || options.legato) {
+    return { cents: 0, settleSec: 0, settlePeriods: 0 };
+  }
+  const human = clamp(options.human ?? 0, 0, 1);
+  const depth = clamp(options.depthCents ?? 0, 0, 120);
+  if (human <= 0 || depth <= 0) {
+    return { cents: 0, settleSec: 0, settlePeriods: 0 };
+  }
+  const strength = clamp(options.articulationStrength ?? .5, 0, 1);
+  const periods = clamp(options.settlePeriods ?? 12, 2, 30);
+  const frequency = Math.max(1, Number(options.frequency) || 261.63);
+  const draw = typeof nextRandom === "function" ? nextRandom() : .5;
+  // C20/C21: prolonged-period starts may sit flat while multiple-slip
+  // starts may flicker sharp. The sign is therefore a seeded class draw,
+  // never a fixed approach from below.
+  const sign = draw < .5 ? -1 : 1;
+  const cents = sign * depth * human * (1 - strength);
+  return {
+    cents,
+    settleSec: periods / frequency,
+    settlePeriods: periods,
+  };
+}
+
+/** T-031: reinterpret the measured bow attack residual as period-scaled
+ * broadband scratch. The shared articulation latent controls its colour:
+ * a weak/floated start is higher-centroid surface whistle, while a strong
+ * accent is lower-centroid crackle. Disabled/non-bow calls return null so
+ * the legacy attack-noise object and blown render remain untouched. */
+export function bowScratchPlan(attackNoise, options = {}) {
+  if (options.excitationType !== "bow" || !attackNoise) return null;
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
+    Number.isFinite(Number(value)) ? Number(value) : lo));
+  const amount = clamp(options.level ?? 0, 0, 2);
+  if (amount <= 0) return null;
+  const strength = clamp(options.articulationStrength ?? .5, 0, 1);
+  const periods = clamp(options.durationPeriods ?? 12, 2, 30);
+  const frequency = Math.max(1, Number(options.frequency) || 261.63);
+  const baseFreq = Math.max(80, Number(attackNoise.freq) || 1000);
+  const colourOctaves = (.5 - strength) * 1.2;
+  return {
+    ...attackNoise,
+    level: Math.max(0, Number(attackNoise.level) || 0) * amount,
+    freq: baseFreq * Math.pow(2, colourOctaves),
+    q: clamp(attackNoise.q ?? .84, .3, 1.2),
+    decay: periods / frequency,
+    durationPeriods: periods,
+    enabled: true,
   };
 }
 
@@ -2868,6 +3164,22 @@ export class GenerationEngine {
       articulationStrength: this._clamp(this.p.articulationStrength ?? 0.5, 0, 1),
       articulationVariation: this._clamp(this.p.articulationVariation ?? 0, 0, 1),
       articulationVelocitySlope: this._clamp(this.p.articulationVelocitySlope ?? 0, -1.5, 1.5),
+      onsetWanderCents: this._clamp(this.p.onsetWanderCents ?? 0, 0, 120),
+      onsetWanderSettlePeriods: this._clamp(this.p.onsetWanderSettlePeriods ?? 12, 2, 30),
+      bowScratchLevel: this._clamp(this.p.bowScratchLevel ?? 0, 0, 2),
+      bowNoise: profile.bowNoise?.profilePinned === true &&
+          Array.isArray(profile.bowNoise.profile)
+        ? {
+            ...profile.bowNoise,
+            deconvolutionBands: Array.isArray(profile.resonances)
+              ? profile.resonances : [],
+          }
+        : null,
+      bowNoiseLevel: this._clamp(this.p.bowNoiseLevel ?? 0, 0, 2),
+      bowNoiseVelocityExponent: this._clamp(
+        Number.isFinite(this.p.bowNoiseVelocityExponent)
+          ? this.p.bowNoiseVelocityExponent
+          : profile.bowNoise?.levelLaw?.velocityExponent ?? 1, 0, 2),
       onsetScoopDepthCents: this._clamp(this.p.onsetScoopDepthCents ?? 0, 0, 180),
       onsetScoopSettle: this._clamp(this.p.onsetScoopSettle ?? 0.06, 0.015, 0.35),
       onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),
@@ -3717,6 +4029,7 @@ export class SynthEngine {
     this._vibratoPhase = 0;
     this._vibratoCycleRate = 5.5;
     this._vibratoCycleDepth = 0;
+    this._bowNoiseImpulseCache = new WeakMap();
     this._surpriseCount = 0;
     this._lastSurpriseAt = 0;
     this._timeline = [];   // ring buffer of scheduled note events (for visualisers)
@@ -4767,6 +5080,8 @@ export class SynthEngine {
     // L5/L5b: one seeded articulation draw controls plosive strength, breath
     // lead and fitted pitch scoop together. Presets that have not opted in
     // retain the exact Q8 class-based scoop for compatibility.
+    const bowedOnsetEnabled = note.excitationType === "bow" &&
+      ((note.onsetWanderCents || 0) > 0 || (note.bowScratchLevel || 0) > 0);
     note._articulationOnset = articulationOnsetPlan(
       () => this._nextRandom(), {
         coupling: note.articulationCoupling,
@@ -4783,6 +5098,7 @@ export class SynthEngine {
         velocitySlope: note.onsetScoopVelocitySlope,
         phraseStart: note.phraseStart,
         legato: note.legatoFromPrevious,
+        forceLatent: bowedOnsetEnabled,
       });
     note._scoopCents = (note.articulationCoupling || 0) > 0
       ? note._articulationOnset.scoopCents
@@ -4790,6 +5106,23 @@ export class SynthEngine {
     note._scoopSettleSec = (note.articulationCoupling || 0) > 0
       ? note._articulationOnset.scoopSettleSec
       : 0;
+    note._bowOnsetWander = bowOnsetWanderPlan(
+      () => this._nextRandom(), {
+        excitationType: note.excitationType,
+        human: note.excitationHuman,
+        articulationStrength: note._articulationOnset.strength,
+        depthCents: note.onsetWanderCents,
+        settlePeriods: note.onsetWanderSettlePeriods,
+        frequency: note.frequency,
+        legato: note.legatoFromPrevious,
+      });
+    note._bowScratch = bowScratchPlan(note.attackNoise, {
+      excitationType: note.excitationType,
+      articulationStrength: note._articulationOnset.strength,
+      level: note.bowScratchLevel,
+      durationPeriods: note.onsetWanderSettlePeriods,
+      frequency: note.frequency,
+    });
     note._wanderEvents = f0WanderTrace(() => this._nextRandom(), note.duration, note.excitationHuman);
     const dispatch = (n) => {
       if (this._voiceMode === "formant" || this._voiceMode === "fourier") {
@@ -4939,17 +5272,24 @@ export class SynthEngine {
       ? scoopCents * Math.max(0, 1 - (time - t0) / atk)
       : 0;
     const wander = note._wanderEvents || [];
+    const bowOnset = note._bowOnsetWander || { cents: 0, settleSec: 0 };
+    const bowOnsetAt = (time) => bowOnset.cents
+      ? bowOnset.cents * Math.max(0, 1 - (time - t0) / Math.max(.001, bowOnset.settleSec))
+      : 0;
     const wanderAt = (time) => {
       let c = 0;
       for (const p of wander) { if (p.time <= time - t0) c = p.cents; else break; }
       return c;
     };
     let events = note._vibratoEvents || [];
-    if (!events.length && (scoopCents || wander.length)) {
+    if (!events.length && (scoopCents || bowOnset.cents || wander.length)) {
       // no vibrato timeline to ride — synthesize ramp points for the
       // imperfections themselves
       const pts = [t0];
       if (scoopCents) for (const f of [0.25, 0.5, 0.75, 1]) pts.push(t0 + atk * f);
+      if (bowOnset.cents) {
+        for (const f of [0.25, 0.5, 0.75, 1]) pts.push(t0 + bowOnset.settleSec * f);
+      }
       for (const p of wander) pts.push(t0 + p.time);
       pts.push(t0 + (note.duration || 0.2));
       events = [...new Set(pts)].sort((a, b) => a - b).map(time => ({ time, cents: 0 }));
@@ -4962,7 +5302,8 @@ export class SynthEngine {
       return target;
     };
     const valueAt = (time, cents = 0) =>
-      baseAt(time) * Math.pow(2, (cents + scoopAt(time) + wanderAt(time)) / 1200);
+      baseAt(time) * Math.pow(2,
+        (cents + scoopAt(time) + bowOnsetAt(time) + wanderAt(time)) / 1200);
 
     if (events.length > 0) {
       param.setValueAtTime(valueAt(t0, events[0].cents), t0);
@@ -5062,7 +5403,6 @@ export class SynthEngine {
       const onsetDelay = note.legatoFromPrevious
         ? 0
         : partialOnsetDelay(harmonic, note.excitationType, note.attackStaggerMs);
-      const vibEvents = note._vibratoEvents || [];
       // Material damping law, tone v2 (T1): each partial decays with the
       // instrument's T60 at that partial's REAL frequency (audits A2/A3) —
       // a 4 kHz mode rings the same whether it is n=4 of a high note or
@@ -5075,31 +5415,17 @@ export class SynthEngine {
         // FM→AM through the body (T5): every polarisation mode traverses
         // the same body law. Close modes may sit on slightly different parts
         // of a ridge, but neither gets a separate body implementation.
-        if (vibEvents.length > 2 && note.bodyBands && note.bodyBands.length &&
-            (note.bodyAmount || 0) > 0) {
-          const r0 = bodyResponse(note.bodyBands, modeFreq, note.bodyAmount);
-          let minC = 0, maxC = 0;
-          for (const e of vibEvents) {
-            if (e.cents < minC) minC = e.cents;
-            if (e.cents > maxC) maxC = e.cents;
+        const bodyEvents = bodyAmAutomationEvents(
+          note, modeFreq, t0, t1, modeFreq / Math.max(1, note.frequency), 100);
+        if (bodyEvents.length > 1 && bodyEvents.some(e => Math.abs(e.gain - 1) > 1e-12)) {
+          const am = this.ctx.createGain();
+          am.gain.setValueAtTime(bodyEvents[0].gain, bodyEvents[0].time);
+          for (let k = 1; k < bodyEvents.length; k++) {
+            const e = bodyEvents[k];
+            am.gain.linearRampToValueAtTime(e.gain, e.time);
           }
-          const rHi = bodyResponse(note.bodyBands,
-            modeFreq * Math.pow(2, maxC / 1200), note.bodyAmount);
-          const rLo = bodyResponse(note.bodyBands,
-            modeFreq * Math.pow(2, minC / 1200), note.bodyAmount);
-          if (Math.abs(rHi - rLo) / r0 > 0.03) {
-            const am = this.ctx.createGain();
-            am.gain.setValueAtTime(1, t0);
-            const stride = Math.max(1, Math.ceil(vibEvents.length / 96));
-            for (let k = 1; k < vibEvents.length; k += stride) {
-              const e = vibEvents[k];
-              const r = bodyResponse(note.bodyBands,
-                modeFreq * Math.pow(2, e.cents / 1200), note.bodyAmount);
-              am.gain.linearRampToValueAtTime(r / r0, e.time);
-            }
-            gainNode.connect(am);
-            tail = am;
-          }
+          gainNode.connect(am);
+          tail = am;
         }
         return tail;
       };
@@ -5174,6 +5500,95 @@ export class SynthEngine {
     });
     this._schedulePartialAmplitudes(scheduled, note, t0, t1);
     if ((note.excitationType || "") === "blow") this._renderBlowFloor(note, t0, t1, env);
+    if ((note.excitationType || "") === "bow") this._renderPinnedBowNoise(note, t0, t1, env);
+  }
+
+  _seededNoiseBuffer() {
+    const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let state = Math.floor(this._nextRandom() * 0x100000000) >>> 0;
+    if (state === 0) state = 0x6d2b79f5;
+    for (let i = 0; i < data.length; i++) {
+      state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+      data[i] = (state >>> 0) / 0x80000000 - 1;
+    }
+    return buffer;
+  }
+
+  _routePinnedBowNoiseBody(source, bands, t0) {
+    let tail = source;
+    for (const band of bands || []) {
+      if (!Number.isFinite(band?.freq) || !Number.isFinite(band?.gain)) continue;
+      const body = this.ctx.createBiquadFilter();
+      body.type = "peaking";
+      body.frequency.setValueAtTime(Math.max(40, band.freq), t0);
+      body.Q.value = Math.max(.3, Math.min(12, 1 / Math.max(.08, band.width || .3)));
+      body.gain.value = Math.max(-12, Math.min(12, band.gain * 6));
+      tail.connect(body);
+      tail = body;
+    }
+    return tail;
+  }
+
+  _pinnedBowNoiseImpulseBuffer(component) {
+    const cacheKey = component.profile;
+    const cached = this._bowNoiseImpulseCache.get(cacheKey);
+    if (cached) return cached;
+    const impulse = buildBowNoiseImpulse(component.profile,
+      component.deconvolutionBands || [], this.ctx.sampleRate);
+    const buffer = this.ctx.createBuffer(1, impulse.length, this.ctx.sampleRate);
+    buffer.copyToChannel(impulse, 0);
+    this._bowNoiseImpulseCache.set(cacheKey, buffer);
+    return buffer;
+  }
+
+  /** T-054: render Agent D's immutable L14 violin residual as its own
+   * body-routed component. Zero level creates no nodes and is exact legacy;
+   * enabled notes use seeded continuous noise and the pinned velocity law. */
+  _renderPinnedBowNoise(note, t0, t1, env) {
+    const component = note.bowNoise;
+    const levelControl = this._clamp(note.bowNoiseLevel ?? 0, 0, 2);
+    if (!component || levelControl <= 0 || !Array.isArray(component.profile) ||
+        component.profile.length < 2 || t1 - t0 < .12) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._seededNoiseBuffer();
+    src.loop = true;
+
+    const convolver = this.ctx.createConvolver();
+    convolver.normalize = false;
+    convolver.buffer = this._pinnedBowNoiseImpulseBuffer(component);
+
+    const gain = this.ctx.createGain();
+    const exponent = this._clamp(note.bowNoiseVelocityExponent ?? 1, 0, 2);
+    // The PSD intercept is corpus-file absolute level and cannot be applied
+    // directly to WebAudio's normalised harmonic sum. The measured mf NHR is
+    // the dimensionless renderer contract: level 1 reproduces that residual-
+    // to-harmonic ratio, while the fitted exponent moves it across dynamics.
+    const rungs = Array.isArray(component.levelLaw?.rungs)
+      ? component.levelLaw.rungs : [];
+    const reference = rungs.find(row => row.dynamic === "mf") || rungs[0];
+    const nhrDb = Number(reference?.noiseToHarmonicDb);
+    const relativeScale = Number.isFinite(nhrDb) ? Math.pow(10, nhrDb / 20) : .04;
+    const base = Math.max(.000001, levelControl * relativeScale *
+      bowNoiseVelocityGain(note.velocity, exponent));
+    gain.gain.setValueAtTime(base, t0);
+    const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
+    const trace = humanFluctuationTrace(
+      () => this._nextRandom(), t1 - t0, "bow", human);
+    for (const point of trace) {
+      if (point.t >= t1 - t0 - .03) continue;
+      gain.gain.linearRampToValueAtTime(
+        base * Math.max(.45, 1 + point.f * human * .22), t0 + point.t);
+    }
+    gain.gain.setValueAtTime(base, Math.max(t0, t1 - .03));
+
+    src.connect(convolver);
+    const tail = this._routePinnedBowNoiseBody(convolver, note.bodyBands, t0);
+    tail.connect(gain);
+    gain.connect(env);
+    src.start(t0);
+    src.stop(t1 + .04);
+    this._track(src);
   }
 
   // T3 Human + T4 Transfer: one seeded fluctuation trace per note drives
@@ -5317,7 +5732,7 @@ export class SynthEngine {
    * spectrum cannot.
    */
   _renderAttackNoise(note, t0, env, out) {
-    const an = note.attackNoise;
+    const an = note._bowScratch?.enabled ? note._bowScratch : note.attackNoise;
     if (!an || !this._noiseBuffer || !note.velocity) return;
     const src = this.ctx.createBufferSource();
     src.buffer = this._noiseBuffer;

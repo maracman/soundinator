@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -10,7 +11,7 @@ import scripts.tone_match.score as score_module
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
-from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
+from scripts.tone_match.assertions import ConstructionSample, SUNG_DERIVED_PRESETS, SUNG_SECTION_TYPES, evaluate_construction, normalize_instrument
 from scripts.tone_match.build_campaign import CAMPAIGNS, PHILHARMONIA_WOODWIND_ALTERNATES, RESONATOR
 from scripts.tone_match.controllability import (
     canonical_hash,
@@ -27,17 +28,23 @@ from scripts.tone_match.iterate import (
     _candidate_fingerprint,
     _consume_controllability_audit,
     _dominant_residual,
+    _distributional_variation_gate,
+    _ensure_legacy_baseline,
     _floor_evidence,
     _free_manifest_contract,
     _load_preset,
+    _mode_params,
     _params,
     _reference_set_id,
     _reference_variability,
     _renderer_contract_hash,
+    _technique_exchange_statuses,
     _tripwire_gate,
     _update_leaderboard,
     _write_run_report,
 )
+from scripts.tone_match.legacy_prior import resolve_legacy_prior
+from scripts.tone_match.humanisation import fit_excitation_position
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
@@ -203,6 +210,28 @@ def test_requested_parameter_order_is_preserved_for_construction_first_fits():
     assert resolved[0].default == .25
 
 
+def test_trumpet_l9_articulation_slope_enters_blown_optimizer_free_set():
+    manifest = json.loads((Path(__file__).parents[1] /
+                           "scripts/tone_match/manifest.json").read_text())
+    row = next(row for row in manifest["continuous"]
+               if row["key"] == "articulationVelocitySlope")
+    assert {key: row[key] for key in ("min", "max", "step", "default", "appliesTo")} == {
+        "min": -1.5, "max": 1.5, "step": 0.01, "default": 0.0,
+        "appliesTo": ["blow"],
+    }
+    resolved = _params(
+        manifest,
+        {"excitationType": "blow", "spectralProfile": "trumpet"},
+        ["articulationVelocitySlope"],
+    )
+    assert resolved == [FreeParam("articulationVelocitySlope", -1.5, 1.5, 0.0)]
+    assert _params(
+        manifest,
+        {"excitationType": "bow", "spectralProfile": "violin"},
+        ["articulationVelocitySlope"],
+    ) == []
+
+
 def test_reference_set_id_changes_when_the_scored_manifest_changes():
     base = [{"path": "/tmp/a.wav", "midi": 60, "velocity": .2}]
     assert _reference_set_id(base) == _reference_set_id([dict(base[0])])
@@ -211,6 +240,34 @@ def test_reference_set_id_changes_when_the_scored_manifest_changes():
     ])
     assert _reference_set_id(base, weights={"partials_db": 1}) != \
         _reference_set_id(base, weights={"partials_db": 0})
+    assert _reference_set_id(base, prior_hash="a") != \
+        _reference_set_id(base, prior_hash="b")
+
+
+def test_exchange_status_parser_uses_latest_per_lane_update(tmp_path, monkeypatch):
+    exchange = tmp_path / "docs/sg2/TECHNIQUES_EXCHANGE.md"
+    exchange.parent.mkdir(parents=True)
+    exchange.write_text(
+        "### T-001 · Example\n"
+        "Status: analysis=pending engine=pending bowed=blocked-engine\n"
+        "Status update: engine=incorporated abc analysis=adapted\n")
+    monkeypatch.setattr(iterate_module, "ROOT", tmp_path)
+    assert _technique_exchange_statuses() == [{
+        "id": "T-001", "title": "Example", "engine": "incorporated abc",
+        "analysis": "adapted", "bowed": "blocked-engine", "sung": "missing",
+        "struck/plucked": "missing",
+    }]
+
+
+def test_humanisation_position_fit_recovers_existing_comb_law():
+    rank = np.arange(1, 33, dtype=float)
+    position = .137
+    comb = 20 * np.log10(np.maximum(
+        np.abs(np.sin(np.pi * rank * position)), 1e-3))
+    observed = comb + 2.5 - 4.0 * np.log2(rank)
+    fitted = fit_excitation_position(observed)
+    assert fitted["position"] == pytest.approx(position, abs=.002)
+    assert fitted["residualDb"] < .1
 
 
 def test_state_best_wrapper_is_a_valid_initial_preset(tmp_path):
@@ -409,6 +466,116 @@ def test_leaderboard_preview_does_not_record_unaccepted_candidate(tmp_path, monk
     assert [row["run"] for row in board["runs"]] == ["accepted"]
 
 
+def test_legacy_prior_uses_pinned_tag_craft_and_measured_overlay():
+    resolved, prior = resolve_legacy_prior("violin", {
+        "sg2Family": "bowed", "spectralProfile": "violin",
+        "excitationType": "bow", "excitationHuman": 0,
+        "vibratoRate": 6.125, "bodyBands": [{"freq": 280, "gain": .4}],
+    })
+    assert prior["tag"] == "sg2-legacy"
+    assert prior["commit"].startswith("e8d3ac1")
+    assert prior["source"] == "violin"
+    assert resolved["excitationHuman"] == pytest.approx(.4)
+    assert resolved["envelopeAttack"] == pytest.approx(.085)
+    assert resolved["vibratoRate"] == pytest.approx(6.125)  # measured wins
+    assert resolved["bodyBands"] == [{"freq": 280, "gain": .4}]
+    assert len(prior["rowHash"]) == len(prior["resolvedParameterHash"]) == 64
+
+
+def test_fit_mode_zeros_human_draws_without_stripping_ship_craft():
+    params = {"excitationHuman": .4, "vibratoDepth": 18,
+              "vibratoRateSd": .5, "envelopeAttack": .08,
+              "attackNoiseLevel": .3}
+    fitted = _mode_params(params, "fit")
+    shipped = _mode_params(params, "ship")
+    assert fitted["excitationHuman"] == 0
+    assert fitted["vibratoRateSd"] == 0
+    assert fitted["vibratoDepth"] == 18
+    assert fitted["attackNoiseLevel"] == .3
+    assert shipped["excitationHuman"] == .4
+    assert shipped["vibratoRateSd"] == .5
+
+
+def test_t031_bowed_controls_are_auditable_but_not_identity_fit_dimensions():
+    manifest = json.loads((
+        iterate_module.ROOT / "scripts/tone_match/manifest.json").read_text())
+    params = {"excitationType": "bow", "onsetWanderCents": 80,
+              "onsetWanderSettlePeriods": 18, "bowScratchLevel": 1}
+    keys = ["onsetWanderCents", "onsetWanderSettlePeriods", "bowScratchLevel"]
+    assert _params(manifest, params, keys, mode="fit") == []
+    assert {row.key for row in _params(manifest, params, keys, mode="ship")} == {
+        "onsetWanderCents", "onsetWanderSettlePeriods", "bowScratchLevel"}
+    assert _mode_params(params, "ship")["onsetWanderCents"] == 80
+
+
+def test_distributional_variation_gate_is_two_sided(monkeypatch):
+    variability = {"status": "measured", "groups": [{
+        "group": "same-note", "referenceIndices": [0],
+        "floorFeatures": {"vibrato": 2.0},
+    }]}
+
+    def compare(left, right, _weights):
+        return {"features": {"vibrato": abs(left - right)}}
+
+    monkeypatch.setattr(iterate_module, "compare_features", compare)
+    passed = _distributional_variation_gate(
+        variability, {0: [0.0, 2.0, 4.0]}, {"vibrato": 1})
+    assert passed["passed"]
+    sterile = _distributional_variation_gate(
+        variability, {0: [0.0, 0.0, 0.0]}, {"vibrato": 1})
+    assert not sterile["passed"]
+    assert sterile["groups"][0]["checks"][0]["status"] == "too-little"
+    sloppy = _distributional_variation_gate(
+        variability, {0: [0.0, 10.0, 20.0]}, {"vibrato": 1})
+    assert not sloppy["passed"]
+    assert sloppy["groups"][0]["checks"][0]["status"] == "too-much"
+
+
+def test_legacy_baseline_is_mandatory_leaderboard_entry_one(tmp_path, monkeypatch):
+    monkeypatch.setattr(iterate_module, "DEFAULT_RUN_ROOT", tmp_path / "runs")
+    monkeypatch.setattr(iterate_module, "STATE_ROOT", tmp_path / "state")
+    best = {"loss": 2.0, "params": {"excitationHuman": .4},
+            "construction": {"passed": False, "counts": {"fail": 1}},
+            "tripwires": {"strictPassed": False, "cells": [],
+                          "strictMissingCells": []}, "gateFailures": 1}
+    prior = {"instrument": "violin", "source": "violin",
+             "rowHash": "a", "resolvedParameterHash": "b"}
+    entry = _ensure_legacy_baseline(
+        "violin", tmp_path / "pass-1", best, "objective", prior,
+        {"passed": False, "status": "fail"})
+    board = json.loads((tmp_path / "runs" / "violin" / "leaderboard.json").read_text())
+    assert entry["kind"] == "legacy-baseline"
+    assert board["runs"][0]["entryNumber"] == 1
+    assert board["legacyBaselineByReferenceSet"]["objective"]["prior"] == prior
+    assert (tmp_path / "state" / "violin" / "leaderboard.json").exists()
+
+
+def test_sung_section_aliases_and_derived_rows_follow_decision_12():
+    assert SUNG_SECTION_TYPES == {"soprano", "mezzo-soprano", "tenor", "bass"}
+    assert normalize_instrument("voice-soprano") == "soprano"
+    assert normalize_instrument("voice-bass") == "bass"
+    assert normalize_instrument("contrabass") == "basso-profondo"
+    assert SUNG_DERIVED_PRESETS["basso-profondo"] == "bass"
+    derived = evaluate_construction("contrabass", [], params={
+        "excitationType": "blow", "derivedFrom": "voice-bass-fitted",
+        "bassoMorphology": {"transform": {"formantScale": .94}},
+    }, strict_evidence=False)
+    assert derived["instrument"] == "basso-profondo"
+    assert derived["targetClass"] == "derived-preset"
+    ids = {row["id"] for row in derived["assertions"]}
+    assert "basso-profondo.derived-parent" in ids
+    assert "basso-profondo.glottal-law" not in ids
+
+
+def test_l9_articulation_velocity_slope_is_in_canonical_manifest():
+    manifest = json.loads((iterate_module.ROOT / "scripts" / "tone_match" /
+                           "manifest.json").read_text())
+    row = next(row for row in manifest["continuous"]
+               if row["key"] == "articulationVelocitySlope")
+    assert (row["min"], row["max"], row["default"], row["appliesTo"]) == (
+        -1.5, 1.5, 0.0, ["blow"])
+
+
 def _bundle(*, f0=220.0, partials=None, percussive=False, B=0.0002):
     partials = np.asarray(partials or [1, .3, .7, .2, .5, .15, .35, .1], dtype=float)
     note = NoteAnalysis("test", f0, "A3", 1.0, partials, f0 * np.arange(1, len(partials) + 1),
@@ -556,10 +723,15 @@ def test_controllability_contract_rejects_objective_or_manifest_drift(tmp_path):
     responders = {feature: (["partialTilt"] if weight > 0 else [])
                   for feature, weight in weights.items()}
     audit = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "instrument": instrument,
         "objectiveHash": objective_contract_hash(instrument, references, weights),
         "manifestHash": manifest_contract_hash(contract),
+        "referenceContractHash": canonical_hash(references),
+        "parameterManifestHash": canonical_hash(contract),
+        "initialPresetHash": canonical_hash({"partialTilt": 0}),
+        "scorerContractVersion": SCORER_CONTRACT_VERSION,
+        "rendererContractHash": _renderer_contract_hash(),
         "startingWeights": weights,
         "finalWeights": weights,
         "responsiveParameters": responders,
@@ -571,7 +743,8 @@ def test_controllability_contract_rejects_objective_or_manifest_drift(tmp_path):
     path = tmp_path / "controllability.json"
     path.write_text(json.dumps(audit))
     assert _consume_controllability_audit(
-        path, instrument, references, free, weights)["clean"]
+        path, instrument, references, free, weights,
+        initial={"partialTilt": 0})["clean"]
     with pytest.raises(ValueError, match="objective hash mismatch"):
         _consume_controllability_audit(
             path, instrument, references + [{"path": "other.wav"}], free, weights)
