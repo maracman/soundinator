@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -201,6 +202,28 @@ def test_requested_parameter_order_is_preserved_for_construction_first_fits():
     )
     assert [row.key for row in resolved] == ["dynamicBlare", "partialTilt", "excitationPosition"]
     assert resolved[0].default == .25
+
+
+def test_trumpet_l9_articulation_slope_enters_blown_optimizer_free_set():
+    manifest = json.loads((Path(__file__).parents[1] /
+                           "scripts/tone_match/manifest.json").read_text())
+    row = next(row for row in manifest["continuous"]
+               if row["key"] == "articulationVelocitySlope")
+    assert {key: row[key] for key in ("min", "max", "step", "default", "appliesTo")} == {
+        "min": -1.5, "max": 1.5, "step": 0.01, "default": 0.0,
+        "appliesTo": ["blow"],
+    }
+    resolved = _params(
+        manifest,
+        {"excitationType": "blow", "spectralProfile": "trumpet"},
+        ["articulationVelocitySlope"],
+    )
+    assert resolved == [FreeParam("articulationVelocitySlope", -1.5, 1.5, 0.0)]
+    assert _params(
+        manifest,
+        {"excitationType": "bow", "spectralProfile": "violin"},
+        ["articulationVelocitySlope"],
+    ) == []
 
 
 def test_reference_set_id_changes_when_the_scored_manifest_changes():
