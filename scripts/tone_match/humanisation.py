@@ -230,6 +230,7 @@ def _dimension_evidence(observable: str, *, matched_pairs: int,
                         adjacent_pairs: int) -> dict[str, Any]:
     if adjacent_pairs:
         return {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": adjacent_pairs,
@@ -238,6 +239,7 @@ def _dimension_evidence(observable: str, *, matched_pairs: int,
         }
     if matched_pairs and observable in _DURATION_ROBUST_OBSERVABLES:
         return {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -245,6 +247,8 @@ def _dimension_evidence(observable: str, *, matched_pairs: int,
             "durationMismatchAffectsGoal": False,
         }
     return {
+        "evidenceGrade": ("B-common-window-repeat" if matched_pairs else
+                          "U-insufficient"),
         "strength": "weaker-evidence" if matched_pairs else
                     "insufficient-evidence",
         "primaryBasis": "same-note-repeat-common-window" if matched_pairs
@@ -600,8 +604,8 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                                   for row in rows),
     } for group, rows in sorted(groups.items())]
     return {
-        "schemaVersion": 3, "instrument": instrument,
-        "method": ("matched-take-human-only-differential-v3-"
+        "schemaVersion": 4, "instrument": instrument,
+        "method": ("matched-take-human-only-differential-v4-"
                    "double-dissociation-f13-evidence"),
         "evidence": {"basis": ("same-note/dynamic/articulation humanisation "
                                 "plus per-dimension lossless within-run "
@@ -612,6 +616,18 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                      "adjacentTrendGroups": adjacent["groups"],
                      "adjacentTrendPairs": len(adjacent["pairs"]),
                      "evidenceByDimension": evidence_by_dimension,
+                     "gradeScale": {
+                         "A-lossless-adjacent": (
+                             "full-strength direct per-note width after "
+                             "within-run register-trend removal"),
+                         "A-duration-robust-repeat": (
+                             "full-strength same-note repeat evidence for a "
+                             "duration-robust observable"),
+                         "B-common-window-repeat": (
+                             "usable repeat evidence weakened by codec, "
+                             "duration, floor, or window sensitivity"),
+                         "U-insufficient": "no eligible evidence",
+                     },
                      "doctrine": ("F13: evidence strength is per dimension; "
                                   "spec fallbacks never impose a blanket "
                                   "downgrade")},
