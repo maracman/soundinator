@@ -102,3 +102,48 @@ these same placement/envelope fields. A new tone-model assertion proves the
 measured positive lead, independent envelope and nonzero release reach the
 bow renderer. `releaseDamping` therefore remains a separate harmonic/body
 ring control, not a stand-in for bow-component release.
+
+## T-074 — five measured-Human bowed adapters require isolated consumers
+
+Owner handoff: Agent D (analysis) → Agent A (engine), pass 06, 2026-07-17.
+
+The current hashed native-episode audit is clean and repeat-stable, but only
+four of nine qualified cello ranges cross the 0.05 response threshold. The
+same adapter machinery is shared by violin. The five failures and exact
+blocking mechanisms are:
+
+1. `vibratoRate`: `vibrato` moves only 0.03455 unit. Non-vibrato audit roles
+   force base probability to zero; rate is inaudible unless the same measured
+   episode first supplies positive depth. Add a forced-episode isolated audit
+   with positive measured depth held fixed, then vary only measured rate.
+2. `vibratoDepth`: `body_am_db` moves only 0.04290 unit. Add an isolated
+   positive-depth episode and prove the body-AM estimator crosses 0.05 in the
+   encoded direction without changing deterministic Human-0 identity.
+3. `vibratoOnsetDelayMs`: the current estimator response is exactly zero.
+   Exercise delay only while a measured positive depth/rate episode is held
+   active; prove the first tracked vibrato cycle moves by the encoded delay
+   within 20 ms and that delay zero is the exact prior path.
+4. `bowScratchLevelDb`: `bowedHumanLevels` multiplies a strongest-prior
+   `bowScratchLevel` of zero, so every dB delta remains exactly zero. On a
+   triggered episode, map the stored absolute measured dB sample to a
+   non-negative linear scratch gain relative to the pinned attack-noise
+   component. No episode/Human 0 must remain exact zero and PCM-identical.
+5. `attackNoiseLevel`: the stored p90 ratio width is 0.003818; adding that raw
+   ratio after the profile/parameter scale moves `onset_noise_db` only 0.04164
+   unit. Consume the already-declared ratio-to-level calibration (×10) once,
+   around the strongest-prior identity, and prove an isolated episode crosses
+   0.05 without double-counting the profile's `attackNoiseLevel` scale.
+
+Required consuming assertions:
+
+- hash the exact `humanRanges` contract and force one episode deterministically;
+- test one range at a time, while retaining only physical prerequisites such
+  as positive vibrato depth, so aggregate `excitationHuman` changes cannot be
+  misattributed to the wrong adapter;
+- prove the named feature moves above 0.05 and in the encoded direction at the
+  measured range endpoints;
+- prove Human 0/no episode is bit-identical to the current strongest-prior
+  render for every adapter;
+- rerun the six-cell native-episode audit after all five land. Until then the
+  decomposition verdict remains `INCONCLUSIVE-MASKED`; no missing-DOF claim or
+  identity widening is permitted.
