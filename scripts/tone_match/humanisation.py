@@ -435,6 +435,115 @@ def _consume_profile_ranges(profiles: dict[str, Any], instrument: str,
     return True
 
 
+def ship_human_overrides(params: dict[str, Any], *, midi: float,
+                         seed: int) -> dict[str, float]:
+    """Resolve measured ``humanRanges`` into one seeded SHIP performance.
+
+    The differential fitter stores physical take-to-take ranges, whereas the
+    renderer consumes a mixture of direct controls, linear levels and
+    period-scaled onset timing.  This is the consuming adapter between those
+    contracts.  FIT mode never calls it.  The articulation-related controls
+    share one latent draw (T-002); bow position, vibrato and sustained bow
+    noise retain independent measured draws.
+
+    ``drawHalfRange`` was derived from the take-pair p90.  A bounded uniform
+    draw reproduces both the observed violin median and p90 pair spread more
+    closely than a Gaussian (the bow-position evidence is episodic/heavy-tail,
+    not a wide Gaussian).  The Human dial scales direct deviations, while
+    controls already Human-scaled inside the renderer receive their measured
+    absolute range and are suppressed there when Human is zero.
+    """
+    human = float(np.clip(params.get("excitationHuman", 0.0), 0.0, 1.0))
+    contract = params.get("humanRanges")
+    ranges = contract.get("ranges", {}) if isinstance(contract, dict) else {}
+    if human <= 0 or not isinstance(ranges, dict) or not ranges:
+        return {}
+
+    rng = np.random.default_rng(int(seed) & 0xFFFFFFFF)
+    independent = {
+        key: float(rng.uniform(-1.0, 1.0))
+        for key in ("excitationPosition", "vibratoRate", "bowNoiseLevelDb")
+    }
+    articulation = float(rng.uniform(-1.0, 1.0))
+    result: dict[str, float] = {}
+    calibration = params.get("shipHumanCalibration") or {}
+    by_midi = calibration.get("byMidi") or {}
+    midi_scales = by_midi.get(str(int(round(float(midi)))), {})
+
+    def scale(key: str) -> float:
+        return max(0.0, float(midi_scales.get(key, 1.0)))
+
+    def row(key: str) -> dict[str, Any] | None:
+        value = ranges.get(key)
+        return value if isinstance(value, dict) and \
+            value.get("status") == "measured" else None
+
+    position = row("excitationPosition")
+    if position:
+        base = float(params.get("excitationPosition", position.get("centre", .13)))
+        half = (float(position.get("drawHalfRange", 0.0)) *
+                scale("excitationPosition"))
+        result["excitationPosition"] = float(np.clip(
+            base + independent["excitationPosition"] * half * human, .02, .5))
+
+    vibrato = row("vibratoRate")
+    if vibrato:
+        base = float(params.get("vibratoRate", vibrato.get("centre", 5.5)))
+        half = float(vibrato.get("drawHalfRange", 0.0)) * scale("vibratoRate")
+        result["vibratoRate"] = float(np.clip(
+            base + independent["vibratoRate"] * half * human, .5, 12.0))
+
+    bow_noise = row("bowNoiseLevelDb")
+    if bow_noise and float(params.get("bowNoiseLevel", 0.0)) > 0:
+        delta_db = (independent["bowNoiseLevelDb"] *
+                    float(bow_noise.get("drawHalfRange", 0.0)) *
+                    scale("bowNoiseLevelDb") * human)
+        result["bowNoiseLevel"] = float(np.clip(
+            float(params["bowNoiseLevel"]) * 10 ** (delta_db / 20), 0.0, 2.0))
+
+    # Stronger articulation raises the contact transient while reducing the
+    # onset pitch error and its settling time.  This preserves T-002's one-
+    # latent anticorrelation instead of inventing independent impossible
+    # combinations.
+    scratch = row("bowScratchLevelDb")
+    if scratch:
+        measured_db = (float(scratch.get("centre", -60.0)) +
+                       articulation * float(scratch.get("drawHalfRange", 0.0)) *
+                       scale("bowScratchLevelDb"))
+        result["bowScratchLevel"] = float(np.clip(
+            10 ** (measured_db / 20), 0.0, 2.0))
+
+    attack = row("attackNoiseLevel")
+    if attack:
+        measured = (float(attack.get("centre", 0.0)) + articulation *
+                    float(attack.get("drawHalfRange", 0.0)) *
+                    scale("attackNoiseLevel"))
+        # The profile fitter's established render calibration is measured
+        # transient/sustain ratio x10 -> attackNoiseLevel.
+        target = float(np.clip(measured * 10.0, 0.0, 2.0))
+        base = float(params.get("attackNoiseLevel", target))
+        result["attackNoiseLevel"] = float(np.clip(
+            base + human * (target - base), 0.0, 2.0))
+
+    wander = row("onsetWanderCents")
+    if wander:
+        # Invert the articulation latent: a weak/floated start wanders more.
+        measured = (float(wander.get("centre", 0.0)) - articulation *
+                    float(wander.get("drawHalfRange", 0.0)) *
+                    scale("onsetWanderCents"))
+        result["onsetWanderCents"] = float(np.clip(measured, 0.0, 120.0))
+
+    settle = row("onsetWanderSettleMs")
+    if settle:
+        measured_ms = (float(settle.get("centre", 0.0)) - articulation *
+                       float(settle.get("drawHalfRange", 0.0)) *
+                       scale("onsetWanderSettleMs"))
+        f0 = 440.0 * 2 ** ((float(midi) - 69.0) / 12.0)
+        result["onsetWanderSettlePeriods"] = float(np.clip(
+            max(0.0, measured_ms) * f0 / 1000.0, 2.0, 30.0))
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instrument", required=True)

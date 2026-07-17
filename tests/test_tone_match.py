@@ -10,7 +10,7 @@ import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
 import scripts.tone_match.struck_plucked_prep as struck_prep_module
 
-from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
+from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, bowed_string_from_filename, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
 from scripts.tone_match.assertions import (
     ConstructionSample,
@@ -54,13 +54,12 @@ from scripts.tone_match.iterate import (
     _write_run_report,
 )
 from scripts.tone_match.legacy_prior import resolve_legacy_prior
-from scripts.tone_match.humanisation import fit_excitation_position
+from scripts.tone_match.humanisation import fit_excitation_position, ship_human_overrides
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, STRUCK_OBJECTIVE_ROLES, rebase_fitted_preset, seed_preset
-from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
+from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, iowa_filename_span, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
 from scripts.tone_match.build_campaign import _run_start_midi
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
-from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 
 
@@ -206,17 +205,17 @@ def test_tail_audit_distinguishes_full_release_from_truncation_and_phrases():
     assert phrase_take({"sourceFile": "violin_C4_phrase_legato.wav"})
 
 
-def test_release_features_are_corpus_gated_and_zero_weight_pending_audit():
+def test_release_features_are_corpus_gated_and_weighted_after_bowed_audit():
     weights = weights_for_instrument("violin")
     for feature in ("release_ring_ms", "release_damp_db_per_s",
                     "release_noise_db"):
-        assert weights[feature] == 0.0
+        assert weights[feature] == 1.0
     reference = _bundle(); rendered = _bundle()
     reference.release_ring_ms = 100.0; rendered.release_ring_ms = 600.0
     comparison = compare_features(reference, rendered, weights)
     assert comparison["features"]["release_ring_ms"] == 500.0
-    assert comparison["composite"] == pytest.approx(
-        compare_features(reference, reference, weights)["composite"])
+    assert comparison["composite"] > compare_features(
+        reference, reference, weights)["composite"]
 
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
     freqs = np.asarray([50.0, 100.0, 200.0, 10_000.0])
@@ -696,6 +695,79 @@ def test_fit_mode_zeros_human_draws_without_stripping_ship_craft():
     assert shipped["vibratoRateSd"] == .5
 
 
+def test_measured_human_ranges_drive_seeded_ship_controls_only():
+    params = {
+        "excitationHuman": 1.0, "excitationPosition": .13,
+        "vibratoRate": 5.9, "bowNoiseLevel": .34,
+        "attackNoiseLevel": .3,
+        "humanRanges": {"ranges": {
+            "excitationPosition": {"status": "measured", "drawHalfRange": .1},
+            "vibratoRate": {"status": "measured", "drawHalfRange": .04},
+            "bowNoiseLevelDb": {"status": "measured", "drawHalfRange": 3.6},
+            "bowScratchLevelDb": {"status": "measured", "centre": -19,
+                                  "drawHalfRange": 10},
+            "attackNoiseLevel": {"status": "measured", "centre": .027,
+                                 "drawHalfRange": .09},
+            "onsetWanderCents": {"status": "measured", "centre": 26,
+                                 "drawHalfRange": 106},
+            "onsetWanderSettleMs": {"status": "measured", "centre": 71,
+                                    "drawHalfRange": 107},
+        }},
+    }
+    first = ship_human_overrides(params, midi=55, seed=44)
+    assert first == ship_human_overrides(params, midi=55, seed=44)
+    assert first != ship_human_overrides(params, midi=55, seed=45)
+    assert set(first) == {
+        "excitationPosition", "vibratoRate", "bowNoiseLevel",
+        "bowScratchLevel", "attackNoiseLevel", "onsetWanderCents",
+        "onsetWanderSettlePeriods",
+    }
+    assert .02 <= first["excitationPosition"] <= .5
+    assert 0 <= first["onsetWanderCents"] <= 120
+    assert 2 <= first["onsetWanderSettlePeriods"] <= 30
+    assert ship_human_overrides({**params, "excitationHuman": 0},
+                                midi=55, seed=44) == {}
+
+
+def test_ship_articulation_latent_anticorrelates_scratch_and_wander():
+    params = {
+        "excitationHuman": 1.0,
+        "humanRanges": {"ranges": {
+            "bowScratchLevelDb": {"status": "measured", "centre": -19,
+                                  "drawHalfRange": 10},
+            "onsetWanderCents": {"status": "measured", "centre": 60,
+                                 "drawHalfRange": 40},
+        }},
+    }
+    draws = [ship_human_overrides(params, midi=60, seed=seed)
+             for seed in range(24)]
+    correlation = np.corrcoef(
+        [row["bowScratchLevel"] for row in draws],
+        [row["onsetWanderCents"] for row in draws])[0, 1]
+    assert correlation < -.95
+
+
+def test_ship_calibration_scales_only_the_declared_midi_draws():
+    params = {
+        "excitationHuman": 1.0,
+        "humanRanges": {"ranges": {
+            "onsetWanderCents": {"status": "measured", "centre": 60,
+                                   "drawHalfRange": 40},
+        }},
+    }
+    plain = ship_human_overrides(params, midi=61, seed=9)
+    calibrated = ship_human_overrides({
+        **params, "shipHumanCalibration": {
+            "byMidi": {"61": {"onsetWanderCents": .2}}}},
+        midi=61, seed=9)
+    assert abs(calibrated["onsetWanderCents"] - 60) == pytest.approx(
+        abs(plain["onsetWanderCents"] - 60) * .2)
+    assert ship_human_overrides({
+        **params, "shipHumanCalibration": {
+            "byMidi": {"61": {"onsetWanderCents": .2}}}},
+        midi=62, seed=9) == ship_human_overrides(params, midi=62, seed=9)
+
+
 def test_t031_bowed_controls_are_auditable_but_not_identity_fit_dimensions():
     manifest = json.loads((
         iterate_module.ROOT / "scripts/tone_match/manifest.json").read_text())
@@ -739,6 +811,42 @@ def test_distributional_variation_gate_is_two_sided(monkeypatch):
         variability, {0: [0.0, 10.0, 20.0]}, {"vibrato": 1})
     assert not sloppy["passed"]
     assert sloppy["groups"][0]["checks"][0]["status"] == "too-much"
+
+
+def test_distributional_gate_excludes_floor_groups_without_qualified_pair(monkeypatch):
+    variability = {"status": "measured", "groups": [
+        {"group": "qualified", "referenceIndices": [0],
+         "floorFeatures": {"vibrato": 2.0}},
+        {"group": "unmatched", "referenceIndices": [1],
+         "floorFeatures": {"vibrato": 200.0}},
+    ]}
+    monkeypatch.setattr(iterate_module, "compare_features",
+                        lambda left, right, _weights: {
+                            "features": {"vibrato": abs(left - right)}})
+    gate = _distributional_variation_gate(
+        variability, {0: [0.0, 2.0, 4.0], 1: [0.0, 2.0, 4.0]},
+        {"vibrato": 1}, eligible_groups={"qualified"})
+    assert gate["passed"]
+    assert gate["groups"][1]["status"] == "not-qualified-pair"
+
+
+def test_distributional_gate_keeps_unreachable_observable_as_named_watch(monkeypatch):
+    variability = {"status": "measured", "groups": [{
+        "group": "qualified", "referenceIndices": [0],
+        "floorFeatures": {"vibrato": 2.0, "onset_noise_db": 10.0},
+    }]}
+    monkeypatch.setattr(iterate_module, "compare_features",
+                        lambda left, right, _weights: {"features": {
+                            "vibrato": abs(left - right),
+                            "onset_noise_db": 0.0}})
+    gate = _distributional_variation_gate(
+        variability, {0: [0.0, 2.0, 4.0]}, {"vibrato": 1},
+        watch_features={"onset_noise_db": "audited actuator span"})
+    assert gate["passed"]
+    watched = next(row for row in gate["groups"][0]["checks"]
+                   if row["feature"] == "onset_noise_db")
+    assert watched["status"] == "watch-unreachable"
+    assert watched["watchReason"] == "audited actuator span"
 
 
 def test_ship_variants_record_one_failed_note_without_aborting(tmp_path, monkeypatch):
@@ -1222,6 +1330,19 @@ def test_register_fit_retains_valid_notes_below_100_hz():
     assert anchors[0]["partials"][1]["amp"] == .1
 
 
+def test_profile_regeneration_preserves_independent_human_and_noise_contracts():
+    refreshed = {"violin": {"partials": [1], "resonances": [{"freq": 300}]}}
+    prior = {"violin": {
+        "partials": [.5],
+        "humanRanges": {"ranges": {"excitationPosition": {"status": "measured"}}},
+        "bowNoise": {"profilePinned": True, "profile": [{"freq": 1000}]},
+    }}
+    merged = merge_profile_sets(refreshed, prior)
+    assert merged["violin"]["partials"] == [1]
+    assert merged["violin"]["humanRanges"] == prior["violin"]["humanRanges"]
+    assert merged["violin"]["bowNoise"] == prior["violin"]["bowNoise"]
+
+
 def test_t033_string_tables_do_not_pool_other_courses():
     notes = []
     for f0, second_partial in (
@@ -1240,6 +1361,28 @@ def test_t033_string_tables_do_not_pool_other_courses():
     strings = fitted["partialsByString"]
     assert strings["string6"][0]["partials"][1]["amp"] == pytest.approx(.1)
     assert strings["string3"][0]["partials"][1]["amp"] == pytest.approx(.8)
+
+
+def test_t033_bowed_tables_consume_only_explicit_string_labels():
+    assert bowed_string_from_filename("Violin.arco.pp.sulG.G3B3.aiff") == "sulG"
+    assert bowed_string_from_filename("Cello.arco.ff.sulC.C2A2.aiff") == "sulC"
+    assert bowed_string_from_filename("phil.violin_C5_1_normal.mp3") is None
+    notes = []
+    for label, second_partial in (("sulA", .15), ("sulE", .85)):
+        for dynamic in ("pp", "ff"):
+            note = _bundle(
+                f0=1046.5,
+                partials=[1, second_partial, .05, .02, .01, .005, .002, .001],
+            ).note
+            note.file = f"Violin.arco.{dynamic}.{label}.C6.aiff"
+            notes.append(note)
+    fitted = aggregate_instrument(
+        notes, [], 8,
+        string_selector=lambda note: bowed_string_from_filename(note.file))
+    strings = fitted["partialsByString"]
+    assert set(strings) == {"sulA", "sulE"}
+    assert strings["sulA"][0]["partials"][1]["amp"] == pytest.approx(.15)
+    assert strings["sulE"][0]["partials"][1]["amp"] == pytest.approx(.85)
 
 
 def test_profile_fit_retains_scoop_distribution_and_plosive_anticorrelation():
@@ -2052,6 +2195,12 @@ def test_string_labels_are_carried_and_phil_names_parsed():
                     "vibrato": "nonvib"}
     vib = parse_phil_name("phil.cello_A4_1_mezzo-piano_molto-vibrato.mp3")
     assert vib["vibrato"] == "vib" and vib["midi"] == 69
+
+
+def test_iowa_run_span_routes_reacquired_chromatic_files_by_declared_pitch():
+    assert iowa_filename_span(Path("Violin.arco.ff.sulG.G3B3.aiff")) == (55, 59)
+    assert iowa_filename_span(Path("Violin.arco.pp.sulA.Bb5Ab6.aiff")) == (82, 92)
+    assert iowa_filename_span(Path("not-a-declared-run.aiff")) is None
 
 
 def test_bow_change_detection_trims_to_single_bow():

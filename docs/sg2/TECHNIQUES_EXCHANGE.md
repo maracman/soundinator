@@ -621,7 +621,16 @@ improved `4.011533→3.723190` (7.19%) and active failures `15→14`. Pass 13
 then failed to beat the comparable stable-objective leader
 (`3.378844 > 3.317250`) after all seven global controls, while all six mel
 cells remained above bar. Construction is 11/11 and resources pass.
-Status: engine=pending (guitar extension above is ready for one-pass consumption) analysis=incorporated (course-labelled storage, generator, corpus atomicity and consuming tests) struck/plucked=blocked-engine T-033 (resume from durable accepted pass-12 full-objective state after consumer lands)
+Agent D pass-03 bowed delivery: the checked-in violin and cello profiles now
+carry all four explicit `sul*` table sets. The exact bowed selection law,
+playability bounds, fallback rule, `partialB` requirement, and five engine
+consuming assertions are filed in `BOWED_ENGINE_HANDOFFS.md`. Analysis tests
+prove that only explicitly labelled bowed takes enter the selected string
+table and that string groups do not pool.
+Status: engine=pending-Agent-A (guitar and bowed contracts are ready for
+one-pass consumption) analysis=incorporated (course/sul-labelled storage,
+generator, corpus atomicity and consuming tests) struck/plucked=blocked-engine
+T-033 bowed=blocked-engine T-033
 
 ### T-034 · ENGINE SPEC (small): dynamic pitch flattening for bowed forte
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; value fitted per instrument; INSTRUMENT physics, not Human
@@ -844,7 +853,7 @@ own same-string reference direction without changing the absent-table
 fallback.
 Affects: profile schema / strings_prep / stringSelect / spectral table
 consumer / partial, mel, and band gates.
-Status: analysis=pending engine=pending bowed=blocked T-033
+Status: analysis=incorporated engine=pending-Agent-A bowed=blocked T-033
 struck/plucked=adapted (string/course identity, no bow selection semantics)
 
 ### T-044 · Bowed strict coverage is role-declared and corpus-backed
@@ -1302,6 +1311,13 @@ matrix to 78 accepted steps, 58 transitions, 11 significant edges, and 86
 symmetric-coupling candidates; the blown contribution remains 42/37 and both
 wrong-renderer flute rows remain absent.
 
+Status update — Agent E sung pass 05, 2026-07-17: T-059
+sung=adapted-one-step-no-edge-claimed. The render-domain candidate records the
+ordered partial → mel → attack → band-balance intervention and the leaderboard
+compares the complete hard-cell outcome before composite. This pass contains
+only one accepted intervention per identity, so it does not fabricate a drift
+edge or update the cross-run asymmetry matrix.
+
 ### T-060 · Release scoring is gated by mechanically audited full tails
 Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-corpus labels
 Finding: release and damping features are invalid on truncated references and
@@ -1319,12 +1335,16 @@ Blown may adopt the method with its own corpus labels.
 Status: analysis=incorporated bowed=incorporated
 struck/plucked=adapt-method sung=adapt-method engine=pending-control
 
-Status update — Agent E sung pass 05, 2026-07-17: T-059
-sung=adapted-one-step-no-edge-claimed. The render-domain candidate records the
-ordered partial → mel → attack → band-balance intervention and the leaderboard
-compares the complete hard-cell outcome before composite. This pass contains
-only one accepted intervention per identity, so it does not fabricate a drift
-edge or update the cross-run asymmetry matrix.
+Status update — Agent D pass 03, 2026-07-17: `releaseDamping` is now a
+manifested bowed free control. A fresh hashed violin audit consumed every 17
+mechanically eligible full-tail row in the rebuilt manifest (a strict
+superset of the 14 known at pass start). It retained all three release
+weights: ring response 10.3 units, damping-slope response 50.094 units, and
+release-noise response 32.3372 units, with `releaseDamping` the best responder
+for each. Independent repeats were stable for all three. Bowed release
+features are therefore released at weight 1; corpus gating remains mandatory.
+Status: analysis=incorporated bowed=incorporated+released
+struck/plucked=adapt-method sung=adapt-method engine=incorporated-bowed-control
 
 ### T-062 · Human-range candidates and consumers are excitation-specific
 Author: Agent A / blown-engine · 2026-07-17 · Firewall: method + engine plumbing
