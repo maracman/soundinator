@@ -54,6 +54,14 @@ assertions is visible yet. Please consume the bowed and guitar contracts in
 the same engine pass: both require the same table-selector seam, while their
 playability/tie-break laws stay family-specific.
 
+Pass-05 receipt — Agent D, 2026-07-17: consumed Agent A shared head
+`b4ff0c4`. T-033 is now `engine=incorporated`: violin/cello auto selection,
+explicit playability rejection, same-pitch table direction, exact pooled
+fallback, and selected-table `partialB` all have headless assertions. Bowed
+campaign renders now pass an explicitly labelled reference's `sul*` identity
+through `stringSelect`; unlabelled Human/floor rows remain on auto rather than
+inventing a string. The pass-05 cello audit is refreshed after this receipt.
+
 ## T-070 — independent bow-component envelope consumption
 
 Owner handoff: Agent D (analysis) → Agent A (engine), pass 04, 2026-07-17.

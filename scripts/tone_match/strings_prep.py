@@ -185,6 +185,20 @@ def find_catalogue_duplicates(catalogue_dir: Path, instrument: str) -> list[dict
                                "articulation": "arco-normal", "files": present})
     return groups
 
+
+def write_reference_role_views(output: Path,
+                               references: list[dict[str, Any]]) -> None:
+    identity_references = [
+        row for row in references
+        if "humanisation" not in set(row.get("roles", []))]
+    humanisation_references = [
+        row for row in references
+        if "humanisation" in set(row.get("roles", []))]
+    (output / "references-fit.json").write_text(
+        json.dumps(identity_references, indent=2) + "\n")
+    (output / "references-humanisation.json").write_text(
+        json.dumps(humanisation_references, indent=2) + "\n")
+
 _STRING_RE = re.compile(r"\bsul([A-G])\b|\.sul([A-G])\.", re.IGNORECASE)
 _PHIL_RE = re.compile(
     r"^phil\.(?P<instrument>[a-z-]+)_(?P<note>[A-Ga-g]s?\d)_"
@@ -793,6 +807,11 @@ def build_string_references(instrument: str, samples_root: Path,
     for pair in pairs["trueDuplicates"]:
         if pair["vibrato"] != "nonvib":
             continue  # spectral floor takes must be non-vibrato
+        if any("_arco-normal.mp3" in name for name in pair["files"]):
+            # The acquired catalogue repetitions differ in source duration,
+            # codec and unverified string. They are emitted below only as
+            # common-window §2.5c Human rows, never as a stopping floor.
+            continue
         group_segments = []
         for file_name in pair["files"]:
             if is_excluded(file_name.replace("phil.", "")):
@@ -903,6 +922,10 @@ def build_string_references(instrument: str, samples_root: Path,
 
     references = audit_references(references)
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
+    # Keep §2.5c evidence in the canonical manifest, but provide explicit
+    # role views so identity audits do not render zero-weight Human takes on
+    # every optimizer evaluation.
+    write_reference_role_views(output, references)
     coverage_weights = weights_for_instrument(instrument)
     active_coverage_bars = {
         bar for bar, feature in TRIPWIRE_FEATURES.items()

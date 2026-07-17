@@ -109,6 +109,153 @@ _UNITS = {
 }
 
 
+# F13: evidence strength is judged per dimension against the Human goal.
+# Lossless within-run adjacent notes are the direct per-note performance
+# quantity and therefore the primary width estimator after register-trend
+# removal. Vibrato trajectory is absent from the Iowa body runs, so those
+# dimensions retain the same-note repeat evidence instead of treating a run
+# of measured zeroes as evidence of zero variation.
+# ``sustainNoiseDb`` is also excluded: its first F13 cello run produced an
+# impossible 81.7 dB p90 because the generic residual/floor estimate absorbed
+# harmonic-subtraction and room-floor error. L14's validated lossless residual
+# extractor, not this adjacent-note shortcut, owns any future promotion.
+_ADJACENT_PRIMARY_OBSERVABLES = {
+    "excitationPosition", "onsetNoiseDb",
+    "onsetNoiseCentroidOct", "noiseLeadMs", "onsetWanderCents",
+    "onsetSettleMs", "attackNoiseLevel",
+}
+_DURATION_ROBUST_OBSERVABLES = {
+    "excitationPosition", "vibratoRateHz", "vibratoDepthCents",
+    "vibratoOnsetDelayMs", "onsetNoiseDb", "noiseLeadMs",
+    "onsetWanderCents", "onsetSettleMs", "attackNoiseLevel",
+}
+
+
+def _trend_removed_adjacent_deltas(
+        rows: list[dict[str, Any]],
+        observations: list[dict[str, float]]) -> dict[str, Any]:
+    """Measure note-to-note variation after removing a run's register trend.
+
+    Rows must come from one lossless source run/string/dynamic. Only adjacent
+    semitones contribute. A linear trend is the deliberately conservative
+    local identity model; the remaining first difference is the per-note
+    performance quantity that SHIP mode draws.
+    """
+    order = np.argsort([float(row["midi"]) for row in rows])
+    ordered_rows = [rows[int(index)] for index in order]
+    ordered_obs = [observations[int(index)] for index in order]
+    midi = np.asarray([float(row["midi"]) for row in ordered_rows])
+    if len(np.unique(midi)) < 3:
+        return {"deltas": {key: [] for key in _UNITS}, "pairs": []}
+    residuals: dict[str, np.ndarray] = {}
+    for key in _UNITS:
+        values = np.asarray([float(row[key]) for row in ordered_obs])
+        finite = np.isfinite(values)
+        if np.count_nonzero(finite) < 3:
+            residuals[key] = np.full(len(values), np.nan)
+            continue
+        design = np.column_stack((np.ones(np.count_nonzero(finite)), midi[finite]))
+        coefficients = np.linalg.lstsq(design, values[finite], rcond=None)[0]
+        residuals[key] = values - (coefficients[0] + coefficients[1] * midi)
+    deltas = {key: [] for key in _UNITS}
+    pairs = []
+    for index in range(len(ordered_rows) - 1):
+        if round(midi[index + 1] - midi[index], 6) != 1.0:
+            continue
+        pair_delta = {}
+        for key in _UNITS:
+            value = abs(residuals[key][index + 1] - residuals[key][index])
+            if np.isfinite(value):
+                deltas[key].append(float(value))
+                pair_delta[key] = round(float(value), 6)
+        pairs.append({
+            "left": ordered_rows[index].get("path"),
+            "right": ordered_rows[index + 1].get("path"),
+            "midi": [int(round(midi[index])), int(round(midi[index + 1]))],
+            "trendRemovedDelta": pair_delta,
+        })
+    return {"deltas": deltas, "pairs": pairs}
+
+
+def _adjacent_variation_evidence(
+        references: list[dict[str, Any]] | None) -> dict[str, Any]:
+    if not references:
+        return {"deltas": {key: [] for key in _UNITS}, "values": {
+            key: [] for key in _UNITS}, "groups": [], "pairs": []}
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in references:
+        source = str(row.get("sourceFile", ""))
+        dynamic = str(row.get("dynamic", ""))
+        string = str(row.get("string", ""))
+        if source and dynamic and string:
+            grouped.setdefault((source, dynamic, string), []).append(row)
+    deltas = {key: [] for key in _UNITS}
+    values = {key: [] for key in _UNITS}
+    groups = []
+    pairs = []
+    for (source, dynamic, string), rows in sorted(grouped.items()):
+        unique = {int(round(float(row["midi"]))): row for row in rows}
+        run_rows = [unique[midi] for midi in sorted(unique)]
+        if len(run_rows) < 3:
+            continue
+        observations = []
+        for row in run_rows:
+            expected = float(row.get("expectedF0Hz") or
+                             440 * 2 ** ((float(row["midi"]) - 69) / 12))
+            bundle = extract_features(
+                str(row["path"]), expected_f0_hz=expected,
+                trust_expected_f0=True)
+            observations.append(human_observables(bundle))
+        result = _trend_removed_adjacent_deltas(run_rows, observations)
+        if not result["pairs"]:
+            continue
+        for key in _ADJACENT_PRIMARY_OBSERVABLES:
+            deltas[key].extend(result["deltas"][key])
+            values[key].extend(float(observation[key])
+                               for observation in observations
+                               if np.isfinite(observation[key]))
+        for pair in result["pairs"]:
+            pair.update({"sourceFile": source, "dynamic": dynamic,
+                         "string": string})
+            pairs.append(pair)
+        groups.append({"sourceFile": source, "dynamic": dynamic,
+                       "string": string, "notes": len(run_rows),
+                       "adjacentPairs": len(result["pairs"]),
+                       "sourceCodec": "lossless"})
+    return {"deltas": deltas, "values": values, "groups": groups,
+            "pairs": pairs}
+
+
+def _dimension_evidence(observable: str, *, matched_pairs: int,
+                        adjacent_pairs: int) -> dict[str, Any]:
+    if adjacent_pairs:
+        return {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": adjacent_pairs,
+            "matchedRepeatPairs": matched_pairs,
+            "goal": "per-note SHIP variation",
+        }
+    if matched_pairs and observable in _DURATION_ROBUST_OBSERVABLES:
+        return {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": matched_pairs,
+            "durationMismatchAffectsGoal": False,
+        }
+    return {
+        "strength": "weaker-evidence" if matched_pairs else
+                    "insufficient-evidence",
+        "primaryBasis": "same-note-repeat-common-window" if matched_pairs
+                        else "none",
+        "adjacentPairs": 0,
+        "matchedRepeatPairs": matched_pairs,
+        "reason": ("codec/duration can affect this observable" if matched_pairs
+                   else "no eligible per-note or repeat evidence"),
+    }
+
+
 # §2.5c.1b: these are candidate PARAMETERS, not merely observed outcomes.
 # A direct physical measurement supplies each take's per-parameter optimum.
 # Outcome-only observables (noise centroid/lead, for example) remain in the
@@ -213,6 +360,10 @@ def _parameter_qualification(pair_rows: list[dict[str, Any]]) -> dict[str, Any]:
 def _consumer_status(controllability: dict[str, Any] | None,
                      qualification: dict[str, Any]) -> dict[str, Any]:
     responsive = (controllability or {}).get("responsiveParameters", {})
+    native_episode = ((controllability or {}).get("humanRangeDelivery") ==
+                      "engine-native-zero-inflated-note-episode" and
+                      bool((controllability or {}).get(
+                          "humanRangeContractHash")))
     rows = {}
     for parameter, status in qualification.items():
         if status["status"] != "qualified-humanisation":
@@ -221,9 +372,12 @@ def _consumer_status(controllability: dict[str, Any] | None,
         expected_parameter = spec.get("responseParameter", parameter)
         feature = spec["responseFeature"]
         responders = set(responsive.get(feature, []))
+        native_responder = native_episode and "excitationHuman" in responders
         rows[parameter] = {
             "parameter": expected_parameter, "feature": feature,
-            "functional": expected_parameter in responders,
+            "functional": expected_parameter in responders or native_responder,
+            "delivery": ("engine-native-zero-inflated-note-episode"
+                         if native_responder else "direct-parameter"),
             "responders": sorted(responders),
         }
     return {
@@ -323,6 +477,7 @@ def _identity_residual(left: Any, right: Any) -> dict[str, Any]:
 def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                      identity_best: dict[str, Any] | None = None,
                      controllability: dict[str, Any] | None = None,
+                     adjacent_references: list[dict[str, Any]] | None = None,
                      ) -> dict[str, Any]:
     groups: dict[str, list[dict[str, Any]]] = {}
     for reference in references:
@@ -369,17 +524,35 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                     "decomposition": decomposition,
                 })
     qualification = _parameter_qualification(pair_rows)
+    adjacent = _adjacent_variation_evidence(adjacent_references)
     ranges = {}
     for parameter, spec in _CANDIDATE_PARAMETERS.items():
         if qualification[parameter]["status"] != "qualified-humanisation":
             continue
         observable = spec["observable"]
+        primary_deltas = adjacent["deltas"][observable]
+        range_values = (values[observable] + adjacent["values"][observable]
+                        if primary_deltas else values[observable])
+        range_deltas = primary_deltas or deltas[observable]
         ranges[parameter] = {
-            **_range(values[observable], deltas[observable], spec["unit"]),
+            **_range(range_values, range_deltas, spec["unit"]),
             "qualification": qualification[parameter],
+            "evidence": _dimension_evidence(
+                observable, matched_pairs=len(deltas[observable]),
+                adjacent_pairs=len(primary_deltas)),
         }
-    spread_observables = {key: _range(values[key], deltas[key], unit)
-                          for key, unit in _UNITS.items()}
+    spread_observables = {}
+    evidence_by_dimension = {}
+    for key, unit in _UNITS.items():
+        primary_deltas = adjacent["deltas"][key]
+        range_values = (values[key] + adjacent["values"][key]
+                        if primary_deltas else values[key])
+        row = _range(range_values, primary_deltas or deltas[key], unit)
+        evidence = _dimension_evidence(
+            key, matched_pairs=len(deltas[key]),
+            adjacent_pairs=len(primary_deltas))
+        spread_observables[key] = {**row, "evidence": evidence}
+        evidence_by_dimension[key] = evidence
     failures = [row for row in pair_rows if not row["decomposition"]["passed"]]
     matched_paths = {
         str(row["path"]) for rows in groups.values() for row in rows}
@@ -427,16 +600,25 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                                   for row in rows),
     } for group, rows in sorted(groups.items())]
     return {
-        "schemaVersion": 2, "instrument": instrument,
-        "method": "matched-take-human-only-differential-v2-double-dissociation",
+        "schemaVersion": 3, "instrument": instrument,
+        "method": ("matched-take-human-only-differential-v3-"
+                   "double-dissociation-f13-evidence"),
         "evidence": {"basis": ("same-note/dynamic/articulation humanisation "
-                                "or lossless floor groups"),
+                                "plus per-dimension lossless within-run "
+                                "adjacent-note variation"),
                      "groups": len(groups), "takes": len(cache),
                      "pairs": len(pair_rows),
-                     "groupEvidence": group_evidence},
+                     "groupEvidence": group_evidence,
+                     "adjacentTrendGroups": adjacent["groups"],
+                     "adjacentTrendPairs": len(adjacent["pairs"]),
+                     "evidenceByDimension": evidence_by_dimension,
+                     "doctrine": ("F13: evidence strength is per dimension; "
+                                  "spec fallbacks never impose a blanket "
+                                  "downgrade")},
         "qualification": qualification,
         "ranges": ranges, "spreadObservables": spread_observables,
         "decompositionTest": verdict, "pairFits": pair_rows,
+        "adjacentTrendPairs": adjacent["pairs"],
     }
 
 
@@ -580,6 +762,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="best.json from the current identity rebaseline")
     parser.add_argument("--controllability", type=Path,
                         help="current hashed controllability audit")
+    parser.add_argument("--adjacent-references", type=Path,
+                        help=("lossless within-run note rows; defaults to the "
+                              "campaign body-reference manifest when present"))
     args = parser.parse_args(argv)
     references_path = args.references or data_root / "campaigns" / args.instrument / "references.json"
     references = json.loads(references_path.read_text())
@@ -587,13 +772,24 @@ def main(argv: list[str] | None = None) -> int:
                      if args.identity_best else None)
     controllability = (json.loads(args.controllability.read_text())
                        if args.controllability else None)
+    adjacent_path = (args.adjacent_references or
+                     data_root / "campaigns" / args.instrument /
+                     "body-references.json")
+    adjacent_references = None
+    if adjacent_path.is_file():
+        adjacent_payload = json.loads(adjacent_path.read_text())
+        adjacent_references = (adjacent_payload.get("references", [])
+                               if isinstance(adjacent_payload, dict)
+                               else adjacent_payload)
     result = fit_human_ranges(
         args.instrument, references, identity_best=identity_best,
-        controllability=controllability)
+        controllability=controllability,
+        adjacent_references=adjacent_references)
     profiles = json.loads(args.profile.read_text())
     if args.instrument not in profiles:
         raise ValueError(f"{args.instrument}: missing measured profile row")
     profile_updated = _consume_profile_ranges(profiles, args.instrument, result)
+    campaign_initial_updated = False
     if profile_updated:
         # A non-PASS decomposition is never permission to widen identity.
         # Qualified take-pair ranges remain valid standalone evidence.
@@ -601,11 +797,23 @@ def main(argv: list[str] | None = None) -> int:
         # one-space indentation; preserve it so a successful fit changes
         # only its row.
         args.profile.write_text(json.dumps(profiles, indent=1) + "\n")
+        # Keep the current campaign seed on the same measured Human contract
+        # without forcing an expensive corpus rebuild. Identity fields stay
+        # untouched; the next audit hashes the newly consumed ranges.
+        campaign_initial = (data_root / "campaigns" / args.instrument /
+                            "initial.json")
+        if campaign_initial.is_file():
+            initial = json.loads(campaign_initial.read_text())
+            initial["humanRanges"] = result
+            campaign_initial.write_text(json.dumps(initial, indent=2) + "\n")
+            campaign_initial_updated = True
     report = args.report or data_root / "campaigns" / args.instrument / "humanisation-fit.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"profile": str(args.profile) if profile_updated else None,
-                      "profileUpdated": profile_updated, "report": str(report),
+                      "profileUpdated": profile_updated,
+                      "campaignInitialUpdated": campaign_initial_updated,
+                      "report": str(report),
                       "decompositionTest": result["decompositionTest"]}, indent=2))
     return {"PASS": 0, "FAIL-MISSING-DOF": 2,
             "INCONCLUSIVE-MASKED": 3}[result["decompositionTest"]["verdict"]]

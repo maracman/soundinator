@@ -1396,6 +1396,14 @@ all family campaign adapters.
 Status: engine=incorporated `b5f91b7` analysis=pending-review
 struck/plucked=adapt-method sung=adapt-method bowed=adapt-method
 
+Status update — Agent D bowed pass 05, 2026-07-17: T-063
+bowed=incorporated. Bow noise and scratch levels now consume the single
+engine-native zero-inflated episode as dB deltas around the strongest-prior
+controls. Campaign SHIP jobs detect profile-native `humanRanges`, retire the
+second Python draw, and reject stale saved jobs that contain manual Human
+overrides. A headless assertion covers both bowed level consumers; FIT/Human
+zero and profiles without ranges retain their exact fallback.
+
 ### T-067 · ENGINE LAW SPEC (Agent A): held strike/pluck = free decay, note-off = damper contact
 Author: Agent C / struck-plucked · 2026-07-17 · Firewall: mechanism; decay and damper values per instrument
 Finding: owner L18 makes an ADSR sustain plateau a construction error for
@@ -1789,3 +1797,52 @@ fallback. Eight-second output checks pass L18's slope/no-plateau bars and
 prove `envelopeSustain` 0.05 versus 1.0 is PCM-identical. Bow/blow retain their
 existing ADSR semantics. Physical damper tables remain absent where Agent C
 classified the evidence incomplete.
+
+### T-073 · Cello matched-take ranges are measured but decomposition-masked
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: cello values only; method shared
+Finding: the pass-05 cello acquisition supplies six same-note/dynamic/
+articulation cells (C2/G3/E5 × pp/ff), 15 common-window takes and 12 within-cell
+pairs. The source gap remains explicit: every take is duration-mismatched MP3,
+the Philharmonia session identity is presumed, and sulC/sulD/sulA are planned
+fingerings rather than source labels. These rows are therefore Human-only and
+cannot enter the lossless stopping floor or release/noise-floor extraction.
+
+The §2.5c double-dissociation qualifies 9/11 candidates on at least one pair:
+excitation position, vibrato rate/depth/onset delay, bow-noise and bow-scratch
+level, attack-noise level, onset wander and onset settle. Vibrato ramp and rate
+drift do not qualify. Examples of pooled p90 pair spread are 0.13975
+fraction-of-string for excitation position, 10.9968 dB sustain bow noise,
+13.6355 dB onset scratch, 71.8415 cents onset wander and 149.576 ms settling.
+All 12 decompositions fail after the allowed Human removal, but the verdict is
+`INCONCLUSIVE-MASKED`: the per-take identity rows are not yet near the §3 core
+bars and the qualified cello Human consumers lack a dedicated response audit.
+This is not evidence of a missing Human DOF and never widens identity.
+
+Consuming assertions: measured ranges remain in the cello profile despite the
+masked verdict; T-063's one native zero-inflated episode owns the draw; stale
+manual SHIP overrides are rejected; distribution PASS waits for a fresh
+cello-specific Human response audit and two-sided seeded spread gate.
+Affects: cello `humanRanges` / §2.5c report / campaign-role firewall / T-063.
+Status: analysis=incorporated bowed=measured-ranges+inconclusive-masked
+engine=incorporated-native-episode distribution=blocked-cello-response-audit
+
+Status update — Agent D crash recovery/F13, 2026-07-17: F13 is now applied
+per dimension. Eleven lossless source/dynamic/string runs supply 47 adjacent
+semitone pairs; a local linear register trend is removed before first
+differences become the primary per-note SHIP width. Bow position, onset
+scratch, attack noise, onset wander and settling therefore have full-strength
+lossless-adjacent evidence. Vibrato rate/depth/onset delay retain full-strength
+same-note common-window evidence because duration mismatch does not affect
+those goals. Sustained bow noise, vibrato ramp and rate drift remain weaker.
+The invalid 81.7 dB generic adjacent sustain-floor result is explicitly
+excluded: harmonic-subtraction/room-floor error masks it, and L14 owns any
+future lossless promotion.
+
+The fresh hashed `excitationHuman=0.4` native-episode audit is clean and
+repeat-stable. Four of nine qualified adapters cross the 0.05 response bar:
+bow position (partials 0.0776), sustained bow noise (0.1594), onset wander
+(0.1950) and onset settle (0.0719). Vibrato rate/depth/delay, scratch and
+attack-noise do not. Decomposition therefore remains `INCONCLUSIVE-MASKED`;
+distribution remains blocked on those consumers plus the two-sided seeded
+spread gate. Status: analysis=F13-incorporated bowed=response-audited-4of9
+engine=native-episode-partial distribution=blocked-consumers+two-sided-gate

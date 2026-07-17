@@ -43,6 +43,7 @@ from scripts.tone_match.iterate import (
     _free_manifest_contract,
     _load_preset,
     _mode_params,
+    _native_human_episode_profile,
     _params,
     _reference_set_id,
     _reference_render_params_override,
@@ -211,6 +212,72 @@ def test_human_candidate_requires_double_dissociation_in_both_directions():
     assert not same["qualified"]
 
 
+def test_f13_adjacent_note_variation_removes_register_trend_per_dimension():
+    from scripts.tone_match.humanisation import (
+        _dimension_evidence, _trend_removed_adjacent_deltas)
+    rows = [{"midi": midi, "path": f"note-{midi}.wav"}
+            for midi in (60, 61, 62, 63)]
+    observations = []
+    for index, position in enumerate((.10, .12, .105, .13)):
+        row = {key: 0.0 for key in (
+            "excitationPosition", "vibratoRateHz", "vibratoDepthCents",
+            "vibratoOnsetDelayMs", "vibratoRampMs",
+            "vibratoRateDriftHzPerSecond", "sustainNoiseDb",
+            "onsetNoiseDb", "onsetNoiseCentroidOct", "noiseLeadMs",
+            "onsetWanderCents", "onsetSettleMs", "attackNoiseLevel")}
+        row["excitationPosition"] = position
+        row["onsetWanderCents"] = 10 + 2 * index + (4 if index == 2 else 0)
+        observations.append(row)
+    result = _trend_removed_adjacent_deltas(rows, observations)
+    assert len(result["pairs"]) == 3
+    assert max(result["deltas"]["excitationPosition"]) > 0
+    assert max(result["deltas"]["onsetWanderCents"]) > 0
+    evidence = _dimension_evidence(
+        "excitationPosition", matched_pairs=2, adjacent_pairs=3)
+    assert evidence["strength"] == "full-strength"
+    assert evidence["primaryBasis"] == \
+        "lossless-within-run-adjacent-note-trend-removed"
+
+
+def test_f13_duration_robust_repeat_is_not_blanket_downgraded():
+    from scripts.tone_match.humanisation import _dimension_evidence
+    onset = _dimension_evidence(
+        "onsetWanderCents", matched_pairs=4, adjacent_pairs=0)
+    noise_floor = _dimension_evidence(
+        "vibratoRateDriftHzPerSecond", matched_pairs=4, adjacent_pairs=0)
+    assert onset["strength"] == "full-strength"
+    assert onset["durationMismatchAffectsGoal"] is False
+    assert noise_floor["strength"] == "weaker-evidence"
+
+
+def test_native_human_episode_requires_hashed_delivery_and_feature_response():
+    from scripts.tone_match.humanisation import _consumer_status
+
+    qualification = {
+        "vibratoRate": {"status": "qualified-humanisation"},
+        "onsetWanderCents": {"status": "qualified-humanisation"},
+    }
+    audit = {
+        "clean": True,
+        "humanRangeDelivery": "engine-native-zero-inflated-note-episode",
+        "humanRangeContractHash": "contract-hash",
+        "responsiveParameters": {
+            "vibrato": [],
+            "onset_wander_cents": ["excitationHuman"],
+        },
+    }
+    status = _consumer_status(audit, qualification)
+    assert not status["parameters"]["vibratoRate"]["functional"]
+    assert status["parameters"]["onsetWanderCents"]["functional"]
+    assert status["parameters"]["onsetWanderCents"]["delivery"] == \
+        "engine-native-zero-inflated-note-episode"
+    assert not status["allQualifiedConsumersFunctional"]
+
+    audit["humanRangeContractHash"] = None
+    unhashed = _consumer_status(audit, qualification)
+    assert not unhashed["parameters"]["onsetWanderCents"]["functional"]
+
+
 def test_human_decomposition_verdict_is_three_valued():
     from scripts.tone_match.humanisation import _decomposition_verdict
     assert _decomposition_verdict(0, False, False) == "PASS"
@@ -271,16 +338,16 @@ def test_bow_component_envelope_extractor_passes_synthetic_roundtrip():
     assert all(validation["checks"].values())
 
 
-def test_release_features_are_corpus_gated_and_weighted_after_bowed_audit():
+def test_release_features_are_corpus_gated_and_watch_only_without_bow_lift_anchors():
     weights = weights_for_instrument("violin")
     for feature in ("release_ring_ms", "release_damp_db_per_s",
                     "release_noise_db"):
-        assert weights[feature] == 1.0
+        assert weights[feature] == 0.0
     reference = _bundle(); rendered = _bundle()
     reference.release_ring_ms = 100.0; rendered.release_ring_ms = 600.0
     comparison = compare_features(reference, rendered, weights)
     assert comparison["features"]["release_ring_ms"] == 500.0
-    assert comparison["composite"] > compare_features(
+    assert comparison["composite"] == compare_features(
         reference, reference, weights)["composite"]
 
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
@@ -947,6 +1014,20 @@ def test_ship_variants_record_one_failed_note_without_aborting(tmp_path, monkeyp
     assert len(result["analysisFailures"]) == 2
     assert {row["referenceIndex"] for row in result["analysisFailures"]} == {1}
     assert result["primaryRenderDirectory"].endswith("variant-00")
+
+
+def test_native_human_episode_retires_the_second_python_draw(tmp_path):
+    profile_dir = tmp_path / "web" / "static"
+    profile_dir.mkdir(parents=True)
+    (profile_dir / "measured_profiles.json").write_text(json.dumps({
+        "violin": {"humanRanges": {"ranges": {
+            "excitationPosition": {"status": "measured"},
+        }}},
+    }))
+    assert _native_human_episode_profile(
+        {"spectralProfile": "violin"}, tmp_path)
+    assert not _native_human_episode_profile(
+        {"spectralProfile": "cello"}, tmp_path)
 
 
 def test_ship_variants_resume_saved_seeds_and_skip_completed_wavs(tmp_path, monkeypatch):

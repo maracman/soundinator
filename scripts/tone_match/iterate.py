@@ -485,6 +485,24 @@ def _reference_render_params_override(reference: dict[str, Any]) -> dict[str, st
     return result
 
 
+def _native_human_episode_profile(params: dict[str, Any],
+                                  repo_root: Path = ROOT) -> bool:
+    """Whether the renderer owns this profile's measured Human episode.
+
+    T-063 moved measured widths into one zero-inflated, seeded engine episode.
+    Reapplying the older per-job Python override would draw a second episode,
+    scale its width by Human, and double several bowed observables.
+    """
+    profile_key = params.get("spectralProfile")
+    path = repo_root / "web/static/measured_profiles.json"
+    if not isinstance(profile_key, str) or not path.is_file():
+        return False
+    profiles = _load(path)
+    ranges = ((profiles.get(profile_key, {}).get("humanRanges") or {})
+              .get("ranges"))
+    return isinstance(ranges, dict) and bool(ranges)
+
+
 def _render_ship_variants(
     run_dir: Path,
     label: str,
@@ -503,6 +521,8 @@ def _render_ship_variants(
     target = run_dir / "ship-mode" / label
     target.mkdir(parents=True, exist_ok=True)
     ship_params = _mode_params(params, SHIP_MODE)
+    native_human_episode = _native_human_episode_profile(
+        ship_params, repo_root)
     if ship_calibration:
         ship_params["shipHumanCalibration"] = ship_calibration
     params_path = target / "params.json"
@@ -520,13 +540,18 @@ def _render_ship_variants(
         for variant_index in range(count):
             for reference_index in range(len(references)):
                 job = jobs[variant_index * len(references) + reference_index]
+                saved_manual = {key: value for key, value in
+                                job.get("paramsOverride", {}).items()
+                                if key not in {"performanceRole", "stringSelect"}}
+                if native_human_episode and saved_manual:
+                    raise ValueError(
+                        f"{target}: saved SHIP jobs double-apply the retired "
+                        "Python Human adapter; rebuild variants")
                 human_range_overrides.append({
                     "variantIndex": variant_index,
                     "referenceIndex": reference_index,
                     "seed": int(job["seed"]),
-                    "overrides": {key: value for key, value in
-                                  job.get("paramsOverride", {}).items()
-                                  if key != "performanceRole"},
+                    "overrides": saved_manual,
                 })
     else:
         params_path.write_text(json.dumps(ship_params, indent=2) + "\n")
@@ -540,8 +565,10 @@ def _render_ship_variants(
             variant_dir.mkdir(parents=True, exist_ok=True)
             for reference_index, reference in enumerate(references):
                 note_seed = seed + reference_index * 104_729
-                performance_override = ship_human_overrides(
-                    ship_params, midi=reference.get("midi", 60), seed=note_seed)
+                performance_override = ({} if native_human_episode else
+                    ship_human_overrides(
+                        ship_params, midi=reference.get("midi", 60),
+                        seed=note_seed))
                 jobs.append({
                     "paramsFile": str(params_path), "midi": reference.get("midi", 60),
                     "velocity": reference.get("velocity", .62),
@@ -604,6 +631,9 @@ def _render_ship_variants(
         watch_features=(ship_calibration or {}).get("watchFeatures"))
     payload = {"mode": SHIP_MODE, "variantCount": count, "seeds": seeds,
                "paramsHash": canonical_hash(ship_params), "gate": gate,
+               "humanRangeDelivery": (
+                   "engine-native-zero-inflated-note-episode"
+                   if native_human_episode else "python-legacy-adapter"),
                "humanRangeOverrides": human_range_overrides,
                "analysisFailures": analysis_failures,
                "primaryRenderDirectory": str(target / "variant-00")}

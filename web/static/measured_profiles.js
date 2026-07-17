@@ -8148,6 +8148,910 @@ export const MEASURED_PROFILES = {
       "decay": 0.18,
       "measuredBandwidthHz": 639.0,
       "measuredLevelRatio": 0.025
+    },
+    "humanRanges": {
+      "schemaVersion": 3,
+      "instrument": "cello",
+      "method": "matched-take-human-only-differential-v3-double-dissociation-f13-evidence",
+      "evidence": {
+        "basis": "same-note/dynamic/articulation humanisation plus per-dimension lossless within-run adjacent-note variation",
+        "groups": 6,
+        "takes": 15,
+        "pairs": 12,
+        "groupEvidence": [
+          {
+            "group": "36|ff|arco-normal|planned-sulC-unverified|PhilCat",
+            "takes": 2,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "36|pp|arco-normal|planned-sulC-unverified|PhilCat",
+            "takes": 3,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "55|ff|arco-normal|planned-sulD-unverified|PhilCat",
+            "takes": 2,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "55|pp|arco-normal|planned-sulD-unverified|PhilCat",
+            "takes": 3,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "76|ff|arco-normal|planned-sulA-unverified|PhilCat",
+            "takes": 3,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "76|pp|arco-normal|planned-sulA-unverified|PhilCat",
+            "takes": 2,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          }
+        ],
+        "adjacentTrendGroups": [
+          {
+            "sourceFile": "Cello.arco.ff.sulC.C2A2.aiff",
+            "dynamic": "ff",
+            "string": "sulC",
+            "notes": 10,
+            "adjacentPairs": 9,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.ff.sulG.B2Bb3.aiff",
+            "dynamic": "ff",
+            "string": "sulG",
+            "notes": 3,
+            "adjacentPairs": 2,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.ff.sulG.G2B2.aiff",
+            "dynamic": "ff",
+            "string": "sulG",
+            "notes": 5,
+            "adjacentPairs": 4,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulC.A2Gb3.aiff",
+            "dynamic": "mf",
+            "string": "sulC",
+            "notes": 3,
+            "adjacentPairs": 2,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulC.C2Ab2.aiff",
+            "dynamic": "mf",
+            "string": "sulC",
+            "notes": 9,
+            "adjacentPairs": 8,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulG.B2A3.aiff",
+            "dynamic": "mf",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulG.G2Bb2.aiff",
+            "dynamic": "mf",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulC.C2Gb2.aiff",
+            "dynamic": "pp",
+            "string": "sulC",
+            "notes": 7,
+            "adjacentPairs": 6,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulC.Gb2D3.aiff",
+            "dynamic": "pp",
+            "string": "sulC",
+            "notes": 5,
+            "adjacentPairs": 4,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulG.B2A3.aiff",
+            "dynamic": "pp",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulG.G2Bb2.aiff",
+            "dynamic": "pp",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          }
+        ],
+        "adjacentTrendPairs": 47,
+        "evidenceByDimension": {
+          "excitationPosition": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "vibratoRateHz": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          },
+          "vibratoDepthCents": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          },
+          "vibratoOnsetDelayMs": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          },
+          "vibratoRampMs": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          },
+          "vibratoRateDriftHzPerSecond": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          },
+          "sustainNoiseDb": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          },
+          "onsetNoiseDb": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "onsetNoiseCentroidOct": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "noiseLeadMs": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "onsetWanderCents": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "onsetSettleMs": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "attackNoiseLevel": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "doctrine": "F13: evidence strength is per dimension; spec fallbacks never impose a blanket downgrade"
+      },
+      "qualification": {
+        "excitationPosition": {
+          "parameter": "excitationPosition",
+          "observable": "excitationPosition",
+          "unit": "fraction-of-string",
+          "pairsTested": 12,
+          "qualifiedPairs": 12,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRate": {
+          "parameter": "vibratoRate",
+          "observable": "vibratoRateHz",
+          "unit": "Hz",
+          "pairsTested": 12,
+          "qualifiedPairs": 3,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoDepth": {
+          "parameter": "vibratoDepth",
+          "observable": "vibratoDepthCents",
+          "unit": "cents",
+          "pairsTested": 12,
+          "qualifiedPairs": 3,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoOnsetDelayMs": {
+          "parameter": "vibratoOnsetDelayMs",
+          "observable": "vibratoOnsetDelayMs",
+          "unit": "ms",
+          "pairsTested": 12,
+          "qualifiedPairs": 2,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRampMs": {
+          "parameter": "vibratoRampMs",
+          "observable": "vibratoRampMs",
+          "unit": "ms",
+          "pairsTested": 12,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRateDrift": {
+          "parameter": "vibratoRateDrift",
+          "observable": "vibratoRateDriftHzPerSecond",
+          "unit": "Hz/s",
+          "pairsTested": 12,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "bowNoiseLevelDb": {
+          "parameter": "bowNoiseLevelDb",
+          "observable": "sustainNoiseDb",
+          "unit": "dB",
+          "pairsTested": 12,
+          "qualifiedPairs": 11,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "bowScratchLevelDb": {
+          "parameter": "bowScratchLevelDb",
+          "observable": "onsetNoiseDb",
+          "unit": "dB",
+          "pairsTested": 12,
+          "qualifiedPairs": 8,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "attackNoiseLevel": {
+          "parameter": "attackNoiseLevel",
+          "observable": "attackNoiseLevel",
+          "unit": "linear-ratio",
+          "pairsTested": 12,
+          "qualifiedPairs": 7,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "onsetWanderCents": {
+          "parameter": "onsetWanderCents",
+          "observable": "onsetWanderCents",
+          "unit": "cents",
+          "pairsTested": 12,
+          "qualifiedPairs": 12,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "onsetWanderSettleMs": {
+          "parameter": "onsetWanderSettleMs",
+          "observable": "onsetSettleMs",
+          "unit": "ms",
+          "pairsTested": 12,
+          "qualifiedPairs": 12,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        }
+      },
+      "ranges": {
+        "excitationPosition": {
+          "status": "measured",
+          "unit": "fraction-of-string",
+          "centre": 0.072,
+          "min": 0.0303,
+          "max": 0.2447,
+          "pairSpreadMedian": 0.037867,
+          "pairSpreadP90": 0.178956,
+          "drawHalfRange": 0.126541,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "excitationPosition",
+            "observable": "excitationPosition",
+            "unit": "fraction-of-string",
+            "pairsTested": 12,
+            "qualifiedPairs": 12,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "vibratoRate": {
+          "status": "measured",
+          "unit": "Hz",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 5.793457,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 2.819824,
+          "drawHalfRange": 1.993917,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "vibratoRate",
+            "observable": "vibratoRateHz",
+            "unit": "Hz",
+            "pairsTested": 12,
+            "qualifiedPairs": 3,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoDepth": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 15.264357,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 13.426888,
+          "drawHalfRange": 9.494243,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "vibratoDepth",
+            "observable": "vibratoDepthCents",
+            "unit": "cents",
+            "pairsTested": 12,
+            "qualifiedPairs": 3,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoOnsetDelayMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 46.439909,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 41.795918,
+          "drawHalfRange": 29.554177,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "vibratoOnsetDelayMs",
+            "observable": "vibratoOnsetDelayMs",
+            "unit": "ms",
+            "pairsTested": 12,
+            "qualifiedPairs": 2,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "bowNoiseLevelDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -33.228167,
+          "min": -153.871448,
+          "max": -18.143892,
+          "pairSpreadMedian": 3.544419,
+          "pairSpreadP90": 10.996809,
+          "drawHalfRange": 7.775918,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "bowNoiseLevelDb",
+            "observable": "sustainNoiseDb",
+            "unit": "dB",
+            "pairsTested": 12,
+            "qualifiedPairs": 11,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "bowScratchLevelDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -4.684178,
+          "min": -27.258266,
+          "max": 0.0,
+          "pairSpreadMedian": 2.998025,
+          "pairSpreadP90": 25.511678,
+          "drawHalfRange": 18.039481,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "bowScratchLevelDb",
+            "observable": "onsetNoiseDb",
+            "unit": "dB",
+            "pairsTested": 12,
+            "qualifiedPairs": 8,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "attackNoiseLevel": {
+          "status": "measured",
+          "unit": "linear-ratio",
+          "centre": 0.000682,
+          "min": 0.0,
+          "max": 0.065255,
+          "pairSpreadMedian": 0.000325,
+          "pairSpreadP90": 0.0054,
+          "drawHalfRange": 0.003818,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "attackNoiseLevel",
+            "observable": "attackNoiseLevel",
+            "unit": "linear-ratio",
+            "pairsTested": 12,
+            "qualifiedPairs": 7,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetWanderCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 31.474778,
+          "min": 3.784456,
+          "max": 123.320329,
+          "pairSpreadMedian": 17.509263,
+          "pairSpreadP90": 58.014725,
+          "drawHalfRange": 41.022606,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "onsetWanderCents",
+            "observable": "onsetWanderCents",
+            "unit": "cents",
+            "pairsTested": 12,
+            "qualifiedPairs": 12,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetWanderSettleMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 131.836735,
+          "min": 0.0,
+          "max": 230.956916,
+          "pairSpreadMedian": 61.578231,
+          "pairSpreadP90": 128.674117,
+          "drawHalfRange": 90.986341,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "onsetWanderSettleMs",
+            "observable": "onsetSettleMs",
+            "unit": "ms",
+            "pairsTested": 12,
+            "qualifiedPairs": 12,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        }
+      },
+      "spreadObservables": {
+        "excitationPosition": {
+          "status": "measured",
+          "unit": "fraction-of-string",
+          "centre": 0.072,
+          "min": 0.0303,
+          "max": 0.2447,
+          "pairSpreadMedian": 0.037867,
+          "pairSpreadP90": 0.178956,
+          "drawHalfRange": 0.126541,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "vibratoRateHz": {
+          "status": "measured",
+          "unit": "Hz",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 5.793457,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 2.819824,
+          "drawHalfRange": 1.993917,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoDepthCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 15.264357,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 13.426888,
+          "drawHalfRange": 9.494243,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoOnsetDelayMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 46.439909,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 41.795918,
+          "drawHalfRange": 29.554177,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoRampMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.0,
+          "drawHalfRange": 0.0,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "vibratoRateDriftHzPerSecond": {
+          "status": "measured",
+          "unit": "Hz/s",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.0,
+          "drawHalfRange": 0.0,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "sustainNoiseDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -33.228167,
+          "min": -153.871448,
+          "max": -18.143892,
+          "pairSpreadMedian": 3.544419,
+          "pairSpreadP90": 10.996809,
+          "drawHalfRange": 7.775918,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "onsetNoiseDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -4.684178,
+          "min": -27.258266,
+          "max": 0.0,
+          "pairSpreadMedian": 2.998025,
+          "pairSpreadP90": 25.511678,
+          "drawHalfRange": 18.039481,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetNoiseCentroidOct": {
+          "status": "measured",
+          "unit": "octaves",
+          "centre": 0.339768,
+          "min": -0.673575,
+          "max": 3.162296,
+          "pairSpreadMedian": 0.331328,
+          "pairSpreadP90": 3.510374,
+          "drawHalfRange": 2.48221,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "noiseLeadMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 46.439909,
+          "min": 0.0,
+          "max": 278.639456,
+          "pairSpreadMedian": 52.244898,
+          "pairSpreadP90": 193.190023,
+          "drawHalfRange": 136.605975,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetWanderCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 31.474778,
+          "min": 3.784456,
+          "max": 123.320329,
+          "pairSpreadMedian": 17.509263,
+          "pairSpreadP90": 58.014725,
+          "drawHalfRange": 41.022606,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetSettleMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 131.836735,
+          "min": 0.0,
+          "max": 230.956916,
+          "pairSpreadMedian": 61.578231,
+          "pairSpreadP90": 128.674117,
+          "drawHalfRange": 90.986341,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "attackNoiseLevel": {
+          "status": "measured",
+          "unit": "linear-ratio",
+          "centre": 0.000682,
+          "min": 0.0,
+          "max": 0.065255,
+          "pairSpreadMedian": 0.000325,
+          "pairSpreadP90": 0.0054,
+          "drawHalfRange": 0.003818,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        }
+      },
+      "decompositionTest": {
+        "verdict": "INCONCLUSIVE-MASKED",
+        "passed": false,
+        "pairs": 12,
+        "failedPairs": 12,
+        "rule": "after Human comb/level/tilt removal: partial and body residual <=3 dB; B <=1.5x (near-zero uses 3 cents); T60 <=1.5x",
+        "maskingFactors": [
+          "one or more per-take identity fits miss the \u00a73 core bars",
+          "one or more qualified Human consumers are unaudited or non-functional"
+        ],
+        "interpretation": "identity/renderer misfit masks the residual; no missing-Human-DOF claim is permitted"
+      }
     }
   },
   "clarinet": {
