@@ -1753,3 +1753,27 @@ edge cannot steer the sung hierarchy unless both features are active for that
 voice, exceed nonzero feature-specific repeat floors, and represent independent
 intervention lineages. The quarantined cross-family inharmonicity/release-noise
 edge is not used for sung triage.
+
+Status update — Agent A engine pass, 2026-07-17: T-033/T-043
+engine=incorporated. Violin/cello auto selection uses the lowest playable
+string, guitar auto uses minimum fret with the lower-course tie break, explicit
+unplayable selections reject, and selected tables carry their own partial B.
+Headless assertions cover directionality at the same pitch, exact pooled
+fallback and invalid selections for all three instrument layouts.
+
+Status update — Agent A engine pass, 2026-07-17: T-065/A-VOICE-05
+engine=incorporated. All four pinned singer surfaces now interpolate in log-f0
+and velocity before the shared vowel-body stage, clamp at their evidence hull,
+override generic scalar means, and retain the scalar path exactly when absent.
+Assertions prove all fitted tables reach the profile, vowels share the same
+pre-body source, and body transfer remains downstream. Fresh sung campaign
+response audits remain with the sung lane before any new feature weighting.
+
+Status update — Agent A engine pass, 2026-07-17: T-067 held strike/pluck law
+engine=incorporated. Strike/pluck sustain and decay ADSR fields no longer own
+the hold: every resonant mode, including mode 1, continuously free-decays and
+note-off begins fitted register/frequency damper contact or the exact legacy
+fallback. Eight-second output checks pass L18's slope/no-plateau bars and
+prove `envelopeSustain` 0.05 versus 1.0 is PCM-identical. Bow/blow retain their
+existing ADSR semantics. Physical damper tables remain absent where Agent C
+classified the evidence incomplete.

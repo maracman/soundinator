@@ -12,6 +12,10 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "web" / "static" / "measured_profiles.json"
 DST = ROOT / "web" / "static" / "measured_profiles.js"
+SUNG_SOURCE_TABLES = (ROOT / "scripts" / "tone_match" / "calibrations" /
+                      "sung-source-tables-pass07.json")
+BLOWN_SOURCE_TABLES = (ROOT / "scripts" / "tone_match" / "calibrations" /
+                       "blown-sustain-source-pass05.json")
 
 PERF_KEYS = [
     "envelopeAttack", "envelopeAttackSd", "envelopeDecay", "envelopeSustain",
@@ -30,6 +34,35 @@ PERF_KEYS = [
 
 def main():
     d = json.loads(SRC.read_text())
+    sung_tables = {}
+    if SUNG_SOURCE_TABLES.exists():
+        handoff = json.loads(SUNG_SOURCE_TABLES.read_text())
+        if handoff.get("syntheticRoundTrip", {}).get("passed") is not True:
+            raise ValueError("refusing A-VOICE-05 rows without passing round trip")
+        for voice, table in handoff.get("voices", {}).items():
+            if table.get("coverage", {}).get("complete") is not True:
+                raise ValueError(f"refusing incomplete A-VOICE-05 {voice} table")
+            sung_tables[f"voice-{voice}"] = {
+                "schemaVersion": handoff.get("schemaVersion"),
+                "handoff": handoff.get("handoff"),
+                "evidenceSha256": handoff.get("evidenceSha256"),
+                "sourceIdentity": table.get("sourceIdentity"),
+                "interpolation": handoff.get("interpolationContract"),
+                "rows": table.get("rows", []),
+            }
+    blown_tables = {}
+    if BLOWN_SOURCE_TABLES.exists():
+        handoff = json.loads(BLOWN_SOURCE_TABLES.read_text())
+        for instrument, table in handoff.get("instruments", {}).items():
+            if table.get("coverage", {}).get("complete") is not True:
+                raise ValueError(f"refusing incomplete blown sustain table {instrument}")
+            blown_tables[instrument] = {
+                "schemaVersion": handoff.get("schemaVersion"),
+                "handoff": handoff.get("handoff"),
+                "evidenceSha256": handoff.get("evidenceSha256"),
+                "interpolation": handoff.get("interpolationContract"),
+                "rows": table.get("rows", []),
+            }
     out = {}
     for key, v in d.items():
         if not isinstance(v, dict) or "partials" not in v:
@@ -102,6 +135,9 @@ def main():
                 for course, rows in sorted(strings.items())
                 if isinstance(rows, list)
             }
+        source_surface = sung_tables.get(key) or blown_tables.get(key)
+        if source_surface:
+            entry["spectralPartialsByRegisterDynamic"] = source_surface
         attack_registers = (v.get("attack") or {}).get("byRegister")
         if isinstance(attack_registers, list) and attack_registers:
             entry["attackByRegister"] = [{
@@ -111,6 +147,15 @@ def main():
                 "bandT90ms": row.get("bandT90ms", {}),
             } for row in attack_registers if isinstance(row, dict) and
                 isinstance(row.get("f0"), (int, float))]
+        damper_registers = v.get("damperByRegister")
+        if isinstance(damper_registers, list) and damper_registers:
+            entry["damperByRegister"] = [{
+                key: row[key] for key in (
+                    "f0", "dampDbPerSecondAtFundamental", "frequencyExponent",
+                    "nNotes", "source") if row.get(key) is not None
+            } for row in damper_registers if isinstance(row, dict) and
+                all(isinstance(row.get(key), (int, float)) for key in
+                    ("f0", "dampDbPerSecondAtFundamental", "frequencyExponent"))]
         an = v["performance"].get("attackNoise")
         if isinstance(an, dict):
             entry["attackNoise"] = {k: round(x, 4) for k, x in an.items()
@@ -170,6 +215,14 @@ def main():
                     if key in decomposition
                 }
         out[key] = entry
+
+    # Soprano has a fitted A-VOICE-05 source surface but intentionally no
+    # generic pooled measured-profile row. Emit the pinned surface alone; the
+    # engine supplies the legacy vocal craft table only as its absent-cell
+    # fallback, never as the fitted singer identity.
+    for key, source_surface in sung_tables.items():
+        if key not in out:
+            out[key] = {"spectralPartialsByRegisterDynamic": source_surface}
 
     DST.write_text(
         "// GENERATED from web/static/measured_profiles.json by "
