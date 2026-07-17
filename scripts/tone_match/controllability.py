@@ -29,6 +29,7 @@ import numpy as np
 from .score import (
     DEFAULT_WEIGHTS,
     PERCEPTUAL_UNITS,
+    SCORER_CONTRACT_VERSION,
     compare_features,
     extract_features,
     weights_for_instrument,
@@ -52,6 +53,8 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "attackNoiseFreq": (1000.0, 2400.0, 0.0),
     "attackNoiseQ": (0.84, 2.5, 0.0),
     "attackNoiseDecay": (0.05, 0.15, 0.0),
+    "attackNoiseDirect": (0.0, 0.8, 0.0),
+    "attackNoiseVelocityExponent": (1.0, 0.25, 0.0),
     "partialTilt": (0.0, 0.35, 0.0),
     "partialTransfer": (0.1, 0.4, 0.0),
     "partialMaterial": (0.3, 0.6, 0.0),
@@ -59,6 +62,9 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "spectralDynamicAmount": (1.0, 1.8, 0.0),
     "dynamicBlare": (0.0, 0.4, 0.0),
     "envelopeAttack": (0.08, 0.25, 0.0),
+    "velocityHardnessCoupling": (0.2, 0.8, 0.0),
+    "decaySecondStage": (0.2, 0.8, 0.0),
+    "decaySecondRatio": (2.0, 6.0, 0.0),
     "vibratoProb": (1.0, 0.0, 0.0),
     "vibratoDepth": (18.0, 40.0, 0.0),
     "vibratoRate": (5.5, 6.5, 0.0),
@@ -119,19 +125,26 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
               free_params: dict[str, tuple[float, float, float]] | None = None,
               objective_references: list[dict[str, Any]] | None = None,
               manifest_contract: list[dict[str, Any]] | None = None,
+              manifest_document: dict[str, Any] | None = None,
               ) -> dict[str, Any]:
     free_params = free_params or BOWED_FREE_PARAMS
     output_dir.mkdir(parents=True, exist_ok=True)
     renders = output_dir / "renders"
     renders.mkdir(exist_ok=True)
 
-    # variant parameter sets: base + one per perturbed param
+    # Each probe gets its own matched baseline.  Conditional controls such as
+    # the G4 second decay stage are inert at their neutral defaults; the
+    # manifest's auditContext activates the paired control for both sides of
+    # the comparison without contaminating the campaign initial preset.
     variants: dict[str, dict[str, Any]] = {"__base__": dict(baseline_params)}
     for key, (base_value, perturbed, _alt) in free_params.items():
         params = dict(baseline_params)
+        rows = {row["key"]: row for row in (manifest_document or {}).get(
+            "continuous", [])}
+        params.update(rows.get(key, {}).get("auditContext", {}))
         params[key] = base_value
-        variants["__base__"].setdefault(key, base_value)
-        perturbed_params = dict(variants["__base__"])
+        variants[f"__base__-{key}"] = params
+        perturbed_params = dict(params)
         perturbed_params[key] = perturbed
         variants[key] = perturbed_params
     # T-041: repeat the exact baseline in independent offline render
@@ -155,7 +168,22 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             })
     _render_batch(jobs, repo_root)
 
-    ref_bundles = [extract_features(ref["path"]) for ref in references]
+    struck = instrument.strip().lower() in {
+        "piano", "piano-grand", "grand-piano", "piano-upright",
+        "upright-piano", "guitar",
+        "guitar-nylon", "guitar-steel", "harp", "glockenspiel",
+        "marimba", "xylophone", "vibraphone",
+    }
+
+    def analysis_kwargs(ref: dict[str, Any]) -> dict[str, Any]:
+        if not struck:
+            return {}
+        expected = 440.0 * 2 ** ((float(ref.get("midi", 60)) - 69) / 12)
+        return {"expected_f0_hz": expected, "trust_expected_f0": True,
+                "force_percussive": True}
+
+    ref_bundles = [extract_features(ref["path"], **analysis_kwargs(ref))
+                   for ref in references]
     weights = weights_for_instrument(instrument)
     render_cache: dict[tuple[str, int], Any] = {}
 
@@ -165,7 +193,8 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             render_cache[key] = extract_features(
                 renders / f"{name}-{ref_index}.wav",
                 active_duration_s=references[ref_index].get(
-                    "durationSec", 1.5))
+                    "durationSec", 1.5),
+                **analysis_kwargs(references[ref_index]))
         return render_cache[key]
 
     def distances(name: str) -> dict[str, list[float]]:
@@ -237,10 +266,11 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     matrix: dict[str, dict[str, float]] = {}
     render_failures: dict[str, int] = {}
     for key in free_params:
+        probe_base = distances(f"__base__-{key}")
         perturbed = distances(key)
         matrix[key] = {}
-        for feature in base:
-            base_vals = np.asarray(base[feature], dtype=float)[base_ok]
+        for feature in probe_base:
+            base_vals = np.asarray(probe_base[feature], dtype=float)[base_ok]
             pert_vals = np.asarray(perturbed[feature], dtype=float)[base_ok]
             deltas = pert_vals - base_vals
             finite = deltas[np.isfinite(deltas)]
@@ -265,6 +295,24 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         })
         final_weights[feature] = 0.0
 
+    responsive = {
+        feature: sorted(key for key in matrix
+                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
+        for feature in DEFAULT_WEIGHTS
+    }
+    # §2.3 is constructive: an unsupported objective becomes an explicit
+    # watch metric in this exact audit, never a knowingly impossible score.
+    for feature, weight in sorted(final_weights.items()):
+        if float(weight) <= 0 or responsive.get(feature):
+            continue
+        zero_weighted.append({
+            "feature": feature,
+            "previousWeight": weight,
+            "reason": "no free manifest parameter crossed the response threshold",
+            "status": "watch-metric",
+        })
+        final_weights[feature] = 0.0
+
     verdicts = []
     for feature, weight in sorted(DEFAULT_WEIGHTS.items()):
         active_weight = final_weights.get(feature, weight)
@@ -281,11 +329,6 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "status": status,
         })
 
-    responsive = {
-        feature: sorted(key for key in matrix
-                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
-        for feature in DEFAULT_WEIGHTS
-    }
     watch_metrics = [v["feature"] for v in verdicts if v["status"] == "watch-metric"]
     uncontrolled = [v["feature"] for v in verdicts if v["status"] == "UNCONTROLLABLE"]
     objective_references = objective_references or references
@@ -293,15 +336,23 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
         {"key": key, "baseline": values[0], "perturbed": values[1]}
         for key, values in sorted(free_params.items())
     ]
-    audit = {"schemaVersion": 2, "instrument": instrument,
+    from .iterate import _renderer_contract_hash  # local: avoids import cycle
+    audit = {"schemaVersion": 3, "instrument": instrument,
              "status": "clean" if not uncontrolled else "not-clean",
              "threshold": RESPONSE_THRESHOLD,
+             "scorerContractVersion": SCORER_CONTRACT_VERSION,
+             "rendererContractHash": _renderer_contract_hash(),
+             "referenceContractHash": _canonical_hash(objective_references),
+             "parameterManifestHash": _canonical_hash(
+                 manifest_document if manifest_document is not None else manifest_contract),
+             "initialPresetHash": _canonical_hash(baseline_params),
              "objectiveHash": objective_contract_hash(
                  instrument, objective_references, final_weights),
              "manifestHash": manifest_contract_hash(manifest_contract),
              "manifest": manifest_contract,
              "startingWeights": weights,
              "finalWeights": final_weights,
+             "weights": final_weights,
              "references": [ref.get("path") for ref in references],
              "excludedReferences": excluded_refs,
              "analysisFailuresPerParam": render_failures,
@@ -316,6 +367,7 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
              "zeroWeighted": zero_weighted,
              "matrix": matrix, "verdicts": verdicts,
              "responsiveParameters": responsive,
+             "responders": responsive,
              "watchMetrics": watch_metrics,
              "uncontrolledWeightedFeatures": uncontrolled,
              "clean": not uncontrolled}
@@ -370,7 +422,8 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         parser.error(f"no perturbation specification for: {', '.join(unknown)}")
     free_params = {key: BOWED_FREE_PARAMS[key] for key in keys}
-    contract = _manifest_contract(json.loads(args.manifest.read_text()), baseline, keys)
+    manifest_document = json.loads(args.manifest.read_text())
+    contract = _manifest_contract(manifest_document, baseline, keys)
     seen: dict[str, dict[str, Any]] = {}
     for row in references:
         seen.setdefault(f"{row.get('register')}|{row.get('dynamic')}", row)
@@ -378,7 +431,8 @@ def main(argv: list[str] | None = None) -> int:
     audit = run_audit(args.instrument, baseline, subset, args.output,
                       args.repo_root, free_params=free_params,
                       objective_references=references,
-                      manifest_contract=contract)
+                      manifest_contract=contract,
+                      manifest_document=manifest_document)
     print(json.dumps({"clean": audit["clean"],
                       "repeatability": audit["repeatability"]["status"],
                       "unstableFeatures": audit["repeatability"][

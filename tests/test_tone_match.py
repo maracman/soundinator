@@ -27,6 +27,7 @@ from scripts.tone_match.iterate import (
     _candidate_fingerprint,
     _consume_controllability_audit,
     _dominant_residual,
+    _ensure_legacy_baseline,
     _floor_evidence,
     _free_manifest_contract,
     _load_preset,
@@ -39,6 +40,7 @@ from scripts.tone_match.iterate import (
     _write_run_report,
 )
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, rebase_fitted_preset, seed_preset
+from scripts.tone_match.legacy_prior import resolve_legacy_prior, ship_mode_params
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
@@ -347,7 +349,66 @@ def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables(
     assert seed["velocityHardnessCoupling"] == 0
     assert seed["decaySecondStage"] == 0
     assert seed["spectralResonanceAmount"] == 1
+    assert seed["envelopeAttack"] == pytest.approx(.004)
     assert "partialB" not in seed
+
+
+def test_nylon_prior_is_exact_legacy_row_with_separate_fit_and_ship_modes():
+    fit, fit_provenance = resolve_legacy_prior("guitar-nylon", mode="fit")
+    ship, ship_provenance = resolve_legacy_prior("guitar-nylon", mode="ship")
+    assert fit_provenance["tag"] == "sg2-legacy"
+    assert fit_provenance["commit"].startswith("e8d3ac1")
+    assert fit_provenance["row"] == \
+        "guitar-nylon ← legacy piano craft adapted to pluck"
+    assert fit["excitationType"] == ship["excitationType"] == "pluck"
+    assert fit["excitationHuman"] == 0
+    assert ship["excitationHuman"] > 0
+    fitted = {**fit, "partialTilt": .25, "_sg2Prior": fit_provenance,
+              "_sg2Mode": "fit"}
+    ship_seed = {**ship, "_sg2Prior": ship_provenance, "_sg2Mode": "ship"}
+    delivered = ship_mode_params(fitted, ship_seed)
+    assert delivered["partialTilt"] == .25
+    assert delivered["excitationHuman"] == ship["excitationHuman"]
+    assert delivered["_sg2Prior"]["mode"] == "ship"
+
+
+def test_live_exchange_table_uses_latest_struck_lane_disposition(tmp_path, monkeypatch):
+    monkeypatch.setattr(iterate_module, "ROOT", tmp_path)
+    path = tmp_path / "docs" / "sg2" / "TECHNIQUES_EXCHANGE.md"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "### T-033 · course tables\n\n"
+        "Status: engine=incorporated analysis=incorporated\n\n"
+        "Owner disposition: struck/plucked=pending consumer\n\n"
+        "Later: struck/plucked=incorporated in pass\n")
+    assert iterate_module._technique_exchange_statuses() == [{
+        "id": "T-033", "title": "course tables",
+        "lane": "incorporated in pass",
+    }]
+
+
+def test_legacy_baseline_is_immutable_leaderboard_row_one(tmp_path, monkeypatch):
+    monkeypatch.setattr(iterate_module, "DEFAULT_RUN_ROOT", tmp_path / "runs")
+    monkeypatch.setattr(iterate_module, "STATE_ROOT", tmp_path / "state")
+    baseline = {
+        "loss": 4.0, "params": {"excitationHuman": 0},
+        "construction": {"passed": False, "counts": {"fail": 2}},
+        "tripwires": {"strictPassed": False, "cells": [],
+                      "strictMissingCells": []},
+    }
+    prior = {"resolvedHash": "prior-hash", "row": "legacy piano → nylon"}
+    _ensure_legacy_baseline(
+        "guitar-nylon", baseline, {"excitationHuman": .1},
+        "objective", prior)
+    candidate = {**baseline, "loss": 3.0, "params": {"partialTilt": .2}}
+    _update_leaderboard(
+        "guitar-nylon", tmp_path / "pass", candidate, "objective",
+        ship_params={"partialTilt": .2, "excitationHuman": .1}, prior=prior)
+    board = json.loads(
+        (tmp_path / "runs" / "guitar-nylon" / "leaderboard.json").read_text())
+    assert board["runs"][0]["entryType"] == "legacy-baseline"
+    assert board["runs"][0]["mode"] == "ship"
+    assert board["runs"][0]["params"]["excitationHuman"] > 0
 
 
 def test_profile_rebase_refreshes_structural_anchors_but_keeps_fitted_controls():

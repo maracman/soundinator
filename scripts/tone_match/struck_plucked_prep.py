@@ -3,8 +3,8 @@
 
 This is deliberately a preflight builder, not a fitter.  It turns the
 analysis-only corpus into reproducible matched-note manifests, records the
-weak/absent take-pair evidence, and emits neutral family seed presets for the
-controllability audit.  Audio remains below ``/private/tmp``.
+weak/absent take-pair evidence, and emits §2.4c strongest-prior presets for
+the controllability audit.  Audio remains under the durable SG2 data root.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from scripts.fit_profiles_from_samples import (
     sf,
 )
 from scripts.tone_match.paths import sg2_data_root
+from scripts.tone_match.legacy_prior import resolve_legacy_prior
 
 
 VELOCITY = {"pp": 0.2, "p": 0.28, "f": 0.82, "ff": 0.92}
@@ -35,6 +36,7 @@ VELOCITY = {"pp": 0.2, "p": 0.28, "f": 0.82, "ff": 0.92}
 # humanisation material rather than being mixed into the Philharmonia loss.
 CAMPAIGNS: dict[str, dict[str, Any]] = {
     "grand-piano": {
+        "instrument": "grand-piano",
         "corpus": "piano",
         "profile": "piano",
         "excitation": "strike",
@@ -49,6 +51,7 @@ CAMPAIGNS: dict[str, dict[str, Any]] = {
         "source": "Iowa MIS",
     },
     "guitar-nylon": {
+        "instrument": "guitar-nylon",
         "corpus": "guitar",
         "profile": "guitar",
         "excitation": "pluck",
@@ -132,12 +135,16 @@ def write_reference(source: Path, target_midi: int, target: Path) -> tuple[int, 
     return midi_of(f0), f0, render_duration, pitch_evidence
 
 
-def seed_preset(spec: dict[str, Any], measured: dict[str, Any]) -> dict[str, Any]:
+def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
+                mode: str = "fit", repo_root: Path | None = None) -> dict[str, Any]:
+    """Overlay measured identity on the table-selected immutable craft prior."""
     profile = measured[spec["profile"]]
     performance = profile.get("performance") or {}
     attack = performance.get("attackNoise") or {}
     attack_registers = (profile.get("attack") or {}).get("byRegister") or []
-    seed: dict[str, Any] = {
+    seed, provenance = resolve_legacy_prior(
+        spec["instrument"], mode=mode, repo_root=repo_root or Path(__file__).resolve().parents[2])
+    measured_identity: dict[str, Any] = {
         "seed": 7331,
         "sg2Family": "struck-plucked",
         "voiceMode": "fourier",
@@ -147,21 +154,11 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any]) -> dict[str, Any
         "excitationType": spec["excitation"],
         "resonatorClass": "string",
         "bodyType": "auto",
-        "partialMaterial": (profile.get("material") or {}).get("suggestedMaterial", 0.35),
+        # The measured profile owns the transient shape; this control is its
+        # unity gain, not a replacement hand value.
         "attackNoiseLevel": 1.0,
-        "attackNoiseFreq": attack.get("freq"),
-        "attackNoiseQ": attack.get("q"),
-        "attackNoiseDecay": attack.get("decay"),
-        "envelopeAttack": performance.get("envelopeAttack", 0.02),
-        "envelopeDecay": performance.get("envelopeDecay", 0.8),
-        "envelopeSustain": performance.get("envelopeSustain", 0.15),
-        "envelopeRelease": performance.get("envelopeRelease", 0.12),
         "vibratoProb": 0,
-        "excitationPosition": 0.13,
-        "excitationHardness": 0.6,
-        "excitationHuman": 0.0,
         "toneBreath": 0.0,
-        "partialTransfer": 0.15,
         "partialTilt": 0.0,
         "spectralResonanceAmount": 1.0,
         "spectralDynamicAmount": 1.0,
@@ -171,6 +168,20 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any]) -> dict[str, Any
         "decaySecondStage": 0.0,
         "decaySecondRatio": 1.0,
     }
+    material = (profile.get("material") or {}).get("suggestedMaterial")
+    if material is not None:
+        measured_identity["partialMaterial"] = material
+    for target, source in (
+        ("attackNoiseFreq", "freq"), ("attackNoiseQ", "q"),
+        ("attackNoiseDecay", "decay"),
+    ):
+        if attack.get(source) is not None:
+            measured_identity[target] = attack[source]
+    for key in ("envelopeAttack", "envelopeDecay", "envelopeSustain",
+                "envelopeRelease"):
+        if performance.get(key) is not None:
+            measured_identity[key] = performance[key]
+    seed.update(measured_identity)
     resonances = profile.get("resonances") or []
     if len(resonances) >= 3:
         seed["bodyBands"] = resonances
@@ -184,6 +195,8 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any]) -> dict[str, Any
     # one scalar B.  Legacy/sparse profiles retain the scalar fallback.
     if not profile.get("partialsByRegister"):
         seed["partialB"] = profile.get("partialB", 0)
+    seed["_sg2Mode"] = mode
+    seed["_sg2Prior"] = provenance
     return {key: value for key, value in seed.items() if value is not None}
 
 
@@ -262,7 +275,8 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
                     f"T-033 auto course {guitar_course_for_midi(midi)}"
                 )
     measured = json.loads(measured_path.read_text())
-    initial = seed_preset(spec, measured)
+    initial = seed_preset(spec, measured, mode="fit")
+    ship_prior = seed_preset(spec, measured, mode="ship")
     if rebase_state is not None:
         initial = rebase_fitted_preset(
             json.loads(rebase_state.read_text()),
@@ -270,6 +284,9 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
         )
     pairs = _take_pairs(instrument, corpus)
     (output / "initial.json").write_text(json.dumps(initial, indent=2) + "\n")
+    (output / "ship-prior.json").write_text(json.dumps(ship_prior, indent=2) + "\n")
+    (output / "prior.json").write_text(
+        json.dumps(ship_prior["_sg2Prior"], indent=2) + "\n")
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
     (output / "take-pairs.json").write_text(json.dumps(pairs, indent=2) + "\n")
     summary = {
@@ -281,6 +298,10 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
         "dynamics": sorted({row["dynamic"] for row in references}),
         "floorGroupsWithAlternates": 0,
         "humanisationEvidence": pairs["evidence"],
+        "priorRow": ship_prior["_sg2Prior"]["row"],
+        "priorHash": ship_prior["_sg2Prior"]["resolvedHash"],
+        "fitModeHuman": initial.get("excitationHuman"),
+        "shipModeHuman": ship_prior.get("excitationHuman"),
         "rebasedFrom": str(rebase_state) if rebase_state else None,
         "fittingGate": "blocked-until-P5-and-controllability-clean",
     }

@@ -469,3 +469,21 @@ Composite loss: `3.723190`
 | `partialTilt` | 0.3456418637007195 | not run |
 | `partialTransfer` | 0.6180339887498948 | not run |
 | `spectralResonanceAmount` | 0.6246117974981071 | not run |
+
+## guitar-nylon — pass14-legacy-prior
+
+Composite loss: `4.853343`
+
+| Parameter | Fitted | ±10% sensitivity |
+|---|---:|---:|
+| `attackNoiseDirect` | 0.0 | 0.013667 |
+| `attackNoiseLevel` | 0.40325224750231337 | 0.003383 |
+| `attackNoiseVelocityExponent` | 1.0 | 0.012127 |
+| `decaySecondRatio` | 1.0 | 0.006625 |
+| `decaySecondStage` | 0.0 | 0.006777 |
+| `excitationHardness` | 0.7668284148430117 | 0.012604 |
+| `excitationPosition` | 0.2899482059642847 | 0.015769 |
+| `partialTilt` | 0.2 | 0.012852 |
+| `partialTransfer` | 0.3 | 0.012623 |
+| `spectralResonanceAmount` | 1.0 | 0.015312 |
+| `velocityHardnessCoupling` | 0.26585481862241056 | 0.012769 |
