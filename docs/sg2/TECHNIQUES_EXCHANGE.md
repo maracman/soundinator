@@ -1713,3 +1713,45 @@ Affects: criteria_drift.py evidence admission / optimiser reports / empirical
 hierarchy interpretation.
 Status: analysis=validation-incorporated+edge-quarantined
 bowed=incorporated engine=n/a struck/plucked=adapt-method sung=adapt-method
+
+### T-072 · Bowed L16 fixed-Hz envelopes and L18 bow-lift semantics stay separate
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: shared method; violin values only
+Finding: the family-generic L16 extractor now has a synthetic round trip that
+requires all three defining signs: positive onset excess over the mode's own
+early-decay law, excess decay over the fitted frequency baseline, and a
+positive dynamic slope. The violin audit deduplicates role trims by
+source-file/note/dynamic/string and uses nine lossless onset/spectral notes.
+It finds no harmonic-rank class. One fixed-Hz body/radiation class survives
+all nine notes at 356.359 Hz, with 3.796 dB median onset boost, 5.832 dB/s
+excess early decay, and +6.414 dB per velocity unit. These values are violin
+identity evidence and do not transfer to another bowed instrument.
+
+Gate correction: the earlier canonical extractor overwrote temporal
+`onsetBoostDb` with onset level relative to the fundamental/band median, and
+its synthetic fixture raised an entire mode rather than injecting an
+onset-only transient. Those quantities are now separate fields and the gate
+injects a transient that is gone before the baseline-fit window. Any L16 real
+assignment emitted by the older gate, including the prior piano artifacts,
+must be re-extracted before consumption; the old class rows are not evidence
+for a renderer value merely because the previous synthetic check passed.
+
+The L18 bow-lift analogue is not established by the held violin references.
+Nine unique lossless full tails contain six detected final knees but zero
+labelled bow-lift/note-off times; their measured release floor spans -22.802
+to -7.520 dB. Thus `releaseNoiseDb` is a recording/room-floor observable,
+while `releaseDamping` changes harmonic ring. The pass-04 discontinuity in
+the release-floor probe is a scorer/semantic mismatch, not evidence that one
+scalar is the physical bow-lift law. Ring, damping-slope and floor features
+remain watch-only until a labelled anchor separates pre/post-lift harmonic
+decay, residual bow-contact noise, and room tail.
+
+Consuming assertions: extend the generic T-069 fixed-Hz anomaly consumer to
+bowed profiles without enabling a harmonic-rank class; the 356.359-Hz row
+changes only its assigned absolute-frequency band during onset and returns to
+the unchanged sustained body law; absence is PCM-identical. A future L18
+consumer requires lossless notes with labelled bow-lift, measurable pre/post
+harmonic envelopes, and separately tracked residual-contact/room tails.
+Affects: L16 bowed profile schema / T-069 consumer / release scorer admission /
+violin plateau interpretation.
+Status: analysis=incorporated bowed=measured-fixedHz-class
+engine=pending-generic-T-069-bowed-consumer L18=blocked-labelled-bow-lift-evidence

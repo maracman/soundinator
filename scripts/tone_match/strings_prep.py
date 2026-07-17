@@ -124,6 +124,10 @@ PHIL_ANCHOR_NOTES = {
     "violin": {55: "G3", 72: "C5", 88: "E6"},
     "cello": {36: "C2", 55: "G3", 76: "E5"},
 }
+PHIL_STRING_HINTS = {
+    "violin": {55: "sulG", 72: "sulA", 88: "sulE"},
+    "cello": {36: "sulC", 55: "sulD", 76: "sulA"},
+}
 
 # Philharmonia catalogue length codes >= 0.5 s (the analyser needs at least
 # a 0.2 s mid-note window); the quarter-second "025" takes are unusable.
@@ -166,7 +170,16 @@ def find_catalogue_duplicates(catalogue_dir: Path, instrument: str) -> list[dict
         for dynamic, catalogue_dynamic in _CATALOGUE_DYNAMICS.items():
             names = [f"{instrument}_{note}_{length}_{catalogue_dynamic}_arco-normal.mp3"
                      for length in _CATALOGUE_LENGTHS]
-            present = [name for name in names if (catalogue_dir / name).exists()]
+            # A dedicated catalogue cache stores bare names; an acquisition
+            # task may instead place provenance-prefixed files directly in
+            # samples/<instrument>.  Preserve the actual filename in either
+            # layout and never refetch it here.
+            present = []
+            for name in names:
+                if (catalogue_dir / name).exists():
+                    present.append(name)
+                elif (catalogue_dir / f"phil.{name}").exists():
+                    present.append(f"phil.{name}")
             if len(present) >= 2:
                 groups.append({"midi": midi, "note": note, "dynamic": dynamic,
                                "articulation": "arco-normal", "files": present})
@@ -826,7 +839,11 @@ def build_string_references(instrument: str, samples_root: Path,
     # takes replace adjacent-semitone proxies as the floor where they exist)
     catalogue_groups = []
     anchor_register = {a["midi"]: a["register"] for a in STRING_CAMPAIGNS[instrument]}
-    catalogue_dir = (catalogue_root / instrument) if catalogue_root else None
+    configured_catalogue = ((catalogue_root / instrument)
+                            if catalogue_root else None)
+    catalogue_dir = (configured_catalogue
+                     if configured_catalogue and configured_catalogue.is_dir()
+                     else corpus)
     if catalogue_dir and catalogue_dir.is_dir():
         for group in find_catalogue_duplicates(catalogue_dir, instrument):
             group_segments = []
@@ -862,12 +879,23 @@ def build_string_references(instrument: str, samples_root: Path,
                     "string": "unlabelled",
                     "durationSec": render_duration,
                     "articulation": "arco", "vibrato": "normal",
-                    "roles": ["floor"],
-                    "floorGroup": (f"{midi}|{group['dynamic']}|arco-normal|"
-                                   f"unlabelled|PhilCat|"
-                                   f"{_duration_bucket(render_duration)}"),
+                    # Duration-mismatched MP3 catalogue takes are valid
+                    # §2.5c pair evidence after common-window trimming, but
+                    # they are not a lossless full-tail stopping floor.
+                    "roles": ["humanisation"],
+                    "humanisationGroup": (
+                        f"{group['midi']}|{group['dynamic']}|arco-normal|"
+                        f"planned-{PHIL_STRING_HINTS[instrument][group['midi']]}-"
+                        "unverified|PhilCat"),
+                    "floorGroup": f"humanisation-only|{file_name}",
                     "sourceClass": "Philharmonia catalogue",
                     "sourceFile": file_name,
+                    "pairEvidenceClass": (
+                        "phil-multi-take-duration-mismatched-mp3-common-window"),
+                    "originalDurationMatched": False,
+                    "sourceCodec": "mp3",
+                    "plannedString": PHIL_STRING_HINTS[instrument][group["midi"]],
+                    "stringVerified": False,
                 })
                 used.append(file_name)
             if len(used) >= 2:

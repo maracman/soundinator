@@ -25,8 +25,9 @@ from .score import THIRD_OCTAVE_CENTRES, extract_features, inharmonicity_compari
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _floor_group(reference: dict[str, Any]) -> str:
-    return str(reference.get("floorGroup") or "|").strip()
+def _pair_group(reference: dict[str, Any]) -> str:
+    return str(reference.get("humanisationGroup") or
+               reference.get("floorGroup") or "|").strip()
 
 
 def _comb_db(position: float, count: int) -> np.ndarray:
@@ -325,11 +326,12 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                      ) -> dict[str, Any]:
     groups: dict[str, list[dict[str, Any]]] = {}
     for reference in references:
-        if "floor" in set(reference.get("roles", [])):
-            groups.setdefault(_floor_group(reference), []).append(reference)
+        roles = set(reference.get("roles", []))
+        if roles.intersection({"humanisation", "floor"}):
+            groups.setdefault(_pair_group(reference), []).append(reference)
     groups = {key: rows for key, rows in groups.items() if len(rows) >= 2}
     if not groups:
-        raise ValueError(f"{instrument}: no matched floor-role take pairs")
+        raise ValueError(f"{instrument}: no matched humanisation/floor take pairs")
     cache: dict[str, Any] = {}
     for rows in groups.values():
         for reference in rows:
@@ -409,12 +411,29 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                                     "no missing-Human-DOF claim is permitted"),
         }[verdict_name],
     }
+    group_evidence = [{
+        "group": group,
+        "takes": len(rows),
+        "roles": sorted({role for row in rows
+                          for role in row.get("roles", [])}),
+        "sourceClasses": sorted({str(row.get("sourceClass", "unknown"))
+                                 for row in rows}),
+        "pairEvidenceClasses": sorted({
+            str(row.get("pairEvidenceClass", "lossless-floor"))
+            for row in rows}),
+        "allOriginalDurationsMatched": all(
+            row.get("originalDurationMatched", True) for row in rows),
+        "allStringsVerified": all(row.get("stringVerified", True)
+                                  for row in rows),
+    } for group, rows in sorted(groups.items())]
     return {
         "schemaVersion": 2, "instrument": instrument,
         "method": "matched-take-human-only-differential-v2-double-dissociation",
-        "evidence": {"basis": "true same-note/dynamic/articulation floor groups",
+        "evidence": {"basis": ("same-note/dynamic/articulation humanisation "
+                                "or lossless floor groups"),
                      "groups": len(groups), "takes": len(cache),
-                     "pairs": len(pair_rows)},
+                     "pairs": len(pair_rows),
+                     "groupEvidence": group_evidence},
         "qualification": qualification,
         "ranges": ranges, "spreadObservables": spread_observables,
         "decompositionTest": verdict, "pairFits": pair_rows,

@@ -104,6 +104,20 @@ def test_l16_l17_l18_piano_anatomy_extractor_passes_synthetic_roundtrip(tmp_path
     assert output.exists()
 
 
+def test_l16_onset_boost_is_temporal_not_relative_to_fundamental():
+    from scripts.tone_match.piano_anatomy import _component_rows, _synthetic_note
+
+    sample_rate = 24_000
+    f0 = 220.0
+    samples = _synthetic_note(f0, .9, sample_rate=sample_rate)
+    partials, bands, _ = _component_rows(
+        samples, sample_rate, f0, .9, "synthetic")
+    rank_six = next(row for row in partials if row["rank"] == 6)
+    assert rank_six["onsetBoostDb"] > 0
+    assert rank_six["onsetLevelRelativeToFundamentalDb"] < 0
+    assert all("onsetLevelRelativeToBandMedianDb" in row for row in bands)
+
+
 def test_sustained_band_profile_is_gain_invariant_and_uses_third_octaves():
     sr = 44_100
     t = np.arange(int(1.7 * sr)) / sr
@@ -163,6 +177,17 @@ def test_qualified_human_ranges_survive_a_masked_decomposition():
               "ranges": {"excitationPosition": {"status": "measured"}}}
     assert _consume_profile_ranges(profiles, "french-horn", masked)
     assert profiles["french-horn"]["humanRanges"] is masked
+
+
+def test_humanisation_group_is_separate_from_stopping_floor_group():
+    from scripts.tone_match.humanisation import _pair_group
+
+    reference = {
+        "roles": ["humanisation"],
+        "humanisationGroup": "55|pp|arco-normal|sulD|PhilCat",
+        "floorGroup": "humanisation-only|take-a",
+    }
+    assert _pair_group(reference) == reference["humanisationGroup"]
 
 
 def test_human_candidate_requires_double_dissociation_in_both_directions():
@@ -2372,6 +2397,18 @@ def test_catalogue_duplicate_finder_requires_two_usable_takes(tmp_path):
     # anchor notes stay consistent with the campaign tables
     for instrument, anchors in STRING_CAMPAIGNS.items():
         assert set(PHIL_ANCHOR_NOTES[instrument]) == {a["midi"] for a in anchors}
+
+
+def test_catalogue_duplicate_finder_accepts_provenance_prefixed_samples(tmp_path):
+    names = ("phil.cello_G3_05_pianissimo_arco-normal.mp3",
+             "phil.cello_G3_1_pianissimo_arco-normal.mp3",
+             "phil.cello_G3_15_pianissimo_arco-normal.mp3")
+    for name in names:
+        (tmp_path / name).write_bytes(b"")
+    groups = find_catalogue_duplicates(tmp_path, "cello")
+    assert len(groups) == 1
+    assert groups[0]["midi"] == 55
+    assert groups[0]["files"] == list(names)
 
 
 def test_string_campaigns_cover_three_registers_and_two_dynamics():
