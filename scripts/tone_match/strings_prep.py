@@ -164,6 +164,8 @@ _PHIL_RE = re.compile(
     r"(?P<length>[^_]+)_(?P<dynamic>[a-z-]+)_(?P<vibrato>[a-z-]+)\.mp3$")
 
 _NOTE_TO_MIDI = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+_IOWA_SPAN_RE = re.compile(
+    r"\.([A-G](?:b|#)?-?\d)([A-G](?:b|#)?-?\d)\.aiff$", re.IGNORECASE)
 
 
 def parse_string_label(filename: str) -> str | None:
@@ -191,6 +193,26 @@ def parse_phil_name(filename: str) -> dict[str, Any] | None:
         "vibrato": "vib" if "vibrato" in match.group("vibrato") and
                    "non" not in match.group("vibrato") else "nonvib",
     }
+
+
+def _named_note_midi(note: str) -> int:
+    match = re.fullmatch(r"([A-Ga-g])([b#]?)(-?\d)", note)
+    if not match:
+        raise ValueError(f"invalid note name: {note}")
+    letter, accidental, octave_text = match.groups()
+    accidental_offset = 1 if accidental == "#" else -1 if accidental == "b" else 0
+    return ((int(octave_text) + 1) * 12 + _NOTE_TO_MIDI[letter.upper()]
+            + accidental_offset)
+
+
+def iowa_filename_span(path: Path) -> tuple[int, int] | None:
+    """Declared inclusive MIDI span of an Iowa chromatic-run filename."""
+    match = _IOWA_SPAN_RE.search(path.name)
+    if not match:
+        return None
+    endpoints = sorted((_named_note_midi(match.group(1)),
+                        _named_note_midi(match.group(2))))
+    return endpoints[0], endpoints[1]
 
 
 def trim_to_single_bow(segment: np.ndarray, sample_rate: int,
@@ -400,6 +422,36 @@ def select_chromatic_segments(path: Path, target_midis: tuple[int, ...],
     return selected
 
 
+def select_chromatic_across_runs(sources: list[Path],
+                                 target_midis: tuple[int, ...]):
+    """Select target pitches across complementary Iowa acquisition runs.
+
+    Reacquisition can split a string/dynamic corpus into several declared
+    chromatic spans. Assign each requested pitch to the narrowest filename
+    span that contains it, then retain the within-run one-segment-per-pitch
+    constraint in :func:`select_chromatic_segments`.
+    """
+    assignments: dict[Path, list[int]] = {}
+    for midi in target_midis:
+        eligible = []
+        for source in sources:
+            span = iowa_filename_span(source)
+            if span is not None and span[0] <= midi <= span[1]:
+                eligible.append((span[1] - span[0], source.name, source))
+        if not eligible:
+            raise RuntimeError(
+                f"no declared Iowa run covers MIDI {midi}: "
+                f"{', '.join(source.name for source in sources)}")
+        source = min(eligible)[2]
+        assignments.setdefault(source, []).append(midi)
+
+    selected = []
+    for source, midis in assignments.items():
+        for row in select_chromatic_segments(source, tuple(midis)):
+            selected.append((*row, source))
+    return sorted(selected, key=lambda row: target_midis.index(row[0]))
+
+
 def bowed_seed(instrument: str, profile: dict[str, Any]) -> dict[str, Any]:
     """Campaign seed that pins the measured body decision for assertions."""
     performance = profile.get("performance") or {}
@@ -429,6 +481,10 @@ def bowed_seed(instrument: str, profile: dict[str, Any]) -> dict[str, Any]:
         "vibratoDepth": performance.get("vibratoDepth", 0.0),
         "vibratoRate": performance.get("vibratoRate", 5.5),
     }
+    if profile.get("partialsByString"):
+        seed["partialsByString"] = profile["partialsByString"]
+    if profile.get("humanRanges"):
+        seed["humanRanges"] = profile["humanRanges"]
     if resonances or fit.get("omittedReason"):
         seed["bodyBands"] = resonances
         seed["bodyStability"] = {
@@ -490,13 +546,13 @@ def build_string_references(instrument: str, samples_root: Path,
                 sources = sorted(corpus.glob(
                     f"{instrument.capitalize()}.arco.{dynamic}."
                     f"{run['string']}.*.aiff"))
-                if len(sources) != 1:
+                if not sources:
                     raise RuntimeError(
                         f"{instrument} {dynamic} {run['string']}: "
-                        f"expected one Iowa run, found {len(sources)}")
-                source = sources[0]
+                        "no Iowa acquisition run found")
                 for (midi, segment, sample_rate, unconstrained, expected_f0,
-                     cents) in select_chromatic_segments(source, run["midis"]):
+                     cents, source) in select_chromatic_across_runs(
+                         sources, run["midis"]):
                     peak = float(np.max(np.abs(segment)))
                     if peak > 0.99:
                         segment = segment * (0.99 / peak)
