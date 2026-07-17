@@ -31,13 +31,13 @@ measured low-register band-balance cells fail, and the remaining four lack
 evidence. The identity view intentionally has no same-pitch duplicate groups,
 so its SHIP distribution gate is `insufficient-evidence`, not PASS.
 
-## Current-HEAD controllability before fitting
+## Controllability before fitting and on final shared head
 
-The recovery audit is
+The recovery audit run before fitting is
 `campaigns/cello/audit-agentd-crash-recovery-e80cc69/controllability.json`.
 It is clean, repeat-stable and has no uncontrolled weighted feature. Its hashes
 are identical to the pre-crash authoritative audit, proving the completed r2
-run remains comparable after merging current shared head:
+run remained comparable when fitting resumed:
 
 | Contract | Hash |
 |---|---|
@@ -47,8 +47,17 @@ run remains comparable after merging current shared head:
 | parameter manifest | `7adc49c61c35cd05` |
 | initial preset | `f3af8be2373457b1` |
 
-Release ring, release damping/floor, onset timing trajectory and vibrato
-trajectory remain visible watch metrics. No fitting began before this audit.
+Shared head advanced again after fitting. The final-head refresh at
+`campaigns/cello/audit-agentd-pass05-final-e8cf367/controllability.json` is
+also clean and repeat-stable with no uncontrolled weighted feature: objective
+`df19e42d56eae4e7`, renderer `f116e1dfdfafdb27`, references
+`a88a94217af673ca`, manifest `7adc49c61c35cd05`, and initial
+`32329d5ebe1fa8fc`. The initial hash now includes the consumed Human contract,
+and the renderer hash includes Agent C's merged bar work, so the old r2 is
+reported against its historical pre-fit contract rather than relabelled as a
+final-head rerun. Release ring, release damping/floor, onset timing trajectory
+and vibrato trajectory remain visible watch metrics. No fitting began before
+the first clean audit.
 
 ## Cello identity fit and exit
 
@@ -91,9 +100,11 @@ not qualify.
 
 All 12 decompositions still fail and every matched identity take remains
 outside the core bars, so the verdict remains `INCONCLUSIVE-MASKED`. The
-dedicated hashed native-episode audit is clean and stable, but only four of
-nine qualified adapters exceed the response threshold: bow position, sustained
-bow noise, onset wander and onset settle. Vibrato rate/depth/delay, scratch and
+dedicated hashed native-episode audit is clean and stable on final shared head
+(`audit-agentd-pass05-f13-human-episode-final`, renderer
+`f116e1dfdfafdb27`, Human contract `f446b6f2edca3f83`), but only four of nine
+qualified adapters exceed the response threshold: bow position, sustained bow
+noise, onset wander and onset settle. Vibrato rate/depth/delay, scratch and
 attack-noise delivery remain non-functional at the tested Human step. This is
 not evidence of a missing Human DOF and never widens identity.
 
@@ -111,7 +122,11 @@ not evidence of a missing Human DOF and never widens identity.
 
 ## Verification
 
-Final verification and listening-page rebuild are recorded in the pass-end
-commit. The run-local listening page is
+Final merged-head verification passes `npm test`,
+`node scripts/verify_tone_model.mjs`, the full Python suite, and
+`npm run test:render-note` (hash
+`987fff8cf49ccfb747d9894c9ac38010b0489bd8c2d462f1ddd0cfeaa9be6cc2`).
+The run-local listening page is
 `runs/cello/agentd-pass05-t033-a0-globals-r2/listen-cello-agentd-pass05-t033-a0-globals-r2.html`;
-the shared listening index is rebuilt from fresh seeds at pass end.
+the shared `listen.html` was rebuilt at engine `e8cf367` with 16 instruments
+and fresh renders for 12 affected instruments.
