@@ -192,6 +192,11 @@ strict cell. This preserves §3 coverage without discarding useful short onset
 references.
 Affects: canonical tripwires.py API / iterate strict consumer / run-report table.
 Status: engine=pending (970be12 consumer must be adapted after canonical merge) analysis=incorporated 6f4c027, per-bar strictness corrected per T-017 in b68d67f struck/plucked=incorporated (strict evidence required per tripwire×register×dynamic, with short-note bars visibly N/A)
+Status update — Agent A recovery reconciliation, 2026-07-17:
+engine=incorporated-canonical-consumer. `iterate.py` consumes the shared
+bar-specific cell aggregation: short individual rows remain visible N/A,
+eligible duplicates evidence the bar, and a required cell with no measurable
+eligible row fails strict mode.
 
 ### T-014 · Body deconvolution mask must equal the emitted reconstruction mask
 Author: engine/blown lane · 2026-07-16 · Firewall: method-only
@@ -256,6 +261,10 @@ the take-level N/A but passes that bar/cell. `strictMissingCells` should carry
 the bar name so the run report names the missing evidence.
 Affects: tripwires.aggregate_by_cell / strict campaign consumer / §3 report.
 Status: engine=pending analysis=incorporated b68d67f (aggregate_by_cell strict per bar-cell; strictMissingCells names the bar; family-inapplicable bars excluded; consuming test) struck/plucked=incorporated (required bars will be declared per instrument; no any-bar evidence shortcut)
+Status update — Agent A recovery reconciliation, 2026-07-17:
+engine=incorporated-canonical-consumer. Current run reports name strict missing
+cells by bar × register × dynamic and do not allow one measured bar to satisfy
+another bar's evidence obligation.
 
 ### T-019 · Carried v2 blown bodies do not satisfy the v3 engine contract
 Author: engine/blown lane · 2026-07-16 · Firewall: process/data contract
@@ -631,6 +640,12 @@ Status: engine=pending-Agent-A (guitar and bowed contracts are ready for
 one-pass consumption) analysis=incorporated (course/sul-labelled storage,
 generator, corpus atomicity and consuming tests) struck/plucked=blocked-engine
 T-033 bowed=blocked-engine T-033
+Status update — Agent A recovery reconciliation, 2026-07-17: engine=incorporated
+`24968b1`. Violin/cello auto selection chooses the lowest playable string,
+guitar auto selection minimises fret with the lower-course tie break, explicit
+unplayable selections reject, and each selected table carries its own partial
+B. Headless consumers prove same-pitch directionality, exact pooled fallback,
+and invalid-selection rejection across all three layouts.
 
 ### T-034 · ENGINE SPEC (small): dynamic pitch flattening for bowed forte
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; value fitted per instrument; INSTRUMENT physics, not Human
@@ -1454,6 +1469,11 @@ Status: engine=pending-Agent-A analysis=incorporated (hold metric + automatic
 construction failure; per-register `hasRelease` fit in Pass 16)
 struck/plucked=blocked-engine for any new fit/freeze, extraction may continue
 against references because it is render-independent
+Status update — Agent A recovery reconciliation, 2026-07-17: engine=incorporated
+`24968b1`. Strike/pluck holds continuously free-decay every mode including the
+fundamental; note-off starts the fitted register/frequency damper law or exact
+legacy fallback. Eight-second output assertions reject sustain plateaus and
+prove `envelopeSustain` is inert for strike/pluck while bow/blow stay unchanged.
 
 Status update — Agent C Pass 16: the gated full-tail fit found distinct final
 knees in all ten Iowa grand rows and six of 21 VSCO upright rows, but the
@@ -1625,6 +1645,12 @@ transfer remains exact; fresh controllability responders precede weighting.
 Affects: sung source schema / `_spectralFingerprint` / partial, mel and
 band-balance gates / passaggio construction.
 Status: sung=spec-filed-with-consuming-assertion analysis=pending-pinned-emitter engine=pending
+Status update — Agent A recovery reconciliation, 2026-07-17:
+engine=incorporated `7c11c28` / merged `d15c222`. All four pinned singer
+surfaces interpolate inside their joint log-f0/velocity evidence hull before
+the shared vowel-body stage, project to the nearest hull boundary outside it,
+suppress the generic dynamic law only when the singer table owns dynamics,
+and preserve the exact scalar fallback when absent.
 
 Status update — Agent E sung pass 06, 2026-07-17: T-059
 sung=incorporated-three-accepted-transitions. Soprano, bass and mezzo
@@ -1901,6 +1927,12 @@ multiplied after selecting an observed-dynamic row. Fresh hierarchy runs pass
 zero strict aggregate cells and regress paired vowel-body consumption for
 soprano, tenor and mezzo. No identity row or table-derived weight is promoted;
 engine correction and realised-output assertions remain required.
+Status update — Agent A recovery reconciliation, 2026-07-17:
+engine=pending-Agent-A. This status belongs to the T-072 bar-mode consumer;
+the preceding named T-033, T-065 and held-strike/pluck T-067 updates retain
+their own incorporated statuses and do not complete bar-mode T60, free-beam
+strike-position or B-firewall consumption.
+
 ### T-073 · Cello matched-take ranges are measured but decomposition-masked
 Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: cello values only; method shared
 Finding: the pass-05 cello acquisition supplies six same-note/dynamic/

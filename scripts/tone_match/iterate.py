@@ -503,6 +503,17 @@ def _native_human_episode_profile(params: dict[str, Any],
     return isinstance(ranges, dict) and bool(ranges)
 
 
+def _strict_json_value(value: Any) -> Any:
+    """Preserve calibration provenance without emitting JavaScript-invalid NaN."""
+    if isinstance(value, dict):
+        return {key: _strict_json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_strict_json_value(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 def _render_ship_variants(
     run_dir: Path,
     label: str,
@@ -524,7 +535,7 @@ def _render_ship_variants(
     native_human_episode = _native_human_episode_profile(
         ship_params, repo_root)
     if ship_calibration:
-        ship_params["shipHumanCalibration"] = ship_calibration
+        ship_params["shipHumanCalibration"] = _strict_json_value(ship_calibration)
     params_path = target / "params.json"
     human_range_overrides = []
     jobs_path = target / "jobs.json"

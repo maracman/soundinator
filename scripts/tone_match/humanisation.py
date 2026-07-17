@@ -672,7 +672,8 @@ def ship_human_overrides(params: dict[str, Any], *, midi: float,
     midi_scales = by_midi.get(str(int(round(float(midi)))), {})
 
     def scale(key: str) -> float:
-        value = float(midi_scales.get(key, 1.0))
+        raw = midi_scales.get(key, 1.0)
+        value = float(raw) if isinstance(raw, (int, float)) else 1.0
         # A reference with too few audible partials cannot identify the
         # excitation-position comb and is recorded as NaN by the evidence
         # fitter.  That missing datum must not leak into renderer JSON; the

@@ -55,7 +55,8 @@ def _profile_partials(profile: dict[str, Any], f0: float) -> np.ndarray:
 
 
 def fit_instrument(instrument: str, references_path: Path,
-                   jobs_path: Path) -> dict[str, Any]:
+                   jobs_path: Path,
+                   accepted_cells: set[tuple[str, str]]) -> dict[str, Any]:
     profiles = json.loads(PROFILE_PATH.read_text())
     profile = profiles[instrument]
     references = json.loads(references_path.read_text())
@@ -100,12 +101,18 @@ def fit_instrument(instrument: str, references_path: Path,
         if not np.isfinite(peak) or peak <= 0:
             raise ValueError(f"{instrument} {register}/{dynamic}: invalid source row")
         adjusted /= peak
+        base = np.maximum(base, 0)
+        accepted = (register, dynamic) in accepted_cells
+        emitted = adjusted if accepted else base
         rows.append({
             "register": register,
             "dynamic": dynamic,
             "f0Hz": round(f0, 6),
             "velocity": round(velocity, 6),
-            "partials": [round(float(value), 8) for value in adjusted],
+            "partials": [round(float(value), 8) for value in emitted],
+            "attemptedPartials": [round(float(value), 8) for value in adjusted],
+            "activationStatus": ("accepted-upstream-partial-improvement" if accepted
+                                 else "neutralized-upstream-partial-regression"),
             "nTakes": len(evidence),
             "medianAbsCorrectionDb": round(float(np.nanmedian(np.abs(adjustment))), 6),
             "provenance": [{
@@ -126,7 +133,13 @@ def fit_instrument(instrument: str, references_path: Path,
         "paramsSha256": _sha(params_path),
         "referencesSha256": _sha(references_path),
         "rows": rows,
-        "coverage": {"requiredCells": 6, "emittedCells": len(rows), "complete": True},
+        "coverage": {
+            "requiredCells": 6, "emittedCells": len(rows), "complete": True,
+            "activatedCells": sum(row["activationStatus"].startswith("accepted")
+                                  for row in rows),
+            "neutralizedCells": sum(row["activationStatus"].startswith("neutralized")
+                                    for row in rows),
+        },
     }
 
 
@@ -134,17 +147,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instrument", action="append", required=True,
                         help="instrument=references.json=fit-jobs.json")
+    parser.add_argument("--accept-cell", action="append", default=[],
+                        help="hierarchy-approved instrument=register=dynamic cell")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    accepted: dict[str, set[tuple[str, str]]] = {}
+    for spec in args.accept_cell:
+        instrument, register, dynamic = spec.split("=", 2)
+        accepted.setdefault(instrument, set()).add((register, dynamic))
     tables = {}
     for spec in args.instrument:
         instrument, references, jobs = spec.split("=", 2)
         tables[instrument] = fit_instrument(
-            instrument, Path(references), Path(jobs))
+            instrument, Path(references), Path(jobs), accepted.get(instrument, set()))
     payload = {
         "schemaVersion": 1,
         "handoff": "BLOWN-SUSTAIN-01",
-        "status": "pinned-paired-evidence",
+        "status": "pinned-paired-evidence-hierarchy-gated",
         "interpolationContract": "log-f0 x velocity; clamp outside measured hull",
         "firewall": "rows remain per instrument; no cross-instrument values",
         "instruments": tables,
