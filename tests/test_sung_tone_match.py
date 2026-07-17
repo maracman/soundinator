@@ -189,6 +189,64 @@ def test_rendered_vowel_body_transfer_consumes_exact_fitted_shape():
     assert not wrong["passed"]
 
 
+def test_rendered_vowel_body_transfer_excludes_inaudible_source_tails():
+    f0 = 130.8128
+    frequencies = f0 * np.arange(1, 61)
+    bands = [
+        {"freq": 520.0, "gain": 1.1, "width": 0.13},
+        {"freq": 1750.0, "gain": 0.8, "width": 0.16},
+    ]
+    # Twenty-one audible harmonics consume the exact body.  The table also
+    # contains trackable but <-50 dB tails whose arbitrary leakage ratios must
+    # not veto the emitted consumer.
+    source = np.r_[np.exp(-.12 * np.arange(21)), np.full(39, 1e-5)]
+    log2_gain = np.zeros(60)
+    for band in bands:
+        log2_gain += band["gain"] * np.exp(
+            -0.5 * (np.log2(frequencies / band["freq"]) / band["width"]) ** 2
+        )
+    body = source * np.clip(2 ** log2_gain, .2, 4.5)
+    body[21:] *= np.linspace(.2, 18, 39)
+    result = compare_rendered_vowel_body_transfer(
+        body, source, np.ones(60, dtype=bool), f0_hz=f0, bands=bands)
+    assert result["passed"]
+    assert result["audibilityFloorDb"] == -50
+    assert result["commonHarmonics"] == 21
+    assert result["commonHarmonicsBeforeAudibilityFloor"] == 60
+
+
+def test_body_transfer_pair_isolates_harmonics_without_changing_source_or_body():
+    params = {
+        "spectralPartialsByRegisterDynamic": {"rows": [{"f0Hz": 220}]},
+        "spectralPartialMeans": [1.0, 0.5],
+        "bodyBands": [{"freq": 700, "gain": 1, "width": .1}],
+        "toneBreath": .3,
+        "voiceBreathSync": .8,
+        "attackNoiseLevel": .4,
+        "consonantClass": "fricative",
+        "consonantStrength": .75,
+        "excitationHuman": .35,
+        "envelopeProb": .35,
+        "vibratoProb": .85,
+    }
+    isolated = _body_audit_params(params_for_mode(params, "fit"))
+    assert isolated["spectralPartialsByRegisterDynamic"] == params[
+        "spectralPartialsByRegisterDynamic"
+    ]
+    assert isolated["spectralPartialMeans"] == params["spectralPartialMeans"]
+    assert isolated["bodyBands"] == params["bodyBands"]
+    assert isolated["toneBreath"] == 0
+    assert isolated["voiceBreathSync"] == 0
+    assert isolated["attackNoiseLevel"] == 0
+    assert isolated["partialTransfer"] == 0
+    assert isolated["spectralCullThreshold"] == 0.0001
+    assert isolated["consonantClass"] == "none"
+    assert isolated["consonantStrength"] == 0
+    assert isolated["excitationHuman"] == 0
+    assert isolated["envelopeProb"] == 0
+    assert isolated["vibratoProb"] == 0
+
+
 def test_paired_transfer_classifier_compares_all_vowels_and_keeps_annex_box():
     f0 = 130.8128
     frequencies = f0 * np.arange(1, 49)
