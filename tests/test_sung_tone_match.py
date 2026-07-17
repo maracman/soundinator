@@ -49,6 +49,8 @@ from scripts.tone_match.sung_source_tables import (
 )
 from scripts.tone_match.sung_source_audit import AUDIT_DURATION_SEC, summarize_responses
 from scripts.tone_match.sung_breath import (
+    assess_room_decay,
+    synthetic_room_decay_round_trip,
     synthetic_round_trip as breath_synthetic_round_trip,
 )
 from scripts.tone_match.sung_prior import (
@@ -106,6 +108,19 @@ def test_pitch_sync_breath_synthetic_round_trip_meets_t067_tolerances():
     assert result["prominenceErrorDb"] <= 1
     assert result["measured"]["pitch_sync_breath_db"] == \
         result["measured"]["pitchSyncBreathDb"]
+    assert result["roomDecayRoundTrip"]["passed"]
+
+
+def test_t067_room_decay_is_quantified_and_logged_separately():
+    result = synthetic_room_decay_round_trip()
+    assert result["passed"]
+    assert result["absoluteFractionError"] <= .20
+    assert result["measured"]["roomSuspected"]
+    assert result["measured"]["disposition"] == "log-separately-never-breath"
+
+    rng = np.random.default_rng(67)
+    dry = assess_room_decay(rng.standard_normal(24_000), 12_000)
+    assert not dry["roomSuspected"]
 
 
 def test_standard_section_voice_classes_are_first_class():

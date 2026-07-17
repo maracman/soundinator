@@ -27,7 +27,12 @@ from scipy import signal
 import soundfile as sf
 
 from scripts.tone_match.build_campaign import select_chromatic_run
-from scripts.tone_match.strings_prep import select_chromatic_across_runs
+from scripts.tone_match.strings_prep import (
+    iowa_filename_span,
+    parse_string_label,
+    select_chromatic_across_runs,
+    select_chromatic_segments,
+)
 
 
 DYNAMICS = ("pp", "mf", "ff")
@@ -142,10 +147,12 @@ def harmonic_mask(freqs: np.ndarray, f0: float, cents: float = 35.0) -> np.ndarr
 def _component_power_tracks(samples: np.ndarray, sample_rate: int, f0: float,
                             band_hz: tuple[float, float]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return time, residual-noise density and harmonic density tracks."""
-    # Match the canonical score sense's 2048-bin resolution.  A 1024-bin
-    # window lets the mandatory two-bin harmonic guard overlap every
-    # residual slot for low alto-sax/clarinet fundamentals.
-    nperseg = min(2048, len(samples))
+    # Resolve residual slots between the mandatory two-bin harmonic guards.
+    # Cello C2 needs 8192 bins; using violin's 2048-bin window masks the whole
+    # low band and would silently turn a method precedent into a value/scale
+    # transfer across the family firewall.
+    target = 8192 if f0 < 120 else 4096 if f0 < 220 else 2048
+    nperseg = min(target, len(samples))
     if nperseg < 256:
         raise ValueError("audio segment is too short for component-envelope extraction")
     freqs, times, power = signal.spectrogram(
@@ -283,6 +290,8 @@ def _integrated_powers(freqs: np.ndarray, psd: np.ndarray, noise_db: np.ndarray,
                        centres: np.ndarray, band_hz: tuple[float, float]) -> tuple[float, float, float]:
     inside = (freqs >= band_hz[0]) & (freqs <= band_hz[1])
     finite = np.isfinite(noise_db)
+    if not np.any(finite):
+        return math.nan, math.nan, math.nan
     interp = np.interp(np.log2(np.maximum(freqs[inside], centres[finite][0])),
                        np.log2(centres[finite]), noise_db[finite])
     df = float(freqs[1] - freqs[0])
@@ -418,6 +427,38 @@ def validate_component_roundtrip(mixed: Path, harmonic_only: Path, f0: float,
         raise RuntimeError(
             f"synthetic {instrument}/{component} extractor validation failed: {metrics}")
     return result
+
+
+def synthetic_component_roundtrip(output_dir: Path, *, instrument: str,
+                                  component: str, f0: float = 130.813,
+                                  band_hz: tuple[float, float] = DEFAULT_BAND_HZ) -> dict[str, Any]:
+    """Create and consume a known harmonic+noise fixture for one contract."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    sample_rate = 48_000
+    time = np.arange(round(sample_rate * 3.0)) / sample_rate
+    edge = np.minimum(1.0, time / .035) * np.minimum(
+        1.0, np.maximum(0.0, (3.0 - time) / .055))
+    harmonic = edge * sum(
+        .5 / rank * np.sin(2 * np.pi * f0 * rank * time + .13 * rank)
+        for rank in range(1, min(32, int(12_000 // f0))))
+    white = np.random.default_rng(14017).standard_normal(len(time))
+    low = signal.sosfilt(signal.butter(
+        3, [260 / (sample_rate / 2), 780 / (sample_rate / 2)],
+        btype="bandpass", output="sos"), white)
+    mid = signal.sosfilt(signal.butter(
+        3, [1450 / (sample_rate / 2), 4100 / (sample_rate / 2)],
+        btype="bandpass", output="sos"), white)
+    high = signal.sosfilt(signal.butter(
+        2, 6200 / (sample_rate / 2), btype="highpass", output="sos"), white)
+    noise = (.13 * low + .045 * mid + .012 * high) * edge
+    harmonic_path = output_dir / "synthetic-harmonic-only.wav"
+    mixed_path = output_dir / "synthetic-harmonic-plus-component.wav"
+    sf.write(harmonic_path, harmonic, sample_rate, subtype="FLOAT")
+    sf.write(mixed_path, harmonic + noise,
+             sample_rate, subtype="FLOAT")
+    return validate_component_roundtrip(
+        mixed_path, harmonic_path, f0, output_dir / "validation.json",
+        instrument=instrument, component=component, band_hz=band_hz)
 
 
 def _record(path: Path, dynamic: str, string: str, f0: float,
@@ -574,12 +615,23 @@ def _load_component_manifest(records_path: Path) -> tuple[dict[str, Any], list[d
             raise ValueError(f"record {index} has no positive expectedF0Hz/f0Hz")
         envelope = component_envelope_evidence(
             samples, sample_rate, f0, band_hz=band)
-        canonical = extract_features(
-            path, active_duration_s=active_duration, expected_f0_hz=f0,
-            trust_expected_f0=True, release_expected=bool(source.get("hasRelease")))
         extractor_lead = envelope["noiseLeadMs"]
-        envelope["noiseLeadMs"] = round(float(canonical.noise_lead_ms), 3)
-        envelope["noiseLeadSense"] = "canonical score.py noise_lead_ms"
+        try:
+            canonical = extract_features(
+                path, active_duration_s=active_duration, expected_f0_hz=f0,
+                trust_expected_f0=True,
+                release_expected=bool(source.get("hasRelease")))
+            envelope["noiseLeadMs"] = round(float(canonical.noise_lead_ms), 3)
+            envelope["noiseLeadSense"] = "canonical score.py noise_lead_ms"
+            envelope["canonicalNoiseLeadStatus"] = "measured"
+        except (ValueError, RuntimeError) as exc:
+            # The spectral residual remains valid under the pinned expected
+            # f0 even when score.py cannot form a full multi-feature bundle.
+            # Preserve the independently validated component-track lead and
+            # log the fallback rather than dropping a pitch from its pool.
+            envelope["noiseLeadMs"] = extractor_lead
+            envelope["noiseLeadSense"] = "validated component-envelope track"
+            envelope["canonicalNoiseLeadStatus"] = f"fallback: {exc}"
         envelope["envelopeTrackLeadMs"] = extractor_lead
         records.append({
             **source,
@@ -741,6 +793,88 @@ def prepare_dense_wind_manifest(samples_root: Path, instrument: str,
     return manifest
 
 
+def prepare_dense_bowed_manifest(samples_root: Path, instrument: str,
+                                 output: Path) -> dict[str, Any]:
+    """Segment the lossless Iowa pp/mf/ff corpus for a bowed L14 profile.
+
+    Every pool is one string and one dynamic, and must contain multiple
+    pitches.  This makes the fixed-in-Hz residual the separator while keeping
+    string-specific mechanics and the per-dynamic ladder explicit.
+    """
+    if instrument not in {"violin", "cello"}:
+        raise ValueError("dense bowed manifest supports violin or cello")
+    references_dir = output.parent / "dense-references"
+    references_dir.mkdir(parents=True, exist_ok=True)
+    records, excluded = [], [{
+        "source": "Philharmonia MP3",
+        "reason": "lossy coding corrupts low-level broadband noise floors",
+    }]
+    prefix = instrument.capitalize()
+    for source in sorted(samples_root.glob(f"{prefix}.arco.*.sul*.*.aiff")):
+        dynamic = next((value for value in DYNAMICS
+                        if f".{value}." in source.name), None)
+        string = parse_string_label(source.name)
+        span = iowa_filename_span(source)
+        if dynamic is None or string is None or span is None:
+            excluded.append({"source": source.name,
+                             "reason": "missing dynamic/string/pitch-span label"})
+            continue
+        midis = tuple(range(span[0], span[1] + 1))
+        if len(midis) < 2:
+            excluded.append({"source": source.name,
+                             "reason": "single-pitch run cannot prove cross-pitch residual"})
+            continue
+        assert_lossless_source(source, source.name)
+        try:
+            selected = select_chromatic_segments(source, midis)
+        except RuntimeError as exc:
+            excluded.append({"source": source.name,
+                             "reason": f"canonical segmentation failed: {exc}"})
+            continue
+        for midi, segment, sample_rate, _raw_f0, f0, cents in selected:
+            target = references_dir / f"{source.stem}-m{midi}.wav"
+            peak = float(np.max(np.abs(segment)))
+            if peak > .99:
+                segment = segment * (.99 / peak)
+            sf.write(target, segment, sample_rate, subtype="PCM_24")
+            records.append({
+                "path": str(target.resolve()), "sourceFile": source.name,
+                "dynamic": dynamic, "velocity": VELOCITY[dynamic],
+                "string": string, "poolGroup": string,
+                "expectedF0Hz": round(float(f0), 6), "midi": midi,
+                "pitchErrorCents": round(float(cents), 3),
+                "durationSec": round(max(.5, min(2.0, len(segment) /
+                                                  sample_rate * .72)), 6),
+                "hasRelease": True,
+            })
+    required = {(dynamic, string) for dynamic in DYNAMICS
+                for string in ("sulC", "sulG", "sulD", "sulA")}
+    if instrument == "violin":
+        required = {(dynamic, string) for dynamic in DYNAMICS
+                    for string in ("sulG", "sulD", "sulA", "sulE")}
+    counts = {(dynamic, string): sum(
+        row["dynamic"] == dynamic and row["string"] == string for row in records)
+        for dynamic, string in required}
+    weak = {f"{dynamic}/{string}": count for (dynamic, string), count in counts.items()
+            if count < 2}
+    if weak:
+        raise RuntimeError(f"bowed L14 requires >=2 pitches per string/dynamic: {weak}")
+    manifest = {
+        "schema": "sg2-pinned-noise-records-v1", "instrument": instrument,
+        "component": "bowNoise", "componentClass": "pinnedPreOnsetNoise",
+        "levelControl": "bowNoiseLevel", "bandHz": list(DEFAULT_BAND_HZ),
+        "source": f"{instrument}-owned dense Iowa lossless AIFF corpus only",
+        "excluded": excluded,
+        "poolingContract": "cross-pitch within string and dynamic; values never transfer",
+        "dynamicLadder": list(DYNAMICS),
+        "records": sorted(records, key=lambda row: (
+            row["velocity"], row["string"], row["expectedF0Hz"], row["sourceFile"])),
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+
 def extract_pinned_component(records_path: Path, validation: Path,
                              output: Path, measured: Path | None = None) -> dict[str, Any]:
     """Extract one L17 component without forking the L14 separator."""
@@ -764,12 +898,19 @@ def extract_pinned_component(records_path: Path, validation: Path,
 
     for row in records:
         samples, sr, f0 = row["spectralSamples"], row["sampleRate"], row["f0Hz"]
-        row["standard"] = residual_spectrum(samples, sr, f0, band_hz=band_hz)
-        row["mask25"] = residual_spectrum(samples, sr, f0, mask_cents=25, band_hz=band_hz)
-        row["mask50"] = residual_spectrum(samples, sr, f0, mask_cents=50, band_hz=band_hz)
-        row["win2048"] = residual_spectrum(samples, sr, f0, nfft=2048, band_hz=band_hz)
-        row["win8192"] = residual_spectrum(samples, sr, f0, nfft=8192, band_hz=band_hz)
-        row["ambient"] = ambient_spectrum(Path(row["path"]))
+        base_nfft = 8192 if f0 < 120 else 4096
+        row["standard"] = residual_spectrum(
+            samples, sr, f0, nfft=base_nfft, band_hz=band_hz)
+        row["mask25"] = residual_spectrum(
+            samples, sr, f0, nfft=base_nfft, mask_cents=25, band_hz=band_hz)
+        row["mask50"] = residual_spectrum(
+            samples, sr, f0, nfft=base_nfft, mask_cents=50, band_hz=band_hz)
+        row["winLow"] = residual_spectrum(
+            samples, sr, f0, nfft=base_nfft // 2, band_hz=band_hz)
+        row["winHigh"] = residual_spectrum(
+            samples, sr, f0, nfft=base_nfft * 2, band_hz=band_hz)
+        row["ambient"] = ambient_spectrum(
+            Path(row["path"]), nfft=base_nfft)
     centres = records[0]["standard"].centres
     dynamics = sorted({row["dynamic"] for row in records},
                       key=lambda dynamic: np.median([
@@ -799,10 +940,6 @@ def extract_pinned_component(records_path: Path, validation: Path,
     by_dynamic = {}
     failed_cross_pitch = [row for row in cross_pitch
                           if row["medianPitchShapeErrorDb"] > 3.0]
-    if failed_cross_pitch:
-        raise RuntimeError(
-            "cross-pitch commonality gate failed (median shape error >3 dB): "
-            f"{failed_cross_pitch}")
     for dynamic in dynamics:
         profiles = [_normalise(profile, centres, band_hz)
                     for (candidate, _), profile in group_profiles.items()
@@ -813,16 +950,16 @@ def extract_pinned_component(records_path: Path, validation: Path,
     standard = _nanmedian(np.asarray([row["standard"].db for row in records]), axis=0)
     mask25 = _nanmedian(np.asarray([row["mask25"].db for row in records]), axis=0)
     mask50 = _nanmedian(np.asarray([row["mask50"].db for row in records]), axis=0)
-    win2048 = _nanmedian(np.asarray([row["win2048"].db for row in records]), axis=0)
-    win8192 = _nanmedian(np.asarray([row["win8192"].db for row in records]), axis=0)
+    win_low = _nanmedian(np.asarray([row["winLow"].db for row in records]), axis=0)
+    win_high = _nanmedian(np.asarray([row["winHigh"].db for row in records]), axis=0)
     pitch_mad = _nanmedian(np.abs(np.asarray([
         _normalise(row["standard"].db, centres, band_hz) for row in records]) - pooled), axis=0)
     mask_sensitivity = _nanmax(np.abs(np.vstack([
         _normalise(mask25, centres, band_hz) - _normalise(standard, centres, band_hz),
         _normalise(mask50, centres, band_hz) - _normalise(standard, centres, band_hz)])), axis=0)
     window_sensitivity = _nanmax(np.abs(np.vstack([
-        _normalise(win2048, centres, band_hz) - _normalise(standard, centres, band_hz),
-        _normalise(win8192, centres, band_hz) - _normalise(standard, centres, band_hz)])), axis=0)
+        _normalise(win_low, centres, band_hz) - _normalise(standard, centres, band_hz),
+        _normalise(win_high, centres, band_hz) - _normalise(standard, centres, band_hz)])), axis=0)
     in_band = (centres >= band_hz[0]) & (centres <= band_hz[1])
     source_snrs = np.asarray([
         row["standard"].db - row["ambient"].db for row in records])
@@ -893,6 +1030,8 @@ def extract_pinned_component(records_path: Path, validation: Path,
     level_law = _fit_generic_level_law(records, dynamics, level_control)
     result = {
         "schema": "sg2-pinned-noise-component-v1",
+        "status": ("rejected-cross-pitch-commonality" if failed_cross_pitch else
+                   "accepted-pinned-component"),
         "instrument": instrument,
         "component": component,
         "componentClass": "pinnedPreOnsetNoise",
@@ -904,12 +1043,18 @@ def extract_pinned_component(records_path: Path, validation: Path,
         "notesByDynamic": {dynamic: sum(row["dynamic"] == dynamic for row in records)
                            for dynamic in dynamics},
         "bandHz": [float(band_hz[0]), float(band_hz[1])],
-        "profilePinned": True,
+        "profilePinned": not bool(failed_cross_pitch),
+        "activationEligible": not bool(failed_cross_pitch),
         "profile": profile,
         "profilesByDynamic": profiles_by_dynamic,
         "shapeStableAcrossDynamics": shape_stable,
         "dynamicShapeComparisons": comparisons,
         "crossPitchGroups": cross_pitch,
+        "crossPitchGate": {
+            "passed": not bool(failed_cross_pitch),
+            "medianShapeErrorDbMax": 3.0,
+            "failedGroups": failed_cross_pitch,
+        },
         "levelLaw": level_law,
         "placementLaw": placement,
         "envelope": envelope,
@@ -919,7 +1064,8 @@ def extract_pinned_component(records_path: Path, validation: Path,
             "minimumRequiredP25SourceSnrDb": 0.0,
         },
         "artifactScreen": {
-            "harmonicMaskCents": [25, 35, 50], "welchNfft": [2048, 4096, 8192],
+            "harmonicMaskCents": [25, 35, 50],
+            "welchNfft": "f0-scaled: 4096/8192/16384 below 120 Hz; 2048/4096/8192 otherwise",
             "flagThresholds": {"pitchMadDb": 6, "maskSensitivityDb": 3,
                                "windowSensitivityDb": 3, "sourceSnrP25Db": 0},
             "flaggedBands": [{
@@ -933,14 +1079,15 @@ def extract_pinned_component(records_path: Path, validation: Path,
         "engineContract": {
             "component": component, "componentClass": "pinnedPreOnsetNoise",
             "bodyRouting": 1, "levelControl": level_control,
-            "excitationTypes": (["blow"] if component == "windBreath" else []),
+            "excitationTypes": (["blow"] if component == "windBreath" else
+                                ["bow"] if component == "bowNoise" else []),
             "shapeOptimiserMutable": False, "preOnsetCapable": True,
             "independentEnvelopeRequired": True,
         },
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2) + "\n")
-    if measured is not None:
+    if measured is not None and not failed_cross_pitch:
         measured_data = json.loads(measured.read_text())
         target = measured_data[instrument].setdefault("pinnedNoiseComponents", {})
         target[component] = {key: result[key] for key in (
@@ -1136,6 +1283,19 @@ def _parser() -> argparse.ArgumentParser:
     prepare_dense.add_argument("--samples", type=Path, required=True)
     prepare_dense.add_argument("--instrument", choices=sorted(WIND_INSTRUMENTS), required=True)
     prepare_dense.add_argument("--output", type=Path, required=True)
+    prepare_bowed = sub.add_parser(
+        "prepare-bowed-dense", help="segment dense lossless Iowa bowed runs")
+    prepare_bowed.add_argument("--samples", type=Path, required=True)
+    prepare_bowed.add_argument("--instrument", choices=("violin", "cello"), required=True)
+    prepare_bowed.add_argument("--output", type=Path, required=True)
+    synthetic_component = sub.add_parser(
+        "synthetic-component", help="generate and validate a component fixture")
+    synthetic_component.add_argument("--instrument", required=True)
+    synthetic_component.add_argument("--component", required=True)
+    synthetic_component.add_argument("--f0", type=float, default=130.813)
+    synthetic_component.add_argument("--band-hz", type=float, nargs=2,
+                                     default=DEFAULT_BAND_HZ, metavar=("LOW", "HIGH"))
+    synthetic_component.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -1156,9 +1316,16 @@ def main(argv: list[str] | None = None) -> int:
             args.records, args.validation, args.output, args.measured)
     elif args.command == "prepare-wind":
         result = prepare_wind_manifest(args.references, args.instrument, args.output)
-    else:
+    elif args.command == "prepare-wind-dense":
         result = prepare_dense_wind_manifest(
             args.samples, args.instrument, args.output)
+    elif args.command == "prepare-bowed-dense":
+        result = prepare_dense_bowed_manifest(
+            args.samples, args.instrument, args.output)
+    else:
+        result = synthetic_component_roundtrip(
+            args.output, instrument=args.instrument, component=args.component,
+            f0=args.f0, band_hz=tuple(args.band_hz))
     print(json.dumps({"status": "ok", "output": str(args.output),
                       "summary": {key: result.get(key) for key in
                                   ("schema", "status", "notes", "shapeStableAcrossDynamics")}}, indent=2))
