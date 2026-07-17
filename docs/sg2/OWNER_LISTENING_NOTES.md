@@ -55,6 +55,42 @@ instrument's effective body equals its fitted bands. The horn improved
 despite this because its refit likely carries explicit `bodyBands` in
 params, bypassing the profile plumbing — verify that too.
 
+### L17 · Pre-onset noise-lead is a COMPONENT CLASS: wind breath = bow sound = piano action noise (owner, 2026-07-17)
+Owner: "the blown instruments, particularly the winds (flute, sax and
+clarinet), require a similar breath component that functions similarly to
+the bow sound we mentioned before. It is much more audible in the piano
+samples. And it can, in the same way as the bow sound, precede the onset
+of the tone."
+
+Unification: the L14 bow extraction defined a component class — a
+per-instrument PINNED noise component, extracted by cross-pitch residual
+commonality, body-routed, with its own level control, capable of
+PRECEDING tone onset. The owner names three members: bow-hair scratch
+(done for violin), WIND BREATH (flute/sax/clarinet — extraction never
+run), and PIANO ACTION NOISE (the audibly clearest case in the reference
+recordings — key/hammer mechanism noise leading the strike).
+
+Requirements:
+1. Run the L14 extraction for wind breath (per instrument, per dynamic,
+   cross-pitch, lossless sources only, synthetic round-trip before real
+   data). The blown campaigns' existing breath laws (levels, exponents)
+   remain; what's new is the PINNED measured spectrum replacing generic
+   noise, and the PRE-ONSET placement fitted from the references'
+   noise-lead measurements (`noise_lead_ms` sense already exists).
+2. Piano action noise: run the same extraction on the piano corpus
+   (struck lane); it naturally composes with the L16 envelope-anomaly
+   work (action noise is the pre-onset member of that family). Its
+   audibility in the references makes piano the best validation case
+   for the extraction method itself.
+3. Engine: the pre-onset placement must be a real capability — the
+   component may begin BEFORE the tone's t0 (the engine's noise-lead /
+   attackNoiseDirect machinery is the seam; verify a pinned component
+   can lead the harmonic onset by the measured lead time, per-note
+   drawn from the articulation latent per L5b/T-002).
+4. Preset-level activation assertion (per the violin L14 lesson): a
+   preset whose profile carries a pinned pre-onset component must emit
+   it audibly in ship-mode — never silent-by-default.
+
 ### L16 · Piano: envelope-anomalous frequencies — OWNER EXTRACTION PROTOCOL #2 (2026-07-17)
 Owner: "the piano specifically has resonances that have a different volume
 of attack and decay... characteristic frequencies that come out when the
