@@ -410,6 +410,23 @@ console.log("L18/T-066 struck hold and damper semantics");
     near(middleDamper.dampDbPerSecondAtFundamental, 180, 1e-12) &&
     damperByRegisterAt(damperRows, 55).dampDbPerSecondAtFundamental === 120 &&
     damperByRegisterAt(damperRows, 880).dampDbPerSecondAtFundamental === 240);
+  const dynamicDamperRows = [
+    { f0: 110, dynamic: "pp", velocityAnchor: .2,
+      dampDbPerSecondAtFundamental: 400, frequencyExponent: 0 },
+    { f0: 440, dynamic: "pp", velocityAnchor: .2,
+      dampDbPerSecondAtFundamental: 500, frequencyExponent: 0 },
+    { f0: 110, dynamic: "ff", velocityAnchor: .9,
+      dampDbPerSecondAtFundamental: 200, frequencyExponent: 0 },
+    { f0: 440, dynamic: "ff", velocityAnchor: .9,
+      dampDbPerSecondAtFundamental: 300, frequencyExponent: 0 },
+  ];
+  check("L18 damper table interpolates register within dynamic, then velocity",
+    near(damperByRegisterAt(dynamicDamperRows, 220, .2)
+      .dampDbPerSecondAtFundamental, 450, 1e-12) &&
+    near(damperByRegisterAt(dynamicDamperRows, 220, .9)
+      .dampDbPerSecondAtFundamental, 250, 1e-12) &&
+    near(damperByRegisterAt(dynamicDamperRows, 220, .55)
+      .dampDbPerSecondAtFundamental, 350, 1e-12));
   check("L18 positive frequency exponent damps high modes faster",
     damperT60Seconds(middleDamper, 1760, 220) <
     damperT60Seconds(middleDamper, 220, 220));
@@ -428,7 +445,17 @@ console.log("L18/T-066 struck hold and damper semantics");
   const midi90 = 440 * 2 ** ((90 - 69) / 12);
   check("T-007 L18 profile consumes all 333 verified key-release takes",
     measuredEvidence === 333 &&
-    MEASURED_PROFILES.piano.engineHandoffs?.verifiedDamperTakes === 333);
+    MEASURED_PROFILES.piano.engineHandoffs?.verifiedDamperTakes === 333 &&
+    MEASURED_PROFILES.piano.engineHandoffs?.measuredDamperCells === 23 &&
+    MEASURED_PROFILES.piano.engineHandoffs?.matchedLegatoBaselineSubtracted === true);
+  check("T-007 L18 broadband reference leaves modal exponent neutral",
+    measuredRows.every(row => row.frequencyExponent === 0) &&
+    MEASURED_PROFILES.piano.engineHandoffs?.damperFrequencyExponentStatus ===
+      "neutral-unidentified-zero-weight");
+  check("T-007 L18 profile consumes register x dynamic contact rates",
+    new Set(measuredRows.map(row => row.dynamic)).size === 4 &&
+    damperByRegisterAt(measuredRows, 261.625565, .15).dampDbPerSecondAtFundamental >
+      damperByRegisterAt(measuredRows, 261.625565, .94).dampDbPerSecondAtFundamental);
   check("T-007 L18 physical undamped firewall begins at MIDI 90",
     damperByRegisterAt(measuredRows, midi87)?.undamped !== true &&
     damperByRegisterAt(measuredRows, midi90)?.undamped === true &&

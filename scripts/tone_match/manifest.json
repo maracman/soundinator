@@ -63,7 +63,7 @@
   "structured": {
     "partialsByString": "T-033 pinned per-string register-table sets; violin sulG/sulD/sulA/sulE and cello sulC/sulG/sulD/sulA; pooled tables are the exact absent/sparse fallback",
     "spectralPartialsByRegisterDynamic": "pinned source-residual rows over log-f0 × velocity; consumed before instrument/vowel body response and preferred over generic scalar means",
-    "damperByRegister": "L18 pinned note-off damper rows {f0,dampDbPerSecondAtFundamental,frequencyExponent}; log-f0 interpolation with positive exponent damping high modes faster",
+    "damperByRegister": "L18 pinned note-off contact rows {f0,velocityAnchor,dampDbPerSecondAtFundamental,frequencyExponent}; log-f0 then velocity interpolation; MIDI 90+ bypass; modal exponent stays neutral until per-mode evidence",
     "barModeRatioOffsetsCentsByRegister": "T-072/T-027 pinned {f0,offsetsCents[6]} free-bar mode trims; mode 1 fixed zero and string B forbidden",
     "barModeT60ByRegister": "T-072 pinned {f0,t60Seconds[6]} held-decay rows; null cells retain the material-law fallback",
     "barStrikePositionWeights": "T-072 optional six-mode fitted strike-pattern override; absent uses normalized free-free beam mode shapes",
