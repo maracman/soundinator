@@ -1806,3 +1806,12 @@ strike/pluck L18 law is now incorporated at shared commit `b4ff0c4`; nylon is
 therefore reopened for a renderer-hash-specific residual re-audit. T-068's
 piano point-envelope adapter/preset activation and T-069's anomaly consumer
 are still pending on the merged head and remain neutral.
+
+Status update — Agent C pass 17 final dependency reconciliation, 2026-07-17:
+T-067 held strike/pluck L18=`engine=incorporated b4ff0c4`; T-068
+`engine=incorporated-generic-L17-consumer` but
+`struck/plucked=blocked-piano-point-envelope-adapter-and-preset-activation`;
+T-069=`engine=pending-Agent-A`; T-072=`engine=pending-Agent-A` with the
+bar-specific objective at zero weight. Nylon's fresh post-L18 audit is clean
+at objective `151b91aa63c04c54`, manifest `340412ce5aa8a9ca`, renderer
+`3629da50977f0fc1`; no stale pre-L18 audit is consumed.

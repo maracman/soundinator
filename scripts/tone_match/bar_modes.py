@@ -373,6 +373,105 @@ def audit_contract(fit_path: Path, initial_path: Path, manifest_path: Path,
     return result
 
 
+def render_first_fit(fit_path: Path, initial_path: Path, references_path: Path,
+                     output: Path, repo_root: Path) -> dict[str, Any]:
+    """Render the activated first preset and score its bar-only observables."""
+    from scripts.tone_match.controllability import _render_batch
+
+    fit = json.loads(fit_path.read_text())
+    initial = json.loads(initial_path.read_text())
+    references = json.loads(references_path.read_text())
+    output.mkdir(parents=True, exist_ok=True)
+    renders = output / "renders"
+    renders.mkdir(exist_ok=True)
+    params_path = output / "params.json"
+    params_path.write_text(json.dumps(initial, indent=2) + "\n")
+    jobs = [{
+        "paramsFile": str(params_path),
+        "midi": ref["midi"],
+        "velocity": ref.get("velocity", .62),
+        "durationSec": ref.get("durationSec", 2.5),
+        "sampleRate": ref.get("sampleRate", 48_000),
+        "out": str(renders / f"{index:02d}-{ref['midi']}.wav"),
+    } for index, ref in enumerate(references)]
+    _render_batch(jobs, repo_root)
+    targets = {row["midi"]: row for row in fit["notes"]}
+    rows = []
+    ratio_checks = []
+    hierarchy = []
+    centre_checks = []
+    for ref, job in zip(references, jobs):
+        midi = int(ref["midi"])
+        expected = 440 * 2 ** ((midi - 69) / 12)
+        samples, sample_rate = _load(Path(job["out"]))
+        rendered = analyse_bar(samples, sample_rate, expected)
+        target = targets[midi]
+        target_modes = {row["mode"]: row for row in target["modes"]}
+        comparisons = []
+        for mode in rendered["modes"]:
+            reference_mode = target_modes.get(mode["mode"])
+            if reference_mode is None:
+                continue
+            error = mode["offsetCents"] - reference_mode["offsetCents"]
+            comparisons.append({
+                "mode": mode["mode"],
+                "targetOffsetCents": reference_mode["offsetCents"],
+                "renderOffsetCents": mode["offsetCents"],
+                "errorCents": round(error, 3),
+                "within35Cents": abs(error) <= 35,
+                "targetT60Seconds": reference_mode["t60Seconds"],
+                "renderT60Seconds": mode["t60Seconds"],
+                "targetLevelDb": reference_mode["levelDb"],
+                "renderLevelDb": mode["levelDb"],
+            })
+            if mode["mode"] in (2, 3):
+                ratio_checks.append(abs(error) <= 35)
+        mode_map = {row["mode"]: row for row in rendered["modes"]}
+        one, two, three = mode_map.get(1), mode_map.get(2), mode_map.get(3)
+        if one and two and one["t60Seconds"] and two["t60Seconds"]:
+            hierarchy.append(one["t60Seconds"] / two["t60Seconds"])
+        if one and two and three:
+            dip = two["levelDb"] - max(one["levelDb"], three["levelDb"])
+            centre_checks.append(dip <= -6)
+        rows.append({"midi": midi, "register": ref.get("register"),
+                     "renderPath": job["out"], "rendered": rendered,
+                     "comparisons": comparisons})
+    ratio_pass = bool(ratio_checks) and all(ratio_checks)
+    hierarchy_median = float(np.median(hierarchy)) if hierarchy else None
+    hierarchy_pass = hierarchy_median is not None and hierarchy_median >= 5
+    centre_pass = bool(centre_checks) and all(centre_checks)
+    result = {
+        "schema": "sg2-glockenspiel-first-render-v1",
+        "instrument": "glockenspiel",
+        "status": "pass" if ratio_pass and hierarchy_pass and centre_pass else "fail",
+        "objectiveHash": _canonical_hash({
+            "fitSha256": hashlib.sha256(fit_path.read_bytes()).hexdigest(),
+            "references": references,
+            "thresholds": {"ratioCents": 35, "mode1To2T60Ratio": 5,
+                           "centreStrikeDipDb": -6},
+        }),
+        "initialPresetHash": _canonical_hash(initial),
+        "rendererFilesHash": _canonical_hash({
+            str(path.relative_to(repo_root)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in (repo_root / "web/static/synth.js",
+                         repo_root / "web/static/measured_profiles.js",
+                         repo_root / "scripts/render_note.mjs")
+        }),
+        "gates": {
+            "modeRatios2To3Within35Cents": ratio_pass,
+            "mode1ToMode2T60RatioMedian": (round(hierarchy_median, 4)
+                                            if hierarchy_median is not None else None),
+            "mode1ToMode2T60RatioAtLeast5": hierarchy_pass,
+            "centreStrikeMode2DipAllMeasured": centre_pass,
+            "partialEconomySixModes": initial.get("spectralPartials") == 6,
+            "stringBPinnedZero": initial.get("partialB") == 0,
+        },
+        "rows": rows,
+    }
+    (output / "first-fit.json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -390,6 +489,12 @@ def main(argv: list[str] | None = None) -> int:
     p_audit.add_argument("--initial", type=Path, required=True)
     p_audit.add_argument("--manifest", type=Path, required=True)
     p_audit.add_argument("--output", type=Path, required=True)
+    p_render = sub.add_parser("render-first-fit")
+    p_render.add_argument("--fit", type=Path, required=True)
+    p_render.add_argument("--initial", type=Path, required=True)
+    p_render.add_argument("--references", type=Path, required=True)
+    p_render.add_argument("--output", type=Path, required=True)
+    p_render.add_argument("--repo-root", type=Path, default=Path.cwd())
     args = parser.parse_args(argv)
     if args.command == "validate":
         result = validate(args.output)
@@ -399,11 +504,18 @@ def main(argv: list[str] | None = None) -> int:
         summary = {"status": "ok", "output": str(args.output)}
     elif args.command == "install-profile":
         summary = install_profile(args.profiles, args.fit)
-    else:
+    elif args.command == "audit-contract":
         result = audit_contract(args.fit, args.initial, args.manifest, args.output)
         summary = {"status": result["status"], "output": str(args.output),
                    "objectiveHash": result["objectiveHash"],
                    "manifestHash": result["manifestHash"]}
+    else:
+        result = render_first_fit(args.fit, args.initial, args.references,
+                                  args.output, args.repo_root.resolve())
+        summary = {"status": result["status"], "output": str(args.output),
+                   "objectiveHash": result["objectiveHash"],
+                   "rendererFilesHash": result["rendererFilesHash"],
+                   "gates": result["gates"]}
     print(json.dumps(summary, indent=2))
     return 0
 

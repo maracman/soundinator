@@ -7,10 +7,11 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import scripts.tone_match.iterate as iterate_module
+import scripts.tone_match.bar_modes as bar_modes_module
 import scripts.tone_match.score as score_module
 import scripts.tone_match.struck_plucked_prep as struck_prep_module
 from scripts.tone_match.piano_anatomy import VALIDATION_SCHEMA as PIANO_ANATOMY_VALIDATION_SCHEMA, _available_pre_roll, validate as validate_piano_anatomy
-from scripts.tone_match.bar_modes import BAR_RATIOS, analyse_bar
+from scripts.tone_match.bar_modes import BAR_RATIOS, analyse_bar, render_first_fit
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, bowed_string_from_filename, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
@@ -526,6 +527,53 @@ def test_harp_and_glock_campaigns_keep_dense_strings_and_bar_firewall():
     assert glock["profile"] == "glockenspiel"
     assert glock["spectralPartials"] == len(BAR_RATIOS) == 6
     assert [row["midi"] for row in glock["anchors"]] == [79, 84, 91, 96, 103, 108]
+
+
+def test_glock_first_render_gate_hashes_and_reports_missing_bar_controls(
+        tmp_path, monkeypatch):
+    fit_path = tmp_path / "fit.json"
+    initial_path = tmp_path / "initial.json"
+    references_path = tmp_path / "references.json"
+    fit_path.write_text(json.dumps({"notes": [{
+        "midi": 79,
+        "modes": [
+            {"mode": 1, "offsetCents": 0, "t60Seconds": 8, "levelDb": 0},
+            {"mode": 2, "offsetCents": -100, "t60Seconds": .5, "levelDb": -12},
+            {"mode": 3, "offsetCents": 20, "t60Seconds": .4, "levelDb": -6},
+        ],
+    }]}))
+    initial_path.write_text(json.dumps({"spectralPartials": 6, "partialB": 0}))
+    references_path.write_text(json.dumps([{
+        "midi": 79, "velocity": .62, "durationSec": 3, "register": "low",
+    }]))
+    monkeypatch.setattr(
+        "scripts.tone_match.controllability._render_batch",
+        lambda jobs, _root: Path(jobs[0]["out"]).touch())
+    monkeypatch.setattr(bar_modes_module, "_load",
+                        lambda _path: (np.zeros(64), 48_000))
+    monkeypatch.setattr(bar_modes_module, "analyse_bar", lambda *_args: {
+        "modes": [
+            {"mode": 1, "offsetCents": 0, "t60Seconds": 4, "levelDb": 0},
+            {"mode": 2, "offsetCents": 0, "t60Seconds": 3, "levelDb": -3},
+            {"mode": 3, "offsetCents": 0, "t60Seconds": 2, "levelDb": -1},
+        ],
+    })
+
+    result = render_first_fit(
+        fit_path, initial_path, references_path, tmp_path / "output", Path.cwd())
+
+    assert result["status"] == "fail"
+    assert result["gates"] == {
+        "modeRatios2To3Within35Cents": False,
+        "mode1ToMode2T60RatioMedian": pytest.approx(4 / 3, abs=1e-4),
+        "mode1ToMode2T60RatioAtLeast5": False,
+        "centreStrikeMode2DipAllMeasured": False,
+        "partialEconomySixModes": True,
+        "stringBPinnedZero": True,
+    }
+    assert len(result["objectiveHash"]) == 16
+    assert len(result["rendererFilesHash"]) == 16
+    assert json.loads((tmp_path / "output" / "first-fit.json").read_text()) == result
 
 
 def test_declared_single_piano_note_wins_even_over_nearby_tracker_mode(
