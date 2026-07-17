@@ -177,9 +177,17 @@ def register_for_f0(voice_class: str, f0_hz: float) -> str:
     return "high"
 
 
-def _roles(audio: VocalSetFile) -> list[str]:
+def _roles(audio: VocalSetFile, voice_class: str, register: str) -> list[str]:
     if audio.context == "long_tones" and audio.technique in {"straight", "pp", "forte"}:
         return ["spectral", "onset"]
+    # Female1's long tones end on the declared soprano passaggio.  Her
+    # annotated slow-piano scale reaches MIDI 79 (783.99 Hz), above it, with
+    # 0.7--0.9 s stable note cells.  Promote only those high cells to spectral
+    # evidence; lower scale cells remain floor proxies and no other class
+    # inherits this corpus-specific role decision.
+    if (voice_class == "soprano" and audio.singer == "female1" and register == "high"
+            and audio.context == "scales" and audio.technique == "slow_piano"):
+        return ["spectral", "onset", "floor"]
     if audio.technique == "vibrato":
         return ["vibrato"]
     if audio.technique in {"slow_piano", "slow_forte", "straight"}:
@@ -321,13 +329,16 @@ def build_references(
             if len(segment) < int(0.18 * sample_rate):
                 continue
             register = register_for_f0(voice_class, note["expectedF0Hz"])
+            # The source stem is part of the target name.  Several VocalSet
+            # singers have C- and F-start scale files with the same selected
+            # MIDI/sequence; omitting it silently overwrote one evidence row.
             target = notes_dir / (
-                f"{singer}-{audio.context}-{audio.technique}-{audio.vowel}-"
+                f"{singer}-{audio.path.stem}-{audio.vowel}-"
                 f"{sequence:02d}-m{note['expectedMidi']}_{audio.vowel}.wav"
             )
             sf.write(target, segment, sample_rate, subtype="PCM_16")
             duration = len(segment) / sample_rate
-            roles = _roles(audio)
+            roles = _roles(audio, voice_class, register)
             references.append({
                 "path": str(target.resolve()),
                 "midi": note["expectedMidi"],

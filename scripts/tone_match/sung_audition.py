@@ -18,7 +18,10 @@ from scripts.tone_match.score import (
     compare_features,
     extract_features,
 )
-from scripts.tone_match.sung_features import vowel_classification_gate
+from scripts.tone_match.sung_features import (
+    compare_rendered_vowel_body_transfer,
+    vowel_classification_gate,
+)
 from scripts.tone_match.sung_prior import params_for_mode
 from scripts.tone_match.tripwires import (
     aggregate_by_cell,
@@ -56,6 +59,7 @@ def build(
     output_root: Path,
     repo_root: Path,
     audit_path: Path,
+    reuse_renders: bool = False,
 ) -> dict:
     references = json.loads(references_path.read_text())
     voice_classes = {row.get("voiceClass") for row in references}
@@ -93,12 +97,20 @@ def build(
     ship_renders.mkdir(exist_ok=True)
     jobs = []
     manifest = []
-    ship_seed_base = secrets.randbits(30)
+    prior_manifest_path = output_root / "audition-manifest.json"
+    if reuse_renders and prior_manifest_path.exists():
+        prior_manifest = json.loads(prior_manifest_path.read_text())
+        ship_seed_base = int(prior_manifest[0]["shipSeed"])
+    else:
+        ship_seed_base = secrets.randbits(30)
     for index, row in enumerate(selected):
         params = json.loads((fit_root / f"initial-{row['vowel']}.json").read_text())
         fit_params = params_for_mode(params, "fit")
+        bypass_params = {**fit_params, "bodyBands": []}
         ship_params = params_for_mode(params, "ship", seed=ship_seed_base + index)
         fit_out = fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
+        bypass_out = (fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}-body-bypass.wav"
+                      if row["register"] in {"low", "mid"} else None)
         ship_out = ship_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
         jobs.append({
             "params": fit_params,
@@ -108,6 +120,15 @@ def build(
             "sampleRate": row.get("sampleRate", 44100),
             "out": str(fit_out),
         })
+        if bypass_out is not None:
+            jobs.append({
+                "params": bypass_params,
+                "midi": row["midi"],
+                "velocity": row["velocity"],
+                "durationSec": row["durationSec"],
+                "sampleRate": row.get("sampleRate", 44100),
+                "out": str(bypass_out),
+            })
         jobs.append({
             "params": ship_params,
             "midi": row["midi"],
@@ -123,31 +144,87 @@ def build(
             "dynamic": row["dynamic"],
             "reference": row["path"],
             "fitRender": str(fit_out),
+            "bodyBypassRender": str(bypass_out) if bypass_out is not None else None,
             "render": str(ship_out),
             "shipSeed": ship_seed_base + index,
             "sourceFile": row["sourceFile"],
         })
     jobs_path = output_root / "jobs.json"
     jobs_path.write_text(json.dumps(jobs, indent=2) + "\n")
-    subprocess.run(
-        ["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],
-        cwd=repo_root, check=True,
-    )
+    if reuse_renders:
+        missing = [job["out"] for job in jobs if not Path(job["out"]).exists()]
+        if missing:
+            raise ValueError(
+                f"cannot reuse renders; {len(missing)} outputs are missing, first: {missing[0]}"
+            )
+    else:
+        subprocess.run(
+            ["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],
+            cwd=repo_root, check=True,
+        )
 
     weights = dict(audit["finalWeights"])
     score_rows = []
     tripwire_notes = []
     construction_samples = []
     rendered_formants: dict[str, dict[str, tuple[float, float]]] = {}
+    body_transfer_rows = []
+    source_fit = json.loads((fit_root / "SOURCE_VOWEL_FIT.json").read_text())
+    vowel_bodies = source_fit["fit"]["vowelBodies"]
     for row, trial in zip(selected, manifest):
+        rendered = None
+        render_error = None
         try:
-            reference = extract_features(
-                trial["reference"], expected_f0_hz=row["expectedF0Hz"]
-            )
             rendered = extract_features(
                 trial["fitRender"], active_duration_s=row["durationSec"],
                 expected_f0_hz=row["expectedF0Hz"],
             )
+        except (ValueError, RuntimeError) as exc:
+            render_error = str(exc)
+
+        if trial["bodyBypassRender"] is not None:
+            transfer = {
+                "vowel": row["vowel"],
+                "register": row["register"],
+                "dynamic": row["dynamic"],
+                "technique": row.get("technique"),
+                "fittedFormantsHz": vowel_bodies[row["vowel"]]["formantsHz"][:2],
+            }
+            try:
+                if rendered is None:
+                    raise ValueError(render_error or "body render analysis unavailable")
+                bypass = extract_features(
+                    trial["bodyBypassRender"], active_duration_s=row["durationSec"],
+                    expected_f0_hz=row["expectedF0Hz"],
+                )
+                common_mask = (
+                    np.asarray(rendered.note.partial_snr_ok, dtype=bool)
+                    & np.asarray(bypass.note.partial_snr_ok, dtype=bool)
+                )
+                transfer.update(compare_rendered_vowel_body_transfer(
+                    rendered.note.partial_amps,
+                    bypass.note.partial_amps,
+                    common_mask,
+                    f0_hz=row["expectedF0Hz"],
+                    bands=vowel_bodies[row["vowel"]]["bands"],
+                    amount=1.0,
+                ))
+            except (ValueError, RuntimeError) as exc:
+                transfer.update({
+                    "passed": False,
+                    "reason": str(exc),
+                    "commonHarmonics": 0,
+                    "medianShapeErrorDb": None,
+                    "shapeCorrelation": None,
+                })
+            body_transfer_rows.append(transfer)
+
+        try:
+            reference = extract_features(
+                trial["reference"], expected_f0_hz=row["expectedF0Hz"]
+            )
+            if rendered is None:
+                raise ValueError(render_error or "render analysis unavailable")
         except (ValueError, RuntimeError) as exc:
             score_rows.append({
                 "label": trial["label"],
@@ -197,8 +274,44 @@ def build(
             "normalized": score["normalized"],
             "weights": score["weights"],
         })
-    vowel_gate = vowel_classification_gate(rendered_formants, voice_class)
-    source_fit = json.loads((fit_root / "SOURCE_VOWEL_FIT.json").read_text())
+    fitted_centres = {
+        vowel: tuple(body["formantsHz"][:2])
+        for vowel, body in vowel_bodies.items()
+    }
+    required_transfer_rows = []
+    consumed_formants: dict[str, dict[str, tuple[float, float]]] = {}
+    for vowel in "aeiou":
+        for register in ("low", "mid"):
+            candidates = [
+                evidence for evidence in body_transfer_rows
+                if evidence["vowel"] == vowel and evidence["register"] == register
+            ]
+            candidates.sort(key=lambda evidence: (
+                not evidence["passed"],
+                evidence["technique"] != "straight",
+                evidence["medianShapeErrorDb"]
+                if evidence["medianShapeErrorDb"] is not None else float("inf"),
+            ))
+            chosen = candidates[0] if candidates else {
+                "vowel": vowel, "register": register, "passed": False,
+                "reason": "no rendered evidence row",
+            }
+            required_transfer_rows.append(chosen)
+            if chosen.get("passed"):
+                consumed_formants.setdefault(vowel, {})[register] = fitted_centres[vowel]
+    body_consumption = {
+        "passed": len(required_transfer_rows) == 10
+        and all(row.get("passed") for row in required_transfer_rows),
+        "passedRows": sum(bool(row.get("passed")) for row in required_transfer_rows),
+        "requiredRows": 10,
+        "rows": required_transfer_rows,
+        "allEvidenceRows": body_transfer_rows,
+    }
+    # The paired render proves which fitted F1/F2 body reached audio.  Those
+    # emitted centres must still land inside the annex class-scaled regions;
+    # fitting a centre never grants permission to redefine its own box.
+    vowel_gate = vowel_classification_gate(consumed_formants, voice_class)
+    lpc_vowel_gate = vowel_classification_gate(rendered_formants, voice_class)
     construction = evaluate_construction(
         voice_class,
         construction_samples,
@@ -233,6 +346,8 @@ def build(
         "construction": construction,
         "tripwires": tripwires,
         "vowelClassification": vowel_gate,
+        "vowelBodyConsumption": body_consumption,
+        "lpcVowelClassificationWatch": lpc_vowel_gate,
         "weights": weights,
         "controllability": {
             "path": str(audit_path),
@@ -310,10 +425,14 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--controllability", type=Path, required=True)
+    parser.add_argument(
+        "--reuse-renders", action="store_true",
+        help="rescore an existing complete FIT/SHIP render set",
+    )
     args = parser.parse_args()
     summary = build(
         args.references, args.fit_root, args.out, args.repo_root,
-        args.controllability,
+        args.controllability, args.reuse_renders,
     )
     print(json.dumps({
         "meanComposite": summary["meanComposite"],
