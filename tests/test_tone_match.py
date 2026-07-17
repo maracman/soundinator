@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
+import scripts.tone_match.struck_plucked_prep as struck_prep_module
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
@@ -107,6 +108,26 @@ def test_reacquired_chromatic_run_names_resolve_their_first_midi():
     assert _run_start_midi("BbClar.pp.D3B3.aiff") == 50
     assert _run_start_midi("AltoSax.NoVib.ff.Db3B3.aiff") == 49
     assert _run_start_midi("Horn.ff.Bb1B1.aiff") == 34
+
+
+def test_requested_blown_controls_have_controllability_probes():
+    from scripts.tone_match.controllability import BOWED_FREE_PARAMS
+    assert {
+        "breathLevelScale", "breathVelocityExponent", "breathTurbulence",
+        "breathBodyAmount", "onsetSpectrumTilt", "onsetSpectrumDecay",
+        "articulationVelocitySlope",
+    } <= set(BOWED_FREE_PARAMS)
+
+
+def test_failed_humanisation_fit_is_not_authorised_for_profile_consumption():
+    from scripts.tone_match.humanisation import _consume_profile_ranges
+    profiles = {"french-horn": {"partials": []}}
+    failed = {"decompositionTest": {"passed": False}, "ranges": {"x": 1}}
+    assert not _consume_profile_ranges(profiles, "french-horn", failed)
+    assert "humanRanges" not in profiles["french-horn"]
+    passed = {"decompositionTest": {"passed": True}, "ranges": {"x": 1}}
+    assert _consume_profile_ranges(profiles, "french-horn", passed)
+    assert profiles["french-horn"]["humanRanges"] is passed
 
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
     freqs = np.asarray([50.0, 100.0, 200.0, 10_000.0])
@@ -359,11 +380,33 @@ def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
     piano = STRUCK_CAMPAIGNS["grand-piano"]
     nylon = STRUCK_CAMPAIGNS["guitar-nylon"]
     assert len(piano["anchors"]) >= 5
+    assert [row["midi"] for row in piano["anchors"]] == [24, 36, 60, 84, 108]
     assert piano["dynamics"] == ("pp", "ff")
     assert len(nylon["anchors"]) >= 3
     assert nylon["source"].startswith("Philharmonia")
     assert [row["string"] for row in nylon["anchors"]] == \
         ["string6", "string3", "string1"]
+
+
+def test_declared_single_piano_note_wins_even_over_nearby_tracker_mode(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        struck_prep_module, "load_mono",
+        lambda _path: (np.ones(4_800, dtype=float) * .1, 48_000))
+    monkeypatch.setattr(
+        struck_prep_module, "segment_notes",
+        lambda *_args, **_kwargs: [(0, 4_800)])
+    monkeypatch.setattr(
+        struck_prep_module, "analyse_note",
+        lambda *_args, **_kwargs: SimpleNamespace(f0=1094.219))
+    _samples, _rate, f0, evidence = struck_prep_module.select_note(
+        tmp_path / "Piano.pp.C6.aiff", 84)
+    assert f0 == pytest.approx(1046.502261, rel=1e-6)
+    assert evidence == {
+        "method": "filename-nominal-anchor",
+        "rawDetectedF0": 1094.219,
+        "rawDetectedMidi": 85,
+    }
 
 
 def test_t033_guitar_auto_course_uses_minimum_fret_and_24_fret_bound():
