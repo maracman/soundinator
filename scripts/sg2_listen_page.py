@@ -136,8 +136,16 @@ def render_if_stale(inst, params, refs, commit, profile_hash):
              "out": f"{outdir}/note-{i}.wav"} for i, r in enumerate(refs)]
     jobs_path = f"{outdir}/jobs.json"
     json.dump(jobs, open(jobs_path, "w"))
-    subprocess.run(["node", "scripts/render_note.mjs", "--batch", jobs_path],
-                   check=True, capture_output=True)
+    # Agents merge to the served branch continuously; a batch can catch a
+    # mid-merge engine state. Retry twice with a pause before failing.
+    for attempt in range(3):
+        r = subprocess.run(["node", "scripts/render_note.mjs", "--batch", jobs_path],
+                           capture_output=True)
+        if r.returncode == 0: break
+        if attempt < 2: time.sleep(25)
+    else:
+        raise subprocess.CalledProcessError(r.returncode, r.args,
+                                            output=r.stdout, stderr=r.stderr)
     json.dump(want, open(stamp_path, "w"))
     return True
 

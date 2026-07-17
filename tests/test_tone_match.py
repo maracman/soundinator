@@ -743,6 +743,35 @@ def test_ship_variants_record_one_failed_note_without_aborting(tmp_path, monkeyp
     assert result["primaryRenderDirectory"].endswith("variant-00")
 
 
+def test_ship_variants_resume_saved_seeds_and_skip_completed_wavs(tmp_path, monkeypatch):
+    calls = []
+
+    def render(_command, **_kwargs):
+        calls.append(_command)
+        jobs = json.loads(Path(_command[-1]).read_text())
+        for job in jobs:
+            output = Path(job["out"])
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"RIFF" + b"\0" * 64)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(iterate_module.subprocess, "run", render)
+    monkeypatch.setattr(iterate_module, "extract_features",
+                        lambda path, **_kwargs: str(path))
+    monkeypatch.setattr(iterate_module, "_distributional_variation_gate",
+                        lambda *_args, **_kwargs: {"passed": False,
+                                                   "status": "fail"})
+    args = (tmp_path, "candidate", "flute", {"excitationType": "blow"},
+            [{"midi": 60}, {"midi": 72}], {}, {}, 2)
+    first = _render_ship_variants(*args, repo_root=tmp_path)
+    saved_jobs = json.loads(
+        (tmp_path / "ship-mode" / "candidate" / "jobs.json").read_text())
+    second = _render_ship_variants(*args, repo_root=tmp_path)
+    assert len(calls) == 1
+    assert first["seeds"] == second["seeds"]
+    assert first["seeds"] == [saved_jobs[0]["seed"], saved_jobs[2]["seed"]]
+
+
 def test_legacy_baseline_is_mandatory_leaderboard_entry_one(tmp_path, monkeypatch):
     monkeypatch.setattr(iterate_module, "DEFAULT_RUN_ROOT", tmp_path / "runs")
     monkeypatch.setattr(iterate_module, "STATE_ROOT", tmp_path / "state")

@@ -19,7 +19,7 @@ No partial or mel strict aggregate cell closed. The residual is not repairable
 with the renderer's one pooled explicit source table: after exact fitted-vowel
 body subtraction, a register × dynamic source counterfactual lowers median
 partial error by 34.6–52.7% across the four voices. `A-VOICE-05` and exchange
-item T-063 therefore specify the missing consuming law. The counterfactual
+item T-064 therefore specify the missing consuming law. The counterfactual
 tables remain diagnostic; no register/dynamic residual was folded into vowel
 bodies or unrelated identity parameters.
 
@@ -85,16 +85,15 @@ mezzo each retain an incumbent vector and an accepted candidate vector in
 `accepted-criteria-steps.json`. Their directed drift events were accumulated
 in `sg2-data/state/criteria-drift.json`; the tenor rejection is absent. After
 the sung steps were logged, the shared state contained 86 accepted steps and
-62 directed transitions. Two concurrent violin steps landed before finalisation,
-so the final read is 88 accepted steps, 63 directed transitions, 16 significant
-measured edges, 83 symmetric-coupling candidates and 3 theory disagreements.
-The six sung run-local IDs are present in shared state; no rejected tenor ID is
+62 directed transitions. Other lanes continued advancing the live aggregate
+during finalisation, so no later fleet-wide count is claimed as sung-owned. The
+six sung run-local IDs remain present in shared state; no rejected tenor ID is
 present.
 
 ## L16 disposition
 
 L16's envelope-anomaly mechanism is adapted for possible future sung onsets in
-T-062. A consonant or glottal-onset component may eventually need an onset
+T-063. A consonant or glottal-onset component may eventually need an onset
 boost plus faster per-frequency decay separated from the baseline envelope.
 Piano values and class assignments do not transfer. Sung activation requires
 its own per-partial onset tracks, fixed-Hz versus harmonic-rank separation,
@@ -119,7 +118,9 @@ not used to idle the source fit.
 | Bass | `bb1f5ca5bb748c98` | `a579e74e30d52b3b` | stable | yes |
 | Mezzo | `570e3a53d5189bb3` | `a579e74e30d52b3b` | stable | yes |
 
-All audits consume renderer hash `cf173478fa0481d1`. Every fit retains the
+After merging the advancing shared head, all audits were refreshed and all ten
+objective-comparator score sets were revalidated without metric drift. They
+consume renderer hash `e55f961366e8aad3`. Every fit retains the
 pinned `vocal` prior at tag `sg2-legacy`, commit
 `e8d3ac123c0f1c2647c4dbf03d48934b1966564d`, parameter hash
 `8b1047dfbe83d6ba`. FIT scoring is deterministic; selected listening renders
