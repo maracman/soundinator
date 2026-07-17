@@ -64,6 +64,7 @@ from scripts.tone_match.bowed_source_tables import (
     deconvolve_source,
     synthetic_deconvolution_round_trip,
 )
+from scripts.tone_match.bowed_source_refine import apply_bounded_partial_correction
 from scripts.tone_match.bowed_body_audit import (
     PAIR_RATIO_FLOOR_DB,
     _audit_params as bowed_body_audit_params,
@@ -279,6 +280,18 @@ def test_bowed_source_attempt_uses_only_the_named_local_string_table():
     assert _string_partials(params, "sulC", 90) == pytest.approx(
         [1.0 + (.5 - 1.0) * amount, .2 + (.8 - .2) * amount])
     assert _string_partials(params, "sulA", 90) == pytest.approx([.1, 1.0])
+
+
+def test_bowed_source_render_correction_is_bounded_and_preserves_zeros():
+    corrected, evidence = apply_bounded_partial_correction(
+        [1.0, .5, 0.0, .25], np.asarray([20.0, -20.0, 20.0, np.nan]),
+        correction_fraction=.65, max_correction_db=6.0)
+    assert corrected[0] == pytest.approx(1.0)
+    assert corrected[1] == pytest.approx(.5 * 10 ** (-12 / 20), abs=1e-8)
+    assert corrected[2] == 0.0
+    assert corrected[3] == pytest.approx(.25 * 10 ** (-6 / 20), abs=1e-8)
+    assert evidence["correctedPartials"] == 2
+    assert evidence["maxAbsAppliedDb"] == 6.0
 
 
 def test_native_human_episode_requires_hashed_delivery_and_feature_response():

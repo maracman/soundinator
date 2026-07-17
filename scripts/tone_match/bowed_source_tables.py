@@ -217,7 +217,7 @@ def build_deconvolved(
     params_path: Path,
     accepted_cells: set[tuple[str, str]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Build six direct, body-divided cello source cells.
+    """Build direct, body-divided bowed source cells from declared evidence.
 
     ``accepted_cells`` is deliberately explicit.  Merely measuring a row may
     not activate it; the caller supplies only cells that passed the upstream
@@ -247,7 +247,7 @@ def build_deconvolved(
             continue
         f0 = float(reference.get("expectedF0Hz") or reference.get("detectedF0"))
         analysed = extract_features(
-            path, n_partials=32, expected_f0_hz=f0, trust_expected_f0=True)
+            path, n_partials=64, expected_f0_hz=f0, trust_expected_f0=True)
         frequencies = np.asarray(analysed.note.partial_freqs, float)
         attempted = deconvolve_source(
             np.asarray(analysed.partial_db, float), frequencies, bands, amount,
@@ -285,10 +285,13 @@ def build_deconvolved(
                            "referenceSha256": _sha(path)},
         })
     cells = {(row["register"], row["dynamic"]) for row in rows}
-    expected = {(register, dynamic) for register in ("low", "mid", "high")
-                for dynamic in ("pp", "ff")}
-    if cells != expected or len(rows) != 6:
-        raise ValueError(f"expected six lossless cells, got {len(rows)}: {sorted(cells)}")
+    if not rows or len(cells) != len(rows):
+        raise ValueError(
+            "expected one lossless spectral reference per declared cell, got "
+            f"{len(rows)} rows/{len(cells)} cells: {sorted(cells)}")
+    undeclared = accepted_cells - cells
+    if undeclared:
+        raise ValueError(f"accepted cells lack lossless spectral evidence: {sorted(undeclared)}")
     table = {
         "schemaVersion": 2,
         "handoff": "D-BOWED-SOURCE-02",
@@ -312,11 +315,16 @@ def build_deconvolved(
         "emittedBodyLowestF0Hz": lowest_f0_hz,
         "referencesSha256": _sha(references_path),
         "rows": rows,
-        "activationEligible": len(accepted_cells) == 6,
+        "declaredLosslessCells": [
+            {"register": register, "dynamic": dynamic}
+            for register, dynamic in sorted(cells)
+        ],
+        "activationEligible": accepted_cells == cells,
         "activationRule": (
             "the current renderer's dynamic-ownership flag is table-wide; emit no "
-            "mixed accepted/neutral table. All six cells must clear their upstream "
-            "hierarchy audits before candidate consumption"),
+            "mixed accepted/neutral table. Every declared lossless spectral cell "
+            "must clear its upstream hierarchy audit before candidate consumption; "
+            "unobserved cells are handled only by the declared measured-hull clamp"),
     }
     table["evidenceSha256"] = hashlib.sha256(json.dumps(
         table, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
