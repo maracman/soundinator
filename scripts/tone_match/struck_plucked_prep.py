@@ -84,7 +84,8 @@ def write_limited_vsco_contracts(samples_root: Path,
                 note, dynamic = match.groups()
                 velocity = VELOCITY[dynamic]
                 velocity_evidence = f"source filename label: {dynamic}"
-            midi = _midi_from_note_name(note)
+            written_midi = _midi_from_note_name(note)
+            midi = written_midi + 12 if instrument == "glockenspiel" else written_midi
             info = sf.info(path)
             rows.append({
                 "file": path.name,
@@ -99,6 +100,9 @@ def write_limited_vsco_contracts(samples_root: Path,
                 "velocityEvidence": velocity_evidence,
                 "midi": midi,
                 "note": _note_name(midi),
+                "writtenMidi": written_midi,
+                "writtenNote": _note_name(written_midi),
+                "transpositionSemitones": 12 if instrument == "glockenspiel" else 0,
                 "sampleRate": info.samplerate,
                 "channels": info.channels,
                 "subtype": info.subtype,
@@ -134,6 +138,11 @@ def write_limited_vsco_contracts(samples_root: Path,
             class_note = (
                 "The future campaign must retain `resonatorClass=bar`; failures "
                 "of bar-mode controls are engine specs, never a reason to bend B.")
+            pitch_note = (
+                "The landed WAVs' measured first bar mode is one octave above "
+                "the filename label. This empirical file convention is distinct "
+                "from the score's two-octave glock transposition; both raw label "
+                "and sounding MIDI are preserved, and synthesis uses the latter.")
         else:
             limitation = (
                 "Twenty-three pitch anchors span the harp, but 20 are mf and "
@@ -142,6 +151,7 @@ def write_limited_vsco_contracts(samples_root: Path,
             class_note = (
                 "These are plucked-string references; no glock/bar or piano "
                 "construction parameters are borrowed.")
+            pitch_note = "Filename pitch and sounding pitch agree."
         coverage = [
             f"# Coverage — {instrument}\n\n",
             f"Durable corpus: **{len(rows)} VSCO 2 CE WAV files**, spanning ",
@@ -152,14 +162,16 @@ def write_limited_vsco_contracts(samples_root: Path,
             f"- Dynamics present: {', '.join(dynamics)}.\n",
             f"- Coverage verdict: {limitation}\n",
             f"- Construction firewall: {class_note}\n",
+            f"- Pitch identity: {pitch_note}\n",
             "- Steel-string guitar remains corpus-absent and is not inferred from these files.\n\n",
             "## Landed reference inventory\n\n",
-            "| MIDI | Note | Dynamic | File |\n",
-            "|---:|---|---|---|\n",
+            "| Sounding MIDI | Sounding note | Written note | Dynamic | File |\n",
+            "|---:|---|---|---|---|\n",
         ]
         for row in notes:
             coverage.append(
-                f"| {row['midi']} | {row['note']} | {row['dynamic']} | `{row['file']}` |\n")
+                f"| {row['midi']} | {row['note']} | {row['writtenNote']} | "
+                f"{row['dynamic']} | `{row['file']}` |\n")
         (corpus / "COVERAGE.md").write_text("".join(coverage), encoding="utf-8")
 
         prep = {
@@ -169,6 +181,9 @@ def write_limited_vsco_contracts(samples_root: Path,
             "references": [{
                 "path": str(corpus / row["file"]),
                 "midi": row["midi"],
+                "soundingMidi": row["midi"],
+                "writtenMidi": row["writtenMidi"],
+                "writtenNote": row["writtenNote"],
                 "velocity": row["velocity"],
                 "dynamic": row["dynamic"],
                 # Evidence roles use the shared tripwire taxonomy. Decay is
@@ -348,6 +363,68 @@ CAMPAIGNS: dict[str, dict[str, Any]] = {
         "dynamics": ("p", "f"),
         "source": "Philharmonia classical guitar",
     },
+    "harp": {
+        "instrument": "harp",
+        "corpus": "harp",
+        "profile": "guitar",
+        "analysisProfile": "harp",
+        "excitation": "pluck",
+        "resonator": "string",
+        "anchors": [
+            {"register": ("wire-bass" if midi <= 45 else
+                          "gut-mid" if midi <= 83 else "nylon-top"),
+             "midi": midi, dynamic: filename}
+            for midi, dynamic, filename in (
+                (28, "f", "vsco2.KSHarp_E1_f.wav"),
+                (31, "mp", "vsco2.KSHarp_G1_mp.wav"),
+                (35, "mf", "vsco2.KSHarp_B1_mf.wav"),
+                (38, "mf", "vsco2.KSHarp_D2_mf.wav"),
+                (41, "mf", "vsco2.KSHarp_F2_mf.wav"),
+                (45, "mf", "vsco2.KSHarp_A2_mf.wav"),
+                (48, "mf", "vsco2.KSHarp_C3_mf.wav"),
+                (52, "mf", "vsco2.KSHarp_E3_mf.wav"),
+                (55, "mf", "vsco2.KSHarp_G3_mf.wav"),
+                (59, "mf", "vsco2.KSHarp_B3_mf.wav"),
+                (62, "mf", "vsco2.KSHarp_D4_mf.wav"),
+                (65, "mf", "vsco2.KSHarp_F4_mf.wav"),
+                (69, "mf", "vsco2.KSHarp_A4_mf.wav"),
+                (72, "mf", "vsco2.KSHarp_C5_mf.wav"),
+                (76, "mf", "vsco2.KSHarp_E5_mf.wav"),
+                (79, "mf", "vsco2.KSHarp_G5_mf.wav"),
+                (83, "mf", "vsco2.KSHarp_B5_mf.wav"),
+                (86, "mf", "vsco2.KSHarp_D6_mf.wav"),
+                (89, "mf", "vsco2.KSHarp_F6_mf.wav"),
+                (93, "mf", "vsco2.KSHarp_A6_mf.wav"),
+                (95, "mf", "vsco2.KSHarp_B6_mf.wav"),
+                (98, "f", "vsco2.KSHarp_D7_f.wav"),
+                (101, "f", "vsco2.KSHarp_F7_f.wav"),
+            )
+        ],
+        "dynamics": None,
+        "source": "VSCO 2 CE harp",
+    },
+    "glockenspiel": {
+        "instrument": "glockenspiel",
+        "corpus": "glockenspiel",
+        "profile": "piano",
+        "analysisProfile": "glockenspiel",
+        "excitation": "strike",
+        "resonator": "bar",
+        "spectralPartials": 6,
+        "anchors": [
+            {"register": register, "midi": midi, "mf": filename}
+            for register, midi, filename in (
+                ("low", 79, "vsco2.glock_medium_G4.wav"),
+                ("low-mid", 84, "vsco2.glock_medium_C5.wav"),
+                ("mid", 91, "vsco2.glock_medium_G5.wav"),
+                ("upper-mid", 96, "vsco2.glock_medium_C6.wav"),
+                ("high", 103, "vsco2.glock_medium_G6.wav"),
+                ("top", 108, "vsco2.glock_medium_C7.wav"),
+            )
+        ],
+        "dynamics": ("mf",),
+        "source": "VSCO 2 CE glockenspiel",
+    },
 }
 
 
@@ -357,7 +434,9 @@ def midi_of(f0: float) -> int:
 
 def _filename_declares_single_note(path: Path) -> bool:
     return (path.name.startswith("Piano.") or path.name.startswith("phil.guitar_") or
-            path.name.startswith("vsco2.Player_"))
+            path.name.startswith("vsco2.Player_") or
+            path.name.startswith("vsco2.KSHarp_") or
+            path.name.startswith("vsco2.glock_"))
 
 
 def select_note(path: Path, target_midi: int) -> tuple[np.ndarray, int, float, dict[str, Any]]:
@@ -411,7 +490,7 @@ def write_reference(source: Path, target_midi: int, target: Path) -> tuple[int, 
 def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
                 mode: str = "fit", repo_root: Path | None = None) -> dict[str, Any]:
     """Overlay measured identity on the table-selected immutable craft prior."""
-    profile = measured[spec["profile"]]
+    profile = measured[spec.get("analysisProfile", spec["profile"])]
     performance = profile.get("performance") or {}
     attack = performance.get("attackNoise") or {}
     attack_registers = (profile.get("attack") or {}).get("byRegister") or []
@@ -421,9 +500,9 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
         "voiceMode": "fourier",
         "spectralProfile": spec["profile"],
         "spectralMix": 1.0,
-        "spectralPartials": 64,
+        "spectralPartials": spec.get("spectralPartials", 64),
         "excitationType": spec["excitation"],
-        "resonatorClass": "string",
+        "resonatorClass": spec.get("resonator", "string"),
         "bodyType": "auto",
     }
     seed, provenance = resolve_legacy_prior(
@@ -443,6 +522,10 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
         "velocityHardnessCoupling": 0.0,
         "decaySecondStage": 0.0,
         "decaySecondRatio": 1.0,
+        # Direct Fourier is the valid temporary home for a measured identity
+        # whose named profile still awaits Agent A's activation adapter.
+        "spectralPartialMeans": [float(row.get("amp", 0))
+                                 for row in profile.get("partials", [])],
     }
     material = (profile.get("material") or {}).get("suggestedMaterial")
     if material is not None:
@@ -459,8 +542,16 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
             measured_identity[key] = performance[key]
     seed.update(measured_identity)
     resonances = profile.get("resonances") or []
-    if len(resonances) >= 3:
+    body_fit = profile.get("resonancesFit") or {}
+    body_stable = (not body_fit or
+                   (isinstance(body_fit.get("splitHalfCorr"), (int, float)) and
+                    float(body_fit["splitHalfCorr"]) >= .8))
+    if len(resonances) >= 3 and body_stable:
         seed["bodyBands"] = resonances
+    elif spec["instrument"] in {"harp", "glockenspiel"}:
+        # Explicit evidence-backed omission prevents a borrowed guitar/piano
+        # body from masquerading as the new instrument's first fit.
+        seed["bodyBands"] = []
     if attack_registers:
         seed["envelopeAttackByRegister"] = [
             {"f0": row["f0"], "attack": row["envelopeAttack"]}
@@ -469,7 +560,10 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
         ]
     # T-007 consuming side: G1 profiles with anchors must not be shadowed by
     # one scalar B.  Legacy/sparse profiles retain the scalar fallback.
-    if profile.get("partialsByRegister"):
+    if spec.get("resonator") == "bar":
+        seed["partialB"] = 0.0
+        seed["stringBForbidden"] = True
+    elif profile.get("partialsByRegister"):
         seed.pop("partialB", None)
     else:
         seed["partialB"] = profile.get("partialB", 0)
@@ -522,14 +616,19 @@ def _take_pairs(instrument: str, corpus: Path) -> dict[str, Any]:
             for left, right in zip(range(0, 42, 2), range(2, 44, 2))
         ]
         reason = "VSCO upright acquisition has one round robin only; adjacent-pitch proxy is weaker than true repetition evidence."
-    else:
+    elif instrument == "grand-piano":
         proxies = [
             {"files": [f"Piano.{dynamic}.C{octave}.aiff", f"Piano.{dynamic}.C{octave + 1}.aiff"],
              "method": "adjacent-register proxy only; remove keyboard trend before use"}
             for dynamic in ("pp", "mf", "ff") for octave in range(1, 8)
         ]
         reason = "No true repeated take at the same pitch/dynamic in the delivered Iowa set."
-    return {"trueDuplicates": [], "proxyPairs": proxies, "evidence": "proxy", "reason": reason}
+    else:
+        proxies = []
+        reason = ("The landed VSCO subset contains one take per pitch/dynamic; "
+                  "no same-cell repeats or defensible adjacent-string proxy are claimed.")
+    return {"trueDuplicates": [], "proxyPairs": proxies,
+            "evidence": "proxy" if proxies else "absent", "reason": reason}
 
 
 def build(instrument: str, samples_root: Path, measured_path: Path,
@@ -544,7 +643,9 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
     notes_dir.mkdir(parents=True, exist_ok=True)
     references = []
     for anchor in spec["anchors"]:
-        for dynamic in spec["dynamics"]:
+        dynamics = spec["dynamics"] or tuple(
+            key for key in VELOCITY if key in anchor)
+        for dynamic in dynamics:
             source = corpus / anchor[dynamic]
             if not source.exists():
                 raise RuntimeError(f"coverage-listed source missing: {source}")
@@ -554,6 +655,7 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
                 raise RuntimeError(f"{source}: detected MIDI {midi}, expected {anchor['midi']}")
             references.append({
                 "path": str(target), "midi": midi, "detectedF0": round(f0, 3),
+                "expectedF0Hz": round(440.0 * 2 ** ((midi - 69) / 12), 6),
                 "pitchEvidence": pitch_evidence,
                 "velocity": spec.get("velocity", VELOCITY)[dynamic],
                 "dynamic": dynamic,

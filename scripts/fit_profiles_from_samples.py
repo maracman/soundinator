@@ -85,6 +85,12 @@ VOWEL_RE = re.compile(r"_([aeiou])\.(?:wav|aif|aiff|flac|ogg|mp3)$", re.IGNORECA
 SINGLE_NOTE_RE = re.compile(r"(?:^|[._])([A-Ga-g])([#b]?)(-?\d)(?=[._-]|$)")
 VSCO_UPRIGHT_RE = re.compile(
     r"^(?:vsco2\.)?Player_dyn[123]_rr1_(\d{3})\.wav$", re.IGNORECASE)
+VSCO_HARP_RE = re.compile(
+    r"^(?:vsco2\.)?KSHarp_([A-G])([#b]?)(-?\d)_(?:mp|mf|f)\.wav$",
+    re.IGNORECASE)
+VSCO_GLOCK_RE = re.compile(
+    r"^(?:vsco2\.)?glock_(?:medium)_([A-G])([#b]?)(-?\d)\.wav$",
+    re.IGNORECASE)
 GUITAR_OPEN_MIDI = {
     "string6": 40,
     "string5": 45,
@@ -132,6 +138,23 @@ def expected_single_note_f0(filename: str) -> float | None:
             midi = 21 + 2 * sample_index
         else:
             return None
+        return 440.0 * 2 ** ((midi - 69) / 12)
+    glock = VSCO_GLOCK_RE.match(name)
+    limited_vsco = VSCO_HARP_RE.match(name) or glock
+    if limited_vsco:
+        letter, accidental, octave_text = limited_vsco.groups()
+        pitch_class = {
+            "C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11,
+        }[letter.upper()]
+        pitch_class += {"": 0, "#": 1, "b": -1}[accidental]
+        midi = 12 * (int(octave_text) + 1) + pitch_class
+        # The landed VSCO glock WAVs' first bar mode is consistently one
+        # octave above the filename label.  Do not conflate that empirical
+        # file convention with the score's two-octave transposition rule.
+        # Fitting follows the measured fundamental and preserves the raw
+        # filename label in the preparation contract.
+        if glock:
+            midi += 12
         return 440.0 * 2 ** ((midi - 69) / 12)
     if not (name.startswith("phil.") or name.startswith("Piano.")):
         return None
@@ -2128,7 +2151,9 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
                     force_percussive=(True if expected_f0_hz is not None and
                                       ("guitar" in fn.lower() or
                                        fn.startswith("Piano.") or
-                                       VSCO_UPRIGHT_RE.match(fn)) else None),
+                                       VSCO_UPRIGHT_RE.match(fn) or
+                                       VSCO_HARP_RE.match(fn) or
+                                       VSCO_GLOCK_RE.match(fn)) else None),
                 )
                 if note is not None:
                     result.append(note)
@@ -2176,6 +2201,11 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
                                string_selector=string_selector,
                                register_group_count=(
                                    5 if instrument_name in {"piano", "piano-upright"}
+                                   # One lossless VSCO note represents one
+                                   # physical harp string.  Preserve that
+                                   # density instead of pooling 23 strings
+                                   # into three broad keyboard regions.
+                                   else len(notes) if instrument_name == "harp"
                                    else 3))
     if agg.get("resonancesFit") and body_reference_notes:
         agg["resonancesFit"]["bodyReferenceNotes"] = len(body_reference_notes)
