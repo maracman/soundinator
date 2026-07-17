@@ -1,7 +1,8 @@
 # SG2 construction dossier — struck and plucked strings
 
 Status: research verdict complete; checklist implemented in
-`scripts/tone_match/assertions.py` (checklist version 1).
+`scripts/tone_match/assertions.py` (checklist version 3; L18 hold law and L17
+pinned-component activation added in Pass 16).
 
 Scope: acoustic piano and acoustic guitar, isolated dry notes.
 
@@ -83,9 +84,12 @@ paired f0 lock and the impulsive-envelope check.
 |  | `piano.hardness-coupling` | `velocityHardnessCoupling > 0` |
 |  | `piano.dynamic-brightening` | Upper-partial index rises with velocity |
 |  | `piano.double-decay` | Second stage enabled and late T60 exceeds early T60 |
+|  | `piano.free-decay-no-plateau` | Every held-key ship render continues decaying; one plateau is an automatic fail |
+|  | `piano.pre-onset-component-active` | Any pinned action-noise component is audible and uses its own fitted envelope |
 | Guitar | `guitar.excitor`, `guitar.resonator` | `pluck` into a stiff string |
 |  | `guitar.stiff-string`, `guitar.hardness-coupling` | Measured stiffness and velocity-dependent contact |
 |  | `guitar.dynamic-brightening`, `guitar.double-decay` | Brighter forceful attacks and slower aftersound |
+|  | `guitar.free-decay-no-plateau` | Held plucks decay freely until explicit hand/finger damping |
 |  | `guitar.air-mode` | Fixed 75–130 Hz air region present where measurable |
 
 The construction gate does not require sympathetic resonance or pedal noise
@@ -104,4 +108,3 @@ wrong string/hammer/body model.
 
 Verdict: G1, G4 and G7 are confirmed. G4 is a structural minimum rather than
 a claim that one two-exponential law captures every coupled string.
-

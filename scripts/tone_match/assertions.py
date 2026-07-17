@@ -458,6 +458,66 @@ def evaluate_construction(
         rows.append(_result(f"{name}.impulsive-envelope", "Excitation produces a decaying, impulsive note",
                             None if percussive_fraction is None else percussive_fraction >= .67,
                             percussive_fraction, "at least 2/3 of notes classified percussive", strict_evidence=strict_evidence))
+        hold_rows = [
+            {"register": sample.register, "dynamic": sample.dynamic,
+             "slopeDbPerSecond": sample.render.hold_decay_db_per_s,
+             "plateauFraction": sample.render.hold_plateau_fraction}
+            for sample in sample_list
+            if sample.render.hold_decay_db_per_s is not None and
+            sample.render.hold_plateau_fraction is not None
+        ]
+        hold_pass = None if not hold_rows else all(
+            float(row["slopeDbPerSecond"]) <= -.30 and
+            float(row["plateauFraction"]) < .50
+            for row in hold_rows)
+        rows.append(_result(
+            f"{name}.free-decay-no-plateau",
+            "Held strike/pluck notes decay freely until damping on release (L18)",
+            hold_pass, hold_rows,
+            "every rendered hold: slope <= -0.30 dB/s and plateau fraction < 0.50",
+            strict_evidence=strict_evidence))
+        components = _param(params, "preOnsetComponents")
+        components = components if isinstance(components, list) else []
+        pinned = [component for component in components
+                  if isinstance(component, dict) and
+                  component.get("profilePinned") is True]
+        if pinned:
+            leads = [float(sample.render.noise_lead_ms) for sample in sample_list
+                     if sample.render.noise_lead_ms is not None]
+            lead = float(np.median(leads)) if leads else None
+            component_rows = []
+            schema_ok = True
+            for component in pinned:
+                envelope = component.get("envelope")
+                points = envelope.get("points") if isinstance(envelope, dict) else None
+                fitted_points = [point for point in points
+                                 if isinstance(point, dict) and
+                                 isinstance(point.get("timeMs"), (int, float)) and
+                                 isinstance(point.get("gainDb"), (int, float))] \
+                    if isinstance(points, list) else []
+                gains = [float(point["gainDb"]) for point in fitted_points]
+                peak_index = int(np.argmax(gains)) if gains else 0
+                transient_shape = (len(gains) >= 3 and max(gains) - min(gains) >= 12 and
+                                   any(gain <= gains[peak_index] - 12
+                                       for gain in gains[peak_index + 1:]))
+                own_envelope = (isinstance(envelope, dict) and
+                                envelope.get("independentOfHarmonicEnvelope") is True and
+                                isinstance(points, list) and
+                                len(fitted_points) == len(points) and
+                                any(float(point["timeMs"]) < 0 for point in fitted_points) and
+                                transient_shape)
+                active = float(component.get("level", 0) or 0) > 0
+                schema_ok &= own_envelope and active
+                component_rows.append({"component": component.get("component"),
+                                       "activeLevel": component.get("level"),
+                                       "ownEnvelope": own_envelope})
+            rows.append(_result(
+                f"{name}.pre-onset-component-active",
+                "Every pinned pre-onset component is audible with its own fitted envelope (L17)",
+                schema_ok and lead is not None and lead >= 3,
+                {"components": component_rows, "renderNoiseLeadMs": lead},
+                "pinned component level > 0, independent fitted envelope, and rendered median noise lead >= 3 ms",
+                strict_evidence=strict_evidence))
     else:
         rows.append(_result(f"{name}.sustained-envelope", "Continuous excitation sustains the note",
                             None if percussive_fraction is None else percussive_fraction <= .33,
@@ -1018,7 +1078,7 @@ def evaluate_construction(
     failed = [row for row in rows if row["status"] == "fail"]
     missing = [row for row in rows if row["status"] == "not-applicable"]
     return {
-        "checklistVersion": 2,
+        "checklistVersion": 3,
         "instrument": name,
         "family": FAMILY.get(name),
         "targetClass": ("fitted-section" if name in SUNG_SECTION_TYPES else

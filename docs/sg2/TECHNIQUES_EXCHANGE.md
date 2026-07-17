@@ -1396,6 +1396,149 @@ all family campaign adapters.
 Status: engine=incorporated `b5f91b7` analysis=pending-review
 struck/plucked=adapt-method sung=adapt-method bowed=adapt-method
 
+### T-067 · ENGINE LAW SPEC (Agent A): held strike/pluck = free decay, note-off = damper contact
+Author: Agent C / struck-plucked · 2026-07-17 · Firewall: mechanism; decay and damper values per instrument
+Finding: owner L18 makes an ADSR sustain plateau a construction error for
+impulse-driven resonators. The live renderer still schedules
+`envelopeSustain` in `_adsr`, and `connectDecay` excludes harmonic 1, so the
+fundamental can settle onto a literal plateau while upper modes decay. A
+comment claiming “no sustain plateau” does not alter that graph. Held-key
+duration decides only when damping begins; it never creates a sustained
+level.
+
+Engine contract for Agent A:
+1. For `excitationType=strike|pluck`, ignore `envelopeDecay` and
+   `envelopeSustain` in the audible hold law. Attack is a short gate only.
+   Apply `twoStageDecayPlan` to EVERY rendered resonant mode, including mode
+   1, continuously from strike until note-off. The free-decay law must remain
+   active for arbitrarily long held notes, so a plateau is unreachable.
+2. At note-off, cancel-and-hold each mode's current free-decay gain and begin
+   damper/contact decay from that instantaneous value. Consume a structured
+   `damperByRegister` table with rows
+   `{f0, dampDbPerSecondAtFundamental, frequencyExponent}`; interpolate in
+   log-f0. Mode `f` damps at
+   `dampDbPerSecondAtFundamental * (f/f0)^frequencyExponent`, so positive
+   fitted exponents kill highs faster. Absent table retains the existing
+   bounded `releaseDamping` fallback; values never transfer between piano,
+   guitar, harp, and bars.
+3. Extend oscillator/node lifetime from the fitted damper T60, not the old
+   material-derived `releaseRingSeconds` when a table is present. A damper
+   contact-noise component is separately L17-gated and must not be fabricated
+   by this law.
+4. This owner-authorised semantics change applies to every strike/pluck ship
+   preset. `envelopeSustain` may remain serialized for migration/UI
+   compatibility but cannot affect strike/pluck PCM. Bow/blow/sung paths must
+   remain exact-identical.
+
+Consuming assertions: (a) 8 s held strike and pluck renders have negative
+hold slope throughout and no >=250 ms plateau; (b) changing
+`envelopeSustain` 0.05→1 changes strike/pluck PCM by <1e-12 after the attack;
+(c) mode 1 and upper modes follow the fitted early/late slopes before
+note-off; (d) a register-table row changes only matching strike/pluck release,
+with high bands damping faster for positive exponent; (e) bow/blow PCM is
+unchanged. Agent C landed the campaign-side construction row
+`*.free-decay-no-plateau`: every ship render requires hold slope <= -0.30
+dB/s and plateau fraction <0.50; one plateau is an automatic family FAIL.
+
+Affects: `_adsr` / `_renderSpectralPartials.connectDecay` / note-off gain
+automation / measured-profile damper schema / L18 / piano and guitar gates.
+Status: engine=pending-Agent-A analysis=incorporated (hold metric + automatic
+construction failure; per-register `hasRelease` fit in Pass 16)
+struck/plucked=blocked-engine for any new fit/freeze, extraction may continue
+against references because it is render-independent
+
+Status update — Agent C Pass 16: the gated full-tail fit found distinct final
+knees in all ten Iowa grand rows and six of 21 VSCO upright rows, but the
+per-mode frequency fits are physical only in grand bass/low-mid (positive
+high-frequency exponent). Grand mid/treble and every upright fitted exponent
+are non-positive, evidence that several file-end knees are edits/fades or
+room-floor crossings rather than damper contact. They remain diagnostics and
+are NOT emitted as engine values. L18 release status is therefore
+`blocked-incomplete-physical-damper-fit`; acquire note-off-aligned damper
+takes for the uncovered registers. This does not weaken the no-plateau law.
+
+### T-068 · ENGINE SPEC (Agent A): pinned pre-onset components carry independent envelopes
+Author: Agent C / struck-plucked · 2026-07-17 · Firewall: component architecture; spectrum/envelope/level values per instrument
+Finding: L17 extraction on the lossless Iowa grand corpus confirms an audible
+pitch-invariant `pianoActionNoise` component leading harmonic tone onset.
+The VSCO upright files begin within 2–3 ms of action/strike and are correctly
+`insufficient-pre-roll`; no grand values transfer. The extractor emits an
+immutable 1/6-octave profile, per-dynamic profiles, fitted noise lead, and an
+envelope point table in milliseconds relative to harmonic onset. This is the
+validation case for the generic class, not a piano-only renderer.
+
+Measured grand evidence: five cross-pitch rows clear the >=8 dB broadband
+pre-strike transient gate. The pooled median lead is 81.270 ms; the pp fit
+(two pitches) peaks at -5 ms and reaches -20 dB 5 ms later, while the ff fit
+(three pitches) peaks at -25 ms and reaches -20 dB 25 ms later. Two files lack
+usable pre-roll and three more do not clear the transient evidence threshold;
+they are exclusions, not zero-valued fits.
+
+Engine contract:
+1. Consume `preOnsetComponents[]` rows with
+   `{component, profilePinned, profile, level, bodyRouting, envelope}`. The
+   envelope owns its time course: `envelope.points[] = {timeMs,gainDb}` may
+   begin at negative time and includes peak/settle/release. Never multiply it
+   by the harmonic ADSR; any airflow/bow coupling is a separately fitted term.
+2. Schedule the component at `toneT0 + min(timeMs)/1000`. Offline/live note
+   scheduling must reserve sufficient pre-roll rather than clamping negative
+   points to toneT0. Spectrum is immutable measured data; only exposed level
+   may scale it. Route through the measured body exactly once according to
+   the emitted post-body/deconvolution convention.
+3. Shared members are piano action noise, wind breath, and bow scratch, but
+   each uses its own profile and envelope. Missing/zero component is exact
+   identity for presets without evidence. An optional damper-contact member
+   schedules relative to note-off, not tone onset, and remains absent until
+   extracted.
+
+Consuming assertions: (a) emitted spectrum recovered within 2 dB median/4 dB
+P95; (b) rendered component peak/lead/release match its envelope within one
+automation quantum; (c) changing harmonic ADSR does not change the isolated
+component envelope; (d) a preset carrying a pinned component cannot resolve
+level zero. Agent C's construction row `*.pre-onset-component-active` checks
+level > 0, a non-flat independent pre-onset envelope with a post-peak fall,
+and rendered median
+`noise_lead_ms >= 3`; silent-by-default is a family construction FAIL.
+
+Affects: note scheduling/pre-roll / shared pinned-noise renderer / measured
+profile schema / L17 items 2–5 / piano action-noise preset.
+Status: engine=incorporated-generic-L17-consumer analysis=incorporated
+(synthetic round trip, grand extraction, upright insufficiency classification,
+activation assertion) struck/plucked=blocked-piano-schema-adapter-and-profile-
+activation; the shared consumer uses `pinnedNoiseComponents`, so the fitted
+point envelope must be mapped without loss and pass its preset audit
+
+### T-069 · ENGINE SPEC (Agent A): pinned envelope-deviation classes
+Author: Agent C / struck-plucked · 2026-07-17 · Firewall: mechanism; class assignments and values per instrument
+Finding: the L16 synthetic round trip recovers both an injected harmonic-rank
+class and fixed-Hz class after fitting the baseline T60(f) law. Real grand
+and upright extractions both recover velocity-positive, onset-prominent,
+fast-decaying harmonic-rank groups; neither corpus clears the fixed-Hz
+classifier, which is useful negative validation. Grand and upright deviant
+rank sets differ materially, so the classes are measured identities rather
+than a transferred “piano zing” table.
+
+Engine contract: consume immutable `envelopeAnomalyClasses[]` rows. A
+`home=harmonicRank` row targets its pinned ranks; `home=fixedHz` targets an
+absolute-frequency band/component. Each row carries onset boost at velocity
+anchors, excess early-decay rate, optional late rate, and a neutral level
+control. At strike, multiply only assigned modes by a transient deviation
+envelope which returns exactly to the baseline two-stage law; velocity
+interpolates fitted anchors continuously. Class level zero/absent is exact
+identity. Optimisation may scale a user level only; it never reassigns modes,
+homes, or fitted envelope shapes.
+
+Consuming assertions: synthetic rank-6/fixed-2.8-kHz fixture is recovered and
+rendered at the correct home; ff onset boost exceeds pp in the fitted
+direction; excess decay returns to the unchanged L18 baseline; unassigned
+modes and non-struck families are PCM-identical; class assignments in the
+preset exactly equal the measured profile.
+
+Affects: per-mode gain automation / optional fixed-Hz transient modes /
+measured profile schema / L16 / piano, guitar, harp, and bar consumers.
+Status: engine=pending-Agent-A analysis=incorporated (round trip + both-piano
+extractions) struck/plucked=blocked-consumer before anomaly classes can enter
+a preset
 ### T-066 · Pinned pre-onset noise is a component contract, not a tone-ADSR colour
 Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-instrument data
 Finding: L14's cross-pitch residual separator generalises to L17 only when the
