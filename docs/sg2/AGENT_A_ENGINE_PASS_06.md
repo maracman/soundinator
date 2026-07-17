@@ -117,16 +117,16 @@ run summary remain under `state/flute` and `runs/flute`.
 
 ## Listening and verification
 
-The global owner page was rebuilt from engine `fd40124` for 16 instruments;
+The global owner page was rebuilt from final shared engine `87f3ed3` for 16 instruments;
 12 affected sections were freshly rendered. `listen.html` SHA-256 is
-`5ca1029e4192f5c87c8fa6aa74382c6c30a65047a931b359bd5be513a9f5e4fa`.
+`9ef9f208864d1152f52fb0e654224f477503b75a60cef02e0a8291e4d0e1d936`.
 
 - `npm test`: PASS, 11/11;
 - `node scripts/verify_tone_model.mjs`: PASS;
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: PASS;
 - `PYTHON=../../../.venv/bin/python node scripts/render_note.mjs --verify`:
   PASS, PCM SHA-256
-  `3aa4245553a06243f24f60cf613e0c8dc941cd2c2600453ec3f86fb8391bc38c`;
+  `9e06f17d58d9045b74439ab0332b9f04257e504d3a11a751c5798c1c2c0f79d2`;
 - handoff source validation, JSON validation and `git diff --check`: PASS.
 
 The priority consumer commit was merged once to the shared branch before the
