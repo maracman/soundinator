@@ -42,9 +42,9 @@ CAMPAIGNS: dict[str, dict[str, Any]] = {
         "excitation": "strike",
         "anchors": [
             {"register": "bass", "midi": 24, "pp": "Piano.pp.C1.aiff", "ff": "Piano.ff.C1.aiff"},
-            {"register": "low-mid", "midi": 48, "pp": "Piano.pp.C3.aiff", "ff": "Piano.ff.C3.aiff"},
-            {"register": "mid", "midi": 72, "pp": "Piano.pp.C5.aiff", "ff": "Piano.ff.C5.aiff"},
-            {"register": "treble", "midi": 96, "pp": "Piano.pp.C7.aiff", "ff": "Piano.ff.C7.aiff"},
+            {"register": "low-mid", "midi": 36, "pp": "Piano.pp.C2.aiff", "ff": "Piano.ff.C2.aiff"},
+            {"register": "mid", "midi": 60, "pp": "Piano.pp.C4.aiff", "ff": "Piano.ff.C4.aiff"},
+            {"register": "treble", "midi": 84, "pp": "Piano.pp.C6.aiff", "ff": "Piano.ff.C6.aiff"},
             {"register": "top", "midi": 108, "pp": "Piano.pp.C8.aiff", "ff": "Piano.ff.C8.aiff"},
         ],
         "dynamics": ("pp", "ff"),
@@ -104,18 +104,14 @@ def select_note(path: Path, target_midi: int) -> tuple[np.ndarray, int, float, d
             }
         raise RuntimeError(f"no analysable note in {path}")
     distance, segment, f0 = min(candidates, key=lambda row: row[0])
+    if _filename_declares_single_note(path):
+        nominal = 440.0 * 2 ** ((target_midi - 69) / 12)
+        return segment, sample_rate, nominal, {
+            "method": "filename-nominal-anchor",
+            "rawDetectedF0": round(float(f0), 3),
+            "rawDetectedMidi": midi_of(f0),
+        }
     if distance > 1:
-        # The lowest piano strings can be dominated by an upper partial.  A
-        # one-note source whose filename declares the pitch is still valid
-        # reference audio; use the nominal f0 for scheduling and retain the
-        # tracker miss as explicit evidence rather than relabelling the take.
-        if _filename_declares_single_note(path):
-            nominal = 440.0 * 2 ** ((target_midi - 69) / 12)
-            return segment, sample_rate, nominal, {
-                "method": "filename-nominal-fallback",
-                "rawDetectedF0": round(float(f0), 3),
-                "rawDetectedMidi": midi_of(f0),
-            }
         raise RuntimeError(
             f"{path}: closest detected MIDI {midi_of(f0)} is not target {target_midi}"
         )
