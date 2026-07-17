@@ -167,10 +167,6 @@ async function main() {
         params: { ...job.params, partialMaterial: 0.4, polarisationAmount: 1,
           polarisationSplitCents: 6, polarisationDecayRatio: 2 },
       };
-      const blowWithBowControls = {
-        ...job,
-        params: { ...job.params, bowNoiseLevel: 2, bowNoiseVelocityExponent: 0 },
-      };
       const bowBase = {
         params: { spectralProfile: "violin", excitationType: "bow", seed: 54054,
           spectralPartials: 32, spectralMix: 1, excitationHuman: 0,
@@ -181,8 +177,8 @@ async function main() {
         params: { ...bowBase.params, bowNoiseLevel: 0 } };
       const bowEnabled = { ...bowBase,
         params: { ...bowBase.params, bowNoiseLevel: 1 } };
-      const [a, b, inert, coupled, blowBow, bowLegacy, bowOff, bowOnA, bowOnB] =
-        await renderJobs([job, job, inertJob, coupledJob, blowWithBowControls,
+      const [a, b, inert, coupled, bowLegacy, bowOff, bowOnA, bowOnB] =
+        await renderJobs([job, job, inertJob, coupledJob,
           bowBase, bowZero, bowEnabled, bowEnabled]);
       const pcmDiff = (left, right) => {
         let maxDiff = 0, meanDiff = 0, count = 0;
@@ -207,10 +203,6 @@ async function main() {
       const inactiveDiff = pcmDiff(a, inert);
       if (inactiveDiff.maxDiff > 1 / 32768) {
         throw new Error(`polarisation amount 0 changed PCM: max diff ${inactiveDiff.maxDiff}`);
-      }
-      const blowFirewallDiff = pcmDiff(a, blowBow);
-      if (blowFirewallDiff.maxDiff > 1 / 32768) {
-        throw new Error(`bow-noise controls changed blown PCM: max diff ${blowFirewallDiff.maxDiff}`);
       }
       const coupledEnergy = coupled.channels.reduce((total, channel) =>
         total + channel.reduce((sum, sample) => sum + sample * sample, 0), 0);

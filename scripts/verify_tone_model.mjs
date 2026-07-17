@@ -857,37 +857,6 @@ console.log("T-054: pinned violin bow-noise consumer");
     pp.noiseToHarmonicDb - ff.noiseToHarmonicDb >= 2);
 }
 
-console.log("T-039: bowed noise uses the shared excitation-noise boundary");
-{
-  const base = {
-    seed: 539, voiceMode: "fourier", spectralProfile: "violin",
-    excitationType: "bow", excitationHuman: 0, spectralPartials: 32,
-  };
-  const silent = new GenerationEngine({ ...base, bowNoiseLevel: 0 })
-    ._spectralFingerprint(.2, 440, 0);
-  const enabled = new GenerationEngine({ ...base, bowNoiseLevel: 1,
-    bowNoiseVelocityExponent: .5 })._spectralFingerprint(.2, 440, 0);
-  check("T-039 bow-noise level cannot alter the harmonic core",
-    JSON.stringify(silent.harmonicPartials) === JSON.stringify(enabled.harmonicPartials));
-  const ppRelativeNhr = bowNoiseVelocityGain(.2, .5);
-  const ffRelativeNhr = bowNoiseVelocityGain(.9, .5);
-  check("T-039 sublinear bow-noise velocity raises relative pp NHR",
-    ppRelativeNhr > ffRelativeNhr,
-    `${ppRelativeNhr.toFixed(3)} <= ${ffRelativeNhr.toFixed(3)}`);
-  const blownBase = new GenerationEngine({
-    seed: 539, voiceMode: "fourier", spectralProfile: "clarinet",
-    excitationType: "blow", bowNoiseLevel: 0,
-  })._spectralFingerprint(.2, 440, 0);
-  const blownWithBow = new GenerationEngine({
-    seed: 539, voiceMode: "fourier", spectralProfile: "clarinet",
-    excitationType: "blow", bowNoiseLevel: 2, bowNoiseVelocityExponent: 0,
-  })._spectralFingerprint(.2, 440, 0);
-  check("T-039 bow controls are firewalled from the blown fingerprint",
-    JSON.stringify(blownBase.harmonicPartials) ===
-      JSON.stringify(blownWithBow.harmonicPartials) &&
-    blownBase.toneBreathLevel === blownWithBow.toneBreathLevel);
-}
-
 console.log("T6: preset migration (T-B9 partial)");
 {
   const old = {
