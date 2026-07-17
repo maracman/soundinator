@@ -27,6 +27,7 @@ from .analysis import load_mono
 
 SCHEMA_VERSION = 1
 METHOD = "tracked-f0-harmonic-subtraction-residual-envelope-modulation"
+ROOM_METHOD = "nonnegative-exponential-residual-power-decomposition-v1"
 
 
 def _analysis_audio(samples: np.ndarray, sample_rate: int,
@@ -156,6 +157,70 @@ def _envelope_spectrum(residual: np.ndarray, sample_rate: int,
     return frequencies, spectrum
 
 
+def assess_room_decay(residual: np.ndarray, sample_rate: int,
+                      *, frame_seconds: float = .025,
+                      hop_seconds: float = .0125) -> dict[str, Any]:
+    """Quantify the residual share consistent with a decaying room tail.
+
+    This deliberately does not model or render a room.  It fits a
+    non-negative ``floor + amplitude * exp(-t/tau)`` curve to residual power
+    and reports the fitted component separately.  The component is only
+    labelled room-suspected when it explains a material share with a stable
+    decay; it is never folded into ``pitch_sync_breath_db``.
+    """
+    audio = np.asarray(residual, float)
+    frame = max(64, int(round(frame_seconds * sample_rate)))
+    hop = max(32, int(round(hop_seconds * sample_rate)))
+    if len(audio) < frame * 8:
+        raise ValueError("room-decay assessment needs at least eight frames")
+    window = np.hanning(frame)
+    scale = max(float(np.sum(window ** 2)), 1e-12)
+    powers = np.asarray([
+        float(np.sum((audio[start:start + frame] * window) ** 2) / scale)
+        for start in range(0, len(audio) - frame + 1, hop)
+    ])
+    times = (np.arange(len(powers)) * hop + frame / 2) / sample_rate
+    # Ignore the first few attack frames: bow/breath onset transients are an
+    # instrument component, not evidence of a room tail.
+    keep = times >= min(.12, times[-1] * .15)
+    powers, times = powers[keep], times[keep]
+    times = times - times[0]
+    floor = float(np.percentile(powers, 10))
+    target = np.maximum(powers - floor, 0.0)
+    total = float(np.sum(powers)) + 1e-20
+    best = None
+    for tau in np.geomspace(.06, 2.5, 96):
+        basis = np.exp(-times / tau)
+        amplitude = max(0.0, float(np.dot(target, basis) /
+                                   max(np.dot(basis, basis), 1e-20)))
+        predicted = floor + amplitude * basis
+        error = float(np.sum((powers - predicted) ** 2))
+        if best is None or error < best[0]:
+            best = (error, float(tau), amplitude, predicted, basis)
+    assert best is not None
+    error, tau, amplitude, predicted, basis = best
+    variance = float(np.sum((powers - np.mean(powers)) ** 2))
+    r_squared = max(0.0, 1.0 - error / max(variance, 1e-20))
+    decay_power = amplitude * basis
+    fraction = float(np.sum(decay_power) / total)
+    suspected = bool(fraction >= .20 and r_squared >= .40 and amplitude > floor * .25)
+    return {
+        "method": ROOM_METHOD,
+        "roomSuspected": suspected,
+        "suspectedDecayFraction": round(float(np.clip(fraction, 0, 1)), 6),
+        "suspectedDecayPercent": round(float(np.clip(fraction, 0, 1)) * 100, 3),
+        "decayTimeConstantSeconds": round(tau, 6),
+        "estimatedT60Seconds": round(tau * math.log(1000), 6),
+        "fitRSquared": round(r_squared, 6),
+        "powerFloor": round(floor, 12),
+        "frames": len(powers),
+        "decisionThresholds": {"fractionMin": .20, "rSquaredMin": .40,
+                               "amplitudeToFloorMin": .25},
+        "disposition": "log-separately-never-breath" if suspected else
+                       "screened-not-room-like",
+    }
+
+
 def pitch_sync_breath_observable(
     samples: np.ndarray,
     sample_rate: int,
@@ -183,6 +248,10 @@ def pitch_sync_breath_observable(
         centre = float(np.nanmedian(track))
         tracking = {"status": "provided-track", "frames": len(source_track)}
     residual = subtract_tracked_harmonics(audio, rate, track)
+    room_assessment = assess_room_decay(residual, rate)
+    inferred_room_suspected = room_assessment["roomSuspected"]
+    effective_room_suspected = (inferred_room_suspected
+                                if room_suspected is None else room_suspected)
     frequencies, spectrum = _envelope_spectrum(residual, rate, centre)
     search = (frequencies >= centre * .95) & (frequencies <= centre * 1.05)
     if not np.any(search):
@@ -216,11 +285,43 @@ def pitch_sync_breath_observable(
         "residualRms": round(residual_rms, 9),
         "durationSeconds": round(len(audio) / rate, 6),
         "analysisSampleRate": rate,
-        "roomSuspected": room_suspected,
+        "roomSuspected": effective_room_suspected,
+        "roomSuspectedByAutomatedAssessment": inferred_room_suspected,
+        "roomResidualAssessment": room_assessment,
+        "roomSuspectedComponents": ([{
+            "component": "exponential-residual-power-decay",
+            "fraction": room_assessment["suspectedDecayFraction"],
+            "t60Seconds": room_assessment["estimatedT60Seconds"],
+            "fitRSquared": room_assessment["fitRSquared"],
+            "disposition": "excluded-from-breath-weight",
+        }] if inferred_room_suspected else []),
         "roomResidualDisposition": (
-            "excluded-from-breath" if room_suspected is True else
-            "unassessed-separate" if room_suspected is None else
+            "excluded-from-breath" if effective_room_suspected is True else
             "screened-not-suspected"),
+    }
+
+
+def synthetic_room_decay_round_trip(*, sample_rate: int = 12000,
+                                    seed: int = 67467) -> dict[str, Any]:
+    """Known dry floor plus exponential residual verifies room-share logging."""
+    duration = 2.2
+    time = np.arange(round(duration * sample_rate)) / sample_rate
+    rng = np.random.default_rng(seed)
+    dry = .012 * rng.standard_normal(len(time))
+    room = .05 * rng.standard_normal(len(time)) * np.exp(-time / .48)
+    mixed = dry + room
+    measured = assess_room_decay(mixed, sample_rate)
+    injected_fraction = float(np.sum(room ** 2) /
+                              max(np.sum(mixed ** 2), 1e-20))
+    error = abs(measured["suspectedDecayFraction"] - injected_fraction)
+    passed = bool(measured["roomSuspected"] and error <= .20)
+    return {
+        "passed": passed,
+        "injectedDecayEnergyFraction": round(injected_fraction, 6),
+        "recoveredDecayFraction": measured["suspectedDecayFraction"],
+        "absoluteFractionError": round(error, 6),
+        "maximumFractionError": .20,
+        "measured": measured,
     }
 
 
@@ -256,6 +357,7 @@ def synthetic_round_trip(*, f0_hz: float = 180.0,
         "prominenceErrorDb": round(prominence_error, 6),
         "measured": measured,
         "knownResidual": truth,
+        "roomDecayRoundTrip": synthetic_room_decay_round_trip(),
     }
 
 
@@ -303,13 +405,26 @@ def measure_manifest(path: Path) -> dict[str, Any]:
         "roomScreening": {
             "screenedNotSuspected": sum(row["roomSuspected"] is False for row in rows),
             "suspectedExcluded": sum(row["roomSuspected"] is True for row in rows),
-            "unassessedSeparate": sum(row["roomSuspected"] is None for row in rows),
+            "unassessedSeparate": 0,
+            "method": ROOM_METHOD,
+            "medianSuspectedDecayPercent": round(float(np.median([
+                row["roomResidualAssessment"]["suspectedDecayPercent"]
+                for row in rows])), 3) if rows else None,
+            "p95SuspectedDecayPercent": round(float(np.percentile([
+                row["roomResidualAssessment"]["suspectedDecayPercent"]
+                for row in rows], 95)), 3) if rows else None,
         },
+        "roomSuspectedComponents": [{
+            "path": row["path"], "sourceFile": row.get("sourceFile"),
+            "voiceClass": row.get("voiceClass"),
+            **row["roomSuspectedComponents"][0],
+        } for row in rows if row["roomSuspectedComponents"]],
         "activationEligible": bool(rows) and all(
-            row["roomSuspected"] is False for row in rows),
+            row["roomSuspected"] is False for row in rows) and
+            synthetic_room_decay_round_trip()["passed"],
         "activationBlocker": (
             None if rows and all(row["roomSuspected"] is False for row in rows)
-            else "lossless rows require explicit room-residual screening"),
+            else "room-suspected residual components remain excluded"),
     }
 
 

@@ -12,6 +12,7 @@ from scripts.tone_match.bow_noise import (
     component_envelope_evidence,
     extract_pinned_component,
     residual_spectrum,
+    synthetic_component_roundtrip,
     validate_component_roundtrip,
     validate_engine_roundtrip,
 )
@@ -66,6 +67,15 @@ def test_harmonic_subtraction_recovers_known_coloured_noise(tmp_path):
     assert result["status"] == "pass"
     assert result["metrics"]["correlation"] >= 0.90
     assert result["metrics"]["medianAbsDb"] <= 1.6
+
+
+def test_cello_owned_l14_component_passes_synthetic_roundtrip(tmp_path):
+    result = synthetic_component_roundtrip(
+        tmp_path, instrument="cello", component="bowNoise", f0=130.813,
+        band_hz=(200, 12000))
+    assert result["status"] == "pass"
+    assert result["instrument"] == "cello"
+    assert result["component"] == "bowNoise"
 
 
 def test_harmonic_bins_are_removed_from_residual():

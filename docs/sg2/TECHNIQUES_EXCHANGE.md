@@ -1721,6 +1721,17 @@ tracking error is 0.136%. Lossless VocalSet rows are emitted separately from
 exclusions, but room residuals remain unassessed; `activationEligible=false`,
 feature weight remains zero and every adult `voiceBreathSync` value stays zero.
 
+Status update — Agent D bowed/analysis pass 07, 2026-07-18: T-067
+analysis=room-decay-quantified-values-still-neutral. A synthetic dry-floor plus
+known exponential-decay residual recovers the suspected energy share within
+the 0.20 absolute tolerance. The lossless VocalSet pass now fits a non-negative
+floor + exponential residual-power component per row and logs every suspected
+component separately. Suspected rows are bass 2/45, mezzo 3/45, soprano 1/45
+and tenor 8/44; their mean suspected shares are 59.91%, 61.28%, 64.10% and
+49.92%. No suspected share becomes breath. All four voices remain
+`activationEligible=false`, feature weight remains zero, and adult
+`voiceBreathSync` values remain zero.
+
 Status update — Agent D bowed pass 04, 2026-07-17: T-033 remains
 `engine=pending-Agent-A`, with both guitar and bowed contracts ready for the
 same table-selection seam. The live Agent A pass-04 snapshot still records
@@ -2135,8 +2146,35 @@ without the declared ×10 calibration. Full mechanisms and five consuming
 assertions are filed in `BOWED_ENGINE_HANDOFFS.md`.
 Affects: measuredHumanEpisode / bowedHumanLevels / vibrato episode prerequisites /
 attack-noise calibration / §2.5c decomposition gate.
-Status: analysis=incorporated bowed=audited-4of9+masked
-engine=pending-five-isolated-adapters sung=adapt-method struck/plucked=adapt-method
+Status: analysis=incorporated bowed=isolated-consumers-pass+masked
+engine=incorporated-five-isolated-adapters+human0-pcm-identity
+distribution=six-cell-rerun-clean+decomposition-still-masked
+sung=adapt-method struck/plucked=adapt-method
+
+### T-075 · Cello source and L14 residuals require cello-owned deconvolution and full ladders
+Author: Agent D / bowed analysis · 2026-07-18 · Firewall: method shared; cello values only
+Finding: six lossless Iowa cello cells are now estimated by dividing measured
+harmonics by the exact emitted cello body, including the low-register T-003
+neighbour cap. The synthetic round trip has 0.0 dB maximum shape error. The
+cell estimates differ from the upstream string tier by 1.784--4.777 dB median,
+but none is activated: the renderer's source-table dynamic-ownership flag is
+table-wide, so a mixed accepted/neutral table would suppress the generic law
+for unevidenced rows. All six must pass their cell hierarchy before consumption.
+
+The cello-owned L14 run uses 206 lossless Iowa notes, all four strings,
+cross-pitch pooling within each string and a pp/mf/ff ladder. Its synthetic
+component round trip passes and 11/12 string×dynamic pools pass the 3 dB
+commonality gate. `sulG/mf` fails at 3.607 dB, so the extracted profile remains
+non-pinned and the checked-in cello profile is untouched. The adapted T-058
+body-on/body-bypass audit passes 4/6 source cells but fails mid/ff and high/ff;
+this is the current construction blocker rather than permission to fold body
+error into the source.
+Consuming rule: do not install `D-BOWED-SOURCE-02` or the cello L14 profile
+until all six source/body cells and all 12 residual pools pass their declared
+gates. Violin values never fill a cello failure.
+Affects: cello source surface / bowNoise / body transfer / construction hierarchy.
+Status: analysis=incorporated-rejected-artifacts bowed=blocked-body-2of6+L14-1of12
+engine=n/a-values-uninstalled distribution=blocked-cello-residual
 
 Status update — Agent C struck/plucked pass 18, 2026-07-17: T-068 and T-069
 are now incorporated and preset-active for grand piano. The lossless point
