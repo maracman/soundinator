@@ -139,11 +139,10 @@ held-strike/pluck T-067 no longer overwrites that separate bar consumer.
 
 ## Listening page, verification and next work
 
-`sg2-data/listen.html` was rebuilt from integrated engine `f537bd3` in SHIP
-mode with fresh build seed `1784291636`. It contains 16 instruments and this
-build re-rendered 12 sections: alto sax, cello, clarinet, flute, French horn,
-glockenspiel, grand piano, nylon guitar, harp, upright piano, trumpet and
-violin.
+`sg2-data/listen.html` was rebuilt again from the landed shared head `7a7df67`
+in SHIP mode with fresh build seed `1784292093`. It contains 16 instruments
+and this build re-rendered all 16 sections, including all five blown presets,
+the newly activated harp/glockenspiel profiles and the four sung sections.
 
 Pass-end verification:
 
