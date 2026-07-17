@@ -133,7 +133,8 @@ all three winds, bowed legacy-compatible, and a method handoff for sung and
 struck/plucked. The full generated snapshot is
 `sg2-data/state/agent-a-pass04-exchange-statuses.json`.
 
-`sg2-data/listen.html` was rebuilt with fresh seed `1784274682`. Ten sections
+`sg2-data/listen.html` was rebuilt from integrated engine commit `a2be424` with
+fresh seed `1784276431`. Ten sections
 re-rendered, including flute, clarinet and alto sax; all three are labeled
 `blown-l17-ship-r5 (verified SHIP candidate)` and resolve the passing activation
 audit before rendering.
