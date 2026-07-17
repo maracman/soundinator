@@ -128,7 +128,8 @@ legacy prior, restores saved evaluation/cache state, preserves saved SHIP
 seeds, and renders only missing WAVs. This closed the batch-server interruption
 without changing any completed evidence row.
 
-Verification is green: `npm test` (11), `verify_tone_model.mjs`, full Python
-pytest (201), the targeted SHIP-resume regression, and isolated
+Verification is green on the integrated shared head: `npm test` (11),
+`verify_tone_model.mjs`, full Python pytest (206), the targeted SHIP-resume
+regression, and isolated
 `render_note.mjs --verify` at
-`d78bc664aa995e70be4cfc39eeb897f8a87a4536c63fba4bd3cee8d9af6592e8`.
+`56d9efdf64dfd8188b059d78a5646de00e18f47d509a0126ec7aff93700b8e71`.
