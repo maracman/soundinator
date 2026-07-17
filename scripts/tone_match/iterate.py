@@ -445,6 +445,12 @@ def _feature_analysis_kwargs(instrument: str, reference: dict[str, Any]) -> dict
             "force_percussive": True}
 
 
+def _reference_render_params_override(reference: dict[str, Any]) -> dict[str, str]:
+    """Declare the reference role that may alter deterministic render policy."""
+    role = "vibrato" if "vibrato" in reference_roles(reference) else "non-vibrato"
+    return {"performanceRole": role}
+
+
 def _render_ship_variants(
     run_dir: Path,
     label: str,
@@ -476,6 +482,7 @@ def _render_ship_variants(
                 "durationSec": reference.get("durationSec", 1.5),
                 "sampleRate": reference.get("sampleRate", 48_000),
                 "seed": seed + reference_index * 104_729,
+                "paramsOverride": _reference_render_params_override(reference),
                 "out": str(variant_dir / f"note-{reference_index}.wav"),
             })
     jobs_path = target / "jobs.json"
@@ -776,6 +783,7 @@ class ToneMatcher:
             jobs.append({"paramsFile": str(params_path), "midi": ref.get("midi", 60),
                          "velocity": ref.get("velocity", .62), "durationSec": ref.get("durationSec", 1.5),
                          "sampleRate": ref.get("sampleRate", 48000),
+                         "paramsOverride": _reference_render_params_override(ref),
                          **({"seed": articulation_seed} if articulation_seed is not None else {}),
                          "out": str(target / f"note-{ref_index}.wav")})
         jobs_path = target / "jobs.json"

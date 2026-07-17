@@ -36,6 +36,7 @@ from scripts.tone_match.iterate import (
     _mode_params,
     _params,
     _reference_set_id,
+    _reference_render_params_override,
     _reference_variability,
     _renderer_contract_hash,
     _technique_exchange_statuses,
@@ -1279,6 +1280,21 @@ def test_reference_roles_define_bar_specific_coverage_without_floor_leakage():
         reference_roles({"roles": ["mystery"]})
 
 
+def test_reference_render_override_declares_vibrato_role_without_role_leakage():
+    assert _reference_render_params_override({"roles": ["vibrato"]}) == {
+        "performanceRole": "vibrato",
+    }
+    assert _reference_render_params_override({"roles": ["spectral", "onset"]}) == {
+        "performanceRole": "non-vibrato",
+    }
+    assert _reference_render_params_override({"roles": ["floor"]}) == {
+        "performanceRole": "non-vibrato",
+    }
+    # Legacy references without explicit roles retain their existing all-role
+    # interpretation and therefore still exercise the vibrato scorer.
+    assert _reference_render_params_override({}) == {"performanceRole": "vibrato"}
+
+
 def test_bowed_construction_uses_spectral_and_vibrato_roles_separately():
     spectral = _bundle()
     spectral.ltas_rolloff_db_oct = -15.0
@@ -1462,6 +1478,11 @@ def test_tone_matcher_penalizes_unanalysable_candidate_without_aborting(
     monkeypatch.setattr(iterate_module, "extract_features", features)
     objective = matcher.evaluate(np.asarray([0.0]))
     record = matcher.evaluations[0]
+    jobs = json.loads((tmp_path / "renders" / "eval-0000" / "jobs.json").read_text())
+    assert [job["paramsOverride"] for job in jobs] == [
+        {"performanceRole": "non-vibrato"},
+        {"performanceRole": "non-vibrato"},
+    ]
     assert np.isfinite(objective)
     assert len(record["analysisFailures"]) == 1
     assert record["scores"][0]["composite"] == 100.0
