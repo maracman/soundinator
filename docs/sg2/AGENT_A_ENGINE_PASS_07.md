@@ -120,6 +120,11 @@ and is stored at `sg2-data/state/agent-a-pass07-exchange-statuses.json`. The
 global listening build's final hash is recorded in
 `sg2-data/state/agent-a-pass07-summary.json`.
 
+The global owner page was freshly rebuilt for all 16 instruments against
+audio-equivalent engine head `aaf01bf`, with no render failures. Its
+`listen.html` SHA-256 is
+`d266b4353cac86fd2853fef9205d7b51f906ee31186a83f43edf05b750172923`.
+
 - `npm test`: PASS, 11/11;
 - `node scripts/verify_tone_model.mjs`: PASS;
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: PASS;
