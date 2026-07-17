@@ -390,3 +390,103 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# ---------------------------------------------------------------------------
+# Struck/plucked lane contract surface (Agent C, pass05).  The fitter-side
+# consuming assertions, the perturbation law and the planned watch-metric
+# ledgers survive here; the pass05 audit CLI itself was superseded by the
+# hashed-contract audit above.
+
+DEFAULT_KEYS = (
+    "excitationPosition", "excitationHardness", "velocityHardnessCoupling",
+    "excitationHuman", "attackNoiseLevel", "attackNoiseDirect",
+    "attackNoiseVelocityExponent", "partialTransfer", "partialTilt",
+    "spectralResonanceAmount", "decaySecondStage", "decaySecondRatio",
+)
+
+PLANNED_WATCH_METRICS = {
+    "grand-piano": [
+        ("two_polarisation_beating", "no scorer sensor and no generating parameter"),
+        ("release_damper_ring", "release ring is not independently controllable"),
+        ("sympathetic_bloom", "partialTransfer is only a proxy; no keyed/pedal coupling law"),
+        ("decay_aligned_band_balance", "T-005 percussive window feature not yet emitted"),
+    ],
+    "guitar-nylon": [
+        ("two_polarisation_beating", "no scorer sensor and no generating parameter"),
+        ("sympathetic_bloom", "partialTransfer is only a proxy; no open-string coupling law"),
+        ("decay_aligned_band_balance", "T-005 percussive window feature not yet emitted"),
+    ],
+}
+
+REQUIRED_CONTROL_EFFECTS = {
+    "velocityHardnessCoupling": {
+        "metric": "velocity_hardness_brightness",
+        "features": {"partials_db", "log_mel_db", "centroid_semitones", "onset_tilt_db_oct"},
+        "reason": "G7 must move a brightness observable, not only an f0/B estimator",
+    },
+    "decaySecondStage": {
+        "metric": "two_stage_decay",
+        "features": {"decay_log_ratio"},
+        "reason": "G4 amount must move measured decay",
+    },
+    "decaySecondRatio": {
+        "metric": "two_stage_decay_ratio",
+        "features": {"decay_log_ratio"},
+        "reason": "G4 late/early ratio must move measured decay",
+    },
+}
+
+
+def canonical_hash(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()[:16]
+
+
+def manifest_rows(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {row["key"]: row for row in manifest["continuous"]}
+
+
+def perturbations(spec, initial: dict[str, Any]) -> list[float]:
+    centre = float(initial.get(spec.key, spec.default))
+    delta = 0.1 * (spec.hi - spec.lo)
+    candidates = [float(np.clip(centre - delta, spec.lo, spec.hi)),
+                  float(np.clip(centre + delta, spec.lo, spec.hi))]
+    return list(dict.fromkeys(value for value in candidates if abs(value - centre) > 1e-12))
+
+
+def validate_audit_contract(audit: dict[str, Any], *, instrument: str,
+                            references: list[dict[str, Any]], manifest: dict[str, Any],
+                            initial: dict[str, Any] | None = None) -> None:
+    """T-007 consuming-side assertion for fitter/audit handoff."""
+    from .iterate import _renderer_contract_hash  # local: avoids import cycle
+    from .score import SCORER_CONTRACT_VERSION
+    errors = []
+    if audit.get("instrument") != instrument:
+        errors.append(f"instrument {audit.get('instrument')!r} != {instrument!r}")
+    if audit.get("referenceContractHash") != canonical_hash(references):
+        errors.append("reference manifest changed after controllability audit")
+    if audit.get("parameterManifestHash") != canonical_hash(manifest):
+        errors.append("free-parameter manifest changed after controllability audit")
+    if initial is not None and audit.get("initialPresetHash") != canonical_hash(initial):
+        errors.append("initial preset changed after controllability audit")
+    if audit.get("status") != "clean":
+        errors.append(f"audit status is {audit.get('status')!r}, not 'clean'")
+    if audit.get("scorerContractVersion") != SCORER_CONTRACT_VERSION:
+        errors.append("scorer contract changed after controllability audit")
+    if audit.get("rendererContractHash") != _renderer_contract_hash():
+        errors.append("renderer contract changed after controllability audit")
+    if int(audit.get("schemaVersion", 0)) < 3:
+        errors.append("repeat-render stability evidence is missing")
+    unstable = set(audit.get("repeatability", {}).get("unstableFeatures", []))
+    active_unstable = sorted(
+        feature for feature in unstable
+        if float(audit.get("weights", {}).get(feature, 0)) > 0)
+    if active_unstable:
+        errors.append(f"repeat-unstable features still carry weight: {active_unstable}")
+    responders = audit.get("responders", {})
+    for feature, weight in audit.get("weights", {}).items():
+        if float(weight) > 0 and not responders.get(feature):
+            errors.append(f"weighted feature {feature!r} has no responsive free parameter")
+    if errors:
+        raise ValueError("invalid controllability contract: " + "; ".join(errors))

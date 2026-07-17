@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Rebuild the owner's SG2 listening page from the latest leaderboard bests.
 
-Scans /private/tmp/sg2/campaigns/* for reference sets, resolves each
+Scans SG2_DATA/campaigns/* for reference sets, resolves each
 instrument's current best parameters (leaderboard `best.params` inline,
 falling back to `<inst>/<run>/best.json` wrappers and flat params files),
 renders any stale notes through scripts/render_note.mjs, and writes
-/private/tmp/sg2/listen.html.
+SG2_DATA/listen.html.
 
 Renders are cached per instrument by (params hash, engine commit, measured
 profile hash): nothing re-renders unless the best params or audible engine
@@ -18,12 +18,17 @@ Run from the engine checkout whose sound you want on the page:
 Agents: run this at the end of every pass (owner-facing contract).
 """
 import hashlib, html, json, os, subprocess, sys, time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.tone_match.paths import sg2_data_root
 
 # Durable artifact root (2026-07-16 incident: /private/tmp was reaped twice,
-# destroying corpus + campaign state). Default lives inside the project,
-# gitignored. Override with SG2_DATA.
-SG2 = os.environ.get("SG2_DATA") or os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sg2-data")
+# destroying corpus + campaign state). Resolved through
+# scripts/tone_match/paths.sg2_data_root; override with SG2_DATA.
+SG2 = str(sg2_data_root())
 NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 
 def nname(m): return f"{NOTE_NAMES[m % 12]}{m // 12 - 1}"
@@ -70,7 +75,8 @@ def resolve_best(inst):
         run = best.get("run") or best.get("runId") or best.get("name") or "?"
         p = unwrap(best)
         if p: return p, f"{run} (leaderboard)"
-        for cand in (f"{SG2}/{inst}/{run}/best.json", f"{SG2}/refit-wave/{run}/best.json"):
+        for cand in (f"{SG2}/state/{inst}/{run}/best.json",
+                     f"{SG2}/runs/{inst}/{run}/best.json"):
             if os.path.exists(cand):
                 p = unwrap(json.load(open(cand)))
                 if p: return p, f"{run} (leaderboard)"

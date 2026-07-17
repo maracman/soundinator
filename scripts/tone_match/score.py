@@ -46,8 +46,15 @@ DEFAULT_WEIGHTS = {
     "onset_lockin_periods": 1.0,
 }
 
+SCORER_CONTRACT_VERSION = "sg2-score-active-trajectories-v2"
+
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
+}
+
+_STRUCK_PLUCKED_INSTRUMENTS = {
+    "piano", "grand-piano", "upright-piano", "guitar", "guitar-nylon",
+    "guitar-steel", "harp", "glockenspiel",
 }
 
 # BOWED_PREFLIGHT P1 senses.  They enter with ZERO weight for blown so the
@@ -96,6 +103,24 @@ THIRD_OCTAVE_CENTRES_HZ = (
 )
 OCTAVE_CENTRES_HZ = (125, 250, 500, 1000, 2000, 4000, 8000)
 
+THIRD_OCTAVE_CENTRES = np.asarray([
+    100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000,
+    1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
+], dtype=float)
+OCTAVE_CENTRES = np.asarray([63, 125, 250, 500, 1000, 2000, 4000, 8000],
+                            dtype=float)
+
+# FAMILY FIREWALL: these describe continuous-air/bow pitch behaviour, not an
+# impulsive hammer, finger, plectrum or mallet.  They stay visible in reports
+# but begin at zero weight for struck/plucked; family evidence would need to
+# introduce a struck-specific observable rather than inherit blown values.
+_STRUCK_FIREWALL_FEATURES = (
+    "vibrato", "sustain_noise_db", "onset_scoop_cents",
+    "onset_scoop_settle_ms", "vibrato_onset_delay_ms", "vibrato_ramp_ms",
+    "vibrato_rate_drift", "body_am_db", "noise_lead_ms",
+    "onset_wander_cents",
+)
+
 
 def weights_for_instrument(instrument: str | None,
                            overrides: dict[str, float] | None = None) -> dict[str, float]:
@@ -115,6 +140,9 @@ def weights_for_instrument(instrument: str | None,
             weights[key] = 0.0
     if (instrument or "").strip().lower() in _BOWED_INSTRUMENTS:
         for key in _BOWED_WATCH_METRICS:
+            weights[key] = 0.0
+    if (instrument or "").strip().lower() in _STRUCK_PLUCKED_INSTRUMENTS:
+        for key in _STRUCK_FIREWALL_FEATURES:
             weights[key] = 0.0
     if overrides:
         weights.update(overrides)
@@ -148,13 +176,6 @@ PERCEPTUAL_UNITS = {
     "ltas_rolloff_db_oct": 4.0,   # C7: ±4 dB/oct tolerance = one unit
     "onset_lockin_periods": 9.0,  # C18: half the 18-period acceptance bound
 }
-
-THIRD_OCTAVE_CENTRES = np.asarray([
-    100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000,
-    1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
-], dtype=float)
-OCTAVE_CENTRES = np.asarray([63, 125, 250, 500, 1000, 2000, 4000, 8000],
-                            dtype=float)
 
 
 @dataclass
@@ -453,17 +474,42 @@ def _mel_bank(sample_rate: int, nfft: int, bands: int = 48, fmin: float = 40, fm
     return bank
 
 
+def _trajectory_power(power: np.ndarray, freqs: np.ndarray,
+                      f0: float) -> tuple[np.ndarray, np.ndarray]:
+    """Active-frame mel power and noise-robust centroid power."""
+    frame_energy = np.sum(power, axis=0)
+    if not frame_energy.size or float(np.max(frame_energy)) <= 0:
+        return power, power
+    active = frame_energy >= float(np.max(frame_energy)) * 1e-4
+    if not np.any(active):
+        active = frame_energy > 0
+    mel_power = power[:, active]
+    # Codec/room residue tens of dB below a frame's dominant component is
+    # inaudible but can dominate a broadband centroid after the note decays.
+    floor = np.max(mel_power, axis=0, keepdims=True) * 1e-3
+    centroid_power = np.where(mel_power >= floor, mel_power, 0.0)
+    centroid_power[freqs < max(20.0, 0.5 * float(f0)), :] = 0.0
+    empty = np.sum(centroid_power, axis=0) <= 0
+    if np.any(empty):
+        centroid_power[:, empty] = mel_power[:, empty]
+    return mel_power, centroid_power
+
+
 def extract_features(
     path: str | Path,
     n_partials: int = 32,
     *,
     active_duration_s: float | None = None,
     expected_f0_hz: float | None = None,
+    trust_expected_f0: bool = False,
+    force_percussive: bool | None = None,
 ) -> FeatureBundle:
     samples, sample_rate = load_mono(str(path))
     if active_duration_s is None:
         note = analyse_audio_file(path, n_partials=max(64, n_partials),
-                                  expected_f0_hz=expected_f0_hz)
+                                  expected_f0_hz=expected_f0_hz,
+                                  trust_expected_f0=trust_expected_f0,
+                                  force_percussive=force_percussive)
     else:
         # Offline renders contain the requested active note plus a deliberately
         # long release/ring tail.  Construction assertions about sustained vs
@@ -475,16 +521,20 @@ def extract_features(
         samples = samples[:active_frames]
         note = analyse_audio_samples(samples, sample_rate, name=str(path),
                                      n_partials=max(64, n_partials),
-                                     expected_f0_hz=expected_f0_hz)
+                                     expected_f0_hz=expected_f0_hz,
+                                     trust_expected_f0=trust_expected_f0,
+                                     force_percussive=force_percussive)
     nfft = 2048
     _, times, spectrum = signal.stft(samples, fs=sample_rate, nperseg=nfft, noverlap=1536,
                                      boundary=None, padded=False)
     power = np.abs(spectrum) ** 2
-    mel = _mel_bank(sample_rate, nfft) @ power
+    freqs = np.fft.rfftfreq(nfft, 1 / sample_rate)
+    mel_power, centroid_power = _trajectory_power(power, freqs, note.f0)
+    mel = _mel_bank(sample_rate, nfft) @ mel_power
     mel_db = 10 * np.log10(np.maximum(mel, 1e-12))
     mel_db -= np.percentile(mel_db, 95)  # loudness-match without chasing peaks
-    freqs = np.fft.rfftfreq(nfft, 1 / sample_rate)
-    centroid = (freqs[:, None] * power).sum(axis=0) / np.maximum(power.sum(axis=0), 1e-20)
+    centroid = (freqs[:, None] * centroid_power).sum(axis=0) / \
+        np.maximum(centroid_power.sum(axis=0), 1e-20)
     amps = np.maximum(note.partial_amps[:n_partials], 1e-4)
     partial_db = 20 * np.log10(amps / max(float(np.max(amps)), 1e-12))
     (sustain_noise_db, onset_tilt, onset_noise_db,
@@ -737,10 +787,10 @@ def quantitative_tripwires(ref: FeatureBundle, render: FeatureBundle,
         ref_depth, render_depth = float(ref_vib.get("depth", 0)), float(render_vib.get("depth", 0))
         rate_error = abs(render_rate - ref_rate)
         depth_error = abs(render_depth - ref_depth) / max(abs(ref_depth), 1e-9)
-        vibrato_pass = rate_error <= .3 and depth_error <= .3
+        vibrato_pass = rate_error <= .5 and depth_error <= .25
         vibrato_observed = {"rateErrorHz": rate_error, "depthErrorFraction": depth_error}
     rows.append(_tripwire_row("vibrato", vibrato_observed,
-                              "presence matches; rate +/-0.3 Hz; depth +/-30%", vibrato_pass))
+                              "rate within 0.5 Hz; depth within 25%", vibrato_pass))
 
     b_ref, b_render = ref.note.B or 0, render.note.B or 0
     if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
@@ -779,15 +829,29 @@ def score_files(
     params: dict[str, Any] | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ref = extract_features(ref_path)
-    render = extract_features(render_path)
+    context = context or {}
+    expected_f0_hz = context.get("expectedF0Hz")
+    if expected_f0_hz is None and context.get("midi") is not None:
+        expected_f0_hz = 440.0 * 2 ** ((float(context["midi"]) - 69) / 12)
+    force_percussive = instrument in {
+        "piano", "grand-piano", "upright-piano", "guitar", "guitar-nylon",
+        "guitar-steel", "harp", "glockenspiel",
+    }
+    ref = extract_features(ref_path, active_duration_s=context.get("durationSec"),
+                           expected_f0_hz=expected_f0_hz,
+                           trust_expected_f0=expected_f0_hz is not None,
+                           force_percussive=force_percussive)
+    render = extract_features(
+        render_path, active_duration_s=context.get("durationSec"),
+        expected_f0_hz=expected_f0_hz,
+        trust_expected_f0=expected_f0_hz is not None,
+        force_percussive=force_percussive)
     result = compare_features(ref, render, weights_for_instrument(instrument, weights))
     result["tripwires"] = quantitative_tripwires(ref, render, result, instrument)
     if instrument:
         # Local import avoids an import cycle: assertions operates on the
         # FeatureBundle defined by this module.
         from .assertions import ConstructionSample, evaluate_construction
-        context = context or {}
         sample = ConstructionSample(render=render, reference=ref,
                                     register=context.get("register"), dynamic=context.get("dynamic"),
                                     velocity=context.get("velocity"))

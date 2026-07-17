@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Finish the external SG2 corpus handoff without downloading anything.
 
-The acquisition archives and audio remain under /private/tmp.  This script
+The acquisition archives and audio remain under the gitignored SG2 data root. This script
 selects already-extracted VocalSet material, copies those references into the
 instrument layout, and generates the per-instrument PROVENANCE.json and
 COVERAGE.md contract consumed by fit_profiles_from_samples.py.
@@ -16,6 +16,8 @@ import shutil
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+from scripts.tone_match.paths import sg2_data_root
 
 
 AUDIO_EXTENSIONS = {".aif", ".aiff", ".wav", ".flac", ".ogg", ".mp3"}
@@ -228,10 +230,11 @@ def write_contract(samples_root: Path, iowa_manifest: Path,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--samples", type=Path, default=Path("/private/tmp/sg2/samples"))
-    parser.add_argument("--iowa-list", type=Path, default=Path("/private/tmp/sg2/iowa_list.txt"))
+    data_root = sg2_data_root()
+    parser.add_argument("--samples", type=Path, default=data_root / "samples")
+    parser.add_argument("--iowa-list", type=Path, default=data_root / "iowa_list.txt")
     parser.add_argument("--vocalset-root", type=Path,
-                        default=Path("/private/tmp/sg2/vocalset_extract/FULL"))
+                        default=data_root / "vocalset_extract" / "FULL")
     parser.add_argument("--skip-vocal-selection", action="store_true")
     args = parser.parse_args(argv)
     selection = {} if args.skip_vocal_selection else select_vocalset(args.vocalset_root, args.samples)

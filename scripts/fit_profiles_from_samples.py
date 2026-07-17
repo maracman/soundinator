@@ -82,6 +82,15 @@ SLOPE_MIN, SLOPE_SPAN = 0.25, 1.1
 
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 VOWEL_RE = re.compile(r"_([aeiou])\.(?:wav|aif|aiff|flac|ogg|mp3)$", re.IGNORECASE)
+SINGLE_NOTE_RE = re.compile(r"(?:^|[._])([A-Ga-g])([#b]?)(-?\d)(?=[._-]|$)")
+GUITAR_OPEN_MIDI = {
+    "string6": 40,
+    "string5": 45,
+    "string4": 50,
+    "string3": 55,
+    "string2": 59,
+    "string1": 64,
+}
 
 
 def engine_t60(freq_hz: float, material: float) -> float:
@@ -102,6 +111,38 @@ def hz_to_note_name(f: float) -> str:
     midi = 69 + 12 * math.log2(f / 440.0)
     m = int(round(midi))
     return f"{NOTE_NAMES[m % 12]}{m // 12 - 1}"
+
+
+def expected_single_note_f0(filename: str) -> float | None:
+    """Return the pitch declared by a known single-note corpus filename."""
+    name = os.path.basename(filename)
+    if not (name.startswith("phil.") or name.startswith("Piano.")):
+        return None
+    match = SINGLE_NOTE_RE.search(name)
+    if not match:
+        return None
+    letter, accidental, octave_text = match.groups()
+    pitch_class = {
+        "C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11,
+    }[letter.upper()]
+    if accidental == "#":
+        pitch_class += 1
+    elif accidental == "b":
+        pitch_class -= 1
+    midi = 12 * (int(octave_text) + 1) + pitch_class
+    return 440.0 * 2 ** ((midi - 69) / 12)
+
+
+def guitar_course_for_midi(midi: int, max_fret: int = 24) -> str | None:
+    """T-033 auto course law: minimum playable fret, low-course tie break."""
+    playable = [
+        (midi - open_midi, open_midi, course)
+        for course, open_midi in GUITAR_OPEN_MIDI.items()
+        if 0 <= midi - open_midi <= max_fret
+    ]
+    if not playable:
+        return None
+    return min(playable)[2]
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -473,7 +514,9 @@ def harmonic_frame_amps(seg: np.ndarray, sr: int, f0: float,
 
 def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
                  min_detected_partials: int = 5,
-                 expected_f0_hz: float | None = None):
+                 expected_f0_hz: float | None = None,
+                 trust_expected_f0: bool = False,
+                 force_percussive: bool | None = None):
     f0 = estimate_f0(seg, sr)
     f0_unconstrained = f0
     if expected_f0_hz is not None:
@@ -487,7 +530,9 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
         # retained as QC provenance; source MIDI is never rewritten.
         def _cents(a: float, b: float) -> float:
             return abs(1200 * math.log2(a / b))
-        if f0 is not None:
+        if trust_expected_f0:
+            f0 = expected_f0_hz
+        elif f0 is not None:
             candidates = [f0 * ratio for k in range(1, 7)
                           for ratio in (1.0 / k, float(k))]
             matches = [c for c in candidates if _cents(c, expected_f0_hz) <= 50]
@@ -500,7 +545,9 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
                     f"(unconstrained estimate {f0:.1f} Hz)")
         else:
             f0 = expected_f0_hz
-    if f0 is None or not (40 < f0 < 2500):
+    f0_low, f0_high = ((20, 6000) if trust_expected_f0 and expected_f0_hz is not None
+                       else (40, 2500))
+    if f0 is None or not (f0_low < f0 < f0_high):
         return None
     env, hop = rms_envelope(seg, sr)
     t_env = np.arange(len(env)) * hop / sr
@@ -519,6 +566,8 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
     mid = env[len(env) // 4: 3 * len(env) // 4]
     sustain_ratio = float(np.median(mid)) / peak if mid.size else 0.0
     percussive = sustain_ratio < 0.35 and peak_i < len(env) // 4
+    if force_percussive is not None:
+        percussive = bool(force_percussive)
 
     note = NoteAnalysis(file=fname, f0=f0, note=hz_to_note_name(f0),
                         f0_unconstrained=f0_unconstrained,
@@ -567,7 +616,12 @@ def analyse_note(seg: np.ndarray, sr: int, fname: str, n_partials: int = 64,
             i_lo = int(np.searchsorted(freqs, fn - half))
             i_hi = int(np.searchsorted(freqs, fn + half))
             local_med = float(np.median(mag[i_lo:i_hi])) + 1e-15
-            if pa > 8 * local_med:                      # ≈ +18 dB
+            # A trusted scheduled render can have a broad low-piano peak
+            # whose main lobe fills much of the ±0.42 f0 window.  The known
+            # MIDI already excludes noise/f0 impostors, so use a +9.5 dB
+            # local gate there; corpus discovery retains the stricter +18 dB.
+            snr_ratio = 3 if trust_expected_f0 else 8
+            if pa > snr_ratio * local_med:
                 amps[n - 1] = pa
                 pfreqs[n - 1] = pf
                 ok[n - 1] = True
@@ -1565,7 +1619,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
                          n_partials: int, min_amp_f0: float = 40.0,
                          body_stability_gate: dict | None = None,
                          body_diagnostic_centres_hz: tuple[float, ...] = (),
-                         body_notes: list[NoteAnalysis] | None = None):
+                         body_notes: list[NoteAnalysis] | None = None,
+                         string_selector=None):
     """Combine per-note measurements into one engine-shaped record."""
     # analyse_note already rejects f0 <= 40 Hz.  The historical 100 Hz
     # spectral cutoff silently removed the practical low register of horn,
@@ -1642,6 +1697,56 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
                 partials=[dict(amp=round(float(a), 5), spread=round(float(s), 3))
                           for a, s in zip(g_amp, g_spread)],
             ))
+
+    # T-033 analysis storage: keep course identity ahead of engine
+    # interpolation. Each course owns only measurements selected for that
+    # course; sparse/missing courses are omitted so the engine can consume the
+    # existing pooled profile bit-identically.
+    partials_by_string = {}
+    if string_selector is not None:
+        by_string: dict[str, list[NoteAnalysis]] = {}
+        for note in spec_notes:
+            course = string_selector(note)
+            if course:
+                by_string.setdefault(course, []).append(note)
+        for course, course_notes in sorted(by_string.items()):
+            # One table per measured pitch, capped to three anchors per course.
+            by_midi: dict[int, list[NoteAnalysis]] = {}
+            for note in course_notes:
+                midi = int(round(69 + 12 * math.log2(note.f0 / 440.0)))
+                by_midi.setdefault(midi, []).append(note)
+            pitch_groups = [by_midi[midi] for midi in sorted(by_midi)]
+            if len(pitch_groups) > 3:
+                split = np.array_split(np.asarray(pitch_groups, dtype=object), 3)
+                pitch_groups = [
+                    [note for bucket in chunk for note in bucket]
+                    for chunk in split if len(chunk)
+                ]
+            anchors = []
+            for group in pitch_groups:
+                if len(group) < 2:
+                    continue
+                g_amp = np.zeros(n_partials)
+                for i in range(n_partials):
+                    detected = [A[spec_index[id(n)], i] for n in group
+                                if n.partial_snr_ok[i] and
+                                A[spec_index[id(n)], i] > 0]
+                    g_amp[i] = float(np.median(detected)) if detected else 0.0
+                if g_amp.max() > 0:
+                    g_amp /= g_amp.max()
+                g_b = robust_mean([n.B for n in group if n.B is not None])
+                anchors.append(dict(
+                    f0=round(float(np.exp(np.mean(np.log([n.f0 for n in group])))), 3),
+                    partialB=round(float(g_b), 8) if g_b is not None else None,
+                    nNotes=len(group),
+                    partials=[
+                        dict(amp=round(float(a), 5),
+                             spread=round(float(spread[i]), 3))
+                        for i, a in enumerate(g_amp)
+                    ],
+                ))
+            if anchors:
+                partials_by_string[course] = anchors
 
     # tail slope diagnostic: dB/octave of harmonic rank over n ≥ 8
     det_idx = [i for i in range(7, n_partials) if amp[i] > 0]
@@ -1827,6 +1932,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         partialB=round(B_med, 8),
         partialBByNote=B_by_note,
         partialsByRegister=partials_by_register,
+        **({"partialsByString": partials_by_string}
+           if partials_by_string else {}),
         resonances=resonances,
         resonancesFit=resonances_fit,
         vowelFormants=vowel_formants,
@@ -1886,6 +1993,35 @@ def validate_corpus_contract(samples_dir: str, only: set[str] | None = None) -> 
                     payload = json.load(handle)
                 if not isinstance(payload, dict) or not payload:
                     errors.append(f"{instrument}: PROVENANCE.json must be a non-empty object")
+                else:
+                    rows = payload.get("files")
+                    declared = {
+                        row.get("file") for row in rows
+                        if isinstance(row, dict) and isinstance(row.get("file"), str)
+                    } if isinstance(rows, list) else set()
+                    actual = set(audio)
+                    if not declared:
+                        errors.append(
+                            f"{instrument}: PROVENANCE.json must declare every audio file"
+                        )
+                    elif declared != actual:
+                        undeclared = sorted(actual - declared)
+                        missing = sorted(declared - actual)
+                        detail = []
+                        if undeclared:
+                            detail.append(
+                                "undeclared audio: " + ", ".join(undeclared[:5]) +
+                                (" …" if len(undeclared) > 5 else "")
+                            )
+                        if missing:
+                            detail.append(
+                                "declared but missing: " + ", ".join(missing[:5]) +
+                                (" …" if len(missing) > 5 else "")
+                            )
+                        errors.append(
+                            f"{instrument}: acquisition snapshot is not atomic "
+                            f"({'; '.join(detail)})"
+                        )
             except (OSError, json.JSONDecodeError) as exc:
                 errors.append(f"{instrument}: invalid PROVENANCE.json ({exc})")
         if not os.path.isfile(coverage) or os.path.getsize(coverage) == 0:
@@ -1930,6 +2066,7 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
         for fn in file_list:
             path = os.path.join(inst_dir, fn)
             x, sr = load_mono(path)
+            expected_f0_hz = expected_single_note_f0(fn)
             # The Iowa horn chromatic runs use shorter inter-note gaps than
             # the other MIS sets; 250 ms merges entire scales into one note.
             # Keep the conservative gate elsewhere so vibrato/bow dips are
@@ -1942,10 +2079,22 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
                 peaks = [float(np.abs(x[s:e]).max()) for s, e in segs]
                 top = max(peaks)
                 segs = [se for se, p in zip(segs, peaks) if p > top * 0.1]
+            if expected_f0_hz is not None and segs:
+                # These archives declare one pitch per file. Codec tails or
+                # room-noise islands must not become extra "notes", and a
+                # dominant upper harmonic must not relabel the source.
+                segs = [max(segs, key=lambda se: float(np.abs(x[se[0]:se[1]]).max()))]
             if verbose:
                 print(f"    {fn}: {len(segs)} note(s)")
             for s, e in segs:
-                note = analyse_note(x[s:e], sr, path, n_partials)
+                note = analyse_note(
+                    x[s:e], sr, path, n_partials,
+                    expected_f0_hz=expected_f0_hz,
+                    trust_expected_f0=expected_f0_hz is not None,
+                    force_percussive=(True if expected_f0_hz is not None and
+                                      ("guitar" in fn.lower() or
+                                       fn.startswith("Piano.")) else None),
+                )
                 if note is not None:
                     result.append(note)
         return result
@@ -1978,11 +2127,16 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
         if verbose:
             print(f"    body references: {len(body_reference_notes)} note(s)")
     instrument_name = os.path.basename(os.path.normpath(inst_dir))
+    string_selector = None
+    if instrument_name == "guitar":
+        string_selector = lambda note: guitar_course_for_midi(
+            int(round(69 + 12 * math.log2(note.f0 / 440.0))))
     agg = aggregate_instrument(notes, vib_notes, n_partials,
                                body_stability_gate=AIR_JET_BODY_GATE.get(instrument_name),
                                body_diagnostic_centres_hz=
                                BOWED_BODY_DIAGNOSTIC_CENTRES.get(instrument_name, ()),
-                               body_notes=body_reference_notes or notes)
+                               body_notes=body_reference_notes or notes,
+                               string_selector=string_selector)
     if agg.get("resonancesFit") and body_reference_notes:
         agg["resonancesFit"]["bodyReferenceNotes"] = len(body_reference_notes)
     mode_evidence = validate_bowed_body_modes(
@@ -2000,6 +2154,24 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
     prov.setdefault("files", files)
     agg["provenance"] = prov
     return agg
+
+
+def merge_profile_sets(out: dict, previous: dict) -> dict:
+    """Preserve omitted body fits and instruments from an explicit base."""
+    for inst, profile in out.items():
+        prior = previous.get(inst)
+        if not isinstance(prior, dict):
+            continue
+        # A sparse single-note refresh can replace corrupt pitch/spectral
+        # evidence without pretending it also re-measured the body.
+        for key in ("resonances", "resonancesFit"):
+            if not profile.get(key) and prior.get(key):
+                profile[key] = prior[key]
+    for inst, profile in previous.items():
+        if inst not in out:
+            out[inst] = profile
+            print(f"[{inst}] kept previous profile (not re-analysed this run)")
+    return out
 
 
 def main(argv=None):
@@ -2021,6 +2193,12 @@ def main(argv=None):
     ap.add_argument("--body-references", default=None,
                     help="optional root containing <instrument>/body-references.json; "
                          "these pitch-anchored notes fit only the fixed-Hz body")
+    ap.add_argument(
+        "--merge-base",
+        help="JSON profile set used as the preservation base instead of the "
+             "current --out file; useful for rebuilding against an immutable "
+             "committed/frozen profile while acquisition is in progress",
+    )
     args = ap.parse_args(argv)
 
     only = set(args.only.split(",")) if args.only else None
@@ -2052,17 +2230,17 @@ def main(argv=None):
               f"t60Ref={mat.get('t60Ref')} slope={mat.get('slope')} "
               f"m*={mat.get('suggestedMaterial')} "
               f"A={p['envelopeAttack']} S={p['envelopeSustain']}")
-    if args.keep_existing and os.path.exists(args.out):
+    merge_base = args.merge_base
+    if merge_base is None and args.keep_existing and os.path.exists(args.out):
+        merge_base = args.out
+    if merge_base is not None:
         # Conservative merge: never silently lose an instrument on a partial
         # (--only) or full regeneration — legacy fits without a corpus folder
         # (e.g. trombone) and instruments outside --only survive.  Run
         # without --keep-existing to intentionally drop instruments.
-        with open(args.out) as fh:
+        with open(merge_base) as fh:
             previous = json.load(fh)
-        for inst, profile in previous.items():
-            if inst not in out:
-                out[inst] = profile
-                print(f"[{inst}] kept previous profile (not re-analysed this run)")
+        out = merge_profile_sets(out, previous)
     out = {inst: out[inst] for inst in sorted(out)}
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as fh:
