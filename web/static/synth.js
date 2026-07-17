@@ -1164,6 +1164,176 @@ export function buildBowNoiseImpulse(rows, measuredBodyBands, sampleRate = 48000
   return Float32Array.from(causal, value => value / norm);
 }
 
+// L17 promotes the violin-specific L14 residual to a component class.  Keep
+// the proven bow helpers above as the spectral implementation, while exposing
+// one schema/activation/timing seam for bow scratch, wind breath and future
+// piano action noise.  Values remain per-instrument measured data.
+const PINNED_NOISE_CONTROL_DEFAULTS = Object.freeze({
+  bowNoiseLevel: 0,
+  windBreathLevel: 0,
+});
+
+function pinnedNoiseComponentsObject(profile) {
+  const explicit = profile?.pinnedNoiseComponents;
+  const components = explicit && typeof explicit === "object" && !Array.isArray(explicit)
+    ? { ...explicit } : {};
+  // T-054 predates the component-class schema.  Adapt it at the consumer so
+  // the one canonical violin table is not duplicated or rewritten.
+  if (profile?.bowNoise?.profilePinned === true && !components.bowNoise) {
+    components.bowNoise = {
+      ...profile.bowNoise,
+      componentClass: "bowNoise",
+      engineContract: {
+        ...(profile.bowNoise.engineContract || {}),
+        levelControl: "bowNoiseLevel",
+        independentEnvelopeRequired: true,
+        excitationTypes: ["bow"],
+      },
+    };
+  }
+  return components;
+}
+
+export function pinnedNoiseComponentsFor(profile) {
+  return Object.entries(pinnedNoiseComponentsObject(profile))
+    .filter(([, component]) => component?.profilePinned === true &&
+      Array.isArray(component.profile) && component.profile.length >= 2)
+    .map(([id, component]) => ({ id, ...component }));
+}
+
+/** Resolve the immutable component spectrum at playing velocity. L17 keeps
+ * independently extracted dynamic tables when their shapes do not pass the
+ * cross-dynamic stability gate; interpolation happens in dB on their shared
+ * fixed-Hz grid. Legacy/single-table L14 components retain their pinned table. */
+export function pinnedNoiseProfileAt(component, velocity = .62) {
+  const tables = component?.profilesByDynamic;
+  if (!tables || typeof tables !== "object" || Array.isArray(tables)) {
+    return Array.isArray(component?.profile) ? component.profile : [];
+  }
+  const velocities = new Map((component?.placementLaw?.byDynamic || [])
+    .map(row => [String(row?.dynamic || ""), Number(row?.velocity)]));
+  const rows = Object.entries(tables).map(([dynamic, profile]) => ({
+    velocity: velocities.get(dynamic), profile,
+  })).filter(row => Number.isFinite(row.velocity) && Array.isArray(row.profile) &&
+    row.profile.length >= 2).sort((a, b) => a.velocity - b.velocity);
+  if (!rows.length) return Array.isArray(component?.profile) ? component.profile : [];
+  const v = Math.max(0, Math.min(1, Number(velocity) || 0));
+  let lo = rows[0], hi = rows[rows.length - 1], amount = 0;
+  if (v <= lo.velocity) hi = lo;
+  else if (v >= hi.velocity) lo = hi;
+  else {
+    let index = 1;
+    while (index < rows.length && rows[index].velocity < v) index++;
+    lo = rows[index - 1]; hi = rows[index];
+    amount = (v - lo.velocity) / Math.max(1e-9, hi.velocity - lo.velocity);
+  }
+  if (lo === hi) return lo.profile;
+  const upperByFrequency = new Map(hi.profile.map(row => [Number(row?.freqHz), row]));
+  const interpolated = lo.profile.map(row => {
+    const upper = upperByFrequency.get(Number(row?.freqHz));
+    const a = Number(row?.gainDb), b = Number(upper?.gainDb);
+    return Number.isFinite(a) && Number.isFinite(b)
+      ? { ...row, gainDb: a + (b - a) * amount }
+      : { ...row };
+  });
+  return interpolated.length >= 2 ? interpolated : component.profile;
+}
+
+function statisticMedian(value, fallback = 0) {
+  const number = Number(value?.median ?? value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function dynamicEvidenceAt(rows, velocity, field, fallback = 0) {
+  const points = (Array.isArray(rows) ? rows : [])
+    .map(row => ({ velocity: Number(row?.velocity), value: statisticMedian(row?.[field], NaN) }))
+    .filter(row => Number.isFinite(row.velocity) && Number.isFinite(row.value))
+    .sort((a, b) => a.velocity - b.velocity);
+  if (!points.length) return fallback;
+  const v = Math.max(0, Math.min(1, Number(velocity) || 0));
+  if (v <= points[0].velocity) return points[0].value;
+  if (v >= points[points.length - 1].velocity) return points[points.length - 1].value;
+  let hi = 1;
+  while (hi < points.length && points[hi].velocity < v) hi++;
+  const lo = points[hi - 1], upper = points[hi];
+  const amount = (v - lo.velocity) / Math.max(1e-9, upper.velocity - lo.velocity);
+  return lo.value + (upper.value - lo.value) * amount;
+}
+
+export function pinnedNoiseLeadMsAt(component, velocity = .62) {
+  const law = component?.placementLaw || {};
+  const fallback = statisticMedian(law?.allNotes?.noiseLeadMs ?? law?.allNotes, 0);
+  return Math.max(0, Math.min(450,
+    dynamicEvidenceAt(law.byDynamic, velocity, "noiseLeadMs", fallback)));
+}
+
+export function pinnedNoiseEnvelopeAt(component, velocity = .62) {
+  const envelope = component?.envelope || {};
+  const all = envelope.allNotes || {};
+  const value = (field, fallback) => dynamicEvidenceAt(
+    envelope.byDynamic, velocity, field, statisticMedian(all[field], fallback));
+  return {
+    preOnsetSwellMs: Math.max(0, Math.min(450, value("preOnsetSwellMs", 0))),
+    peakOffsetMs: Math.max(-450, Math.min(450, value("peakOffsetMs", 0))),
+    settleFromPeakMs: Math.max(0, Math.min(1000, value("settleFromPeakMs", 0))),
+    sustainBelowPeakDb: Math.max(-60, Math.min(12, value("sustainBelowPeakDb", 0))),
+    releaseMs: Math.max(5, Math.min(2000, value("releaseMs", 30))),
+    independent: envelope.toneAdsrSlave === false ||
+      component?.engineContract?.independentEnvelopeRequired === true,
+  };
+}
+
+export function pinnedNoiseLevelFor(component, params = {}) {
+  const control = String(component?.engineContract?.levelControl || "");
+  if (!(control in PINNED_NOISE_CONTROL_DEFAULTS)) return 0;
+  const value = Number(params?.[control]);
+  return Math.max(0, Math.min(2, Number.isFinite(value)
+    ? value : PINNED_NOISE_CONTROL_DEFAULTS[control]));
+}
+
+/** Preset-level F4/L17 gate.  Every pinned component is enumerated; ship mode
+ * requires its own non-zero control and an independently scheduled envelope.
+ * The report is intentionally pure so factory/profile and campaign presets
+ * use the exact same assertion. */
+export function pinnedNoiseActivationReport(profile, params = {}, shipMode = true) {
+  return pinnedNoiseComponentsFor(profile).map(component => {
+    const control = String(component.engineContract?.levelControl || "");
+    const level = pinnedNoiseLevelFor(component, params);
+    const envelope = pinnedNoiseEnvelopeAt(component, Number(params.velocity) || .62);
+    const excitationTypes = Array.isArray(component.engineContract?.excitationTypes)
+      ? component.engineContract.excitationTypes : [];
+    const applicable = excitationTypes.length === 0 ||
+      excitationTypes.includes(String(params.excitationType || ""));
+    const componentClass = component.componentClass || component.id;
+    const wind = componentClass === "windBreath" || component.id === "windBreath";
+    const effectiveLevel = wind
+      ? level * Math.max(0, Number(params.toneBreath) || 0) : level;
+    const active = !applicable || !shipMode ||
+      (effectiveLevel > 0 && envelope.independent);
+    return { id: component.id, componentClass: component.componentClass || component.id,
+      control, level, effectiveLevel, independentEnvelope: envelope.independent,
+      preOnsetLeadMs: pinnedNoiseLeadMsAt(component, Number(params.velocity) || .62),
+      applicable, active };
+  });
+}
+
+export function maxPinnedNoiseLeadSeconds(profile, velocity = .62) {
+  return pinnedNoiseComponentsFor(profile).reduce((maximum, component) =>
+    Math.max(maximum, pinnedNoiseLeadMsAt(component, velocity) / 1000), 0);
+}
+
+export function maxPinnedNoiseLeadForParams(params = {}, velocity = .62) {
+  const profile = SPECTRAL_PROFILES[String(params?.spectralProfile || "")];
+  const activation = new Map(pinnedNoiseActivationReport(
+    profile, { ...params, velocity }, true).map(row => [row.id, row]));
+  return pinnedNoiseComponentsFor(profile).reduce((maximum, component) => {
+    const row = activation.get(component.id);
+    return row?.applicable && row.active
+      ? Math.max(maximum, pinnedNoiseLeadMsAt(component, velocity) / 1000)
+      : maximum;
+  }, 0);
+}
+
 // ── Per-instrument performance character ─────────────────────
 //
 // A static spectrum alone never reads as "violin" — the temporal envelope,
@@ -1315,6 +1485,12 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
   }
   if (m.bowNoise?.profilePinned === true && Array.isArray(m.bowNoise.profile)) {
     prof.bowNoise = m.bowNoise;
+  }
+  if (m.pinnedNoiseComponents && typeof m.pinnedNoiseComponents === "object" &&
+      !Array.isArray(m.pinnedNoiseComponents)) {
+    // L17: profile-owned immutable component contracts.  Do not merge values
+    // across instruments; the family firewall permits only this architecture.
+    prof.pinnedNoiseComponents = m.pinnedNoiseComponents;
   }
   // The fitted body (including an explicit empty omission) was resolved
   // before BODY_PRESETS construction above. Never re-merge it here: a
@@ -3442,6 +3618,13 @@ export class GenerationEngine {
       attackNoise = { ...attackNoise, level: Math.max(0,
         Number(attackNoise.level || 0) + attackNoiseDelta) };
     }
+    const pinnedNoiseComponents = Object.fromEntries(
+      pinnedNoiseComponentsFor(profile).map(component => [component.id, {
+        ...component,
+        profile: pinnedNoiseProfileAt(component, velocity),
+        deconvolutionBands: Array.isArray(profile.resonances)
+          ? profile.resonances : [],
+      }]));
     return {
       harmonicPartials: partials,
       // Shape/frequency/decay are pinned by the measurement campaign. The
@@ -3496,6 +3679,8 @@ export class GenerationEngine {
         Number.isFinite(this.p.bowNoiseVelocityExponent)
           ? this.p.bowNoiseVelocityExponent
           : profile.bowNoise?.levelLaw?.velocityExponent ?? 1, 0, 2),
+      pinnedNoiseComponents,
+      windBreathLevel: this._clamp(this.p.windBreathLevel ?? 0, 0, 2),
       onsetScoopDepthCents: this._clamp(this.p.onsetScoopDepthCents ?? 0, 0, 180),
       onsetScoopSettle: this._clamp(this.p.onsetScoopSettle ?? 0.06, 0.015, 0.35),
       onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),
@@ -4371,7 +4556,7 @@ export class SynthEngine {
     this._vibratoPhase = 0;
     this._vibratoCycleRate = 5.5;
     this._vibratoCycleDepth = 0;
-    this._bowNoiseImpulseCache = new WeakMap();
+    this._bowNoiseImpulseCache = new Map();
     this._surpriseCount = 0;
     this._lastSurpriseAt = 0;
     this._timeline = [];   // ring buffer of scheduled note events (for visualisers)
@@ -4598,7 +4783,11 @@ export class SynthEngine {
     this._percussionOnly = !!params.percussionOnly;
     this._engine = new GenerationEngine(params);
     this._engine.initialise();
-    this._nextTime = this.ctx.currentTime + 0.05;
+    // L17: give the first pinned component the same real pre-onset window as
+    // every later lookahead-scheduled note.  Without this, only note one was
+    // clipped to the audio-context start even though the component law led t0.
+    this._nextTime = this.ctx.currentTime + Math.max(
+      .05, maxPinnedNoiseLeadForParams(params, .62) + .015);
     this.playing = true;
     this._schedule();
   }
@@ -4804,7 +4993,11 @@ export class SynthEngine {
         this._masterOut.gain.cancelScheduledValues(now);
         this._masterOut.gain.setTargetAtTime(this._masterVolume, now, 0.012);
       }
-      this.renderNotesSpan(params, notes, this.ctx.currentTime + 0.05, totalBeats, loopBeats, percStrikes);
+      const firstVelocity = Number(notes?.find(note => !note?.isRest)?.velocity) || .62;
+      const preRoll = Math.max(.05,
+        maxPinnedNoiseLeadForParams(params, firstVelocity) + .015);
+      this.renderNotesSpan(params, notes, this.ctx.currentTime + preRoll,
+        totalBeats, loopBeats, percStrikes);
       this.playing = true;
     });
   }
@@ -5577,7 +5770,8 @@ export class SynthEngine {
       bp.connect(g);
       g.connect(env);
     }
-    this._renderSpectralPartials(note, t0, t1, env);
+    this._renderSpectralPartials(note, t0, t1, env,
+      note._out || this._voiceBus || this.master);
     this._renderBreath(note, t0, t1, env);
     env.connect(note._out || this._voiceBus || this.master);
 
@@ -5598,7 +5792,8 @@ export class SynthEngine {
     base.gain.value = 1 - this._spectralMix(note) * 0.7;
     osc.connect(base);
     base.connect(env);
-    this._renderSpectralPartials(note, t0, t1, env);
+    this._renderSpectralPartials(note, t0, t1, env,
+      note._out || this._voiceBus || this.master);
     this._renderBreath(note, t0, t1, env);
     env.connect(note._out || this._voiceBus || this.master);
     osc.start(t0);
@@ -5611,7 +5806,7 @@ export class SynthEngine {
     const t1 = t0 + note.duration;
     const env = this._adsr(note.velocity, t0, t1, note);
     const out = note._out || this._voiceBus || this.master;
-    this._renderSpectralPartials(note, t0, t1, env);
+    this._renderSpectralPartials(note, t0, t1, env, out);
     this._renderAttackNoise(note, t0, env, out);
     this._renderConsonant(note, t0, t1, out);
     this._renderBreath(note, t0, t1, env);
@@ -5794,9 +5989,19 @@ export class SynthEngine {
     this._vibratoCycleRate = this._clamp(rateMean + this._gaussian() * rateSd, 0.1, 18);
   }
 
-  _renderSpectralPartials(note, t0, t1, env) {
+  _renderSpectralPartials(note, t0, t1, env, out = null) {
     const partials = note.harmonicPartials;
     const mix = this._spectralMix(note);
+    const pinned = note.pinnedNoiseComponents || {};
+    if ((note.excitationType || "") === "blow" && pinned.windBreath) {
+      this._renderPinnedNoiseComponent(
+        note, pinned.windBreath, note.windBreathLevel, t0, t1, out || env);
+    }
+    if ((note.excitationType || "") === "bow") {
+      const bow = pinned.bowNoise || note.bowNoise;
+      if (bow) this._renderPinnedNoiseComponent(
+        note, bow, note.bowNoiseLevel, t0, t1, out || env);
+    }
     if (!partials || partials.length === 0 || mix <= 0) return;
     const norm = Math.max(
       0.001,
@@ -5924,8 +6129,11 @@ export class SynthEngine {
       }
     });
     this._schedulePartialAmplitudes(scheduled, note, t0, t1);
-    if ((note.excitationType || "") === "blow") this._renderBlowFloor(note, t0, t1, env);
-    if ((note.excitationType || "") === "bow") this._renderPinnedBowNoise(note, t0, t1, env);
+    if ((note.excitationType || "") === "blow") {
+      if (!pinned.windBreath) {
+        this._renderBlowFloor(note, t0, t1, env);
+      }
+    }
   }
 
   _seededNoiseBuffer() {
@@ -5956,7 +6164,10 @@ export class SynthEngine {
   }
 
   _pinnedBowNoiseImpulseBuffer(component) {
-    const cacheKey = component.profile;
+    const cacheKey = JSON.stringify({
+      profile: component.profile,
+      deconvolutionBands: component.deconvolutionBands || [],
+    });
     const cached = this._bowNoiseImpulseCache.get(cacheKey);
     if (cached) return cached;
     const impulse = buildBowNoiseImpulse(component.profile,
@@ -5967,53 +6178,104 @@ export class SynthEngine {
     return buffer;
   }
 
+  /** L17: one renderer for every pinned pre-onset noise component.  The
+   * component owns its spectrum, placement and envelope; it never traverses
+   * the harmonic note ADSR.  Existing breath/bow level and velocity laws are
+   * retained as multiplicative controls around the measured contract. */
+  _renderPinnedNoiseComponent(note, component, controlLevel, t0, t1, out) {
+    const levelControl = this._clamp(controlLevel ?? 0, 0, 2);
+    if (!out || !component || levelControl <= 0 ||
+        !Array.isArray(component.profile) || component.profile.length < 2 ||
+        t1 - t0 < .12) return;
+    const componentClass = String(component.componentClass || component.id || "");
+    const wind = componentClass === "windBreath" || component.id === "windBreath";
+    const exponent = wind
+      ? this._clamp(note.breathVelocityExponent ??
+        component.levelLaw?.velocityExponent ?? 1, 0, 2)
+      : this._clamp(note.bowNoiseVelocityExponent ??
+        component.levelLaw?.velocityExponent ?? 1, 0, 2);
+    let base;
+    if (wind) {
+      // Direct routing replaces the old env connection, so include the
+      // velocity factor that the shared ADSR previously supplied.
+      base = levelControl * this._clamp(note.toneBreathLevel ?? 0, 0, 1) * .2 *
+        this._clamp(note.breathLevelScale ?? 1, 0, 3) *
+        Math.pow(this._clamp(note.velocity, .01, 1), exponent) *
+        Math.pow(10, this._clamp(note.measuredBreathDeltaDb ?? 0, -30, 30) / 20);
+    } else {
+      const rungs = Array.isArray(component.levelLaw?.rungs)
+        ? component.levelLaw.rungs : [];
+      const reference = rungs.find(row => row.dynamic === "mf") || rungs[0];
+      const nhrDb = Number(reference?.noiseToHarmonicDb);
+      const relativeScale = Number.isFinite(nhrDb)
+        ? Math.pow(10, nhrDb / 20) : .04;
+      base = levelControl * relativeScale *
+        this._clamp(note.velocity, .01, 1) *
+        bowNoiseVelocityGain(note.velocity, exponent);
+    }
+    base = Math.max(.000001, base);
+
+    const leadSec = pinnedNoiseLeadMsAt(component, note.velocity) / 1000;
+    const shape = pinnedNoiseEnvelopeAt(component, note.velocity);
+    const swellSec = shape.preOnsetSwellMs / 1000;
+    const requestedStart = t0 - Math.max(leadSec, swellSec);
+    const start = Math.max(this.ctx.currentTime, requestedStart);
+    const requestedPeak = t0 + shape.peakOffsetMs / 1000;
+    const peak = Math.max(start + .001, requestedPeak);
+    const settle = Math.max(peak + .001,
+      peak + shape.settleFromPeakMs / 1000);
+    const sustain = base * Math.pow(10, shape.sustainBelowPeakDb / 20);
+    const articulationPeak = wind
+      ? base * Math.max(.2, note._articulationOnset?.breathLeadGain ?? 1)
+      : base;
+    const releaseStart = Math.max(settle, t1);
+    const releaseEnd = releaseStart + shape.releaseMs / 1000;
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._seededNoiseBuffer();
+    src.loop = true;
+    const convolver = this.ctx.createConvolver();
+    convolver.normalize = false;
+    convolver.buffer = this._pinnedBowNoiseImpulseBuffer(component);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(.000001, start);
+    gain.gain.linearRampToValueAtTime(
+      Math.max(.000001, articulationPeak), peak);
+    gain.gain.linearRampToValueAtTime(Math.max(.000001, sustain), settle);
+
+    const texture = wind
+      ? this._clamp(note.breathTurbulence ?? 0, 0, 1)
+      : this._clamp(note.excitationHuman ?? 0, 0, 1);
+    if (texture > 0 && settle < t1 - .03) {
+      const trace = humanFluctuationTrace(
+        () => this._nextRandom(), t1 - settle, wind ? "blow" : "bow", texture);
+      for (const point of trace) {
+        const at = settle + point.t;
+        if (at <= settle || at >= t1 - .03) continue;
+        gain.gain.linearRampToValueAtTime(
+          Math.max(.000001, sustain * Math.max(.4,
+            1 + point.f * texture * (wind ? .3 : .22))), at);
+      }
+    }
+    gain.gain.setValueAtTime(Math.max(.000001, sustain), releaseStart);
+    gain.gain.exponentialRampToValueAtTime(.000001, releaseEnd);
+
+    src.connect(convolver);
+    const tail = this._routePinnedBowNoiseBody(
+      convolver, note.bodyBands, start);
+    tail.connect(gain);
+    gain.connect(out);
+    src.start(start);
+    src.stop(releaseEnd + .02);
+    this._track(src);
+  }
+
   /** T-054: render Agent D's immutable L14 violin residual as its own
    * body-routed component. Zero level creates no nodes and is exact legacy;
    * enabled notes use seeded continuous noise and the pinned velocity law. */
   _renderPinnedBowNoise(note, t0, t1, env) {
-    const component = note.bowNoise;
-    const levelControl = this._clamp(note.bowNoiseLevel ?? 0, 0, 2);
-    if (!component || levelControl <= 0 || !Array.isArray(component.profile) ||
-        component.profile.length < 2 || t1 - t0 < .12) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this._seededNoiseBuffer();
-    src.loop = true;
-
-    const convolver = this.ctx.createConvolver();
-    convolver.normalize = false;
-    convolver.buffer = this._pinnedBowNoiseImpulseBuffer(component);
-
-    const gain = this.ctx.createGain();
-    const exponent = this._clamp(note.bowNoiseVelocityExponent ?? 1, 0, 2);
-    // The PSD intercept is corpus-file absolute level and cannot be applied
-    // directly to WebAudio's normalised harmonic sum. The measured mf NHR is
-    // the dimensionless renderer contract: level 1 reproduces that residual-
-    // to-harmonic ratio, while the fitted exponent moves it across dynamics.
-    const rungs = Array.isArray(component.levelLaw?.rungs)
-      ? component.levelLaw.rungs : [];
-    const reference = rungs.find(row => row.dynamic === "mf") || rungs[0];
-    const nhrDb = Number(reference?.noiseToHarmonicDb);
-    const relativeScale = Number.isFinite(nhrDb) ? Math.pow(10, nhrDb / 20) : .04;
-    const base = Math.max(.000001, levelControl * relativeScale *
-      bowNoiseVelocityGain(note.velocity, exponent));
-    gain.gain.setValueAtTime(base, t0);
-    const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
-    const trace = humanFluctuationTrace(
-      () => this._nextRandom(), t1 - t0, "bow", human);
-    for (const point of trace) {
-      if (point.t >= t1 - t0 - .03) continue;
-      gain.gain.linearRampToValueAtTime(
-        base * Math.max(.45, 1 + point.f * human * .22), t0 + point.t);
-    }
-    gain.gain.setValueAtTime(base, Math.max(t0, t1 - .03));
-
-    src.connect(convolver);
-    const tail = this._routePinnedBowNoiseBody(convolver, note.bodyBands, t0);
-    tail.connect(gain);
-    gain.connect(env);
-    src.start(t0);
-    src.stop(t1 + .04);
-    this._track(src);
+    this._renderPinnedNoiseComponent(
+      note, note.bowNoise, note.bowNoiseLevel, t0, t1, env);
   }
 
   // T3 Human + T4 Transfer: one seeded fluctuation trace per note drives

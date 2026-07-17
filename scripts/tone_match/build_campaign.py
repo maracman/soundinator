@@ -122,37 +122,69 @@ def _run_start_midi(filename: str) -> int:
     return (int(octave_text) + 1) * 12 + semitone
 
 
-def _select(path: Path, target_midi: int) -> tuple[np.ndarray, int, float]:
+def select_chromatic_run(path: Path, target_midis: tuple[int, ...]) -> list[tuple[int, np.ndarray, int, float]]:
+    """Select unique Iowa-run segments for a known ascending MIDI sequence.
+
+    This is the component-generic form of the campaign's canonical ``_select``
+    machinery.  Detected f0 wins when it is credible; weak-fundamental reed
+    notes fall back to the documented filename/run order with an anchored f0
+    analysis.  Every source segment may be consumed at most once.
+    """
     samples, sample_rate = load_mono(str(path))
     segments = segment_notes(samples, sample_rate, merge_gap_s=0.12)
+    if len(target_midis) > 1 and len(segments) == len(target_midis):
+        ordered = []
+        for target_midi, (start, end) in zip(target_midis, segments):
+            segment = samples[start:end]
+            expected = 440.0 * 2 ** ((target_midi - 69) / 12)
+            note = analyse_note(segment, sample_rate, str(path), 16,
+                                min_detected_partials=2,
+                                expected_f0_hz=expected, trust_expected_f0=True)
+            ordered.append((target_midi, segment, sample_rate,
+                            float(note.f0 if note is not None else expected)))
+        return ordered
     candidates = []
-    for start, end in segments:
+    for index, (start, end) in enumerate(segments):
         segment = samples[start:end]
         note = analyse_note(segment, sample_rate, str(path), 16)
         if note is not None:
-            candidates.append((abs(_midi(note.f0) - target_midi), segment, note.f0))
-    if not candidates:
-        # Closed-tube runs can defeat an unconstrained monophonic tracker
-        # because the fundamental is deliberately weak. Iowa files are
-        # ascending chromatic runs named with their first pitch, so select by
-        # the documented run order and analyse against the known MIDI anchor.
-        index = target_midi - _run_start_midi(path.name)
-        if index < 0 or index >= len(segments):
+            candidates.append((index, segment, note.f0))
+    selected = []
+    used: set[int] = set()
+    for target_midi in target_midis:
+        ranked = [(abs(_midi(f0) - target_midi), index, segment, f0)
+                  for index, segment, f0 in candidates if index not in used]
+        if ranked and min(row[0] for row in ranked) <= 1:
+            _, index, segment, f0 = min(ranked, key=lambda row: row[0])
+        else:
+            # Closed-tube runs can defeat an unconstrained monophonic tracker
+            # because the fundamental is deliberately weak. Iowa files are
+            # ascending chromatic runs named with their first pitch, so select
+            # by documented run order and analyse against the known MIDI.
+            index = target_midi - _run_start_midi(path.name)
+            if index < 0 or index >= len(segments) or index in used:
+                raise RuntimeError(
+                    f"{path}: target MIDI {target_midi} is outside or duplicates "
+                    f"its {len(segments)}-segment chromatic run")
+            start, end = segments[index]
+            segment = samples[start:end]
+            expected = 440.0 * 2 ** ((target_midi - 69) / 12)
+            note = analyse_note(segment, sample_rate, str(path), 16,
+                                min_detected_partials=2,
+                                expected_f0_hz=expected, trust_expected_f0=True)
+            if note is None:
+                raise RuntimeError(f"no analysable anchored note in {path}")
+            f0 = note.f0
+        if abs(_midi(f0) - target_midi) > 1:
             raise RuntimeError(
-                f"{path}: target MIDI {target_midi} is outside its "
-                f"{len(segments)}-segment chromatic run")
-        start, end = segments[index]
-        segment = samples[start:end]
-        expected = 440.0 * 2 ** ((target_midi - 69) / 12)
-        note = analyse_note(segment, sample_rate, str(path), 16,
-                            min_detected_partials=2,
-                            expected_f0_hz=expected, trust_expected_f0=True)
-        if note is None:
-            raise RuntimeError(f"no analysable anchored note in {path}")
-        return segment, sample_rate, note.f0
-    _, segment, f0 = min(candidates, key=lambda row: row[0])
-    if abs(_midi(f0) - target_midi) > 1:
-        raise RuntimeError(f"{path}: closest detected MIDI {_midi(f0)} is not target {target_midi}")
+                f"{path}: closest detected MIDI {_midi(f0)} is not target {target_midi}")
+        used.add(index)
+        selected.append((target_midi, segment, sample_rate, float(f0)))
+    return selected
+
+
+def _select(path: Path, target_midi: int) -> tuple[np.ndarray, int, float]:
+    _, segment, sample_rate, f0 = select_chromatic_run(path, (target_midi,))[0]
     return segment, sample_rate, f0
 
 
