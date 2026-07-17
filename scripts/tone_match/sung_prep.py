@@ -35,7 +35,10 @@ VOICE_CLASSES = {
     "tenor": {"male2", "male3", "male11"},
     "bass": {"male8"},
     "mezzo-soprano": {"female5", "female8"},
-    "soprano": {"female2", "female6"},
+    # VocalSet readme-anon.txt labels all seven as sopranos.  The repaired
+    # corpus deliberately lands every candidate so identity selection is an
+    # evidence decision, not a stale two-singer convenience filter (T-049).
+    "soprano": {"female1", "female2", "female3", "female4", "female6", "female7", "female9"},
 }
 
 # Initial physiological register boundaries. They are explicitly priors, not

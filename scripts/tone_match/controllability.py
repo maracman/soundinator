@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,8 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "attackNoiseFreq": (1000.0, 2400.0, 0.0),
     "attackNoiseQ": (0.84, 2.5, 0.0),
     "attackNoiseDecay": (0.05, 0.15, 0.0),
+    "attackNoiseDirect": (0.0, 0.8, 0.0),
+    "attackNoiseVelocityExponent": (1.0, 0.25, 0.0),
     "partialTilt": (0.0, 0.35, 0.0),
     "partialTransfer": (0.1, 0.4, 0.0),
     "partialMaterial": (0.3, 0.6, 0.0),
@@ -59,12 +62,30 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "spectralDynamicAmount": (1.0, 1.8, 0.0),
     "dynamicBlare": (0.0, 0.4, 0.0),
     "envelopeAttack": (0.08, 0.25, 0.0),
+    "velocityHardnessCoupling": (0.2, 0.8, 0.0),
+    "decaySecondStage": (0.2, 0.8, 0.0),
+    "decaySecondRatio": (2.0, 6.0, 0.0),
     "vibratoProb": (1.0, 0.0, 0.0),
     "vibratoDepth": (18.0, 40.0, 0.0),
     "vibratoRate": (5.5, 6.5, 0.0),
     "onsetWanderCents": (0.0, 80.0, 0.0),
     "onsetWanderSettlePeriods": (12.0, 24.0, 0.0),
     "bowScratchLevel": (0.0, 1.0, 0.0),
+}
+
+SUNG_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
+    # Structured per-vowel bodies remain a follow-up audit. These continuous
+    # controls cover the pooled vocal source and performance layer.
+    "glottalTilt": (0.0, 0.5, 0.0),
+    "singerFormantAmount": (0.0, 0.7, 0.0),
+    "voiceBreathSync": (0.0, 0.6, 0.0),
+    "toneBreath": (0.03, 0.18, 0.0),
+    "excitationHuman": (0.0, 0.6, 0.0),
+    "attackNoiseLevel": (0.14, 0.55, 0.0),
+    "partialTilt": (0.0, 0.35, 0.0),
+    "partialTransfer": (0.2, 0.5, 0.0),
+    "spectralResonanceAmount": (1.0, 0.5, 0.0),
+    "spectralDynamicAmount": (0.8, 1.25, 0.0),
 }
 
 
@@ -122,19 +143,25 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
               free_params: dict[str, tuple[float, float, float]] | None = None,
               objective_references: list[dict[str, Any]] | None = None,
               manifest_contract: list[dict[str, Any]] | None = None,
+              manifest_document: dict[str, Any] | None = None,
               ) -> dict[str, Any]:
     free_params = free_params or BOWED_FREE_PARAMS
     output_dir.mkdir(parents=True, exist_ok=True)
     renders = output_dir / "renders"
     renders.mkdir(exist_ok=True)
 
-    # variant parameter sets: base + one per perturbed param
+    # Every probe gets a matched baseline. Conditional laws (for example G4
+    # second-stage decay) use the manifest auditContext on both sides without
+    # contaminating the neutral campaign seed.
     variants: dict[str, dict[str, Any]] = {"__base__": dict(baseline_params)}
+    rows = {row["key"]: row for row in (manifest_document or {}).get(
+        "continuous", [])}
     for key, (base_value, perturbed, _alt) in free_params.items():
-        params = dict(baseline_params)
-        params[key] = base_value
-        variants["__base__"].setdefault(key, base_value)
-        perturbed_params = dict(variants["__base__"])
+        probe_base = dict(baseline_params)
+        probe_base.update(rows.get(key, {}).get("auditContext", {}))
+        probe_base[key] = base_value
+        variants[f"__base__-{key}"] = probe_base
+        perturbed_params = dict(probe_base)
         perturbed_params[key] = perturbed
         variants[key] = perturbed_params
     # T-041: repeat the exact baseline in independent offline render
@@ -158,7 +185,24 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             })
     _render_batch(jobs, repo_root)
 
-    ref_bundles = [extract_features(ref["path"]) for ref in references]
+    struck = instrument.strip().lower() in {
+        "piano", "piano-grand", "grand-piano", "piano-upright",
+        "upright-piano", "guitar", "guitar-nylon", "guitar-steel",
+        "harp", "glockenspiel", "marimba", "xylophone", "vibraphone",
+    }
+
+    def analysis_kwargs(ref: dict[str, Any]) -> dict[str, Any]:
+        expected = ref.get("expectedF0Hz")
+        if expected is None and struck:
+            expected = 440.0 * 2 ** ((float(ref.get("midi", 60)) - 69) / 12)
+        return {
+            **({"expected_f0_hz": expected} if expected is not None else {}),
+            **({"trust_expected_f0": True, "force_percussive": True}
+               if struck else {}),
+        }
+
+    ref_bundles = [extract_features(ref["path"], **analysis_kwargs(ref))
+                   for ref in references]
     weights = weights_for_instrument(instrument)
     render_cache: dict[tuple[str, int], Any] = {}
 
@@ -168,7 +212,9 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             render_cache[key] = extract_features(
                 renders / f"{name}-{ref_index}.wav",
                 active_duration_s=references[ref_index].get(
-                    "durationSec", 1.5))
+                    "durationSec", 1.5),
+                **analysis_kwargs(references[ref_index]),
+            )
         return render_cache[key]
 
     def distances(name: str) -> dict[str, list[float]]:
@@ -240,18 +286,24 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     matrix: dict[str, dict[str, float]] = {}
     render_failures: dict[str, int] = {}
     for key in free_params:
+        probe_base = f"__base__-{key}"
         perturbed = distances(key)
         matrix[key] = {}
+        direct_rows = []
+        for ref_index in np.flatnonzero(base_ok):
+            try:
+                direct_rows.append(compare_features(
+                    render_bundle(probe_base, int(ref_index)),
+                    render_bundle(key, int(ref_index)), weights))
+            except ValueError:
+                continue
         for feature in base:
-            base_vals = np.asarray(base[feature], dtype=float)[base_ok]
-            pert_vals = np.asarray(perturbed[feature], dtype=float)[base_ok]
-            deltas = pert_vals - base_vals
-            finite = deltas[np.isfinite(deltas)]
-            # analysis failures are recorded separately, NOT as responses:
-            # knife-edge references fail under unrelated perturbations (the
-            # seeded noise realisation shifts), and folding that into the
-            # response matrix marked every feature "controllable".
-            matrix[key][feature] = float(np.max(np.abs(finite))) if finite.size else 0.0
+            finite = [float(row["normalized"][feature]) for row in direct_rows
+                      if np.isfinite(row["normalized"].get(feature, math.nan))]
+            # T-007/T-024: controllability is the direct perceptual response
+            # to one changed parameter, not a difference between two
+            # reference losses (which can cancel around an equidistant take).
+            matrix[key][feature] = max(finite, default=0.0)
         any_pert = np.asarray(perturbed[next(iter(base))], dtype=float)[base_ok]
         render_failures[key] = int(np.isnan(any_pert).sum())
 
@@ -264,6 +316,22 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "feature": feature,
             "previousWeight": final_weights[feature],
             "reason": "repeat renders crossed the controllability threshold",
+            "status": "watch-metric",
+        })
+        final_weights[feature] = 0.0
+
+    responsive = {
+        feature: sorted(key for key in matrix
+                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
+        for feature in DEFAULT_WEIGHTS
+    }
+    for feature, weight in sorted(final_weights.items()):
+        if float(weight) <= 0 or responsive.get(feature):
+            continue
+        zero_weighted.append({
+            "feature": feature,
+            "previousWeight": weight,
+            "reason": "no audited free parameter crossed the response threshold",
             "status": "watch-metric",
         })
         final_weights[feature] = 0.0
@@ -284,11 +352,6 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "status": status,
         })
 
-    responsive = {
-        feature: sorted(key for key in matrix
-                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
-        for feature in DEFAULT_WEIGHTS
-    }
     watch_metrics = [v["feature"] for v in verdicts if v["status"] == "watch-metric"]
     uncontrolled = [v["feature"] for v in verdicts if v["status"] == "UNCONTROLLABLE"]
     objective_references = objective_references or references
@@ -306,9 +369,9 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
              "threshold": RESPONSE_THRESHOLD,
              "scorerContractVersion": SCORER_CONTRACT_VERSION,
              "rendererContractHash": _renderer_contract_hash(repo_root),
-             "referenceContractHash": canonical_hash(objective_references),
-             "parameterManifestHash": canonical_hash(manifest_contract),
-             "initialPresetHash": canonical_hash(baseline_params),
+             "referenceContractHash": _canonical_hash(objective_references),
+             "parameterManifestHash": _canonical_hash(manifest_contract),
+             "initialPresetHash": _canonical_hash(baseline_params),
              "objectiveHash": objective_contract_hash(
                  instrument, objective_references, final_weights),
              "manifestHash": manifest_contract_hash(manifest_contract),
@@ -374,29 +437,57 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path,
                         default=Path(__file__).with_name("manifest.json"))
     parser.add_argument("--keys",
-                        help="comma-separated free keys; defaults to the bowed audit set")
+                        help="comma-separated free keys; defaults by instrument family")
     args = parser.parse_args(argv)
     references = json.loads(args.references.read_text())
     campaign_seed = json.loads(args.initial.read_text())
     from .legacy_prior import resolve_legacy_prior
     baseline, legacy_prior = resolve_legacy_prior(args.instrument, campaign_seed)
+    sung_instruments = {
+        "soprano", "mezzo-soprano", "tenor", "bass",
+        "voice-soprano", "voice-mezzo", "voice-tenor", "voice-bass",
+    }
+    available = (SUNG_FREE_PARAMS if args.instrument.strip().lower()
+                 in sung_instruments else BOWED_FREE_PARAMS)
+    objective_references = (
+        [row for row in references if "spectral" in row.get("roles", [])]
+        if args.instrument.strip().lower() in sung_instruments else references
+    )
+    if not objective_references:
+        parser.error("references contain no rows with the spectral role")
     keys = (list(dict.fromkeys(key.strip() for key in args.keys.split(",")
                               if key.strip()))
-            if args.keys else list(BOWED_FREE_PARAMS))
-    unknown = [key for key in keys if key not in BOWED_FREE_PARAMS]
+            if args.keys else list(available))
+    unknown = [key for key in keys if key not in available]
     if unknown:
         parser.error(f"no perturbation specification for: {', '.join(unknown)}")
-    free_params = {key: BOWED_FREE_PARAMS[key] for key in keys}
-    contract = _manifest_contract(json.loads(args.manifest.read_text()), baseline, keys)
+    free_params = {key: available[key] for key in keys}
+    manifest_document = json.loads(args.manifest.read_text())
+    contract = _manifest_contract(manifest_document, baseline, keys)
     seen: dict[str, dict[str, Any]] = {}
-    for row in references:
-        seen.setdefault(f"{row.get('register')}|{row.get('dynamic')}", row)
+    analysis_rejects = []
+    for row in objective_references:
+        key = f"{row.get('register')}|{row.get('dynamic')}"
+        if key in seen:
+            continue
+        try:
+            extract_features(
+                row["path"], expected_f0_hz=row.get("expectedF0Hz")
+            )
+        except (ValueError, RuntimeError) as exc:
+            analysis_rejects.append({"path": row.get("path"), "error": str(exc)})
+            continue
+        seen[key] = row
     subset = list(seen.values())[:6]
+    if not subset:
+        parser.error("no pitch-anchored objective reference can be analysed")
     audit = run_audit(args.instrument, baseline, subset, args.output,
                       args.repo_root, free_params=free_params,
-                      objective_references=references,
-                      manifest_contract=contract)
+                      objective_references=objective_references,
+                      manifest_contract=contract,
+                      manifest_document=manifest_document)
     audit["legacyPrior"] = legacy_prior
+    audit["auditReferenceSelectionRejects"] = analysis_rejects
     (args.output / "controllability.json").write_text(
         json.dumps(audit, indent=1) + "\n")
     print(json.dumps({"clean": audit["clean"],

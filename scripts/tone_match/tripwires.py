@@ -68,6 +68,9 @@ ROLE_BARS = {
     "onset": {"attack-t90"},
     "vibrato": {"vibrato"},
     "floor": set(),
+    # Same-singer repeats evidence the separate SUNG distributional gate.
+    # They are legal objective rows but do not imply any §3 bar coverage.
+    "humanisation": set(),
 }
 
 

@@ -138,3 +138,49 @@ Consuming-side assertions:
   from one singer bundle and each row's effective body equals that vowel's
   fitted bands;
 - all limiting-factor and leaderboard files remain under durable `SG2_DATA`.
+
+## D-VOICE-02 · Consonant-onset feature consumers (Agent D, activation-gated)
+
+The landed `consonants-spoken/` LibriSpeech subset and alignments now have a
+durable spoken-to-sung adaptation build. The first balanced extraction is 48
+plosives, 48 nasals and 48 fricatives. Its adapted medians are:
+
+| Class | Duration | Burst centroid | VOT | Transition | Pre-beat |
+|---|---:|---:|---:|---:|---:|
+| plosive | 49 ms | 3210 Hz | 24.7 ms | 52.5 ms | 122.6 ms |
+| nasal | 56 ms | 770 Hz | 0 ms | 52.5 ms | 115.5 ms |
+| fricative | 70 ms | 5567 Hz | 0 ms | 52.5 ms | 122.3 ms |
+
+These are provisional S31–S33 adaptations, not sung measurements: consonant
+duration ×0.70, F1/F2 transition time ×0.75, voiceless VOT ×0.65, and voiced
+VOT ×1.10, with the sustained vowel placed on the beat and the consonant moved
+pre-beat. The machine-readable source is
+`sg2-data/campaigns/sung-consonants/CONSONANT_ONSET_FIT.json`.
+
+Add family-specific extraction and scorer fields for burst centroid, burst
+duration, VOT, F1 transition slope and F2 transition slope. Every weight must
+remain exactly zero until A-VOICE-03 exists in the renderer and a fresh
+controllability audit demonstrates a responsible parameter for each activated
+feature. The objective hash must include the adaptation policy and corpus
+provenance. A spoken measurement must never be represented as direct sung
+ground truth.
+
+## D-VOICE-03 · Sung family-firewall assertion (Agent D, requested)
+
+Please add a shared assertion that fails if a SUNG run imports fitted values,
+presets, candidate tables or objective rows from a non-sung family. Shared
+neutral engine mechanisms are allowed; fitted bowed/blown/struck values are
+not. The assertion must cover both direct preset consumption (F5) and
+optimizer/leaderboard seeding (F12), and must run before evaluation rather than
+appearing only in a report.
+
+Required proof cases:
+
+1. A `voice-*` objective seeded with a violin/cello/brass fitted candidate
+   fails even when the parameter names exist in the common manifest.
+2. A SUNG legacy `vocal` craft prior with pinned provenance passes.
+3. A same-singer prior SUNG pass may seed the next pass.
+4. A morphology-derived boy soprano or basso profondo names only its frozen
+   adult SUNG source and transform.
+5. The assertion is exercised through the canonical runner used by
+   `evaluate_construction`/`evaluate_tripwires`.

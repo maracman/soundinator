@@ -44,10 +44,14 @@ Observed median partial residuals span 3.58–10.75 dB; several short lossy
 catalogue takes also produce unstable B estimates. Per §2.5c.2, the fit does
 not widen body bands, B, material or base partial tables to hide this.
 
-Limiting factor: the Human set still lacks consuming controls for the
-remaining pressure/body-AM take variation (T-029) and structured bow-position
-draws. Re-run this decomposition after those consumers land; retain B as a
-watch metric for short catalogue takes whose stretch estimate is unstable.
+Limiting factor: T-029's instantaneous-frequency body gain has landed, but its
+final offline scorer re-audit is blocked by the red T-054 render verifier.
+T-031's WebAudio controls also have no effective canonical offline-render
+consumer: under renderer hash `d31d8d205e704191`, all three remain below the
+0.05 perceptual-unit response threshold (`onset_wander_cents` peaks at
+0.00060). Re-run this decomposition after the headless consumers pass; retain
+B as a watch metric for short catalogue takes whose stretch estimate is
+unstable.
 
 ## Profile and consumer contract
 
