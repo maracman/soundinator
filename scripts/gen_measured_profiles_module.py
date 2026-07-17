@@ -127,6 +127,8 @@ def main():
                 "profilePinned": True,
                 "profile": bow_noise.get("profile", []),
                 "levelLaw": bow_noise.get("levelLaw", {}),
+                "placementLaw": bow_noise.get("placementLaw", {}),
+                "envelope": bow_noise.get("envelope", {}),
                 "engineContract": bow_noise.get("engineContract", {}),
             }
         # L17: component-generic pinned pre-onset noise.  Preserve measured

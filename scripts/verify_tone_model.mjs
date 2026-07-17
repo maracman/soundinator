@@ -1149,6 +1149,13 @@ console.log("L17: pinned pre-onset component class + preset activation");
     SPECTRAL_PROFILES.violin, violinFoundation?.parameters, true);
   check("violin's formerly silent pinned bow component is preset-active",
     violinActivation.some(row => row.id === "bowNoise" && row.active && row.level > 0));
+  const violinBow = pinnedNoiseComponentsFor(SPECTRAL_PROFILES.violin)
+    .find(row => row.id === "bowNoise");
+  const violinBowEnvelope = pinnedNoiseEnvelopeAt(violinBow, .62);
+  check("violin consumes its measured independent bow-component envelope",
+    violinBow?.envelope?.toneAdsrSlave === false &&
+    pinnedNoiseLeadMsAt(violinBow, .62) > 0 &&
+    violinBowEnvelope.independent && violinBowEnvelope.releaseMs > 0);
 }
 
 console.log("T6: preset migration (T-B9 partial)");

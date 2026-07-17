@@ -27,7 +27,7 @@ from scipy import signal
 import soundfile as sf
 
 from scripts.tone_match.build_campaign import select_chromatic_run
-from scripts.tone_match.strings_prep import select_chromatic_segments
+from scripts.tone_match.strings_prep import select_chromatic_across_runs
 
 
 DYNAMICS = ("pp", "mf", "ff")
@@ -230,6 +230,38 @@ def component_envelope_evidence(samples: np.ndarray, sample_rate: int, f0: float
     }
 
 
+def validate_component_envelope_roundtrip() -> dict[str, Any]:
+    """Known-envelope synthetic trust gate for the L17 temporal extractor."""
+    sample_rate = 48_000
+    t = np.arange(round(sample_rate * 1.8)) / sample_rate
+    harmonic_envelope = np.clip((t - .20) / .025, 0, 1)
+    harmonic_envelope *= np.where(t < 1.45, 1, np.exp(-38 * (t - 1.45)))
+    harmonic = (.7 * np.sin(2 * np.pi * 440 * t) +
+                .35 * np.sin(2 * np.pi * 880 * t)) * harmonic_envelope
+    bow_envelope = np.clip((t - .14) / .08, 0, 1)
+    bow_envelope *= np.where(t < .22, 1, .42 + .58 * np.exp(-18 * (t - .22)))
+    bow_envelope *= np.where(t < 1.45, 1, np.exp(-28 * (t - 1.45)))
+    rng = np.random.default_rng(54017)
+    measured = component_envelope_evidence(
+        harmonic + rng.standard_normal(len(t)) * bow_envelope * .055,
+        sample_rate, 440)
+    checks = {
+        "noiseLeadMs": abs(float(measured["noiseLeadMs"]) - 60) <= 35,
+        "peakOffsetMs": abs(float(measured["peakOffsetMs"]) - 20) <= 40,
+        "settleFromPeakMs": 0 <= float(measured["settleFromPeakMs"]) <= 250,
+        "releaseMs": not measured["releaseCensored"] and
+                     0 <= float(measured["releaseMs"]) <= 250,
+    }
+    return {
+        "schema": "sg2-component-envelope-validation-v1",
+        "status": "pass" if all(checks.values()) else "fail",
+        "injected": {"noiseLeadMs": 60, "peakOffsetMs": 20,
+                     "releaseStartSec": 1.45},
+        "measured": measured,
+        "checks": checks,
+    }
+
+
 def _band_profile(freqs: np.ndarray, psd: np.ndarray, centres: np.ndarray,
                   usable: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
     if usable is None:
@@ -404,11 +436,10 @@ def load_iowa_records(body_references: Path, samples_root: Path) -> list[dict[st
                for row in rows]
     for dynamic in DYNAMICS:
         matches = sorted(samples_root.glob(f"Violin.arco.{dynamic}.sulE.*.aiff"))
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one Iowa sulE {dynamic} run, found {matches}")
-        source = matches[0]
-        for midi, segment, sample_rate, _, f0, cents in select_chromatic_segments(
-                source, SULE_TARGETS):
+        if not matches:
+            raise RuntimeError(f"expected Iowa sulE {dynamic} runs, found none")
+        for (midi, segment, sample_rate, _, f0, cents,
+             source) in select_chromatic_across_runs(matches, SULE_TARGETS):
             records.append({"path": f"{source}#MIDI{midi}", "dynamic": dynamic,
                             "string": "sulE", "f0Hz": float(f0), "midi": midi,
                             "pitchErrorCents": round(float(cents), 2),
@@ -464,6 +495,54 @@ def _median_summary(rows: list[dict[str, Any]], key: str) -> dict[str, float]:
         "median": round(float(np.median(values)), 3),
         "p25": round(float(np.percentile(values, 25)), 3),
         "p75": round(float(np.percentile(values, 75)), 3),
+    }
+
+
+def _fit_bow_component_timing(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Fit violin's L17 placement/envelope in the shared consumer schema."""
+    validation = validate_component_envelope_roundtrip()
+    if validation["status"] != "pass":
+        raise RuntimeError(
+            f"synthetic bow component-envelope validation failed: {validation}")
+    evidence = [{
+        "path": row["path"], "dynamic": row["dynamic"],
+        "velocity": VELOCITY[row["dynamic"]], "string": row["string"],
+        "f0Hz": row["f0Hz"],
+        **component_envelope_evidence(
+            row["samples"], row["sampleRate"], row["f0Hz"]),
+    } for row in records]
+    envelope_keys = ("preOnsetSwellMs", "peakOffsetMs", "settleFromPeakMs",
+                     "sustainBelowPeakDb", "releaseMs")
+    by_dynamic = []
+    placement_by_dynamic = []
+    for dynamic in DYNAMICS:
+        members = [row for row in evidence if row["dynamic"] == dynamic]
+        by_dynamic.append({
+            "dynamic": dynamic, "velocity": VELOCITY[dynamic],
+            **{key: _median_summary(members, key) for key in envelope_keys},
+        })
+        placement_by_dynamic.append({
+            "dynamic": dynamic, "velocity": VELOCITY[dynamic],
+            "noiseLeadMs": _median_summary(members, "noiseLeadMs"),
+        })
+    return {
+        "componentEnvelopeValidation": validation,
+        "placementLaw": {
+            "model": "linear interpolation of per-dynamic residual-envelope lead; positive leads tone t0",
+            "sense": "f0-comb residual track relative to harmonic track",
+            "byDynamic": placement_by_dynamic,
+            "allNotes": _median_summary(evidence, "noiseLeadMs"),
+        },
+        "envelope": {
+            "model": "independent piecewise pre-onset swell/peak/settle/sustain/release envelope",
+            "toneAdsrSlave": False,
+            "byDynamic": by_dynamic,
+            "allNotes": {key: _median_summary(evidence, key)
+                         for key in envelope_keys},
+            "releaseCensoredNotes": sum(
+                bool(row["releaseCensored"]) for row in evidence),
+            "perNoteEvidence": evidence,
+        },
     }
 
 
@@ -941,6 +1020,7 @@ def extract_iowa(body_references: Path, samples_root: Path, validation: Path,
               "gainDb": round(float(pooled_shape[i]), 3)}
              for i in np.where(in_band & ~rejected & np.isfinite(pooled_shape))[0]]
     law = _fit_level_law(dynamic_rows)
+    component_timing = _fit_bow_component_timing(records)
     stable = all(row["correlation"] >= 0.9 and row["medianAbsDb"] <= 3.0
                  for row in dynamic_comparisons)
     median_coverage = np.nanmedian(np.asarray(
@@ -984,6 +1064,7 @@ def extract_iowa(body_references: Path, samples_root: Path, validation: Path,
         "dynamicShapeComparisons": dynamic_comparisons,
         "crossPitchGroups": group_stats,
         "levelLaw": law,
+        **component_timing,
         "artifactScreen": {
             "harmonicMaskCents": [25, 35, 50], "welchNfft": [2048, 4096, 8192],
             "vibrato": "Iowa arco non-vibrato only; no vibrato smear admitted",
@@ -993,7 +1074,9 @@ def extract_iowa(body_references: Path, samples_root: Path, validation: Path,
         },
         "engineContract": {
             "component": "bowNoise", "bodyRouting": 1,
-            "userControl": "bowNoiseLevel", "shapeOptimiserMutable": False,
+            "userControl": "bowNoiseLevel", "levelControl": "bowNoiseLevel",
+            "excitationTypes": ["bow"], "shapeOptimiserMutable": False,
+            "preOnsetCapable": True, "independentEnvelopeRequired": True,
             "velocityLaw": law["model"],
         },
     }
@@ -1005,7 +1088,9 @@ def extract_iowa(body_references: Path, samples_root: Path, validation: Path,
             key: result[key] for key in ("method", "source", "excluded", "bandHz",
                                         "bandEvidence",
                                         "profilePinned", "profile", "shapeStableAcrossDynamics",
-                                        "dynamicShapeComparisons", "levelLaw", "artifactScreen",
+                                        "dynamicShapeComparisons", "levelLaw",
+                                        "componentEnvelopeValidation",
+                                        "placementLaw", "envelope", "artifactScreen",
                                         "engineContract")}
         measured.write_text(json.dumps(measured_data, indent=1) + "\n")
     return result

@@ -1667,3 +1667,49 @@ controllability audit may `pitch_sync_breath_db` receive weight or any adult
 voice receive nonzero `voiceBreathSync`.
 Affects: A-VOICE-04 / sung_features or shared analysis / construction breath row / tenor,bass,mezzo activation.
 Status: sung=spec-filed-values-neutral analysis=pending-review engine=incorporated-base-consumer
+
+Status update — Agent D bowed pass 04, 2026-07-17: T-033 remains
+`engine=pending-Agent-A`, with both guitar and bowed contracts ready for the
+same table-selection seam. The live Agent A pass-04 snapshot still records
+`bowed=blocked-engine T-033`. The bowed profile and the five exact consuming
+assertions are refreshed in `BOWED_ENGINE_HANDOFFS.md`; no T-033 engine
+completion is claimed.
+
+### T-070 · Bow excitation uses the shared independent component envelope
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: mechanism + per-instrument values
+Finding: L17.5 applies to bowed excitation as directly as to breath. Violin's
+57 Iowa notes now pass through T-066's shared f0-comb residual tracker and
+emit `placementLaw` plus component-owned peak/settle/sustain/release evidence
+inside the legacy bow profile. The known-envelope synthetic gate passes all
+four timing checks. Pooled violin evidence has 127.710 ms lead/swell,
+23.220 ms settle and sustain 4.206 dB below peak; 36 tails are explicitly
+censored rather than silently treated as releases.
+Consuming assertions: profile generation preserves the placement/envelope;
+the shared legacy bow adapter resolves them into the generic component
+renderer; positive measured lead, independent scheduling and nonzero release
+are asserted against the live tone model; harmonic ADSR remains independent.
+Affects: bowNoise placementLaw/envelope / shared pinned-noise renderer /
+release interpretation / L17.5.
+Status: analysis=incorporated bowed=incorporated
+engine=incorporated-shared-L17-`3b17222` struck/plucked=adapt-method sung=adapt-method
+
+### T-071 · Drift edges require independent, active evidence before causal use
+Author: Agent D / analysis · 2026-07-17 · Firewall: method-only
+Finding: validation of the first promoted edge,
+`inharmonicity_log_ratio ⊣ release_noise_db` (18 vs 7, p=0.0432853),
+finds scorer-tracking artefact rather than a physical hierarchy. Eleven of 18
+forward events come from blown instruments where string inharmonicity is not
+an active physical control. Seven violin events repeat nearly the same
+calibration intervention across r1-r5, so they are not independent trials.
+Most blown release-floor movements are numerical changes of 1e-6 to 1e-3
+against a default zero feature-specific repeat floor. Only one guitar event
+has a material release-noise change. Partial-frequency stretch has no
+credible mechanism for causing a recorded room/tail noise floor.
+Consuming rule: retain the raw matrix edge for auditability but quarantine it
+from causal triage. Re-promotion requires both features active for the source
+instrument, a nonzero feature-specific repeat floor, and deduplication by
+intervention lineage; then the binomial test is rerun.
+Affects: criteria_drift.py evidence admission / optimiser reports / empirical
+hierarchy interpretation.
+Status: analysis=validation-incorporated+edge-quarantined
+bowed=incorporated engine=n/a struck/plucked=adapt-method sung=adapt-method

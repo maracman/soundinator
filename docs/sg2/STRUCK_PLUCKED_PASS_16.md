@@ -1,6 +1,6 @@
 # Struck/plucked Pass 16 — complete piano-note anatomy
 
-Date: 2026-07-17  
+Date: 2026-07-17
 Scope: L18 held-key/damper law first; L16 envelope-anomaly extraction; L17
 piano action-noise extraction with independent envelopes; nylon continuation
 only after those dependencies.
