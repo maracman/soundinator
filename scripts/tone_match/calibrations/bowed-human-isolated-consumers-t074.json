@@ -1,0 +1,32 @@
+{
+  "schema": "sg2-t074-isolated-human-consumers-v1",
+  "verifier": "scripts/verify_tone_model.mjs",
+  "verifierSha256": "bcf7ee89e7e9640260a76c6f15cb4259bde2c59804f27129db53b98fdb98a873",
+  "method": "hash-pinned isolated measured-support endpoints with physical prerequisites only",
+  "instruments": {
+    "violin": {
+      "verdict": "pass",
+      "rangesSha256": "1659637dadb08fe99107eb3f47a63658880960212b6dd47fedbc236c061b5769",
+      "functionalParameters": [
+        "vibratoRate",
+        "bowScratchLevelDb",
+        "attackNoiseLevel",
+        "onsetWanderCents",
+        "onsetWanderSettleMs"
+      ]
+    },
+    "cello": {
+      "verdict": "pass",
+      "rangesSha256": "37584ceb079c0187758be1ca662cc2c1734d0ac807a219507feba61f17af08a2",
+      "functionalParameters": [
+        "vibratoRate",
+        "vibratoDepth",
+        "vibratoOnsetDelayMs",
+        "bowScratchLevelDb",
+        "attackNoiseLevel",
+        "onsetWanderCents",
+        "onsetWanderSettleMs"
+      ]
+    }
+  }
+}

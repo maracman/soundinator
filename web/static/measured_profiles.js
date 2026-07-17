@@ -9490,8 +9490,7 @@ export const MEASURED_PROFILES = {
         "failedPairs": 12,
         "rule": "after Human comb/level/tilt removal: partial and body residual <=3 dB; B <=1.5x (near-zero uses 3 cents); T60 <=1.5x",
         "maskingFactors": [
-          "one or more per-take identity fits miss the \u00a73 core bars",
-          "one or more qualified Human consumers are unaudited or non-functional"
+          "one or more per-take identity fits miss the \u00a73 core bars"
         ],
         "interpretation": "identity/renderer misfit masks the residual; no missing-Human-DOF claim is permitted"
       }

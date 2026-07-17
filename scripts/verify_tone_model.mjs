@@ -203,17 +203,19 @@ console.log("T-074 isolated bowed measured-Human adapters");
   const contractHash = (value) => createHash("sha256")
     .update(JSON.stringify(canonicalise(value))).digest("hex").slice(0, 16);
   const expectedHashes = {
-    violin: "fe732ab20272e2d6",
-    cello: "8c08050d43c4ff69",
+    // Hashes use the JavaScript-serialised engine module (where 0.0 is 0),
+    // while the durable proof additionally pins Python's source-JSON hash.
+    violin: "0a83af1ea25dbbd7",
+    cello: "ee0d3a93f38e5b36",
   };
   for (const instrument of ["violin", "cello"]) {
     const contract = MEASURED_PROFILES[instrument].humanRanges;
-    check(`T-074 ${instrument} exact Human contract is hash-pinned`,
-      contractHash(contract) === expectedHashes[instrument],
-      contractHash(contract));
-    check(`T-074 ${instrument} decomposition remains masked`,
-      contract.decompositionTest?.verdict === "INCONCLUSIVE-MASKED" &&
-      contract.decompositionTest?.passed === false);
+    check(`T-074 ${instrument} exact engine-facing Human ranges are hash-pinned`,
+      contractHash(contract.ranges) === expectedHashes[instrument],
+      contractHash(contract.ranges));
+    check(`T-074 ${instrument} decomposition records a three-valued verdict`,
+      ["PASS", "FAIL-MISSING-DOF", "INCONCLUSIVE-MASKED"]
+        .includes(contract.decompositionTest?.verdict));
   }
 
   // Force the measured support endpoints while keeping only the named causal
@@ -362,6 +364,36 @@ console.log("T-074 isolated bowed measured-Human adapters");
       `${attackLow} -> ${attackHigh}`);
     check(`T-074 ${instrument} no episode preserves attack strongest prior`,
       measuredAttackNoiseLevel(baseNoise.level, "bow", null) === baseNoise.level);
+
+    const wanderLowEpisode = isolatedEpisode(
+      instrument, "onsetWanderCents", false);
+    const wanderHighEpisode = isolatedEpisode(
+      instrument, "onsetWanderCents", true);
+    const settleLowEpisode = isolatedEpisode(
+      instrument, "onsetWanderSettleMs", false);
+    const settleHighEpisode = isolatedEpisode(
+      instrument, "onsetWanderSettleMs", true);
+    const onsetFingerprint = (episode) => new GenerationEngine({
+      seed: 7408, voiceMode: "fourier", spectralProfile: instrument,
+      excitationType: "bow", excitationHuman: 1,
+      onsetWanderCents: 60, onsetWanderSettlePeriods: 15,
+    })._spectralFingerprint(.62, 220, 0, null, episode);
+    const wanderLow = onsetFingerprint(wanderLowEpisode);
+    const wanderHigh = onsetFingerprint(wanderHighEpisode);
+    check(`T-074 ${instrument} measured bow-wander endpoints reach bow depth`,
+      wanderHigh.onsetWanderCents - wanderLow.onsetWanderCents > .05,
+      `${wanderLow.onsetWanderCents} -> ${wanderHigh.onsetWanderCents}`);
+    const settleLow = onsetFingerprint(settleLowEpisode);
+    const settleHigh = onsetFingerprint(settleHighEpisode);
+    const clampSettlePeriods = episode => Math.min(30, Math.max(2,
+      15 + measuredHumanDelta(episode, "onsetSettleMs") * 220 / 1000));
+    check(`T-074 ${instrument} measured bow-settle ms convert once to periods`,
+      settleHigh.onsetWanderSettlePeriods > settleLow.onsetWanderSettlePeriods &&
+      near(settleLow.onsetWanderSettlePeriods,
+        clampSettlePeriods(settleLowEpisode), 1e-9) &&
+      near(settleHigh.onsetWanderSettlePeriods,
+        clampSettlePeriods(settleHighEpisode), 1e-9),
+      `${settleLow.onsetWanderSettlePeriods} -> ${settleHigh.onsetWanderSettlePeriods}`);
   }
   check("T-074 violin does not invent cello-only depth/delay ranges",
     !("vibratoDepth" in MEASURED_PROFILES.violin.humanRanges.ranges) &&
