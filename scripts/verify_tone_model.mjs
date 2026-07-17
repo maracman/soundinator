@@ -593,6 +593,13 @@ console.log("T-033 per-string + pinned register × dynamic source surfaces");
     near(sourcePartialsAt(surface, 800, .2)[1], .8, 1e-12));
   check("A-VOICE-05 velocity interpolation changes source shape without changing pitch",
     near(sourcePartialsAt(surface, 100, .6)[2], .6, 1e-12));
+  const sparseSurface = { rows: [
+    { f0Hz: 100, velocity: .2, partials: [1, 0] },
+    { f0Hz: 400, velocity: .2, partials: [1, 1] },
+    { f0Hz: 100, velocity: 1, partials: [1, 0] },
+  ] };
+  check("A-VOICE-05 sparse passaggio projects to the joint hull, not a missing rectangle corner",
+    near(sourcePartialsAt(sparseSurface, 400, 1)[1], .5, 1e-12));
   for (const voice of ["voice-tenor", "voice-bass", "voice-mezzo", "voice-soprano"]) {
     check(`A-VOICE-05 ${voice} pinned table reaches the engine profile`,
       SPECTRAL_PROFILES[voice]?.spectralPartialsByRegisterDynamic?.rows?.length > 0);
@@ -610,6 +617,23 @@ console.log("T-033 per-string + pinned register × dynamic source surfaces");
   check("A-VOICE-05 vowel body still acts after the shared source row",
     aSource.harmonicPartials.some((part, i) =>
       Math.abs(part.mean - iSource.harmonicPartials[i].mean) > 1e-6));
+  const dynamicOwnedSurface = { ...surface,
+    dynamicComposition: "suppress generic spectralDynamicAmount while a table row is active" };
+  const dynamicOwned = amount => new GenerationEngine({
+    seed: 10, spectralProfile: "voice-tenor", spectralPartials: 3,
+    spectralPartialsByRegisterDynamic: dynamicOwnedSurface,
+    spectralDynamicAmount: amount, dynamicBlare: 1, spectralResonanceAmount: 0,
+    excitationHuman: 0,
+  })._spectralFingerprint(.2, 100).harmonicPartials.map(part => part.mean);
+  check("A-VOICE-05 velocity-conditioned rows suppress the generic dynamic law",
+    JSON.stringify(dynamicOwned(0)) === JSON.stringify(dynamicOwned(1.5)));
+  const residualOwned = amount => new GenerationEngine({
+    seed: 10, spectralProfile: "flute", excitationType: "blow", spectralPartials: 3,
+    spectralPartialsByRegisterDynamic: surface, spectralDynamicAmount: amount,
+    dynamicBlare: 1, spectralResonanceAmount: 0, excitationHuman: 0,
+  })._spectralFingerprint(.2, 100).harmonicPartials.map(part => part.mean);
+  check("blown residual tables retain their separately fitted generic dynamic composition",
+    JSON.stringify(residualOwned(0)) !== JSON.stringify(residualOwned(1.5)));
   const absentA = new GenerationEngine({ seed: 11, spectralProfile: "vocal",
     spectralPartials: 8, spectralPartialMeans: [1, .3, .1], excitationHuman: 0 });
   const absentB = new GenerationEngine({ seed: 11, spectralProfile: "vocal",

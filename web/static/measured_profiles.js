@@ -30990,6 +30990,7 @@ export const MEASURED_PROFILES = {
       "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "male8",
       "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
+      "dynamicComposition": "rows contain observed source shape at their measured velocity; suppress generic spectralDynamicAmount while a table row is active",
       "rows": [
         {
           "register": "high",
@@ -33648,6 +33649,7 @@ export const MEASURED_PROFILES = {
       "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "female5",
       "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
+      "dynamicComposition": "rows contain observed source shape at their measured velocity; suppress generic spectralDynamicAmount while a table row is active",
       "rows": [
         {
           "register": "high",
@@ -36332,6 +36334,7 @@ export const MEASURED_PROFILES = {
       "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "male3",
       "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
+      "dynamicComposition": "rows contain observed source shape at their measured velocity; suppress generic spectralDynamicAmount while a table row is active",
       "rows": [
         {
           "register": "high",
@@ -37742,6 +37745,7 @@ export const MEASURED_PROFILES = {
       "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f",
       "sourceIdentity": "female1",
       "interpolation": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
+      "dynamicComposition": "rows contain observed source shape at their measured velocity; suppress generic spectralDynamicAmount while a table row is active",
       "rows": [
         {
           "register": "high",

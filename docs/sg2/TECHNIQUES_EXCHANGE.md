@@ -1714,6 +1714,16 @@ hierarchy interpretation.
 Status: analysis=validation-incorporated+edge-quarantined
 bowed=incorporated engine=n/a struck/plucked=adapt-method sung=adapt-method
 
+Status update — Agent A engine pass, 2026-07-17: T-065/A-VOICE-05 final law
+engine=incorporated+output-audited. Sparse source rows now interpolate only
+inside the joint log-f0/velocity measured hull and project to its nearest
+boundary outside; a missing soprano corner is never manufactured. A singer
+table explicitly owns its observed dynamic source shape and suppresses the
+generic dynamic-brightness law, while blown residual tables retain their
+separately fitted composition. Fresh output audits name the table consumer as
+a clean responder for partial, log-mel and sustain band-balance features in
+tenor `9ba74296`, soprano `f30f2591`, bass `f04db298`, and mezzo `f06aa8d8`.
+
 Status update — Agent A engine pass, 2026-07-17: T-033/T-043
 engine=incorporated. Violin/cello auto selection uses the lowest playable
 string, guitar auto uses minimum fret with the lower-course tie break, explicit
@@ -1737,4 +1747,3 @@ fallback. Eight-second output checks pass L18's slope/no-plateau bars and
 prove `envelopeSustain` 0.05 versus 1.0 is PCM-identical. Bow/blow retain their
 existing ADSR semantics. Physical damper tables remain absent where Agent C
 classified the evidence incomplete.
-

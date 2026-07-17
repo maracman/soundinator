@@ -22,6 +22,10 @@ from scripts.tone_match.score import compare_features, extract_features
 
 TARGET_FEATURES = ("partials_db", "log_mel_db", "band_balance_db")
 RESPONSE_THRESHOLD = 0.05
+# The shared sustain-balance extractor removes 250 ms of onset and 100 ms of
+# offset, then requires one full second. Shorter output audits silently turn
+# band balance into a zero-valued not-applicable feature.
+AUDIT_DURATION_SEC = 1.6
 VOICE_KEYS = {
     "voice-bass": "bass",
     "voice-tenor": "tenor",
@@ -130,7 +134,7 @@ def audit(repo_root: Path, instrument: str, best_path: Path,
         common = {
             "midi": midi,
             "velocity": float(row["velocity"]),
-            "durationSec": 0.9,
+            "durationSec": AUDIT_DURATION_SEC,
             "sampleRate": 24000,
         }
         for mode, source_surface in (

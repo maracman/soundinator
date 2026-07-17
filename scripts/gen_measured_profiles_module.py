@@ -39,6 +39,12 @@ def main():
         handoff = json.loads(SUNG_SOURCE_TABLES.read_text())
         if handoff.get("syntheticRoundTrip", {}).get("passed") is not True:
             raise ValueError("refusing A-VOICE-05 rows without passing round trip")
+        if "never rectangular extrapolation" not in handoff.get(
+                "interpolationContract", ""):
+            raise ValueError("refusing A-VOICE-05 rows without joint-hull law")
+        if "suppress generic spectralDynamicAmount" not in handoff.get(
+                "dynamicComposition", ""):
+            raise ValueError("refusing A-VOICE-05 rows without dynamic composition law")
         for voice, table in handoff.get("voices", {}).items():
             if table.get("coverage", {}).get("complete") is not True:
                 raise ValueError(f"refusing incomplete A-VOICE-05 {voice} table")
@@ -48,6 +54,7 @@ def main():
                 "evidenceSha256": handoff.get("evidenceSha256"),
                 "sourceIdentity": table.get("sourceIdentity"),
                 "interpolation": handoff.get("interpolationContract"),
+                "dynamicComposition": handoff.get("dynamicComposition"),
                 "rows": table.get("rows", []),
             }
     blown_tables = {}
