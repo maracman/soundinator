@@ -1,15 +1,27 @@
 from __future__ import annotations
 
+import json
 import numpy as np
+import pytest
 
 from scripts.tone_match.assertions import normalize_instrument
+from scripts.tone_match.controllability import objective_contract_hash
+from scripts.tone_match.score import SCORER_CONTRACT_VERSION
+from scripts.tone_match.sung_audition import _consume_audit
 from scripts.tone_match.sung_features import (
     SungObservation,
+    compare_rendered_vowel_body_transfer,
     fit_pooled_source_vowel_bodies,
     vowel_classification_gate,
     vowel_regions_for_class,
 )
-from scripts.tone_match.sung_prep import VOICE_CLASSES, parse_vocalset_file, register_for_f0
+from scripts.tone_match.sung_prep import (
+    VOICE_CLASSES,
+    VocalSetFile,
+    _roles,
+    parse_vocalset_file,
+    register_for_f0,
+)
 from scripts.tone_match.sung_fit import fit_campaign
 from scripts.tone_match.sung_consonants import (
     CONSONANT_FEATURE_WEIGHTS,
@@ -81,6 +93,64 @@ def test_vowel_gate_uses_class_scaled_regions():
     assert vowel_classification_gate(rendered, "tenor")["passed"]
     rendered["i"]["mid"] = rendered["u"]["mid"]
     assert not vowel_classification_gate(rendered, "tenor")["passed"]
+
+
+def test_rendered_vowel_body_transfer_consumes_exact_fitted_shape():
+    f0 = 130.8128
+    frequencies = f0 * np.arange(1, 49)
+    bands = [
+        {"freq": 520.0, "gain": 1.1, "width": 0.13},
+        {"freq": 1750.0, "gain": 0.8, "width": 0.16},
+    ]
+    source = np.exp(-0.08 * np.arange(48))
+    log2_gain = np.zeros(48)
+    for band in bands:
+        log2_gain += band["gain"] * np.exp(
+            -0.5 * (np.log2(frequencies / band["freq"]) / band["width"]) ** 2
+        )
+    body = source * np.clip(2 ** log2_gain, 0.2, 4.5)
+    result = compare_rendered_vowel_body_transfer(
+        body, source, np.ones(48, dtype=bool),
+        f0_hz=f0, bands=bands,
+    )
+    assert result["passed"]
+    assert result["medianShapeErrorDb"] < 1e-9
+    wrong = compare_rendered_vowel_body_transfer(
+        source, source, np.ones(48, dtype=bool),
+        f0_hz=f0, bands=bands,
+    )
+    assert not wrong["passed"]
+
+
+def test_soprano_above_passaggio_scale_role_is_explicit_and_firewalled():
+    audio = VocalSetFile(
+        path="f1_scales_c_slow_piano_a.wav",
+        singer="female1", singer_short="f1", context="scales",
+        technique="slow_piano", vowel="a",
+    )
+    assert _roles(audio, "soprano", "high") == ["spectral", "onset", "floor"]
+    assert _roles(audio, "soprano", "mid") == ["floor"]
+    assert _roles(audio, "mezzo-soprano", "high") == ["floor"]
+    assert _roles(VocalSetFile(
+        path="f2_scales_c_slow_piano_a.wav",
+        singer="female2", singer_short="f2", context="scales",
+        technique="slow_piano", vowel="a",
+    ), "soprano", "high") == ["floor"]
+
+
+def test_sung_audition_rejects_a_stale_renderer_audit(tmp_path):
+    path = tmp_path / "controllability.json"
+    path.write_text(json.dumps({
+        "instrument": "tenor",
+        "finalWeights": {},
+        "objectiveHash": objective_contract_hash("tenor", [], {}),
+        "scorerContractVersion": SCORER_CONTRACT_VERSION,
+        "rendererContractHash": "stale-renderer",
+        "clean": True,
+        "responsiveParameters": {},
+    }))
+    with pytest.raises(ValueError, match="renderer contract changed"):
+        _consume_audit(path, "tenor", [])
 
 
 def test_alternating_fit_separates_one_source_from_five_bodies():

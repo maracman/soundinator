@@ -176,3 +176,9 @@ All five campaigns remain open. The table is the new lineage baseline, not an
 improvement claim and not a freeze decision. Refinement starts from these
 reports only; prior leaderboards are retained as historical artifacts but are
 excluded from comparisons.
+
+The `/tmp` incident invalidated that frozen-reference lineage. The
+reacquired-corpus rebuild, replacement P5.2 baselines, §2.4c hashes, active
+band-balance results, and §2.5c.6 exit states are recorded in
+`BLOWN_REACQUIRED_REBASELINE.md`; its losses are intentionally not compared
+with the table above.
