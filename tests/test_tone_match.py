@@ -651,6 +651,46 @@ def test_alto_sax_owner_notes_are_construction_gates():
     assert all(by_id[key] == "pass" for key in owner_ids)
 
 
+@pytest.mark.parametrize("instrument", ["clarinet", "french-horn"])
+def test_f5_breath_laws_scope_close_requested_blown_families(instrument):
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+               for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+    base = {
+        "excitationType": "blow", "resonatorClass": "conicalTube", "dynamicBlare": .2,
+        "breathVelocityExponent": 1, "breathTurbulence": 0, "breathBodyAmount": 0,
+    }
+    owner_ids = {f"{instrument}.soft-breath-law", f"{instrument}.turbulence-law",
+                 f"{instrument}.body-coloured-air"}
+    failed = evaluate_construction(instrument, samples, params=base)
+    failed_ids = {row["id"] for row in failed["assertions"] if row["status"] == "fail"}
+    assert owner_ids <= failed_ids
+    fitted = evaluate_construction(instrument, samples, params={
+        **base, "breathVelocityExponent": .5, "breathTurbulence": .2,
+        "breathBodyAmount": .4,
+    })
+    by_id = {row["id"]: row["status"] for row in fitted["assertions"]}
+    assert all(by_id[key] == "pass" for key in owner_ids)
+
+
+@pytest.mark.parametrize("instrument", ["trumpet", "french-horn"])
+def test_f5_onset_spectrum_scope_closes_requested_blown_families(instrument):
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+               for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+    base = {
+        "excitationType": "blow", "resonatorClass": "conicalTube", "dynamicBlare": .2,
+        "onsetSpectrumTilt": 0, "onsetSpectrumDecay": .06,
+    }
+    assertion_id = f"{instrument}.onset-spectrum-law"
+    failed = evaluate_construction(instrument, samples, params=base)
+    by_id = {row["id"]: row["status"] for row in failed["assertions"]}
+    assert by_id[assertion_id] == "fail"
+    fitted = evaluate_construction(instrument, samples, params={
+        **base, "onsetSpectrumTilt": .2,
+    })
+    by_id = {row["id"]: row["status"] for row in fitted["assertions"]}
+    assert by_id[assertion_id] == "pass"
+
+
 def test_boy_morphology_requires_scaled_formants_to_reach_body_stage():
     bundle = _bundle()
     samples = [ConstructionSample(bundle, bundle, register, dynamic, dynamic)
