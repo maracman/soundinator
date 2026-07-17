@@ -112,7 +112,7 @@ source evidence.
 Durable state is recorded in
 `sg2-data/state/agent-a-pass06-summary.json`; the live generated exchange
 snapshot is `agent-a-pass06-exchange-statuses.json` (source SHA-256
-`94847f283b7eb6d4…`, 76 entries). Flute's automatically filed work item and
+`3cf25ddf90431198…`, 77 entries). Flute's automatically filed work item and
 run summary remain under `state/flute` and `runs/flute`.
 
 ## Listening and verification
