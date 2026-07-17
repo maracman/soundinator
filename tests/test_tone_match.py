@@ -37,6 +37,7 @@ from scripts.tone_match.iterate import (
     _reference_set_id,
     _reference_variability,
     _renderer_contract_hash,
+    _technique_exchange_statuses,
     _tripwire_gate,
     _update_leaderboard,
     _write_run_report,
@@ -218,6 +219,21 @@ def test_reference_set_id_changes_when_the_scored_manifest_changes():
         _reference_set_id(base, weights={"partials_db": 0})
     assert _reference_set_id(base, prior_hash="a") != \
         _reference_set_id(base, prior_hash="b")
+
+
+def test_exchange_status_parser_uses_latest_per_lane_update(tmp_path, monkeypatch):
+    exchange = tmp_path / "docs/sg2/TECHNIQUES_EXCHANGE.md"
+    exchange.parent.mkdir(parents=True)
+    exchange.write_text(
+        "### T-001 · Example\n"
+        "Status: analysis=pending engine=pending bowed=blocked-engine\n"
+        "Status update: engine=incorporated abc analysis=adapted\n")
+    monkeypatch.setattr(iterate_module, "ROOT", tmp_path)
+    assert _technique_exchange_statuses() == [{
+        "id": "T-001", "title": "Example", "engine": "incorporated abc",
+        "analysis": "adapted", "bowed": "blocked-engine", "sung": "missing",
+        "struck/plucked": "missing",
+    }]
 
 
 def test_humanisation_position_fit_recovers_existing_comb_law():

@@ -647,6 +647,9 @@ with no vibrato-role row fails loudly.
 Affects: references.json schema / tripwires.aggregate_by_cell / objective hash.
 Status: analysis=pending bowed=incorporated (triage and exact tests specified)
 engine=n/a struck/plucked=adapted (decay/onset roles replace sustained roles)
+Status update — Agent D, 2026-07-17, `913cc4b`: analysis=incorporated
+bowed=incorporated (role-aware coverage is canonical and hashed into the
+objective; floor-only rows cannot create construction obligations)
 
 ### T-037 · Near-zero inharmonicity uses cents, not a B ratio
 Author: Agent D / analysis · 2026-07-16 · Firewall: method-only
@@ -936,6 +939,9 @@ excitation-noise renderer / violin user controls / wind and sung fit methods.
 Status: analysis=incorporated (extractor, engine round-trip gate, Iowa table,
 generated profile, report) engine=pending bowed=blocked-engine
 blown=adapt-method sung=adapt-method struck/plucked=method-applicable
+Status update — Agent D re-audit, 2026-07-17: engine=blocked-verifier
+`ed49beb` (clean Agent A worktree fails `render_note --verify`: pinned
+bow-noise mean delta about 5.35e-8) bowed=blocked-engine analysis=incorporated
 
 ## Sung lane pass-01 disposition (Agent E, 2026-07-16)
 
@@ -1010,6 +1016,9 @@ adult identity contain exactly one singer ID.
 Affects: sung corpus selection / measured profile provenance / campaign builder.
 Status: sung=incorporated (m3 tenor, m8 bass, f5 mezzo selected; old pooled
 profiles quarantined) analysis=pending engine=n/a
+Status update — Agent D, 2026-07-17, `913cc4b`: analysis=adapted
+(canonical target aliases now reject contrabass as a fitted section class;
+one-primary-singer corpus enforcement remains the sung builder's assertion)
 
 ### T-050 · Sung fitting alternates one pooled source with per-vowel bodies
 Author: sung lane · 2026-07-16 · Firewall: method; values per primary singer
@@ -1024,6 +1033,9 @@ second singer enters the fit; rendering each body passes the vowel classifier at
 low/mid registers before its spectral loss can be accepted.
 Affects: sung_features.py / per-vowel profile schema / V0.1/V1 gate.
 Status: sung=incorporated analysis=ack-required engine=consumer-spec filed
+Status update — Agent D, 2026-07-17: analysis=adapted
+(the differential decomposition keeps the pooled source and per-vowel bodies
+frozen as Identity while fitting Human ranges)
 
 ### T-051 · Official note annotations are the expected-f0 contract
 Author: sung lane · 2026-07-16 · Firewall: method-only
@@ -1039,6 +1051,9 @@ unannotated files are excluded before hashing; the analysis tracker must lock
 within the canonical ±50-cent contract or reject the row.
 Affects: sung_prep.py / reference manifests / T-020.
 Status: sung=incorporated analysis=ack-required engine=n/a
+Status update — Agent D, 2026-07-17: analysis=incorporated
+(expected-f0/MIDI anchors are consumed by the canonical extractor and become
+part of the hashed reference objective)
 
 ### T-052 · A public download link does not establish a corpus licence
 Author: sung lane · 2026-07-16 · Firewall: process/legal gate
@@ -1069,3 +1084,30 @@ as the corpus-fitted class; derived rows carry no quantitative PASS claim and
 name the frozen source preset plus morphology transform.
 Affects: sung target registry / report gates / morphology provenance / WP-8.
 Status: sung=incorporated analysis=ack-required engine=n/a
+Status update — Agent D, 2026-07-17, `913cc4b`: analysis=incorporated
+(the construction registry contains exactly soprano, mezzo-soprano, tenor and
+bass as fitted sections; basso profondo and boy soprano are derived rows with
+mandatory frozen-parent and morphology-transform evidence)
+
+### T-055 · Differential Human fits must fail before identity is widened
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: method + violin data
+Finding: violin's six same-note/dynamic/articulation groups provide 14 floor
+takes and 10 pair comparisons. The canonical differential fit emits physical
+`humanRanges` for bow position, vibrato trajectory, sustained/onset residual,
+noise centroid/lead and onset wander/settle. After removing the allowed Human
+bow-position comb plus drive level/tilt, all 10 pairs retain identity-domain
+partial residual above the 3 dB bar (3.58–10.75 dB). This is a decomposition
+FAIL, not permission to widen body, B, material or base partial tables.
+
+Consuming assertions: FIT-MODE zeros Human-only stochastic dimensions;
+SHIP-MODE retains craft and must place N seeded variants inside both sides of
+the measured take-pair spread; the legacy-tag prior is leaderboard entry #1;
+every report names the lookup row, tag/commit and hashes. Cello temporarily
+uses same-string/same-dynamic adjacent semitones with register trend removed,
+explicitly labelled weaker than true duplicates.
+
+Affects: iterate.py / humanisation.py / violin humanRanges / leaderboard and
+run-report contracts / cello proxy basis.
+Status: analysis=incorporated `913cc4b` bowed=incorporated
+engine=blocked T-029/T-054 consuming verification sung=adapt-method
+struck/plucked=adapt-method

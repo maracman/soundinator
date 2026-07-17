@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import secrets
 import subprocess
 import tempfile
@@ -518,16 +519,44 @@ def _technique_exchange_statuses() -> list[dict[str, str]]:
     if not path.exists():
         return [{"id": "exchange", "title": "techniques exchange",
                  "engine": "FAIL: file missing from branch"}]
-    statuses, current_id, title = [], None, ""
+    statuses, current_id, title, body = [], None, "", []
+
+    def flush() -> None:
+        if not current_id:
+            return
+        lanes = {key: "missing" for key in
+                 ("engine", "analysis", "bowed", "sung", "struck/plucked")}
+        pattern = re.compile(
+            r"(?:^|\s)(engine|analysis|bowed|sung|struck/plucked)="
+            r"(.*?)(?=\s(?:engine|analysis|bowed|sung|struck/plucked)=|$)")
+        status_chunks: list[str] = []
+        current_chunk = ""
+        for line in body:
+            if line.startswith("Status"):
+                if current_chunk:
+                    status_chunks.append(current_chunk)
+                current_chunk = line
+            elif current_chunk and not line:
+                status_chunks.append(current_chunk)
+                current_chunk = ""
+            elif current_chunk:
+                current_chunk += " " + line
+        if current_chunk:
+            status_chunks.append(current_chunk)
+        for chunk in status_chunks:
+            for match in pattern.finditer(chunk):
+                lanes[match.group(1)] = match.group(2).strip()
+        statuses.append({"id": current_id, "title": title, **lanes})
+
     for line in path.read_text().splitlines():
         if line.startswith("### T-"):
+            flush()
             heading = line[4:].strip()
             current_id, _, title = heading.partition(" · ")
-        elif current_id and line.startswith("Status:"):
-            engine = line.split("engine=", 1)[1].split(" analysis=", 1)[0].strip() \
-                if "engine=" in line else "missing"
-            statuses.append({"id": current_id, "title": title, "engine": engine})
-            current_id = None
+            body = []
+        elif current_id:
+            body.append(line.strip())
+    flush()
     return statuses
 
 
@@ -659,9 +688,12 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
         else:
             lines.append(f"| `{key}` | {summary['bestParams'].get(key)} | not run | not run | not run |\n")
     lines.extend(["\n## Techniques exchange statuses\n\n",
-                  "| Entry | Engine/blown status |\n|---|---|\n"])
+                  "| Entry | Engine | Analysis | Bowed | Sung | Struck/plucked |\n"
+                  "|---|---|---|---|---|---|\n"])
     for row in summary.get("exchangeStatuses", []):
-        lines.append(f"| `{row['id']}` {row['title']} | {row['engine']} |\n")
+        lines.append(f"| `{row['id']}` {row['title']} | {row['engine']} | "
+                     f"{row['analysis']} | {row['bowed']} | {row['sung']} | "
+                     f"{row['struck/plucked']} |\n")
     board = summary["leaderboardState"]
     lines.extend(["\n## Leaderboard state\n\n",
                   f"Reference set: `{summary['referenceSet']}`. Current run is "
