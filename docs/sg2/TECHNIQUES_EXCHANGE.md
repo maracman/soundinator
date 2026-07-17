@@ -1748,6 +1748,45 @@ hierarchy interpretation.
 Status: analysis=validation-incorporated+edge-quarantined
 bowed=incorporated engine=n/a struck/plucked=adapt-method sung=adapt-method
 
+Status update — Agent E sung pass 08, 2026-07-17: T-064
+sung=incorporated-four-voice-base-consonant-fit-anomaly-still-neutral. The
+same output-verification bar now passes on the current soprano, tenor, bass and
+mezzo identities at representative MIDI 72/60/48/67. Every class is distinct,
+all five burst/VOT/transition perturbations clear the same-seed repeat floor,
+and the provenance-gated unlicensed gesture remains neutral. The fitted values
+remain provisional LibriSpeech spoken-to-sung adaptations; L16/T-064 envelope-
+anomaly classes still have no sung extraction or round trip and remain neutral.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-065
+sung=blocked-prelanding-contract-review. The pinned emitter is strengthened to
+declare joint measured-hull interpolation and observed-dynamic composition.
+Review of Agent A's uncommitted draft found two activation blockers: independent
+f0 clamps per velocity rectangularise soprano's sparse hull, and the observed
+dynamic rows are multiplied again by generic `spectralDynamicAmount`. The new
+output audit at `c7ea902` binds the renderer/table/incumbent hashes and requires
+partial, mel and band-balance response above a same-seed floor. No source-law
+strict cell is claimed until a corrected canonical consumer commit lands.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-067
+sung=values-neutral-weight-zero analysis=pending-unimplemented. A read-only
+audit of clean Agent D tip `c8a8fe8` found no `pitch_sync_breath_db`
+implementation, synthetic residual-envelope round trip, corpus measurement,
+responder test or artifact. The `b5f91b7` engine-only zero identity, envelope-
+line, octave and body-route proofs remain incorporated but cannot earn breath
+weight or a nonzero fitted `voiceBreathSync` value.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-070
+sung=adapted-component-envelope-method-values-neutral. The independent
+component-envelope mechanism is applicable to aspiration and future sung onset
+residuals, but violin timing/level values do not transfer. Sung activation
+still requires its own lossless residual extraction and synthetic trust gate.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-071
+sung=incorporated-edge-quarantine. Raw drift evidence remains stored, but an
+edge cannot steer the sung hierarchy unless both features are active for that
+voice, exceed nonzero feature-specific repeat floors, and represent independent
+intervention lineages. The quarantined cross-family inharmonicity/release-noise
+edge is not used for sung triage.
 ### T-072 · Bowed L16 fixed-Hz envelopes and L18 bow-lift semantics stay separate
 Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: shared method; violin values only
 Finding: the family-generic L16 extractor now has a synthetic round trip that
@@ -1877,6 +1916,17 @@ prove `envelopeSustain` 0.05 versus 1.0 is PCM-identical. Bow/blow retain their
 existing ADSR semantics. Physical damper tables remain absent where Agent C
 classified the evidence incomplete.
 
+Status update — Agent E sung pass 08 post-landing, 2026-07-17: T-065
+sung=blocked-live-consumer-contract. The committed `b4ff0c4` surface path is
+audible and moves partial/mel output for all four voices, but every
+active/absent audit reports zero `band_balance_db` response and remains
+not-clean. Live code retains both pre-landing blockers: f0 is clamped inside
+independent velocity slices before velocity interpolation (rectangularising
+soprano's sparse joint hull), and generic `spectralDynamicAmount` is still
+multiplied after selecting an observed-dynamic row. Fresh hierarchy runs pass
+zero strict aggregate cells and regress paired vowel-body consumption for
+soprano, tenor and mezzo. No identity row or table-derived weight is promoted;
+engine correction and realised-output assertions remain required.
 Status update — Agent A recovery reconciliation, 2026-07-17:
 engine=pending-Agent-A. This status belongs to the T-072 bar-mode consumer;
 the preceding named T-033, T-065 and held-strike/pluck T-067 updates retain
@@ -1964,3 +2014,31 @@ therefore remains the honest bar-control blocker. Harp's current-profile audit
 was interrupted before a contract and its saved baseline predates profile
 activation, so it is preserved as superseded evidence and is not consumed for
 fitting.
+
+Status update — Agent E sung pass 09, 2026-07-17: T-065
+sung=incorporated-current-head-output-audited. After syncing the activated
+harp/glock profile payload, all evidence was rebound to renderer contract
+`095c293b83ebd244`. The final A-VOICE-05 consumer is clean for partial,
+log-mel and sustain band-balance output in soprano, tenor, bass and mezzo; the
+four identity minimum-responder audits are also clean and repeat-stable. The
+source-law comparator lowers both composite and the first unresolved partial
+residual tier for every voice, so the canonical upstream-first selection rule
+promotes all four `pass09-source-law-strict` rows. No strict aggregate cell
+passes, so these remain interim failing leaders rather than ship candidates.
+
+Status update — Agent E sung pass 09, 2026-07-17: T-058
+sung=incorporated-next-limiting-factor. The promoted source law regresses the
+paired emitted-body/vowel assertion from 10/10 to tenor 8/10, soprano 9/10,
+bass 7/10 and mezzo 9/10. This lower-tier regression cannot veto an improvement
+at the still-failing partial tier, but it is the named next fitting target:
+source and vowel body must be co-consumed without losing the measured source
+shape or the vowel identity. No F13 fallback is invoked; all deterministic
+identity rows retain full-strength licensed spectral and paired-body evidence.
+
+Status update — Agent E sung pass 09, 2026-07-17: T-067
+sung=values-neutral-weight-zero analysis=pending-unimplemented. No current-head
+analysis observable, synthetic residual-envelope round trip, corpus measurement
+or fresh responder exists for `pitch_sync_breath_db`; the engine-only consumer
+proof therefore still cannot earn breath weight or a nonzero adult-voice
+`voiceBreathSync` value. With every identity strict aggregate cell failing,
+§2.5c remains `INCONCLUSIVE-MASKED` and no Human range is widened.
