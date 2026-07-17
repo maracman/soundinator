@@ -907,6 +907,28 @@ console.log("T-033 per-string + pinned register × dynamic source surfaces");
   check("T-033 unplayable and wrong-instrument explicit keys reject",
     (() => { try { resolveStringSelection("violin", 55, "sulE"); return false; } catch { return true; } })() &&
     (() => { try { resolveStringSelection("cello", 57, "sulE"); return false; } catch { return true; } })());
+  const measuredGuitar = SPECTRAL_PROFILES.guitar;
+  const nylonSix = stringProfileAt(measuredGuitar, "guitar", 82.407, "string6");
+  const nylonThree = stringProfileAt(measuredGuitar, "guitar", 195.998, "string3");
+  const nylonOne = stringProfileAt(measuredGuitar, "guitar", 659.255, "string1");
+  check("T-033 nylon profile preserves three independently measured course identities",
+    Object.keys(measuredGuitar.partialsByString || {}).sort().join(",") ===
+      "string1,string3,string6" &&
+    new Set([nylonSix.partialB, nylonThree.partialB, nylonOne.partialB]).size === 3 &&
+    Math.max(Math.abs(hiLoDb(nylonSix) - hiLoDb(nylonThree)),
+      Math.abs(hiLoDb(nylonThree) - hiLoDb(nylonOne))) >= 3);
+  const nylonStringOneFingerprint = new GenerationEngine({ seed: 42,
+    voiceMode: "fourier", spectralProfile: "guitar", excitationType: "pluck",
+    stringSelect: "string1",
+  })._spectralFingerprint(.62, 391.995);
+  const nylonStringThreeFingerprint = new GenerationEngine({ seed: 42,
+    voiceMode: "fourier", spectralProfile: "guitar", excitationType: "pluck",
+    stringSelect: "string3",
+  })._spectralFingerprint(.62, 391.995);
+  check("T-033 nylon selected-course identity reaches sounded partials at equal pitch",
+    nylonStringOneFingerprint.partialB !== nylonStringThreeFingerprint.partialB &&
+    nylonStringOneFingerprint.harmonicPartials.some((row, index) =>
+      Math.abs(row.amp - nylonStringThreeFingerprint.harmonicPartials[index]?.amp) > 1e-5));
 
   const surface = { rows: [
     { f0Hz: 100, velocity: .2, partials: [1, .2, .4] },
@@ -1687,12 +1709,26 @@ console.log("L17: pinned pre-onset component class + preset activation");
   const pianoActivation = pinnedNoiseActivationReport(
     SPECTRAL_PROFILES.piano, pianoPreset?.parameters, true)
     .find(row => row.id === "pianoActionNoise");
+  const omittedPianoActivation = pinnedNoiseActivationReport(
+    SPECTRAL_PROFILES.piano, {
+      ...pianoPreset?.parameters,
+      pianoActionNoiseLevel: undefined,
+    }, true).find(row => row.id === "pianoActionNoise");
+  const missingPianoActivation = pinnedNoiseActivationReport(
+    SPECTRAL_PROFILES.piano, Object.fromEntries(Object.entries(
+      pianoPreset?.parameters || {}).filter(([key]) =>
+        key !== "pianoActionNoiseLevel")), true)
+    .find(row => row.id === "pianoActionNoise");
   const pianoFingerprint = new GenerationEngine({ seed: 690,
     ...pianoPreset?.parameters })._spectralFingerprint(.62, 261.63);
   check("T-007 piano preset activates the point-envelope component",
     pianoActivation?.active && pianoActivation.pointEnvelopeCount >= 40 &&
     pianoFingerprint.pinnedNoiseLevels?.pianoActionNoise === 1 &&
     pianoFingerprint.pinnedNoiseComponents?.pianoActionNoise?.profile?.length === 22);
+  check("T-007 omitted required piano activation remains applicable and fails SHIP",
+    missingPianoActivation?.applicable && !missingPianoActivation.active &&
+    missingPianoActivation.explicitActivationPresent === false &&
+    omittedPianoActivation?.explicitActivationPresent === true);
 
   const anomalies = envelopeAnomalyClassesFor(SPECTRAL_PROFILES.piano);
   const rankOne = anomalies.find(row => row.home === "harmonicRank" &&

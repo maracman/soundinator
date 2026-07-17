@@ -525,12 +525,26 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
         # Direct Fourier is the valid temporary home for a measured identity
         # whose named profile still awaits Agent A's activation adapter.
     }
-    if spec["instrument"] not in {"harp", "glockenspiel"}:
+    has_selected_partial_surface = bool(
+        profile.get("partialsByRegister") or profile.get("partialsByString") or
+        profile.get("spectralPartialsByRegisterDynamic"))
+    if (spec["instrument"] not in {"harp", "glockenspiel"} and
+            not has_selected_partial_surface):
         # Legacy instruments without a named measured-profile activation use
-        # this temporary direct Fourier surface. Harp/glock now consume their
-        # own named profiles so their dense register tables remain live.
+        # this temporary direct Fourier surface.  Never install it over a
+        # register/string source surface: spectralPartialMeans has deliberate
+        # precedence in the renderer and would otherwise shadow G1/T-033.
         measured_identity["spectralPartialMeans"] = [
             float(row.get("amp", 0)) for row in profile.get("partials", [])]
+    damper_rows = profile.get("damperByRegister")
+    if isinstance(damper_rows, list) and damper_rows:
+        seed["damperByRegister"] = damper_rows
+    if isinstance(profile.get("preOnsetComponents"), list):
+        seed["preOnsetComponents"] = profile["preOnsetComponents"]
+        seed["pianoActionNoiseLevel"] = 1.0
+    if isinstance(profile.get("envelopeAnomalyClasses"), list):
+        seed["envelopeAnomalyClasses"] = profile["envelopeAnomalyClasses"]
+        seed["envelopeAnomalyLevel"] = 1.0
     material = (profile.get("material") or {}).get("suggestedMaterial")
     if material is not None:
         measured_identity["partialMaterial"] = material
@@ -595,11 +609,18 @@ def rebase_fitted_preset(fitted: dict[str, Any],
     # These anchors are generated from measured-profile pitch evidence and are
     # not optimizer-owned. Keeping an old copy after a profile correction
     # silently reintroduces the superseded register model.
-    for key in ("envelopeAttackByRegister",):
+    for key in ("envelopeAttackByRegister", "damperByRegister",
+                "preOnsetComponents", "envelopeAnomalyClasses",
+                "pianoActionNoiseLevel",
+                "envelopeAnomalyLevel"):
         if key in refreshed_seed:
             rebased[key] = refreshed_seed[key]
         else:
             rebased.pop(key, None)
+    # A selected register/course table owns the source identity.  Carrying a
+    # stale pooled direct surface would shadow it at the final JS consumer.
+    if "spectralPartialMeans" not in refreshed_seed:
+        rebased.pop("spectralPartialMeans", None)
     return rebased
 
 
