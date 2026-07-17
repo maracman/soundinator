@@ -128,7 +128,7 @@ After merging the advancing shared head, all audits were refreshed and all ten
 objective-comparator score sets were revalidated without metric drift. The
 final A-VOICE consumer sync changed only bass's objective seal by activating
 previously dead responders; its score values did not drift. All audits consume
-renderer hash `6528359e37786bc0`. Every fit retains the
+renderer hash `d43b3435a042d441`. Every fit retains the
 pinned `vocal` prior at tag `sg2-legacy`, commit
 `e8d3ac123c0f1c2647c4dbf03d48934b1966564d`, parameter hash
 `8b1047dfbe83d6ba`. FIT scoring is deterministic; selected listening renders

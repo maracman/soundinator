@@ -165,7 +165,7 @@ unless it explicitly enables the already-public parameter.
 Landing status (shared head `b5f91b7`, observed during pass-06 finalisation):
 the Fourier/blow consumer, zero-identity proof, octave-tracking proof and body
 route proof are present. Fresh audits at renderer contract
-`6528359e37786bc0` name `voiceBreathSync` as an audible responder for all four
+`d43b3435a042d441` name `voiceBreathSync` as an audible responder for all four
 adult voices. The dedicated `pitch_sync_breath_db` analysis observable and
 corpus-fitted nonzero values remain pending, so construction stays failing at
 the neutral value; this is now an analysis/activation task rather than a
