@@ -519,10 +519,33 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     near(breathFingerprint.toneBreathLevel, .28, 1e-12));
   check("L4 airflow remains present at Human zero",
     breathFingerprint.excitationHuman === 0 && breathFingerprint.toneBreathLevel > 0);
+  for (const spectralProfile of ["clarinet", "french-horn"]) {
+    const fingerprint = new GenerationEngine({
+      seed: 92, voiceMode: "fourier", spectralProfile,
+      excitationType: "blow", toneBreath: .2,
+      breathVelocityExponent: .5, breathTurbulence: .2, breathBodyAmount: .4,
+    })._spectralFingerprint(.25, 261.63, 0);
+    check(`F5 ${spectralProfile} breath-law controls reach its rendered fingerprint`,
+      fingerprint.excitationType === "blow" && fingerprint.toneBreathLevel > 0 &&
+      near(fingerprint.breathVelocityExponent, .5, 1e-12) &&
+      near(fingerprint.breathTurbulence, .2, 1e-12) &&
+      near(fingerprint.breathBodyAmount, .4, 1e-12));
+  }
   check("onset harmonic colour is neutral at zero",
     [1, 2, 8, 32].every(n => onsetSpectrumGain(n, 0) === 1));
   check("positive onset tilt brightens only the transient harmonic print",
     onsetSpectrumGain(16, .5) > onsetSpectrumGain(2, .5));
+  for (const spectralProfile of ["trumpet", "french-horn"]) {
+    const fingerprint = new GenerationEngine({
+      seed: 93, voiceMode: "fourier", spectralProfile,
+      excitationType: "blow", onsetSpectrumTilt: .2, onsetSpectrumDecay: .07,
+    })._spectralFingerprint(.82, 261.63, 0);
+    check(`F5 ${spectralProfile} onset-spectrum controls reach its rendered fingerprint`,
+      near(fingerprint.onsetSpectrumTilt, .2, 1e-12) &&
+      near(fingerprint.onsetSpectrumDecay, .07, 1e-12) &&
+      onsetSpectrumGain(16, fingerprint.onsetSpectrumTilt) >
+        onsetSpectrumGain(2, fingerprint.onsetSpectrumTilt));
+  }
   const seeded = (seed) => () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;
