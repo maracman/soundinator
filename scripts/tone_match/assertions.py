@@ -456,7 +456,10 @@ def evaluate_construction(
 
     notes = [sample.render.note for sample in sample_list]
     percussive_fraction = float(np.mean([note.percussive for note in notes])) if notes else None
-    if name in {"piano", "guitar"}:
+    # L18 impulse-driven families free-decay after strike/pluck. Requiring a
+    # sustained classification for harp or bars reverses the owner law and
+    # incorrectly makes a physical transient a construction failure.
+    if name in {"piano", "piano-upright", "guitar", "harp", "glockenspiel"}:
         rows.append(_result(f"{name}.impulsive-envelope", "Excitation produces a decaying, impulsive note",
                             None if percussive_fraction is None else percussive_fraction >= .67,
                             percussive_fraction, "at least 2/3 of notes classified percussive", strict_evidence=strict_evidence))
