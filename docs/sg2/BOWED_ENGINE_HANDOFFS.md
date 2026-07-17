@@ -47,26 +47,28 @@ renderer.
 
 Pass-04 queue chase — Agent D, 2026-07-17: the analysis payload remains
 ready and the generated profile hash is
-`c1fc16842bb30bc38e6cd459315d690af93ea546ed87011f4449aba35d95e844`.
+`1e15fe225b619dd1df73649ad19226dfc71ffb6cebe494c6785c76450214fe08`.
 Agent A's live pass-04 exchange snapshot still says `engine=pending-Agent-A`
 and `bowed=blocked-engine T-033`; no consuming commit or one of the five
 assertions is visible yet. Please consume the bowed and guitar contracts in
 the same engine pass: both require the same table-selector seam, while their
 playability/tie-break laws stay family-specific.
 
-## T-064 — independent bow-component envelope consumption
+## T-067 — independent bow-component envelope consumption
 
 Owner handoff: Agent D (analysis) → Agent A (engine), pass 04, 2026-07-17.
 
 L17.5 requires bow noise to have its own measured temporal envelope. The
-checked-in violin measured profile now contains `bowNoise.componentEnvelope`
-with a synthetic-validated residual-component extractor and 57 Iowa notes.
+checked-in violin measured profile now contains `bowNoise.placementLaw` and
+`bowNoise.envelope`, using the shared L17 residual-component schema over 57
+Iowa notes.
 Its contract is independent of harmonic ADSR: airflow/note amplitude is only
 a multiplicative term, the component may lead harmonic onset, and release is
-optional per row when no full tail was measured. The pooled values are a
-121.905 ms lead, 400.544 ms component attack, +235.102 ms peak offset,
-1.397 peak/sustain gain, 17.415 ms settle, and 238.005 ms release from 16
-admissible release rows. `byDynamic` holds the pp/mf/ff medians.
+optional per row when no full tail was measured. The pooled medians are a
+127.710 ms lead/swell, 0 ms peak offset, 23.220 ms settle and -4.206 dB
+sustain below peak. Twenty-one rows have an uncensored component tail;
+`byDynamic` retains the pp/mf/ff distributions and censor counts remain
+explicit.
 
 Required engine consuming assertions:
 
@@ -80,11 +82,15 @@ Required engine consuming assertions:
    calibrated by the existing bow-noise level/dynamic fit.
 4. A measured `releaseMs` shapes only the bow residual after note-off;
    missing release data uses the current fallback bit-identically.
-5. A profile without `componentEnvelope` is bit-identical to the current
+5. A profile without measured `placementLaw`/`envelope` is bit-identical to the current
    bowed renderer.
 
-Analysis evidence: the synthetic injection recovers a 45.333 ms lead from a
-60 ms target, +16 ms peak offset from +20 ms, 72 ms settle, and 32 ms
-release; every declared tolerance passes. The engine portion is pending
-Agent A. Until it lands, `releaseDamping` cannot safely stand in for the
-temporal bow-noise release law.
+Analysis evidence: the known-envelope synthetic injection recovers a
+53.333 ms lead from a 60 ms target, -10.667 ms peak offset from a local
++20 ms peak target, 64 ms settle, and 10.667 ms relative release; every
+declared tolerance passes. During the pass-end merge, Agent A's shared L17
+component renderer landed at `3b17222`; the violin legacy adapter now consumes
+these same placement/envelope fields. A new tone-model assertion proves the
+measured positive lead, independent envelope and nonzero release reach the
+bow renderer. `releaseDamping` therefore remains a separate harmonic/body
+ring control, not a stand-in for bow-component release.

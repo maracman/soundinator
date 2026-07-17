@@ -35,6 +35,7 @@
     { "key": "onsetWanderSettlePeriods", "min": 2.0, "max": 30.0, "step": 1.0, "default": 12.0, "appliesTo": ["bow"], "auditContext": { "onsetWanderCents": 80.0 }, "note": "T-031 bowed lock-in duration in nominal f0 periods; ship/audit only; audit enables measured wander depth" },
     { "key": "bowScratchLevel", "min": 0.0, "max": 2.0, "step": 0.01, "default": 0.0, "appliesTo": ["bow"], "note": "T-031 Human/articulation-scaled period-locked bow-contact residual; zero is exact-neutral" },
     { "key": "bowNoiseLevel", "min": 0.0, "max": 2.0, "step": 0.01, "default": 0.0, "appliesTo": ["bow"], "note": "T-054 level for the immutable measured sustained bow-noise spectrum; zero is exact-neutral" },
+    { "key": "windBreathLevel", "min": 0.0, "max": 2.0, "step": 0.01, "default": 0.0, "appliesTo": ["blow"], "note": "L17 level only for an immutable pinned wind-breath spectrum/placement/envelope; zero is exact-neutral" },
     { "key": "releaseDamping", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "appliesTo": ["bow", "strike", "pluck"], "note": "T-060/T-023 independent note-off damping; zero preserves the held note and material-derived release ring" },
     { "key": "onsetScoopDepthCents", "min": 0.0, "max": 180.0, "step": 1.0, "default": 0.0, "appliesTo": ["blow"], "note": "measured weak-articulation phrase-start scoop depth at Human 1; Human 0 and depth 0 are exact pitch" },
     { "key": "onsetScoopSettle", "min": 0.015, "max": 0.35, "step": 0.005, "default": 0.06, "appliesTo": ["blow"], "note": "measured scoop settling time; inert while depth is 0" },
@@ -71,7 +72,10 @@
     "materialT60 fit (t60Ref, slope) where free decay was measured",
     "attackNoise freq/q/decay + band stagger (bandT90ms)",
     "vibratoProb/Depth/Rate stats",
-    "envelope A/D/S/R"
+    "envelope A/D/S/R",
+    "pinnedNoiseComponents spectrum/profile rows",
+    "pinnedNoiseComponents placementLaw from noise_lead_ms",
+    "pinnedNoiseComponents independent component envelope"
   ],
   "fixed": {
     "spectralPartials": 64,

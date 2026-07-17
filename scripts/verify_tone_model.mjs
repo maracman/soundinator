@@ -54,6 +54,12 @@ import {
   bowNoisePreBodyGainDbAt,
   bowNoiseVelocityGain,
   buildBowNoiseImpulse,
+  pinnedNoiseComponentsFor,
+  pinnedNoiseProfileAt,
+  pinnedNoiseLeadMsAt,
+  pinnedNoiseEnvelopeAt,
+  pinnedNoiseActivationReport,
+  maxPinnedNoiseLeadForParams,
   FORMANT_PRESETS,
   migrateToneParams,
   spaceArrivalDelay,
@@ -69,6 +75,7 @@ import {
   consonantTransitionGain,
 } from "../web/static/synth.js";
 import { MEASURED_PROFILES } from "../web/static/measured_profiles.js";
+import { FACTORY_PRESETS } from "../web/static/factory-presets.js";
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -1080,6 +1087,75 @@ console.log("T-054: pinned violin bow-noise consumer");
   const ff = component.levelLaw.rungs.find(row => row.dynamic === "ff");
   check("T-054 measured pp NHR exceeds ff by at least 2 dB",
     pp.noiseToHarmonicDb - ff.noiseToHarmonicDb >= 2);
+}
+
+console.log("L17: pinned pre-onset component class + preset activation");
+{
+  const winds = ["flute", "clarinet", "alto-sax"];
+  for (const instrument of winds) {
+    const measured = MEASURED_PROFILES[instrument];
+    const component = measured?.pinnedNoiseComponents?.windBreath;
+    const profile = SPECTRAL_PROFILES[instrument];
+    const resolved = pinnedNoiseComponentsFor(profile)
+      .find(row => row.id === "windBreath");
+    const lead = pinnedNoiseLeadMsAt(component, .2);
+    const envelope = pinnedNoiseEnvelopeAt(component, .2);
+    check(`${instrument} carries one immutable wind-breath contract`,
+      component?.profilePinned === true && resolved?.profile === component.profile &&
+      component.engineContract?.shapeOptimiserMutable === false);
+    check(`${instrument} consumes measured positive pre-onset placement`,
+      lead > 0 && maxPinnedNoiseLeadForParams({
+        spectralProfile: instrument, excitationType: "blow",
+        toneBreath: .2, windBreathLevel: 1,
+      }, .2) >= lead / 1000);
+    check(`${instrument} consumes its independent fitted component envelope`,
+      envelope.independent && envelope.preOnsetSwellMs >= 0 &&
+      envelope.releaseMs > 0 && component.envelope?.toneAdsrSlave === false);
+    const ppSpectrum = pinnedNoiseProfileAt(component, .2);
+    const ffSpectrum = pinnedNoiseProfileAt(component, .92);
+    check(`${instrument} consumes separate pinned pp/ff spectra`,
+      ppSpectrum === component.profilesByDynamic?.pp &&
+      ffSpectrum === component.profilesByDynamic?.ff &&
+      ppSpectrum.some((row, index) =>
+        Math.abs(row.gainDb - ffSpectrum[index]?.gainDb) > 1e-6));
+    const fingerprint = new GenerationEngine({
+      seed: 1717, voiceMode: "fourier", spectralProfile: instrument,
+      excitationType: "blow", toneBreath: .2, windBreathLevel: 1,
+    })._spectralFingerprint(.2, 440, 0);
+    check(`${instrument} pinned component and non-neutral level reach the renderer`,
+      fingerprint.pinnedNoiseComponents?.windBreath?.profile === ppSpectrum &&
+      fingerprint.windBreathLevel === 1);
+    const falseActivation = pinnedNoiseActivationReport(profile, {
+      spectralProfile: instrument, excitationType: "blow",
+      toneBreath: 0, windBreathLevel: 1,
+    }, true).find(row => row.id === "windBreath");
+    check(`${instrument} activation gate rejects a silent upstream breath law`,
+      falseActivation?.applicable && !falseActivation.active &&
+      falseActivation.effectiveLevel === 0);
+  }
+
+  const failures = [];
+  for (const preset of FACTORY_PRESETS) {
+    const params = preset?.parameters || {};
+    const profile = SPECTRAL_PROFILES[String(params.spectralProfile || "")];
+    for (const row of pinnedNoiseActivationReport(profile, params, true)) {
+      if (row.applicable && !row.active) failures.push(`${preset.id}:${row.id}:${row.control}`);
+    }
+  }
+  check("every applicable factory preset activates every pinned component in SHIP mode",
+    failures.length === 0, failures.join(", "));
+  const violinFoundation = FACTORY_PRESETS.find(row => row.id === "factory-sub-violin-natural");
+  const violinActivation = pinnedNoiseActivationReport(
+    SPECTRAL_PROFILES.violin, violinFoundation?.parameters, true);
+  check("violin's formerly silent pinned bow component is preset-active",
+    violinActivation.some(row => row.id === "bowNoise" && row.active && row.level > 0));
+  const violinBow = pinnedNoiseComponentsFor(SPECTRAL_PROFILES.violin)
+    .find(row => row.id === "bowNoise");
+  const violinBowEnvelope = pinnedNoiseEnvelopeAt(violinBow, .62);
+  check("violin consumes its measured independent bow-component envelope",
+    violinBow?.envelope?.toneAdsrSlave === false &&
+    pinnedNoiseLeadMsAt(violinBow, .62) > 0 &&
+    violinBowEnvelope.independent && violinBowEnvelope.releaseMs > 0);
 }
 
 console.log("T6: preset migration (T-B9 partial)");

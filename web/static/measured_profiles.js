@@ -1200,6 +1200,1590 @@ export const MEASURED_PROFILES = {
       "measuredBandwidthHz": 742.0,
       "measuredLevelRatio": 0.009
     },
+    "pinnedNoiseComponents": {
+      "windBreath": {
+        "componentClass": "pinnedPreOnsetNoise",
+        "method": "f0 harmonic subtraction + per-dynamic cross-pitch median",
+        "source": "dense Iowa MIS lossless chromatic AIFF runs, canonically segmented",
+        "bandHz": [
+          200.0,
+          14400.0
+        ],
+        "profilePinned": true,
+        "profile": [
+          {
+            "freqHz": 200.0,
+            "gainDb": -1.56
+          },
+          {
+            "freqHz": 224.5,
+            "gainDb": -0.768
+          },
+          {
+            "freqHz": 252.0,
+            "gainDb": -0.545
+          },
+          {
+            "freqHz": 282.8,
+            "gainDb": 0.347
+          },
+          {
+            "freqHz": 317.5,
+            "gainDb": 1.634
+          },
+          {
+            "freqHz": 356.4,
+            "gainDb": 2.202
+          },
+          {
+            "freqHz": 400.0,
+            "gainDb": 2.934
+          },
+          {
+            "freqHz": 504.0,
+            "gainDb": 2.711
+          },
+          {
+            "freqHz": 712.7,
+            "gainDb": -1.137
+          },
+          {
+            "freqHz": 800.0,
+            "gainDb": -0.755
+          },
+          {
+            "freqHz": 898.0,
+            "gainDb": 1.672
+          },
+          {
+            "freqHz": 1007.9,
+            "gainDb": 4.624
+          },
+          {
+            "freqHz": 1131.4,
+            "gainDb": 0.864
+          },
+          {
+            "freqHz": 1269.9,
+            "gainDb": 1.752
+          },
+          {
+            "freqHz": 1425.4,
+            "gainDb": 3.112
+          },
+          {
+            "freqHz": 1600.0,
+            "gainDb": 4.069
+          },
+          {
+            "freqHz": 1795.9,
+            "gainDb": 1.107
+          },
+          {
+            "freqHz": 2015.9,
+            "gainDb": 0.818
+          },
+          {
+            "freqHz": 2262.7,
+            "gainDb": -0.067
+          },
+          {
+            "freqHz": 2539.8,
+            "gainDb": 1.628
+          },
+          {
+            "freqHz": 2850.9,
+            "gainDb": 1.711
+          },
+          {
+            "freqHz": 3200.0,
+            "gainDb": -1.068
+          },
+          {
+            "freqHz": 3591.9,
+            "gainDb": -4.233
+          },
+          {
+            "freqHz": 4031.7,
+            "gainDb": -6.917
+          },
+          {
+            "freqHz": 6400.0,
+            "gainDb": -2.991
+          },
+          {
+            "freqHz": 8063.5,
+            "gainDb": -7.583
+          }
+        ],
+        "profilesByDynamic": {
+          "pp": [
+            {
+              "freqHz": 200.0,
+              "gainDb": 1.408
+            },
+            {
+              "freqHz": 224.5,
+              "gainDb": 0.608
+            },
+            {
+              "freqHz": 252.0,
+              "gainDb": -0.07
+            },
+            {
+              "freqHz": 282.8,
+              "gainDb": 2.976
+            },
+            {
+              "freqHz": 317.5,
+              "gainDb": 2.871
+            },
+            {
+              "freqHz": 356.4,
+              "gainDb": 3.199
+            },
+            {
+              "freqHz": 400.0,
+              "gainDb": 4.872
+            },
+            {
+              "freqHz": 504.0,
+              "gainDb": 0.737
+            },
+            {
+              "freqHz": 712.7,
+              "gainDb": -5.327
+            },
+            {
+              "freqHz": 800.0,
+              "gainDb": -3.92
+            },
+            {
+              "freqHz": 898.0,
+              "gainDb": -1.492
+            },
+            {
+              "freqHz": 1007.9,
+              "gainDb": 2.379
+            },
+            {
+              "freqHz": 1131.4,
+              "gainDb": -0.812
+            },
+            {
+              "freqHz": 1269.9,
+              "gainDb": 1.089
+            },
+            {
+              "freqHz": 1425.4,
+              "gainDb": 1.996
+            },
+            {
+              "freqHz": 1600.0,
+              "gainDb": 2.801
+            },
+            {
+              "freqHz": 1795.9,
+              "gainDb": 2.551
+            },
+            {
+              "freqHz": 2015.9,
+              "gainDb": 1.58
+            },
+            {
+              "freqHz": 2262.7,
+              "gainDb": -0.078
+            },
+            {
+              "freqHz": 2539.8,
+              "gainDb": 1.993
+            },
+            {
+              "freqHz": 2850.9,
+              "gainDb": 2.842
+            },
+            {
+              "freqHz": 3200.0,
+              "gainDb": 0.189
+            },
+            {
+              "freqHz": 3591.9,
+              "gainDb": -3.192
+            },
+            {
+              "freqHz": 4031.7,
+              "gainDb": -6.705
+            },
+            {
+              "freqHz": 6400.0,
+              "gainDb": -2.594
+            },
+            {
+              "freqHz": 8063.5,
+              "gainDb": -9.656
+            }
+          ],
+          "ff": [
+            {
+              "freqHz": 200.0,
+              "gainDb": -4.529
+            },
+            {
+              "freqHz": 224.5,
+              "gainDb": -2.144
+            },
+            {
+              "freqHz": 252.0,
+              "gainDb": -1.019
+            },
+            {
+              "freqHz": 282.8,
+              "gainDb": -2.283
+            },
+            {
+              "freqHz": 317.5,
+              "gainDb": 0.398
+            },
+            {
+              "freqHz": 356.4,
+              "gainDb": 1.204
+            },
+            {
+              "freqHz": 400.0,
+              "gainDb": 0.997
+            },
+            {
+              "freqHz": 504.0,
+              "gainDb": 4.686
+            },
+            {
+              "freqHz": 712.7,
+              "gainDb": 3.053
+            },
+            {
+              "freqHz": 800.0,
+              "gainDb": 2.411
+            },
+            {
+              "freqHz": 898.0,
+              "gainDb": 4.837
+            },
+            {
+              "freqHz": 1007.9,
+              "gainDb": 6.869
+            },
+            {
+              "freqHz": 1131.4,
+              "gainDb": 2.54
+            },
+            {
+              "freqHz": 1269.9,
+              "gainDb": 2.414
+            },
+            {
+              "freqHz": 1425.4,
+              "gainDb": 4.228
+            },
+            {
+              "freqHz": 1600.0,
+              "gainDb": 5.337
+            },
+            {
+              "freqHz": 1795.9,
+              "gainDb": -0.337
+            },
+            {
+              "freqHz": 2015.9,
+              "gainDb": 0.055
+            },
+            {
+              "freqHz": 2262.7,
+              "gainDb": -0.055
+            },
+            {
+              "freqHz": 2539.8,
+              "gainDb": 1.263
+            },
+            {
+              "freqHz": 2850.9,
+              "gainDb": 0.581
+            },
+            {
+              "freqHz": 3200.0,
+              "gainDb": -2.326
+            },
+            {
+              "freqHz": 3591.9,
+              "gainDb": -5.275
+            },
+            {
+              "freqHz": 4031.7,
+              "gainDb": -7.13
+            },
+            {
+              "freqHz": 6400.0,
+              "gainDb": -3.387
+            },
+            {
+              "freqHz": 8063.5,
+              "gainDb": -5.509
+            }
+          ]
+        },
+        "levelLaw": {
+          "model": "amplitude = windBreathLevel * existingWindBreathLaw(toneBreath, velocity, airflowEnvelope, inefficiency)",
+          "retainsExistingTerms": [
+            "toneBreath",
+            "velocityExponent",
+            "airflowEnvelope",
+            "inefficiencyLaw",
+            "turbulenceLaw",
+            "bodyRouting"
+          ],
+          "measuredAbsoluteVelocityExponent": 1.296,
+          "velocityExponent": 1.296,
+          "interceptNoisePowerDbAtVelocity1": -49.746,
+          "fitRmseDb": 0.0,
+          "rungs": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "noisePowerDb": -67.864,
+              "noiseToHarmonicDb": -35.171
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "noisePowerDb": -50.685,
+              "noiseToHarmonicDb": -34.06
+            }
+          ]
+        },
+        "placementLaw": {
+          "model": "linear interpolation of per-dynamic median noise_lead_ms; positive leads tone t0",
+          "sense": "canonical score.py noise_lead_ms",
+          "byDynamic": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "noiseLeadMs": {
+                "median": 232.2,
+                "p25": 121.905,
+                "p75": 377.324
+              }
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "noiseLeadMs": {
+                "median": 23.22,
+                "p25": 23.22,
+                "p75": 46.44
+              }
+            }
+          ],
+          "allNotes": {
+            "median": 58.05,
+            "p25": 23.22,
+            "p75": 226.395
+          }
+        },
+        "envelope": {
+          "model": "independent piecewise pre-onset swell/peak/settle/sustain/release envelope",
+          "toneAdsrSlave": false,
+          "byDynamic": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "preOnsetSwellMs": {
+                "median": 191.565,
+                "p25": 72.562,
+                "p75": 316.371
+              },
+              "peakOffsetMs": {
+                "median": 139.32,
+                "p25": 63.855,
+                "p75": 208.98
+              },
+              "settleFromPeakMs": {
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 11.61
+              },
+              "sustainBelowPeakDb": {
+                "median": -2.086,
+                "p25": -4.234,
+                "p75": -0.493
+              },
+              "releaseMs": {
+                "median": 203.175,
+                "p25": 11.61,
+                "p75": 354.104
+              }
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "preOnsetSwellMs": {
+                "median": 29.025,
+                "p25": 23.22,
+                "p75": 46.44
+              },
+              "peakOffsetMs": {
+                "median": 11.61,
+                "p25": 0.0,
+                "p75": 11.61
+              },
+              "settleFromPeakMs": {
+                "median": 34.83,
+                "p25": 23.22,
+                "p75": 69.66
+              },
+              "sustainBelowPeakDb": {
+                "median": -11.376,
+                "p25": -14.757,
+                "p75": -9.286
+              },
+              "releaseMs": {
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 14.512
+              }
+            }
+          ],
+          "allNotes": {
+            "preOnsetSwellMs": {
+              "median": 46.44,
+              "p25": 23.22,
+              "p75": 188.662
+            },
+            "peakOffsetMs": {
+              "median": 11.61,
+              "p25": 0.0,
+              "p75": 133.515
+            },
+            "settleFromPeakMs": {
+              "median": 23.22,
+              "p25": 0.0,
+              "p75": 49.343
+            },
+            "sustainBelowPeakDb": {
+              "median": -6.035,
+              "p25": -11.351,
+              "p75": -2.204
+            },
+            "releaseMs": {
+              "median": 11.61,
+              "p25": 0.0,
+              "p75": 200.273
+            }
+          },
+          "releaseCensoredNotes": 1,
+          "perNoteEvidence": [
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m60.wav",
+              "dynamic": "pp",
+              "f0Hz": 262.234747,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 267.029,
+              "preOnsetSwellMs": 359.909,
+              "peakOffsetMs": -301.859,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 3.108,
+              "releaseMs": 441.179,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 359.909
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m61.wav",
+              "dynamic": "pp",
+              "f0Hz": 277.832794,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 174.15,
+              "preOnsetSwellMs": 162.54,
+              "peakOffsetMs": -116.1,
+              "settleFromPeakMs": 11.61,
+              "sustainBelowPeakDb": -5.652,
+              "releaseMs": 452.789,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 162.54
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m62.wav",
+              "dynamic": "pp",
+              "f0Hz": 294.400879,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 905.578,
+              "preOnsetSwellMs": 0.0,
+              "peakOffsetMs": 243.81,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 3.549,
+              "releaseMs": 452.789,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 0.0
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m63.wav",
+              "dynamic": "pp",
+              "f0Hz": 314.395218,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 11.61,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 104.49,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 0.225,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m64.wav",
+              "dynamic": "pp",
+              "f0Hz": 330.773121,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 208.98,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 81.27,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.967,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m65.wav",
+              "dynamic": "pp",
+              "f0Hz": 353.931265,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 174.15,
+              "preOnsetSwellMs": 174.15,
+              "peakOffsetMs": 232.2,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.976,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 174.15
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m66.wav",
+              "dynamic": "pp",
+              "f0Hz": 371.769371,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 267.029,
+              "preOnsetSwellMs": 267.029,
+              "peakOffsetMs": 127.71,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.803,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 267.029
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m67.wav",
+              "dynamic": "pp",
+              "f0Hz": 396.043539,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 46.44,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": 162.54,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.218,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m68.wav",
+              "dynamic": "pp",
+              "f0Hz": 419.199087,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 0.0,
+              "preOnsetSwellMs": 0.0,
+              "peakOffsetMs": 116.1,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 1.83,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 0.0
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m69.wav",
+              "dynamic": "pp",
+              "f0Hz": 445.715244,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 58.05,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 208.98,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 0.196,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m70.wav",
+              "dynamic": "pp",
+              "f0Hz": 475.153348,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 104.49,
+              "preOnsetSwellMs": 116.1,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 139.32,
+              "sustainBelowPeakDb": -10.893,
+              "releaseMs": 81.27,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 116.1
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C4B4-m71.wav",
+              "dynamic": "pp",
+              "f0Hz": 506.776996,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 11.61,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 116.1,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.481,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m72.wav",
+              "dynamic": "pp",
+              "f0Hz": 537.69521,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 243.81,
+              "preOnsetSwellMs": 197.37,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -4.027,
+              "releaseMs": 348.299,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 197.37
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m73.wav",
+              "dynamic": "pp",
+              "f0Hz": 566.069487,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 534.059,
+              "preOnsetSwellMs": 534.059,
+              "peakOffsetMs": 150.93,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -5.516,
+              "releaseMs": 208.98,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 534.059
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m74.wav",
+              "dynamic": "pp",
+              "f0Hz": 598.280124,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 348.299,
+              "preOnsetSwellMs": 359.909,
+              "peakOffsetMs": 197.37,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.911,
+              "releaseMs": 267.029,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 359.909
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m75.wav",
+              "dynamic": "pp",
+              "f0Hz": 635.088556,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 522.449,
+              "preOnsetSwellMs": 301.859,
+              "peakOffsetMs": 162.54,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.673,
+              "releaseMs": 789.478,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 301.859
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m76.wav",
+              "dynamic": "pp",
+              "f0Hz": 678.226522,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 429.569,
+              "preOnsetSwellMs": 429.569,
+              "peakOffsetMs": 104.49,
+              "settleFromPeakMs": 336.689,
+              "sustainBelowPeakDb": -4.947,
+              "releaseMs": 267.029,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 429.569
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m77.wav",
+              "dynamic": "pp",
+              "f0Hz": 715.959664,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 522.449,
+              "preOnsetSwellMs": 371.519,
+              "peakOffsetMs": 150.93,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.634,
+              "releaseMs": 371.519,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 371.519
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m78.wav",
+              "dynamic": "pp",
+              "f0Hz": 759.511089,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 789.478,
+              "preOnsetSwellMs": 104.49,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 208.98,
+              "sustainBelowPeakDb": -6.535,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 104.49
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m79.wav",
+              "dynamic": "pp",
+              "f0Hz": 804.737154,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 359.909,
+              "preOnsetSwellMs": 359.909,
+              "peakOffsetMs": 162.54,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -1.48,
+              "releaseMs": 267.029,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 359.909
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.C5Ab5-m80.wav",
+              "dynamic": "pp",
+              "f0Hz": 856.048886,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 847.528,
+              "preOnsetSwellMs": 847.528,
+              "peakOffsetMs": 197.37,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.497,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 847.528
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m49.wav",
+              "dynamic": "pp",
+              "f0Hz": 139.441333,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 92.88,
+              "preOnsetSwellMs": 81.27,
+              "peakOffsetMs": -81.27,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.8,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 81.27
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m50.wav",
+              "dynamic": "pp",
+              "f0Hz": 147.242621,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": -23.22,
+              "settleFromPeakMs": 11.61,
+              "sustainBelowPeakDb": -5.979,
+              "releaseMs": 243.81,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m51.wav",
+              "dynamic": "pp",
+              "f0Hz": 156.082971,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 197.37,
+              "preOnsetSwellMs": 185.76,
+              "peakOffsetMs": 116.1,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.763,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 185.76
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m52.wav",
+              "dynamic": "pp",
+              "f0Hz": 164.887406,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 127.71,
+              "preOnsetSwellMs": 127.71,
+              "peakOffsetMs": 92.88,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -1.848,
+              "releaseMs": 197.37,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 127.71
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m53.wav",
+              "dynamic": "pp",
+              "f0Hz": 174.565736,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 139.32,
+              "preOnsetSwellMs": 139.32,
+              "peakOffsetMs": -116.1,
+              "settleFromPeakMs": 11.61,
+              "sustainBelowPeakDb": -4.379,
+              "releaseMs": 34.83,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 139.32
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m54.wav",
+              "dynamic": "pp",
+              "f0Hz": 185.144889,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 208.98,
+              "preOnsetSwellMs": 208.98,
+              "peakOffsetMs": 220.59,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.713,
+              "releaseMs": 220.59,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 208.98
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m55.wav",
+              "dynamic": "pp",
+              "f0Hz": 196.181279,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 301.859,
+              "preOnsetSwellMs": 278.639,
+              "peakOffsetMs": 208.98,
+              "settleFromPeakMs": 92.88,
+              "sustainBelowPeakDb": -4.186,
+              "releaseMs": 452.789,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 278.639
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m56.wav",
+              "dynamic": "pp",
+              "f0Hz": 207.661622,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 290.249,
+              "preOnsetSwellMs": 278.639,
+              "peakOffsetMs": 243.81,
+              "settleFromPeakMs": 255.42,
+              "sustainBelowPeakDb": -6.091,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 278.639
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m57.wav",
+              "dynamic": "pp",
+              "f0Hz": 221.45158,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 220.59,
+              "preOnsetSwellMs": 267.029,
+              "peakOffsetMs": 243.81,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.323,
+              "releaseMs": 394.739,
+              "releaseCensored": true,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 267.029
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m58.wav",
+              "dynamic": "pp",
+              "f0Hz": 233.939144,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 812.698,
+              "preOnsetSwellMs": 789.478,
+              "peakOffsetMs": 220.59,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.515,
+              "releaseMs": 325.079,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 789.478
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.pp.Db3B3-m59.wav",
+              "dynamic": "pp",
+              "f0Hz": 248.405804,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 255.42,
+              "preOnsetSwellMs": 267.029,
+              "peakOffsetMs": 243.81,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 1.938,
+              "releaseMs": 905.578,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 267.029
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m60.wav",
+              "dynamic": "ff",
+              "f0Hz": 261.348422,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -11.625,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m61.wav",
+              "dynamic": "ff",
+              "f0Hz": 276.70988,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 116.1,
+              "sustainBelowPeakDb": -16.811,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m62.wav",
+              "dynamic": "ff",
+              "f0Hz": 293.695368,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 46.44,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 34.83,
+              "sustainBelowPeakDb": -6.375,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m63.wav",
+              "dynamic": "ff",
+              "f0Hz": 309.711207,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 11.61,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 46.44,
+              "sustainBelowPeakDb": -11.975,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m64.wav",
+              "dynamic": "ff",
+              "f0Hz": 328.132514,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 34.83,
+              "sustainBelowPeakDb": -12.994,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m65.wav",
+              "dynamic": "ff",
+              "f0Hz": 352.082116,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 58.05,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 58.05,
+              "sustainBelowPeakDb": -16.076,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m66.wav",
+              "dynamic": "ff",
+              "f0Hz": 373.239318,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 58.05,
+              "preOnsetSwellMs": 58.05,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 46.44,
+              "sustainBelowPeakDb": -13.618,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 58.05
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m67.wav",
+              "dynamic": "ff",
+              "f0Hz": 396.056,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 46.44,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 11.61,
+              "sustainBelowPeakDb": -3.214,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m68.wav",
+              "dynamic": "ff",
+              "f0Hz": 416.904236,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -5.433,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m69.wav",
+              "dynamic": "ff",
+              "f0Hz": 442.67306,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 11.61,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 11.61,
+              "sustainBelowPeakDb": -4.306,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m70.wav",
+              "dynamic": "ff",
+              "f0Hz": 470.016977,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 69.66,
+              "sustainBelowPeakDb": -17.023,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C4B4-m71.wav",
+              "dynamic": "ff",
+              "f0Hz": 498.351656,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 58.05,
+              "preOnsetSwellMs": 58.05,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 69.66,
+              "sustainBelowPeakDb": -19.512,
+              "releaseMs": 46.44,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 58.05
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m72.wav",
+              "dynamic": "ff",
+              "f0Hz": 528.638738,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 69.66,
+              "sustainBelowPeakDb": -19.93,
+              "releaseMs": 34.83,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m73.wav",
+              "dynamic": "ff",
+              "f0Hz": 557.198901,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 34.83,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 34.83,
+              "sustainBelowPeakDb": -17.035,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m74.wav",
+              "dynamic": "ff",
+              "f0Hz": 587.27372,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 46.44,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -8.52,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m75.wav",
+              "dynamic": "ff",
+              "f0Hz": 623.474643,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 34.83,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 34.83,
+              "sustainBelowPeakDb": -10.364,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m76.wav",
+              "dynamic": "ff",
+              "f0Hz": 664.632573,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 162.54,
+              "sustainBelowPeakDb": -17.438,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m77.wav",
+              "dynamic": "ff",
+              "f0Hz": 702.833872,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 34.83,
+              "sustainBelowPeakDb": -16.485,
+              "releaseMs": 46.44,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m78.wav",
+              "dynamic": "ff",
+              "f0Hz": 740.279838,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -11.427,
+              "releaseMs": 34.83,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m79.wav",
+              "dynamic": "ff",
+              "f0Hz": 787.573354,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 34.83,
+              "sustainBelowPeakDb": -14.317,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.C5Ab5-m80.wav",
+              "dynamic": "ff",
+              "f0Hz": 831.742154,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -14.168,
+              "releaseMs": 34.83,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m49.wav",
+              "dynamic": "ff",
+              "f0Hz": 139.310317,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 34.83,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -6.941,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m50.wav",
+              "dynamic": "ff",
+              "f0Hz": 146.426274,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 92.88,
+              "preOnsetSwellMs": 92.88,
+              "peakOffsetMs": 23.22,
+              "settleFromPeakMs": 348.299,
+              "sustainBelowPeakDb": -7.206,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 92.88
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m51.wav",
+              "dynamic": "ff",
+              "f0Hz": 155.242641,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 46.44,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 69.66,
+              "sustainBelowPeakDb": -10.474,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m52.wav",
+              "dynamic": "ff",
+              "f0Hz": 164.643475,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 81.27,
+              "preOnsetSwellMs": 81.27,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 58.05,
+              "sustainBelowPeakDb": -10.785,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 81.27
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m53.wav",
+              "dynamic": "ff",
+              "f0Hz": 173.358352,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 46.44,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 34.83,
+              "sustainBelowPeakDb": -10.455,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m54.wav",
+              "dynamic": "ff",
+              "f0Hz": 183.603345,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 34.83,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 46.44,
+              "sustainBelowPeakDb": -12.423,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m55.wav",
+              "dynamic": "ff",
+              "f0Hz": 195.957651,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 58.05,
+              "preOnsetSwellMs": 58.05,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -8.706,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 58.05
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m56.wav",
+              "dynamic": "ff",
+              "f0Hz": 207.0745,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -10.417,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m57.wav",
+              "dynamic": "ff",
+              "f0Hz": 219.710808,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 46.44,
+              "sustainBelowPeakDb": -11.237,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m58.wav",
+              "dynamic": "ff",
+              "f0Hz": 233.115087,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 69.66,
+              "sustainBelowPeakDb": -9.479,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/alto-sax/wind-breath/dense-references/AltoSax.NoVib.ff.Db3B3-m59.wav",
+              "dynamic": "ff",
+              "f0Hz": 246.8168,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 11.61,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 92.88,
+              "sustainBelowPeakDb": -11.325,
+              "releaseMs": 34.83,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            }
+          ]
+        },
+        "engineContract": {
+          "component": "windBreath",
+          "componentClass": "pinnedPreOnsetNoise",
+          "bodyRouting": 1,
+          "levelControl": "windBreathLevel",
+          "excitationTypes": [
+            "blow"
+          ],
+          "shapeOptimiserMutable": false,
+          "preOnsetCapable": true,
+          "independentEnvelopeRequired": true
+        }
+      }
+    },
     "humanRanges": {
       "schemaVersion": 2,
       "instrument": "alto-sax",
@@ -7270,6 +8854,628 @@ export const MEASURED_PROFILES = {
       "measuredBandwidthHz": 745.0,
       "measuredLevelRatio": 0.005
     },
+    "pinnedNoiseComponents": {
+      "windBreath": {
+        "componentClass": "pinnedPreOnsetNoise",
+        "method": "f0 harmonic subtraction + per-dynamic cross-pitch median",
+        "source": "Iowa MIS lossless AIFF-derived campaign references only",
+        "bandHz": [
+          200.0,
+          14400.0
+        ],
+        "profilePinned": true,
+        "profile": [
+          {
+            "freqHz": 200.0,
+            "gainDb": 0.947
+          },
+          {
+            "freqHz": 282.8,
+            "gainDb": -0.258
+          },
+          {
+            "freqHz": 317.5,
+            "gainDb": -0.914
+          },
+          {
+            "freqHz": 356.4,
+            "gainDb": -0.457
+          },
+          {
+            "freqHz": 400.0,
+            "gainDb": -2.471
+          },
+          {
+            "freqHz": 800.0,
+            "gainDb": -2.299
+          },
+          {
+            "freqHz": 1269.9,
+            "gainDb": 2.499
+          },
+          {
+            "freqHz": 1425.4,
+            "gainDb": -0.94
+          },
+          {
+            "freqHz": 1600.0,
+            "gainDb": 3.051
+          },
+          {
+            "freqHz": 1795.9,
+            "gainDb": 1.31
+          },
+          {
+            "freqHz": 2015.9,
+            "gainDb": 1.924
+          },
+          {
+            "freqHz": 2262.7,
+            "gainDb": 5.209
+          },
+          {
+            "freqHz": 2539.8,
+            "gainDb": -0.892
+          },
+          {
+            "freqHz": 2850.9,
+            "gainDb": -0.375
+          },
+          {
+            "freqHz": 3200.0,
+            "gainDb": 2.47
+          },
+          {
+            "freqHz": 3591.9,
+            "gainDb": 1.435
+          },
+          {
+            "freqHz": 4031.7,
+            "gainDb": -2.301
+          },
+          {
+            "freqHz": 4525.5,
+            "gainDb": -0.043
+          },
+          {
+            "freqHz": 5079.7,
+            "gainDb": -0.107
+          },
+          {
+            "freqHz": 5701.8,
+            "gainDb": -1.358
+          },
+          {
+            "freqHz": 6400.0,
+            "gainDb": -1.478
+          },
+          {
+            "freqHz": 7183.8,
+            "gainDb": -1.183
+          },
+          {
+            "freqHz": 8063.5,
+            "gainDb": -0.838
+          },
+          {
+            "freqHz": 9051.0,
+            "gainDb": -2.34
+          },
+          {
+            "freqHz": 10159.4,
+            "gainDb": -3.809
+          },
+          {
+            "freqHz": 11403.5,
+            "gainDb": -2.48
+          },
+          {
+            "freqHz": 12800.0,
+            "gainDb": -2.036
+          },
+          {
+            "freqHz": 14367.5,
+            "gainDb": 1.483
+          }
+        ],
+        "profilesByDynamic": {
+          "pp": [
+            {
+              "freqHz": 200.0,
+              "gainDb": 3.981
+            },
+            {
+              "freqHz": 282.8,
+              "gainDb": 2.434
+            },
+            {
+              "freqHz": 317.5,
+              "gainDb": 1.85
+            },
+            {
+              "freqHz": 356.4,
+              "gainDb": 2.41
+            },
+            {
+              "freqHz": 400.0,
+              "gainDb": -1.037
+            },
+            {
+              "freqHz": 800.0,
+              "gainDb": -2.575
+            },
+            {
+              "freqHz": 1269.9,
+              "gainDb": 2.452
+            },
+            {
+              "freqHz": 1425.4,
+              "gainDb": -0.277
+            },
+            {
+              "freqHz": 1600.0,
+              "gainDb": 4.52
+            },
+            {
+              "freqHz": 1795.9,
+              "gainDb": 1.877
+            },
+            {
+              "freqHz": 2015.9,
+              "gainDb": 1.883
+            },
+            {
+              "freqHz": 2262.7,
+              "gainDb": 6.173
+            },
+            {
+              "freqHz": 2539.8,
+              "gainDb": 0.206
+            },
+            {
+              "freqHz": 2850.9,
+              "gainDb": 1.289
+            },
+            {
+              "freqHz": 3200.0,
+              "gainDb": 5.525
+            },
+            {
+              "freqHz": 3591.9,
+              "gainDb": 1.878
+            },
+            {
+              "freqHz": 4031.7,
+              "gainDb": -2.968
+            },
+            {
+              "freqHz": 4525.5,
+              "gainDb": 0.505
+            },
+            {
+              "freqHz": 5079.7,
+              "gainDb": -1.018
+            },
+            {
+              "freqHz": 5701.8,
+              "gainDb": -2.305
+            },
+            {
+              "freqHz": 6400.0,
+              "gainDb": -3.864
+            },
+            {
+              "freqHz": 7183.8,
+              "gainDb": -3.165
+            },
+            {
+              "freqHz": 8063.5,
+              "gainDb": -3.406
+            },
+            {
+              "freqHz": 9051.0,
+              "gainDb": -4.391
+            },
+            {
+              "freqHz": 10159.4,
+              "gainDb": -6.035
+            },
+            {
+              "freqHz": 11403.5,
+              "gainDb": -5.249
+            },
+            {
+              "freqHz": 12800.0,
+              "gainDb": -4.763
+            },
+            {
+              "freqHz": 14367.5,
+              "gainDb": -0.206
+            }
+          ],
+          "ff": [
+            {
+              "freqHz": 200.0,
+              "gainDb": -2.086
+            },
+            {
+              "freqHz": 282.8,
+              "gainDb": -2.95
+            },
+            {
+              "freqHz": 317.5,
+              "gainDb": -3.678
+            },
+            {
+              "freqHz": 356.4,
+              "gainDb": -3.324
+            },
+            {
+              "freqHz": 400.0,
+              "gainDb": -3.905
+            },
+            {
+              "freqHz": 800.0,
+              "gainDb": -2.024
+            },
+            {
+              "freqHz": 1269.9,
+              "gainDb": 2.545
+            },
+            {
+              "freqHz": 1425.4,
+              "gainDb": -1.603
+            },
+            {
+              "freqHz": 1600.0,
+              "gainDb": 1.581
+            },
+            {
+              "freqHz": 1795.9,
+              "gainDb": 0.743
+            },
+            {
+              "freqHz": 2015.9,
+              "gainDb": 1.965
+            },
+            {
+              "freqHz": 2262.7,
+              "gainDb": 4.245
+            },
+            {
+              "freqHz": 2539.8,
+              "gainDb": -1.99
+            },
+            {
+              "freqHz": 2850.9,
+              "gainDb": -2.04
+            },
+            {
+              "freqHz": 3200.0,
+              "gainDb": -0.585
+            },
+            {
+              "freqHz": 3591.9,
+              "gainDb": 0.991
+            },
+            {
+              "freqHz": 4031.7,
+              "gainDb": -1.634
+            },
+            {
+              "freqHz": 4525.5,
+              "gainDb": -0.592
+            },
+            {
+              "freqHz": 5079.7,
+              "gainDb": 0.805
+            },
+            {
+              "freqHz": 5701.8,
+              "gainDb": -0.411
+            },
+            {
+              "freqHz": 6400.0,
+              "gainDb": 0.908
+            },
+            {
+              "freqHz": 7183.8,
+              "gainDb": 0.799
+            },
+            {
+              "freqHz": 8063.5,
+              "gainDb": 1.73
+            },
+            {
+              "freqHz": 9051.0,
+              "gainDb": -0.29
+            },
+            {
+              "freqHz": 10159.4,
+              "gainDb": -1.583
+            },
+            {
+              "freqHz": 11403.5,
+              "gainDb": 0.29
+            },
+            {
+              "freqHz": 12800.0,
+              "gainDb": 0.69
+            },
+            {
+              "freqHz": 14367.5,
+              "gainDb": 3.172
+            }
+          ]
+        },
+        "levelLaw": {
+          "model": "amplitude = windBreathLevel * existingWindBreathLaw(toneBreath, velocity, airflowEnvelope, inefficiency)",
+          "retainsExistingTerms": [
+            "toneBreath",
+            "velocityExponent",
+            "airflowEnvelope",
+            "inefficiencyLaw",
+            "turbulenceLaw",
+            "bodyRouting"
+          ],
+          "measuredAbsoluteVelocityExponent": 0.7838,
+          "velocityExponent": 0.7838,
+          "interceptNoisePowerDbAtVelocity1": -56.202,
+          "fitRmseDb": 0.0,
+          "rungs": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "noisePowerDb": -67.16,
+              "noiseToHarmonicDb": -36.016
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "noisePowerDb": -56.77,
+              "noiseToHarmonicDb": -34.693
+            }
+          ]
+        },
+        "placementLaw": {
+          "model": "linear interpolation of per-dynamic median noise_lead_ms; positive leads tone t0",
+          "sense": "canonical score.py noise_lead_ms",
+          "byDynamic": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "noiseLeadMs": {
+                "median": 267.029,
+                "p25": 168.344,
+                "p75": 272.834
+              }
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "noiseLeadMs": {
+                "median": 23.22,
+                "p25": 17.415,
+                "p75": 46.44
+              }
+            }
+          ],
+          "allNotes": {
+            "median": 69.66,
+            "p25": 34.83,
+            "p75": 217.687
+          }
+        },
+        "envelope": {
+          "model": "independent piecewise pre-onset swell/peak/settle/sustain/release envelope",
+          "toneAdsrSlave": false,
+          "byDynamic": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "preOnsetSwellMs": {
+                "median": 243.81,
+                "p25": 156.735,
+                "p75": 261.225
+              },
+              "peakOffsetMs": {
+                "median": 116.1,
+                "p25": 58.05,
+                "p75": 145.125
+              },
+              "settleFromPeakMs": {
+                "median": 11.61,
+                "p25": 5.805,
+                "p75": 46.44
+              },
+              "sustainBelowPeakDb": {
+                "median": -3.369,
+                "p25": -7.806,
+                "p75": -2.779
+              },
+              "releaseMs": {
+                "median": 23.22,
+                "p25": 17.415,
+                "p75": 185.76
+              }
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "preOnsetSwellMs": {
+                "median": 46.44,
+                "p25": 29.025,
+                "p75": 58.05
+              },
+              "peakOffsetMs": {
+                "median": 81.27,
+                "p25": 40.635,
+                "p75": 92.88
+              },
+              "settleFromPeakMs": {
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 11.61
+              },
+              "sustainBelowPeakDb": {
+                "median": -0.129,
+                "p25": -2.639,
+                "p75": 0.037
+              },
+              "releaseMs": {
+                "median": 23.22,
+                "p25": 17.415,
+                "p75": 23.22
+              }
+            }
+          ],
+          "allNotes": {
+            "preOnsetSwellMs": {
+              "median": 69.66,
+              "p25": 52.245,
+              "p75": 200.273
+            },
+            "peakOffsetMs": {
+              "median": 92.88,
+              "p25": 20.317,
+              "p75": 113.197
+            },
+            "settleFromPeakMs": {
+              "median": 5.805,
+              "p25": 0.0,
+              "p75": 20.317
+            },
+            "sustainBelowPeakDb": {
+              "median": -2.779,
+              "p25": -4.703,
+              "p75": -0.644
+            },
+            "releaseMs": {
+              "median": 23.22,
+              "p25": 14.512,
+              "p75": 23.22
+            }
+          },
+          "releaseCensoredNotes": 1,
+          "perNoteEvidence": [
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/clarinet/references/iowa-low-pp-54.wav",
+              "dynamic": "pp",
+              "f0Hz": 184.997211,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 267.029,
+              "preOnsetSwellMs": 243.81,
+              "peakOffsetMs": 174.15,
+              "settleFromPeakMs": 11.61,
+              "sustainBelowPeakDb": -3.369,
+              "releaseMs": 348.299,
+              "releaseCensored": true,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 243.81
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/clarinet/references/iowa-mid-pp-72.wav",
+              "dynamic": "pp",
+              "f0Hz": 523.251131,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 278.639,
+              "preOnsetSwellMs": 278.639,
+              "peakOffsetMs": 116.1,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.189,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 278.639
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/clarinet/references/iowa-high-pp-84.wav",
+              "dynamic": "pp",
+              "f0Hz": 1108.730524,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 69.66,
+              "preOnsetSwellMs": 69.66,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 81.27,
+              "sustainBelowPeakDb": -12.244,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 69.66
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/clarinet/references/iowa-low-ff-54.wav",
+              "dynamic": "ff",
+              "f0Hz": 184.997211,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 23.22,
+              "preOnsetSwellMs": 46.44,
+              "peakOffsetMs": 104.49,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 0.202,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 46.44
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/clarinet/references/iowa-mid-ff-72.wav",
+              "dynamic": "ff",
+              "f0Hz": 523.251131,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 69.66,
+              "preOnsetSwellMs": 69.66,
+              "peakOffsetMs": 81.27,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.129,
+              "releaseMs": 11.61,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 69.66
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/clarinet/references/iowa-high-ff-84.wav",
+              "dynamic": "ff",
+              "f0Hz": 1046.502261,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 11.61,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 23.22,
+              "sustainBelowPeakDb": -5.148,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            }
+          ]
+        },
+        "engineContract": {
+          "component": "windBreath",
+          "componentClass": "pinnedPreOnsetNoise",
+          "bodyRouting": 1,
+          "levelControl": "windBreathLevel",
+          "excitationTypes": [
+            "blow"
+          ],
+          "shapeOptimiserMutable": false,
+          "preOnsetCapable": true,
+          "independentEnvelopeRequired": true
+        }
+      }
+    },
     "humanRanges": {
       "schemaVersion": 2,
       "instrument": "clarinet",
@@ -8881,6 +11087,652 @@ export const MEASURED_PROFILES = {
       "decay": 0.146,
       "measuredBandwidthHz": 951.0,
       "measuredLevelRatio": 0.01
+    },
+    "pinnedNoiseComponents": {
+      "windBreath": {
+        "componentClass": "pinnedPreOnsetNoise",
+        "method": "f0 harmonic subtraction + per-dynamic cross-pitch median",
+        "source": "Iowa MIS lossless AIFF-derived campaign references only",
+        "bandHz": [
+          200.0,
+          14400.0
+        ],
+        "profilePinned": true,
+        "profile": [
+          {
+            "freqHz": 200.0,
+            "gainDb": 2.215
+          },
+          {
+            "freqHz": 252.0,
+            "gainDb": 0.323
+          },
+          {
+            "freqHz": 282.8,
+            "gainDb": 0.253
+          },
+          {
+            "freqHz": 317.5,
+            "gainDb": 1.964
+          },
+          {
+            "freqHz": 356.4,
+            "gainDb": -0.79
+          },
+          {
+            "freqHz": 400.0,
+            "gainDb": 0.643
+          },
+          {
+            "freqHz": 712.7,
+            "gainDb": -1.458
+          },
+          {
+            "freqHz": 800.0,
+            "gainDb": 1.579
+          },
+          {
+            "freqHz": 898.0,
+            "gainDb": 0.074
+          },
+          {
+            "freqHz": 1425.4,
+            "gainDb": 3.505
+          },
+          {
+            "freqHz": 1600.0,
+            "gainDb": 8.954
+          },
+          {
+            "freqHz": 1795.9,
+            "gainDb": 3.479
+          },
+          {
+            "freqHz": 2015.9,
+            "gainDb": 6.652
+          },
+          {
+            "freqHz": 2262.7,
+            "gainDb": 8.199
+          },
+          {
+            "freqHz": 2539.8,
+            "gainDb": 6.478
+          },
+          {
+            "freqHz": 2850.9,
+            "gainDb": 3.208
+          },
+          {
+            "freqHz": 3200.0,
+            "gainDb": -2.946
+          },
+          {
+            "freqHz": 3591.9,
+            "gainDb": -1.179
+          },
+          {
+            "freqHz": 4031.7,
+            "gainDb": -1.228
+          },
+          {
+            "freqHz": 4525.5,
+            "gainDb": -2.928
+          },
+          {
+            "freqHz": 5079.7,
+            "gainDb": -4.673
+          },
+          {
+            "freqHz": 5701.8,
+            "gainDb": -6.185
+          },
+          {
+            "freqHz": 6400.0,
+            "gainDb": -3.907
+          },
+          {
+            "freqHz": 7183.8,
+            "gainDb": -4.627
+          },
+          {
+            "freqHz": 8063.5,
+            "gainDb": -4.988
+          },
+          {
+            "freqHz": 9051.0,
+            "gainDb": -5.541
+          },
+          {
+            "freqHz": 10159.4,
+            "gainDb": -3.263
+          },
+          {
+            "freqHz": 11403.5,
+            "gainDb": -0.749
+          },
+          {
+            "freqHz": 12800.0,
+            "gainDb": -3.405
+          },
+          {
+            "freqHz": 14367.5,
+            "gainDb": -3.381
+          }
+        ],
+        "profilesByDynamic": {
+          "pp": [
+            {
+              "freqHz": 200.0,
+              "gainDb": 6.133
+            },
+            {
+              "freqHz": 252.0,
+              "gainDb": 4.738
+            },
+            {
+              "freqHz": 282.8,
+              "gainDb": 4.574
+            },
+            {
+              "freqHz": 317.5,
+              "gainDb": 5.449
+            },
+            {
+              "freqHz": 356.4,
+              "gainDb": 1.149
+            },
+            {
+              "freqHz": 400.0,
+              "gainDb": 3.141
+            },
+            {
+              "freqHz": 712.7,
+              "gainDb": -0.732
+            },
+            {
+              "freqHz": 800.0,
+              "gainDb": 3.986
+            },
+            {
+              "freqHz": 898.0,
+              "gainDb": -0.917
+            },
+            {
+              "freqHz": 1425.4,
+              "gainDb": 0.253
+            },
+            {
+              "freqHz": 1600.0,
+              "gainDb": 2.976
+            },
+            {
+              "freqHz": 1795.9,
+              "gainDb": -3.21
+            },
+            {
+              "freqHz": 2015.9,
+              "gainDb": 2.885
+            },
+            {
+              "freqHz": 2262.7,
+              "gainDb": 4.726
+            },
+            {
+              "freqHz": 2539.8,
+              "gainDb": 3.584
+            },
+            {
+              "freqHz": 2850.9,
+              "gainDb": 3.553
+            },
+            {
+              "freqHz": 3200.0,
+              "gainDb": -7.661
+            },
+            {
+              "freqHz": 3591.9,
+              "gainDb": -5.483
+            },
+            {
+              "freqHz": 4031.7,
+              "gainDb": -2.445
+            },
+            {
+              "freqHz": 4525.5,
+              "gainDb": -5.711
+            },
+            {
+              "freqHz": 5079.7,
+              "gainDb": -8.789
+            },
+            {
+              "freqHz": 5701.8,
+              "gainDb": -8.608
+            },
+            {
+              "freqHz": 6400.0,
+              "gainDb": -5.237
+            },
+            {
+              "freqHz": 7183.8,
+              "gainDb": -5.09
+            },
+            {
+              "freqHz": 8063.5,
+              "gainDb": -6.714
+            },
+            {
+              "freqHz": 9051.0,
+              "gainDb": -7.808
+            },
+            {
+              "freqHz": 10159.4,
+              "gainDb": -6.133
+            },
+            {
+              "freqHz": 11403.5,
+              "gainDb": -4.098
+            },
+            {
+              "freqHz": 12800.0,
+              "gainDb": -6.821
+            },
+            {
+              "freqHz": 14367.5,
+              "gainDb": -5.062
+            }
+          ],
+          "ff": [
+            {
+              "freqHz": 200.0,
+              "gainDb": -1.703
+            },
+            {
+              "freqHz": 252.0,
+              "gainDb": -4.092
+            },
+            {
+              "freqHz": 282.8,
+              "gainDb": -4.067
+            },
+            {
+              "freqHz": 317.5,
+              "gainDb": -1.522
+            },
+            {
+              "freqHz": 356.4,
+              "gainDb": -2.729
+            },
+            {
+              "freqHz": 400.0,
+              "gainDb": -1.855
+            },
+            {
+              "freqHz": 712.7,
+              "gainDb": -2.183
+            },
+            {
+              "freqHz": 800.0,
+              "gainDb": -0.829
+            },
+            {
+              "freqHz": 898.0,
+              "gainDb": 1.066
+            },
+            {
+              "freqHz": 1425.4,
+              "gainDb": 6.756
+            },
+            {
+              "freqHz": 1600.0,
+              "gainDb": 14.933
+            },
+            {
+              "freqHz": 1795.9,
+              "gainDb": 10.168
+            },
+            {
+              "freqHz": 2015.9,
+              "gainDb": 10.419
+            },
+            {
+              "freqHz": 2262.7,
+              "gainDb": 11.671
+            },
+            {
+              "freqHz": 2539.8,
+              "gainDb": 9.372
+            },
+            {
+              "freqHz": 2850.9,
+              "gainDb": 2.862
+            },
+            {
+              "freqHz": 3200.0,
+              "gainDb": 1.77
+            },
+            {
+              "freqHz": 3591.9,
+              "gainDb": 3.126
+            },
+            {
+              "freqHz": 4031.7,
+              "gainDb": -0.011
+            },
+            {
+              "freqHz": 4525.5,
+              "gainDb": -0.146
+            },
+            {
+              "freqHz": 5079.7,
+              "gainDb": -0.558
+            },
+            {
+              "freqHz": 5701.8,
+              "gainDb": -3.763
+            },
+            {
+              "freqHz": 6400.0,
+              "gainDb": -2.576
+            },
+            {
+              "freqHz": 7183.8,
+              "gainDb": -4.163
+            },
+            {
+              "freqHz": 8063.5,
+              "gainDb": -3.262
+            },
+            {
+              "freqHz": 9051.0,
+              "gainDb": -3.274
+            },
+            {
+              "freqHz": 10159.4,
+              "gainDb": -0.394
+            },
+            {
+              "freqHz": 11403.5,
+              "gainDb": 2.6
+            },
+            {
+              "freqHz": 12800.0,
+              "gainDb": 0.011
+            },
+            {
+              "freqHz": 14367.5,
+              "gainDb": -1.699
+            }
+          ]
+        },
+        "levelLaw": {
+          "model": "amplitude = windBreathLevel * existingWindBreathLaw(toneBreath, velocity, airflowEnvelope, inefficiency)",
+          "retainsExistingTerms": [
+            "toneBreath",
+            "velocityExponent",
+            "airflowEnvelope",
+            "inefficiencyLaw",
+            "turbulenceLaw",
+            "bodyRouting"
+          ],
+          "measuredAbsoluteVelocityExponent": 0.8099,
+          "velocityExponent": 0.8099,
+          "interceptNoisePowerDbAtVelocity1": -58.869,
+          "fitRmseDb": 0.0,
+          "rungs": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "noisePowerDb": -70.192,
+              "noiseToHarmonicDb": -30.849
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "noisePowerDb": -59.456,
+              "noiseToHarmonicDb": -33.751
+            }
+          ]
+        },
+        "placementLaw": {
+          "model": "linear interpolation of per-dynamic median noise_lead_ms; positive leads tone t0",
+          "sense": "canonical score.py noise_lead_ms",
+          "byDynamic": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "noiseLeadMs": {
+                "median": 81.27,
+                "p25": 69.66,
+                "p75": 87.075
+              }
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "noiseLeadMs": {
+                "median": 34.83,
+                "p25": 23.22,
+                "p75": 75.465
+              }
+            }
+          ],
+          "allNotes": {
+            "median": 69.66,
+            "p25": 40.635,
+            "p75": 89.977
+          }
+        },
+        "envelope": {
+          "model": "independent piecewise pre-onset swell/peak/settle/sustain/release envelope",
+          "toneAdsrSlave": false,
+          "byDynamic": [
+            {
+              "dynamic": "pp",
+              "velocity": 0.2,
+              "preOnsetSwellMs": {
+                "median": 58.05,
+                "p25": 40.635,
+                "p75": 75.465
+              },
+              "peakOffsetMs": {
+                "median": 81.27,
+                "p25": 46.44,
+                "p75": 121.905
+              },
+              "settleFromPeakMs": {
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 40.635
+              },
+              "sustainBelowPeakDb": {
+                "median": -2.58,
+                "p25": -4.949,
+                "p75": -0.607
+              },
+              "releaseMs": {
+                "median": 34.83,
+                "p25": 29.025,
+                "p75": 156.734
+              }
+            },
+            {
+              "dynamic": "ff",
+              "velocity": 0.92,
+              "preOnsetSwellMs": {
+                "median": 34.83,
+                "p25": 23.22,
+                "p75": 69.66
+              },
+              "peakOffsetMs": {
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 69.66
+              },
+              "settleFromPeakMs": {
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 0.0
+              },
+              "sustainBelowPeakDb": {
+                "median": 1.451,
+                "p25": 0.573,
+                "p75": 3.49
+              },
+              "releaseMs": {
+                "median": 34.83,
+                "p25": 17.415,
+                "p75": 40.635
+              }
+            }
+          ],
+          "allNotes": {
+            "preOnsetSwellMs": {
+              "median": 46.44,
+              "p25": 26.122,
+              "p75": 84.172
+            },
+            "peakOffsetMs": {
+              "median": 46.44,
+              "p25": 2.902,
+              "p75": 124.807
+            },
+            "settleFromPeakMs": {
+              "median": 0.0,
+              "p25": 0.0,
+              "p75": 0.0
+            },
+            "sustainBelowPeakDb": {
+              "median": 0.53,
+              "p25": -2.011,
+              "p75": 1.43
+            },
+            "releaseMs": {
+              "median": 34.83,
+              "p25": 26.122,
+              "p75": 43.537
+            }
+          },
+          "releaseCensoredNotes": 0,
+          "perNoteEvidence": [
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/flute/references/iowa-low-pp-60.wav",
+              "dynamic": "pp",
+              "f0Hz": 261.625565,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 92.88,
+              "preOnsetSwellMs": 92.88,
+              "peakOffsetMs": 11.61,
+              "settleFromPeakMs": 81.27,
+              "sustainBelowPeakDb": -7.317,
+              "releaseMs": 278.639,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 92.88
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/flute/references/iowa-mid-pp-72.wav",
+              "dynamic": "pp",
+              "f0Hz": 523.251131,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 81.27,
+              "preOnsetSwellMs": 23.22,
+              "peakOffsetMs": 81.27,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 1.366,
+              "releaseMs": 34.83,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 23.22
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/flute/references/iowa-high-pp-84.wav",
+              "dynamic": "pp",
+              "f0Hz": 1046.502261,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 58.05,
+              "preOnsetSwellMs": 58.05,
+              "peakOffsetMs": 162.54,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -2.58,
+              "releaseMs": 23.22,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 58.05
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/flute/references/iowa-low-ff-60.wav",
+              "dynamic": "ff",
+              "f0Hz": 261.625565,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 116.1,
+              "preOnsetSwellMs": 104.49,
+              "peakOffsetMs": 139.32,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": -0.306,
+              "releaseMs": 34.83,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 104.49
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/flute/references/iowa-mid-ff-72.wav",
+              "dynamic": "ff",
+              "f0Hz": 523.251131,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 34.83,
+              "preOnsetSwellMs": 34.83,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 5.53,
+              "releaseMs": 0.0,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 34.83
+            },
+            {
+              "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/flute/references/iowa-high-ff-84.wav",
+              "dynamic": "ff",
+              "f0Hz": 1046.502261,
+              "sense": "positive noiseLeadMs means component precedes harmonic onset",
+              "threshold": "first crossing of 10% of own sustain spectral density",
+              "noiseLeadMs": 11.61,
+              "preOnsetSwellMs": 11.61,
+              "peakOffsetMs": 0.0,
+              "settleFromPeakMs": 0.0,
+              "sustainBelowPeakDb": 1.451,
+              "releaseMs": 46.44,
+              "releaseCensored": false,
+              "stftHopMs": 11.61,
+              "noiseLeadSense": "canonical score.py noise_lead_ms",
+              "envelopeTrackLeadMs": 11.61
+            }
+          ]
+        },
+        "engineContract": {
+          "component": "windBreath",
+          "componentClass": "pinnedPreOnsetNoise",
+          "bodyRouting": 1,
+          "levelControl": "windBreathLevel",
+          "excitationTypes": [
+            "blow"
+          ],
+          "shapeOptimiserMutable": false,
+          "preOnsetCapable": true,
+          "independentEnvelopeRequired": true
+        }
+      }
     },
     "humanRanges": {
       "schemaVersion": 2,
@@ -22535,11 +25387,1147 @@ export const MEASURED_PROFILES = {
           }
         ]
       },
+      "placementLaw": {
+        "model": "linear interpolation of per-dynamic residual-envelope lead; positive leads tone t0",
+        "sense": "f0-comb residual track relative to harmonic track",
+        "byDynamic": [
+          {
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "noiseLeadMs": {
+              "median": 232.2,
+              "p25": 133.515,
+              "p75": 284.444
+            }
+          },
+          {
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "noiseLeadMs": {
+              "median": 150.93,
+              "p25": 87.075,
+              "p75": 220.59
+            }
+          },
+          {
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "noiseLeadMs": {
+              "median": 81.27,
+              "p25": 58.05,
+              "p75": 87.075
+            }
+          }
+        ],
+        "allNotes": {
+          "median": 127.71,
+          "p25": 69.66,
+          "p75": 232.2
+        }
+      },
+      "envelope": {
+        "model": "independent piecewise pre-onset swell/peak/settle/sustain/release envelope",
+        "toneAdsrSlave": false,
+        "byDynamic": [
+          {
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "preOnsetSwellMs": {
+              "median": 232.2,
+              "p25": 133.515,
+              "p75": 284.444
+            },
+            "peakOffsetMs": {
+              "median": 69.66,
+              "p25": 29.025,
+              "p75": 145.125
+            },
+            "settleFromPeakMs": {
+              "median": 0.0,
+              "p25": 0.0,
+              "p75": 29.025
+            },
+            "sustainBelowPeakDb": {
+              "median": -2.126,
+              "p25": -4.543,
+              "p75": -1.211
+            },
+            "releaseMs": {
+              "median": 0.0,
+              "p25": 0.0,
+              "p75": 40.635
+            }
+          },
+          {
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "preOnsetSwellMs": {
+              "median": 150.93,
+              "p25": 87.075,
+              "p75": 220.59
+            },
+            "peakOffsetMs": {
+              "median": -23.22,
+              "p25": -52.245,
+              "p75": 197.37
+            },
+            "settleFromPeakMs": {
+              "median": 11.61,
+              "p25": 0.0,
+              "p75": 29.025
+            },
+            "sustainBelowPeakDb": {
+              "median": -3.9,
+              "p25": -5.384,
+              "p75": -0.427
+            },
+            "releaseMs": {
+              "median": 11.61,
+              "p25": 0.0,
+              "p75": 110.295
+            }
+          },
+          {
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "preOnsetSwellMs": {
+              "median": 81.27,
+              "p25": 58.05,
+              "p75": 87.075
+            },
+            "peakOffsetMs": {
+              "median": -11.61,
+              "p25": -23.22,
+              "p75": 63.855
+            },
+            "settleFromPeakMs": {
+              "median": 58.05,
+              "p25": 23.22,
+              "p75": 104.49
+            },
+            "sustainBelowPeakDb": {
+              "median": -9.233,
+              "p25": -18.203,
+              "p75": -6.084
+            },
+            "releaseMs": {
+              "median": 0.0,
+              "p25": 0.0,
+              "p75": 34.83
+            }
+          }
+        ],
+        "allNotes": {
+          "preOnsetSwellMs": {
+            "median": 127.71,
+            "p25": 69.66,
+            "p75": 232.2
+          },
+          "peakOffsetMs": {
+            "median": 0.0,
+            "p25": -23.22,
+            "p75": 185.76
+          },
+          "settleFromPeakMs": {
+            "median": 23.22,
+            "p25": 0.0,
+            "p75": 46.44
+          },
+          "sustainBelowPeakDb": {
+            "median": -4.206,
+            "p25": -8.147,
+            "p75": -0.838
+          },
+          "releaseMs": {
+            "median": 0.0,
+            "p25": 0.0,
+            "p75": 69.66
+          }
+        },
+        "releaseCensoredNotes": 36,
+        "perNoteEvidence": [
+          {
+            "path": "../../campaigns/violin/body-references/low-055-ff-sulG.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulG",
+            "f0Hz": 195.536277,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 34.83,
+            "preOnsetSwellMs": 34.83,
+            "peakOffsetMs": 0.0,
+            "settleFromPeakMs": 429.569,
+            "sustainBelowPeakDb": -21.955,
+            "releaseMs": 58.05,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-056-ff-sulG.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulG",
+            "f0Hz": 203.402129,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 150.93,
+            "preOnsetSwellMs": 150.93,
+            "peakOffsetMs": -34.83,
+            "settleFromPeakMs": 58.05,
+            "sustainBelowPeakDb": -8.147,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-057-ff-sulG.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulG",
+            "f0Hz": 217.350868,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 185.76,
+            "preOnsetSwellMs": 185.76,
+            "peakOffsetMs": 104.49,
+            "settleFromPeakMs": 34.83,
+            "sustainBelowPeakDb": -9.233,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-058-ff-sulG.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulG",
+            "f0Hz": 229.89465,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 325.079,
+            "preOnsetSwellMs": 325.079,
+            "peakOffsetMs": -92.88,
+            "settleFromPeakMs": 46.44,
+            "sustainBelowPeakDb": -7.767,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-059-ff-sulG.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulG",
+            "f0Hz": 243.668607,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 220.59,
+            "preOnsetSwellMs": 220.59,
+            "peakOffsetMs": 0.0,
+            "settleFromPeakMs": 46.44,
+            "sustainBelowPeakDb": -9.24,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-062-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 291.879228,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 81.27,
+            "preOnsetSwellMs": 81.27,
+            "peakOffsetMs": -23.22,
+            "settleFromPeakMs": 185.76,
+            "sustainBelowPeakDb": -20.225,
+            "releaseMs": 220.59,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-063-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 304.568123,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 69.66,
+            "preOnsetSwellMs": 69.66,
+            "peakOffsetMs": -11.61,
+            "settleFromPeakMs": 81.27,
+            "sustainBelowPeakDb": -17.862,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-064-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 323.818447,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 81.27,
+            "preOnsetSwellMs": 81.27,
+            "peakOffsetMs": -23.22,
+            "settleFromPeakMs": 58.05,
+            "sustainBelowPeakDb": -17.687,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-065-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 342.910345,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 81.27,
+            "preOnsetSwellMs": 81.27,
+            "peakOffsetMs": -11.61,
+            "settleFromPeakMs": 127.71,
+            "sustainBelowPeakDb": -12.343,
+            "releaseMs": 185.76,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-066-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 371.159521,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 81.27,
+            "preOnsetSwellMs": 81.27,
+            "peakOffsetMs": -46.44,
+            "settleFromPeakMs": 81.27,
+            "sustainBelowPeakDb": -21.066,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-067-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 393.150711,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 58.05,
+            "preOnsetSwellMs": 58.05,
+            "peakOffsetMs": -11.61,
+            "settleFromPeakMs": 23.22,
+            "sustainBelowPeakDb": -5.992,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-068-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 415.887222,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 46.44,
+            "preOnsetSwellMs": 46.44,
+            "peakOffsetMs": -11.61,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -1.041,
+            "releaseMs": 592.109,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-069-ff-sulD.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulD",
+            "f0Hz": 439.234322,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 69.66,
+            "preOnsetSwellMs": 69.66,
+            "peakOffsetMs": -23.22,
+            "settleFromPeakMs": 23.22,
+            "sustainBelowPeakDb": -6.176,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-072-ff-sulA.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulA",
+            "f0Hz": 529.876952,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 81.27,
+            "preOnsetSwellMs": 81.27,
+            "peakOffsetMs": -46.44,
+            "settleFromPeakMs": 69.66,
+            "sustainBelowPeakDb": -18.543,
+            "releaseMs": 11.61,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-073-ff-sulA.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulA",
+            "f0Hz": 560.422722,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 58.05,
+            "preOnsetSwellMs": 58.05,
+            "peakOffsetMs": 23.22,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 1.263,
+            "releaseMs": 0.0,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-074-ff-sulA.wav",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulA",
+            "f0Hz": 596.581151,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 81.27,
+            "preOnsetSwellMs": 81.27,
+            "peakOffsetMs": 208.98,
+            "settleFromPeakMs": 615.329,
+            "sustainBelowPeakDb": -20.03,
+            "releaseMs": 11.61,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-055-mf-sulG.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulG",
+            "f0Hz": 195.578941,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 81.27,
+            "preOnsetSwellMs": 81.27,
+            "peakOffsetMs": -46.44,
+            "settleFromPeakMs": 34.83,
+            "sustainBelowPeakDb": -5.081,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-056-mf-sulG.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulG",
+            "f0Hz": 206.473423,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 92.88,
+            "preOnsetSwellMs": 92.88,
+            "peakOffsetMs": -46.44,
+            "settleFromPeakMs": 11.61,
+            "sustainBelowPeakDb": -4.684,
+            "releaseMs": 58.05,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-057-mf-sulG.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulG",
+            "f0Hz": 218.61401,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 255.42,
+            "preOnsetSwellMs": 255.42,
+            "peakOffsetMs": 197.37,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -0.336,
+            "releaseMs": 464.399,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-058-mf-sulG.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulG",
+            "f0Hz": 228.343376,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 58.05,
+            "preOnsetSwellMs": 58.05,
+            "peakOffsetMs": -34.83,
+            "settleFromPeakMs": 23.22,
+            "sustainBelowPeakDb": -4.025,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-059-mf-sulG.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulG",
+            "f0Hz": 240.493035,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 325.079,
+            "preOnsetSwellMs": 325.079,
+            "peakOffsetMs": 232.2,
+            "settleFromPeakMs": 11.61,
+            "sustainBelowPeakDb": -3.776,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-062-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 291.704794,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 220.59,
+            "preOnsetSwellMs": 220.59,
+            "peakOffsetMs": -11.61,
+            "settleFromPeakMs": 46.44,
+            "sustainBelowPeakDb": -8.432,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-063-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 309.646971,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 208.98,
+            "preOnsetSwellMs": 208.98,
+            "peakOffsetMs": 197.37,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -0.519,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-064-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 323.496946,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 220.59,
+            "preOnsetSwellMs": 220.59,
+            "peakOffsetMs": -11.61,
+            "settleFromPeakMs": 69.66,
+            "sustainBelowPeakDb": -11.696,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-065-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 353.400991,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 127.71,
+            "preOnsetSwellMs": 127.71,
+            "peakOffsetMs": 0.0,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 0.431,
+            "releaseMs": 185.76,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-066-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 371.591083,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 116.1,
+            "preOnsetSwellMs": 116.1,
+            "peakOffsetMs": -58.05,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -0.838,
+            "releaseMs": 81.27,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-067-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 387.722779,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 301.859,
+            "preOnsetSwellMs": 301.859,
+            "peakOffsetMs": -92.88,
+            "settleFromPeakMs": 46.44,
+            "sustainBelowPeakDb": -6.849,
+            "releaseMs": 11.61,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-068-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 415.977459,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 92.88,
+            "preOnsetSwellMs": 92.88,
+            "peakOffsetMs": 243.81,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 2.426,
+            "releaseMs": 208.98,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-069-mf-sulD.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulD",
+            "f0Hz": 435.748707,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 150.93,
+            "preOnsetSwellMs": 150.93,
+            "peakOffsetMs": -34.83,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 1.681,
+            "releaseMs": 0.0,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-072-mf-sulA.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulA",
+            "f0Hz": 518.200421,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 325.079,
+            "preOnsetSwellMs": 325.079,
+            "peakOffsetMs": -81.27,
+            "settleFromPeakMs": 23.22,
+            "sustainBelowPeakDb": -3.9,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-073-mf-sulA.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulA",
+            "f0Hz": 565.99823,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 185.76,
+            "preOnsetSwellMs": 185.76,
+            "peakOffsetMs": -127.71,
+            "settleFromPeakMs": 23.22,
+            "sustainBelowPeakDb": -4.456,
+            "releaseMs": 336.689,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-074-mf-sulA.wav",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulA",
+            "f0Hz": 582.084318,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 150.93,
+            "preOnsetSwellMs": 150.93,
+            "peakOffsetMs": -81.27,
+            "settleFromPeakMs": 11.61,
+            "sustainBelowPeakDb": -5.687,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-055-pp-sulG.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulG",
+            "f0Hz": 194.92764,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 220.59,
+            "preOnsetSwellMs": 220.59,
+            "peakOffsetMs": 92.88,
+            "settleFromPeakMs": 34.83,
+            "sustainBelowPeakDb": -6.03,
+            "releaseMs": 0.0,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-056-pp-sulG.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulG",
+            "f0Hz": 202.195856,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 267.029,
+            "preOnsetSwellMs": 267.029,
+            "peakOffsetMs": 243.81,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -1.351,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-057-pp-sulG.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulG",
+            "f0Hz": 216.367225,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 127.71,
+            "preOnsetSwellMs": 127.71,
+            "peakOffsetMs": 69.66,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -2.068,
+            "releaseMs": 11.61,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-058-pp-sulG.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulG",
+            "f0Hz": 227.949744,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 185.76,
+            "preOnsetSwellMs": 185.76,
+            "peakOffsetMs": -46.44,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -2.672,
+            "releaseMs": 81.27,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-059-pp-sulG.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulG",
+            "f0Hz": 239.188169,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 104.49,
+            "preOnsetSwellMs": 104.49,
+            "peakOffsetMs": 104.49,
+            "settleFromPeakMs": 58.05,
+            "sustainBelowPeakDb": -5.239,
+            "releaseMs": 11.61,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-062-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 291.84033,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 301.859,
+            "preOnsetSwellMs": 301.859,
+            "peakOffsetMs": 69.66,
+            "settleFromPeakMs": 46.44,
+            "sustainBelowPeakDb": -4.047,
+            "releaseMs": 46.44,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-063-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 303.683704,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 139.32,
+            "preOnsetSwellMs": 139.32,
+            "peakOffsetMs": -23.22,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 1.457,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-064-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 325.11723,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 197.37,
+            "preOnsetSwellMs": 197.37,
+            "peakOffsetMs": 58.05,
+            "settleFromPeakMs": 34.83,
+            "sustainBelowPeakDb": -5.758,
+            "releaseMs": 46.44,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-065-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 339.731112,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 232.2,
+            "preOnsetSwellMs": 232.2,
+            "peakOffsetMs": 46.44,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -1.438,
+            "releaseMs": 267.029,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-066-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 362.642811,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 243.81,
+            "preOnsetSwellMs": 243.81,
+            "peakOffsetMs": 11.61,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -2.126,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-067-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 386.467422,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 255.42,
+            "preOnsetSwellMs": 255.42,
+            "peakOffsetMs": 185.76,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -1.071,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-068-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 404.562959,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 487.619,
+            "preOnsetSwellMs": 487.619,
+            "peakOffsetMs": -23.22,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 1.562,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-069-pp-sulD.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulD",
+            "f0Hz": 435.121239,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 278.639,
+            "preOnsetSwellMs": 278.639,
+            "peakOffsetMs": 81.27,
+            "settleFromPeakMs": 11.61,
+            "sustainBelowPeakDb": -4.206,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-072-pp-sulA.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulA",
+            "f0Hz": 513.624241,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 325.079,
+            "preOnsetSwellMs": 325.079,
+            "peakOffsetMs": 46.44,
+            "settleFromPeakMs": 23.22,
+            "sustainBelowPeakDb": -4.881,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-073-pp-sulA.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulA",
+            "f0Hz": 544.24704,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 0.0,
+            "preOnsetSwellMs": 0.0,
+            "peakOffsetMs": 92.88,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -0.388,
+            "releaseMs": 81.27,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../campaigns/violin/body-references/low-074-pp-sulA.wav",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulA",
+            "f0Hz": 578.372486,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 452.789,
+            "preOnsetSwellMs": 452.789,
+            "peakOffsetMs": 220.59,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -1.617,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.pp.sulE.Ab6B7.aiff#MIDI92",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulE",
+            "f0Hz": 1684.0781509083474,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 290.249,
+            "preOnsetSwellMs": 290.249,
+            "peakOffsetMs": 11.61,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 0.956,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.pp.sulE.Ab6B7.aiff#MIDI96",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulE",
+            "f0Hz": 2118.779204072702,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 0.0,
+            "preOnsetSwellMs": 0.0,
+            "peakOffsetMs": 220.59,
+            "settleFromPeakMs": 11.61,
+            "sustainBelowPeakDb": -4.152,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.pp.sulE.Ab6B7.aiff#MIDI100",
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "string": "sulE",
+            "f0Hz": 2644.4339251762035,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 11.61,
+            "preOnsetSwellMs": 11.61,
+            "peakOffsetMs": 232.2,
+            "settleFromPeakMs": 34.83,
+            "sustainBelowPeakDb": -8.121,
+            "releaseMs": 34.83,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.mf.sulE.C6Gb7.aiff#MIDI92",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulE",
+            "f0Hz": 1650.504916762112,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 23.22,
+            "preOnsetSwellMs": 23.22,
+            "peakOffsetMs": -23.22,
+            "settleFromPeakMs": 139.32,
+            "sustainBelowPeakDb": -9.485,
+            "releaseMs": 139.32,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.mf.sulE.C6Gb7.aiff#MIDI96",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulE",
+            "f0Hz": 2088.4311717603305,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 11.61,
+            "preOnsetSwellMs": 11.61,
+            "peakOffsetMs": 208.98,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": -0.592,
+            "releaseMs": 81.27,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.mf.sulE.C6Gb7.aiff#MIDI100",
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "string": "sulE",
+            "f0Hz": 2632.3773568633223,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": -127.71,
+            "preOnsetSwellMs": 0.0,
+            "peakOffsetMs": 243.81,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 3.538,
+            "releaseMs": 69.66,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.ff.sulE.C6Gb7.aiff#MIDI92",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulE",
+            "f0Hz": 1663.6738769430674,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": -81.27,
+            "preOnsetSwellMs": 0.0,
+            "peakOffsetMs": 243.81,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 3.601,
+            "releaseMs": 0.0,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.ff.sulE.C6Gb7.aiff#MIDI96",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulE",
+            "f0Hz": 2087.7324423830955,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 92.88,
+            "preOnsetSwellMs": 92.88,
+            "peakOffsetMs": 232.2,
+            "settleFromPeakMs": 928.798,
+            "sustainBelowPeakDb": -9.224,
+            "releaseMs": 104.49,
+            "releaseCensored": false,
+            "stftHopMs": 11.61
+          },
+          {
+            "path": "../../samples/violin/Violin.arco.ff.sulE.C6Gb7.aiff#MIDI100",
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "string": "sulE",
+            "f0Hz": 2713.092219899083,
+            "sense": "positive noiseLeadMs means component precedes harmonic onset",
+            "threshold": "first crossing of 10% of own sustain spectral density",
+            "noiseLeadMs": 0.0,
+            "preOnsetSwellMs": 0.0,
+            "peakOffsetMs": 243.81,
+            "settleFromPeakMs": 0.0,
+            "sustainBelowPeakDb": 2.251,
+            "releaseMs": 0.0,
+            "releaseCensored": true,
+            "stftHopMs": 11.61
+          }
+        ]
+      },
       "engineContract": {
         "component": "bowNoise",
         "bodyRouting": 1,
         "userControl": "bowNoiseLevel",
+        "levelControl": "bowNoiseLevel",
+        "excitationTypes": [
+          "bow"
+        ],
         "shapeOptimiserMutable": false,
+        "preOnsetCapable": true,
+        "independentEnvelopeRequired": true,
         "velocityLaw": "amplitude = bowNoiseLevel * velocity ** bowNoiseVelocityExponent"
       }
     },

@@ -53,6 +53,9 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "excitationHardness": (0.5, 0.7, 0.0),
     "excitationHuman": (0.2, 0.6, 0.0),
     "toneBreath": (0.03, 0.15, 0.0),
+    # L17 pinned wind component: audit two active levels. Zero remains an
+    # engine identity endpoint, but is forbidden by the SHIP activation gate.
+    "windBreathLevel": (1.0, 0.25, 0.0),
     "breathNoiseColor": (0.0, 0.6, 0.0),
     "breathLevelScale": (1.0, 2.2, 0.0),
     "breathVelocityExponent": (1.0, 0.25, 0.0),

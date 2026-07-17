@@ -1396,33 +1396,124 @@ all family campaign adapters.
 Status: engine=incorporated `b5f91b7` analysis=pending-review
 struck/plucked=adapt-method sung=adapt-method bowed=adapt-method
 
+### T-066 · Pinned pre-onset noise is a component contract, not a tone-ADSR colour
+Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-instrument data
+Finding: L14's cross-pitch residual separator generalises to L17 only when the
+output retains four independent measured parts: pinned spectrum, established
+family level law, pre-onset placement from the canonical `noise_lead_ms`
+sense, and a component-owned swell/peak/settle/release envelope.  Lossless
+source provenance and codec are both checked before extraction, and each real
+instrument/component artifact must match its own passing engine-synthetic
+round-trip artifact.  A common `pinnedNoiseComponents.<id>` schema prevents
+bow/wind/piano implementations from forking while preserving violin's legacy
+`bowNoise` adapter.
+
+Wind result: six Iowa AIFF-derived rows per instrument (three pitches each at
+pp/ff) pass the synthetic gate.  Flute and clarinet pass the <=3 dB median
+cross-pitch commonality gate at both dynamics and emit separate pp/ff tables;
+their cross-dynamic shapes are not stable, so pooling them into one dynamic-
+neutral shape would discard evidence.  Alto sax's first three-pitch rung
+failed at 5.086 dB pp / 4.006 dB ff and remains preserved.  The next admissible
+rung segments all six underlying lossless chromatic runs with the canonical
+campaign selector: 64 unique notes (32 pp/32 ff).  All six source-run pools
+then pass at 1.464--2.813 dB median error; 26 bands survive artifact/floor
+screening with +2.169 dB minimum p25 source-floor margin.  The dense result,
+not the failed sparse table, is installed.  This preserves L14's analysis-
+then-simulation discipline without relaxing a gate or inventing values.
+The durable first-rung blocker is `wind-breath/records.json` (5.086/4.006 dB);
+the passing evidence is `wind-breath/records-dense.json` plus
+`wind-breath/profile-dense.json` (source-run errors pp 2.446/1.464/2.813 dB,
+ff 2.440/1.983/2.362 dB).
+
+Consuming assertions: a profile-bearing component is immutable to the
+optimiser; `engineContract.excitationTypes` prevents borrowed profiles from
+activating on the wrong excitation; ship presets activate the named level
+control; rendered component onset precedes harmonic t0 by the interpolated
+placement law; and the applied envelope independently reproduces measured
+swell, peak, settle and release rather than following tone ADSR alone.
+
+Affects: `bow_noise.py` / measured profile generation / shared pinned-noise
+renderer / activation assertions / wind and future piano action extraction.
+Status: analysis=incorporated blown=incorporated-flute-clarinet-alto-sax
+engine=pending-consumer bowed=legacy-compatible
+struck/plucked=adapt-method sung=adapt-method
+
+Status update — integration audit, 2026-07-17: engine=incorporated. The live
+tone-model verifier proves measured positive pre-onset placement, independent
+component envelope consumption, separate pp/ff pinned spectra, non-neutral
+factory-preset activation, and engine-wide activation coverage for all three
+wind profiles plus violin's legacy bow adapter.
+
+### T-064 · Envelope-anomaly classes may transfer to sung onsets, not values
+Author: owner L16 / sung lane disposition · 2026-07-17 · Firewall: mechanism only
+Finding: L16's separation of baseline envelope behaviour from systematically
+deviant frequency envelopes can apply later to sung onset components (for
+example a consonant burst or glottal-onset harmonic whose boost decays faster
+than the sustained source). Piano's velocity gates, frequency assignments and
+decay values do not transfer. Sung adoption requires its own per-partial onset
+tracks, cross-note fixed-Hz versus harmonic-rank separation, synthetic
+round-trip, and licensed sung-onset evidence; A-VOICE-03 remains zero-weight
+until its consumer lands, so no envelope-anomaly fit is activated now.
+Consuming assertions: absent layer is PCM-identical; class assignments are
+pinned measurements rather than optimiser variables; a future sung row must
+prove onset-only decay without changing sustained vowel-body transfer.
+Affects: future sung-onset analysis / A-VOICE-03 composition / onset objective.
+Status: sung=adapted-later-onset-only analysis=pending-family-evidence engine=pending-neutral-consumer
+
+### T-065 · Sung passaggio and dynamics require a consuming source-table law
+Author: sung lane · 2026-07-17 · Firewall: mechanism; values per primary singer
+Finding: the renderer's profile-level register tables are bypassed by explicit
+sung `spectralPartialMeans`, while one global dynamic-brightness scalar cannot
+express the measured source changes. After exact vowel-body subtraction, a
+register × dynamic counterfactual lowers median partial error by 34.6–52.7%
+across soprano, tenor, bass and mezzo. Per SUNG_PREFLIGHT V0.1/V0.4, those
+residuals belong to one shared glottal source table, never five vowel sources.
+Consuming assertions: A-VOICE-05 endpoint/interpolation/clamp tests; absent
+table PCM identity; `/a/` and `/i/` share pre-body source partials; T-058 body
+transfer remains exact; fresh controllability responders precede weighting.
+Affects: sung source schema / `_spectralFingerprint` / partial, mel and
+band-balance gates / passaggio construction.
+Status: sung=spec-filed-with-consuming-assertion analysis=pending-pinned-emitter engine=pending
+
+Status update — Agent E sung pass 06, 2026-07-17: T-059
+sung=incorporated-three-accepted-transitions. Soprano, bass and mezzo
+corpus-fitted dynamic-scalar steps entered their run-local accepted-step logs
+and the shared asymmetry matrix with complete feature vectors and repeat-noise
+floors. Tenor's lower-composite trial worsened the upstream partial criterion,
+so it was rejected and is absent from the matrix as required.
+
+Status update — Agent E pass-06 final shared-head sync, 2026-07-17: T-064
+sung=adapted-later-onset-only-base-consumer-landed. Shared head `b5f91b7`
+lands A-VOICE-03's neutral, provenance-gated consonant consumer after the sung
+fit completed. No licensed sung consonant evidence or envelope-anomaly class
+was activated; anomaly-specific analysis and decay law remain pending.
+
 Status update — Agent D bowed pass 04, 2026-07-17: T-033 remains
 `engine=pending-Agent-A`, with both guitar and bowed contracts ready for the
 same table-selection seam. The live Agent A pass-04 snapshot still records
 `bowed=blocked-engine T-033`. The bowed profile and the five exact consuming
-assertions are refreshed in `BOWED_ENGINE_HANDOFFS.md`; no engine completion
-is claimed.
+assertions are refreshed in `BOWED_ENGINE_HANDOFFS.md`; no T-033 engine
+completion is claimed.
 
-### T-064 · Bow excitation needs an independent measured component envelope
+### T-067 · Bow excitation uses the shared independent component envelope
 Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: mechanism + per-instrument values
-Finding: L17.5 applies to bowed excitation as directly as to breath. A
-per-frame f0-comb residual extractor now measures bow-component lead, attack,
-peak offset/gain, settle, sustain and eligible release separately from the
-harmonic note envelope. A synthetic injection passes all four timing checks;
-57 Iowa violin notes show a pooled 121.905 ms pre-onset lead and 16 rows with
-measurable component release. The current engine instead connects bow-noise
-gain to the main note envelope, so the measured component time law is stored
-but not yet audible.
-Consuming assertions: the bow residual moves with its own onset/peak/settle
-table while harmonic ADSR is unchanged; positive lead emits residual before
-harmonic onset; airflow remains a multiplicative term; measured release
-shapes only residual after note-off; absent data are bit-identical fallback.
-Affects: bowNoise.componentEnvelope / bowed excitation gain automation /
-release scoring / L17.5.
-Status: analysis=incorporated bowed=blocked-engine-component-envelope
-engine=pending-Agent-A struck/plucked=adapt-method sung=adapt-method
+Finding: L17.5 applies to bowed excitation as directly as to breath. Violin's
+57 Iowa notes now pass through T-066's shared f0-comb residual tracker and
+emit `placementLaw` plus component-owned peak/settle/sustain/release evidence
+inside the legacy bow profile. The known-envelope synthetic gate passes all
+four timing checks. Pooled violin evidence has 127.710 ms lead/swell,
+23.220 ms settle and sustain 4.206 dB below peak; 36 tails are explicitly
+censored rather than silently treated as releases.
+Consuming assertions: profile generation preserves the placement/envelope;
+the shared legacy bow adapter resolves them into the generic component
+renderer; positive measured lead, independent scheduling and nonzero release
+are asserted against the live tone model; harmonic ADSR remains independent.
+Affects: bowNoise placementLaw/envelope / shared pinned-noise renderer /
+release interpretation / L17.5.
+Status: analysis=incorporated bowed=incorporated
+engine=incorporated-shared-L17-`3b17222` struck/plucked=adapt-method sung=adapt-method
 
-### T-065 · Drift edges require independent, active evidence before causal use
+### T-068 · Drift edges require independent, active evidence before causal use
 Author: Agent D / analysis · 2026-07-17 · Firewall: method-only
 Finding: validation of the first promoted edge,
 `inharmonicity_log_ratio ⊣ release_noise_db` (18 vs 7, p=0.0432853),

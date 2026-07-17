@@ -56,27 +56,29 @@ leaderboard-comparable. Its decisive points are:
 All 11 positive probes exhibit the same discontinuous release-noise penalty.
 The shared scalar can shorten the rendered ring, but it cannot reproduce the
 mixture of zero/short/long reference rings and the independent residual-noise
-tail. This is the pass exit limiting factor: a register/dynamic release law
-and T-064's independent bow-component release are required before another
-meaningful search. The raw `release_noise_db` reference is also a recorded
+tail. This is the pass exit limiting factor: a register/dynamic harmonic/body
+release law is required before another meaningful search; T-067 separately
+lands the bow-component release path. The raw `release_noise_db` reference is also a recorded
 tail/room floor, so it must not be interpreted as a pure physical bow-release
 amplitude. r5 remains sacred and unchanged.
 
 ## L17.5 bow-component envelope
 
 `bow_noise.py` now measures non-harmonic residual power per STFT frame after
-an f0-comb separation. It fits lead, attack, peak timing/gain, settle, sustain
+an f0-comb separation. It fits lead/swell, peak timing/gain, settle, sustain
 and eligible release independently of the harmonic ADSR. The synthetic gate
-recovers a 45.333 ms lead from a 60 ms injection, +16 ms peak offset from
-+20 ms, 72 ms settle, and 32 ms release; all declared checks pass.
+recovers a 53.333 ms lead from a 60 ms injection, -10.667 ms peak offset
+around the local +20 ms target, 64 ms settle, and 10.667 ms relative release;
+all declared checks pass.
 
-The 57-note Iowa profile reports pooled values of 121.905 ms lead,
-400.544 ms attack, +235.102 ms peak offset, 1.397 peak/sustain gain,
-17.415 ms settle and 238.005 ms release across 16 measurable release rows.
-Separate pp/mf/ff values remain in the profile. The engine does not yet
-consume this independent envelope, so T-064 is filed to Agent A with five
-named assertions; the present renderer's main-envelope bow-noise path is not
-misreported as complete.
+The 57-note Iowa profile reports pooled medians of 127.710 ms lead/swell,
+0 ms peak offset, 23.220 ms settle and -4.206 dB sustain below peak. Separate
+pp/mf/ff distributions remain in the profile; 36 tails are marked censored
+and 21 have measurable component endings. Concurrent shared commit `3b17222`
+landed the generic L17 renderer during pass-end integration. T-067 adapts the
+legacy violin profile to that schema, and a new tone-model assertion proves
+the measured positive lead, independent envelope and nonzero release reach
+the renderer. This does not make `releaseDamping` a bow-noise release law.
 
 ## Cello low-A0 anchor and matched-take plan
 
@@ -103,7 +105,7 @@ double dissociation and two-sided seeded distribution gate.
 ## T-033 Agent A queue chase
 
 The current generated profile hash is
-`c1fc16842bb30bc38e6cd459315d690af93ea546ed87011f4449aba35d95e844`.
+`1e15fe225b619dd1df73649ad19226dfc71ffb6cebe494c6785c76450214fe08`.
 The live Agent A pass-04 status still records
 `engine=pending-Agent-A (guitar and bowed contracts are ready for one-pass
 consumption)` and `bowed=blocked-engine T-033`. No engine commit implementing
@@ -131,7 +133,7 @@ for causal triage:
 
 The validation verdict is scorer-tracking artefact. The raw edge stays in the
 matrix for auditability but is quarantined from the working causal hierarchy.
-T-065 requires active-feature admission, nonzero feature-specific repeat
+T-068 requires active-feature admission, nonzero feature-specific repeat
 floors and intervention-lineage deduplication before re-promotion.
 
 ## Leaderboard, backstop, hashes and exit state
@@ -149,16 +151,24 @@ resolved parameter hash
 The violin run/state leaderboards remain byte-identical with r5 marked
 `shipEligible`, `beatsLegacyComposite` and variation-passed. No diagnostic
 pass-04 row is added. The bow analysis artifact hash is
-`a782348c2f13bb1f6a99671e6dae1721d5857a9e2ea55f2269b3540ba7e7db47`.
+`68fe6281d7dcf029cf74fe2df034288afbdc62b363460d9976cdff01cf68bc09`.
 
-- Violin session outcome: `limiting-factor`; r5 retained, pending independent
-  bow-component/release consumption and a less confounded tail-floor scorer.
+- Violin session outcome: `limiting-factor`; r5 retained, with independent
+  bow-component/release consumption landed and a less confounded tail-floor
+  scorer still required.
 - Cello session outcome: `evidence-improvement`; low A0 anchor landed, matched
   Human takes remain pending before optimisation resumes.
-- T-033 remains pending Agent A; T-064 is a new engine handoff.
+- T-033 remains pending Agent A; T-067's shared L17 bow consumer is complete.
 - Strict §3, resource and vibrato/body-AM obligations remain visible.
 - OWNER DECISION NEEDED: none.
 
 ## Verification
 
-Verification results are recorded after the merged pass-end rebuild.
+- `npm test`: 11/11 PASS.
+- `node scripts/verify_tone_model.mjs`: all tone-model assertions PASS,
+  including measured violin bow-component envelope consumption.
+- `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: 223/223 PASS.
+- `PYTHON=../../../.venv/bin/python node scripts/render_note.mjs --verify`:
+  PASS, renderer hash
+  `0f945f10c333d73201afcccf2df6736262d40d9c22a5b40a1497dad1b93e76c8`.
+- `PYTHON=../../../.venv/bin/python python3 scripts/sg2_listen_page.py`: PASS.
