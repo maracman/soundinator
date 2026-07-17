@@ -473,13 +473,33 @@ def test_legacy_prior_uses_pinned_tag_craft_and_measured_overlay():
         "vibratoRate": 6.125, "bodyBands": [{"freq": 280, "gain": .4}],
     })
     assert prior["tag"] == "sg2-legacy"
-    assert prior["commit"].startswith("e8d3ac1")
+    assert prior["commit"] == "e8d3ac123c0f1c2647c4dbf03d48934b1966564d"
+    assert prior["blobs"]["web/static/synth.js"] == \
+        "ea9ed79adbb2412bf2078f1a68af68374f76a017"
     assert prior["source"] == "violin"
     assert resolved["excitationHuman"] == pytest.approx(.4)
     assert resolved["envelopeAttack"] == pytest.approx(.085)
     assert resolved["vibratoRate"] == pytest.approx(6.125)  # measured wins
     assert resolved["bodyBands"] == [{"freq": 280, "gain": .4}]
     assert len(prior["rowHash"]) == len(prior["resolvedParameterHash"]) == 64
+
+
+def test_nylon_prior_uses_piano_craft_with_separate_fit_and_ship_human():
+    topology = {
+        "sg2Family": "struck-plucked", "spectralProfile": "guitar",
+        "excitationType": "pluck", "resonatorClass": "string",
+    }
+    fitted, fit_prior = resolve_legacy_prior(
+        "guitar-nylon", topology, mode="fit")
+    shipped, ship_prior = resolve_legacy_prior(
+        "guitar-nylon", topology, mode="ship")
+    assert fit_prior["row"] == \
+        "guitar-nylon ← legacy piano craft adapted to pluck"
+    assert fit_prior["source"] == ship_prior["source"] == "piano"
+    assert fitted["excitationType"] == shipped["excitationType"] == "pluck"
+    assert fitted["excitationHuman"] == 0
+    assert shipped["excitationHuman"] > 0
+    assert fit_prior["resolvedHash"] != ship_prior["resolvedHash"]
 
 
 def test_fit_mode_zeros_human_draws_without_stripping_ship_craft():

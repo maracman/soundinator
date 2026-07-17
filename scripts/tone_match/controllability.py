@@ -53,6 +53,8 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "attackNoiseFreq": (1000.0, 2400.0, 0.0),
     "attackNoiseQ": (0.84, 2.5, 0.0),
     "attackNoiseDecay": (0.05, 0.15, 0.0),
+    "attackNoiseDirect": (0.0, 0.8, 0.0),
+    "attackNoiseVelocityExponent": (1.0, 0.25, 0.0),
     "partialTilt": (0.0, 0.35, 0.0),
     "partialTransfer": (0.1, 0.4, 0.0),
     "partialMaterial": (0.3, 0.6, 0.0),
@@ -60,6 +62,9 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "spectralDynamicAmount": (1.0, 1.8, 0.0),
     "dynamicBlare": (0.0, 0.4, 0.0),
     "envelopeAttack": (0.08, 0.25, 0.0),
+    "velocityHardnessCoupling": (0.2, 0.8, 0.0),
+    "decaySecondStage": (0.2, 0.8, 0.0),
+    "decaySecondRatio": (2.0, 6.0, 0.0),
     "vibratoProb": (1.0, 0.0, 0.0),
     "vibratoDepth": (18.0, 40.0, 0.0),
     "vibratoRate": (5.5, 6.5, 0.0),
@@ -138,21 +143,25 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
               free_params: dict[str, tuple[float, float, float]] | None = None,
               objective_references: list[dict[str, Any]] | None = None,
               manifest_contract: list[dict[str, Any]] | None = None,
+              manifest_document: dict[str, Any] | None = None,
               ) -> dict[str, Any]:
     free_params = free_params or BOWED_FREE_PARAMS
     output_dir.mkdir(parents=True, exist_ok=True)
     renders = output_dir / "renders"
     renders.mkdir(exist_ok=True)
 
-    # Variant parameter sets: one fully specified base plus one changed key.
-    # Building the base first prevents early variants from omitting defaults
-    # belonging to later keys in the manifest.
-    base_params = dict(baseline_params)
+    # Every probe gets a matched baseline. Conditional laws (for example G4
+    # second-stage decay) use the manifest auditContext on both sides without
+    # contaminating the neutral campaign seed.
+    variants: dict[str, dict[str, Any]] = {"__base__": dict(baseline_params)}
+    rows = {row["key"]: row for row in (manifest_document or {}).get(
+        "continuous", [])}
     for key, (base_value, perturbed, _alt) in free_params.items():
-        base_params.setdefault(key, base_value)
-    variants: dict[str, dict[str, Any]] = {"__base__": base_params}
-    for key, (_base_value, perturbed, _alt) in free_params.items():
-        perturbed_params = dict(base_params)
+        probe_base = dict(baseline_params)
+        probe_base.update(rows.get(key, {}).get("auditContext", {}))
+        probe_base[key] = base_value
+        variants[f"__base__-{key}"] = probe_base
+        perturbed_params = dict(probe_base)
         perturbed_params[key] = perturbed
         variants[key] = perturbed_params
     # T-041: repeat the exact baseline in independent offline render
@@ -176,12 +185,24 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             })
     _render_batch(jobs, repo_root)
 
-    # SUNG analysis is anchored to the corpus annotation so a tracker mode
-    # switch cannot masquerade as a parameter response.
-    ref_bundles = [
-        extract_features(ref["path"], expected_f0_hz=ref.get("expectedF0Hz"))
-        for ref in references
-    ]
+    struck = instrument.strip().lower() in {
+        "piano", "piano-grand", "grand-piano", "piano-upright",
+        "upright-piano", "guitar", "guitar-nylon", "guitar-steel",
+        "harp", "glockenspiel", "marimba", "xylophone", "vibraphone",
+    }
+
+    def analysis_kwargs(ref: dict[str, Any]) -> dict[str, Any]:
+        expected = ref.get("expectedF0Hz")
+        if expected is None and struck:
+            expected = 440.0 * 2 ** ((float(ref.get("midi", 60)) - 69) / 12)
+        return {
+            **({"expected_f0_hz": expected} if expected is not None else {}),
+            **({"trust_expected_f0": True, "force_percussive": True}
+               if struck else {}),
+        }
+
+    ref_bundles = [extract_features(ref["path"], **analysis_kwargs(ref))
+                   for ref in references]
     weights = weights_for_instrument(instrument)
     render_cache: dict[tuple[str, int], Any] = {}
 
@@ -192,7 +213,7 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
                 renders / f"{name}-{ref_index}.wav",
                 active_duration_s=references[ref_index].get(
                     "durationSec", 1.5),
-                expected_f0_hz=references[ref_index].get("expectedF0Hz"),
+                **analysis_kwargs(references[ref_index]),
             )
         return render_cache[key]
 
@@ -265,13 +286,14 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     matrix: dict[str, dict[str, float]] = {}
     render_failures: dict[str, int] = {}
     for key in free_params:
+        probe_base = f"__base__-{key}"
         perturbed = distances(key)
         matrix[key] = {}
         direct_rows = []
         for ref_index in np.flatnonzero(base_ok):
             try:
                 direct_rows.append(compare_features(
-                    render_bundle("__base__", int(ref_index)),
+                    render_bundle(probe_base, int(ref_index)),
                     render_bundle(key, int(ref_index)), weights))
             except ValueError:
                 continue
@@ -440,7 +462,8 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         parser.error(f"no perturbation specification for: {', '.join(unknown)}")
     free_params = {key: available[key] for key in keys}
-    contract = _manifest_contract(json.loads(args.manifest.read_text()), baseline, keys)
+    manifest_document = json.loads(args.manifest.read_text())
+    contract = _manifest_contract(manifest_document, baseline, keys)
     seen: dict[str, dict[str, Any]] = {}
     analysis_rejects = []
     for row in objective_references:
@@ -461,7 +484,8 @@ def main(argv: list[str] | None = None) -> int:
     audit = run_audit(args.instrument, baseline, subset, args.output,
                       args.repo_root, free_params=free_params,
                       objective_references=objective_references,
-                      manifest_contract=contract)
+                      manifest_contract=contract,
+                      manifest_document=manifest_document)
     audit["legacyPrior"] = legacy_prior
     audit["auditReferenceSelectionRejects"] = analysis_rejects
     (args.output / "controllability.json").write_text(
