@@ -69,11 +69,6 @@ _BOWED_P1_FEATURES = (
     "ltas_rolloff_db_oct", "onset_lockin_periods",
 )
 
-# T-005 band balance (RESEARCH_SUSTAIN_BALANCE 5.a).  The machinery serves
-# every family; the blown lane flips this weight on when it re-baselines its
-# leaderboards (its objective ids reset at that point anyway).
-_PENDING_BLOWN_FEATURES = ("band_balance_db",)
-
 # §2.3 controllability audit verdicts (violin, 2026-07-16): these features
 # have NO generating engine parameter yet — body_am_db because the body EQ
 # does not track instantaneous frequency under vibrato (annex N1: the
@@ -149,8 +144,6 @@ def weights_for_instrument(instrument: str | None,
     if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
         weights["inharmonicity_log_ratio"] = 0.0
         for key in _BOWED_P1_FEATURES:
-            weights[key] = 0.0
-        for key in _PENDING_BLOWN_FEATURES:
             weights[key] = 0.0
     if (instrument or "").strip().lower() in _BOWED_INSTRUMENTS:
         for key in _BOWED_WATCH_METRICS:
