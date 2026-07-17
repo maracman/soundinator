@@ -499,6 +499,26 @@ def evaluate_construction(
                             None if rise is None else rise >= 3, rise,
                             "high-minus-low even/odd contrast >= 3 dB", strict_evidence=strict_evidence))
 
+    if name in {"alto-sax", "tenor-sax", "clarinet", "french-horn"}:
+        breath_exponent = _param(params, "breathVelocityExponent")
+        rows.append(_result(f"{name}.soft-breath-law",
+                            "Soft reed dynamics retain proportionally more air noise",
+                            None if breath_exponent is None else float(breath_exponent) < 1,
+                            breath_exponent, "breathVelocityExponent < 1",
+                            strict_evidence=strict_evidence))
+        turbulence = _param(params, "breathTurbulence")
+        rows.append(_result(f"{name}.turbulence-law",
+                            "Sustained air has continuous seeded texture",
+                            None if turbulence is None else float(turbulence) > 0,
+                            turbulence, "breathTurbulence > 0",
+                            strict_evidence=strict_evidence))
+        body_air = _param(params, "breathBodyAmount")
+        rows.append(_result(f"{name}.body-coloured-air",
+                            "Air noise passes through the fitted instrument body",
+                            None if body_air is None else float(body_air) > 0,
+                            body_air, "breathBodyAmount > 0",
+                            strict_evidence=strict_evidence))
+
     if name in {"alto-sax", "tenor-sax", "trumpet", "french-horn"}:
         contrast = float(np.mean([_odd_even_contrast(s.render) for s in sample_list])) if sample_list else None
         rows.append(_result(f"{name}.full-series", "Full harmonic series retains even modes",
@@ -567,25 +587,7 @@ def evaluate_construction(
                                 {"correlation": correlation, "samples": correlation_count},
                                 "at least 4 tracked reference onsets and Pearson r <= -0.2",
                                 strict_evidence=strict_evidence))
-        if name in {"alto-sax", "tenor-sax"}:
-            breath_exponent = _param(params, "breathVelocityExponent")
-            rows.append(_result(f"{name}.soft-breath-law",
-                                "Soft reed dynamics retain proportionally more air noise",
-                                None if breath_exponent is None else float(breath_exponent) < 1,
-                                breath_exponent, "breathVelocityExponent < 1",
-                                strict_evidence=strict_evidence))
-            turbulence = _param(params, "breathTurbulence")
-            rows.append(_result(f"{name}.turbulence-law",
-                                "Sustained air has continuous seeded texture",
-                                None if turbulence is None else float(turbulence) > 0,
-                                turbulence, "breathTurbulence > 0",
-                                strict_evidence=strict_evidence))
-            body_air = _param(params, "breathBodyAmount")
-            rows.append(_result(f"{name}.body-coloured-air",
-                                "Air noise passes through the fitted instrument body",
-                                None if body_air is None else float(body_air) > 0,
-                                body_air, "breathBodyAmount > 0",
-                                strict_evidence=strict_evidence))
+        if name in {"alto-sax", "tenor-sax", "trumpet", "french-horn"}:
             onset_tilt = _param(params, "onsetSpectrumTilt")
             onset_decay = _param(params, "onsetSpectrumDecay")
             onset_enabled = None if onset_tilt is None or onset_decay is None else (

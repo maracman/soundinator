@@ -19,6 +19,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 LEGACY_TAG = "sg2-legacy"
+LEGACY_COMMIT = "e8d3ac123c0f1c2647c4dbf03d48934b1966564d"
+LEGACY_BLOBS = {
+    "web/static/synth.js": "ea9ed79adbb2412bf2078f1a68af68374f76a017",
+    "web/static/factory-presets.js": "99ecce9d63a72f8a1834b5145ce025f655a5018f",
+}
 
 
 # This is the §2.4c table expressed as data.  Values never transfer between
@@ -58,6 +63,20 @@ LEGACY_PRIOR_ROWS: dict[str, dict[str, Any]] = {
     "boy-soprano": {"kind": "derived", "parent": "soprano"},
 }
 
+LEGACY_ROW_LABELS = {
+    "grand-piano": "piano-grand ← legacy piano (true legacy)",
+    "piano-grand": "piano-grand ← legacy piano (true legacy)",
+    "upright-piano": "piano-upright ← legacy piano craft; fitted upright identity",
+    "piano-upright": "piano-upright ← legacy piano craft; fitted upright identity",
+    "guitar-nylon": "guitar-nylon ← legacy piano craft adapted to pluck",
+    "guitar-steel": "guitar-steel ← legacy piano craft adapted to pluck",
+    "harp": "harp ← legacy piano craft, pluck defaults",
+    "glockenspiel": "glockenspiel ← legacy piano craft, strike defaults, bar class",
+    "marimba": "marimba interim ← legacy piano craft, strike defaults, bar class",
+    "xylophone": "xylophone interim ← legacy piano craft, strike defaults, bar class",
+    "vibraphone": "vibraphone interim ← legacy piano craft, strike defaults, bar class",
+}
+
 
 # Campaign measurement fields are the final overlay in §2.4c.  Free craft
 # controls such as excitationHuman and partialTransfer deliberately do not
@@ -78,6 +97,27 @@ PINNED_MEASUREMENT_KEYS = {
 def canonical_hash(value: Any) -> str:
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def verify_anchor(repo_root: Path = ROOT) -> dict[str, Any]:
+    """Resolve and verify both immutable source blobs used by §2.4c."""
+    commit = subprocess.run(
+        ["git", "rev-parse", f"{LEGACY_TAG}^{{commit}}"], cwd=repo_root,
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    if commit != LEGACY_COMMIT:
+        raise ValueError(f"{LEGACY_TAG} resolved to {commit}, expected {LEGACY_COMMIT}")
+    blobs = {}
+    for source, expected in LEGACY_BLOBS.items():
+        actual = subprocess.run(
+            ["git", "rev-parse", f"{LEGACY_TAG}:{source}"], cwd=repo_root,
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        if actual != expected:
+            raise ValueError(
+                f"legacy source blob changed for {source}: {actual} != {expected}")
+        blobs[source] = actual
+    return {"tag": LEGACY_TAG, "commit": commit, "blobs": blobs}
 
 
 def _extract_js_object(source: str, declaration: str) -> str:
@@ -129,10 +169,7 @@ def _extract_js_object(source: str, declaration: str) -> str:
 @lru_cache(maxsize=1)
 def legacy_performance_rows() -> tuple[str, dict[str, dict[str, Any]]]:
     try:
-        commit = subprocess.run(
-            ["git", "rev-parse", f"{LEGACY_TAG}^{{commit}}"], cwd=ROOT,
-            check=True, capture_output=True, text=True,
-        ).stdout.strip()
+        commit = verify_anchor(ROOT)["commit"]
         source = subprocess.run(
             ["git", "show", f"{LEGACY_TAG}:web/static/synth.js"], cwd=ROOT,
             check=True, capture_output=True, text=True,
@@ -174,8 +211,12 @@ def _flatten_performance(performance: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in flat.items() if value is not None}
 
 
-def resolve_legacy_prior(instrument: str, campaign_seed: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def resolve_legacy_prior(instrument: str, campaign_seed: dict[str, Any], *,
+                         mode: str = "ship", repo_root: Path = ROOT,
+                         ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return strongest-prior params and the reportable resolved row."""
+    if mode not in {"fit", "ship"}:
+        raise ValueError(f"unknown prior mode: {mode}")
     key = instrument.strip().lower().replace("_", "-").replace(" ", "-")
     row = LEGACY_PRIOR_ROWS.get(key)
     if row is None:
@@ -195,6 +236,7 @@ def resolve_legacy_prior(instrument: str, campaign_seed: dict[str, Any]) -> tupl
         report = {"instrument": key, **row, "tag": None, "commit": None,
                   "declaredParent": declared_parent}
     else:
+        anchor = verify_anchor(repo_root)
         commit, rows = legacy_performance_rows()
         source = row["source"]
         if source not in rows:
@@ -209,8 +251,15 @@ def resolve_legacy_prior(instrument: str, campaign_seed: dict[str, Any]) -> tupl
                              "sg2Family", "bodyType"):
             if topology_key in campaign_seed:
                 resolved[topology_key] = campaign_seed[topology_key]
-        report = {"instrument": key, **row, "tag": LEGACY_TAG,
-                  "commit": commit, "craftHash": canonical_hash(craft)}
+        ship_human = float(craft.get("excitationHuman", 0.0) or 0.0)
+        if mode == "fit":
+            resolved["excitationHuman"] = 0.0
+        report = {"instrument": key, **row, **anchor,
+                  "commit": commit, "craftHash": canonical_hash(craft),
+                  "mode": mode, "shipHuman": ship_human}
+    report["row"] = LEGACY_ROW_LABELS.get(
+        key, f"{key} ← legacy {report.get('source', report.get('parent', 'parent'))}")
     report["rowHash"] = canonical_hash(report)
     report["resolvedParameterHash"] = canonical_hash(resolved)
+    report["resolvedHash"] = report["resolvedParameterHash"]
     return resolved, report

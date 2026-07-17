@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,10 @@ from scripts.tone_match.paths import sg2_data_root
 VELOCITY = {"pp": 0.2, "ff": 0.92}
 RESONATOR = {"flute": "openTube", "clarinet": "closedTube", "alto-sax": "conicalTube",
              "trumpet": "conicalTube", "french-horn": "conicalTube"}
+SAMPLE_DIRS = {
+    "flute": "flute", "clarinet": "clarinet-bb", "alto-sax": "sax-alto-eb",
+    "trumpet": "trumpet-bb", "french-horn": "horn-french",
+}
 
 # Every campaign spans named low/mid/high registers at pp and ff.  Filenames
 # identify the run; target MIDI selects one detected segment from that run.
@@ -105,16 +110,45 @@ def _midi(f0: float) -> int:
     return int(round(69 + 12 * math.log2(f0 / 440.0)))
 
 
+def _run_start_midi(filename: str) -> int:
+    match = re.search(r"\.([A-G](?:b|#)?)(-?\d)", Path(filename).stem)
+    if not match:
+        raise ValueError(f"cannot infer chromatic-run start note from {filename}")
+    pitch, octave_text = match.groups()
+    semitone = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}[pitch[0]]
+    if len(pitch) > 1:
+        semitone += -1 if pitch[1] == "b" else 1
+    return (int(octave_text) + 1) * 12 + semitone
+
+
 def _select(path: Path, target_midi: int) -> tuple[np.ndarray, int, float]:
     samples, sample_rate = load_mono(str(path))
+    segments = segment_notes(samples, sample_rate, merge_gap_s=0.12)
     candidates = []
-    for start, end in segment_notes(samples, sample_rate, merge_gap_s=0.12):
+    for start, end in segments:
         segment = samples[start:end]
         note = analyse_note(segment, sample_rate, str(path), 16)
         if note is not None:
             candidates.append((abs(_midi(note.f0) - target_midi), segment, note.f0))
     if not candidates:
-        raise RuntimeError(f"no analysable note in {path}")
+        # Closed-tube runs can defeat an unconstrained monophonic tracker
+        # because the fundamental is deliberately weak. Iowa files are
+        # ascending chromatic runs named with their first pitch, so select by
+        # the documented run order and analyse against the known MIDI anchor.
+        index = target_midi - _run_start_midi(path.name)
+        if index < 0 or index >= len(segments):
+            raise RuntimeError(
+                f"{path}: target MIDI {target_midi} is outside its "
+                f"{len(segments)}-segment chromatic run")
+        start, end = segments[index]
+        segment = samples[start:end]
+        expected = 440.0 * 2 ** ((target_midi - 69) / 12)
+        note = analyse_note(segment, sample_rate, str(path), 16,
+                            min_detected_partials=2,
+                            expected_f0_hz=expected, trust_expected_f0=True)
+        if note is None:
+            raise RuntimeError(f"no analysable anchored note in {path}")
+        return segment, sample_rate, note.f0
     _, segment, f0 = min(candidates, key=lambda row: row[0])
     if abs(_midi(f0) - target_midi) > 1:
         raise RuntimeError(f"{path}: closest detected MIDI {_midi(f0)} is not target {target_midi}")
@@ -129,6 +163,27 @@ def _write_reference(source: Path, target_midi: int, output: Path) -> tuple[int,
     sf.write(output, segment, sample_rate, subtype="PCM_16")
     duration = len(segment) / sample_rate
     return _midi(f0), f0, max(0.5, min(2.0, duration * 0.72))
+
+
+def _campaign_source(samples_root: Path, instrument: str, filename: str) -> Path:
+    """Resolve the reacquired Iowa corpus's durable, source-labelled folders."""
+    return samples_root / SAMPLE_DIRS[instrument] / filename
+
+
+def _alternate_source(primary_root: Path, samples_root: Path, instrument: str,
+                      family: str, filename: str) -> Path | None:
+    """Resolve optional Philharmonia takes without reviving /tmp-era paths.
+
+    Older corpora used ``<root>/<family>/<filename>``. Reacquired catalogue
+    files, when present, live beside the Iowa source and retain an explicit
+    ``phil.`` prefix. Missing auxiliary takes are recorded in BUILD.json and
+    never silently invented or substituted.
+    """
+    primary = primary_root / family / filename
+    if primary.exists():
+        return primary
+    reacquired = _campaign_source(samples_root, instrument, f"phil.{filename}")
+    return reacquired if reacquired.exists() else None
 
 
 def _seed(instrument: str, measured: dict[str, Any]) -> dict[str, Any]:
@@ -228,22 +283,29 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
     notes_dir = output / "references"
     notes_dir.mkdir(parents=True, exist_ok=True)
     references = []
+    missing_alternates = []
     for register in CAMPAIGNS[instrument]:
         for dynamic in ("pp", "ff"):
-            source = samples_root / instrument / register[dynamic]
+            source = _campaign_source(samples_root, instrument, register[dynamic])
             target = notes_dir / f"iowa-{register['register']}-{dynamic}-{register['midi']}.wav"
             midi, f0, duration = _write_reference(source, register["midi"], target)
             references.append({
                 "path": str(target), "midi": midi, "detectedF0": round(f0, 3),
+                "expectedF0Hz": round(440.0 * 2 ** ((midi - 69) / 12), 6),
                 "velocity": VELOCITY[dynamic], "dynamic": dynamic,
                 "register": register["register"], "durationSec": duration,
                 "articulation": "normal", "vibrato": "nonvib",
                 "floorGroup": f"{midi}|{dynamic}|normal", "sourceClass": "Iowa MIS",
                 "sourceFile": source.name,
+                "roles": ["spectral", "onset", "floor"],
             })
     for alternate in PHILHARMONIA_ALTERNATES.get(instrument, []):
         family = "trumpet" if instrument == "trumpet" else "french horn"
-        source = phil_root / family / alternate["file"]
+        source = _alternate_source(phil_root, samples_root, instrument,
+                                   family, alternate["file"])
+        if source is None:
+            missing_alternates.append(alternate["file"])
+            continue
         if is_excluded(alternate["file"]):
             continue  # T-012: owner-rejected take
         dynamic = alternate["dynamic"]
@@ -251,15 +313,21 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
         midi, f0, duration = _write_reference(source, alternate["midi"], target)
         references.append({
             "path": str(target), "midi": midi, "detectedF0": round(f0, 3),
+            "expectedF0Hz": round(440.0 * 2 ** ((midi - 69) / 12), 6),
             "velocity": VELOCITY[dynamic], "dynamic": dynamic,
             "register": alternate["register"], "durationSec": duration,
             "articulation": "normal", "vibrato": "nonvib",
             "floorGroup": f"{midi}|{dynamic}|normal", "sourceClass": "Philharmonia",
             "sourceFile": source.name,
+            "roles": ["floor"],
         })
     for alternate in PHILHARMONIA_WOODWIND_ALTERNATES.get(instrument, []):
         family = "saxophone" if instrument == "alto-sax" else instrument
-        source = phil_woodwind_root / family / alternate["file"]
+        source = _alternate_source(phil_woodwind_root, samples_root, instrument,
+                                   family, alternate["file"])
+        if source is None:
+            missing_alternates.append(alternate["file"])
+            continue
         if is_excluded(alternate["file"]):
             continue  # T-012: owner-rejected take
         dynamic = alternate["dynamic"]
@@ -273,11 +341,13 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
             continue
         references.append({
             "path": str(target), "midi": midi, "detectedF0": round(f0, 3),
+            "expectedF0Hz": round(440.0 * 2 ** ((midi - 69) / 12), 6),
             "velocity": VELOCITY[dynamic], "dynamic": dynamic,
             "register": alternate["register"], "durationSec": duration,
             "articulation": "normal", "vibrato": "nonvib",
             "floorGroup": f"{midi}|{dynamic}|normal", "sourceClass": f"Philharmonia {family}",
             "sourceFile": source.name,
+            "roles": ["floor"],
         })
     measured = json.loads(measured_path.read_text())
     initial = _seed(instrument, measured)
@@ -285,7 +355,8 @@ def build(instrument: str, samples_root: Path, measured_path: Path, output_root:
     (output / "references.json").write_text(json.dumps(references, indent=2) + "\n")
     summary = {"instrument": instrument, "output": str(output), "references": len(references),
                "floorGroups": sum(1 for group in {row["floorGroup"] for row in references}
-                                  if sum(item["floorGroup"] == group for item in references) >= 2)}
+                                  if sum(item["floorGroup"] == group for item in references) >= 2),
+               "missingAlternates": sorted(missing_alternates)}
     (output / "BUILD.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary
 

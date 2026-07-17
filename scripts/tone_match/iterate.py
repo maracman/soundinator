@@ -242,8 +242,9 @@ def _reference_variability(references: list[dict[str, Any]], feature_loader=extr
                     expected_f0_hz=expected_f0_hz,
                     trust_expected_f0=expected_f0_hz is not None,
                     force_percussive=(instrument or "").strip().lower() in {
-                        "piano", "grand-piano", "upright-piano", "guitar",
-                        "guitar-nylon", "guitar-steel", "harp", "glockenspiel",
+                        "piano", "piano-grand", "grand-piano", "piano-upright",
+                        "upright-piano", "guitar", "guitar-nylon", "guitar-steel",
+                        "harp", "glockenspiel", "marimba", "xylophone", "vibraphone",
                     })
             else:
                 cache[index] = feature_loader(reference["path"])
@@ -432,14 +433,22 @@ def _benchmark_resources(run_dir: Path, instrument: str, best: dict[str, Any]) -
 
 def _feature_analysis_kwargs(instrument: str, reference: dict[str, Any]) -> dict[str, Any]:
     struck = instrument.strip().lower() in {
-        "piano", "grand-piano", "upright-piano", "guitar",
+        "piano", "piano-grand", "grand-piano", "piano-upright",
+        "upright-piano", "guitar",
         "guitar-nylon", "guitar-steel", "harp", "glockenspiel",
+        "marimba", "xylophone", "vibraphone",
     }
     if not struck:
         return {}
     expected = 440.0 * 2 ** ((float(reference.get("midi", 60)) - 69) / 12)
     return {"expected_f0_hz": expected, "trust_expected_f0": True,
             "force_percussive": True}
+
+
+def _reference_render_params_override(reference: dict[str, Any]) -> dict[str, str]:
+    """Declare the reference role that may alter deterministic render policy."""
+    role = "vibrato" if "vibrato" in reference_roles(reference) else "non-vibrato"
+    return {"performanceRole": role}
 
 
 def _render_ship_variants(
@@ -473,6 +482,7 @@ def _render_ship_variants(
                 "durationSec": reference.get("durationSec", 1.5),
                 "sampleRate": reference.get("sampleRate", 48_000),
                 "seed": seed + reference_index * 104_729,
+                "paramsOverride": _reference_render_params_override(reference),
                 "out": str(variant_dir / f"note-{reference_index}.wav"),
             })
     jobs_path = target / "jobs.json"
@@ -688,7 +698,7 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
                          f"{sensitivity['increase']:.6f} |\n")
         else:
             lines.append(f"| `{key}` | {summary['bestParams'].get(key)} | not run | not run | not run |\n")
-    lines.extend(["\n## Techniques exchange statuses\n\n",
+    lines.extend(["\n## Techniques exchange statuses (generated from live file)\n\n",
                   "| Entry | Engine | Analysis | Bowed | Sung | Struck/plucked |\n"
                   "|---|---|---|---|---|---|\n"])
     for row in summary.get("exchangeStatuses", []):
@@ -696,15 +706,20 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
                      f"{row['analysis']} | {row['bowed']} | {row['sung']} | "
                      f"{row['struck/plucked']} |\n")
     board = summary["leaderboardState"]
+    legacy = summary.get("legacyBaseline", {})
     lines.extend(["\n## Leaderboard state\n\n",
                   f"Reference set: `{summary['referenceSet']}`. Current run is "
                   f"**{'leader' if board['isLeader'] else 'not leader'}**; "
                   f"previous comparable best: `{board.get('previousBestLoss')}`; "
                   f"current loss: `{summary['bestLoss']:.6f}`.\n",
+                  f"Leaderboard row 1: `legacy-baseline` at "
+                  f"`{legacy.get('loss', 'missing')}` in ship mode.\n",
                   "\n## Owner render directories\n\n",
                   f"Best renders: `{summary['renderArtifacts']['bestRenderDirectory']}`  \n",
                   f"Listening page: `{summary['renderArtifacts']['listeningPage']}`  \n",
-                  f"Manifest: `{summary['renderArtifacts']['auditionManifest']}`\n"])
+                  f"Manifest: `{summary['renderArtifacts']['auditionManifest']}`  \n",
+                  f"Mode: `{summary['renderArtifacts'].get('mode', 'missing')}`; "
+                  f"fresh seed: `{summary['renderArtifacts'].get('seed', 'missing')}`.\n"])
     path.write_text("".join(lines), encoding="utf-8")
 
 
@@ -768,6 +783,7 @@ class ToneMatcher:
             jobs.append({"paramsFile": str(params_path), "midi": ref.get("midi", 60),
                          "velocity": ref.get("velocity", .62), "durationSec": ref.get("durationSec", 1.5),
                          "sampleRate": ref.get("sampleRate", 48000),
+                         "paramsOverride": _reference_render_params_override(ref),
                          **({"seed": articulation_seed} if articulation_seed is not None else {}),
                          "out": str(target / f"note-{ref_index}.wav")})
         jobs_path = target / "jobs.json"
@@ -783,8 +799,9 @@ class ToneMatcher:
         # damped low course cannot be mis-tracked as sustained.
         struck = (params.get("sg2Family") == "struck-plucked" or
                   (self.instrument or "").strip().lower() in {
-                      "piano", "grand-piano", "upright-piano", "guitar",
-                      "guitar-nylon", "guitar-steel", "harp", "glockenspiel"})
+                      "piano", "piano-grand", "grand-piano", "piano-upright",
+                      "upright-piano", "guitar", "guitar-nylon", "guitar-steel",
+                      "harp", "glockenspiel", "marimba", "xylophone", "vibraphone"})
         for ref_index, (ref, job) in enumerate(zip(self.references, jobs)):
             analysis_kwargs = {}
             if struck:
@@ -1159,7 +1176,7 @@ def main(argv: list[str] | None = None) -> int:
     if not free:
         raise SystemExit("no applicable free parameters")
     audit_path = (Path(args.controllability) if args.controllability else
-                  DEFAULT_RUN_ROOT / "campaigns" / args.instrument /
+                  SG2_DATA_ROOT / "campaigns" / args.instrument /
                   "audit" / "controllability.json")
     controllability = _consume_controllability_audit(
         audit_path, args.instrument, references, free, starting_weights,
