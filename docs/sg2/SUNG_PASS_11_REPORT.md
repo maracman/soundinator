@@ -136,7 +136,7 @@ Pass snapshot internal SHA-256 is
 Controllability table internal SHA-256 is
 `c6f3dee61617e7914b4e9bf43de2db2fd0e1109a09fedb0b95cd1be75a56c16b`.
 Final exchange source SHA-256 is
-`c7b3196c65f92e402c8c8a1431913401a3f683531515f25f0aa96584af0cc2fe`.
+`c9502750a0404f130375eccefa06795dc7919a06fabd09d770dc29ccab2cbe47`.
 Leaderboard and `best.json` backstops are copied under
 `sg2-data/state/voice-*`; candidate SHIP manifests contain fresh seeds and the
 16-instrument listening page was rebuilt from the merged shared renderer head.
@@ -155,7 +155,7 @@ The required landing suite passes:
 - `node scripts/verify_tone_model.mjs` — all tone-model v2 assertions pass
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q` — pass
 - `PYTHON="$PWD/../../../.venv/bin/python" node scripts/render_note.mjs --verify`
-  — pass, `7d1d2b7bec97d1e3d398db28609380498d27296c31ac0f98f70119dbd54e0acf`
+  — pass, `94b1c1f7013236fbd780a277c0c12cf27e035f1694d5dc413e3a385cc731c13e`
 
 The limiting factor is now precisely bounded: every active source cell moves
 the partial objective in the correct direction, but the remaining cross-vowel
