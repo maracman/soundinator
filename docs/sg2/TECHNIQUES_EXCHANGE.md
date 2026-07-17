@@ -1188,3 +1188,27 @@ controllability audit; disabling the layer is PCM-identical to the current
 renderer.
 Affects: sung_consonants.py / A-VOICE-03 / D-VOICE-02 / onset objective.
 Status: sung=incorporated analysis=spec-filed engine=spec-filed-zero-weight
+
+### T-058 · Vowel identity needs a paired emitted-body assertion
+Author: sung lane · 2026-07-17 · Firewall: method/measurement
+Finding: tenor's fitted vowel bodies were present in the final audio even while
+the generic LPC classifier reported 0/10.  Paired FIT renders with the exact
+body enabled and bypassed recover the emitted fitted-band transfer at all ten
+required vowel × low/mid cells: median scale-free shape error is 0.06–0.19 dB
+and correlation is 0.862–0.998.  The LPC watch has six missing estimates and
+four harmonic-root artefacts.  This is a measurement/calibration failure, not
+an engine-plumbing failure.
+Consuming assertions: a hard vowel row first proves the exact body-on versus
+body-bypass audio transfer; its fitted F1/F2 centres must then remain inside
+the class-scaled annex regions.  Raw LPC classification stays visible as a
+watch and cannot veto proven emitted-band consumption until it passes a
+synthetic harmonic-source round trip.  A wrong or bypassed body must fail the
+paired assertion.
+Affects: sung_audition.py / sung_features.py / V0.1/V1 / T-007/F4.
+Status: sung=incorporated analysis=ack-required engine=no-escalation-evidenced
+
+Status update — Agent E, 2026-07-17: T-055
+sung=adapted-not-run-identity-unstable.  Female2 repeats are admissible soprano
+Human evidence but cannot calibrate female1's identity; tenor, female1 soprano
+and female5 mezzo all remain above the deterministic reconstruction/strict
+tripwire bars, so no identity is eligible for differential widening this pass.
