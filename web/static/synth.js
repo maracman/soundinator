@@ -1755,6 +1755,14 @@ export function breathVelocityGain(velocity, exponent = 1) {
   return Math.pow(v, k);
 }
 
+/** A-VOICE-04/T-061: audio-rate depth for the one body-routed airflow
+ * floor. Zero is a node-graph identity; the 0.65 bound keeps gain positive. */
+export function pitchSynchronousBreathDepth(level, sync = 0) {
+  const base = Math.max(0, Number(level) || 0);
+  const amount = Math.max(0, Math.min(1, Number(sync) || 0));
+  return base * amount * .65;
+}
+
 /** Short-lived harmonic colour of an onset relative to its sustain print.
  * Zero tilt is an identity, as required for neutral engine landings. */
 export function onsetSpectrumGain(harmonic, tilt = 0) {
@@ -2107,6 +2115,74 @@ export function articulationOnsetPlan(nextRandom, options = {}) {
   };
 }
 
+const _CONSONANT_CLASSES = new Set(["none", "plosive", "nasal", "fricative"]);
+const _CONSONANT_PLACES = new Set(["labial", "alveolar", "velar"]);
+
+export function consonantProvenanceReady(provenance) {
+  return !!(provenance && typeof provenance === "object" &&
+    String(provenance.source || "").trim() &&
+    String(provenance.license || "").trim() && provenance.qc === true);
+}
+
+/** A-VOICE-03: resolve a class colour on the already-seeded articulation
+ * latent. Invalid/unlicensed requests are explicitly disabled, never partly
+ * rendered. Numeric defaults are only reachable after the neutral class and
+ * strength gates have opted in. */
+export function consonantGesturePlan(params = {}, articulationStrength = .5) {
+  const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi,
+    Number.isFinite(Number(value)) ? Number(value) : lo));
+  const requestedClass = String(params.consonantClass || "none").toLowerCase();
+  const consonantClass = _CONSONANT_CLASSES.has(requestedClass)
+    ? requestedClass : "none";
+  const requestedPlace = String(params.consonantPlace || "alveolar").toLowerCase();
+  const place = _CONSONANT_PLACES.has(requestedPlace) ? requestedPlace : "alveolar";
+  const baseStrength = clamp(params.consonantStrength ?? 0, 0, 1);
+  const provenanceReady = consonantProvenanceReady(params.consonantProvenance);
+  if (consonantClass === "none" || baseStrength <= 0 || !provenanceReady) {
+    return { enabled: false, consonantClass, place, provenanceReady,
+      reason: consonantClass === "none" || baseStrength <= 0
+        ? "neutral" : "missing-licensed-qc-provenance" };
+  }
+  const latent = clamp(articulationStrength, 0, 1);
+  const strength = clamp(baseStrength * (.5 + latent), 0, 1);
+  const placeBurst = { labial: 700, alveolar: 4200, velar: 2800 }[place];
+  const placeLocus = { labial: 1100, alveolar: 1800, velar: 2400 }[place];
+  return {
+    enabled: true, consonantClass, place,
+    voiced: params.consonantVoiced !== false,
+    strength, articulationStrength: latent,
+    burstHz: clamp(params.consonantBurstHz || placeBurst, 100, 12000),
+    burstSec: clamp((params.consonantBurstDurationMs || 20) / 1000, .003, .12),
+    votSec: clamp((params.consonantVotMs || 0) / 1000, -.1, .12),
+    f1StartHz: 250,
+    f2LocusHz: clamp(params.consonantF2LocusHz || placeLocus, 300, 5000),
+    transitionSec: clamp((params.consonantTransitionMs || 60) / 1000, .01, .2),
+    nasalZeroHz: clamp(params.consonantNasalZeroHz ||
+      ({ labial: 1000, alveolar: 1800, velar: 3000 }[place]), 300, 6000),
+    fricativeHz: clamp(params.consonantFricativeHz ||
+      (place === "alveolar" ? 6000 : place === "velar" ? 3300 : 1800), 300, 12000),
+    preBeatSec: clamp((params.consonantPreBeatMs || 0) / 1000, 0, .12),
+    transientGain: 1 + strength * .8,
+    breathLeadGain: Math.max(.35, 1 - strength * .45),
+    scoopScale: Math.max(.35, 1 - strength * .5),
+    provenance: params.consonantProvenance,
+  };
+}
+
+/** Spectral approximation to the initial F1/F2 transition. At progress 1
+ * the multiplier is exactly unity, so the already-fitted vowel body wins. */
+export function consonantTransitionGain(frequencyHz, plan, progress = 0) {
+  if (!plan?.enabled) return 1;
+  const p = Math.max(0, Math.min(1, Number(progress) || 0));
+  if (p >= 1) return 1;
+  const f = Math.max(20, Number(frequencyHz) || 20);
+  const ridge = (centre, widthOct) => Math.exp(-.5 *
+    (Math.log2(f / Math.max(20, centre)) / widthOct) ** 2);
+  const colour = .45 * ridge(plan.f1StartHz, .42) +
+    .55 * ridge(plan.f2LocusHz, .34);
+  return 1 + plan.strength * colour * (1 - p);
+}
+
 /** T-031: a bowed onset wanders to either side of nominal pitch while the
  * string locks into Helmholtz motion. This is deliberately not the blown
  * scoop: sign is seeded per note, duration is measured in f0 periods, and
@@ -2203,6 +2279,54 @@ export function f0WanderTrace(rand, durSec, human = 0) {
   return events;
 }
 
+/** §2.5c/T-055: turn measured matched-take ranges into one bounded note
+ * episode.  The differential layer moves around the existing craft/identity
+ * value; it never replaces that value with the corpus median.  This is why
+ * Human 0 is an exact identity and why no hand-authored width appears here.
+ *
+ * Each range stores p90/sqrt(2) as drawHalfRange.  A bounded uniform episode
+ * (rather than a wide Gaussian) is clipped to the measured 5–95% support.
+ * The result is stable for one note and redrawn for the next note/seed. */
+export function measuredHumanEpisode(humanRanges, human = 0, nextRandom = Math.random) {
+  const amount = Math.max(0, Math.min(1, Number(human) || 0));
+  const ranges = humanRanges?.ranges;
+  if (amount <= 0 || !ranges || typeof ranges !== "object") return null;
+  // Human is the occurrence probability of a played-performance episode,
+  // not a hand-authored width multiplier. Once an episode occurs, its widths
+  // are the measured take-pair widths verbatim (T-055's zero-inflated tails).
+  const trigger = Math.max(0, Math.min(1,
+    Number(typeof nextRandom === "function" ? nextRandom() : .5) || 0));
+  if (trigger >= amount) return null;
+  const deltas = {}, samples = {}, widths = {}, observables = {};
+  for (const [parameter, range] of Object.entries(ranges)) {
+    if (range?.status !== "measured") continue;
+    const centre = Number(range.centre), lo = Number(range.min);
+    const hi = Number(range.max), half = Number(range.drawHalfRange);
+    if (![centre, lo, hi, half].every(Number.isFinite) || half < 0 || hi < lo) continue;
+    const draw = Math.max(0, Math.min(1,
+      Number(typeof nextRandom === "function" ? nextRandom() : .5) || 0));
+    const sample = Math.max(lo, Math.min(hi, centre + (draw * 2 - 1) * half));
+    deltas[parameter] = sample - centre;
+    samples[parameter] = sample;
+    widths[parameter] = half;
+    observables[parameter] = range.qualification?.observable || parameter;
+  }
+  return Object.keys(deltas).length ? {
+    method: "matched-take-bounded-episode",
+    schemaVersion: humanRanges.schemaVersion ?? null,
+    instrument: humanRanges.instrument ?? null,
+    amount, deltas, samples, drawHalfRanges: widths, observables,
+  } : null;
+}
+
+export function measuredHumanDelta(episode, observable) {
+  if (!episode?.deltas || !episode?.observables) return 0;
+  for (const [parameter, name] of Object.entries(episode.observables)) {
+    if (name === observable) return Number(episode.deltas[parameter]) || 0;
+  }
+  return 0;
+}
+
 // ─── Global space designer (Q6) ─────────────────────────────
 // A track's position over time is a list of anchors {beat, angle, dist,
 // smooth 0..1}. Between anchors we interpolate linearly, eased toward
@@ -2267,6 +2391,7 @@ export function notePerformance(note) {
     attackNoiseLevel: note.attackNoise?.level ?? null,
     tuningCents: note.intonationCents || 0,
     formantPos: note.formantPos ?? null,
+    measuredHumanEpisode: note.measuredHumanEpisode ?? null,
   };
 }
 
@@ -2596,6 +2721,9 @@ export class GenerationEngine {
     // enabling/adding percussion never perturbs the melodic sequence a given
     // seed produces (owner 2026-07-10).
     this._percRng = new SeededRNG(((params.seed || 42) ^ 0x9e3779b9) >>> 0);
+    // Measured performance episodes must not perturb composition for the same
+    // seed. They get the same separate-stream treatment as percussion.
+    this._humanRng = new SeededRNG(((params.seed || 42) ^ 0x51ed270b) >>> 0);
     this.scale = this._buildScale();
     this.repertoire = null;
     this._motif = null;
@@ -2966,12 +3094,21 @@ export class GenerationEngine {
   }
 
   _subNoteVariation(velocity = 0.6, fundamentalHz = 261.63, degree = 0, formantPos = null) {
+    const humanEpisode = this._measuredHumanEpisode();
     return {
       ...this._toneColourImperfection(),
-      ...this._vibratoParams(fundamentalHz, velocity),
-      ...this._spectralFingerprint(velocity, fundamentalHz, degree, formantPos),
+      ...this._vibratoParams(fundamentalHz, velocity, humanEpisode),
+      ...this._spectralFingerprint(
+        velocity, fundamentalHz, degree, formantPos, humanEpisode),
       ...this._envelopeVariation(fundamentalHz, velocity),
     };
+  }
+
+  _measuredHumanEpisode() {
+    const profile = MEASURED_PROFILES[this.p.spectralProfile];
+    const amount = Number(this.p.excitationHuman) || 0;
+    return measuredHumanEpisode(profile?.humanRanges, amount,
+      () => this._humanRng.next());
   }
 
   // One shared trigger + z-scores + SDs, applied around a param set's OWN
@@ -3092,7 +3229,7 @@ export class GenerationEngine {
     union.forEach((u, i) => { u.part.amp = Math.max(0, u.part.amp + deltas[i]); });
   }
 
-  _vibratoParams(fundamentalHz = null, velocity = null) {
+  _vibratoParams(fundamentalHz = null, velocity = null, humanEpisode = null) {
     const profileExcitation = SPECTRAL_PROFILES[this.p.spectralProfile]
       ?.performance?.excitation?.type;
     const fitted = (this.p.excitationType || profileExcitation) === "bow"
@@ -3108,12 +3245,29 @@ export class GenerationEngine {
     // about 0.8 of a smooth sinusoid across the six T-047 cells; this pinned
     // render calibration makes the consumer reproduce the measured target.
     const fittedDepth = fitted?.depth == null ? null : fitted.depth * 1.25;
+    const baseProbability = fittedProbability ?? this.p.vibratoProb ?? 0;
+    const baseDepth = fittedDepth ?? this.p.vibratoDepth ?? 0;
+    const episodeDepth = measuredHumanDelta(humanEpisode, "vibratoDepthCents");
+    const episodeRate = measuredHumanDelta(humanEpisode, "vibratoRateHz");
+    // A zero-cent measured take is a genuine non-vibrato episode.  When the
+    // craft prior is probabilistically off, positive measured depth activates
+    // just this note instead of hand-widening vibratoProb globally.
+    const episodeActivates = baseProbability <= 0 && episodeDepth > 1e-9;
     return {
-      vibratoProb: fittedProbability ?? this.p.vibratoProb ?? 0,
-      vibratoDepth: fittedDepth ?? this.p.vibratoDepth ?? 0,
+      vibratoProb: episodeActivates ? 1 : baseProbability,
+      vibratoDepth: episodeActivates
+        ? episodeDepth : Math.max(0, baseDepth + episodeDepth),
       vibratoDepthSd: fitted ? 0 : this.p.vibratoDepthSd ?? 0,
-      vibratoRate: fitted?.rate ?? this.p.vibratoRate ?? 5.5,
+      vibratoRate: episodeActivates
+        ? Math.max(.1, episodeRate || fitted?.rate || this.p.vibratoRate || 5.5)
+        : Math.max(.1, (fitted?.rate ?? this.p.vibratoRate ?? 5.5) + episodeRate),
       vibratoRateSd: fitted ? 0 : this.p.vibratoRateSd ?? 0,
+      vibratoOnsetDelayMs: Math.max(0,
+        measuredHumanDelta(humanEpisode, "vibratoOnsetDelayMs")),
+      vibratoRampMs: Math.max(0,
+        measuredHumanDelta(humanEpisode, "vibratoRampMs")),
+      vibratoRateDrift: measuredHumanDelta(
+        humanEpisode, "vibratoRateDriftHzPerSecond"),
     };
   }
 
@@ -3163,7 +3317,8 @@ export class GenerationEngine {
     }));
   }
 
-  _spectralFingerprint(velocity = 0.6, fundamentalHz = 261.63, degree = 0, formantPos = null) {
+  _spectralFingerprint(velocity = 0.6, fundamentalHz = 261.63, degree = 0,
+                       formantPos = null, humanEpisode = null) {
     const profile = SPECTRAL_PROFILES[this.p.spectralProfile] || SPECTRAL_PROFILES.violin;
     const registerProfile = registerProfileAt(profile, fundamentalHz);
     const profilePartials = registerProfile.partials.length ? registerProfile.partials : profile.partials;
@@ -3201,7 +3356,10 @@ export class GenerationEngine {
     const resClass = this.p.resonatorClass || "string";
     const excDefault = profile.performance?.excitation || { type: "bow", position: 0.5, hardness: 0.6 };
     const excType = this.p.excitationType || excDefault.type || "bow";
-    const excPos = Number.isFinite(this.p.excitationPosition) ? this.p.excitationPosition : (excDefault.position ?? 0.5);
+    const baseExcPos = Number.isFinite(this.p.excitationPosition)
+      ? this.p.excitationPosition : (excDefault.position ?? 0.5);
+    const excPos = this._clamp(
+      baseExcPos + measuredHumanDelta(humanEpisode, "excitationPosition"), .01, .99);
     let excHard = Number.isFinite(this.p.excitationHardness) ? this.p.excitationHardness : (excDefault.hardness ?? 0.6);
     excHard = velocityHardness(excHard, velocity, this.p.velocityHardnessCoupling);
     // The Human dial (T3): one coherent draw stands in for the player's
@@ -3274,11 +3432,16 @@ export class GenerationEngine {
       : null;
     const measuredAttackNoise = resolveAttackNoise(
       profile.performance?.attackNoise, this.p, fundamentalHz);
-    const attackNoise = measuredAttackNoise && lockinStaggerMs != null
+    let attackNoise = measuredAttackNoise && lockinStaggerMs != null
       ? { ...measuredAttackNoise, decay: Math.min(
         Number(measuredAttackNoise.decay) || Infinity,
         Math.max(.005, lockinStaggerMs / 1000)) }
       : measuredAttackNoise;
+    const attackNoiseDelta = measuredHumanDelta(humanEpisode, "attackNoiseLevel");
+    if (attackNoise && attackNoiseDelta) {
+      attackNoise = { ...attackNoise, level: Math.max(0,
+        Number(attackNoise.level || 0) + attackNoiseDelta) };
+    }
     return {
       harmonicPartials: partials,
       // Shape/frequency/decay are pinned by the measurement campaign. The
@@ -3296,6 +3459,7 @@ export class GenerationEngine {
       spectralMix: this.p.spectralMix ?? 0,
       excitationType: excType,
       excitationHuman: human,
+      measuredHumanEpisode: humanEpisode,
       // L4/L7: a blown note's airflow floor is an explicit, deterministic
       // part of its spectral fingerprint.  The retired formant-only tone
       // imperfection path cannot be the source of breath for Fourier winds.
@@ -3306,6 +3470,7 @@ export class GenerationEngine {
         : 0,
       breathNoiseColor: this._clamp(this.p.breathNoiseColor ?? 0, -1, 1),
       breathLevelScale: this._clamp(this.p.breathLevelScale ?? 1, 0, 3),
+      measuredBreathDeltaDb: measuredHumanDelta(humanEpisode, "sustainNoiseDb"),
       breathVelocityExponent: this._clamp(this.p.breathVelocityExponent ?? 1, 0, 2),
       breathTurbulence: this._clamp(this.p.breathTurbulence ?? 0, 0, 1),
       breathBodyAmount: this._clamp(this.p.breathBodyAmount ?? 0, 0, 1),
@@ -3336,6 +3501,23 @@ export class GenerationEngine {
       onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),
       onsetScoopRegisterSlope: this._clamp(this.p.onsetScoopRegisterSlope ?? 0, -1.5, 1.5),
       onsetScoopVelocitySlope: this._clamp(this.p.onsetScoopVelocitySlope ?? 0, -1.5, 1.5),
+      measuredOnsetDeltaCents: measuredHumanDelta(humanEpisode, "onsetWanderCents"),
+      measuredOnsetSettleDeltaSec:
+        measuredHumanDelta(humanEpisode, "onsetSettleMs") / 1000,
+      consonantClass: String(this.p.consonantClass || "none"),
+      consonantPlace: String(this.p.consonantPlace || "alveolar"),
+      consonantVoiced: this.p.consonantVoiced !== false,
+      consonantStrength: this._clamp(this.p.consonantStrength ?? 0, 0, 1),
+      consonantBurstHz: this._clamp(this.p.consonantBurstHz ?? 0, 0, 12000),
+      consonantBurstDurationMs: this._clamp(
+        this.p.consonantBurstDurationMs ?? 0, 0, 120),
+      consonantVotMs: this._clamp(this.p.consonantVotMs ?? 0, -100, 120),
+      consonantF2LocusHz: this._clamp(this.p.consonantF2LocusHz ?? 0, 0, 5000),
+      consonantTransitionMs: this._clamp(this.p.consonantTransitionMs ?? 0, 0, 200),
+      consonantNasalZeroHz: this._clamp(this.p.consonantNasalZeroHz ?? 0, 0, 6000),
+      consonantFricativeHz: this._clamp(this.p.consonantFricativeHz ?? 0, 0, 12000),
+      consonantPreBeatMs: this._clamp(this.p.consonantPreBeatMs ?? 0, 0, 120),
+      consonantProvenance: this.p.consonantProvenance ?? null,
       voiceBreathSync: this._clamp(this.p.voiceBreathSync ?? 0, 0, 1),
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
       releaseDamping: this._clamp(this.p.releaseDamping ?? 0, 0, 1),
@@ -5242,6 +5424,9 @@ export class SynthEngine {
     // retain the exact Q8 class-based scoop for compatibility.
     const bowedOnsetEnabled = note.excitationType === "bow" &&
       ((note.onsetWanderCents || 0) > 0 || (note.bowScratchLevel || 0) > 0);
+    const consonantRequested = note.consonantClass !== "none" &&
+      (note.consonantStrength || 0) > 0 &&
+      consonantProvenanceReady(note.consonantProvenance);
     note._articulationOnset = articulationOnsetPlan(
       () => this._nextRandom(), {
         coupling: note.articulationCoupling,
@@ -5258,14 +5443,34 @@ export class SynthEngine {
         velocitySlope: note.onsetScoopVelocitySlope,
         phraseStart: note.phraseStart,
         legato: note.legatoFromPrevious,
-        forceLatent: bowedOnsetEnabled,
+        forceLatent: bowedOnsetEnabled || consonantRequested,
       });
+    note._consonant = consonantGesturePlan(
+      note, note._articulationOnset.strength);
     note._scoopCents = (note.articulationCoupling || 0) > 0
       ? note._articulationOnset.scoopCents
       : (note.legatoFromPrevious ? 0 : onsetScoopCents(note.excitationType, note.excitationHuman));
     note._scoopSettleSec = (note.articulationCoupling || 0) > 0
       ? note._articulationOnset.scoopSettleSec
       : 0;
+    if (note.excitationType === "blow" && !note.legatoFromPrevious) {
+      const onsetDelta = Number(note.measuredOnsetDeltaCents) || 0;
+      const settleDelta = Number(note.measuredOnsetSettleDeltaSec) || 0;
+      if (onsetDelta) {
+        const magnitude = this._clamp(Math.abs(note._scoopCents) + onsetDelta, 0, 180);
+        note._scoopCents = -magnitude;
+      }
+      if (settleDelta) {
+        const baseSettle = note._scoopSettleSec > 0
+          ? note._scoopSettleSec : Math.max(.015, note.envelopeAttack ?? .02);
+        note._scoopSettleSec = this._clamp(baseSettle + settleDelta, .005, .35);
+      }
+    }
+    if (note._consonant?.enabled) {
+      note._articulationOnset.transientGain *= note._consonant.transientGain;
+      note._articulationOnset.breathLeadGain *= note._consonant.breathLeadGain;
+      note._scoopCents *= note._consonant.scoopScale;
+    }
     note._bowOnsetWander = bowOnsetWanderPlan(
       () => this._nextRandom(), {
         excitationType: note.excitationType,
@@ -5408,8 +5613,53 @@ export class SynthEngine {
     const out = note._out || this._voiceBus || this.master;
     this._renderSpectralPartials(note, t0, t1, env);
     this._renderAttackNoise(note, t0, env, out);
+    this._renderConsonant(note, t0, t1, out);
     this._renderBreath(note, t0, t1, env);
     env.connect(out);
+  }
+
+  _renderConsonant(note, t0, t1, out) {
+    const plan = note._consonant;
+    if (!plan?.enabled || !out || t1 <= t0) return;
+    const start = Math.max(this.ctx.currentTime, t0 - plan.preBeatSec);
+    const end = Math.min(t1, start + Math.max(plan.burstSec, plan.transitionSec));
+    if (plan.consonantClass === "nasal") {
+      const murmur = this.ctx.createOscillator();
+      murmur.type = "sine";
+      this._setFrequency(murmur.frequency,
+        Math.max(20, note.frequency || 120), start, note);
+      const pole = this.ctx.createBiquadFilter();
+      pole.type = "bandpass"; pole.frequency.value = 250; pole.Q.value = 1.1;
+      const zero = this.ctx.createBiquadFilter();
+      zero.type = "notch"; zero.frequency.value = plan.nasalZeroHz; zero.Q.value = 4;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(.0001, start);
+      gain.gain.linearRampToValueAtTime(.08 * plan.strength, start + .008);
+      gain.gain.linearRampToValueAtTime(.0001, end);
+      murmur.connect(pole); pole.connect(zero); zero.connect(gain); gain.connect(out);
+      murmur.start(start); murmur.stop(end + .02); this._track(murmur);
+      return;
+    }
+    if (!this._noiseBuffer) return;
+    const source = this.ctx.createBufferSource();
+    source.buffer = this._noiseBuffer;
+    const band = this.ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = plan.consonantClass === "fricative"
+      ? plan.fricativeHz : plan.burstHz;
+    band.Q.value = plan.consonantClass === "fricative" ? .8 : 1.5;
+    const gain = this.ctx.createGain();
+    const duration = plan.consonantClass === "fricative"
+      ? Math.max(plan.burstSec, plan.transitionSec) : plan.burstSec;
+    gain.gain.setValueAtTime(.0001, start);
+    gain.gain.linearRampToValueAtTime(
+      (plan.consonantClass === "fricative" ? .11 : .15) * plan.strength,
+      start + .003);
+    gain.gain.exponentialRampToValueAtTime(.0001,
+      Math.min(t1, start + duration));
+    source.connect(band); band.connect(gain); gain.connect(out);
+    source.start(start); source.stop(Math.min(t1, start + duration) + .02);
+    this._track(source);
   }
 
   _spectralMix(note) {
@@ -5487,6 +5737,11 @@ export class SynthEngine {
     const rateMean = this._clamp(note.vibratoRate ?? 5.5, 0.1, 18);
     const rateSd = this._clamp(note.vibratoRateSd ?? 0, 0, 8);
     const noteDuration = Math.max(0, t1 - t0);
+    const onsetDelay = this._clamp((note.vibratoOnsetDelayMs ?? 0) / 1000,
+      0, noteDuration);
+    const depthRamp = this._clamp((note.vibratoRampMs ?? 0) / 1000,
+      0, noteDuration);
+    const rateDrift = this._clamp(note.vibratoRateDrift ?? 0, -8, 8);
     if (noteDuration <= 0.02 || probability <= 0 || (depthMean <= 0 && depthSd <= 0)) {
       if (!note.legatoFromPrevious) this._vibratoActive = false;
       return [];
@@ -5509,7 +5764,12 @@ export class SynthEngine {
     let guard = 0;
 
     while (t < t1 && guard++ < 600) {
-      events.push({ time: t, cents: Math.sin(phase) * depth });
+      const elapsed = t - t0;
+      const ramp = elapsed <= onsetDelay ? 0
+        : depthRamp > 0 ? this._clamp((elapsed - onsetDelay) / depthRamp, 0, 1) : 1;
+      events.push({ time: t, cents: Math.sin(phase) * depth * ramp });
+      rate = this._clamp(rate + rateDrift * Math.max(0, t - t0) * .002,
+        .1, 18);
       const step = Math.min(0.018, Math.max(0.004, 1 / (Math.max(0.1, rate) * 8)));
       const remainingInCycle = (Math.PI * 2 - phase) / (Math.PI * 2 * Math.max(0.1, rate));
       const dt = Math.max(0.001, Math.min(step, remainingInCycle, t1 - t));
@@ -5522,7 +5782,9 @@ export class SynthEngine {
         depth = this._vibratoCycleDepth;
       }
     }
-    events.push({ time: t1, cents: Math.sin(phase) * depth });
+    const endRamp = noteDuration <= onsetDelay ? 0
+      : depthRamp > 0 ? this._clamp((noteDuration - onsetDelay) / depthRamp, 0, 1) : 1;
+    events.push({ time: t1, cents: Math.sin(phase) * depth * endRamp });
     this._vibratoPhase = phase % (Math.PI * 2);
     return events;
   }
@@ -5560,9 +5822,12 @@ export class SynthEngine {
       const baseGainScale = mix / norm;
       // Q8 attack stagger: low partials speak first on bow/blow onsets
       // (never on legato joins — the column of air / string is already going)
+      const consonantVot = note._consonant?.enabled
+        ? Math.max(0, note._consonant.votSec || 0) : 0;
       const onsetDelay = note.legatoFromPrevious
         ? 0
-        : partialOnsetDelay(harmonic, note.excitationType, note.attackStaggerMs);
+        : Math.max(consonantVot,
+          partialOnsetDelay(harmonic, note.excitationType, note.attackStaggerMs));
       // Material damping law, tone v2 (T1): each partial decays with the
       // instrument's T60 at that partial's REAL frequency (audits A2/A3) —
       // a 4 kHz mode rings the same whether it is n=4 of a high note or
@@ -5763,9 +6028,11 @@ export class SynthEngine {
       const onsetTilt = (note.onsetSpectrumTilt || 0) *
         (note._articulationOnset?.transientGain ?? 1);
       const onsetGain = onsetSpectrumGain(item.part.harmonic, onsetTilt);
+      const consonantGain = consonantTransitionGain(
+        item.part.harmonicFrequency, note._consonant, 0);
       modesFor(item).forEach(mode => {
         const target = mode.gainScale * Math.max(0, item.part.amp);
-        const onsetTarget = target * onsetGain;
+        const onsetTarget = target * onsetGain * consonantGain;
         // Q8 attack stagger: all coupled modes share the primary partial's
         // onset timing and colour, while retaining their energy split.
         if ((item.onsetDelay || 0) > 0.001) {
@@ -5774,8 +6041,10 @@ export class SynthEngine {
         } else {
           mode.param.setValueAtTime(onsetTarget, t0);
         }
-        if (Math.abs(onsetGain - 1) > 1e-9) {
-          const settle = Math.max(item.onsetDelay || 0, note.onsetSpectrumDecay || 0.06);
+        if (Math.abs(onsetGain * consonantGain - 1) > 1e-9) {
+          const settle = Math.max(item.onsetDelay || 0,
+            Math.abs(onsetGain - 1) > 1e-9 ? note.onsetSpectrumDecay || .06 : 0,
+            note._consonant?.enabled ? note._consonant.transitionSec || 0 : 0);
           mode.param.linearRampToValueAtTime(target, t0 + settle);
         }
       });
@@ -5828,7 +6097,8 @@ export class SynthEngine {
     const g = this.ctx.createGain();
     const level = Math.max(0.0001,
       breathVelocityGain(note.velocity, note.breathVelocityExponent) * airflow * 0.2 *
-      this._clamp(note.breathLevelScale ?? 1, 0, 3));
+      this._clamp(note.breathLevelScale ?? 1, 0, 3) *
+      Math.pow(10, this._clamp(note.measuredBreathDeltaDb ?? 0, -30, 30) / 20));
     const breathLead = (note.articulationCoupling || 0) > 0
       ? level * (note._articulationOnset?.breathLeadGain ?? 1)
       : 0.0001;
@@ -5849,6 +6119,29 @@ export class SynthEngine {
     }
     g.gain.setValueAtTime(level, Math.max(t0 + 0.08, t1 - 0.06));
     g.gain.linearRampToValueAtTime(0.0001, t1);
+    // A-VOICE-04/T-061: sung Fourier notes use this floor, not the legacy
+    // _renderBreath path. Modulate the existing gain at the exact scheduled
+    // source pitch (onset approach + wander + vibrato included); do not add a
+    // second noise source. The zero branch creates no node and preserves the
+    // pre-change graph/PCM for every wind preset.
+    const sync = this._clamp(note.voiceBreathSync ?? 0, 0, 1);
+    const syncDepth = pitchSynchronousBreathDepth(1, sync);
+    let syncModulator = null;
+    if (syncDepth > 0) {
+      syncModulator = this.ctx.createGain();
+      syncModulator.gain.value = 1;
+      const pulse = this.ctx.createOscillator();
+      pulse.type = "sine";
+      this._setFrequency(pulse.frequency,
+        Math.max(20, note.frequency || 120), t0, note);
+      const depth = this.ctx.createGain();
+      depth.gain.value = syncDepth;
+      pulse.connect(depth);
+      depth.connect(syncModulator.gain);
+      pulse.start(t0);
+      pulse.stop(t1 + .02);
+      this._track(pulse);
+    }
     src.connect(bp);
     let tail = bp;
     const bodyAmount = this._clamp(note.breathBodyAmount ?? 0, 0, 1);
@@ -5864,7 +6157,12 @@ export class SynthEngine {
         tail = body;
       }
     }
-    tail.connect(g);
+    if (syncModulator) {
+      tail.connect(syncModulator);
+      syncModulator.connect(g);
+    } else {
+      tail.connect(g);
+    }
     g.connect(env);
     src.start(t0);
     src.stop(t1 + 0.02);

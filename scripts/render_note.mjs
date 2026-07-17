@@ -185,9 +185,31 @@ async function main() {
         params: { ...bowBase.params, bowNoiseLevel: 0 } };
       const bowEnabled = { ...bowBase,
         params: { ...bowBase.params, bowNoiseLevel: 1 } };
-      const [a, b, inert, coupled, bowLegacy, bowOff, bowOnA, bowOnB] =
+      const mutedPartials = Array(64).fill(0);
+      const breathBase = {
+        params: { spectralProfile: "voice-mezzo", excitationType: "blow",
+          seed: 61061, spectralPartials: 32, spectralMix: 1,
+          spectralPartialMeans: mutedPartials, spectralPartialSds: mutedPartials,
+          toneBreath: 1, breathLevelScale: 1, breathTurbulence: 0,
+          breathBodyAmount: 0, excitationHuman: 0, vibratoProb: 0,
+          envelopeAttack: .005, envelopeDecay: .01, envelopeSustain: 1,
+          envelopeRelease: .02, reverbWet: 0 },
+        midi: 57, velocity: .62, durationSec: .9, sampleRate: 24000,
+      };
+      const breathOmitted = breathBase;
+      const breathZero = { ...breathBase,
+        params: { ...breathBase.params, voiceBreathSync: 0 } };
+      const breathSyncLow = { ...breathBase,
+        params: { ...breathBase.params, voiceBreathSync: .8 } };
+      const breathSyncHigh = { ...breathSyncLow, midi: 69 };
+      const breathBody = { ...breathSyncLow,
+        params: { ...breathSyncLow.params, breathBodyAmount: 1,
+          bodyBands: [{ freq: 2200, gain: 2, width: .18 }] } };
+      const [a, b, inert, coupled, bowLegacy, bowOff, bowOnA, bowOnB,
+        syncLegacy, syncZero, syncLow, syncHigh, syncBody] =
         await renderJobs([job, job, inertJob, coupledJob,
-          bowBase, bowZero, bowEnabled, bowEnabled]);
+          bowBase, bowZero, bowEnabled, bowEnabled,
+          breathOmitted, breathZero, breathSyncLow, breathSyncHigh, breathBody]);
       const pcmDiff = (left, right) => {
         let maxDiff = 0, meanDiff = 0, count = 0;
         for (let ch = 0; ch < left.channels.length; ch++) {
@@ -228,6 +250,59 @@ async function main() {
       const bowConsumerDiff = pcmDiff(bowOff, bowOnA);
       if (bowConsumerDiff.meanDiff <= 1e-7) {
         throw new Error(`pinned bow-noise consumer is silent: mean diff ${bowConsumerDiff.meanDiff}`);
+      }
+      const syncZeroDiff = pcmDiff(syncLegacy, syncZero);
+      if (syncZeroDiff.maxDiff > 1 / 32768) {
+        throw new Error(`A-VOICE-04 sync zero changed legacy blow-floor PCM: max diff ${syncZeroDiff.maxDiff}`);
+      }
+      const envelopeTone = (render, frequency) => {
+        const samples = render.channels[0], sr = render.sampleRate;
+        const start = Math.floor(.16 * sr), end = Math.min(samples.length, Math.floor(.76 * sr));
+        let mean = 0;
+        for (let i = start; i < end; i++) mean += Math.abs(samples[i]);
+        mean /= Math.max(1, end - start);
+        let real = 0, imag = 0;
+        for (let i = start; i < end; i++) {
+          const value = Math.abs(samples[i]) - mean;
+          const phase = 2 * Math.PI * frequency * (i - start) / sr;
+          real += value * Math.cos(phase); imag -= value * Math.sin(phase);
+        }
+        return Math.hypot(real, imag) / Math.max(1, end - start);
+      };
+      const lowHz = 440 * 2 ** ((57 - 69) / 12);
+      const highHz = lowHz * 2;
+      const lowLine = envelopeTone(syncLow, lowHz);
+      const lowSide = Math.max(envelopeTone(syncLow, lowHz - 20),
+        envelopeTone(syncLow, lowHz + 20));
+      const zeroLine = envelopeTone(syncZero, lowHz);
+      if (!(lowLine >= 2 * lowSide && lowLine >= 2 * zeroLine)) {
+        const syncDiff = pcmDiff(syncZero, syncLow);
+        throw new Error(`A-VOICE-04 tracked envelope line below 6 dB gate: line ${lowLine}, side ${lowSide}, zero ${zeroLine}, diff ${JSON.stringify(syncDiff)}`);
+      }
+      let bestHigh = { frequency: 0, magnitude: -Infinity };
+      for (let frequency = highHz * .98; frequency <= highHz * 1.02; frequency += .25) {
+        const magnitude = envelopeTone(syncHigh, frequency);
+        if (magnitude > bestHigh.magnitude) bestHigh = { frequency, magnitude };
+      }
+      let bestLow = { frequency: 0, magnitude: -Infinity };
+      for (let frequency = lowHz * .98; frequency <= lowHz * 1.02; frequency += .25) {
+        const magnitude = envelopeTone(syncLow, frequency);
+        if (magnitude > bestLow.magnitude) bestLow = { frequency, magnitude };
+      }
+      if (Math.abs(bestHigh.frequency / bestLow.frequency - 2) > .02) {
+        throw new Error(`A-VOICE-04 modulation peak does not octave-track: ${bestLow.frequency} -> ${bestHigh.frequency}`);
+      }
+      const bodyDiff = pcmDiff(syncLow, syncBody);
+      if (bodyDiff.meanDiff <= 1e-6) {
+        throw new Error(`A-VOICE-04 body route is not audible: mean diff ${bodyDiff.meanDiff}`);
+      }
+      let bestBody = { frequency: 0, magnitude: -Infinity };
+      for (let frequency = lowHz * .98; frequency <= lowHz * 1.02; frequency += .25) {
+        const magnitude = envelopeTone(syncBody, frequency);
+        if (magnitude > bestBody.magnitude) bestBody = { frequency, magnitude };
+      }
+      if (Math.abs(bestBody.frequency / bestLow.frequency - 1) > .02) {
+        throw new Error(`A-VOICE-04 body route moved pulse frequency: ${bestLow.frequency} -> ${bestBody.frequency}`);
       }
       const left = a.channels[0], right = a.channels[1];
       let delta = 0, energy = 0;
