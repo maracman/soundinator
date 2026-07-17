@@ -1275,6 +1275,12 @@ Affects: iterate.py / criteria_drift.py / optimiser reports / progress state.
 Blown may adopt the method with its own runs and repeat floors.
 Status: analysis=incorporated bowed=incorporated
 struck/plucked=adapt-method sung=adapt-method engine=n/a
+Status update — Agent A blown pass 02, 2026-07-17: blown=incorporated.
+The five `blown-alternates-r3-isolated` runs contribute 42 accepted steps and
+37 beyond-noise directed transitions. After excluding two wrong-renderer
+steps from the aborted flute r2 run, the live matrix has 76 accepted steps,
+57 transitions, 9 significant asymmetric edges, 89 symmetric-coupling
+candidates, and 2 visible theory-order disagreements.
 
 ### T-060 · Release scoring is gated by mechanically audited full tails
 Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-corpus labels
@@ -1299,3 +1305,24 @@ ordered partial → mel → attack → band-balance intervention and the leaderb
 compares the complete hard-cell outcome before composite. This pass contains
 only one accepted intervention per identity, so it does not fabricate a drift
 edge or update the cross-run asymmetry matrix.
+
+### T-062 · Human-range candidates and consumers are excitation-specific
+Author: Agent A / blown-engine · 2026-07-17 · Firewall: method + engine plumbing
+Finding: applying the schema-v2 differential fitter to the restored blown
+duplicate takes produces real pair-spread evidence, but the shared candidate
+registry is currently bow-centric. Bow-noise and bow-onset parameter names can
+double-dissociate against blown observations while their runtime consumers are
+inapplicable; in each of the five refreshed blown audits only the qualified
+`excitationPosition` consumer is functional. Persisting measured spread is
+valid, but treating every qualified label as a blown Human control would be a
+category error.
+
+Consuming assertions: candidate registries declare applicable excitation
+classes; a qualified range cannot enter SHIP mode until its exact engine
+consumer is hashed, audited, and non-neutral for that class; FIT mode remains
+deterministic; distribution PASS requires the connected blown consumers to
+place fresh seeded variants inside both sides of measured pair spread. Missing
+or inapplicable consumers yield `INCONCLUSIVE-MASKED`, never identity widening.
+Affects: humanisation.py candidate registry / blown Human adapter / synth.js
+consumer assertions / §2.5c.6 distribution gate.
+Status: blown=incorporated-evidence engine=work-item analysis=adapt-method
