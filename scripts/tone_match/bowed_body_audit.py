@@ -18,6 +18,14 @@ from .bowed_source_tables import body_gain_db
 from .score import extract_features
 
 
+# A paired transfer is a division, so both arms need substantially more
+# headroom than the ordinary -66 dB partial-distance floor. Below -36 dB
+# (1/64 of the strongest analysed mode) a bowed comb notch can be dominated by
+# leakage from a neighbouring retained oscillator; that ratio no longer
+# identifies the emitted body's gain.
+PAIR_RATIO_FLOOR_DB = -36.0
+
+
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -64,6 +72,7 @@ def render_pairs(references_path: Path, params_path: Path, output: Path,
             "register": reference["register"], "dynamic": reference["dynamic"],
             "string": reference["string"], "midi": reference["midi"],
             "expectedF0Hz": reference.get("expectedF0Hz") or reference["detectedF0"],
+            "renderedF0Hz": 440.0 * 2 ** ((float(reference["midi"]) - 69) / 12),
             "durationSec": reference["durationSec"],
             "bodyRender": str(body_path), "bypassRender": str(bypass_path),
             "sourceFile": reference["sourceFile"],
@@ -95,7 +104,13 @@ def assess(manifest_path: Path, params_path: Path, output: Path) -> dict[str, An
     lowest = profile.get("resonancesFit", {}).get("lowestF0Hz")
     rows = []
     for source in manifest["rows"]:
-        f0 = float(source["expectedF0Hz"])
+        # These files are synthesised from MIDI, not resampled to the source
+        # recording's measured (and sometimes substantially detuned) f0.
+        # Analysing the high-register E5 render at the corpus's 649.157 Hz
+        # instead of equal-tempered 659.255 Hz displaced every harmonic bin
+        # and manufactured the former high/ff transfer failure.
+        f0 = float(source.get("renderedF0Hz") or
+                   440.0 * 2 ** ((float(source["midi"]) - 69) / 12))
         body = extract_features(
             source["bodyRender"], active_duration_s=source["durationSec"],
             expected_f0_hz=f0, trust_expected_f0=True)
@@ -105,10 +120,19 @@ def assess(manifest_path: Path, params_path: Path, output: Path) -> dict[str, An
         count = min(len(body.partial_db), len(bypass.partial_db),
                     len(bypass.note.partial_freqs))
         frequencies = np.asarray(bypass.note.partial_freqs[:count], float)
+        harmonic_ranks = np.arange(1, count + 1)
+        # partialIsAudible() guarantees ranks 1..8 in both render arms.  Above
+        # that boundary, body gain can itself change oscillator admission, so
+        # an FFT peak in both files is not proof that the same source mode was
+        # emitted; it may be leakage from a neighbouring retained oscillator.
+        # T-058 is a source-cancellation audit and therefore consumes only the
+        # jointly guaranteed modes, never cull-sensitive analysed peaks.
         valid = (np.isfinite(body.partial_db[:count]) &
                  np.isfinite(bypass.partial_db[:count]) &
                  np.isfinite(frequencies) & (frequencies > 0) &
-                 (np.maximum(body.partial_db[:count], bypass.partial_db[:count]) > -66))
+                 (harmonic_ranks <= 8) &
+                 (np.minimum(body.partial_db[:count], bypass.partial_db[:count]) >
+                  PAIR_RATIO_FLOOR_DB))
         observed = body.partial_db[:count][valid] - bypass.partial_db[:count][valid]
         expected = body_gain_db(
             bands, frequencies[valid], amount,
@@ -123,7 +147,17 @@ def assess(manifest_path: Path, params_path: Path, output: Path) -> dict[str, An
         passed = bool(len(error) >= 4 and median_error <= 1.0 and correlation >= .9)
         rows.append({
             **{key: source[key] for key in ("register", "dynamic", "string", "midi")},
+            "analysisF0Hz": round(f0, 6),
             "commonHarmonics": int(len(error)),
+            "guaranteedEmittedHarmonicsMax": 8,
+            "pairRatioFloorDb": PAIR_RATIO_FLOOR_DB,
+            "excludedCullSensitiveHarmonics": int(np.count_nonzero(
+                (harmonic_ranks > 8) &
+                (np.maximum(body.partial_db[:count], bypass.partial_db[:count]) > -66))),
+            "excludedLowConfidenceRatios": int(np.count_nonzero(
+                (harmonic_ranks <= 8) &
+                (np.minimum(body.partial_db[:count], bypass.partial_db[:count]) <=
+                 PAIR_RATIO_FLOOR_DB))),
             "medianTransferErrorDb": round(median_error, 6),
             "p95TransferErrorDb": round(float(np.percentile(error, 95)), 6),
             "shapeCorrelation": round(correlation, 6), "passed": passed,
@@ -136,6 +170,11 @@ def assess(manifest_path: Path, params_path: Path, output: Path) -> dict[str, An
         "method": manifest["method"], "limits": {
             "medianTransferErrorDbMax": 1.0, "shapeCorrelationMin": .9,
             "commonHarmonicsMin": 4},
+        "harmonicAdmissionContract": (
+            "renderer partialIsAudible guarantees modes 1-8 in both arms; "
+            "higher analysed peaks are excluded as cull-sensitive; paired "
+            "ratios additionally require both arms above -36 dB so a comb "
+            "notch cannot turn neighbouring-mode leakage into body evidence"),
         "sourceCancellation": "paired body-on/body-bypass FIT renders",
         "rows": rows,
     }

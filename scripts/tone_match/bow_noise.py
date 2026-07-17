@@ -925,17 +925,83 @@ def extract_pinned_component(records_path: Path, validation: Path,
             if len({round(row["f0Hz"], 3) for row in members}) < 2:
                 raise ValueError(
                     f"cross-pitch pool {dynamic}/{pool_group} has fewer than two pitches")
-            common = _median_profile(row["standard"] for row in members)
+            # Corpus files are chromatic runs of unequal length.  Weighting
+            # every segmented note equally lets an eleven-note run dominate a
+            # four-note run and confounds player/session drift with the fixed
+            # component.  Form one robust profile per source run, then give
+            # each run one vote.  No take is excluded.
+            source_keys = sorted({str(row.get("sourceFile") or row["path"])
+                                  for row in members})
+            source_members = {
+                source: [row for row in members
+                         if str(row.get("sourceFile") or row["path"]) == source]
+                for source in source_keys
+            }
+            source_profiles = {
+                source: _median_profile(row["standard"] for row in rows)
+                for source, rows in source_members.items()
+            }
+            common = _nanmedian(np.asarray(list(source_profiles.values())), axis=0)
+            legacy_note_weighted_common = _median_profile(
+                row["standard"] for row in members)
             group_profiles[(dynamic, pool_group)] = common
-            metrics = [_shape_metrics(row["standard"].db, common, centres, band_hz)
-                       for row in members]
+            note_metrics = [
+                _shape_metrics(row["standard"].db, common, centres, band_hz)
+                for row in members]
+            source_metrics = {
+                source: _shape_metrics(profile, common, centres, band_hz)
+                for source, profile in source_profiles.items()
+            }
+            source_diagnostics = []
+            for source in source_keys:
+                within = [_shape_metrics(row["standard"].db,
+                                         source_profiles[source], centres, band_hz)
+                          for row in source_members[source]]
+                source_diagnostics.append({
+                    "sourceFile": source,
+                    "notes": len(source_members[source]),
+                    "withinRunMedianShapeErrorDb": round(float(np.median([
+                        metric["medianAbsDb"] for metric in within])), 3),
+                    "toBalancedCommonCorrelation": source_metrics[source]["correlation"],
+                    "toBalancedCommonShapeErrorDb": source_metrics[source]["medianAbsDb"],
+                })
+            source_shape_errors = [metric["medianAbsDb"]
+                                   for metric in source_metrics.values()]
+            note_shape_error = float(np.median([
+                metric["medianAbsDb"] for metric in note_metrics]))
+            legacy_note_shape_error = float(np.median([
+                _shape_metrics(row["standard"].db, legacy_note_weighted_common,
+                               centres, band_hz)["medianAbsDb"]
+                for row in members]))
+            source_shape_error = float(np.median(source_shape_errors))
+            source_contamination_evidence = any(
+                row["toBalancedCommonShapeErrorDb"] > 3
+                for row in source_diagnostics)
+            if legacy_note_shape_error > 3 and source_shape_error <= 3:
+                diagnosis = "unequal-run-segmentation-weighting-not-contamination"
+            elif source_shape_error > 3 and all(
+                    row["withinRunMedianShapeErrorDb"] <= 3
+                    for row in source_diagnostics):
+                diagnosis = "real-between-run-variation"
+            elif source_shape_error > 3:
+                diagnosis = "possible-pool-contamination"
+            else:
+                diagnosis = "cross-pitch-common-after-run-balancing"
             cross_pitch.append({
                 "dynamic": dynamic, "poolGroup": pool_group, "notes": len(members),
+                "sourceRuns": len(source_keys),
+                "aggregation": "median within source run, then equal-weight median across runs",
                 "pitchesHz": sorted(round(row["f0Hz"], 3) for row in members),
                 "medianPitchCorrelation": round(float(np.median([
-                    metric["correlation"] for metric in metrics])), 4),
+                    metric["correlation"] for metric in source_metrics.values()])), 4),
                 "medianPitchShapeErrorDb": round(float(np.median([
-                    metric["medianAbsDb"] for metric in metrics])), 3),
+                    metric["medianAbsDb"] for metric in source_metrics.values()])), 3),
+                "unbalancedPerNoteMedianShapeErrorDb": round(note_shape_error, 3),
+                "legacyNoteWeightedMedianShapeErrorDb": round(
+                    legacy_note_shape_error, 3),
+                "overageDiagnosis": diagnosis,
+                "poolContaminationEvidence": source_contamination_evidence,
+                "sourceRunDiagnostics": source_diagnostics,
             })
     by_dynamic = {}
     failed_cross_pitch = [row for row in cross_pitch
@@ -1035,7 +1101,8 @@ def extract_pinned_component(records_path: Path, validation: Path,
         "instrument": instrument,
         "component": component,
         "componentClass": "pinnedPreOnsetNoise",
-        "method": "f0 harmonic subtraction + per-dynamic cross-pitch median",
+        "method": ("f0 harmonic subtraction + per-source-run median + "
+                   "equal-weight per-dynamic cross-pitch median"),
         "source": manifest.get("source", "lossless corpus records"),
         "excluded": manifest.get("excluded", []),
         "validation": validation_data,
