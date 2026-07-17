@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scripts.tone_match.iterate import _renderer_contract_hash
+
 
 def seed_breath(fit_root: Path, output_root: Path, evidence_path: Path,
                 calibration_path: Path, amount: float) -> dict[str, Any]:
@@ -23,8 +25,14 @@ def seed_breath(fit_root: Path, output_root: Path, evidence_path: Path,
         raise ValueError("invalid room-residual accounting")
     voice_class = evidence.get("voiceClass")
     expected = calibration.get("provisionalVoiceBreathSync", {}).get(voice_class)
-    if calibration.get("schema") != "sg2-pitch-sync-breath-calibration-v1":
+    if calibration.get("schema") not in {
+        "sg2-pitch-sync-breath-calibration-v1",
+        "sg2-pitch-sync-breath-calibration-v2",
+    }:
         raise ValueError("unsupported T-067 engine calibration")
+    bound_renderer = calibration.get("rendererContractHash")
+    if bound_renderer is not None and bound_renderer != _renderer_contract_hash():
+        raise ValueError("T-067 engine calibration belongs to another renderer")
     if expected is None or abs(float(expected) - float(amount)) > 1e-9:
         raise ValueError("seed does not match the engine-curve inversion")
 
