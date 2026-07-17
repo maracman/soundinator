@@ -4150,6 +4150,10 @@ export class GenerationEngine {
     const resClass = this.p.resonatorClass || "string";
     const excDefault = profile.performance?.excitation || { type: "bow", position: 0.5, hardness: 0.6 };
     const excType = this.p.excitationType || excDefault.type || "bow";
+    const measuredOnsetDeltaCents = measuredHumanDelta(
+      humanEpisode, "onsetWanderCents");
+    const measuredOnsetSettleDeltaSec = measuredHumanDelta(
+      humanEpisode, "onsetSettleMs") / 1000;
     const baseExcPos = Number.isFinite(this.p.excitationPosition)
       ? this.p.excitationPosition : (excDefault.position ?? 0.5);
     const excPos = this._clamp(
@@ -4308,8 +4312,19 @@ export class GenerationEngine {
       articulationStrength: this._clamp(this.p.articulationStrength ?? 0.5, 0, 1),
       articulationVariation: this._clamp(this.p.articulationVariation ?? 0, 0, 1),
       articulationVelocitySlope: this._clamp(this.p.articulationVelocitySlope ?? 0, -1.5, 1.5),
-      onsetWanderCents: this._clamp(this.p.onsetWanderCents ?? 0, 0, 120),
-      onsetWanderSettlePeriods: this._clamp(this.p.onsetWanderSettlePeriods ?? 12, 2, 30),
+      // Native §2.5c bowed episodes are physical deviations around the
+      // strongest-prior onset.  Convert the measured settle delta from ms to
+      // periods at this note before the bow plan consumes it.  Previously
+      // both values were merely carried as diagnostics and only the blown
+      // scoop path used them, which let an aggregate Human audit hide a dead
+      // bowed adapter.
+      onsetWanderCents: this._clamp(
+        (this.p.onsetWanderCents ?? 0) +
+        (excType === "bow" ? measuredOnsetDeltaCents : 0), 0, 120),
+      onsetWanderSettlePeriods: this._clamp(
+        (this.p.onsetWanderSettlePeriods ?? 12) +
+        (excType === "bow" ? measuredOnsetSettleDeltaSec * fundamentalHz : 0),
+        2, 30),
       bowScratchLevel: bowedLevels.bowScratchLevel,
       bowNoise: profile.bowNoise?.profilePinned === true &&
           Array.isArray(profile.bowNoise.profile)
@@ -4335,9 +4350,8 @@ export class GenerationEngine {
       onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),
       onsetScoopRegisterSlope: this._clamp(this.p.onsetScoopRegisterSlope ?? 0, -1.5, 1.5),
       onsetScoopVelocitySlope: this._clamp(this.p.onsetScoopVelocitySlope ?? 0, -1.5, 1.5),
-      measuredOnsetDeltaCents: measuredHumanDelta(humanEpisode, "onsetWanderCents"),
-      measuredOnsetSettleDeltaSec:
-        measuredHumanDelta(humanEpisode, "onsetSettleMs") / 1000,
+      measuredOnsetDeltaCents,
+      measuredOnsetSettleDeltaSec,
       consonantClass: String(this.p.consonantClass || "none"),
       consonantPlace: String(this.p.consonantPlace || "alveolar"),
       consonantVoiced: this.p.consonantVoiced !== false,

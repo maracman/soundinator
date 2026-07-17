@@ -11,6 +11,7 @@ move beyond their construction bars.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -23,6 +24,10 @@ from .score import THIRD_OCTAVE_CENTRES, extract_features, inharmonicity_compari
 
 
 ROOT = Path(__file__).resolve().parents[2]
+ISOLATED_CONSUMER_PROOF = (
+    Path(__file__).with_name("calibrations") /
+    "bowed-human-isolated-consumers-t074.json"
+)
 
 
 def _pair_group(reference: dict[str, Any]) -> str:
@@ -361,13 +366,32 @@ def _parameter_qualification(pair_rows: list[dict[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _canonical_hash(value: Any) -> str:
+    return hashlib.sha256(json.dumps(
+        value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def _consumer_status(controllability: dict[str, Any] | None,
-                     qualification: dict[str, Any]) -> dict[str, Any]:
+                     qualification: dict[str, Any], *,
+                     instrument: str | None = None,
+                     ranges: dict[str, Any] | None = None,
+                     isolated_proof: dict[str, Any] | None = None,
+                     ) -> dict[str, Any]:
     responsive = (controllability or {}).get("responsiveParameters", {})
     native_episode = ((controllability or {}).get("humanRangeDelivery") ==
                       "engine-native-zero-inflated-note-episode" and
                       bool((controllability or {}).get(
                           "humanRangeContractHash")))
+    proof_row = ((isolated_proof or {}).get("instruments", {}).get(instrument, {})
+                 if instrument else {})
+    expected_ranges_hash = _canonical_hash(ranges or {})
+    proof_valid = bool(
+        (isolated_proof or {}).get("schema") ==
+        "sg2-t074-isolated-human-consumers-v1" and
+        proof_row.get("rangesSha256") == expected_ranges_hash and
+        proof_row.get("verdict") == "pass")
+    isolated = (set(proof_row.get("functionalParameters", []))
+                if proof_valid else set())
     rows = {}
     for parameter, status in qualification.items():
         if status["status"] != "qualified-humanisation":
@@ -377,15 +401,26 @@ def _consumer_status(controllability: dict[str, Any] | None,
         feature = spec["responseFeature"]
         responders = set(responsive.get(feature, []))
         native_responder = native_episode and "excitationHuman" in responders
+        isolated_responder = parameter in isolated
         rows[parameter] = {
             "parameter": expected_parameter, "feature": feature,
-            "functional": expected_parameter in responders or native_responder,
-            "delivery": ("engine-native-zero-inflated-note-episode"
+            "functional": (expected_parameter in responders or native_responder or
+                           isolated_responder),
+            "delivery": ("T-074-hash-pinned-isolated-endpoint"
+                         if isolated_responder else
+                         "engine-native-zero-inflated-note-episode"
                          if native_responder else "direct-parameter"),
             "responders": sorted(responders),
         }
     return {
         "auditClean": bool((controllability or {}).get("clean")),
+        "isolatedProof": {
+            "path": str(ISOLATED_CONSUMER_PROOF),
+            "valid": proof_valid,
+            "expectedRangesSha256": expected_ranges_hash,
+            "proofRangesSha256": proof_row.get("rangesSha256"),
+            "verifierSha256": (isolated_proof or {}).get("verifierSha256"),
+        },
         "parameters": rows,
         "allQualifiedConsumersFunctional": bool(rows) and
             bool((controllability or {}).get("clean")) and
@@ -396,6 +431,28 @@ def _consumer_status(controllability: dict[str, Any] | None,
 def _identity_fit_status(identity_best: dict[str, Any] | None,
                          references: list[dict[str, Any]],
                          matched_paths: set[str]) -> dict[str, Any]:
+    audited_rows = (identity_best or {}).get("rows")
+    if isinstance(audited_rows, list):
+        by_path = {str(row.get("path")): row for row in audited_rows}
+        rows = []
+        for path in sorted(matched_paths):
+            audited = by_path.get(path, {})
+            rows.append({
+                "path": path,
+                "good": bool(audited.get("good")),
+                "failedCoreFeatures": audited.get("failedCoreFeatures", []),
+                "analysisFailure": audited.get("analysisFailure"),
+                "renderSha256": audited.get("renderSha256"),
+            })
+        fully_functional = bool((identity_best or {}).get(
+            "fullyFunctionalRenderPath"))
+        return {
+            "method": "dedicated-per-take-render-and-score-audit",
+            "fullyFunctionalRenderPath": fully_functional,
+            "takes": rows,
+            "allMatchedTakesNearBars": bool(rows) and fully_functional and
+                all(row["good"] for row in rows),
+        }
     scores = (identity_best or {}).get("scores", [])
     rows = []
     core = ("partials_db", "log_mel_db", "attack_ms", "band_balance_db",
@@ -413,7 +470,9 @@ def _identity_fit_status(identity_best: dict[str, Any] | None,
         rows.append({"path": str(reference.get("path")), "good": good,
                      "failedCoreFeatures": failures,
                      "analysisFailure": score.get("analysisFailure")})
-    return {"takes": rows, "allMatchedTakesNearBars": bool(rows) and
+    return {"method": "legacy-index-aligned-best-scores",
+            "fullyFunctionalRenderPath": bool(scores),
+            "takes": rows, "allMatchedTakesNearBars": bool(rows) and
             all(row["good"] for row in rows)}
 
 
@@ -482,6 +541,7 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
                      identity_best: dict[str, Any] | None = None,
                      controllability: dict[str, Any] | None = None,
                      adjacent_references: list[dict[str, Any]] | None = None,
+                     isolated_proof: dict[str, Any] | None = None,
                      ) -> dict[str, Any]:
     groups: dict[str, list[dict[str, Any]]] = {}
     for reference in references:
@@ -562,7 +622,9 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
         str(row["path"]) for rows in groups.values() for row in rows}
     identity_status = _identity_fit_status(
         identity_best, references, matched_paths)
-    consumer_status = _consumer_status(controllability, qualification)
+    consumer_status = _consumer_status(
+        controllability, qualification, instrument=instrument, ranges=ranges,
+        isolated_proof=isolated_proof)
     verdict_name = _decomposition_verdict(
         len(failures), identity_status["allMatchedTakesNearBars"],
         consumer_status["allQualifiedConsumersFunctional"])
@@ -636,6 +698,73 @@ def fit_human_ranges(instrument: str, references: list[dict[str, Any]], *,
         "decompositionTest": verdict, "pairFits": pair_rows,
         "adjacentTrendPairs": adjacent["pairs"],
     }
+
+
+def reclassify_decomposition(
+        result: dict[str, Any], *, instrument: str,
+        identity_audit: dict[str, Any], controllability: dict[str, Any],
+        isolated_proof: dict[str, Any]) -> dict[str, Any]:
+    """Refresh only §2.5c.2's verdict against current consuming evidence.
+
+    The measured take-pair observables, double dissociations and residuals are
+    model-independent evidence and are intentionally left byte-for-byte
+    unchanged.  Pass 08 changes only the two masks: dedicated current-renderer
+    identity fits and T-074 isolated consumer proofs.
+    """
+    refreshed = json.loads(json.dumps(result))
+    pair_rows = refreshed.get("pairFits", [])
+    matched_paths = {
+        str(path) for row in pair_rows for path in (row.get("left"), row.get("right"))
+        if path
+    }
+    audit_paths = {str(row.get("path")) for row in identity_audit.get("rows", [])}
+    # Reports historically store source filenames while the render audit owns
+    # absolute prepared WAV paths.  Resolve by basename only when it is unique.
+    if matched_paths and not matched_paths.issubset(audit_paths):
+        by_source = {
+            str(row.get("sourceFile")): str(row.get("path"))
+            for row in identity_audit.get("rows", []) if row.get("sourceFile")
+        }
+        matched_paths = {by_source.get(path, path) for path in matched_paths}
+    references = [{"path": path} for path in sorted(matched_paths)]
+    identity_status = _identity_fit_status(
+        identity_audit, references, matched_paths)
+    qualification = refreshed.get("qualification", {})
+    ranges = refreshed.get("ranges", {})
+    consumer_status = _consumer_status(
+        controllability, qualification, instrument=instrument, ranges=ranges,
+        isolated_proof=isolated_proof)
+    failed_pairs = sum(
+        not bool(row.get("decomposition", {}).get("passed"))
+        for row in pair_rows)
+    verdict_name = _decomposition_verdict(
+        failed_pairs, identity_status["allMatchedTakesNearBars"],
+        consumer_status["allQualifiedConsumersFunctional"])
+    masking = []
+    if not identity_status["allMatchedTakesNearBars"]:
+        masking.append("one or more per-take identity fits miss the §3 core bars")
+    if not consumer_status["allQualifiedConsumersFunctional"]:
+        masking.append("one or more qualified Human consumers are unaudited or non-functional")
+    refreshed["decompositionTest"] = {
+        "verdict": verdict_name,
+        "passed": verdict_name == "PASS",
+        "pairs": len(pair_rows),
+        "failedPairs": failed_pairs,
+        "rule": ("after Human comb/level/tilt removal: partial and body residual <=3 dB; "
+                 "B <=1.5x (near-zero uses 3 cents); T60 <=1.5x"),
+        "identityFit": identity_status,
+        "consumerFunctionality": consumer_status,
+        "maskingFactors": masking,
+        "interpretation": {
+            "PASS": "matched takes reconcile inside qualified Human parameters",
+            "FAIL-MISSING-DOF": ("identity fits are good and consumers work; the "
+                                 "remaining residual evidences a missing Human degree of freedom"),
+            "INCONCLUSIVE-MASKED": ("identity/renderer misfit masks the residual; "
+                                    "no missing-Human-DOF claim is permitted"),
+        }[verdict_name],
+        "rerunMethod": "pass08-existing-measurements-current-identity-and-T074-consumers",
+    }
+    return refreshed
 
 
 def _consume_profile_ranges(profiles: dict[str, Any], instrument: str,
@@ -782,6 +911,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--adjacent-references", type=Path,
                         help=("lossless within-run note rows; defaults to the "
                               "campaign body-reference manifest when present"))
+    parser.add_argument("--isolated-consumer-proof", type=Path,
+                        default=ISOLATED_CONSUMER_PROOF)
+    parser.add_argument("--decomposition-only", action="store_true",
+                        help="retain measured ranges/pairs and refresh only §2.5c.2")
+    parser.add_argument("--identity-audit", type=Path,
+                        help="dedicated current-renderer per-take identity audit")
     args = parser.parse_args(argv)
     references_path = args.references or data_root / "campaigns" / args.instrument / "references.json"
     references = json.loads(references_path.read_text())
@@ -789,6 +924,8 @@ def main(argv: list[str] | None = None) -> int:
                      if args.identity_best else None)
     controllability = (json.loads(args.controllability.read_text())
                        if args.controllability else None)
+    isolated_proof = (json.loads(args.isolated_consumer_proof.read_text())
+                      if args.isolated_consumer_proof.is_file() else {})
     adjacent_path = (args.adjacent_references or
                      data_root / "campaigns" / args.instrument /
                      "body-references.json")
@@ -798,13 +935,22 @@ def main(argv: list[str] | None = None) -> int:
         adjacent_references = (adjacent_payload.get("references", [])
                                if isinstance(adjacent_payload, dict)
                                else adjacent_payload)
-    result = fit_human_ranges(
-        args.instrument, references, identity_best=identity_best,
-        controllability=controllability,
-        adjacent_references=adjacent_references)
     profiles = json.loads(args.profile.read_text())
     if args.instrument not in profiles:
         raise ValueError(f"{args.instrument}: missing measured profile row")
+    if args.decomposition_only:
+        if args.identity_audit is None or controllability is None:
+            parser.error("--decomposition-only requires --identity-audit and --controllability")
+        result = reclassify_decomposition(
+            profiles[args.instrument]["humanRanges"], instrument=args.instrument,
+            identity_audit=json.loads(args.identity_audit.read_text()),
+            controllability=controllability, isolated_proof=isolated_proof)
+    else:
+        result = fit_human_ranges(
+            args.instrument, references, identity_best=identity_best,
+            controllability=controllability,
+            adjacent_references=adjacent_references,
+            isolated_proof=isolated_proof)
     profile_updated = _consume_profile_ranges(profiles, args.instrument, result)
     campaign_initial_updated = False
     if profile_updated:

@@ -64,7 +64,10 @@ from scripts.tone_match.bowed_source_tables import (
     deconvolve_source,
     synthetic_deconvolution_round_trip,
 )
-from scripts.tone_match.bowed_body_audit import _audit_params as bowed_body_audit_params
+from scripts.tone_match.bowed_body_audit import (
+    PAIR_RATIO_FLOOR_DB,
+    _audit_params as bowed_body_audit_params,
+)
 from scripts.tone_match.humanisation import fit_excitation_position, ship_human_overrides
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, STRUCK_OBJECTIVE_ROLES, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, iowa_filename_span, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
@@ -2603,6 +2606,15 @@ def test_cello_t058_body_audit_holds_source_and_neutralises_confounds():
     for key in ("partialTransfer", "attackNoiseLevel", "bowNoiseLevel",
                 "bowScratchLevel", "vibratoProb", "excitationHuman", "reverbWet"):
         assert body[key] == bypass[key] == 0.0
+
+
+def test_cello_t058_pair_ratio_floor_requires_both_render_arms():
+    # One loud arm cannot make a comb-notched, leakage-dominated denominator
+    # a valid source-cancellation measurement.
+    body_db = np.asarray([-12.0, -35.9, -20.0])
+    bypass_db = np.asarray([-14.0, -20.0, -36.1])
+    valid = np.minimum(body_db, bypass_db) > PAIR_RATIO_FLOOR_DB
+    assert valid.tolist() == [True, True, False]
 
 
 def _mode_locked_tone(f0, dominant_harmonic, sr=44_100, duration=1.2,
