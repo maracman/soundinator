@@ -575,3 +575,21 @@ Counter-datum (2026-07-16): the owner ear-checked
 passed it — "sounds fine". So L3 is take-specific QC, NOT a blanket
 Philharmonia exclusion: takes that pass the automated screen and/or owner
 ears stay eligible for spectral fitting.
+
+### Agent D pass 09 · bowed identity source audit (2026-07-18)
+
+The full bowed component stack remains active. The experimental 64-rank
+source candidates are deliberately not promoted to the global owner page:
+violin clears its score-applicable partial-table cells but still fails mel,
+band balance and most attack cells; cello clears only low/ff partial and still
+fails the ordinary identity set. Their run-local listening pages are:
+
+- `sg2-data/runs/violin/agentd-pass09-source64-audit/listen-violin-agentd-pass09-source64-audit.html`
+  (seed 1220009481);
+- `sg2-data/runs/cello/agentd-pass09-source64-audit/listen-cello-agentd-pass09-source64-audit.html`
+  (seed 2095425142).
+
+The canonical `sg2-data/listen.html` was freshly rebuilt at combined head
+`fce31f4` with build seed 1784316093 and retains the verified leaderboard/pinned SHIP
+rows. This separation prevents a useful source diagnostic from being mistaken
+for an identity freeze.

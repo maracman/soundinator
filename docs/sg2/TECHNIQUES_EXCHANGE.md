@@ -2397,3 +2397,36 @@ factory promotion while higher-level gates fail.
 Affects: blown harmonic-source surfaces / band-balance triage / body-refit firewall.
 Status: engine=n/a-method-only analysis=incorporated-synthetic+temporal-gate
 sung=adapt-cumulative-refinement bowed=adapt-method struck/plucked=n/a
+
+Status update — Agent D bowed/analysis pass 09, 2026-07-18: T-075
+bowed=incorporated-source-hierarchy-partial. Direct lossless-reference/body
+deconvolution now activates all declared evidence cells for each instrument
+without manufacturing violin's absent low/pp cell. On the full active stack,
+violin passes the partial-table bar in every score-applicable spectral cell
+(0.89, 1.02 and 1.30 dB); cello low/ff passes at 0.87 dB. Extending the
+extractor from 32 to the full 64-harmonic source contract improves violin
+low/ff mel 7.42→5.72 dB and band mean 5.77→4.62 dB, and cello low/ff band
+mean 4.00→2.52 dB. Ordinary per-take identity nevertheless remains 0/14
+violin and 0/15 cello, so both decompositions remain `INCONCLUSIVE-MASKED`
+and were not rerun.
+
+### T-079 · Measured source surfaces consume declared corpus cells and the full renderer rank contract
+Author: Agent D / bowed analysis · 2026-07-18 · Firewall: method shared; values per instrument
+Finding: the bowed direct-deconvolution emitter hard-coded a six-cell grid and
+analysed only 32 harmonics before padding the renderer's 64-rank source rows
+with zeros. The first assumption blocked violin even though its lossless
+spectral corpus declares five cells and no low/pp observation. The second
+silently removed measured upper harmonics: restoring ranks 33–64 improves
+violin low/ff mel by 1.70 dB and band mean by 1.15 dB while retaining the
+partial PASS. Cello low/ff band mean improves by 1.48 dB. Sparse cells and
+inaudible high ranks remain zero; no harmonic or missing cell is inferred.
+Consuming rule: activation requires every distinct lossless spectral cell
+actually declared by the instrument corpus, with no duplicate cell and no
+accepted undeclared cell. Analyse through the renderer's complete partial-rank
+contract, preserve absent/inaudible ranks as zero, and let the existing joint
+measured-hull clamp handle unobserved corners. A bounded render-domain
+correction may move only already-present harmonics in the same cell and must
+be re-audited in hierarchy order.
+Affects: bowed source extraction / sparse measured hulls / partial, mel and band-balance identity.
+Status: analysis=incorporated bowed=incorporated-partial-pass
+engine=n/a sung=adapt-method struck/plucked=adapt-method
