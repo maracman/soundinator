@@ -9,6 +9,7 @@ import pytest
 import scripts.tone_match.iterate as iterate_module
 import scripts.tone_match.score as score_module
 import scripts.tone_match.struck_plucked_prep as struck_prep_module
+from scripts.tone_match.piano_anatomy import VALIDATION_SCHEMA as PIANO_ANATOMY_VALIDATION_SCHEMA, validate as validate_piano_anatomy
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
@@ -57,7 +58,7 @@ from scripts.tone_match.legacy_prior import resolve_legacy_prior
 from scripts.tone_match.humanisation import fit_excitation_position
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, STRUCK_OBJECTIVE_ROLES, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
-from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
+from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, hold_decay_metrics, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
 from scripts.tone_match.build_campaign import _run_start_midi
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
@@ -77,6 +78,31 @@ def test_time_resampling_is_stable_at_endpoints():
     assert result.shape == (1, 9)
     assert result[0, 0] == 1.0
     assert result[0, -1] == 4.0
+
+
+def test_l18_hold_decay_metric_rejects_a_plateau_and_accepts_free_decay():
+    sample_rate = 8_000
+    times = np.arange(3 * sample_rate) / sample_rate
+    attack = np.minimum(1.0, times / .01)
+    plateau = attack * np.sin(2 * np.pi * 220 * times)
+    free = attack * np.power(10.0, -3.0 * times / 20.0) * np.sin(
+        2 * np.pi * 220 * times)
+    flat_metrics = hold_decay_metrics(plateau, sample_rate)
+    free_metrics = hold_decay_metrics(free, sample_rate)
+    assert flat_metrics is not None and free_metrics is not None
+    assert flat_metrics["slopeDbPerSecond"] > -.15
+    assert flat_metrics["plateauFraction"] >= .5
+    assert free_metrics["slopeDbPerSecond"] == pytest.approx(-3.0, abs=.08)
+    assert free_metrics["plateauFraction"] < .5
+
+
+def test_l16_l17_l18_piano_anatomy_extractor_passes_synthetic_roundtrip(tmp_path):
+    output = tmp_path / "piano-anatomy-validation.json"
+    result = validate_piano_anatomy(output)
+    assert result["schema"] == PIANO_ANATOMY_VALIDATION_SCHEMA
+    assert result["status"] == "pass"
+    assert all(result["checks"].values())
+    assert output.exists()
 
 
 def test_sustained_band_profile_is_gain_invariant_and_uses_third_octaves():
@@ -914,6 +940,69 @@ def test_single_note_checklist_marks_campaign_evidence_not_applicable():
                                    strict_evidence=False)
     assert result["counts"]["notApplicable"] > 0
     assert {row["status"] for row in result["assertions"]} <= {"pass", "fail", "not-applicable"}
+
+
+def test_l18_struck_construction_fails_any_ship_hold_plateau():
+    samples = []
+    for register in ("low", "mid", "high"):
+        for velocity in (.25, .9):
+            bundle = _bundle(percussive=True)
+            bundle.hold_decay_db_per_s = -2.0
+            bundle.hold_plateau_fraction = .1
+            samples.append(ConstructionSample(
+                bundle, bundle, register, velocity, velocity))
+    params = {
+        "excitationType": "strike", "resonatorClass": "string",
+        "velocityHardnessCoupling": .5,
+        "decaySecondStage": .8, "decaySecondRatio": 4,
+    }
+    passed = evaluate_construction("piano", samples, params=params)
+    by_id = {row["id"]: row for row in passed["assertions"]}
+    assert by_id["piano.free-decay-no-plateau"]["status"] == "pass"
+    samples[-1].render.hold_decay_db_per_s = 0.0
+    samples[-1].render.hold_plateau_fraction = 1.0
+    failed = evaluate_construction("piano", samples, params=params)
+    by_id = {row["id"]: row for row in failed["assertions"]}
+    assert by_id["piano.free-decay-no-plateau"]["status"] == "fail"
+
+
+def test_l17_pinned_pre_onset_component_must_be_active_with_own_envelope():
+    samples = []
+    for register in ("low", "mid", "high"):
+        for velocity in (.25, .9):
+            bundle = _bundle(percussive=True)
+            bundle.hold_decay_db_per_s = -2.0
+            bundle.hold_plateau_fraction = .1
+            bundle.noise_lead_ms = 18.0
+            samples.append(ConstructionSample(
+                bundle, bundle, register, velocity, velocity))
+    component = {
+        "component": "pianoActionNoise", "profilePinned": True, "level": 1,
+        "envelope": {"independentOfHarmonicEnvelope": True,
+                     "points": [{"timeMs": -20, "gainDb": -12},
+                                {"timeMs": -5, "gainDb": 0},
+                                {"timeMs": 30, "gainDb": -20}]},
+    }
+    base = {"excitationType": "strike", "resonatorClass": "string",
+            "velocityHardnessCoupling": .5,
+            "decaySecondStage": .8, "decaySecondRatio": 4,
+            "preOnsetComponents": [component]}
+    result = evaluate_construction("piano", samples, params=base)
+    by_id = {row["id"]: row for row in result["assertions"]}
+    assert by_id["piano.pre-onset-component-active"]["status"] == "pass"
+    result = evaluate_construction("piano", samples, params={
+        **base, "preOnsetComponents": [{**component, "level": 0}]})
+    by_id = {row["id"]: row for row in result["assertions"]}
+    assert by_id["piano.pre-onset-component-active"]["status"] == "fail"
+    result = evaluate_construction("piano", samples, params={
+        **base, "preOnsetComponents": [{**component, "envelope": {
+            "independentOfHarmonicEnvelope": True,
+            "points": [{"timeMs": -20, "gainDb": 0},
+                       {"timeMs": -5, "gainDb": 0},
+                       {"timeMs": 30, "gainDb": 0}],
+        }}]})
+    by_id = {row["id"]: row for row in result["assertions"]}
+    assert by_id["piano.pre-onset-component-active"]["status"] == "fail"
 
 
 def test_alto_sax_owner_notes_are_construction_gates():
