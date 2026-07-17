@@ -2373,3 +2373,27 @@ Affects: blown excitation level / register-dynamic interpolation / band-balance 
 Status: engine=incorporated (`cb50b68`, shared `4810c30`)
 blown=incorporated-limiting-factor analysis=adapt-method
 sung=adapt-method-if-independently-measured bowed=n/a struck/plucked=n/a
+
+### T-078 · Post-source/post-air octave residuals refine existing source cells before body refits
+Author: Agent A / engine + blown · 2026-07-18 · Firewall: method only; values per instrument and cell
+Finding: a synthetic harmonic-source-plus-independent-air round trip recovers
+an injected octave law to 0.242 dB mean and 0.460 dB maximum residual under
+0.35/0.75 dB bars. On the current flute mid/ff final render, three disjoint
+active-sustain blocks identify five stable, source-addressable octave bands.
+A bounded gain-one correction applied only to the selected cumulative mid/ff
+source row reduces that construction cell from 3.031/5.845 dB mean/max after
+T-077 to 2.513/4.116 dB. The other five source rows are byte-equivalent in
+the candidate structure; body and register/dynamic air surfaces are unchanged.
+The overall flute construction, strict identity, and variation gates still
+fail, so this is a diagnostic candidate rather than a preset promotion.
+Consuming rule: require the synthetic round trip first, extract reference-minus-
+render residual only from the final post-source/post-air active sustain, and
+require temporal MAD/sign stability before mapping it back to harmonics at or
+above the fundamental. Start every pass from the selected fit's cumulative
+surface, cap the correction, change exactly one existing cell, keep body and
+air fixed, and exclude onset/release/room-tail evidence rather than fitting a
+room component. Never treat a cleared cell as permission for a body refit or
+factory promotion while higher-level gates fail.
+Affects: blown harmonic-source surfaces / band-balance triage / body-refit firewall.
+Status: engine=n/a-method-only analysis=incorporated-synthetic+temporal-gate
+sung=adapt-cumulative-refinement bowed=adapt-method struck/plucked=n/a
