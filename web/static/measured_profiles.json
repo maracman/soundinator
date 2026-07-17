@@ -51862,8 +51862,1182 @@
      "noteSpanFromFilename": "C8",
      "vowel": null
     }
-   ]
-  }
+   ],
+   "engineHandoffs": {
+    "schema": "sg2-piano-engine-handoffs-v1",
+    "l16Sha256": "8fb5017771e108c7bcb91de52badd1cbd193cabe250978c6158a2f924013f5b8",
+    "l17Sha256": "75f55c196f1146a22f23ed2d2ecf59e51f384dba4d7737dbbf48878d8898968d",
+    "l18ProvenanceSha256": "24f9253ab15bf7e5ddb9aeae529bf3cccc653456053be11ac8f7994959ba027d",
+    "verifiedDamperTakes": 333,
+    "damperRegisterExponent": 0.10043,
+    "undampedFromMidi": 90,
+    "undampedPolicy": "natural held-string decay; never extrapolate lower-note damper contact"
+   }
+  },
+  "preOnsetComponents": [
+   {
+    "component": "pianoActionNoise",
+    "status": "measured",
+    "profilePinned": true,
+    "notes": 5,
+    "shapeOptimiserMutable": false,
+    "noiseLeadMs": 81.27,
+    "profile": [
+     {
+      "freqHz": 898.0,
+      "gainDb": 32.258
+     },
+     {
+      "freqHz": 1269.9,
+      "gainDb": 20.716
+     },
+     {
+      "freqHz": 1425.4,
+      "gainDb": 29.435
+     },
+     {
+      "freqHz": 1600.0,
+      "gainDb": 30.489
+     },
+     {
+      "freqHz": 1795.9,
+      "gainDb": 23.001
+     },
+     {
+      "freqHz": 2015.9,
+      "gainDb": 20.735
+     },
+     {
+      "freqHz": 2262.7,
+      "gainDb": 23.873
+     },
+     {
+      "freqHz": 2539.8,
+      "gainDb": 20.016
+     },
+     {
+      "freqHz": 2850.9,
+      "gainDb": 9.876
+     },
+     {
+      "freqHz": 3200.0,
+      "gainDb": 7.942
+     },
+     {
+      "freqHz": 3591.9,
+      "gainDb": 0.41
+     },
+     {
+      "freqHz": 4031.7,
+      "gainDb": -1.585
+     },
+     {
+      "freqHz": 4525.5,
+      "gainDb": -0.41
+     },
+     {
+      "freqHz": 5079.7,
+      "gainDb": -17.048
+     },
+     {
+      "freqHz": 5701.8,
+      "gainDb": -23.354
+     },
+     {
+      "freqHz": 6400.0,
+      "gainDb": -22.231
+     },
+     {
+      "freqHz": 7183.8,
+      "gainDb": -31.153
+     },
+     {
+      "freqHz": 8063.5,
+      "gainDb": -35.818
+     },
+     {
+      "freqHz": 9051.0,
+      "gainDb": -39.139
+     },
+     {
+      "freqHz": 10159.4,
+      "gainDb": -38.325
+     },
+     {
+      "freqHz": 11403.5,
+      "gainDb": -41.389
+     },
+     {
+      "freqHz": 12800.0,
+      "gainDb": -41.261
+     }
+    ],
+    "envelope": {
+     "independentOfHarmonicEnvelope": true,
+     "timeReference": "milliseconds relative to harmonic tone onset",
+     "peakOffsetMs": -5.0,
+     "releaseToMinus20DbMs": 5.0,
+     "points": [
+      {
+       "timeMs": -150,
+       "gainDb": -50.594
+      },
+      {
+       "timeMs": -145,
+       "gainDb": -55.716
+      },
+      {
+       "timeMs": -140,
+       "gainDb": -43.695
+      },
+      {
+       "timeMs": -135,
+       "gainDb": -46.223
+      },
+      {
+       "timeMs": -130,
+       "gainDb": -52.965
+      },
+      {
+       "timeMs": -125,
+       "gainDb": -46.315
+      },
+      {
+       "timeMs": -120,
+       "gainDb": -46.41
+      },
+      {
+       "timeMs": -115,
+       "gainDb": -49.573
+      },
+      {
+       "timeMs": -110,
+       "gainDb": -47.577
+      },
+      {
+       "timeMs": -105,
+       "gainDb": -46.436
+      },
+      {
+       "timeMs": -100,
+       "gainDb": -51.853
+      },
+      {
+       "timeMs": -95,
+       "gainDb": -52.26
+      },
+      {
+       "timeMs": -90,
+       "gainDb": -56.88
+      },
+      {
+       "timeMs": -85,
+       "gainDb": -44.336
+      },
+      {
+       "timeMs": -80,
+       "gainDb": -10.444
+      },
+      {
+       "timeMs": -75,
+       "gainDb": -6.71
+      },
+      {
+       "timeMs": -70,
+       "gainDb": -2.825
+      },
+      {
+       "timeMs": -65,
+       "gainDb": -4.607
+      },
+      {
+       "timeMs": -60,
+       "gainDb": -11.878
+      },
+      {
+       "timeMs": -55,
+       "gainDb": -2.713
+      },
+      {
+       "timeMs": -50,
+       "gainDb": -0.692
+      },
+      {
+       "timeMs": -45,
+       "gainDb": -4.524
+      },
+      {
+       "timeMs": -40,
+       "gainDb": -4.473
+      },
+      {
+       "timeMs": -35,
+       "gainDb": -0.977
+      },
+      {
+       "timeMs": -30,
+       "gainDb": -2.804
+      },
+      {
+       "timeMs": -25,
+       "gainDb": -0.21
+      },
+      {
+       "timeMs": -20,
+       "gainDb": -0.025
+      },
+      {
+       "timeMs": -15,
+       "gainDb": -1.061
+      },
+      {
+       "timeMs": -10,
+       "gainDb": -1.615
+      },
+      {
+       "timeMs": -5,
+       "gainDb": 0.0
+      },
+      {
+       "timeMs": 0,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 5,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 10,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 15,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 20,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 25,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 30,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 35,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 40,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 45,
+       "gainDb": -57.128
+      },
+      {
+       "timeMs": 50,
+       "gainDb": -57.128
+      }
+     ]
+    },
+    "exclusions": [
+     {
+      "sourceFile": "Piano.pp.C4.aiff",
+      "reason": "no >=8 dB broadband pre-strike action transient"
+     },
+     {
+      "sourceFile": "Piano.ff.C4.aiff",
+      "reason": "no >=8 dB broadband pre-strike action transient"
+     },
+     {
+      "sourceFile": "Piano.pp.C6.aiff",
+      "reason": "recording begins too close to action/strike for pre-onset evidence"
+     },
+     {
+      "sourceFile": "Piano.ff.C6.aiff",
+      "reason": "no >=8 dB broadband pre-strike action transient"
+     },
+     {
+      "sourceFile": "Piano.pp.C8.aiff",
+      "reason": "recording begins too close to action/strike for pre-onset evidence"
+     }
+    ],
+    "byDynamic": {
+     "ff": {
+      "status": "measured",
+      "profilePinned": true,
+      "notes": 3,
+      "shapeOptimiserMutable": false,
+      "noiseLeadMs": 76.916,
+      "profile": [
+       {
+        "freqHz": 898.0,
+        "gainDb": 25.242
+       },
+       {
+        "freqHz": 1269.9,
+        "gainDb": 23.772
+       },
+       {
+        "freqHz": 1425.4,
+        "gainDb": 26.01
+       },
+       {
+        "freqHz": 1600.0,
+        "gainDb": 26.808
+       },
+       {
+        "freqHz": 1795.9,
+        "gainDb": 19.91
+       },
+       {
+        "freqHz": 2015.9,
+        "gainDb": 19.994
+       },
+       {
+        "freqHz": 2262.7,
+        "gainDb": 17.635
+       },
+       {
+        "freqHz": 2539.8,
+        "gainDb": 12.016
+       },
+       {
+        "freqHz": 2850.9,
+        "gainDb": 6.501
+       },
+       {
+        "freqHz": 3200.0,
+        "gainDb": 6.768
+       },
+       {
+        "freqHz": 3591.9,
+        "gainDb": -0.407
+       },
+       {
+        "freqHz": 4031.7,
+        "gainDb": -8.735
+       },
+       {
+        "freqHz": 4525.5,
+        "gainDb": 0.407
+       },
+       {
+        "freqHz": 5079.7,
+        "gainDb": -13.369
+       },
+       {
+        "freqHz": 5701.8,
+        "gainDb": -19.46
+       },
+       {
+        "freqHz": 6400.0,
+        "gainDb": -20.202
+       },
+       {
+        "freqHz": 7183.8,
+        "gainDb": -18.842
+       },
+       {
+        "freqHz": 8063.5,
+        "gainDb": -20.599
+       },
+       {
+        "freqHz": 9051.0,
+        "gainDb": -22.076
+       },
+       {
+        "freqHz": 10159.4,
+        "gainDb": -24.883
+       },
+       {
+        "freqHz": 11403.5,
+        "gainDb": -30.864
+       },
+       {
+        "freqHz": 12800.0,
+        "gainDb": -35.005
+       }
+      ],
+      "envelope": {
+       "independentOfHarmonicEnvelope": true,
+       "timeReference": "milliseconds relative to harmonic tone onset",
+       "peakOffsetMs": -25.0,
+       "releaseToMinus20DbMs": 25.0,
+       "points": [
+        {
+         "timeMs": -150,
+         "gainDb": -41.226
+        },
+        {
+         "timeMs": -145,
+         "gainDb": -44.297
+        },
+        {
+         "timeMs": -140,
+         "gainDb": -42.882
+        },
+        {
+         "timeMs": -135,
+         "gainDb": -43.541
+        },
+        {
+         "timeMs": -130,
+         "gainDb": -44.33
+        },
+        {
+         "timeMs": -125,
+         "gainDb": -44.384
+        },
+        {
+         "timeMs": -120,
+         "gainDb": -44.686
+        },
+        {
+         "timeMs": -115,
+         "gainDb": -43.197
+        },
+        {
+         "timeMs": -110,
+         "gainDb": -46.646
+        },
+        {
+         "timeMs": -105,
+         "gainDb": -44.712
+        },
+        {
+         "timeMs": -100,
+         "gainDb": -45.827
+        },
+        {
+         "timeMs": -95,
+         "gainDb": -42.679
+        },
+        {
+         "timeMs": -90,
+         "gainDb": -38.083
+        },
+        {
+         "timeMs": -85,
+         "gainDb": -31.09
+        },
+        {
+         "timeMs": -80,
+         "gainDb": -29.108
+        },
+        {
+         "timeMs": -75,
+         "gainDb": -5.94
+        },
+        {
+         "timeMs": -70,
+         "gainDb": -1.19
+        },
+        {
+         "timeMs": -65,
+         "gainDb": -4.039
+        },
+        {
+         "timeMs": -60,
+         "gainDb": -7.124
+        },
+        {
+         "timeMs": -55,
+         "gainDb": -5.941
+        },
+        {
+         "timeMs": -50,
+         "gainDb": -6.366
+        },
+        {
+         "timeMs": -45,
+         "gainDb": -7.529
+        },
+        {
+         "timeMs": -40,
+         "gainDb": -7.845
+        },
+        {
+         "timeMs": -35,
+         "gainDb": -8.94
+        },
+        {
+         "timeMs": -30,
+         "gainDb": -8.829
+        },
+        {
+         "timeMs": -25,
+         "gainDb": 0.0
+        },
+        {
+         "timeMs": -20,
+         "gainDb": -6.332
+        },
+        {
+         "timeMs": -15,
+         "gainDb": -9.088
+        },
+        {
+         "timeMs": -10,
+         "gainDb": -10.254
+        },
+        {
+         "timeMs": -5,
+         "gainDb": -9.796
+        },
+        {
+         "timeMs": 0,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 5,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 10,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 15,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 20,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 25,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 30,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 35,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 40,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 45,
+         "gainDb": -56.559
+        },
+        {
+         "timeMs": 50,
+         "gainDb": -56.559
+        }
+       ]
+      },
+      "exclusions": [
+       {
+        "sourceFile": "Piano.ff.C4.aiff",
+        "reason": "no >=8 dB broadband pre-strike action transient"
+       },
+       {
+        "sourceFile": "Piano.ff.C6.aiff",
+        "reason": "no >=8 dB broadband pre-strike action transient"
+       }
+      ]
+     },
+     "pp": {
+      "status": "measured",
+      "profilePinned": true,
+      "notes": 2,
+      "shapeOptimiserMutable": false,
+      "noiseLeadMs": 81.995,
+      "profile": [
+       {
+        "freqHz": 898.0,
+        "gainDb": 5.742
+       },
+       {
+        "freqHz": 1269.9,
+        "gainDb": 10.133
+       },
+       {
+        "freqHz": 1425.4,
+        "gainDb": 7.185
+       },
+       {
+        "freqHz": 1600.0,
+        "gainDb": 7.677
+       },
+       {
+        "freqHz": 1795.9,
+        "gainDb": 5.278
+       },
+       {
+        "freqHz": 2015.9,
+        "gainDb": 6.018
+       },
+       {
+        "freqHz": 2262.7,
+        "gainDb": 1.291
+       },
+       {
+        "freqHz": 2539.8,
+        "gainDb": 3.264
+       },
+       {
+        "freqHz": 2850.9,
+        "gainDb": 2.141
+       },
+       {
+        "freqHz": 3200.0,
+        "gainDb": 3.417
+       },
+       {
+        "freqHz": 3591.9,
+        "gainDb": -2.593
+       },
+       {
+        "freqHz": 4031.7,
+        "gainDb": -0.856
+       },
+       {
+        "freqHz": 4525.5,
+        "gainDb": -1.924
+       },
+       {
+        "freqHz": 5079.7,
+        "gainDb": -3.244
+       },
+       {
+        "freqHz": 5701.8,
+        "gainDb": 0.058
+       },
+       {
+        "freqHz": 6400.0,
+        "gainDb": -0.129
+       },
+       {
+        "freqHz": 7183.8,
+        "gainDb": -2.361
+       },
+       {
+        "freqHz": 8063.5,
+        "gainDb": -1.262
+       },
+       {
+        "freqHz": 9051.0,
+        "gainDb": -4.799
+       },
+       {
+        "freqHz": 10159.4,
+        "gainDb": -4.714
+       },
+       {
+        "freqHz": 11403.5,
+        "gainDb": -0.15
+       },
+       {
+        "freqHz": 12800.0,
+        "gainDb": -0.058
+       }
+      ],
+      "envelope": {
+       "independentOfHarmonicEnvelope": true,
+       "timeReference": "milliseconds relative to harmonic tone onset",
+       "peakOffsetMs": -5.0,
+       "releaseToMinus20DbMs": 5.0,
+       "points": [
+        {
+         "timeMs": -150,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -145,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -140,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -135,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -130,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -125,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -120,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -115,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -110,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -105,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -100,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -95,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -90,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -85,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": -80,
+         "gainDb": -9.9
+        },
+        {
+         "timeMs": -75,
+         "gainDb": -34.384
+        },
+        {
+         "timeMs": -70,
+         "gainDb": -32.441
+        },
+        {
+         "timeMs": -65,
+         "gainDb": -6.344
+        },
+        {
+         "timeMs": -60,
+         "gainDb": -30.404
+        },
+        {
+         "timeMs": -55,
+         "gainDb": -4.761
+        },
+        {
+         "timeMs": -50,
+         "gainDb": -2.633
+        },
+        {
+         "timeMs": -45,
+         "gainDb": -5.599
+        },
+        {
+         "timeMs": -40,
+         "gainDb": -5.224
+        },
+        {
+         "timeMs": -35,
+         "gainDb": -2.669
+        },
+        {
+         "timeMs": -30,
+         "gainDb": -2.665
+        },
+        {
+         "timeMs": -25,
+         "gainDb": -2.604
+        },
+        {
+         "timeMs": -20,
+         "gainDb": -1.695
+        },
+        {
+         "timeMs": -15,
+         "gainDb": -2.128
+        },
+        {
+         "timeMs": -10,
+         "gainDb": -2.629
+        },
+        {
+         "timeMs": -5,
+         "gainDb": 0.0
+        },
+        {
+         "timeMs": 0,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 5,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 10,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 15,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 20,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 25,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 30,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 35,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 40,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 45,
+         "gainDb": -59.593
+        },
+        {
+         "timeMs": 50,
+         "gainDb": -59.593
+        }
+       ]
+      },
+      "exclusions": [
+       {
+        "sourceFile": "Piano.pp.C4.aiff",
+        "reason": "no >=8 dB broadband pre-strike action transient"
+       },
+       {
+        "sourceFile": "Piano.pp.C6.aiff",
+        "reason": "recording begins too close to action/strike for pre-onset evidence"
+       },
+       {
+        "sourceFile": "Piano.pp.C8.aiff",
+        "reason": "recording begins too close to action/strike for pre-onset evidence"
+       }
+      ]
+     }
+    }
+   }
+  ],
+  "envelopeAnomalyClasses": [
+   {
+    "id": "piano-harmonic-rank-1",
+    "home": "harmonicRank",
+    "ranks": [
+     1
+    ],
+    "notes": 5,
+    "onsetBoostDb": 5.065,
+    "excessDecayDbPerSecond": 3.532,
+    "velocitySlopeDbPerUnit": 3.734,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-2",
+    "home": "harmonicRank",
+    "ranks": [
+     2
+    ],
+    "notes": 5,
+    "onsetBoostDb": 3.674,
+    "excessDecayDbPerSecond": 5.402,
+    "velocitySlopeDbPerUnit": 5.078,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-24",
+    "home": "harmonicRank",
+    "ranks": [
+     24
+    ],
+    "notes": 3,
+    "onsetBoostDb": 3.531,
+    "excessDecayDbPerSecond": 5.018,
+    "velocitySlopeDbPerUnit": 5.26,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-27",
+    "home": "harmonicRank",
+    "ranks": [
+     27
+    ],
+    "notes": 3,
+    "onsetBoostDb": 2.289,
+    "excessDecayDbPerSecond": 8.203,
+    "velocitySlopeDbPerUnit": 4.074,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-26",
+    "home": "harmonicRank",
+    "ranks": [
+     26
+    ],
+    "notes": 3,
+    "onsetBoostDb": 2.395,
+    "excessDecayDbPerSecond": 5.21,
+    "velocitySlopeDbPerUnit": 8.565,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-fixed-6400hz",
+    "home": "fixedHz",
+    "frequencyHz": 6400.0,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 5,
+    "onsetBoostDb": 2.572,
+    "excessDecayDbPerSecond": 4.357,
+    "velocitySlopeDbPerUnit": 9.655,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   }
+  ],
+  "damperByRegister": [
+   {
+    "f0": 27.5,
+    "midi": 21,
+    "dampDbPerSecondAtFundamental": 269.5,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 32.703196,
+    "midi": 24,
+    "dampDbPerSecondAtFundamental": 276.3,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 38.890873,
+    "midi": 27,
+    "dampDbPerSecondAtFundamental": 337.6,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 46.249303,
+    "midi": 30,
+    "dampDbPerSecondAtFundamental": 326.65,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 55.0,
+    "midi": 33,
+    "dampDbPerSecondAtFundamental": 297.6,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 65.406391,
+    "midi": 36,
+    "dampDbPerSecondAtFundamental": 298.75,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 77.781746,
+    "midi": 39,
+    "dampDbPerSecondAtFundamental": 299.15,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 92.498606,
+    "midi": 42,
+    "dampDbPerSecondAtFundamental": 320.95,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 110.0,
+    "midi": 45,
+    "dampDbPerSecondAtFundamental": 350.4,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 130.812783,
+    "midi": 48,
+    "dampDbPerSecondAtFundamental": 326.8,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 155.563492,
+    "midi": 51,
+    "dampDbPerSecondAtFundamental": 348.9,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 184.997211,
+    "midi": 54,
+    "dampDbPerSecondAtFundamental": 360.7,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 15,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 220.0,
+    "midi": 57,
+    "dampDbPerSecondAtFundamental": 373.9,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 15,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 261.625565,
+    "midi": 60,
+    "dampDbPerSecondAtFundamental": 295.7,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 15,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 311.126984,
+    "midi": 63,
+    "dampDbPerSecondAtFundamental": 449.45,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 369.994423,
+    "midi": 66,
+    "dampDbPerSecondAtFundamental": 377.05,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 16,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 440.0,
+    "midi": 69,
+    "dampDbPerSecondAtFundamental": 421.5,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 15,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 523.251131,
+    "midi": 72,
+    "dampDbPerSecondAtFundamental": 345.7,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 13,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 622.253967,
+    "midi": 75,
+    "dampDbPerSecondAtFundamental": 334.35,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 14,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 739.988845,
+    "midi": 78,
+    "dampDbPerSecondAtFundamental": 465.75,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 12,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 880.0,
+    "midi": 81,
+    "dampDbPerSecondAtFundamental": 275.8,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 8,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 1046.502261,
+    "midi": 84,
+    "dampDbPerSecondAtFundamental": 517.3,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 9,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   },
+   {
+    "f0": 1244.507935,
+    "midi": 87,
+    "dampDbPerSecondAtFundamental": 450.7,
+    "frequencyExponent": 0.10043,
+    "evidenceCount": 9,
+    "undampedAboveF0": 1479.977691,
+    "source": "333 verified Zenph staccato key-release takes; per-file damper metrics in PROVENANCE.json"
+   }
+  ]
  },
  "piano-upright": {
   "partials": [

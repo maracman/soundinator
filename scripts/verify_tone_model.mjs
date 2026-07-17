@@ -20,6 +20,14 @@ import {
   glottalSourceGain,
   velocityHardness,
   twoStageDecayPlan,
+  barModeRatioOffsetsAt,
+  barModeT60At,
+  barModeShapeWeight,
+  excitationPositionWeight,
+  envelopeAnomalyClassesFor,
+  envelopeAnomalyApplies,
+  envelopeAnomalyGainAt,
+  envelopeAnomalyAutomationEvents,
   damperByRegisterAt,
   damperT60Seconds,
   struckEnvelopePlan,
@@ -64,6 +72,7 @@ import {
   pinnedNoiseProfileAt,
   pinnedNoiseLeadMsAt,
   pinnedNoiseEnvelopeAt,
+  pinnedNoiseEnvelopePointsAt,
   pinnedNoiseActivationReport,
   maxPinnedNoiseLeadForParams,
   FORMANT_PRESETS,
@@ -412,6 +421,76 @@ console.log("L18/T-066 struck hold and damper semantics");
   const damperNote = damperEngine._spectralFingerprint(.7, 220);
   check("L18 fitted damper rows reach the sounded-note renderer contract",
     damperNote.damperByRegister === damperRows);
+  const measuredRows = MEASURED_PROFILES.piano.damperByRegister;
+  const measuredEvidence = measuredRows.reduce(
+    (sum, row) => sum + (row.evidenceCount || 0), 0);
+  const midi87 = 440 * 2 ** ((87 - 69) / 12);
+  const midi90 = 440 * 2 ** ((90 - 69) / 12);
+  check("T-007 L18 profile consumes all 333 verified key-release takes",
+    measuredEvidence === 333 &&
+    MEASURED_PROFILES.piano.engineHandoffs?.verifiedDamperTakes === 333);
+  check("T-007 L18 physical undamped firewall begins at MIDI 90",
+    damperByRegisterAt(measuredRows, midi87)?.undamped !== true &&
+    damperByRegisterAt(measuredRows, midi90)?.undamped === true &&
+    damperT60Seconds(damperByRegisterAt(measuredRows, midi90), midi90, midi90) === Infinity);
+  const pianoPreset = FACTORY_PRESETS.find(
+    row => row.id === "factory-sub-piano-natural");
+  const measuredNote = new GenerationEngine({ seed: 180, ...pianoPreset?.parameters })
+    ._spectralFingerprint(.7, 220);
+  check("T-007 piano preset activates the measured L18 damper profile",
+    measuredNote.damperByRegister === measuredRows && measuredRows.length >= 20);
+}
+
+console.log("T-072/T-027 bar-mode consumers and preset activation");
+{
+  const measured = MEASURED_PROFILES.glockenspiel;
+  const ratioRows = measured.barModeRatioOffsetsCentsByRegister;
+  const t60Rows = measured.barModeT60ByRegister;
+  const f0 = ratioRows[0].f0;
+  const offsets = barModeRatioOffsetsAt(ratioRows, f0);
+  const t60s = barModeT60At(t60Rows, f0);
+  check("T-027 fitted bar offsets are bounded and mode 1 stays pinned",
+    offsets.length === 6 && offsets[0] === 0 &&
+    offsets.slice(1).every(value => value >= -386 && value <= 0));
+  check("T-027 bar frequency ignores string B exactly",
+    offsets.every((_, index) => partialFrequency(index + 1, f0, 0, "bar", offsets) ===
+      partialFrequency(index + 1, f0, .02, "bar", offsets)));
+  check("T-027 bar offsets are inert outside the bar class",
+    partialFrequency(3, f0, .001, "string", offsets) ===
+      partialFrequency(3, f0, .001, "string", null));
+  check("T-072 measured per-mode T60 preserves the long/short hierarchy",
+    t60s.length === 6 && t60s[0] / t60s[1] >= 5 &&
+    near(t60s[0], t60Rows[0].t60Seconds[0], 1e-12));
+  const sparseRows = [
+    { f0: 400, t60Seconds: [3, .3, null, null, null, null] },
+    { f0: 800, t60Seconds: [6, .6, null, null, null, null] },
+  ];
+  const interpolated = barModeT60At(sparseRows, Math.sqrt(400 * 800));
+  check("T-072 T60 interpolation is log-f0/log-T60 and null stays fallback",
+    near(interpolated[0], Math.sqrt(18), 1e-12) && interpolated[2] === null);
+  check("T-072 centre strike suppresses mode 2 by at least 6 dB vs 1/3",
+    barModeShapeWeight(2, .5) <= barModeShapeWeight(1, .5) * .5 &&
+    barModeShapeWeight(2, .5) <= barModeShapeWeight(3, .5) * .5);
+  check("T-072 strike position changes levels, never modal frequencies",
+    excitationPositionWeight(2, .5, "bar") <
+      excitationPositionWeight(2, .12, "bar") &&
+    partialFrequency(2, f0, 0, "bar", offsets) ===
+      partialFrequency(2, f0, 0, "bar", offsets));
+
+  const preset = FACTORY_PRESETS.find(
+    row => row.id === "factory-sub-metal-bar");
+  const note = new GenerationEngine({ seed: 720, ...preset?.parameters,
+    spectralPartials: 6 })._spectralFingerprint(.62, f0);
+  check("T-007 glock preset activates pinned ratio and T60 tables",
+    preset?.parameters?.resonatorClass === "bar" &&
+    note.barModeRatioOffsetsCentsByRegister === ratioRows &&
+    note.barModeT60ByRegister === t60Rows &&
+    note.barModeRatioOffsetsCents.length === 6 &&
+    note.barModeT60Seconds.length === 6);
+  check("T-007 glock sounded-note frequencies consume fitted offsets",
+    note.harmonicPartials.slice(0, 6).every((part, index) => near(
+      part.harmonicFrequency,
+      partialFrequency(index + 1, f0, 0, "bar", offsets), 1e-9)));
 }
 
 console.log("T-021: coupled polarisation modes");
@@ -1346,6 +1425,59 @@ console.log("L17: pinned pre-onset component class + preset activation");
     violinBow?.envelope?.toneAdsrSlave === false &&
     pinnedNoiseLeadMsAt(violinBow, .62) > 0 &&
     violinBowEnvelope.independent && violinBowEnvelope.releaseMs > 0);
+
+  const pianoMeasured = MEASURED_PROFILES.piano.preOnsetComponents?.[0];
+  const pianoAction = pinnedNoiseComponentsFor(SPECTRAL_PROFILES.piano)
+    .find(row => row.id === "pianoActionNoise");
+  const ppPoints = pinnedNoiseEnvelopePointsAt(pianoAction, .2);
+  const ffPoints = pinnedNoiseEnvelopePointsAt(pianoAction, .92);
+  check("T-007 piano L17 adapter preserves every measured point envelope",
+    pianoAction?.profilePinned === true && ppPoints.length >= 40 &&
+    ffPoints.length >= 40 &&
+    ppPoints.length === pianoMeasured.byDynamic.pp.envelope.points.length &&
+    ffPoints.length === pianoMeasured.byDynamic.ff.envelope.points.length);
+  check("T-007 piano L17 point envelope remains independent and non-flat",
+    pinnedNoiseEnvelopeAt(pianoAction, .62).pointEnvelope === true &&
+    pinnedNoiseEnvelopeAt(pianoAction, .62).independent &&
+    Math.max(...ppPoints.map(row => row.gainDb)) -
+      Math.min(...ppPoints.map(row => row.gainDb)) >= 20);
+  const pianoPreset = FACTORY_PRESETS.find(
+    row => row.id === "factory-sub-piano-natural");
+  const pianoActivation = pinnedNoiseActivationReport(
+    SPECTRAL_PROFILES.piano, pianoPreset?.parameters, true)
+    .find(row => row.id === "pianoActionNoise");
+  const pianoFingerprint = new GenerationEngine({ seed: 690,
+    ...pianoPreset?.parameters })._spectralFingerprint(.62, 261.63);
+  check("T-007 piano preset activates the point-envelope component",
+    pianoActivation?.active && pianoActivation.pointEnvelopeCount >= 40 &&
+    pianoFingerprint.pinnedNoiseLevels?.pianoActionNoise === 1 &&
+    pianoFingerprint.pinnedNoiseComponents?.pianoActionNoise?.profile?.length === 22);
+
+  const anomalies = envelopeAnomalyClassesFor(SPECTRAL_PROFILES.piano);
+  const rankOne = anomalies.find(row => row.home === "harmonicRank" &&
+    row.ranks?.includes(1));
+  const fixed = anomalies.find(row => row.home === "fixedHz");
+  check("T-007 corrected L16 assignments reach the piano profile unchanged",
+    anomalies.length === MEASURED_PROFILES.piano.envelopeAnomalyClasses.length &&
+    rankOne?.onsetBoostDb > 0 && fixed?.frequencyHz === 6400 &&
+    envelopeAnomalyApplies(rankOne, 1, 261.63) &&
+    !envelopeAnomalyApplies(rankOne, 3, 784.89) &&
+    envelopeAnomalyApplies(fixed, 24, 6400));
+  check("T-007 anomaly law is velocity-coupled, transient and exact-neutral at 0",
+    envelopeAnomalyGainAt(rankOne, .92, 0, 1) >
+      envelopeAnomalyGainAt(rankOne, .2, 0, 1) &&
+    envelopeAnomalyGainAt(rankOne, .62, 1, 1) <
+      envelopeAnomalyGainAt(rankOne, .62, 0, 1) &&
+    envelopeAnomalyGainAt(rankOne, .62, 0, 0) === 1);
+  const anomalyEvents = envelopeAnomalyAutomationEvents(
+    anomalies, 1, 261.63, .62, 0, 2, 1);
+  check("T-007 piano preset activates L16 anomaly automation",
+    pianoPreset?.parameters?.envelopeAnomalyLevel === 1 &&
+    pianoFingerprint.envelopeAnomalyClasses?.length === anomalies.length &&
+    pianoFingerprint.envelopeAnomalyClasses?.[0] === anomalies[0] &&
+    pianoFingerprint.envelopeAnomalyLevel === 1 &&
+    anomalyEvents.length > 2 && anomalyEvents[0].gain >
+      anomalyEvents[anomalyEvents.length - 1].gain);
 }
 
 console.log("T6: preset migration (T-B9 partial)");

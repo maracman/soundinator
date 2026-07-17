@@ -1188,6 +1188,7 @@ export function buildBowNoiseImpulse(rows, measuredBodyBands, sampleRate = 48000
 const PINNED_NOISE_CONTROL_DEFAULTS = Object.freeze({
   bowNoiseLevel: 0,
   windBreathLevel: 0,
+  pianoActionNoiseLevel: 0,
 });
 
 function pinnedNoiseComponentsObject(profile) {
@@ -1205,6 +1206,41 @@ function pinnedNoiseComponentsObject(profile) {
         levelControl: "bowNoiseLevel",
         independentEnvelopeRequired: true,
         excitationTypes: ["bow"],
+      },
+    };
+  }
+  // T-068's piano extractor predates the generic keyed component object and
+  // emits a list with literal point envelopes. Adapt it at the consuming
+  // boundary, retaining every measured point and dynamic-specific profile.
+  for (const row of Array.isArray(profile?.preOnsetComponents)
+    ? profile.preOnsetComponents : []) {
+    const id = String(row?.component || row?.componentClass || "");
+    if (!id || components[id] || row?.profilePinned !== true) continue;
+    const byDynamic = row.byDynamic && typeof row.byDynamic === "object"
+      ? row.byDynamic : {};
+    components[id] = {
+      ...row,
+      componentClass: row.componentClass || id,
+      profilesByDynamic: Object.fromEntries(Object.entries(byDynamic)
+        .filter(([, value]) => Array.isArray(value?.profile))
+        .map(([dynamic, value]) => [dynamic, value.profile])),
+      pointEnvelopesByDynamic: Object.fromEntries(Object.entries(byDynamic)
+        .filter(([, value]) => Array.isArray(value?.envelope?.points))
+        .map(([dynamic, value]) => [dynamic, value.envelope])),
+      placementLaw: {
+        allNotes: { noiseLeadMs: Number(row.noiseLeadMs) || 0 },
+        byDynamic: Object.entries(byDynamic).map(([dynamic, value]) => ({
+          dynamic,
+          velocity: dynamic === "pp" ? .2 : dynamic === "ff" ? .92 : .62,
+          noiseLeadMs: Number(value?.noiseLeadMs) || Number(row.noiseLeadMs) || 0,
+        })),
+      },
+      engineContract: {
+        ...(row.engineContract || {}),
+        levelControl: row.engineContract?.levelControl || "pianoActionNoiseLevel",
+        independentEnvelopeRequired: true,
+        explicitPresetActivationRequired: true,
+        excitationTypes: row.engineContract?.excitationTypes || ["strike"],
       },
     };
   }
@@ -1256,6 +1292,46 @@ export function pinnedNoiseProfileAt(component, velocity = .62) {
   return interpolated.length >= 2 ? interpolated : component.profile;
 }
 
+function dynamicObjectAt(tables, velocity) {
+  if (!tables || typeof tables !== "object" || Array.isArray(tables)) return null;
+  const velocityFor = dynamic => dynamic === "pp" ? .2 : dynamic === "ff" ? .92 : .62;
+  const rows = Object.entries(tables).map(([dynamic, value]) => ({
+    velocity: velocityFor(dynamic), value,
+  })).filter(row => row.value && typeof row.value === "object")
+    .sort((a, b) => a.velocity - b.velocity);
+  if (!rows.length) return null;
+  const v = Math.max(0, Math.min(1, Number(velocity) || 0));
+  if (v <= rows[0].velocity) return rows[0].value;
+  if (v >= rows[rows.length - 1].velocity) return rows[rows.length - 1].value;
+  let hi = 1;
+  while (hi < rows.length && rows[hi].velocity < v) hi++;
+  const lo = rows[hi - 1], upper = rows[hi];
+  const amount = (v - lo.velocity) / Math.max(1e-9, upper.velocity - lo.velocity);
+  const a = Array.isArray(lo.value.points) ? lo.value.points : [];
+  const b = Array.isArray(upper.value.points) ? upper.value.points : [];
+  const upperAt = new Map(b.map(point => [Number(point?.timeMs), point]));
+  const points = a.map(point => {
+    const other = upperAt.get(Number(point?.timeMs));
+    const gainA = Number(point?.gainDb), gainB = Number(other?.gainDb);
+    return Number.isFinite(gainA) && Number.isFinite(gainB)
+      ? { timeMs: Number(point.timeMs), gainDb: gainA + (gainB - gainA) * amount }
+      : { ...point };
+  });
+  return points.length >= 2 ? { ...lo.value, points } : lo.value;
+}
+
+/** Literal component-owned envelope points, in milliseconds relative to t0.
+ * The returned rows are the measured table (or its dB interpolation), never
+ * an ADSR-derived approximation. */
+export function pinnedNoiseEnvelopePointsAt(component, velocity = .62) {
+  const dynamic = dynamicObjectAt(component?.pointEnvelopesByDynamic, velocity);
+  const envelope = dynamic || component?.envelope;
+  return (Array.isArray(envelope?.points) ? envelope.points : [])
+    .map(point => ({ timeMs: Number(point?.timeMs), gainDb: Number(point?.gainDb) }))
+    .filter(point => Number.isFinite(point.timeMs) && Number.isFinite(point.gainDb))
+    .sort((a, b) => a.timeMs - b.timeMs);
+}
+
 function statisticMedian(value, fallback = 0) {
   const number = Number(value?.median ?? value);
   return Number.isFinite(number) ? number : fallback;
@@ -1280,11 +1356,30 @@ function dynamicEvidenceAt(rows, velocity, field, fallback = 0) {
 export function pinnedNoiseLeadMsAt(component, velocity = .62) {
   const law = component?.placementLaw || {};
   const fallback = statisticMedian(law?.allNotes?.noiseLeadMs ?? law?.allNotes, 0);
-  return Math.max(0, Math.min(450,
-    dynamicEvidenceAt(law.byDynamic, velocity, "noiseLeadMs", fallback)));
+  const points = pinnedNoiseEnvelopePointsAt(component, velocity);
+  const pointLead = points.length ? Math.max(0, -points[0].timeMs) : 0;
+  return Math.max(pointLead, Math.max(0, Math.min(450,
+    dynamicEvidenceAt(law.byDynamic, velocity, "noiseLeadMs",
+      fallback || Number(component?.noiseLeadMs) || 0))));
 }
 
 export function pinnedNoiseEnvelopeAt(component, velocity = .62) {
+  const points = pinnedNoiseEnvelopePointsAt(component, velocity);
+  if (points.length >= 2) {
+    const peak = points.reduce((best, point) => point.gainDb > best.gainDb ? point : best);
+    const after = points.filter(point => point.timeMs > peak.timeMs);
+    const settled = after.find(point => point.gainDb <= peak.gainDb - 20) || after[after.length - 1];
+    return {
+      preOnsetSwellMs: Math.max(0, peak.timeMs - points[0].timeMs),
+      peakOffsetMs: peak.timeMs,
+      settleFromPeakMs: Math.max(0, (settled?.timeMs ?? peak.timeMs) - peak.timeMs),
+      sustainBelowPeakDb: (settled?.gainDb ?? peak.gainDb) - peak.gainDb,
+      releaseMs: Math.max(5, points[points.length - 1].timeMs - peak.timeMs),
+      independent: component?.envelope?.independentOfHarmonicEnvelope === true ||
+        component?.engineContract?.independentEnvelopeRequired === true,
+      pointEnvelope: true,
+    };
+  }
   const envelope = component?.envelope || {};
   const all = envelope.allNotes || {};
   const value = (field, fallback) => dynamicEvidenceAt(
@@ -1319,18 +1414,25 @@ export function pinnedNoiseActivationReport(profile, params = {}, shipMode = tru
     const envelope = pinnedNoiseEnvelopeAt(component, Number(params.velocity) || .62);
     const excitationTypes = Array.isArray(component.engineContract?.excitationTypes)
       ? component.engineContract.excitationTypes : [];
-    const applicable = excitationTypes.length === 0 ||
+    const excitationApplicable = excitationTypes.length === 0 ||
       excitationTypes.includes(String(params.excitationType || ""));
+    const applicable = excitationApplicable &&
+      (component.engineContract?.explicitPresetActivationRequired !== true ||
+        Object.prototype.hasOwnProperty.call(params, control));
     const componentClass = component.componentClass || component.id;
     const wind = componentClass === "windBreath" || component.id === "windBreath";
     const effectiveLevel = wind
       ? level * Math.max(0, Number(params.toneBreath) || 0) : level;
+    const points = pinnedNoiseEnvelopePointsAt(component, Number(params.velocity) || .62);
+    const nonFlatPointEnvelope = points.length < 2 ||
+      Math.max(...points.map(point => point.gainDb)) -
+        Math.min(...points.map(point => point.gainDb)) >= 6;
     const active = !applicable || !shipMode ||
-      (effectiveLevel > 0 && envelope.independent);
+      (effectiveLevel > 0 && envelope.independent && nonFlatPointEnvelope);
     return { id: component.id, componentClass: component.componentClass || component.id,
       control, level, effectiveLevel, independentEnvelope: envelope.independent,
       preOnsetLeadMs: pinnedNoiseLeadMsAt(component, Number(params.velocity) || .62),
-      applicable, active };
+      pointEnvelopeCount: points.length, nonFlatPointEnvelope, applicable, active };
   });
 }
 
@@ -1452,7 +1554,7 @@ const SPECTRAL_PERFORMANCE = {
 
 for (const [key, seed] of Object.entries({
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
-  "piano-upright": "piano",
+  "piano-upright": "piano", harp: "piano", glockenspiel: "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
   "voice-soprano": "vocal",
 })) {
@@ -1521,6 +1623,21 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
     // L17: profile-owned immutable component contracts.  Do not merge values
     // across instruments; the family firewall permits only this architecture.
     prof.pinnedNoiseComponents = m.pinnedNoiseComponents;
+  }
+  if (Array.isArray(m.preOnsetComponents)) {
+    prof.preOnsetComponents = m.preOnsetComponents;
+  }
+  if (Array.isArray(m.envelopeAnomalyClasses)) {
+    prof.envelopeAnomalyClasses = m.envelopeAnomalyClasses;
+  }
+  if (Array.isArray(m.barModeRatioOffsetsCentsByRegister)) {
+    prof.barModeRatioOffsetsCentsByRegister = m.barModeRatioOffsetsCentsByRegister;
+  }
+  if (Array.isArray(m.barModeT60ByRegister)) {
+    prof.barModeT60ByRegister = m.barModeT60ByRegister;
+  }
+  if (Array.isArray(m.barStrikePositionWeights)) {
+    prof.barStrikePositionWeights = m.barStrikePositionWeights;
   }
   // The fitted body (including an explicit empty omission) was resolved
   // before BODY_PRESETS construction above. Never re-merge it here: a
@@ -1605,9 +1722,83 @@ export function outputPartialRatio(className, n) {
 // pitch: f_n = ratio_n · f0 · sqrt((1 + B·n²) / (1 + B)). B is a physical
 // constant (piano bass ≈ 1e-4, treble ≈ 1e-3) and gives the same
 // frequencies regardless of how many partials are rendered (audit A4).
-export function partialFrequency(n, f0, B = 0, className = "string") {
-  const b = Math.max(0, B || 0);
-  return outputPartialRatio(className, n) * f0 * Math.sqrt((1 + b * n * n) / (1 + b));
+export function partialFrequency(n, f0, B = 0, className = "string",
+                                 barModeRatioOffsetsCents = null) {
+  // T-072/T-027 firewall: a bar owns measured modal ratios. String
+  // stiffness B is physically meaningless here and may never bend them.
+  const b = className === "bar" ? 0 : Math.max(0, B || 0);
+  const offset = className === "bar" && n > 1 &&
+      Array.isArray(barModeRatioOffsetsCents)
+    ? Math.max(-386, Math.min(0,
+      Number(barModeRatioOffsetsCents[n - 1]) || 0)) : 0;
+  return outputPartialRatio(className, n) * Math.pow(2, offset / 1200) * f0 *
+    Math.sqrt((1 + b * n * n) / (1 + b));
+}
+
+function structuredRowsAt(rows, fundamentalHz, valueKey, count = 6,
+                          logValues = false) {
+  const entries = (Array.isArray(rows) ? rows : []).filter(row =>
+    Number.isFinite(row?.f0) && Array.isArray(row?.[valueKey]))
+    .slice().sort((a, b) => a.f0 - b.f0);
+  if (!entries.length) return null;
+  const hz = Math.max(1, Number(fundamentalHz) || entries[0].f0);
+  let hi = entries.findIndex(row => row.f0 >= hz);
+  if (hi < 0) return entries[entries.length - 1][valueKey].slice(0, count);
+  if (hi === 0) return entries[0][valueKey].slice(0, count);
+  const a = entries[hi - 1], b = entries[hi];
+  const t = Math.max(0, Math.min(1,
+    Math.log(hz / a.f0) / Math.log(b.f0 / a.f0)));
+  return Array.from({ length: count }, (_, index) => {
+    const rawA = a[valueKey][index], rawB = b[valueKey][index];
+    const av = Number(rawA), bv = Number(rawB);
+    if (logValues && (rawA == null || rawB == null ||
+        !Number.isFinite(av) || !Number.isFinite(bv))) return null;
+    if (!Number.isFinite(av) && !Number.isFinite(bv)) return null;
+    if (!Number.isFinite(av)) return bv;
+    if (!Number.isFinite(bv)) return av;
+    if (logValues && av > 0 && bv > 0) {
+      return Math.exp(Math.log(av) + (Math.log(bv) - Math.log(av)) * t);
+    }
+    return av + (bv - av) * t;
+  });
+}
+
+/** T-072: fitted bar ratio trims interpolate in log-register space. */
+export function barModeRatioOffsetsAt(rows, fundamentalHz) {
+  const values = structuredRowsAt(rows, fundamentalHz, "offsetsCents", 6) ||
+    structuredRowsAt(rows, fundamentalHz, "ratioOffsetsCents", 6) ||
+    structuredRowsAt(rows, fundamentalHz, "barModeRatioOffsetsCents", 6);
+  return values ? values.map((value, index) => index === 0 ? 0 :
+    Math.max(-386, Math.min(0, Number(value) || 0))) : null;
+}
+
+/** T-072: one measured held-decay T60 per free-bar mode. */
+export function barModeT60At(rows, fundamentalHz) {
+  const values = structuredRowsAt(rows, fundamentalHz, "t60Seconds", 6, true);
+  return values ? values.map(value => Number.isFinite(value) && value > 0
+    ? Math.max(.02, Math.min(30, value)) : null) : null;
+}
+
+/** Normalised free-free beam parity law. Odd modes have a centre antinode;
+ * even modes have a centre node. The measured per-mode override remains the
+ * higher-resolution consumer when a corpus supplies one. */
+export function barModeShapeWeight(mode, position) {
+  const n = Math.max(1, Math.round(Number(mode) || 1));
+  const x = Math.max(.02, Math.min(.5, Number(position) || .5));
+  const centred = x - .5;
+  return n % 2
+    ? Math.abs(Math.cos((n + 1) * Math.PI * centred))
+    : Math.abs(Math.sin(n * Math.PI * centred));
+}
+
+export function excitationPositionWeight(n, position, resonatorClass = "string",
+                                         barStrikePositionWeights = null) {
+  if (resonatorClass !== "bar") return positionComb(n, position);
+  const measured = Array.isArray(barStrikePositionWeights)
+    ? Number(barStrikePositionWeights[n - 1]) : NaN;
+  return Number.isFinite(measured)
+    ? Math.max(0, Math.min(4, measured))
+    : barModeShapeWeight(n, position);
 }
 
 /** Interpolate measured amplitude/B tables in log-frequency register space. */
@@ -1876,8 +2067,12 @@ export function partialIsAudible(amp, norm, harmonic, threshold = 0.0005) {
   return harmonic <= 8 || Math.max(0, amp) / Math.max(0.001, norm) >= threshold;
 }
 
-export function excitationSpectrum(type, n, { position = 0.5, hardness = 0.6, freqHz = n * 261.63 } = {}) {
-  return excitationDrive(type, n) * positionComb(n, position) * hardnessRolloff(freqHz, hardness, type);
+export function excitationSpectrum(type, n, { position = 0.5, hardness = 0.6,
+  freqHz = n * 261.63, resonatorClass = "string",
+  barStrikePositionWeights = null } = {}) {
+  return excitationDrive(type, n) * excitationPositionWeight(
+    n, position, resonatorClass, barStrikePositionWeights) *
+    hardnessRolloff(freqHz, hardness, type);
 }
 
 // Louder = brighter (audit A14): one global law replaces the per-partial
@@ -1910,6 +2105,79 @@ export function twoStageDecayPlan(freqHz, material, amount = 0, lateRatio = 1) {
   return { earlyT60, lateT60: earlyT60 * (1 + a * (ratio - 1)), breakpointDb: -18 };
 }
 
+export function envelopeAnomalyClassesFor(profile) {
+  return (Array.isArray(profile?.envelopeAnomalyClasses)
+    ? profile.envelopeAnomalyClasses : []).filter(row =>
+    row && (row.home === "harmonicRank" || row.home === "fixedHz") &&
+    Number(row.level ?? 1) > 0);
+}
+
+export function envelopeAnomalyApplies(row, harmonic, frequencyHz) {
+  if (row?.home === "harmonicRank") {
+    const ranks = Array.isArray(row.ranks) ? row.ranks : [row.rank];
+    return ranks.some(rank => Number(rank) === Number(harmonic));
+  }
+  if (row?.home === "fixedHz") {
+    const centre = Number(row.frequencyHz);
+    const width = Math.max(1 / 24, Math.min(1,
+      Number(row.widthOctaves) || 1 / 6));
+    return Number.isFinite(centre) && centre > 0 &&
+      Math.abs(Math.log2(Math.max(1, frequencyHz) / centre)) <= width / 2;
+  }
+  return false;
+}
+
+/** L16 transient multiplier. It is exactly one when absent/disabled, begins
+ * at the measured velocity-coupled onset boost, and asymptotically rejoins
+ * the untouched L18 baseline rather than creating a second sustain law. */
+export function envelopeAnomalyGainAt(row, velocity, elapsedSec,
+                                      level = 1) {
+  const amount = Math.max(0, Math.min(2,
+    Number(level) * Number(row?.level ?? 1) || 0));
+  if (amount <= 0) return 1;
+  const anchors = (Array.isArray(row?.onsetBoostByVelocity)
+    ? row.onsetBoostByVelocity : []).filter(point =>
+    Number.isFinite(point?.velocity) && Number.isFinite(point?.boostDb))
+    .slice().sort((a, b) => a.velocity - b.velocity);
+  let boostDb = Number(row?.onsetBoostDb) || 0;
+  if (anchors.length) {
+    const v = Math.max(0, Math.min(1, Number(velocity) || 0));
+    let hi = anchors.findIndex(point => point.velocity >= v);
+    if (hi < 0) boostDb = anchors[anchors.length - 1].boostDb;
+    else if (hi === 0) boostDb = anchors[0].boostDb;
+    else {
+      const a = anchors[hi - 1], b = anchors[hi];
+      const t = (v - a.velocity) / Math.max(1e-9, b.velocity - a.velocity);
+      boostDb = a.boostDb + (b.boostDb - a.boostDb) * t;
+    }
+  } else if (Number.isFinite(row?.velocitySlopeDbPerUnit)) {
+    boostDb += row.velocitySlopeDbPerUnit *
+      ((Number(velocity) || .62) - (Number(row.velocityReference) || .62));
+  }
+  boostDb = Math.max(0, Math.min(36, boostDb * amount));
+  const excessRate = Math.max(0, Math.min(300,
+    Number(row?.excessDecayDbPerSecond) || 0));
+  const transient = Math.max(0, Math.pow(10, boostDb / 20) - 1) *
+    Math.pow(10, -excessRate * Math.max(0, Number(elapsedSec) || 0) / 20);
+  return 1 + transient;
+}
+
+export function envelopeAnomalyAutomationEvents(classes, harmonic,
+  frequencyHz, velocity, t0, t1, level = 1) {
+  const applicable = (Array.isArray(classes) ? classes : []).filter(row =>
+    envelopeAnomalyApplies(row, harmonic, frequencyHz));
+  if (!applicable.length || Number(level) <= 0) return [];
+  const duration = Math.max(0, t1 - t0);
+  const times = [0, .01, .02, .04, .08, .16, .32, .64, 1.2]
+    .filter(time => time <= duration);
+  if (times[times.length - 1] < duration) times.push(duration);
+  return times.map(elapsed => ({
+    time: t0 + elapsed,
+    gain: applicable.reduce((gain, row) => gain *
+      envelopeAnomalyGainAt(row, velocity, elapsed, level), 1),
+  }));
+}
+
 /** L18: interpolate measured note-off damper contact in log-register space. */
 export function damperByRegisterAt(rows, fundamentalHz) {
   const entries = Array.isArray(rows) ? rows.filter(row =>
@@ -1919,6 +2187,12 @@ export function damperByRegisterAt(rows, fundamentalHz) {
     row.dampDbPerSecondAtFundamental > 0).slice().sort((a, b) => a.f0 - b.f0) : [];
   if (!entries.length) return null;
   const hz = Math.max(1, Number(fundamentalHz) || entries[0].f0);
+  const undampedAboveF0 = entries.map(row => Number(row?.undampedAboveF0))
+    .find(value => Number.isFinite(value) && value > 0);
+  if (Number.isFinite(undampedAboveF0) &&
+      hz >= undampedAboveF0 * (1 - 1e-9)) {
+    return { undamped: true, undampedAboveF0 };
+  }
   let hi = entries.findIndex(row => row.f0 >= hz);
   if (hi < 0) return { ...entries[entries.length - 1] };
   if (hi === 0) return { ...entries[0] };
@@ -1936,6 +2210,7 @@ export function damperByRegisterAt(rows, fundamentalHz) {
 /** Fitted damper T60 for one resonant mode; null preserves T-023 fallback. */
 export function damperT60Seconds(damper, modeFrequency, fundamentalHz) {
   if (!damper) return null;
+  if (damper.undamped === true) return Infinity;
   const f0 = Math.max(1, Number(fundamentalHz) || 1);
   const frequency = Math.max(1, Number(modeFrequency) || f0);
   const rate = Math.max(1e-6, damper.dampDbPerSecondAtFundamental) *
@@ -3824,9 +4099,21 @@ export class GenerationEngine {
       excHard = this._clamp(excHard + this._gaussian() * 0.05 * human, 0, 1);
       levelJitter = Math.max(0.5, 1 + this._gaussian() * 0.04 * human);
     }
+    const ratioRows = Array.isArray(this.p.barModeRatioOffsetsCentsByRegister)
+      ? this.p.barModeRatioOffsetsCentsByRegister
+      : profile.barModeRatioOffsetsCentsByRegister;
+    const barModeRatioOffsetsCents = resClass === "bar"
+      ? barModeRatioOffsetsAt(ratioRows, fundamentalHz) : null;
+    const decayRows = Array.isArray(this.p.barModeT60ByRegister)
+      ? this.p.barModeT60ByRegister : profile.barModeT60ByRegister;
+    const barModeT60Seconds = resClass === "bar"
+      ? barModeT60At(decayRows, fundamentalHz) : null;
+    const barStrikePositionWeights = Array.isArray(this.p.barStrikePositionWeights)
+      ? this.p.barStrikePositionWeights : profile.barStrikePositionWeights;
     let referenceNorm = 0;
     const harmonicFrequencies = profilePartials.slice(0, count).map((_, i) =>
-      Math.max(1, partialFrequency(i + 1, fundamentalHz, partialB, resClass)));
+      Math.max(1, partialFrequency(i + 1, fundamentalHz, partialB, resClass,
+        barModeRatioOffsetsCents)));
     const bodyResponses = bodyResponsesForPartials(bodyBands, harmonicFrequencies,
       resonanceAmount, fundamentalHz, profile.resonancesFit?.lowestF0Hz);
     const partials = profilePartials.slice(0, count).map((partial, i) => {
@@ -3843,9 +4130,13 @@ export class GenerationEngine {
       // rolloff both act on where the partial actually sits.
       const harmonicFrequency = harmonicFrequencies[i];
       const registerResponse = bodyResponses[i] ?? 1;
-      const excCur = excitationSpectrum(excType, harmonic, { position: excPos, hardness: excHard, freqHz: harmonicFrequency });
+      const excCur = excitationSpectrum(excType, harmonic, {
+        position: excPos, hardness: excHard, freqHz: harmonicFrequency,
+        resonatorClass: resClass, barStrikePositionWeights,
+      });
       const excBase = excitationSpectrum(excDefault.type || "bow", harmonic, {
         position: excDefault.position ?? 0.5, hardness: excDefault.hardness ?? 0.6, freqHz: harmonicFrequency,
+        resonatorClass: resClass, barStrikePositionWeights,
       });
       const excitation = excBase > 1e-6 ? Math.min(8, excCur / excBase) : (excCur > 1e-6 ? 8 : 1);
       const sourceTilt = glottalSourceGain(harmonic, this.p.glottalTilt);
@@ -3902,6 +4193,10 @@ export class GenerationEngine {
         deconvolutionBands: Array.isArray(profile.resonances)
           ? profile.resonances : [],
       }]));
+    const pinnedNoiseLevels = Object.fromEntries(
+      Object.values(pinnedNoiseComponents).map(component => [component.id,
+        pinnedNoiseLevelFor(component, this.p)]));
+    const envelopeAnomalyClasses = envelopeAnomalyClassesFor(profile);
     const bowedLevels = bowedHumanLevels(
       this.p.bowNoiseLevel, this.p.bowScratchLevel, humanEpisode);
     return {
@@ -3959,6 +4254,10 @@ export class GenerationEngine {
           ? this.p.bowNoiseVelocityExponent
           : profile.bowNoise?.levelLaw?.velocityExponent ?? 1, 0, 2),
       pinnedNoiseComponents,
+      pinnedNoiseLevels,
+      pianoActionNoiseLevel: this._clamp(this.p.pianoActionNoiseLevel ?? 0, 0, 2),
+      envelopeAnomalyClasses,
+      envelopeAnomalyLevel: this._clamp(this.p.envelopeAnomalyLevel ?? 0, 0, 2),
       windBreathLevel: this._clamp(this.p.windBreathLevel ?? 0, 0, 2),
       onsetScoopDepthCents: this._clamp(this.p.onsetScoopDepthCents ?? 0, 0, 180),
       onsetScoopSettle: this._clamp(this.p.onsetScoopSettle ?? 0.06, 0.015, 0.35),
@@ -3988,6 +4287,12 @@ export class GenerationEngine {
       damperByRegister: Array.isArray(this.p.damperByRegister)
         ? this.p.damperByRegister
         : (Array.isArray(profile.damperByRegister) ? profile.damperByRegister : null),
+      barModeRatioOffsetsCentsByRegister: Array.isArray(ratioRows) ? ratioRows : null,
+      barModeRatioOffsetsCents,
+      barModeT60ByRegister: Array.isArray(decayRows) ? decayRows : null,
+      barModeT60Seconds,
+      barStrikePositionWeights: Array.isArray(barStrikePositionWeights)
+        ? barStrikePositionWeights : null,
       polarisationAmount: this._clamp(this.p.polarisationAmount ?? 0, 0, 1),
       polarisationSplitCents: this._clamp(this.p.polarisationSplitCents ?? 0, 0, 6),
       polarisationDecayRatio: this._clamp(this.p.polarisationDecayRatio ?? 1, 0.25, 4),
@@ -4001,7 +4306,7 @@ export class GenerationEngine {
       // Tone v2 resonator (T1): inharmonicity as a physical B constant
       // (new param wins; legacy cents map onto it) and the mode ratio class.
       partialB,
-      resonatorClass: this.p.resonatorClass || "string",
+      resonatorClass: resClass,
     };
   }
 
@@ -6284,6 +6589,15 @@ export class SynthEngine {
       if (bow) this._renderPinnedNoiseComponent(
         note, bow, note.bowNoiseLevel, t0, t1, out || env);
     }
+    for (const [id, component] of Object.entries(pinned)) {
+      if (id === "windBreath" || id === "bowNoise") continue;
+      const allowed = component.engineContract?.excitationTypes;
+      if (Array.isArray(allowed) && allowed.length &&
+          !allowed.includes(note.excitationType)) continue;
+      this._renderPinnedNoiseComponent(note, component,
+        note.pinnedNoiseLevels?.[id] ?? note[component.engineContract?.levelControl],
+        t0, t1, out || env);
+    }
     if (!partials || partials.length === 0 || mix <= 0) return;
     const norm = Math.max(
       0.001,
@@ -6296,7 +6610,8 @@ export class SynthEngine {
       const harmonic = part.harmonic || 1;
       // Tone v2 (T1): realised mode frequency from the ratio table bent by
       // true stiff-string inharmonicity — count-independent (audit A4).
-      const multiplier = partialFrequency(harmonic, 1, partialB, resClass);
+      const multiplier = partialFrequency(harmonic, 1, partialB, resClass,
+        note.barModeRatioOffsetsCents);
       const freq = note.frequency * multiplier;
       if (freq > this.ctx.sampleRate * 0.45 || freq > 16000) return;
       // Audibility cull: partials that can never rise above ~-66 dB of the
@@ -6342,14 +6657,20 @@ export class SynthEngine {
         return tail;
       };
 
-      const connectDecay = (tail, modeFreq, modeDecayRatio) => {
+      const connectDecay = (tail, modeFreq, modeDecayRatio, modeIndex) => {
         if (!usesFreeDecay(note.excitationType)) {
           tail.connect(env);
           return;
         }
         const decayG = this.ctx.createGain();
-        const plan = twoStageDecayPlan(modeFreq, material,
-          note.decaySecondStage, note.decaySecondRatio);
+        const fittedBarT60 = resClass === "bar" &&
+          Number.isFinite(note.barModeT60Seconds?.[modeIndex - 1])
+          ? note.barModeT60Seconds[modeIndex - 1] : null;
+        const plan = fittedBarT60 == null
+          ? twoStageDecayPlan(modeFreq, material,
+            note.decaySecondStage, note.decaySecondRatio)
+          : { earlyT60: fittedBarT60, lateT60: fittedBarT60,
+              breakpointDb: -18 };
         const earlyT60 = plan.earlyT60 * modeDecayRatio;
         const lateT60 = plan.lateT60 * modeDecayRatio;
         const tau = Math.max(0.02, earlyT60 / 6.91);
@@ -6371,14 +6692,21 @@ export class SynthEngine {
         const fallbackDamperT60 = Math.max(.005, releaseRingSeconds(
           note.partialMaterial, note.frequency, note.releaseDamping));
         const damperT60 = fittedDamperT60 ?? fallbackDamperT60;
-        if (typeof decayG.gain.cancelAndHoldAtTime === "function") {
-          decayG.gain.cancelAndHoldAtTime(t1);
+        // MIDI 90+ piano strings have no dampers. Their post-key-release
+        // tail is the already-scheduled natural material decay: never copy
+        // or extrapolate a lower-note contact rate into this register.
+        if (damper?.undamped !== true) {
+          if (typeof decayG.gain.cancelAndHoldAtTime === "function") {
+            decayG.gain.cancelAndHoldAtTime(t1);
+          } else {
+            decayG.gain.cancelScheduledValues(t1);
+          }
+          decayG.gain.setTargetAtTime(0.0001, t1,
+            Math.max(.001, damperT60 / 6.91));
+          note._ringSec = Math.max(note._ringSec || 0, Math.min(8, damperT60));
         } else {
-          decayG.gain.cancelScheduledValues(t1);
+          note._ringSec = Math.max(note._ringSec || 0, Math.min(8, lateT60));
         }
-        decayG.gain.setTargetAtTime(0.0001, t1,
-          Math.max(.001, damperT60 / 6.91));
-        note._ringSec = Math.max(note._ringSec || 0, Math.min(8, damperT60));
         tail.connect(decayG);
         decayG.connect(env);
       };
@@ -6408,7 +6736,21 @@ export class SynthEngine {
           primarySchedule.followers.push(schedule);
         }
         osc.connect(g);
-        connectDecay(bodyTail(g, modeFreq), modeFreq, modeDecayRatio);
+        let tail = g;
+        const anomalyEvents = envelopeAnomalyAutomationEvents(
+          note.envelopeAnomalyClasses, harmonic, modeFreq, note.velocity,
+          t0 + onsetDelay, t1, note.envelopeAnomalyLevel);
+        if (anomalyEvents.length) {
+          const anomaly = this.ctx.createGain();
+          anomaly.gain.setValueAtTime(anomalyEvents[0].gain, anomalyEvents[0].time);
+          for (let k = 1; k < anomalyEvents.length; k++) {
+            anomaly.gain.linearRampToValueAtTime(
+              anomalyEvents[k].gain, anomalyEvents[k].time);
+          }
+          g.connect(anomaly);
+          tail = anomaly;
+        }
+        connectDecay(bodyTail(tail, modeFreq), modeFreq, modeDecayRatio, harmonic);
         osc.start(t0);
         osc.stop(t1 + 0.04 + (note._ringSec || 0));
         this._track(osc);
@@ -6487,6 +6829,8 @@ export class SynthEngine {
         t1 - t0 < .12) return;
     const componentClass = String(component.componentClass || component.id || "");
     const wind = componentClass === "windBreath" || component.id === "windBreath";
+    const action = componentClass === "pianoActionNoise" ||
+      component.id === "pianoActionNoise";
     const exponent = wind
       ? this._clamp(note.breathVelocityExponent ??
         component.levelLaw?.velocityExponent ?? 1, 0, 2)
@@ -6500,7 +6844,7 @@ export class SynthEngine {
         this._clamp(note.breathLevelScale ?? 1, 0, 3) *
         Math.pow(this._clamp(note.velocity, .01, 1), exponent) *
         Math.pow(10, this._clamp(note.measuredBreathDeltaDb ?? 0, -30, 30) / 20);
-    } else {
+    } else if (!action) {
       const rungs = Array.isArray(component.levelLaw?.rungs)
         ? component.levelLaw.rungs : [];
       const reference = rungs.find(row => row.dynamic === "mf") || rungs[0];
@@ -6510,11 +6854,14 @@ export class SynthEngine {
       base = levelControl * relativeScale *
         this._clamp(note.velocity, .01, 1) *
         bowNoiseVelocityGain(note.velocity, exponent);
+    } else {
+      base = levelControl * .04 * this._clamp(note.velocity, .01, 1);
     }
     base = Math.max(.000001, base);
 
     const leadSec = pinnedNoiseLeadMsAt(component, note.velocity) / 1000;
     const shape = pinnedNoiseEnvelopeAt(component, note.velocity);
+    const points = pinnedNoiseEnvelopePointsAt(component, note.velocity);
     const swellSec = shape.preOnsetSwellMs / 1000;
     const requestedStart = t0 - Math.max(leadSec, swellSec);
     const start = Math.max(this.ctx.currentTime, requestedStart);
@@ -6537,14 +6884,24 @@ export class SynthEngine {
     convolver.buffer = this._pinnedBowNoiseImpulseBuffer(component);
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(.000001, start);
-    gain.gain.linearRampToValueAtTime(
-      Math.max(.000001, articulationPeak), peak);
-    gain.gain.linearRampToValueAtTime(Math.max(.000001, sustain), settle);
+    let endGain = sustain;
+    if (points.length >= 2) {
+      const peakDb = Math.max(...points.map(point => point.gainDb));
+      for (const point of points) {
+        const at = Math.max(start, t0 + point.timeMs / 1000);
+        endGain = base * Math.pow(10, (point.gainDb - peakDb) / 20);
+        gain.gain.linearRampToValueAtTime(Math.max(.000001, endGain), at);
+      }
+    } else {
+      gain.gain.linearRampToValueAtTime(
+        Math.max(.000001, articulationPeak), peak);
+      gain.gain.linearRampToValueAtTime(Math.max(.000001, sustain), settle);
+    }
 
     const texture = wind
       ? this._clamp(note.breathTurbulence ?? 0, 0, 1)
       : this._clamp(note.excitationHuman ?? 0, 0, 1);
-    if (texture > 0 && settle < t1 - .03) {
+    if (!action && texture > 0 && settle < t1 - .03) {
       const trace = humanFluctuationTrace(
         () => this._nextRandom(), t1 - settle, wind ? "blow" : "bow", texture);
       for (const point of trace) {
@@ -6555,7 +6912,7 @@ export class SynthEngine {
             1 + point.f * texture * (wind ? .3 : .22))), at);
       }
     }
-    gain.gain.setValueAtTime(Math.max(.000001, sustain), releaseStart);
+    gain.gain.setValueAtTime(Math.max(.000001, endGain), releaseStart);
     gain.gain.exponentialRampToValueAtTime(.000001, releaseEnd);
 
     src.connect(convolver);
@@ -6837,8 +7194,10 @@ export class SynthEngine {
     // their oscillator stop times by note._ringSec to let the tail sound).
     const damper = damperByRegisterAt(note.damperByRegister, note.frequency);
     const fittedDamperT60 = damperT60Seconds(damper, note.frequency, note.frequency);
-    const ring = fittedDamperT60 ?? releaseRingSeconds(
+    const naturalRing = releaseRingSeconds(
       note.partialMaterial, note.frequency, note.releaseDamping);
+    const ring = damper?.undamped === true ? naturalRing
+      : fittedDamperT60 ?? naturalRing;
     const doubleDecay = this._clamp(note.decaySecondStage ?? 0, 0, 1);
     const doubleRatio = this._clamp(note.decaySecondRatio ?? 1, 1, 8);
     note._ringSec = Math.min(3.5, ring * (1 + doubleDecay * (doubleRatio - 1) * 0.5));
