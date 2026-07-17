@@ -510,6 +510,8 @@ for (const [key, label, seed] of [
   ["alto-sax", "Alto saxophone", "clarinet"],
   ["french-horn", "French horn", "trombone"],
   ["guitar", "Acoustic guitar", "piano"],
+  ["harp", "Concert harp", "guitar"],
+  ["glockenspiel", "Glockenspiel", "piano"],
   ["piano-upright", "Upright piano", "piano"],
   ["voice-tenor", "Tenor voice", "vocal"],
   ["voice-bass", "Bass voice", "vocal"],
@@ -587,6 +589,7 @@ const LEGACY_SPECTRAL_RESONANCES = Object.fromEntries(
     [key, bands.map(band => ({ ...band }))]));
 const BODY_FALLBACK_SEEDS = {
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
+  harp: "guitar", glockenspiel: "piano",
   "piano-upright": "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
   "voice-soprano": "vocal",
@@ -2751,6 +2754,18 @@ export function measuredHumanDelta(episode, observable) {
   return 0;
 }
 
+/** T-063 bowed level adapters. The fitted dB observables are deltas around
+ * the strongest-prior identity controls, never a second absolute episode. */
+export function bowedHumanLevels(bowNoiseLevel, bowScratchLevel, episode) {
+  const scaleDb = (base, observable) => Math.max(0, Math.min(2,
+    (Number(base) || 0) * Math.pow(10,
+      measuredHumanDelta(episode, observable) / 20)));
+  return {
+    bowNoiseLevel: scaleDb(bowNoiseLevel, "sustainNoiseDb"),
+    bowScratchLevel: scaleDb(bowScratchLevel, "onsetNoiseDb"),
+  };
+}
+
 // ─── Global space designer (Q6) ─────────────────────────────
 // A track's position over time is a list of anchors {beat, angle, dist,
 // smooth 0..1}. Between anchors we interpolate linearly, eased toward
@@ -3887,6 +3902,8 @@ export class GenerationEngine {
         deconvolutionBands: Array.isArray(profile.resonances)
           ? profile.resonances : [],
       }]));
+    const bowedLevels = bowedHumanLevels(
+      this.p.bowNoiseLevel, this.p.bowScratchLevel, humanEpisode);
     return {
       harmonicPartials: partials,
       // Shape/frequency/decay are pinned by the measurement campaign. The
@@ -3927,7 +3944,7 @@ export class GenerationEngine {
       articulationVelocitySlope: this._clamp(this.p.articulationVelocitySlope ?? 0, -1.5, 1.5),
       onsetWanderCents: this._clamp(this.p.onsetWanderCents ?? 0, 0, 120),
       onsetWanderSettlePeriods: this._clamp(this.p.onsetWanderSettlePeriods ?? 12, 2, 30),
-      bowScratchLevel: this._clamp(this.p.bowScratchLevel ?? 0, 0, 2),
+      bowScratchLevel: bowedLevels.bowScratchLevel,
       bowNoise: profile.bowNoise?.profilePinned === true &&
           Array.isArray(profile.bowNoise.profile)
         ? {
@@ -3936,7 +3953,7 @@ export class GenerationEngine {
               ? profile.resonances : [],
           }
         : null,
-      bowNoiseLevel: this._clamp(this.p.bowNoiseLevel ?? 0, 0, 2),
+      bowNoiseLevel: bowedLevels.bowNoiseLevel,
       bowNoiseVelocityExponent: this._clamp(
         Number.isFinite(this.p.bowNoiseVelocityExponent)
           ? this.p.bowNoiseVelocityExponent

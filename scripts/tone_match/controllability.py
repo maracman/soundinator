@@ -413,6 +413,15 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
              "objectiveHash": objective_contract_hash(
                  instrument, objective_references, final_weights),
              "manifestHash": manifest_contract_hash(manifest_contract),
+             "humanRangeDelivery": (
+                 "engine-native-zero-inflated-note-episode"
+                 if isinstance(baseline_params.get("humanRanges"), dict) and
+                 bool((baseline_params["humanRanges"].get("ranges") or {}))
+                 else None),
+             "humanRangeContractHash": (
+                 _canonical_hash(baseline_params["humanRanges"])
+                 if isinstance(baseline_params.get("humanRanges"), dict)
+                 else None),
              "manifest": manifest_contract,
              "startingWeights": weights,
              "finalWeights": final_weights,

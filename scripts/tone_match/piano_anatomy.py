@@ -31,6 +31,7 @@ from .score import hold_decay_metrics
 
 SCHEMA = "sg2-piano-anatomy-v1"
 VALIDATION_SCHEMA = "sg2-piano-anatomy-validation-v1"
+PRE_ROLL_SCHEMA = "sg2-piano-action-pre-roll-audit-v1"
 BANDS_PER_OCTAVE = 6
 
 
@@ -132,7 +133,14 @@ def _component_rows(samples: np.ndarray, sample_rate: int, f0: float,
                      if row["rank"] == 1), None)
     if rank_one is not None:
         for row in partials:
-            row["onsetBoostDb"] = row["onsetLevelDb"] - rank_one
+            # Keep the temporal boost returned by _track_metrics.  L16 asks
+            # whether THIS mode is louder at onset than its own extrapolated
+            # early-decay baseline.  Relative-to-fundamental level is a
+            # useful spectral descriptor, but overwriting onsetBoostDb with
+            # it made positive onset prominence impossible for most upper
+            # modes and admitted onset-quiet false classes.
+            row["onsetLevelRelativeToFundamentalDb"] = (
+                row["onsetLevelDb"] - rank_one)
 
     centres = 100 * 2 ** (np.arange(int(math.log2(min(14000, freqs[-1]) / 100)
                                               * BANDS_PER_OCTAVE) + 1) /
@@ -151,7 +159,8 @@ def _component_rows(samples: np.ndarray, sample_rate: int, f0: float,
     if bands:
         centre_level = float(np.median([row["onsetLevelDb"] for row in bands]))
         for row in bands:
-            row["onsetBoostDb"] = row["onsetLevelDb"] - centre_level
+            row["onsetLevelRelativeToBandMedianDb"] = (
+                row["onsetLevelDb"] - centre_level)
     return partials, bands, {"toneOnsetSec": onset, "freqs": freqs,
                              "times": times, "power": power,
                              "samples": samples, "sampleRate": sample_rate}
@@ -187,7 +196,11 @@ def _baseline_and_deviants(rows: list[dict[str, Any]], key: str) -> dict[str, An
         boosts = np.asarray([row["onsetBoostDb"] for row in members])
         velocity_slope = (float(np.polyfit(velocities, boosts, 1)[0])
                           if len(np.unique(np.round(velocities, 3))) >= 2 else 0.0)
-        if excess >= 2.0 and velocity_slope >= 2.0:
+        # L16 classes are onset-prominent, fast-decaying, and stronger at
+        # higher velocity.  All three signs are required; a fast-decaying
+        # but onset-quiet mode is ordinary envelope structure, not the
+        # owner's anomaly class.
+        if onset >= 2.0 and excess >= 2.0 and velocity_slope >= 2.0:
             deviants.append({
                 key: group, "notes": distinct,
                 "onsetBoostDb": round(onset, 3),
@@ -318,6 +331,68 @@ def _action_component(meta_rows: list[tuple[dict[str, Any], dict[str, Any]]]) ->
         },
         "exclusions": exclusions,
     }
+
+
+def _available_pre_roll(samples: np.ndarray, sample_rate: int,
+                        expected_f0_hz: float) -> dict[str, Any]:
+    """Measure the recording lead available before action/strike energy.
+
+    L17 needs at least 10 ms before the first broadband event so background
+    and the start of the action transient are both observable.  Harmonic tone
+    onset is reported separately; it cannot rescue a file whose action event
+    was already clipped at the file boundary.
+    """
+    frame = max(32, round(.005 * sample_rate))
+    hop = max(16, round(.001 * sample_rate))
+    raw_rms = np.sqrt(signal.convolve(samples * samples, np.ones(frame) / frame,
+                                      mode="same") + 1e-20)[::hop]
+    peak = float(np.max(raw_rms))
+    active = np.flatnonzero(raw_rms >= peak * 10 ** (-35 / 20))
+    broadband_onset = float(active[0] * hop / sample_rate) if active.size else 0.0
+    freqs, times, power = _action_stft(samples, sample_rate)
+    tone_onset = _tone_onset(freqs, times, power, expected_f0_hz)
+    available_ms = 1000 * broadband_onset
+    return {
+        "availablePreRollMs": round(available_ms, 3),
+        "harmonicToneOnsetMs": round(1000 * tone_onset, 3),
+        "usableForL17": bool(broadband_onset >= .010),
+        "requirement": "at least 10 ms before first broadband action/strike event",
+    }
+
+
+def audit_pre_roll(samples_root: Path, provenance_path: Path,
+                   output: Path) -> dict[str, Any]:
+    provenance = json.loads(provenance_path.read_text())
+    rows = []
+    for source in provenance.get("files", []):
+        path = samples_root / source["file"]
+        if not path.exists():
+            rows.append({"sourceFile": source["file"], "midi": source.get("midi"),
+                         "dynamic": source.get("dynamic"), "status": "missing"})
+            continue
+        samples, sample_rate = _load(path)
+        midi = int(source["midi"])
+        expected = 440 * 2 ** ((midi - 69) / 12)
+        measured = _available_pre_roll(samples, sample_rate, expected)
+        rows.append({"sourceFile": source["file"], "midi": midi,
+                     "note": source.get("note"), "dynamic": source.get("dynamic"),
+                     "roundRobin": source.get("roundRobin"), "status": "measured",
+                     **measured})
+    usable = [row for row in rows if row.get("usableForL17")]
+    deficient = [row for row in rows if row.get("status") == "measured" and
+                 not row.get("usableForL17")]
+    result = {
+        "schema": PRE_ROLL_SCHEMA, "instrument": "piano-upright",
+        "criterion": "availablePreRollMs >= 10 before first broadband action/strike event",
+        "filesAudited": len(rows), "usableCount": len(usable),
+        "deficientCount": len(deficient), "missingCount": sum(
+            row.get("status") == "missing" for row in rows),
+        "usableSubset": [row["sourceFile"] for row in usable],
+        "rows": rows,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2) + "\n")
+    return result
 
 
 def _damper_frequency_exponent(samples: np.ndarray, sample_rate: int, f0: float,
@@ -503,15 +578,22 @@ def _synthetic_note(f0: float, velocity: float, *, sample_rate: int = 24000,
         rate = 3 + 1.5 * math.log2(max(frequency, 100) / 440)
         rate = max(1, rate)
         amp = 1 / rank
+        transient_db = np.zeros_like(times)
         if rank == 6:
-            amp *= 10 ** ((1 + 7 * velocity) / 20)
+            # L16 is an onset-only excess over the mode's sustained decay,
+            # not merely a loud upper partial.  Keep the injected excess out
+            # of the 80--380 ms baseline-fit window so the round trip tests
+            # the temporal quantity that the extractor reports.
+            transient_db = (3 + 9 * velocity) * np.exp(-active / .018)
             rate += 16
         release_decay = 120 * (rank ** .35) * np.maximum(0.0, times - release)
-        envelope = 10 ** (-(rate * active + release_decay) / 20) * (times >= tone_onset)
+        envelope = 10 ** ((transient_db - rate * active - release_decay) / 20)
+        envelope *= times >= tone_onset
         samples += amp * envelope * np.sin(2 * np.pi * frequency * active)
-    fixed_amp = .04 * 10 ** (10 * velocity / 20)
+    fixed_amp = .04
+    fixed_transient_db = (4 + 11 * velocity) * np.exp(-active / .018)
     fixed_release = 120 * (2800 / f0) ** .35 * np.maximum(0.0, times - release)
-    samples += fixed_amp * 10 ** (-(35 * active + fixed_release) / 20) * (times >= tone_onset) * np.sin(
+    samples += fixed_amp * 10 ** ((fixed_transient_db - 35 * active - fixed_release) / 20) * (times >= tone_onset) * np.sin(
         2 * np.pi * 2800 * active)
     rng = np.random.default_rng(round(f0 * 10 + velocity * 100))
     noise = signal.lfilter([1, -.7], [1], rng.normal(0, 1, len(times)))
@@ -584,6 +666,10 @@ def _parser() -> argparse.ArgumentParser:
     extract_parser.add_argument("--validation", type=Path, required=True)
     extract_parser.add_argument("--output", type=Path, required=True)
     extract_parser.add_argument("--instrument", required=True)
+    pre_roll_parser = sub.add_parser("pre-roll-audit")
+    pre_roll_parser.add_argument("--samples", type=Path, required=True)
+    pre_roll_parser.add_argument("--provenance", type=Path, required=True)
+    pre_roll_parser.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -591,6 +677,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "validate":
         result = validate(args.output)
+    elif args.command == "pre-roll-audit":
+        result = audit_pre_roll(args.samples, args.provenance, args.output)
     else:
         result = extract(args.references, args.samples, args.validation,
                          args.output, args.instrument)

@@ -7,9 +7,11 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import scripts.tone_match.iterate as iterate_module
+import scripts.tone_match.bar_modes as bar_modes_module
 import scripts.tone_match.score as score_module
 import scripts.tone_match.struck_plucked_prep as struck_prep_module
-from scripts.tone_match.piano_anatomy import VALIDATION_SCHEMA as PIANO_ANATOMY_VALIDATION_SCHEMA, validate as validate_piano_anatomy
+from scripts.tone_match.piano_anatomy import VALIDATION_SCHEMA as PIANO_ANATOMY_VALIDATION_SCHEMA, _available_pre_roll, validate as validate_piano_anatomy
+from scripts.tone_match.bar_modes import BAR_RATIOS, analyse_bar, render_first_fit
 
 from scripts.fit_profiles_from_samples import NoteAnalysis, aggregate_instrument, bowed_string_from_filename, expected_single_note_f0, fit_fixed_body, fit_take_spread, guitar_course_for_midi, harmonic_frame_amps, merge_profile_sets, onset_pitch_stats, validate_bowed_body_modes, validate_corpus_contract, vibrato_stats, vowel_from_filename
 from scripts.tone_match.finalize_corpus import _dynamics, _note_span, _vibrato, _vowel
@@ -43,6 +45,7 @@ from scripts.tone_match.iterate import (
     _free_manifest_contract,
     _load_preset,
     _mode_params,
+    _native_human_episode_profile,
     _params,
     _reference_set_id,
     _reference_render_params_override,
@@ -102,6 +105,20 @@ def test_l16_l17_l18_piano_anatomy_extractor_passes_synthetic_roundtrip(tmp_path
     assert result["status"] == "pass"
     assert all(result["checks"].values())
     assert output.exists()
+
+
+def test_l16_onset_boost_is_temporal_not_relative_to_fundamental():
+    from scripts.tone_match.piano_anatomy import _component_rows, _synthetic_note
+
+    sample_rate = 24_000
+    f0 = 220.0
+    samples = _synthetic_note(f0, .9, sample_rate=sample_rate)
+    partials, bands, _ = _component_rows(
+        samples, sample_rate, f0, .9, "synthetic")
+    rank_six = next(row for row in partials if row["rank"] == 6)
+    assert rank_six["onsetBoostDb"] > 0
+    assert rank_six["onsetLevelRelativeToFundamentalDb"] < 0
+    assert all("onsetLevelRelativeToBandMedianDb" in row for row in bands)
 
 
 def test_sustained_band_profile_is_gain_invariant_and_uses_third_octaves():
@@ -165,6 +182,25 @@ def test_qualified_human_ranges_survive_a_masked_decomposition():
     assert profiles["french-horn"]["humanRanges"] is masked
 
 
+def test_humanisation_group_is_separate_from_stopping_floor_group():
+    from scripts.tone_match.humanisation import _pair_group
+
+    reference = {
+        "roles": ["humanisation"],
+        "humanisationGroup": "55|pp|arco-normal|sulD|PhilCat",
+        "floorGroup": "humanisation-only|take-a",
+    }
+    assert _pair_group(reference) == reference["humanisationGroup"]
+
+
+def test_bowed_release_metrics_wait_for_a_labelled_bow_lift_contract():
+    for instrument in ("violin", "cello"):
+        weights = weights_for_instrument(instrument)
+        assert weights["release_ring_ms"] == 0
+        assert weights["release_damp_db_per_s"] == 0
+        assert weights["release_noise_db"] == 0
+
+
 def test_human_candidate_requires_double_dissociation_in_both_directions():
     from scripts.tone_match.humanisation import _double_dissociation
     left = {"excitationPosition": .08}
@@ -176,6 +212,72 @@ def test_human_candidate_requires_double_dissociation_in_both_directions():
     same = _double_dissociation(
         "excitationPosition", left, {"excitationPosition": .0805})
     assert not same["qualified"]
+
+
+def test_f13_adjacent_note_variation_removes_register_trend_per_dimension():
+    from scripts.tone_match.humanisation import (
+        _dimension_evidence, _trend_removed_adjacent_deltas)
+    rows = [{"midi": midi, "path": f"note-{midi}.wav"}
+            for midi in (60, 61, 62, 63)]
+    observations = []
+    for index, position in enumerate((.10, .12, .105, .13)):
+        row = {key: 0.0 for key in (
+            "excitationPosition", "vibratoRateHz", "vibratoDepthCents",
+            "vibratoOnsetDelayMs", "vibratoRampMs",
+            "vibratoRateDriftHzPerSecond", "sustainNoiseDb",
+            "onsetNoiseDb", "onsetNoiseCentroidOct", "noiseLeadMs",
+            "onsetWanderCents", "onsetSettleMs", "attackNoiseLevel")}
+        row["excitationPosition"] = position
+        row["onsetWanderCents"] = 10 + 2 * index + (4 if index == 2 else 0)
+        observations.append(row)
+    result = _trend_removed_adjacent_deltas(rows, observations)
+    assert len(result["pairs"]) == 3
+    assert max(result["deltas"]["excitationPosition"]) > 0
+    assert max(result["deltas"]["onsetWanderCents"]) > 0
+    evidence = _dimension_evidence(
+        "excitationPosition", matched_pairs=2, adjacent_pairs=3)
+    assert evidence["strength"] == "full-strength"
+    assert evidence["primaryBasis"] == \
+        "lossless-within-run-adjacent-note-trend-removed"
+
+
+def test_f13_duration_robust_repeat_is_not_blanket_downgraded():
+    from scripts.tone_match.humanisation import _dimension_evidence
+    onset = _dimension_evidence(
+        "onsetWanderCents", matched_pairs=4, adjacent_pairs=0)
+    noise_floor = _dimension_evidence(
+        "vibratoRateDriftHzPerSecond", matched_pairs=4, adjacent_pairs=0)
+    assert onset["strength"] == "full-strength"
+    assert onset["durationMismatchAffectsGoal"] is False
+    assert noise_floor["strength"] == "weaker-evidence"
+
+
+def test_native_human_episode_requires_hashed_delivery_and_feature_response():
+    from scripts.tone_match.humanisation import _consumer_status
+
+    qualification = {
+        "vibratoRate": {"status": "qualified-humanisation"},
+        "onsetWanderCents": {"status": "qualified-humanisation"},
+    }
+    audit = {
+        "clean": True,
+        "humanRangeDelivery": "engine-native-zero-inflated-note-episode",
+        "humanRangeContractHash": "contract-hash",
+        "responsiveParameters": {
+            "vibrato": [],
+            "onset_wander_cents": ["excitationHuman"],
+        },
+    }
+    status = _consumer_status(audit, qualification)
+    assert not status["parameters"]["vibratoRate"]["functional"]
+    assert status["parameters"]["onsetWanderCents"]["functional"]
+    assert status["parameters"]["onsetWanderCents"]["delivery"] == \
+        "engine-native-zero-inflated-note-episode"
+    assert not status["allQualifiedConsumersFunctional"]
+
+    audit["humanRangeContractHash"] = None
+    unhashed = _consumer_status(audit, qualification)
+    assert not unhashed["parameters"]["onsetWanderCents"]["functional"]
 
 
 def test_human_decomposition_verdict_is_three_valued():
@@ -238,16 +340,16 @@ def test_bow_component_envelope_extractor_passes_synthetic_roundtrip():
     assert all(validation["checks"].values())
 
 
-def test_release_features_are_corpus_gated_and_weighted_after_bowed_audit():
+def test_release_features_are_corpus_gated_and_watch_only_without_bow_lift_anchors():
     weights = weights_for_instrument("violin")
     for feature in ("release_ring_ms", "release_damp_db_per_s",
                     "release_noise_db"):
-        assert weights[feature] == 1.0
+        assert weights[feature] == 0.0
     reference = _bundle(); rendered = _bundle()
     reference.release_ring_ms = 100.0; rendered.release_ring_ms = 600.0
     comparison = compare_features(reference, rendered, weights)
     assert comparison["features"]["release_ring_ms"] == 500.0
-    assert comparison["composite"] > compare_features(
+    assert comparison["composite"] == compare_features(
         reference, reference, weights)["composite"]
 
 def test_trajectory_power_rejects_inaudible_tail_and_codec_bins():
@@ -514,6 +616,66 @@ def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
         ["string6", "string3", "string1"]
 
 
+def test_harp_and_glock_campaigns_keep_dense_strings_and_bar_firewall():
+    harp = STRUCK_CAMPAIGNS["harp"]
+    glock = STRUCK_CAMPAIGNS["glockenspiel"]
+    assert len(harp["anchors"]) == 23
+    assert harp["profile"] == "harp"
+    assert {row["register"] for row in harp["anchors"]} == \
+        {"wire-bass", "gut-mid", "nylon-top"}
+    assert glock["resonator"] == "bar"
+    assert glock["profile"] == "glockenspiel"
+    assert glock["spectralPartials"] == len(BAR_RATIOS) == 6
+    assert [row["midi"] for row in glock["anchors"]] == [79, 84, 91, 96, 103, 108]
+
+
+def test_glock_first_render_gate_hashes_and_reports_missing_bar_controls(
+        tmp_path, monkeypatch):
+    fit_path = tmp_path / "fit.json"
+    initial_path = tmp_path / "initial.json"
+    references_path = tmp_path / "references.json"
+    fit_path.write_text(json.dumps({"notes": [{
+        "midi": 79,
+        "modes": [
+            {"mode": 1, "offsetCents": 0, "t60Seconds": 8, "levelDb": 0},
+            {"mode": 2, "offsetCents": -100, "t60Seconds": .5, "levelDb": -12},
+            {"mode": 3, "offsetCents": 20, "t60Seconds": .4, "levelDb": -6},
+        ],
+    }]}))
+    initial_path.write_text(json.dumps({"spectralPartials": 6, "partialB": 0}))
+    references_path.write_text(json.dumps([{
+        "midi": 79, "velocity": .62, "durationSec": 3, "register": "low",
+    }]))
+    monkeypatch.setattr(
+        "scripts.tone_match.controllability._render_batch",
+        lambda jobs, _root: Path(jobs[0]["out"]).touch())
+    monkeypatch.setattr(bar_modes_module, "_load",
+                        lambda _path: (np.zeros(64), 48_000))
+    monkeypatch.setattr(bar_modes_module, "analyse_bar", lambda *_args: {
+        "modes": [
+            {"mode": 1, "offsetCents": 0, "t60Seconds": 4, "levelDb": 0},
+            {"mode": 2, "offsetCents": 0, "t60Seconds": 3, "levelDb": -3},
+            {"mode": 3, "offsetCents": 0, "t60Seconds": 2, "levelDb": -1},
+        ],
+    })
+
+    result = render_first_fit(
+        fit_path, initial_path, references_path, tmp_path / "output", Path.cwd())
+
+    assert result["status"] == "fail"
+    assert result["gates"] == {
+        "modeRatios2To3Within35Cents": False,
+        "mode1ToMode2T60RatioMedian": pytest.approx(4 / 3, abs=1e-4),
+        "mode1ToMode2T60RatioAtLeast5": False,
+        "centreStrikeMode2DipAllMeasured": False,
+        "partialEconomySixModes": True,
+        "stringBPinnedZero": True,
+    }
+    assert len(result["objectiveHash"]) == 16
+    assert len(result["rendererFilesHash"]) == 16
+    assert json.loads((tmp_path / "output" / "first-fit.json").read_text()) == result
+
+
 def test_declared_single_piano_note_wins_even_over_nearby_tracker_mode(
         tmp_path, monkeypatch):
     monkeypatch.setattr(
@@ -552,7 +714,34 @@ def test_single_note_corpus_filenames_supply_trusted_pitch_anchors():
     assert expected_single_note_f0("vsco2.Player_dyn1_rr1_000.wav") == pytest.approx(27.5)
     assert expected_single_note_f0("vsco2.Player_dyn2_rr1_020.wav") == pytest.approx(277.182631, rel=1e-6)
     assert expected_single_note_f0("vsco2.Player_dyn3_rr1_044.wav") == pytest.approx(4186.009045, rel=1e-6)
+    assert expected_single_note_f0("vsco2.KSHarp_E1_f.wav") == pytest.approx(41.2034446)
+    # Landed glock WAVs' measured first mode is one octave above the raw
+    # filename label; this is distinct from score transposition convention.
+    assert expected_single_note_f0("vsco2.glock_medium_G4.wav") == pytest.approx(783.990872)
     assert expected_single_note_f0("Guitar.ff.sulE.E2B2.mono.aif") is None
+
+
+def test_bar_mode_extractor_never_exposes_string_b_and_recovers_ratios():
+    sample_rate = 48_000
+    times = np.arange(sample_rate) / sample_rate
+    f0 = 784.0
+    samples = sum(
+        (1 / mode) * np.exp(-times * mode) * np.sin(2 * np.pi * f0 * ratio * times)
+        for mode, ratio in enumerate(BAR_RATIOS[:3], start=1)
+    )
+    fit = analyse_bar(samples, sample_rate, f0, max_modes=3)
+    assert [row["offsetCents"] for row in fit["modes"]] == pytest.approx([0, 0, 0], abs=1.5)
+    assert all("partialB" not in row for row in fit["modes"])
+
+
+def test_l17_pre_roll_audit_uses_first_broadband_event_not_tone_onset():
+    sample_rate = 48_000
+    samples = np.zeros(round(.2 * sample_rate))
+    start = round(.018 * sample_rate)
+    samples[start:] = .2 * np.sin(2 * np.pi * 440 * np.arange(len(samples) - start) / sample_rate)
+    assert _available_pre_roll(samples, sample_rate, 440)["usableForL17"] is True
+    clipped = np.roll(samples, -round(.016 * sample_rate))
+    assert _available_pre_roll(clipped, sample_rate, 440)["usableForL17"] is False
 
 
 def test_guitar_measured_profile_uses_nominal_nylon_register_anchors():
@@ -593,6 +782,11 @@ def test_upright_alias_consumes_piano_construction_and_struck_scoring_policy():
     assert weights["vibrato"] == 0
     assert weights["onset_noise_db"] == 1
     assert weights["decay_log_ratio"] == 1
+
+
+def test_glock_scoring_forbids_string_b_as_a_fit_objective():
+    weights = weights_for_instrument("glockenspiel")
+    assert weights["inharmonicity_log_ratio"] == 0
 
 
 def test_upright_measured_profile_retains_five_region_b_curve():
@@ -919,6 +1113,20 @@ def test_ship_variants_record_one_failed_note_without_aborting(tmp_path, monkeyp
     assert len(result["analysisFailures"]) == 2
     assert {row["referenceIndex"] for row in result["analysisFailures"]} == {1}
     assert result["primaryRenderDirectory"].endswith("variant-00")
+
+
+def test_native_human_episode_retires_the_second_python_draw(tmp_path):
+    profile_dir = tmp_path / "web" / "static"
+    profile_dir.mkdir(parents=True)
+    (profile_dir / "measured_profiles.json").write_text(json.dumps({
+        "violin": {"humanRanges": {"ranges": {
+            "excitationPosition": {"status": "measured"},
+        }}},
+    }))
+    assert _native_human_episode_profile(
+        {"spectralProfile": "violin"}, tmp_path)
+    assert not _native_human_episode_profile(
+        {"spectralProfile": "cello"}, tmp_path)
 
 
 def test_ship_variants_resume_saved_seeds_and_skip_completed_wavs(tmp_path, monkeypatch):
@@ -1882,6 +2090,12 @@ def test_reference_render_override_declares_vibrato_role_without_role_leakage():
     assert _reference_render_params_override({"roles": ["floor"]}) == {
         "performanceRole": "non-vibrato",
     }
+    assert _reference_render_params_override({
+        "roles": ["spectral"], "string": "sulD",
+    }) == {"performanceRole": "non-vibrato", "stringSelect": "sulD"}
+    assert "stringSelect" not in _reference_render_params_override({
+        "roles": ["humanisation"], "string": "unlabelled",
+    })
     # Legacy references without explicit roles retain their existing all-role
     # interpretation and therefore still exercise the vibrato scorer.
     assert _reference_render_params_override({}) == {"performanceRole": "vibrato"}
@@ -2394,6 +2608,18 @@ def test_catalogue_duplicate_finder_requires_two_usable_takes(tmp_path):
     # anchor notes stay consistent with the campaign tables
     for instrument, anchors in STRING_CAMPAIGNS.items():
         assert set(PHIL_ANCHOR_NOTES[instrument]) == {a["midi"] for a in anchors}
+
+
+def test_catalogue_duplicate_finder_accepts_provenance_prefixed_samples(tmp_path):
+    names = ("phil.cello_G3_05_pianissimo_arco-normal.mp3",
+             "phil.cello_G3_1_pianissimo_arco-normal.mp3",
+             "phil.cello_G3_15_pianissimo_arco-normal.mp3")
+    for name in names:
+        (tmp_path / name).write_bytes(b"")
+    groups = find_catalogue_duplicates(tmp_path, "cello")
+    assert len(groups) == 1
+    assert groups[0]["midi"] == 55
+    assert groups[0]["files"] == list(names)
 
 
 def test_string_campaigns_cover_three_registers_and_two_dynamics():

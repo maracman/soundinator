@@ -362,14 +362,16 @@ def _param(params: dict[str, Any], key: str) -> Any:
 def _topology_assertions(instrument: str, params: dict[str, Any], strict: bool) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     expected_excitation = {
-        "violin": "bow", "cello": "bow", "piano": "strike", "guitar": "pluck", "flute": "blow",
+        "violin": "bow", "cello": "bow", "piano": "strike", "guitar": "pluck",
+        "harp": "pluck", "glockenspiel": "strike", "flute": "blow",
         "clarinet": "blow", "alto-sax": "blow", "tenor-sax": "blow",
         "trumpet": "blow", "french-horn": "blow", "soprano": "blow",
         "mezzo-soprano": "blow", "tenor": "blow", "bass": "blow",
         "basso-profondo": "blow", "boy-soprano": "blow",
     }.get(instrument)
     expected_resonator = {
-        "violin": "string", "cello": "string", "piano": "string", "guitar": "string", "flute": "openTube",
+        "violin": "string", "cello": "string", "piano": "string", "guitar": "string",
+        "harp": "string", "glockenspiel": "bar", "flute": "openTube",
         "clarinet": "closedTube", "alto-sax": "conicalTube", "tenor-sax": "conicalTube",
         "trumpet": "conicalTube", "french-horn": "conicalTube",
     }.get(instrument)

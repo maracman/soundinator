@@ -8550,6 +8550,910 @@ export const MEASURED_PROFILES = {
       "decay": 0.18,
       "measuredBandwidthHz": 639.0,
       "measuredLevelRatio": 0.025
+    },
+    "humanRanges": {
+      "schemaVersion": 3,
+      "instrument": "cello",
+      "method": "matched-take-human-only-differential-v3-double-dissociation-f13-evidence",
+      "evidence": {
+        "basis": "same-note/dynamic/articulation humanisation plus per-dimension lossless within-run adjacent-note variation",
+        "groups": 6,
+        "takes": 15,
+        "pairs": 12,
+        "groupEvidence": [
+          {
+            "group": "36|ff|arco-normal|planned-sulC-unverified|PhilCat",
+            "takes": 2,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "36|pp|arco-normal|planned-sulC-unverified|PhilCat",
+            "takes": 3,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "55|ff|arco-normal|planned-sulD-unverified|PhilCat",
+            "takes": 2,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "55|pp|arco-normal|planned-sulD-unverified|PhilCat",
+            "takes": 3,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "76|ff|arco-normal|planned-sulA-unverified|PhilCat",
+            "takes": 3,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          },
+          {
+            "group": "76|pp|arco-normal|planned-sulA-unverified|PhilCat",
+            "takes": 2,
+            "roles": [
+              "humanisation"
+            ],
+            "sourceClasses": [
+              "Philharmonia catalogue"
+            ],
+            "pairEvidenceClasses": [
+              "phil-multi-take-duration-mismatched-mp3-common-window"
+            ],
+            "allOriginalDurationsMatched": false,
+            "allStringsVerified": false
+          }
+        ],
+        "adjacentTrendGroups": [
+          {
+            "sourceFile": "Cello.arco.ff.sulC.C2A2.aiff",
+            "dynamic": "ff",
+            "string": "sulC",
+            "notes": 10,
+            "adjacentPairs": 9,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.ff.sulG.B2Bb3.aiff",
+            "dynamic": "ff",
+            "string": "sulG",
+            "notes": 3,
+            "adjacentPairs": 2,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.ff.sulG.G2B2.aiff",
+            "dynamic": "ff",
+            "string": "sulG",
+            "notes": 5,
+            "adjacentPairs": 4,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulC.A2Gb3.aiff",
+            "dynamic": "mf",
+            "string": "sulC",
+            "notes": 3,
+            "adjacentPairs": 2,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulC.C2Ab2.aiff",
+            "dynamic": "mf",
+            "string": "sulC",
+            "notes": 9,
+            "adjacentPairs": 8,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulG.B2A3.aiff",
+            "dynamic": "mf",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.mf.sulG.G2Bb2.aiff",
+            "dynamic": "mf",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulC.C2Gb2.aiff",
+            "dynamic": "pp",
+            "string": "sulC",
+            "notes": 7,
+            "adjacentPairs": 6,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulC.Gb2D3.aiff",
+            "dynamic": "pp",
+            "string": "sulC",
+            "notes": 5,
+            "adjacentPairs": 4,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulG.B2A3.aiff",
+            "dynamic": "pp",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          },
+          {
+            "sourceFile": "Cello.arco.pp.sulG.G2Bb2.aiff",
+            "dynamic": "pp",
+            "string": "sulG",
+            "notes": 4,
+            "adjacentPairs": 3,
+            "sourceCodec": "lossless"
+          }
+        ],
+        "adjacentTrendPairs": 47,
+        "evidenceByDimension": {
+          "excitationPosition": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "vibratoRateHz": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          },
+          "vibratoDepthCents": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          },
+          "vibratoOnsetDelayMs": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          },
+          "vibratoRampMs": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          },
+          "vibratoRateDriftHzPerSecond": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          },
+          "sustainNoiseDb": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          },
+          "onsetNoiseDb": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "onsetNoiseCentroidOct": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "noiseLeadMs": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "onsetWanderCents": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "onsetSettleMs": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          },
+          "attackNoiseLevel": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "doctrine": "F13: evidence strength is per dimension; spec fallbacks never impose a blanket downgrade"
+      },
+      "qualification": {
+        "excitationPosition": {
+          "parameter": "excitationPosition",
+          "observable": "excitationPosition",
+          "unit": "fraction-of-string",
+          "pairsTested": 12,
+          "qualifiedPairs": 12,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRate": {
+          "parameter": "vibratoRate",
+          "observable": "vibratoRateHz",
+          "unit": "Hz",
+          "pairsTested": 12,
+          "qualifiedPairs": 3,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoDepth": {
+          "parameter": "vibratoDepth",
+          "observable": "vibratoDepthCents",
+          "unit": "cents",
+          "pairsTested": 12,
+          "qualifiedPairs": 3,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoOnsetDelayMs": {
+          "parameter": "vibratoOnsetDelayMs",
+          "observable": "vibratoOnsetDelayMs",
+          "unit": "ms",
+          "pairsTested": 12,
+          "qualifiedPairs": 2,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRampMs": {
+          "parameter": "vibratoRampMs",
+          "observable": "vibratoRampMs",
+          "unit": "ms",
+          "pairsTested": 12,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "vibratoRateDrift": {
+          "parameter": "vibratoRateDrift",
+          "observable": "vibratoRateDriftHzPerSecond",
+          "unit": "Hz/s",
+          "pairsTested": 12,
+          "qualifiedPairs": 0,
+          "status": "not-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "bowNoiseLevelDb": {
+          "parameter": "bowNoiseLevelDb",
+          "observable": "sustainNoiseDb",
+          "unit": "dB",
+          "pairsTested": 12,
+          "qualifiedPairs": 11,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "bowScratchLevelDb": {
+          "parameter": "bowScratchLevelDb",
+          "observable": "onsetNoiseDb",
+          "unit": "dB",
+          "pairsTested": 12,
+          "qualifiedPairs": 8,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "attackNoiseLevel": {
+          "parameter": "attackNoiseLevel",
+          "observable": "attackNoiseLevel",
+          "unit": "linear-ratio",
+          "pairsTested": 12,
+          "qualifiedPairs": 7,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "onsetWanderCents": {
+          "parameter": "onsetWanderCents",
+          "observable": "onsetWanderCents",
+          "unit": "cents",
+          "pairsTested": 12,
+          "qualifiedPairs": 12,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        },
+        "onsetWanderSettleMs": {
+          "parameter": "onsetWanderSettleMs",
+          "observable": "onsetSettleMs",
+          "unit": "ms",
+          "pairsTested": 12,
+          "qualifiedPairs": 12,
+          "status": "qualified-humanisation",
+          "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+        }
+      },
+      "ranges": {
+        "excitationPosition": {
+          "status": "measured",
+          "unit": "fraction-of-string",
+          "centre": 0.072,
+          "min": 0.0303,
+          "max": 0.2447,
+          "pairSpreadMedian": 0.037867,
+          "pairSpreadP90": 0.178956,
+          "drawHalfRange": 0.126541,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "excitationPosition",
+            "observable": "excitationPosition",
+            "unit": "fraction-of-string",
+            "pairsTested": 12,
+            "qualifiedPairs": 12,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "vibratoRate": {
+          "status": "measured",
+          "unit": "Hz",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 5.793457,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 2.819824,
+          "drawHalfRange": 1.993917,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "vibratoRate",
+            "observable": "vibratoRateHz",
+            "unit": "Hz",
+            "pairsTested": 12,
+            "qualifiedPairs": 3,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoDepth": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 15.264357,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 13.426888,
+          "drawHalfRange": 9.494243,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "vibratoDepth",
+            "observable": "vibratoDepthCents",
+            "unit": "cents",
+            "pairsTested": 12,
+            "qualifiedPairs": 3,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoOnsetDelayMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 46.439909,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 41.795918,
+          "drawHalfRange": 29.554177,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "vibratoOnsetDelayMs",
+            "observable": "vibratoOnsetDelayMs",
+            "unit": "ms",
+            "pairsTested": 12,
+            "qualifiedPairs": 2,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "bowNoiseLevelDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -33.228167,
+          "min": -153.871448,
+          "max": -18.143892,
+          "pairSpreadMedian": 3.544419,
+          "pairSpreadP90": 10.996809,
+          "drawHalfRange": 7.775918,
+          "takes": 15,
+          "pairs": 12,
+          "qualification": {
+            "parameter": "bowNoiseLevelDb",
+            "observable": "sustainNoiseDb",
+            "unit": "dB",
+            "pairsTested": 12,
+            "qualifiedPairs": 11,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "bowScratchLevelDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -4.684178,
+          "min": -27.258266,
+          "max": 0.0,
+          "pairSpreadMedian": 2.998025,
+          "pairSpreadP90": 25.511678,
+          "drawHalfRange": 18.039481,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "bowScratchLevelDb",
+            "observable": "onsetNoiseDb",
+            "unit": "dB",
+            "pairsTested": 12,
+            "qualifiedPairs": 8,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "attackNoiseLevel": {
+          "status": "measured",
+          "unit": "linear-ratio",
+          "centre": 0.000682,
+          "min": 0.0,
+          "max": 0.065255,
+          "pairSpreadMedian": 0.000325,
+          "pairSpreadP90": 0.0054,
+          "drawHalfRange": 0.003818,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "attackNoiseLevel",
+            "observable": "attackNoiseLevel",
+            "unit": "linear-ratio",
+            "pairsTested": 12,
+            "qualifiedPairs": 7,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetWanderCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 31.474778,
+          "min": 3.784456,
+          "max": 123.320329,
+          "pairSpreadMedian": 17.509263,
+          "pairSpreadP90": 58.014725,
+          "drawHalfRange": 41.022606,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "onsetWanderCents",
+            "observable": "onsetWanderCents",
+            "unit": "cents",
+            "pairsTested": 12,
+            "qualifiedPairs": 12,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetWanderSettleMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 131.836735,
+          "min": 0.0,
+          "max": 230.956916,
+          "pairSpreadMedian": 61.578231,
+          "pairSpreadP90": 128.674117,
+          "drawHalfRange": 90.986341,
+          "takes": 73,
+          "pairs": 47,
+          "qualification": {
+            "parameter": "onsetWanderSettleMs",
+            "observable": "onsetSettleMs",
+            "unit": "ms",
+            "pairsTested": 12,
+            "qualifiedPairs": 12,
+            "status": "qualified-humanisation",
+            "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
+          },
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        }
+      },
+      "spreadObservables": {
+        "excitationPosition": {
+          "status": "measured",
+          "unit": "fraction-of-string",
+          "centre": 0.072,
+          "min": 0.0303,
+          "max": 0.2447,
+          "pairSpreadMedian": 0.037867,
+          "pairSpreadP90": 0.178956,
+          "drawHalfRange": 0.126541,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "vibratoRateHz": {
+          "status": "measured",
+          "unit": "Hz",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 5.793457,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 2.819824,
+          "drawHalfRange": 1.993917,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoDepthCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 15.264357,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 13.426888,
+          "drawHalfRange": 9.494243,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoOnsetDelayMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 46.439909,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 41.795918,
+          "drawHalfRange": 29.554177,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "durationMismatchAffectsGoal": false
+          }
+        },
+        "vibratoRampMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.0,
+          "drawHalfRange": 0.0,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "vibratoRateDriftHzPerSecond": {
+          "status": "measured",
+          "unit": "Hz/s",
+          "centre": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "pairSpreadMedian": 0.0,
+          "pairSpreadP90": 0.0,
+          "drawHalfRange": 0.0,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "sustainNoiseDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -33.228167,
+          "min": -153.871448,
+          "max": -18.143892,
+          "pairSpreadMedian": 3.544419,
+          "pairSpreadP90": 10.996809,
+          "drawHalfRange": 7.775918,
+          "takes": 15,
+          "pairs": 12,
+          "evidence": {
+            "strength": "weaker-evidence",
+            "primaryBasis": "same-note-repeat-common-window",
+            "adjacentPairs": 0,
+            "matchedRepeatPairs": 12,
+            "reason": "codec/duration can affect this observable"
+          }
+        },
+        "onsetNoiseDb": {
+          "status": "measured",
+          "unit": "dB",
+          "centre": -4.684178,
+          "min": -27.258266,
+          "max": 0.0,
+          "pairSpreadMedian": 2.998025,
+          "pairSpreadP90": 25.511678,
+          "drawHalfRange": 18.039481,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetNoiseCentroidOct": {
+          "status": "measured",
+          "unit": "octaves",
+          "centre": 0.339768,
+          "min": -0.673575,
+          "max": 3.162296,
+          "pairSpreadMedian": 0.331328,
+          "pairSpreadP90": 3.510374,
+          "drawHalfRange": 2.48221,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "noiseLeadMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 46.439909,
+          "min": 0.0,
+          "max": 278.639456,
+          "pairSpreadMedian": 52.244898,
+          "pairSpreadP90": 193.190023,
+          "drawHalfRange": 136.605975,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetWanderCents": {
+          "status": "measured",
+          "unit": "cents",
+          "centre": 31.474778,
+          "min": 3.784456,
+          "max": 123.320329,
+          "pairSpreadMedian": 17.509263,
+          "pairSpreadP90": 58.014725,
+          "drawHalfRange": 41.022606,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "onsetSettleMs": {
+          "status": "measured",
+          "unit": "ms",
+          "centre": 131.836735,
+          "min": 0.0,
+          "max": 230.956916,
+          "pairSpreadMedian": 61.578231,
+          "pairSpreadP90": 128.674117,
+          "drawHalfRange": 90.986341,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        },
+        "attackNoiseLevel": {
+          "status": "measured",
+          "unit": "linear-ratio",
+          "centre": 0.000682,
+          "min": 0.0,
+          "max": 0.065255,
+          "pairSpreadMedian": 0.000325,
+          "pairSpreadP90": 0.0054,
+          "drawHalfRange": 0.003818,
+          "takes": 73,
+          "pairs": 47,
+          "evidence": {
+            "strength": "full-strength",
+            "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
+            "adjacentPairs": 47,
+            "matchedRepeatPairs": 12,
+            "goal": "per-note SHIP variation"
+          }
+        }
+      },
+      "decompositionTest": {
+        "verdict": "INCONCLUSIVE-MASKED",
+        "passed": false,
+        "pairs": 12,
+        "failedPairs": 12,
+        "rule": "after Human comb/level/tilt removal: partial and body residual <=3 dB; B <=1.5x (near-zero uses 3 cents); T60 <=1.5x",
+        "maskingFactors": [
+          "one or more per-take identity fits miss the \u00a73 core bars",
+          "one or more qualified Human consumers are unaudited or non-functional"
+        ],
+        "interpretation": "identity/renderer misfit masks the residual; no missing-Human-DOF claim is permitted"
+      }
     }
   },
   "clarinet": {
@@ -17686,6 +18590,234 @@ export const MEASURED_PROFILES = {
       }
     }
   },
+  "glockenspiel": {
+    "partials": [
+      {
+        "amp": 1.0,
+        "spread": 0.1
+      },
+      {
+        "amp": 0.05079,
+        "spread": 0.1
+      },
+      {
+        "amp": 0.00868,
+        "spread": 0.1
+      },
+      {
+        "amp": 0.00661,
+        "spread": 0.1
+      },
+      {
+        "amp": 0.0001,
+        "spread": 0.1
+      },
+      {
+        "amp": 0.0001,
+        "spread": 0.1
+      }
+    ],
+    "partialB": 0.0,
+    "material": 0.05,
+    "performance": {
+      "envelopeAttack": 0.006,
+      "envelopeDecay": 0.5,
+      "envelopeSustain": 0.0,
+      "envelopeRelease": 1.5,
+      "vibratoProb": 0.0
+    },
+    "source": "VSCO 2 CE; CC0-1.0",
+    "notesAnalysed": 6,
+    "resonances": [],
+    "partialsByRegister": [
+      {
+        "f0": 783.9909,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00082,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00965,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.48067,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00196,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.01342,
+            "spread": 0.1
+          }
+        ]
+      },
+      {
+        "f0": 1046.5023,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00134,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0077,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.17881,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.01373,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.1
+          }
+        ]
+      },
+      {
+        "f0": 1567.9817,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00158,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.20656,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.01054,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          }
+        ]
+      },
+      {
+        "f0": 2093.0045,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 0.60646,
+            "spread": 0.1
+          },
+          {
+            "amp": 1.0,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.10723,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00268,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          }
+        ]
+      },
+      {
+        "f0": 3135.9635,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.10001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.00432,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          }
+        ]
+      },
+      {
+        "f0": 4186.009,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.10354,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.1
+          }
+        ]
+      }
+    ],
+    "attackNoise": {
+      "level": 0.6,
+      "freq": 5800,
+      "q": 2.5,
+      "decay": 0.12
+    }
+  },
   "guitar": {
     "partials": [
       {
@@ -19683,6 +20815,6528 @@ export const MEASURED_PROFILES = {
       "decay": 0.25,
       "measuredBandwidthHz": 359.0,
       "measuredLevelRatio": 0.454
+    }
+  },
+  "harp": {
+    "partials": [
+      {
+        "amp": 1.0,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.09088,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.23305,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01901,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.01895,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00561,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0078,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00136,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0029,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00087,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00119,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00066,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00045,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00022,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00023,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00019,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00028,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00031,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00023,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00023,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00025,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00095,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00015,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00017,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00017,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00017,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00033,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00295,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0002,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00077,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00025,
+        "spread": 0.8
+      },
+      {
+        "amp": 7e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00026,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00036,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.0002,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00044,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00012,
+        "spread": 0.744
+      },
+      {
+        "amp": 0.00022,
+        "spread": 0.8
+      },
+      {
+        "amp": 4e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00029,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00054,
+        "spread": 0.8
+      },
+      {
+        "amp": 4e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00025,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00024,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00015,
+        "spread": 0.8
+      },
+      {
+        "amp": 4e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00025,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00025,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00048,
+        "spread": 0.8
+      },
+      {
+        "amp": 3e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00021,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00021,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00016,
+        "spread": 0.8
+      },
+      {
+        "amp": 9e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00018,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00015,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00026,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00012,
+        "spread": 0.8
+      },
+      {
+        "amp": 6e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 4e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00023,
+        "spread": 0.8
+      },
+      {
+        "amp": 7e-05,
+        "spread": 0.8
+      },
+      {
+        "amp": 0.00012,
+        "spread": 0.8
+      },
+      {
+        "amp": 4e-05,
+        "spread": 0.8
+      }
+    ],
+    "partialB": 8.139e-05,
+    "material": 0.37,
+    "performance": {
+      "envelopeAttack": 0.019,
+      "envelopeAttackSd": 0.7766,
+      "envelopeDecay": 0.9977,
+      "envelopeSustain": 0.1132,
+      "envelopeRelease": 0.7533,
+      "vibratoProb": 0.0,
+      "onsetScoopProb": 0.6522,
+      "onsetScoopDepthCents": 79.4036,
+      "onsetScoopDepthSd": 47.5721,
+      "onsetScoopSettleMs": 58.5488,
+      "onsetArticulationCorrelation": -0.0634,
+      "onsetPitchNotes": 23,
+      "lowToHighStaggerMs": -12.5
+    },
+    "source": "VSCO 2 CE",
+    "notesAnalysed": 23,
+    "resonances": [
+      {
+        "freq": 308.2,
+        "gain": 0.6658,
+        "width": 0.2048
+      },
+      {
+        "freq": 668.4,
+        "gain": 1.377,
+        "width": 0.2048
+      },
+      {
+        "freq": 865.2,
+        "gain": 0.8815,
+        "width": 0.2048
+      },
+      {
+        "freq": 1120.0,
+        "gain": 0.5731,
+        "width": 0.2048
+      },
+      {
+        "freq": 1876.5,
+        "gain": 0.04,
+        "width": 0.2048
+      },
+      {
+        "freq": 2428.9,
+        "gain": -0.5934,
+        "width": 0.2048
+      },
+      {
+        "freq": 3143.9,
+        "gain": -0.6541,
+        "width": 0.2048
+      },
+      {
+        "freq": 4069.5,
+        "gain": -0.7339,
+        "width": 0.2048
+      },
+      {
+        "freq": 5267.6,
+        "gain": -0.7165,
+        "width": 0.2048
+      },
+      {
+        "freq": 6818.3,
+        "gain": -1.1597,
+        "width": 0.2048
+      },
+      {
+        "freq": 8825.6,
+        "gain": -1.4756,
+        "width": 0.2048
+      }
+    ],
+    "resonancesFit": {
+      "lowestF0Hz": 41.2,
+      "reconstructionAmount": 1,
+      "roundTripShapeMaxDb": 0.005,
+      "bodyClampMaxDb": 0.0,
+      "method": "ensemble-rank-note-body-v3",
+      "splitHalfCorr": 0.867,
+      "peakHzA": 672.8,
+      "peakHzB": 522.3
+    },
+    "partialsByRegister": [
+      {
+        "f0": 41.203,
+        "partialB": 0.00010361,
+        "partials": [
+          {
+            "amp": 0.29586,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05086,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.13297,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03357,
+            "spread": 0.8
+          },
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04706,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.07373,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05744,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.07577,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.1816,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.25797,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.09172,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.07348,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05276,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02447,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01875,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.06369,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00345,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01121,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01912,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00215,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00938,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00252,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0041,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00243,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00429,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00127,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00295,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00288,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00346,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00156,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0056,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00222,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01552,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00099,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00096,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00079,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.00048,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00188,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00045,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00047,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00044,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00048,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00023,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00027,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 48.999,
+        "partialB": 8.139e-05,
+        "partials": [
+          {
+            "amp": 0.34843,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02923,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.24167,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.3267,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.69327,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.22857,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.17832,
+            "spread": 0.8
+          },
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00874,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.41544,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05362,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.35154,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.06397,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0333,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.1175,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01025,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04542,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01704,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00157,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03373,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03976,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0193,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00266,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00198,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02412,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00117,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00655,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00479,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00295,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.003,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00294,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00403,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00122,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00563,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00195,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00266,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00209,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00159,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00181,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 61.735,
+        "partialB": 1.45e-06,
+        "partials": [
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.15662,
+            "spread": 0.8
+          },
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.50963,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.14861,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.22875,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0759,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.42863,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04788,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0129,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04995,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05906,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00736,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01363,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0345,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00353,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02397,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00183,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01623,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00706,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00157,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01854,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00024,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00513,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00378,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00528,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0041,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0065,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00025,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00044,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00044,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.00118,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00121,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00488,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00074,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00045,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00032,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00027,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00028,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 73.416,
+        "partialB": 3.84e-05,
+        "partials": [
+          {
+            "amp": 0.032,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05054,
+            "spread": 0.8
+          },
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.28771,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01895,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.33019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0817,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04647,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.08023,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0117,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.07629,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00738,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.033,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01115,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00453,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01141,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00267,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00369,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00903,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00181,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01109,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01187,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00388,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00465,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00109,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0074,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00024,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00044,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00044,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00045,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00053,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00072,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00066,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.00036,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00064,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00031,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00023,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 87.307,
+        "partialB": 4.063e-05,
+        "partials": [
+          {
+            "amp": 0.54763,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.24473,
+            "spread": 0.8
+          },
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.2626,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00411,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.09507,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05771,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01893,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02532,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00075,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01526,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00934,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0076,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02197,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02599,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00121,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00994,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01602,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00025,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00654,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00132,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00274,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00034,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00113,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00051,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00541,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00607,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00448,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00058,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0005,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00089,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00116,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00037,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.00079,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00039,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00029,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00029,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00031,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00031,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0003,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 110.0,
+        "partialB": 0.0001908,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.61559,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.3882,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.40506,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.21584,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02243,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00392,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03053,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00924,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00821,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01422,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00283,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00541,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00076,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00086,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00042,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00025,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00059,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00036,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00034,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00027,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 130.813,
+        "partialB": 0.00025326,
+        "partials": [
+          {
+            "amp": 0.29333,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.09088,
+            "spread": 0.8
+          },
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00719,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04531,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00067,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01174,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00104,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00572,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00111,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00038,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00455,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00107,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00028,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00025,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00028,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00028,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0004,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00027,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00028,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00027,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00028,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 164.814,
+        "partialB": 0.00021976,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.13016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.68446,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.15689,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.07695,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00611,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05097,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01027,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03404,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01928,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00643,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01911,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00025,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00378,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00103,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00036,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00101,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00054,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00029,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 195.998,
+        "partialB": 0.00026856,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.08279,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.25969,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01901,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02143,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01253,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03006,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0134,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02504,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00753,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00291,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00137,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00094,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00058,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00035,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 246.942,
+        "partialB": 0.00027032,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03635,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.06314,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00748,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03883,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00882,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00563,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00385,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0029,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00188,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00095,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00154,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00036,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00026,
+            "spread": 0.8
+          },
+          {
+            "amp": 7e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 293.665,
+        "partialB": 1.813e-05,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05542,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.25584,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00873,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.13669,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00561,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02977,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00249,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0131,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00111,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00378,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00074,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00022,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 349.228,
+        "partialB": 0.00023383,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05393,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.09602,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00901,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00701,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01368,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00216,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00114,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00087,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00054,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00038,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 2e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 440.0,
+        "partialB": 3.399e-05,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01808,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.30185,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01492,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00927,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00794,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0131,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00111,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00069,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00047,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.744
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 523.251,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0361,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.07043,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.02235,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.06485,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0048,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00479,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00099,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00059,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 3e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 659.255,
+        "partialB": 0.00074672,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05232,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.50005,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.05098,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03048,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00164,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0078,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00054,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00054,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00029,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00059,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 8e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 6e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 5e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 4e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 783.991,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.73395,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.20715,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00714,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01684,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00247,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00915,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00071,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00171,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00087,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00127,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00058,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00054,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00024,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00023,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00019,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00023,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 987.767,
+        "partialB": 0.00063798,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.49088,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.12312,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04123,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01003,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00185,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00199,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00159,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00065,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0003,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00011,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00012,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 1174.659,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.45248,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.23305,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.03326,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0057,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00169,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00201,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00053,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00034,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 1396.913,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.13156,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.01459,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00429,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00473,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00295,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00027,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00026,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00014,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00013,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 1760.0,
+        "partialB": 0.00051095,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.16306,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00708,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00345,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00113,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00034,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0002,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00016,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 1975.533,
+        "partialB": 0.00010283,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.10949,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00208,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00505,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00196,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00058,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00049,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00042,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00039,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 2349.318,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.12087,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00347,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00603,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00021,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0001,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 9e-05,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      },
+      {
+        "f0": 2793.826,
+        "partialB": 0.0,
+        "partials": [
+          {
+            "amp": 1.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.04861,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00933,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00105,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00018,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00017,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.00015,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.744
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          },
+          {
+            "amp": 0.0,
+            "spread": 0.8
+          }
+        ]
+      }
+    ],
+    "attackByRegister": [
+      {
+        "f0": 41.203,
+        "envelopeAttack": 0.0419,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 48.999,
+        "envelopeAttack": 3.7475,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 61.735,
+        "envelopeAttack": 0.0469,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 73.416,
+        "envelopeAttack": 0.0369,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 87.307,
+        "envelopeAttack": 0.014,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 110.0,
+        "envelopeAttack": 0.0609,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 130.813,
+        "envelopeAttack": 0.0309,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 164.814,
+        "envelopeAttack": 0.015,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 195.998,
+        "envelopeAttack": 0.014,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 246.942,
+        "envelopeAttack": 0.018,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 293.665,
+        "envelopeAttack": 0.015,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 349.228,
+        "envelopeAttack": 0.016,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 440.0,
+        "envelopeAttack": 0.012,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 523.251,
+        "envelopeAttack": 0.008,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 659.255,
+        "envelopeAttack": 0.013,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 783.991,
+        "envelopeAttack": 0.02,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 987.767,
+        "envelopeAttack": 0.0359,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 1174.659,
+        "envelopeAttack": 0.019,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 1396.913,
+        "envelopeAttack": 0.0379,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 1760.0,
+        "envelopeAttack": 0.0259,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 1975.533,
+        "envelopeAttack": 0.02,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 2349.318,
+        "envelopeAttack": 0.01,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      },
+      {
+        "f0": 2793.826,
+        "envelopeAttack": 0.007,
+        "lowToHighStaggerMs": null,
+        "bandT90ms": {}
+      }
+    ],
+    "attackNoise": {
+      "level": 0.6,
+      "freq": 767.0,
+      "q": 0.98,
+      "decay": 0.199,
+      "measuredBandwidthHz": 454.0,
+      "measuredLevelRatio": 3.376
     }
   },
   "piano": {
