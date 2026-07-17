@@ -62,6 +62,9 @@ BOWED_FREE_PARAMS: dict[str, tuple[float, float, float]] = {
     "vibratoProb": (1.0, 0.0, 0.0),
     "vibratoDepth": (18.0, 40.0, 0.0),
     "vibratoRate": (5.5, 6.5, 0.0),
+    "onsetWanderCents": (0.0, 80.0, 0.0),
+    "onsetWanderSettlePeriods": (12.0, 24.0, 0.0),
+    "bowScratchLevel": (0.0, 1.0, 0.0),
 }
 
 

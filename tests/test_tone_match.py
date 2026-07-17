@@ -496,6 +496,18 @@ def test_fit_mode_zeros_human_draws_without_stripping_ship_craft():
     assert shipped["vibratoRateSd"] == .5
 
 
+def test_t031_bowed_controls_are_auditable_but_not_identity_fit_dimensions():
+    manifest = json.loads((
+        iterate_module.ROOT / "scripts/tone_match/manifest.json").read_text())
+    params = {"excitationType": "bow", "onsetWanderCents": 80,
+              "onsetWanderSettlePeriods": 18, "bowScratchLevel": 1}
+    keys = ["onsetWanderCents", "onsetWanderSettlePeriods", "bowScratchLevel"]
+    assert _params(manifest, params, keys, mode="fit") == []
+    assert {row.key for row in _params(manifest, params, keys, mode="ship")} == {
+        "onsetWanderCents", "onsetWanderSettlePeriods", "bowScratchLevel"}
+    assert _mode_params(params, "ship")["onsetWanderCents"] == 80
+
+
 def test_distributional_variation_gate_is_two_sided(monkeypatch):
     variability = {"status": "measured", "groups": [{
         "group": "same-note", "referenceIndices": [0],
