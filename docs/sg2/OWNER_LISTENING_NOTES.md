@@ -55,6 +55,45 @@ instrument's effective body equals its fitted bands. The horn improved
 despite this because its refit likely carries explicit `bodyBands` in
 params, bypassing the profile plumbing — verify that too.
 
+### L16 · Piano: envelope-anomalous frequencies — OWNER EXTRACTION PROTOCOL #2 (2026-07-17)
+Owner: "the piano specifically has resonances that have a different volume
+of attack and decay... characteristic frequencies that come out when the
+note is struck more forcefully, that are louder on the onset and decay
+more rapidly, in the higher end. Rather than isolating the characteristic
+frequency like we did in the bow sound, pull out certain
+frequencies/harmonics that have DIFFERENT ENVELOPE BEHAVIOURS to the
+baseline, and modulate the envelope for these frequencies or ranges."
+
+This is the envelope-domain sibling of L14 (which isolated a
+pitch-invariant SPECTRUM; this isolates envelope-behaviour-DEVIANT
+frequencies). Known physics candidates it should surface: hammer
+nonlinearity components, longitudinal/phantom modes (annex-deferred gap),
+duplex/aliquot strings, soundboard rings — all velocity-gated,
+onset-loud, fast-decaying, upper-spectrum.
+
+Protocol (struck lane = campaign owner; analysis lane = machinery;
+engine = consumer):
+1. Per-note, per-partial envelope tracks (onset peak, early decay rate,
+   late decay rate) — much already measured (bandT90, partial T60s).
+2. Fit the instrument's BASELINE envelope law (T60(f) + two-stage) and
+   compute each partial's/band's residual deviation from it.
+3. Classify systematically deviant frequencies: onset-boost magnitude,
+   excess decay rate, and their VELOCITY dependence (present/louder at
+   ff, reduced at pp — fit the gate curve, don't assume binary).
+4. Cross-note commonality determines the engine home: deviants at
+   FIXED Hz across notes → body/soundboard-class component; deviants by
+   HARMONIC RANK → excitation/hammer-class component. Do not guess —
+   the same separation logic as excitor/body deconvolution.
+5. Engine consumption: an envelope-deviation layer — per-partial or
+   per-band attack-boost × fast-decay envelope class, velocity-coupled,
+   neutral at 0, values PINNED from measurement (optimiser never
+   free-fits the class assignments).
+6. Extractor validated by synthetic round-trip before real data
+   (protocol §4 rule, as with L14).
+Applies beyond piano wherever envelope-anomalous components exist
+(guitar pick transients, harp near-board plucks) — mechanism transfers,
+values never (firewall).
+
 ### L14 · Violin still very bad — OWNER EXTRACTION PROTOCOL: isolate the bow sound as its own component
 Owner (2026-07-17), method prescribed in full: "find the bow sound,
 extract all the partials to have it as its own separate control. I
