@@ -2298,7 +2298,7 @@ sung=incorporated-cumulative-current-head-refinement. The source-cell refiner
 now starts from the selected fit's already-corrected joint-hull surface instead
 of silently resetting to the pass-07 calibration seed, and it relocates FIT
 renders after renderer-suffix quarantine while retaining every rejected-row
-reason. Fresh `c40eb906eba5422b` comparators improve required-cell partial
+reason. Fresh `de30a803305d06c4` comparators improve required-cell partial
 residual 5.803→5.697 tenor, 6.330→6.216 soprano, 5.642→5.393 bass and
 4.893→4.754 mezzo. Log-mel and band balance also improve in all four voices;
 construction and T-058 body/vowel consumption remain fully clean. No partial
@@ -2311,7 +2311,7 @@ Agent D's balanced clean-subset verdict remains the consumable room-residual
 decision: ten lossless, room-screened rows per adult voice carry the weighted
 observable, while historical room-like rows remain excluded watch evidence.
 The engine audit and all four ordinary identity audits were regenerated under
-renderer contract `c40eb906eba5422b`; `pitch_sync_breath_db` retains weight 1,
+renderer contract `de30a803305d06c4`; `pitch_sync_breath_db` retains weight 1,
 `voiceBreathSync` remains its responder, repeatability is stable and no
 weighted feature is uncontrolled.
 
