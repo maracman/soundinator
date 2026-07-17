@@ -49,9 +49,14 @@ DEFAULT_WEIGHTS = {
     "release_ring_ms": 0.0,
     "release_damp_db_per_s": 0.0,
     "release_noise_db": 0.0,
+    # T-067: commissioned sung observable.  Corpus activation remains zero
+    # until the lossless synthetic/engine/corpus gates and a fresh responder
+    # audit pass; keeping it in the score surface lets that audit prove the
+    # audio consumer instead of inspecting a parameter value.
+    "pitch_sync_breath_db": 0.0,
 }
 
-SCORER_CONTRACT_VERSION = "sg2-score-bowed-release-anchor-v7"
+SCORER_CONTRACT_VERSION = "sg2-score-pitch-sync-breath-v9"
 
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
@@ -205,6 +210,10 @@ PERCEPTUAL_UNITS = {
     "release_ring_ms": 100.0,
     "release_damp_db_per_s": 6.0,
     "release_noise_db": 3.0,
+    # The construction/activation bar is a 6 dB modulation prominence; use
+    # that same scale as one perceptual unit.  Sub-0.2 dB cross-context FFT
+    # variation then stays below the generic 0.05-unit repeatability floor.
+    "pitch_sync_breath_db": 6.0,
 }
 
 
@@ -229,6 +238,8 @@ class FeatureBundle:
     release_noise_db: float | None = None
     hold_decay_db_per_s: float | None = None
     hold_plateau_fraction: float | None = None
+    pitch_sync_breath_db: float | None = None
+    pitch_sync_breath: dict[str, Any] | None = None
 
 
 def hold_decay_metrics(samples: np.ndarray, sample_rate: int) -> dict[str, float] | None:
@@ -578,6 +589,7 @@ def extract_features(
     trust_expected_f0: bool = False,
     force_percussive: bool | None = None,
     release_expected: bool = False,
+    measure_pitch_sync_breath: bool = False,
 ) -> FeatureBundle:
     samples, sample_rate = load_mono(str(path))
     full_samples = samples
@@ -626,6 +638,11 @@ def extract_features(
         release_features = analyse_tail_samples(
             full_samples, sample_rate).get("releaseFeatures")
     hold_features = hold_decay_metrics(samples, sample_rate)
+    pitch_sync = None
+    if measure_pitch_sync_breath:
+        from .pitch_sync_breath import measure_pitch_sync_breath_samples
+        pitch_sync = measure_pitch_sync_breath_samples(
+            samples, sample_rate, note.f0)
     return FeatureBundle(note, partial_db, _resample_time(mel_db),
                          _resample_time(centroid)[0], sustain_noise_db, onset_tilt,
                          onset_noise_db, onset_noise_centroid_oct, noise_lead_ms,
@@ -643,7 +660,10 @@ def extract_features(
                          hold_decay_db_per_s=(hold_features or {}).get(
                              "slopeDbPerSecond"),
                          hold_plateau_fraction=(hold_features or {}).get(
-                             "plateauFraction"))
+                             "plateauFraction"),
+                         pitch_sync_breath_db=(pitch_sync or {}).get(
+                             "pitchSyncBreathDb"),
+                         pitch_sync_breath=pitch_sync)
 
 
 def _paired(values_a: dict, values_b: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -841,6 +861,10 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
             abs(render.release_noise_db - ref.release_noise_db)
             if ref.release_noise_db is not None and
             render.release_noise_db is not None else 0.0),
+        "pitch_sync_breath_db": (
+            abs(render.pitch_sync_breath_db - ref.pitch_sync_breath_db)
+            if ref.pitch_sync_breath_db is not None and
+            render.pitch_sync_breath_db is not None else 0.0),
     }
     normalized = {key: values[key] / PERCEPTUAL_UNITS[key] for key in values}
     active_weight = sum(weights[key] for key in values if weights[key] > 0)
@@ -946,15 +970,18 @@ def score_files(
         "piano", "grand-piano", "upright-piano", "piano-upright", "guitar", "guitar-nylon",
         "guitar-steel", "harp", "glockenspiel",
     }
+    sung = (instrument or "").strip().lower() in _SUNG_INSTRUMENTS
     ref = extract_features(ref_path, active_duration_s=context.get("durationSec"),
                            expected_f0_hz=expected_f0_hz,
                            trust_expected_f0=expected_f0_hz is not None,
-                           force_percussive=force_percussive)
+                           force_percussive=force_percussive,
+                           measure_pitch_sync_breath=sung)
     render = extract_features(
         render_path, active_duration_s=context.get("durationSec"),
         expected_f0_hz=expected_f0_hz,
         trust_expected_f0=expected_f0_hz is not None,
-        force_percussive=force_percussive)
+        force_percussive=force_percussive,
+        measure_pitch_sync_breath=sung)
     result = compare_features(ref, render, weights_for_instrument(instrument, weights))
     result["tripwires"] = quantitative_tripwires(ref, render, result, instrument)
     if instrument:

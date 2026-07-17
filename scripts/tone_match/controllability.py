@@ -189,6 +189,8 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
               objective_references: list[dict[str, Any]] | None = None,
               manifest_contract: list[dict[str, Any]] | None = None,
               manifest_document: dict[str, Any] | None = None,
+              weight_overrides: dict[str, float] | None = None,
+              activation_evidence: dict[str, Any] | None = None,
               ) -> dict[str, Any]:
     free_params = free_params or BOWED_FREE_PARAMS
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -231,6 +233,10 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     _render_batch(jobs, repo_root)
 
     struck = instrument.strip().lower() in STRUCK_INSTRUMENTS
+    sung = instrument.strip().lower() in {
+        "soprano", "mezzo-soprano", "tenor", "bass",
+        "voice-soprano", "voice-mezzo", "voice-tenor", "voice-bass",
+    }
 
     def analysis_kwargs(ref: dict[str, Any]) -> dict[str, Any]:
         expected = ref.get("expectedF0Hz")
@@ -241,11 +247,12 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             **({"trust_expected_f0": True, "force_percussive": True}
                if struck else {}),
             "release_expected": bool(ref.get("releaseEligible")),
+            "measure_pitch_sync_breath": sung,
         }
 
     ref_bundles = [extract_features(ref["path"], **analysis_kwargs(ref))
                    for ref in references]
-    weights = weights_for_instrument(instrument)
+    weights = weights_for_instrument(instrument, weight_overrides)
     render_cache: dict[tuple[str, int], Any] = {}
 
     def render_bundle(name: str, ref_index: int):
@@ -426,6 +433,7 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
                  _canonical_hash(baseline_params["humanRanges"])
                  if isinstance(baseline_params.get("humanRanges"), dict)
                  else None),
+             "activationEvidence": activation_evidence,
              "manifest": manifest_contract,
              "startingWeights": weights,
              "finalWeights": final_weights,
@@ -491,6 +499,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="comma-separated free keys; defaults by instrument family")
     parser.add_argument("--ship-human", type=float,
                         help="override calibrated SHIP Human before hashing the baseline")
+    parser.add_argument("--pitch-sync-breath-engine-audit", type=Path)
+    parser.add_argument("--pitch-sync-breath-corpus-audit", type=Path)
+    parser.add_argument("--pitch-sync-breath-only", action="store_true",
+                        help="run the evidence-gated T-067 activation responder audit")
     args = parser.parse_args(argv)
     references = json.loads(args.references.read_text())
     campaign_seed = json.loads(args.initial.read_text())
@@ -522,6 +534,59 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         parser.error(f"no perturbation specification for: {', '.join(unknown)}")
     free_params = {key: available[key] for key in keys}
+    weight_overrides = None
+    activation_evidence = None
+    evidence_requested = bool(args.pitch_sync_breath_engine_audit or
+                              args.pitch_sync_breath_corpus_audit)
+    if evidence_requested:
+        if not (args.pitch_sync_breath_engine_audit and
+                args.pitch_sync_breath_corpus_audit):
+            parser.error("pitch-sync breath activation requires both engine and corpus audits")
+        engine_evidence = json.loads(
+            args.pitch_sync_breath_engine_audit.read_text())
+        corpus_evidence = json.loads(
+            args.pitch_sync_breath_corpus_audit.read_text())
+        expected_voice = {
+            "voice-mezzo": "mezzo-soprano",
+            "voice-soprano": "soprano",
+            "voice-tenor": "tenor",
+            "voice-bass": "bass",
+        }.get(args.instrument.strip().lower(), args.instrument.strip().lower())
+        evidence_errors = []
+        if (engine_evidence.get("status") != "pass" or
+                not all(engine_evidence.get("checks", {}).values())):
+            evidence_errors.append("engine partial-muted octave audit is not pass")
+        from .iterate import _renderer_contract_hash
+        current_renderer = _renderer_contract_hash(args.repo_root)
+        if engine_evidence.get("rendererContractHash") != current_renderer:
+            evidence_errors.append(
+                "engine pitch-sync audit is bound to a stale renderer")
+        if corpus_evidence.get("status") != "pass":
+            evidence_errors.append("lossless corpus audit is not pass")
+        if corpus_evidence.get("voiceClass") != expected_voice:
+            evidence_errors.append("corpus audit belongs to another voice")
+        if corpus_evidence.get("syntheticGate", {}).get("status") != "pass":
+            evidence_errors.append("synthetic AM-noise gate is not pass")
+        if evidence_errors:
+            parser.error("invalid pitch-sync breath evidence: " +
+                         "; ".join(evidence_errors))
+        weight_overrides = {"pitch_sync_breath_db": 1.0}
+        activation_evidence = {
+            "feature": "pitch_sync_breath_db",
+            "engineAudit": str(args.pitch_sync_breath_engine_audit),
+            "engineAuditHash": _canonical_hash(engine_evidence),
+            "corpusAudit": str(args.pitch_sync_breath_corpus_audit),
+            "corpusAuditHash": _canonical_hash(corpus_evidence),
+            "roomSuspectedRowsExcluded": corpus_evidence.get(
+                "roomSuspectedRows", 0),
+        }
+    if args.pitch_sync_breath_only:
+        if not evidence_requested:
+            parser.error("--pitch-sync-breath-only requires engine and corpus audits")
+        if keys != ["voiceBreathSync"]:
+            parser.error("--pitch-sync-breath-only requires --keys voiceBreathSync")
+        weight_overrides = {key: 0.0 for key in DEFAULT_WEIGHTS}
+        weight_overrides["pitch_sync_breath_db"] = 1.0
     manifest_document = json.loads(args.manifest.read_text())
     contract = _manifest_contract(manifest_document, baseline, keys)
     seen: dict[str, dict[str, Any]] = {}
@@ -556,7 +621,9 @@ def main(argv: list[str] | None = None) -> int:
                       args.repo_root, free_params=free_params,
                       objective_references=objective_references,
                       manifest_contract=contract,
-                      manifest_document=manifest_document)
+                      manifest_document=manifest_document,
+                      weight_overrides=weight_overrides,
+                      activation_evidence=activation_evidence)
     audit["legacyPrior"] = legacy_prior
     audit["auditReferenceSelectionRejects"] = analysis_rejects
     (args.output / "controllability.json").write_text(
