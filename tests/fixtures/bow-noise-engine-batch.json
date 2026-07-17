@@ -1,0 +1,18 @@
+[
+  {
+    "paramsFile": "tests/fixtures/bow-noise-engine-mixed.json",
+    "midi": 69,
+    "velocity": 0.62,
+    "durationSec": 3,
+    "sampleRate": 48000,
+    "out": "/private/tmp/sg2/bow-noise-l14/engine-mixed.wav"
+  },
+  {
+    "paramsFile": "tests/fixtures/bow-noise-engine-harmonic-only.json",
+    "midi": 69,
+    "velocity": 0.62,
+    "durationSec": 3,
+    "sampleRate": 48000,
+    "out": "/private/tmp/sg2/bow-noise-l14/engine-harmonic-only.wav"
+  }
+]

@@ -11147,6 +11147,198 @@ export const MEASURED_PROFILES = {
       "decay": 0.155,
       "measuredBandwidthHz": 648.0,
       "measuredLevelRatio": 0.015
+    },
+    "bowNoise": {
+      "method": "f0 harmonic subtraction + same-dynamic/string cross-pitch median",
+      "source": "Iowa MIS lossless AIFF only",
+      "bandHz": [
+        200.0,
+        14400.0
+      ],
+      "profilePinned": true,
+      "profile": [
+        {
+          "freqHz": 200.0,
+          "gainDb": -2.551
+        },
+        {
+          "freqHz": 224.5,
+          "gainDb": -2.949
+        },
+        {
+          "freqHz": 252.0,
+          "gainDb": 0.912
+        },
+        {
+          "freqHz": 282.8,
+          "gainDb": 9.638
+        },
+        {
+          "freqHz": 317.5,
+          "gainDb": 3.582
+        },
+        {
+          "freqHz": 356.4,
+          "gainDb": 3.43
+        },
+        {
+          "freqHz": 400.0,
+          "gainDb": 6.6
+        },
+        {
+          "freqHz": 449.0,
+          "gainDb": 9.712
+        },
+        {
+          "freqHz": 504.0,
+          "gainDb": -2.268
+        },
+        {
+          "freqHz": 565.7,
+          "gainDb": 5.849
+        },
+        {
+          "freqHz": 635.0,
+          "gainDb": 0.23
+        },
+        {
+          "freqHz": 712.7,
+          "gainDb": -0.294
+        },
+        {
+          "freqHz": 800.0,
+          "gainDb": 6.962
+        },
+        {
+          "freqHz": 898.0,
+          "gainDb": 2.414
+        },
+        {
+          "freqHz": 1007.9,
+          "gainDb": 3.055
+        },
+        {
+          "freqHz": 1131.4,
+          "gainDb": 4.069
+        },
+        {
+          "freqHz": 1269.9,
+          "gainDb": -7.533
+        },
+        {
+          "freqHz": 1425.4,
+          "gainDb": -1.174
+        },
+        {
+          "freqHz": 1600.0,
+          "gainDb": -1.008
+        },
+        {
+          "freqHz": 1795.9,
+          "gainDb": -0.192
+        },
+        {
+          "freqHz": 2015.9,
+          "gainDb": 1.369
+        },
+        {
+          "freqHz": 2262.7,
+          "gainDb": 5.819
+        },
+        {
+          "freqHz": 2539.8,
+          "gainDb": 4.168
+        },
+        {
+          "freqHz": 2850.9,
+          "gainDb": 2.912
+        },
+        {
+          "freqHz": 3200.0,
+          "gainDb": 0.355
+        },
+        {
+          "freqHz": 3591.9,
+          "gainDb": -1.125
+        },
+        {
+          "freqHz": 4031.7,
+          "gainDb": -0.407
+        },
+        {
+          "freqHz": 4525.5,
+          "gainDb": -5.068
+        },
+        {
+          "freqHz": 5079.7,
+          "gainDb": -3.589
+        },
+        {
+          "freqHz": 5701.8,
+          "gainDb": -10.453
+        },
+        {
+          "freqHz": 6400.0,
+          "gainDb": -7.618
+        },
+        {
+          "freqHz": 7183.8,
+          "gainDb": -8.174
+        },
+        {
+          "freqHz": 8063.5,
+          "gainDb": -13.718
+        },
+        {
+          "freqHz": 10159.4,
+          "gainDb": -15.452
+        },
+        {
+          "freqHz": 11403.5,
+          "gainDb": -14.648
+        },
+        {
+          "freqHz": 12800.0,
+          "gainDb": -17.406
+        },
+        {
+          "freqHz": 14367.5,
+          "gainDb": -19.5
+        }
+      ],
+      "levelLaw": {
+        "model": "amplitude = bowNoiseLevel * velocity ** bowNoiseVelocityExponent",
+        "velocityExponent": 0.9309,
+        "interceptNoisePowerDbAtVelocity1": -56.847,
+        "fitRmseDb": 2.061,
+        "rungs": [
+          {
+            "dynamic": "pp",
+            "velocity": 0.2,
+            "noisePowerDb": -69.134,
+            "noiseToHarmonicDb": -24.042
+          },
+          {
+            "dynamic": "mf",
+            "velocity": 0.62,
+            "noisePowerDb": -63.52,
+            "noiseToHarmonicDb": -28.725
+          },
+          {
+            "dynamic": "ff",
+            "velocity": 0.92,
+            "noisePowerDb": -55.44,
+            "noiseToHarmonicDb": -27.727
+          }
+        ]
+      },
+      "engineContract": {
+        "component": "bowNoise",
+        "bodyRouting": 1,
+        "userControl": "bowNoiseLevel",
+        "shapeOptimiserMutable": false,
+        "velocityLaw": "amplitude = bowNoiseLevel * velocity ** bowNoiseVelocityExponent"
+      }
     }
   },
   "voice-bass": {
