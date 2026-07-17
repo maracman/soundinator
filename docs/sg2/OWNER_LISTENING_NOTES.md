@@ -90,6 +90,21 @@ Requirements:
 4. Preset-level activation assertion (per the violin L14 lesson): a
    preset whose profile carries a pinned pre-onset component must emit
    it audibly in ship-mode — never silent-by-default.
+5. **Each component has its OWN ENVELOPE (owner addendum, 2026-07-17):
+   "the blown sound as well as the string sound would have its own
+   envelope properties."** The component's temporal shape — pre-onset
+   swell, peak placement relative to tone onset, settle-to-floor, and
+   its own release — is FITTED from the references per component per
+   instrument (the same envelope-track machinery as L16), never merely
+   slaved to the harmonic tone's ADSR. T-001's airflow-coupling
+   (component follows the amplitude envelope) becomes ONE TERM of the
+   fitted component envelope, not the whole law: bow scratch peaks at
+   lock-in then settles; breath leads, swells, and rides; piano action
+   noise is a self-contained transient. Extraction therefore emits
+   spectrum + level law + ENVELOPE SHAPE per component; the engine
+   consumer must support an independent per-component envelope; the
+   activation assertion (item 4) checks the envelope is applied, not
+   just the level.
 
 ### L16 · Piano: envelope-anomalous frequencies — OWNER EXTRACTION PROTOCOL #2 (2026-07-17)
 Owner: "the piano specifically has resonances that have a different volume
