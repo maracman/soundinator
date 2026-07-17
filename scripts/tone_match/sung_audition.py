@@ -86,6 +86,26 @@ def _consume_audit(path: Path, voice_class: str, references: list[dict]) -> dict
     return audit
 
 
+def _body_audit_params(fit_params: dict, *, bypass: bool = False) -> dict:
+    """Build a paired T-058 intervention with downstream confounds neutral.
+
+    The full FIT render retains partial transfer and fitted noise because they
+    belong to identity scoring. Partial transfer is scheduled after body gain,
+    though, so it can distort the ratio of two full-chain renders. The paired
+    intervention holds the measured source surface fixed and neutralises only
+    downstream/non-harmonic terms while testing the emitted body law.
+    """
+    return {
+        **fit_params,
+        "bodyBands": [] if bypass else fit_params.get("bodyBands", []),
+        "partialTransfer": 0.0,
+        "toneBreath": 0.0,
+        "attackNoiseLevel": 0.0,
+        "vibratoProb": 0.0,
+        "spectralCullThreshold": 0.0001,
+    }
+
+
 def build(
     references_path: Path,
     fit_root: Path,
@@ -140,9 +160,12 @@ def build(
     for index, row in enumerate(selected):
         params = json.loads((fit_root / f"initial-{row['vowel']}.json").read_text())
         fit_params = params_for_mode(params, "fit")
-        bypass_params = {**fit_params, "bodyBands": []}
+        body_audit_params = _body_audit_params(fit_params)
+        bypass_params = _body_audit_params(fit_params, bypass=True)
         ship_params = params_for_mode(params, "ship", seed=ship_seed_base + index)
         fit_out = fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
+        body_audit_out = (fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}-body-audit-v2.wav"
+                          if row["register"] in {"low", "mid"} else None)
         bypass_out = (fit_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}-body-bypass.wav"
                       if row["register"] in {"low", "mid"} else None)
         ship_out = ship_renders / f"{index:03d}-{row['register']}_{row['dynamic']}_{row['vowel']}.wav"
@@ -154,6 +177,15 @@ def build(
             "sampleRate": row.get("sampleRate", 44100),
             "out": str(fit_out),
         })
+        if body_audit_out is not None:
+            jobs.append({
+                "params": body_audit_params,
+                "midi": row["midi"],
+                "velocity": row["velocity"],
+                "durationSec": row["durationSec"],
+                "sampleRate": row.get("sampleRate", 44100),
+                "out": str(body_audit_out),
+            })
         if bypass_out is not None:
             jobs.append({
                 "params": bypass_params,
@@ -179,6 +211,7 @@ def build(
             "dynamic": row["dynamic"],
             "reference": row["path"],
             "fitRender": str(fit_out),
+            "bodyAuditRender": str(body_audit_out) if body_audit_out is not None else None,
             "bodyBypassRender": str(bypass_out) if bypass_out is not None else None,
             "render": str(fit_out if scoring_only else ship_out),
             "shipSeed": ship_seed_base + index,
@@ -223,18 +256,20 @@ def build(
                 "fittedFormantsHz": vowel_bodies[row["vowel"]]["formantsHz"][:2],
             }
             try:
-                if rendered is None:
-                    raise ValueError(render_error or "body render analysis unavailable")
+                body_audit = extract_features(
+                    trial["bodyAuditRender"], active_duration_s=row["durationSec"],
+                    expected_f0_hz=row["expectedF0Hz"],
+                )
                 bypass = extract_features(
                     trial["bodyBypassRender"], active_duration_s=row["durationSec"],
                     expected_f0_hz=row["expectedF0Hz"],
                 )
                 common_mask = (
-                    np.asarray(rendered.note.partial_snr_ok, dtype=bool)
+                    np.asarray(body_audit.note.partial_snr_ok, dtype=bool)
                     & np.asarray(bypass.note.partial_snr_ok, dtype=bool)
                 )
                 transfer.update(compare_rendered_vowel_body_transfer(
-                    rendered.note.partial_amps,
+                    body_audit.note.partial_amps,
                     bypass.note.partial_amps,
                     common_mask,
                     f0_hz=row["expectedF0Hz"],
@@ -242,7 +277,7 @@ def build(
                     amount=1.0,
                 ))
                 transfer["classifier"] = classify_rendered_vowel_body_transfer(
-                    rendered.note.partial_amps,
+                    body_audit.note.partial_amps,
                     bypass.note.partial_amps,
                     common_mask,
                     f0_hz=row["expectedF0Hz"],

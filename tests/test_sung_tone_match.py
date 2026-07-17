@@ -7,7 +7,7 @@ import pytest
 from scripts.tone_match.assertions import normalize_instrument
 from scripts.tone_match.controllability import objective_contract_hash
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION
-from scripts.tone_match.sung_audition import _consume_audit
+from scripts.tone_match.sung_audition import _body_audit_params, _consume_audit
 from scripts.tone_match.sung_features import (
     SungObservation,
     classify_rendered_vowel_body_transfer,
@@ -48,6 +48,9 @@ from scripts.tone_match.sung_source_tables import (
     synthetic_round_trip,
 )
 from scripts.tone_match.sung_source_audit import AUDIT_DURATION_SEC, summarize_responses
+from scripts.tone_match.sung_breath import (
+    synthetic_round_trip as breath_synthetic_round_trip,
+)
 from scripts.tone_match.sung_prior import (
     LEGACY_VOCAL_CRAFT,
     LEGACY_VOCAL_PRIOR_HASH,
@@ -74,6 +77,35 @@ def test_register_prior_straddles_passaggio():
     assert register_for_f0("tenor", 260) == "mid"
     assert register_for_f0("tenor", 330) == "mid"
     assert register_for_f0("tenor", 440) == "high"
+
+
+def test_paired_vowel_body_audit_neutralises_downstream_transfer_and_noise():
+    params = {
+        "bodyBands": [{"freq": 700, "gain": 1.2, "width": .2}],
+        "spectralPartialsByRegisterDynamic": {"rows": [{"f0Hz": 220}]},
+        "partialTransfer": .3,
+        "toneBreath": .2,
+        "attackNoiseLevel": .4,
+        "vibratoProb": .8,
+    }
+    body = _body_audit_params(params)
+    bypass = _body_audit_params(params, bypass=True)
+    assert body["bodyBands"] == params["bodyBands"]
+    assert bypass["bodyBands"] == []
+    assert body["spectralPartialsByRegisterDynamic"] is \
+        params["spectralPartialsByRegisterDynamic"]
+    for key in ("partialTransfer", "toneBreath", "attackNoiseLevel",
+                "vibratoProb"):
+        assert body[key] == bypass[key] == 0.0
+
+
+def test_pitch_sync_breath_synthetic_round_trip_meets_t067_tolerances():
+    result = breath_synthetic_round_trip()
+    assert result["passed"]
+    assert result["measured"]["peakErrorPercent"] <= 2
+    assert result["prominenceErrorDb"] <= 1
+    assert result["measured"]["pitch_sync_breath_db"] == \
+        result["measured"]["pitchSyncBreathDb"]
 
 
 def test_standard_section_voice_classes_are_first_class():
