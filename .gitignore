@@ -33,3 +33,4 @@ web/data/global_presets.json
 *.db-shm
 !web/data/.gitkeep
 exports/
+/sg2-data/

@@ -301,7 +301,7 @@ fundamental; an anchor >50 cents from every candidate fails loudly. Until this
 lands, all affected controllability features are zero-weight watch metrics and
 the campaign status is `blocked-analysis`.
 Affects: analyse_note/analysis.py feature extraction / controllability / B and bar-mode gates.
-Status: engine=n/a analysis=incorporated b68d67f (expectedF0Hz anchor: harmonic-family candidate within 50 cents, loud failure otherwise, f0_unconstrained provenance; plumbed through analysis.py + score.extract_features; consuming tests) struck/plucked=adapted (reference manifests log every nominal fallback; fitter refuses the blocked audit)
+Status: engine=n/a analysis=incorporated b68d67f (expectedF0Hz anchor: harmonic-family candidate within 50 cents, loud failure otherwise, f0_unconstrained provenance; plumbed through analysis.py + score.extract_features; consuming tests) struck/plucked=incorporated (campaign and measured-profile generation trust declared single-note pitch; regenerated nylon anchors are 82.407/195.998/659.255 Hz; profile-v2 pass improved raw error 19.82% and active failures 16→14)
 
 ### T-021 · Coupled-polarisation beating is an opt-in two-mode law
 Author: struck/plucked lane · 2026-07-16 · Firewall: mechanism; values per instrument
@@ -440,7 +440,7 @@ corner by 20-30% pp->ff and the n>=8:n<=4 energy ratio by >=3 dB; 4 ms is
 darker than 1 ms at equal f0; bow/blow are bit-identical. Scorer adds
 onset-corner velocity slope only after this control crosses audit threshold.
 Affects: excitationSpectrum/hardness consumer / register profile schema / G7 assertions.
-Status: engine=pending analysis=adapted (T-025 audio assertion retained) struck/plucked=incorporated
+Status: engine=pending analysis=adapted (T-025 audio assertion retained) struck/plucked=adapted (profile-v2 pass preserves dynamic-brightening slope 0.415 at the fitted static tilt; T-028 remains required to fit velocity/contact colour independently of the shared spectrum)
 
 ### T-029 · ENGINE SPEC (URGENT): body gain must track instantaneous frequency under FM
 Author: bowed lane · 2026-07-16 · Firewall: mechanism (all bodied instruments)
@@ -551,9 +551,44 @@ table set + per-string B/damping when present. Headless assertion: with
 per-string tables present, the same midi under two sul selections
 differs in high-band energy in the direction the tables encode; absent
 tables => bit-identical fallback.
+Guitar consuming extension (Agent C, pass 08): `partialsByString` uses
+unambiguous course keys `string6`..`string1` (standard open MIDI
+40/45/50/55/59/64). `stringSelect` is the enum
+`auto|string6|string5|string4|string3|string2|string1`, default `auto`.
+For `auto`, consider courses whose open MIDI is <= the requested MIDI and
+whose fret is <= 24, choose the minimum fret, and break ties toward the
+lower-pitched course. An explicit course outside that playable interval is
+invalid rather than silently falling back. Each course entry may override
+the existing bounded `partials`, `partialB`, and material/decay fields; a
+missing entry consumes the pooled profile bit-identically. Headless
+assertions: (1) E4 auto selects open `string1`; (2) an explicit playable
+course consumes its own table; (3) two synthetic course tables with opposite
+high-band tilt move rendered n>=8/n<=4 energy by at least 3 dB in the encoded
+direction at the same MIDI; (4) absent course tables are bit-identical to the
+current pooled renderer; (5) an unplayable explicit course is rejected.
+Analysis consuming assertion: a course-labelled reference can contribute
+only to its matching course table, and pooled fallback is emitted only when
+course coverage is below the declared minimum.
 Affects: partialsByRegister schema / engine table selection / WP-6 morph
 axis (SWAM exposes Alternate Fingering).
-Status: engine=pending analysis=pending b68d67f (storage lands with the first per-string fit next pass) struck/plucked=adapted (guitar strings and harp material zones need identity tables; bow-specific sul-selection semantics do not transfer)
+Analysis implementation (Agent C): the committed fitter groups guitar notes
+by the exact `auto` course law before aggregation and emits
+`partialsByString` arrays only with at least two notes of coverage. The nylon
+profile now carries `string6` E2, `string3` G3, and `string1` E5 tables
+(p/f evidence each); the JS profile generator preserves them. Campaign
+references carry the same course labels and floor groups. Consuming tests
+prove E2/G3 course spectra cannot pool into one another, sparse courses omit
+cleanly, and the strict corpus contract rejects audio not declared by the
+provenance snapshot.
+Nylon evidence: correcting stale profile-derived attack anchors reopened the
+search. Pass 09 improved `3.477841→3.317939` (4.60%); pass 10 improved the
+same stable objective to `3.317250`; pass 11 improved its decay-stable
+objective `3.163714→3.152017`; pass 12's fully repeat-stable objective
+improved `4.011533→3.723190` (7.19%) and active failures `15→14`. Pass 13
+then failed to beat the comparable stable-objective leader
+(`3.378844 > 3.317250`) after all seven global controls, while all six mel
+cells remained above bar. Construction is 11/11 and resources pass.
+Status: engine=pending (guitar extension above is ready for one-pass consumption) analysis=incorporated (course-labelled storage, generator, corpus atomicity and consuming tests) struck/plucked=blocked-engine T-033 (resume from durable accepted pass-12 full-objective state after consumer lands)
 
 ### T-034 · ENGINE SPEC (small): dynamic pitch flattening for bowed forte
 Author: bowed lane · 2026-07-16 · Firewall: mechanism; value fitted per instrument; INSTRUMENT physics, not Human
@@ -627,9 +662,10 @@ B=0 versus 20-cent upper-mode stretch fails; ordinary non-zero B still uses
 the factor gate; the violin baseline no longer names B as dominant merely
 because the denominator is zero.
 Affects: score.extract_features / tripwires inharmonicity bar / residual ranking.
-Status: analysis=incorporated (cents-floor scorer and canonical tripwire
-consumer assertions; isolated violin pass changes two B cells fail→pass)
-bowed=incorporated engine=n/a struck/plucked=incorporated
+Status: analysis=incorporated (shared cents-floor scorer and canonical
+tripwire consumer assertions landed from Agent C; the isolated violin pass
+changes two B cells fail→pass) bowed=incorporated engine=n/a
+struck/plucked=incorporated
 
 ### T-038 · Bow attack calibration separates amplitude rise from lock-in
 Author: Agent D / analysis · 2026-07-16 · Firewall: mechanism + method; values per instrument
@@ -711,15 +747,21 @@ escalation required
 Author: Agent C / struck-plucked · 2026-07-16 · Firewall: method-only
 Finding: Chromium offline renders with identical parameters may differ by
 one 16-bit PCM step. The audio delta is inaudible, but thresholded feature
-estimators can amplify it into material loss changes. Every distinct audit
-baseline is rendered twice more. A feature whose repeat distance crosses the
-same mean/peak controllability threshold is zero-weighted as a watch metric
-before fitting. Audit schema v2 carries the repeatability matrix and
-unstable-feature list; schema-v1 audits are invalid consumers. The optimizer
-also caches exact duplicate parameter vectors.
-Consuming assertions: schema v1 is rejected; unstable features cannot retain
-weight; exact duplicates return the cached objective; stable features remain
-eligible; tripwire hard gates consume the same final weights as the loss.
+estimators can amplify it into material loss changes (observed on nylon
+guitar inharmonicity and decay). Every distinct audit baseline is therefore
+rendered twice more. A feature whose repeat distance crosses the same
+mean/peak controllability threshold is zero-weighted as a watch metric before
+fitting. Audit schema v3 carries the repeatability matrix plus hashes of the
+references, free-parameter manifest, initial preset, scorer contract, and
+renderer/profile bytes; older audits are invalid consumers. The optimizer
+also caches exact duplicate parameter vectors so Powell cannot score the same
+point twice.
+Consuming assertions: a pre-v3 audit is rejected; changes to synth.js,
+measured_profiles.js, render_note.mjs, or the initial preset invalidate the
+audit; a repeat-unstable feature cannot retain positive weight; exact duplicate
+candidate vectors return the cached objective without another render; stable
+features remain eligible; the objective hash changes when weights or renderer
+contract change; tripwire hard gates consume the same final weights as the loss.
 Violin resolution: the checkout-isolated audit is stable (largest mean
 0.001503, largest peak 0.005839 against threshold 0.05), so no feature is
 quarantined. A non-isolated false quarantine was superseded after port 8765
@@ -728,7 +770,8 @@ Role-aware update: the later accepted-seed audit found inharmonicity unstable
 at 0.0163 mean / 0.0844 peak, so that distinct objective correctly
 quarantines it as a watch metric. Quarantine is baseline-specific evidence,
 not a permanent instrument-wide label.
-Affects: controllability.py / iterate.py / tripwires.py / objective IDs.
+Affects: controllability.py / iterate.py / tripwires.py / objective IDs /
+every family.
 Status: analysis=incorporated struck/plucked=incorporated bowed=incorporated
 engine=n/a
 

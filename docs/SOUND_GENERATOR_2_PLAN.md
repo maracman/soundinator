@@ -105,6 +105,16 @@ boundary in code: everything after the per-partial oscillator sum
 - **Coordinate with layer unification**: before starting a UI-touching WP
   (WP-10, S1/S2), check which layer-unification WPs are mid-flight in the
   same app.js regions and sequence rather than collide.
+- **Durable artifact storage (2026-07-16 INCIDENT rule)**: /private/tmp
+  was reaped twice, destroying the sample corpus, all blown reference
+  sets, leaderboards, and run state. ALL SG2 artifacts (corpus,
+  campaign references, leaderboards, run reports, best params, renders)
+  now live under `<repo>/sg2-data/` (gitignored; env override
+  `SG2_DATA`). Nothing campaign-critical may be written under /tmp or
+  /private/tmp, including git worktrees — put worktrees under the
+  project directory. Leaderboards and best.json params additionally get
+  copied into `sg2-data/state/` on every freeze (cheap JSON — this is
+  the best-so-far-is-sacred backstop).
 - **Shared-branch integration cadence (owner, 2026-07-16)**: the shared
   SG2 branch is the single integration point and must advance. Every
   agent merges its green, landed work to the shared branch AT LEAST once
@@ -353,6 +363,60 @@ the target. Rules:
   preset, and the loop can always be resumed from it — so re-running the
   loop is always safe and always additive.
 
+### 2.4c Strongest-prior initialisation and the sterility bias (owner, 2026-07-17 — MANDATORY)
+
+Root-caused after every campaign independently converged on sterile,
+toy-synth renders (violin/tenor bests carried Human 0, no envelope, no
+breath, no onset noise):
+
+1. **Initialise from the strongest known sound, never from neutral.**
+   Every campaign preset starts as: the LEGACY factory preset + measured
+   profile + SPECTRAL_PERFORMANCE craft defaults (the pre-SG2 sound that
+   passed owner ears for two years), overlaid with campaign-pinned
+   measurements. Evidence rules govern what may MOVE and which NEW laws
+   may enable — they never zero legacy craft parameters. Absence of
+   corpus evidence for a legacy parameter means KEEP THE LEGACY VALUE.
+   T-008 neutrality applies to new mechanisms only.
+1b. **The legacy prior is a LOOKUP, not a judgement call.** Anchor: git
+   tag `sg2-legacy` (e8d3ac1). Each campaign takes its prior from this
+   table — the CRAFT layer (SPECTRAL_PERFORMANCE envelope/vibrato/Human/
+   attack-noise idioms + excitation-type defaults) always comes from the
+   named legacy source; spectral/body content comes from the campaign's
+   own fits (legacy tables serve as spectral fallback only for the eight
+   true-legacy instruments). Every run report names its prior row and
+   the resolved parameter hash. An instrument not in this table =
+   owner escalation, never a guess.
+
+   | Campaign instrument | Legacy prior at `sg2-legacy` | Notes |
+   |---|---|---|
+   | violin, cello, flute, clarinet, trumpet, trombone | its own legacy preset | TRUE legacy — full prior incl. spectral fallback |
+   | piano-grand | legacy `piano` | TRUE legacy |
+   | piano-upright | legacy `piano` craft; fitted upright tables/B | pair-morph target of grand |
+   | guitar-nylon, guitar-steel | legacy `piano` craft adapted to pluck (engine pluck-type defaults at anchor) | no true legacy guitar |
+   | harp | legacy `piano` craft, pluck defaults | |
+   | glockenspiel (+ marimba/xylo/vibes interims) | legacy `piano` craft, strike defaults, `bar` class | short-envelope percussion idiom |
+   | alto sax (+ tenor when sourced) | legacy `clarinet` craft (reed) | spectral from fitted only |
+   | french-horn | legacy `trombone` craft (brass) | |
+   | voice-soprano/mezzo/tenor/bass | legacy `vocal` craft (incl. formant-era vibrato/breath idioms); per-vowel fitted bodies on top | one prior for all four classes |
+   | basso profondo, boy soprano | DERIVED from fitted bass / adult voices (§9 d.2, d.12) — their prior is the fitted parent, not sg2-legacy | |
+
+2. **Legacy is leaderboard entry #1.** Score the legacy preset under the
+   current objective as every campaign's founding baseline. A "best"
+   that loses to legacy — on composite OR owner ear — is not a best.
+   Campaigns ship improvements over the legacy sound or nothing.
+3. **The sterility bias is a named objective defect**: scoring against a
+   single take rewards Human→0 (randomness adds loss variance). Split
+   modes: FIT-MODE may hold Human/variation at 0 for deterministic
+   spectral fitting; SHIP-MODE (leaderboard entries, listening-page
+   renders, frozen presets) carries the full performance layer — legacy
+   or §2.5c-fitted Human, envelope idiom, onset noise, breath/bow noise,
+   vibrato trajectory. A shipping preset with Human 0 or a missing
+   craft layer is a DEFECT unless the instrument is mechanical.
+   Listening-page renders are always ship-mode.
+4. Where the scorer cannot yet measure a craft parameter, it rides along
+   at its legacy/fitted value as a watch dimension — it is never
+   optimised to zero by omission.
+
 ### 2.5c Humanisation calibration — take-pair differential fitting (owner, 2026-07-16)
 
 Where the corpus holds matched takes (same instrument, note, dynamic,
@@ -385,6 +449,20 @@ stopping floor (§2.5). Additionally:
 5. **Research payoff**: Human becomes a calibrated stimulus dimension —
    per-note imperfection draws are measured player variation in physical
    units, directly usable in the appeal/surprisal studies.
+6. **ENFORCEMENT (owner, 2026-07-17 — status audit found §2.5c
+   scaffolded but never executed, while shipped bests zeroed Human):**
+   (a) the differential fits are CAMPAIGN WORK, not capstone work — each
+   campaign runs them as soon as its identity fit stabilises, and
+   `humanRanges` lands in the measured profile then, not at WP-11;
+   (b) **variation is scored distributionally, never against single
+   takes**: render N seeded ship-mode variants per note, measure their
+   per-feature spread, and gate TWO-SIDED against the measured take-pair
+   spread — too little variation (sterile) is a failure exactly as much
+   as too much (sloppy). A single-take loss term must never see
+   ship-mode randomness, so stripping variation can never again improve
+   any score; (c) the listening page and leaderboard renders draw fresh
+   seeds per build — the owner should never hear the same "performance"
+   twice unless auditioning determinism itself.
 
 ### 2.5b The parameter ledger (feeds WP-9/WP-10)
 
@@ -580,6 +658,11 @@ Each campaign WP has the same shape:
   gaps: double decay (two-stage T60), release ring/damper (CH-B4), pluck
   position + body air-mode for guitar, velocity→hardness/noise coupling.
 - **WP-8 · Sung campaign** (tenor, contrabass, mezzo-soprano, boy soprano).
+  **Preflight scaffold is mandatory: docs/sg2/SUNG_PREFLIGHT.md** (V0
+  structural differences — one-source/many-bodies fitting shape, singers
+  are instruments not takes, consonant onsets as articulation gestures,
+  passaggio registers; plus RESEARCH_SUNG_REALISM annex incl. the
+  consonant-onset dataset survey).
   Builds on articulated bodies (CH-B1). Expected gaps: glottal-source
   spectral tilt vs vocal effort, singer's formant band (~2.8–3.2 kHz),
   breathiness (pitch-synchronous noise), f0 drift/portamento personality;
@@ -786,6 +869,18 @@ regressions.
    (§2.5), and every session must end with an improvement, a named
    limiting factor + filed fix, or that demonstration. Best-so-far presets
    are never regressed.
+12. **Sung targets revised to standard voice sections** (2026-07-17):
+    the sung family targets are now the typical section types —
+    **soprano, mezzo-soprano, tenor, bass** — each fitted from its
+    approved VocalSet identity singer (tenor=m3, bass=m8, mezzo=f5;
+    soprano primary to be selected from the corpus-labelled sopranos by
+    the same evidence procedure). **Basso profondo is demoted to a
+    SECONDARY nice-to-have**: approximated AFTER the four section types
+    pass their gates, derived from the fitted bass (downward f0/formant
+    extension per the morphology method), no dedicated capture required
+    unless the approximation fails owner ears. Boy soprano remains
+    decision-2 best-effort construction. Decisions 1's capture extension
+    is superseded by this derivation-first approach.
 11. **Agent B retired; lanes reorganised** (2026-07-16): Agent D owns
     BOTH the bowed campaign and the analysis infrastructure
     (`scripts/tone_match/**`, `scripts/fit_profiles_from_samples.py`,

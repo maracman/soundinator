@@ -55,6 +55,53 @@ instrument's effective body equals its fitted bands. The horn improved
 despite this because its refit likely carries explicit `bodyBands` in
 params, bypassing the profile plumbing — verify that too.
 
+### L14 · Violin still very bad — OWNER EXTRACTION PROTOCOL: isolate the bow sound as its own component
+Owner (2026-07-17), method prescribed in full: "find the bow sound,
+extract all the partials to have it as its own separate control. I
+believe they do not change significantly with volume — when they change
+in volume they keep a much more similar tonal profile than the sound that
+comes from the body of the instrument. Take the same expressed note at
+different pitches and find the common frequencies that aren't affected by
+the note fundamentals. Isolate the range in which we expect to hear the
+bow sound. Do this at p, and separately at pp, first — preserving the
+characteristics of the bow at those volumes. Then see if we can still
+extract something at mp. Compare the profiles extracted at the different
+volumes, and parse out any artifacts through analysis and then through
+simulation."
+
+Formalised protocol (Agent D lane, violin first, method generalises):
+1. **Harmonic subtraction per note**: track the partials (f0-anchored),
+   remove them (harmonic modelling or comb-notch), keep the residual
+   spectrum. Restrict to the plausible bow-noise range first (annex: the
+   scratch band; verify empirically rather than assume).
+2. **Cross-pitch commonality**: pool residual spectra across many pitches
+   of the SAME dynamic and articulation (same-string groups); the
+   pitch-invariant common component = the bow-noise profile (body-
+   coloured, which is correct — it should be body-routed per T-001).
+   What varies with pitch = leakage/artifacts, flagged not kept.
+3. **Dynamic ladder**: extract at pp and p SEPARATELY first (highest
+   noise-to-tone ratio, cleanest); then attempt mp. Compare profile
+   SHAPES across dynamics — owner hypothesis: shape is volume-stable
+   (level changes, profile doesn't), unlike the harmonic sound. If
+   confirmed: bow noise = pinned spectrum table + fitted level-vs-
+   dynamic law (T-001 inefficiency law), NOT a per-dynamic shape.
+4. **Artifact screening, analysis then simulation**: first inspect the
+   extracted profiles for analysis artifacts (harmonic leakage, vibrato
+   smear, window effects); then VALIDATE THE EXTRACTOR BY SIMULATION —
+   synthesize a known harmonic+noise signal through the engine, run the
+   extraction, verify it recovers the injected noise profile within
+   tolerance. The extractor is not trusted until it passes its own
+   synthetic round-trip.
+5. **Engine consequence**: the extracted profile becomes a separate,
+   user-controllable bow-noise component (T-001 architecture: fitted
+   spectrum → body routing → envelope-coupled level × inefficiency law
+   at pp), with its own level control exposed. Pinned from measurement;
+   the optimiser never shapes it freely.
+Method note: this is the noise-domain analogue of the P2 body
+deconvolution (pitch-invariance as the separator) — exchange entry
+warranted; breath extraction for winds and sung breathiness should
+adopt the same cross-pitch residual method.
+
 ### L13 · "Strings seriously degraded" (2026-07-16 late) — INVESTIGATED, NO REGRESSION
 Owner reported serious string degradation on the auto-built page.
 Forensics: violin/cello renders are perceptually identical to the prior

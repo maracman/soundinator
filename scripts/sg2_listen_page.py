@@ -19,7 +19,11 @@ Agents: run this at the end of every pass (owner-facing contract).
 """
 import hashlib, html, json, os, subprocess, sys, time
 
-SG2 = "/private/tmp/sg2"
+# Durable artifact root (2026-07-16 incident: /private/tmp was reaped twice,
+# destroying corpus + campaign state). Default lives inside the project,
+# gitignored. Override with SG2_DATA.
+SG2 = os.environ.get("SG2_DATA") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sg2-data")
 NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 
 def nname(m): return f"{NOTE_NAMES[m % 12]}{m // 12 - 1}"
@@ -42,12 +46,25 @@ def measured_profile_hash():
 def unwrap(obj):
     if not isinstance(obj, dict): return None
     if "excitationType" in obj or "spectralProfile" in obj: return obj
+    if isinstance(obj.get("paramsByVowel"), dict):
+        return {"paramsByVowel": {v: unwrap(p) for v, p in obj["paramsByVowel"].items() if unwrap(p)}}
     if isinstance(obj.get("params"), dict): return unwrap(obj["params"])
     return None
+
+def params_for_ref(params, ref):
+    """Flat params, or per-vowel selection for sung paramsByVowel bests."""
+    by_vowel = params.get("paramsByVowel") if isinstance(params, dict) else None
+    if not by_vowel: return params
+    v = ref.get("vowel")
+    return by_vowel.get(v) or next(iter(by_vowel.values()))
 
 def resolve_best(inst):
     """Return (params, label) or (None, None)."""
     lb_path = f"{SG2}/{inst}/leaderboard.json"
+    for cand in (lb_path, f"{SG2}/state/{inst}/leaderboard.json"):
+        if os.path.exists(cand):
+            lb_path = cand
+            break
     if os.path.exists(lb_path):
         best = (json.load(open(lb_path)).get("best") or {})
         run = best.get("run") or best.get("runId") or best.get("name") or "?"
@@ -57,10 +74,11 @@ def resolve_best(inst):
             if os.path.exists(cand):
                 p = unwrap(json.load(open(cand)))
                 if p: return p, f"{run} (leaderboard)"
-    # newest best.json anywhere under the instrument
+    # newest best.json anywhere under the instrument's dirs (incl. runs/ and state/)
     cands = []
-    for root, _dirs, files in os.walk(f"{SG2}/{inst}"):
-        if "best.json" in files: cands.append(os.path.join(root, "best.json"))
+    for base in (f"{SG2}/{inst}", f"{SG2}/runs/{inst}", f"{SG2}/state/{inst}"):
+        for root, _dirs, files in os.walk(base):
+            if "best.json" in files: cands.append(os.path.join(root, "best.json"))
     for cand in sorted(cands, key=os.path.getmtime, reverse=True):
         p = unwrap(json.load(open(cand)))
         if p: return p, f"{os.path.basename(os.path.dirname(cand))} (newest best)"
@@ -74,17 +92,25 @@ def baseline_params(inst, refs):
     return {"voiceMode": "fourier", "spectralMix": 1.0, "spectralPartials": 64,
             "excitationType": exc, "spectralProfile": profile, "seed": 7331}
 
+# §2.5c.6(c): every build is a fresh seeded performance unless --cached.
+FRESH = "--cached" not in sys.argv
+BUILD_SEED = int(time.time()) if FRESH else None
+
 def render_if_stale(inst, params, refs, commit, profile_hash):
     outdir = f"{SG2}/{inst}/listen-live"
     os.makedirs(outdir, exist_ok=True)
     stamp_path = f"{outdir}/stamp.json"
     want = {"paramsHash": hashlib.sha256(json.dumps(params, sort_keys=True).encode()).hexdigest(),
             "engine": commit, "measuredProfileHash": profile_hash,
-            "count": len(refs)}
+            "buildSeed": BUILD_SEED, "count": len(refs)}
     if os.path.exists(stamp_path) and json.load(open(stamp_path)) == want \
        and all(os.path.exists(f"{outdir}/note-{i}.wav") for i in range(len(refs))):
         return False
-    jobs = [{"params": params, "midi": r["midi"], "velocity": r["velocity"],
+    def job_params(r, i):
+        p = dict(params_for_ref(params, r))
+        if BUILD_SEED is not None: p["seed"] = BUILD_SEED + i * 7919
+        return p
+    jobs = [{"params": job_params(r, i), "midi": r["midi"], "velocity": r["velocity"],
              "durationSec": r["durationSec"], "sampleRate": 48000,
              "out": f"{outdir}/note-{i}.wav"} for i, r in enumerate(refs)]
     jobs_path = f"{outdir}/jobs.json"
@@ -112,13 +138,14 @@ def main():
         except subprocess.CalledProcessError as e:
             sections.append(f"<h2>{inst}</h2><p class=dim>render failed: {html.escape(str(e))}</p>")
             continue
-        rows = sorted(((f"{inst}/listen-live/note-{i}.wav", r) for i, r in enumerate(refs)),
-                      key=lambda p: (p[1]["midi"], p[1].get("dynamic", ""), p[1].get("string", "")))
+        rows = sorted(((f"{inst}/listen-live/note-{i}.wav", r) for i, r in enumerate(refs)
+                       if r.get("role") in (None, "spectral", "onset", "vibrato")),
+                      key=lambda p: (p[1].get("vowel", ""), p[1]["midi"], p[1].get("dynamic", ""), p[1].get("string", "")))
         body = [f"<h2>{inst}<span class=tag style='{style}'>{html.escape(tag)}</span></h2>"
                 "<table><tr><th>Note</th><th>Register · dynamic</th><th>Reference (real)</th>"
                 "<th>Render (synth)</th><th class=dim>Source</th></tr>"]
         for w, r in rows:
-            extra = f"{r.get('string','')} · " if r.get("string") else ""
+            extra = "".join(f"{r[k]} · " for k in ("vowel", "string") if r.get(k))
             body.append(
                 f"<tr><td><b>{nname(r['midi'])}</b></td><td>{extra}{r['register']} · {r['dynamic']}</td>"
                 f"<td><audio controls preload=none src='file://{r['path']}'></audio></td>"
