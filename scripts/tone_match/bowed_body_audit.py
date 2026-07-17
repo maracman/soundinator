@@ -18,6 +18,14 @@ from .bowed_source_tables import body_gain_db
 from .score import extract_features
 
 
+# A paired transfer is a division, so both arms need substantially more
+# headroom than the ordinary -66 dB partial-distance floor. Below -36 dB
+# (1/64 of the strongest analysed mode) a bowed comb notch can be dominated by
+# leakage from a neighbouring retained oscillator; that ratio no longer
+# identifies the emitted body's gain.
+PAIR_RATIO_FLOOR_DB = -36.0
+
+
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -123,7 +131,8 @@ def assess(manifest_path: Path, params_path: Path, output: Path) -> dict[str, An
                  np.isfinite(bypass.partial_db[:count]) &
                  np.isfinite(frequencies) & (frequencies > 0) &
                  (harmonic_ranks <= 8) &
-                 (np.maximum(body.partial_db[:count], bypass.partial_db[:count]) > -66))
+                 (np.minimum(body.partial_db[:count], bypass.partial_db[:count]) >
+                  PAIR_RATIO_FLOOR_DB))
         observed = body.partial_db[:count][valid] - bypass.partial_db[:count][valid]
         expected = body_gain_db(
             bands, frequencies[valid], amount,
@@ -141,9 +150,14 @@ def assess(manifest_path: Path, params_path: Path, output: Path) -> dict[str, An
             "analysisF0Hz": round(f0, 6),
             "commonHarmonics": int(len(error)),
             "guaranteedEmittedHarmonicsMax": 8,
+            "pairRatioFloorDb": PAIR_RATIO_FLOOR_DB,
             "excludedCullSensitiveHarmonics": int(np.count_nonzero(
                 (harmonic_ranks > 8) &
                 (np.maximum(body.partial_db[:count], bypass.partial_db[:count]) > -66))),
+            "excludedLowConfidenceRatios": int(np.count_nonzero(
+                (harmonic_ranks <= 8) &
+                (np.minimum(body.partial_db[:count], bypass.partial_db[:count]) <=
+                 PAIR_RATIO_FLOOR_DB))),
             "medianTransferErrorDb": round(median_error, 6),
             "p95TransferErrorDb": round(float(np.percentile(error, 95)), 6),
             "shapeCorrelation": round(correlation, 6), "passed": passed,
@@ -158,7 +172,9 @@ def assess(manifest_path: Path, params_path: Path, output: Path) -> dict[str, An
             "commonHarmonicsMin": 4},
         "harmonicAdmissionContract": (
             "renderer partialIsAudible guarantees modes 1-8 in both arms; "
-            "higher analysed peaks are excluded as cull-sensitive"),
+            "higher analysed peaks are excluded as cull-sensitive; paired "
+            "ratios additionally require both arms above -36 dB so a comb "
+            "notch cannot turn neighbouring-mode leakage into body evidence"),
         "sourceCancellation": "paired body-on/body-bypass FIT renders",
         "rows": rows,
     }

@@ -1,7 +1,7 @@
 {
   "schema": "sg2-t074-isolated-human-consumers-v1",
   "verifier": "scripts/verify_tone_model.mjs",
-  "verifierSha256": "bcf7ee89e7e9640260a76c6f15cb4259bde2c59804f27129db53b98fdb98a873",
+  "verifierSha256": "8ddedab67249fdb16a5752eb2c11c84afdf9d71f13d27923fa2e4b2101dd40ea",
   "method": "hash-pinned isolated measured-support endpoints with physical prerequisites only",
   "instruments": {
     "violin": {

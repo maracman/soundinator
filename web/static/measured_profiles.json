@@ -18405,7 +18405,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "c44ad88fed28d6daa56462e77936a1673e615305f42329126696164e766a0aa9"
+       "renderSha256": "7f72e56d8e2a624687fa5d9046c628bbad4623acd60dfa48dda7d0682dee1e9c"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_C2_15_fortissimo_arco-normal.wav",
@@ -18416,7 +18416,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "f754ed5fbf966860b4f16348fdd6bba2394db2af8c153fd35dd4d130ce27e87c"
+       "renderSha256": "946427569f3748126003c235a3c5fa21dd2e57a01860f9abb12d55af9f1eecce"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_C2_15_pianissimo_arco-normal.wav",
@@ -18428,7 +18428,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "0e6c7ed58a5ce2a9d193dea7d07a2e61567ab6304f72850db4733e6ff9cfc0ce"
+       "renderSha256": "8171e61041978f63f45cb922590672e1bb4e7e426c0f68764c0369e181a91144"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_C2_1_fortissimo_arco-normal.wav",
@@ -18439,7 +18439,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "cc7dd9296f10a59498885418838007e76b80641b50f70bc6641cba17e3820bea"
+       "renderSha256": "12143c584ec7e5c0498ff507a01bfc8e21eea4bcc28d21eab2b64291a52d9bc1"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_C2_1_pianissimo_arco-normal.wav",
@@ -18450,7 +18450,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "a735d56d4e38b69070d0be0348c893dc5c10a31d819baaefee962c253e6ce4dd"
+       "renderSha256": "cc469409d12c49a38c886951cae7dcd662f5e8f0feae195f8f684e4069e9b20f"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_E5_05_fortissimo_arco-normal.wav",
@@ -18462,7 +18462,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "83a3e70b398ddac4f5afd1605bede095b8827204640239c726e6ffb9d732709c"
+       "renderSha256": "cb77b4b323d13c43f91d69fb023740034c6af35d19d303b1e9b7b62a920afc41"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_E5_05_pianissimo_arco-normal.wav",
@@ -18470,11 +18470,10 @@
        "failedCoreFeatures": [
         "partials_db",
         "log_mel_db",
-        "attack_ms",
-        "inharmonicity_log_ratio"
+        "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "f66d6a0638be8fe7eafa526a84782edb3bbef3ad4e4a1587b72933dd8f8c2b18"
+       "renderSha256": "aa6714bd5aeccfcb46f807b169d582e4dd820b1ce224129c0470eea7c67a11d4"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_E5_15_fortissimo_arco-normal.wav",
@@ -18485,7 +18484,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "a1c036d9c76b7e8506d74bfc25fa6f1b7aee60f54dbca999d1480bb264f38e8e"
+       "renderSha256": "a1f2ec6b6e22f2d0cc1f3a0a7329fca67340675152051426ac7c4c321074f25c"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_E5_1_fortissimo_arco-normal.wav",
@@ -18497,7 +18496,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "e6fcfffda62f952bd6a7c55595fb24296cca08d8909ac0385310e5bd3915a7c3"
+       "renderSha256": "d28d141459fdf48002ea2c882d66ce2d272db1268c2ca21afba09666d4609662"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_E5_1_pianissimo_arco-normal.wav",
@@ -18505,11 +18504,10 @@
        "failedCoreFeatures": [
         "partials_db",
         "log_mel_db",
-        "attack_ms",
-        "inharmonicity_log_ratio"
+        "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "22240c08ce20b69b2597370a89fe1b37ff9caff09f2873b555991af8b1630aa1"
+       "renderSha256": "5a440360bd1b6d6bada8d3f4a81bfca747a94148956d286f86d301ad1ca84b05"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_G3_05_fortissimo_arco-normal.wav",
@@ -18520,7 +18518,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "895e2fc499cd39e3e6e969009879b9fa22b5ee23aec5cce8ba2d53cfe07c50ff"
+       "renderSha256": "570dbdcca8b5b5e33f837409693dd885216b1028f994e71dac6bd3f1cabf7391"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_G3_05_pianissimo_arco-normal.wav",
@@ -18531,7 +18529,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "277e342d4228633a67ee0c240f703fcd15aae1902508c1df837c5c7a57c37f28"
+       "renderSha256": "6f0f069c474f306c26e6c84261aed65bf6abef0fa7aa8d68b6565bedbe24d226"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_G3_15_fortissimo_arco-normal.wav",
@@ -18543,7 +18541,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "7b8abaf14677f3273f21f037d3b1ab145462538c5f5b63a9d3bdcfd97179e95a"
+       "renderSha256": "10af26c7cd0726cb6eb6a1d44f5ff3758010a572eb79bed6295d2ad3e3cd8208"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_G3_15_pianissimo_arco-normal.wav",
@@ -18554,7 +18552,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "21e17b31a78c0886af83607bf2899f9098c39381f442f4a37541048dfa3758d1"
+       "renderSha256": "d3f8ba3aa5fc25e0d1deed50f24f37b1f1aff8c5c8b4256e9b781ce6fba3a520"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/cello/references/philcat-phil.cello_G3_1_pianissimo_arco-normal.wav",
@@ -18565,7 +18563,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "94cb4e3aa2b4dce62b5d7414f687042c366e08b0ea90d8a871086fcc7253d5a4"
+       "renderSha256": "a13c0bfe40371bf1c2bb80fc67f60bc80294c9ca8df6cad6f0cd35c465cd74ab"
       }
      ],
      "allMatchedTakesNearBars": false
@@ -18577,7 +18575,7 @@
       "valid": true,
       "expectedRangesSha256": "37584ceb079c0187758be1ca662cc2c1734d0ac807a219507feba61f17af08a2",
       "proofRangesSha256": "37584ceb079c0187758be1ca662cc2c1734d0ac807a219507feba61f17af08a2",
-      "verifierSha256": "bcf7ee89e7e9640260a76c6f15cb4259bde2c59804f27129db53b98fdb98a873"
+      "verifierSha256": "8ddedab67249fdb16a5752eb2c11c84afdf9d71f13d27923fa2e4b2101dd40ea"
      },
      "parameters": {
       "excitationPosition": {
@@ -77684,7 +77682,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "fcd308a080d2057e3bfadb35df48ca73403dadf6b213f84b8b37bc744d45a370"
+       "renderSha256": "8366bd364242d97ed5ab2e8877ef278462b70d424fba07e76fd621b35e31ae32"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/phil-floor-violin_Cs4_long_mezzo-piano_non-vibrato.wav",
@@ -77695,7 +77693,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "4d933a485a0dd6bf5576fb3c04c8eb71ed187feb4a5de9a2db3c439f738f522b"
+       "renderSha256": "e923b5af9b5cc06d5549cc292bc446c4b8db0e0e45a5579c1effacb6c72cdcba"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_05_fortissimo_arco-normal.wav",
@@ -77707,7 +77705,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "56e0b26cf013c7d2f196096edfb4901751e592f238ad58b7ef9e292dee40523f"
+       "renderSha256": "3561b25d3a3eca98c90500728e9fd2b37241c4fa97f41e8ce8ddbe22fd9cbc27"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_05_pianissimo_arco-normal.wav",
@@ -77718,7 +77716,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "5a7ca9da091f81fc3fcffa267090c80b6c755c18d6f750d9c368986093cdb6a4"
+       "renderSha256": "4eac9a8418ae22f27c3b7ef8e7a25d1faf06f5dadefd38a1f86f300615756a1a"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_15_fortissimo_arco-normal.wav",
@@ -77730,7 +77728,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "367b303b52bca2ec285984d576b1b1c1495587d783d4742b8adb7106e94ec2d6"
+       "renderSha256": "41607f0ebb3fce30cd6c2e718dd6202f606a0c059a4827b8083cdc44c93f0ebe"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_1_fortissimo_arco-normal.wav",
@@ -77742,7 +77740,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "7e408d5a0719735152290eb98c3236abfdad67153b05fe26bff7dad630751c41"
+       "renderSha256": "e494822482b58bfad586d4e6a9e41c022095680c1048af2bc95271d7e243f6bc"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_C5_1_pianissimo_arco-normal.wav",
@@ -77753,7 +77751,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "39b1e1d0a2c8775735adc8a08c492da5e34f2d870ed25a1a501a0cccb7fb3446"
+       "renderSha256": "38e632c5aaedd8795f92335b53d70570eadae0995753903aeaff783fd0ecc57e"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_E6_05_pianissimo_arco-normal.wav",
@@ -77764,7 +77762,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "2856519ddaea20764133a27c7d1149537cc2e5b7ef86e74084d4a97ef7545696"
+       "renderSha256": "4403c93044c202b9e1484e24f3563c01598b772565aa3210a6e1f64ef92cf8b0"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_E6_1_pianissimo_arco-normal.wav",
@@ -77775,7 +77773,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "34dbed825647dc661024860b14c7b69cca40bf521f885cc3d9103f79989deacf"
+       "renderSha256": "9cfeaa9888668916f422dbce3bf4d5df884ef6616c08e72c1143f7e151059d4f"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_05_fortissimo_arco-normal.wav",
@@ -77787,7 +77785,7 @@
         "inharmonicity_log_ratio"
        ],
        "analysisFailure": null,
-       "renderSha256": "0c1d726bbc0351d23f0c649f0281b1f00c733a542abf3d353b987c0c7caf1022"
+       "renderSha256": "bd925213193823f1d4f8699f994850a1a04334ee1f41652ee9abd29971b6d406"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_05_pianissimo_arco-normal.wav",
@@ -77798,7 +77796,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "d797e31e6525271ff1c51bd26b3ab7ded5185e6f19114b96e531d4e1337749b8"
+       "renderSha256": "f00697dba2d37c348f3aecd756f165a7d9e4838e253e6d204378a1ace7eb5ac6"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_15_fortissimo_arco-normal.wav",
@@ -77809,7 +77807,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "2ef88cd9fc59f1b72c7ec1d1f0e0f404b01007b31d2c7f222821cf7e03487d9c"
+       "renderSha256": "36271a26bd6638db7d05d0e08233a7dc9af0f9fc28a382d99fe128325e194cdf"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_1_fortissimo_arco-normal.wav",
@@ -77820,7 +77818,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "331c0f062d29a6259ccecd0442877f1cfbee0277a955ca3199068cb8a67950e1"
+       "renderSha256": "c837a33819ab9784ba4706867ee78e6608b80cac63d3e9bad13284b6a1961c79"
       },
       {
        "path": "/Users/mand6499/Documents/Music Synthesiser for Researching Aesthetics and Mechanistic Origins of Music/sg2-data/campaigns/violin/references/philcat-violin_G3_1_pianissimo_arco-normal.wav",
@@ -77831,7 +77829,7 @@
         "attack_ms"
        ],
        "analysisFailure": null,
-       "renderSha256": "22fb60e27a2d17bbfa9652904389dcf6474128b4049cd57eab5a74486883ccc0"
+       "renderSha256": "254280ef196ebb664de676c06daf964a2284a8445892bbe4dde29f8ea0108ac6"
       }
      ],
      "allMatchedTakesNearBars": false
@@ -77843,7 +77841,7 @@
       "valid": true,
       "expectedRangesSha256": "1659637dadb08fe99107eb3f47a63658880960212b6dd47fedbc236c061b5769",
       "proofRangesSha256": "1659637dadb08fe99107eb3f47a63658880960212b6dd47fedbc236c061b5769",
-      "verifierSha256": "517b18a48eaa4afcce635f90fc5fac2ed57d4a652781e166f945765f864d3743"
+      "verifierSha256": "8ddedab67249fdb16a5752eb2c11c84afdf9d71f13d27923fa2e4b2101dd40ea"
      },
      "parameters": {
       "excitationPosition": {
@@ -77893,7 +77891,7 @@
        "parameter": "onsetWanderCents",
        "feature": "onset_wander_cents",
        "functional": true,
-       "delivery": "engine-native-zero-inflated-note-episode",
+       "delivery": "T-074-hash-pinned-isolated-endpoint",
        "responders": [
         "excitationHuman"
        ]
@@ -77901,16 +77899,15 @@
       "onsetWanderSettleMs": {
        "parameter": "onsetWanderSettlePeriods",
        "feature": "onset_scoop_settle_ms",
-       "functional": false,
-       "delivery": "direct-parameter",
+       "functional": true,
+       "delivery": "T-074-hash-pinned-isolated-endpoint",
        "responders": []
       }
      },
-     "allQualifiedConsumersFunctional": false
+     "allQualifiedConsumersFunctional": true
     },
     "maskingFactors": [
-     "one or more per-take identity fits miss the \u00a73 core bars",
-     "one or more qualified Human consumers are unaudited or non-functional"
+     "one or more per-take identity fits miss the \u00a73 core bars"
     ],
     "interpretation": "identity/renderer misfit masks the residual; no missing-Human-DOF claim is permitted",
     "rerunMethod": "pass08-existing-measurements-current-identity-and-T074-consumers"
