@@ -1,4 +1,4 @@
-# SG2 sung campaign — pass 08 four-voice consonants and source-law activation guard
+# SG2 sung campaign — pass 08 four-voice consonants and live source-law rejection
 
 Date: 2026-07-17  
 Owner: Agent E / sung lane  
@@ -16,14 +16,17 @@ All four auxiliary onset objectives therefore carry the five earned weights.
 They remain provisional spoken-to-sung adaptations and do not replace the
 vowel-only identity leaderboard entries.
 
-A-VOICE-05 did not land this pass. A consuming review of Agent A's uncommitted
-draft found two failures against the pass-07 handoff: it rectangularly
-extrapolates soprano's sparse joint log-f0 × velocity hull, and it multiplies
-already dynamic-specific observed rows by generic `spectralDynamicAmount` a
-second time. The emitter contract is now explicit about both points and a
-hashed output-side source audit is ready. The current canonical renderer fails
-that audit as `blocked-consumer-absent`; consequently no strict identity cell
-was rerun or promoted from draft code.
+A-VOICE-05's surface path landed during finalisation in Agent A commits
+`b4ff0c4`/`ec7cdff` and shared merge `9bd8b77`. It is audible: all four
+active/absent audits show large partial and mel response. It is not clean.
+Every voice has exactly zero `band_balance_db` response, and direct inspection
+confirms both consuming-review blockers survived the landing: the interpolation
+rectangularises soprano's sparse joint log-f0 × velocity hull, and the renderer
+still multiplies already dynamic-specific observed rows by generic
+`spectralDynamicAmount`. Fresh four-voice strict hierarchy runs therefore ran
+but promoted nothing: every aggregate cell still fails, and soprano, tenor and
+mezzo regress the paired vowel-body consumption gate. The stored identity
+leaders remain authoritative.
 
 T-067 remains analysis-side pending. Agent D's clean tip `c8a8fe8` contains no
 `pitch_sync_breath_db` observable, synthetic residual-envelope round trip,
@@ -35,7 +38,8 @@ and breath weight remains zero.
 
 No identity objective changed. These generated rows remain authoritative; the
 pass snapshot retains every incumbent/candidate row in addition to the legacy
-and selected rows shown here.
+and selected rows shown here. The live-law comparators below are rejected audit
+rows, not leaderboard entries.
 
 | Preset / selected entry | Composite | Construction | Strict §3 cells | Emitted body | Vowel | §2.5c Human | Overall |
 |---|---:|---|---|---|---|---|---|
@@ -80,12 +84,45 @@ consumer requirements are:
 2. because every row already contains observed source shape at its measured
    dynamic, suppress generic `spectralDynamicAmount` while a row is active.
 
-The pre-landing canonical audit is intentionally red: renderer contract
+The pre-landing canonical audit is red as expected: renderer contract
 `b25485d1f6004d2d`, audit
 `1d919c8bd08c848f9769e052af2042715d2df5de57d192da0ae27938da605a82`,
-with no partial, mel or band-balance responder. Once a corrected consumer
-lands, this exact audit runs for all four voices before the hierarchy restarts
-at partial → mel → attack → band balance.
+with no partial, mel or band-balance responder. The landed renderer contract is
+`b6a33e2ce3e6aa9c`. Its four active/absent audit hashes are soprano
+`4f9f17c40cecf2cffee9b6298513693ea2b2519b7902c3f12fa2cefb5fa35b53`,
+tenor `0f1a37fa0c1978fb732cbb377ec847625998bd99884357565cd6f24e36f23179`,
+bass `97a26c98d1be164f92ef014763598538695489b6ed290a5656b33620877046e2`
+and mezzo `6be9a87785b867c2392fbf4f7f327d15f8e20fdbe2eefa193fdfd8ed0c875071`.
+Partial and mel respond in all four; band balance responds in none, so all four
+are `not-clean`.
+
+The identity-level minimum-responder re-audits are separately clean and
+repeat-stable for all four voices: `partialTilt` continues to control every
+currently positive-weight feature. That result does not grant weight to the
+pinned table surface; the table must pass its own three-feature audit.
+
+## Live-law strict hierarchy comparator
+
+The comparator changes no fitted vowel or macro parameter. It renders the
+existing identity with the landed measured-profile source surface and scores
+the full licensed spectral reference set in partial → mel → attack → band
+order.
+
+| Voice | Composite, leader → live law | Mean partial dB, leader → live law | Strict cells | Body / vowel | Decision |
+|---|---:|---:|---|---|---|
+| Soprano | 4.510623 → 4.200703 | 25.440 → 19.762 | 0/27 pass + 1 band missing | 9/10 / 9/10 | reject activation |
+| Tenor | 4.191012 → 3.915881 | 21.587 → 18.639 | 0/36 pass | 9/10 / 9/10 | reject activation |
+| Bass | 4.147851 → 3.521257 | 25.355 → 18.169 | 0/36 pass | 10/10 / 10/10 | reject activation |
+| Mezzo | 4.074528 → 3.888168 | 19.587 → 16.676 | 0/36 pass | 6/10 / 6/10 | reject activation |
+
+The upstream partial mean improves for every voice, but no partial aggregate
+cell reaches the strict 3 dB bar. Mel worsens for all four (bass is effectively
+flat), and band balance worsens for soprano, tenor and mezzo. Hierarchy order
+therefore stops at the still-failing partial tier; the lower scalar composite
+cannot override the failed source-surface audit or the downstream consumption
+regressions. Required engine correction remains joint-hull interpolation,
+generic-dynamic suppression while a row is active, and assertions on realised
+post-transform output rather than only diagnostic pre-body `sourceAmp`.
 
 ## T-067 breath coordination
 
@@ -100,8 +137,9 @@ cannot yet earn weight. The live exchange records
 
 All four primary-singer manifests retain 15 explicitly inventoried
 humanisation-role rows, but no identity is eligible for differential fitting.
-Every voice still fails every strict partial and mel aggregate cell, and three
-voices also retain the breath construction mask. Under the three-valued
+Every voice still fails every strict partial and mel aggregate cell, and the
+landed source path does not stabilise any identity upstream. Three voices also
+retain the breath construction mask. Under the three-valued
 §2.5c.2 rule, running the double-dissociation fit now would be
 `INCONCLUSIVE-MASKED`, so no `humanRanges` value is widened. The repeats remain
 queued and run immediately when a corrected source law stabilises an identity's
@@ -112,9 +150,9 @@ upstream cells.
 Pass snapshot SHA-256:
 `4479d0cb7bb878c4901e7da938fcc89be1d9b4f9a9d476e16da0269d5806a2d6`.
 Controllability table SHA-256:
-`d35d4ce1d1b4297dcd7ef543049dd73f061da77d9a31f7efb91dd38d12283649`.
+`98de49d977dd3a9a7891aa0e364e082f41a50c3306bb05b48e4e2d216823f332`.
 Exchange source SHA-256:
-`b60a41310bce66d44f5d72116e439ee147503539159fb562073758861bcb2ae0`.
+`484014638179158feca30bac63a1a4eba3c91a0f7b16e2dd07cf7bb16bacff1b`.
 
 All four identities retain prior row
 `voice-soprano/mezzo/tenor/bass -> legacy vocal`, tag `sg2-legacy`, commit
@@ -128,6 +166,9 @@ rebuilt in fresh-seed SHIP mode.
   comparison sets
 - `sg2-data/runs/sung-pass08/A_VOICE_05_EVIDENCE.json`
 - `sg2-data/runs/sung-pass08/source-controllability-prelanding/voice-tenor/AUDIT.json`
+- `sg2-data/runs/sung-pass08/source-controllability-active/voice-*/AUDIT.json`
+- `sg2-data/runs/voice-*/pass08-controllability-source-law/`
+- `sg2-data/runs/voice-*/pass08-source-law-strict/`
 - `sg2-data/runs/sung-pass08/PASS_END_GATE_SNAPSHOT.json`
 - `sg2-data/runs/sung-pass08/CONTROLLABILITY_TABLE.json`
 - `sg2-data/runs/sung-pass08/EXCHANGE_STATUS_START.json` and
@@ -135,7 +176,7 @@ rebuilt in fresh-seed SHIP mode.
 - current objective leaderboards and `sg2-data/state/voice-*` backstops retained
   byte-for-byte without a draft-law regression
 
-Verification is pending the final pass seal.
+Verification is pending the final post-merge pass seal.
 
 This pass ends in §2.5 state **(a)** for the auxiliary articulation surface: a
 measurable, output-verified consonant capability now covers all four adult

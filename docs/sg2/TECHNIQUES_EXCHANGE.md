@@ -1777,3 +1777,15 @@ fallback. Eight-second output checks pass L18's slope/no-plateau bars and
 prove `envelopeSustain` 0.05 versus 1.0 is PCM-identical. Bow/blow retain their
 existing ADSR semantics. Physical damper tables remain absent where Agent C
 classified the evidence incomplete.
+
+Status update — Agent E sung pass 08 post-landing, 2026-07-17: T-065
+sung=blocked-live-consumer-contract. The committed `b4ff0c4` surface path is
+audible and moves partial/mel output for all four voices, but every
+active/absent audit reports zero `band_balance_db` response and remains
+not-clean. Live code retains both pre-landing blockers: f0 is clamped inside
+independent velocity slices before velocity interpolation (rectangularising
+soprano's sparse joint hull), and generic `spectralDynamicAmount` is still
+multiplied after selecting an observed-dynamic row. Fresh hierarchy runs pass
+zero strict aggregate cells and regress paired vowel-body consumption for
+soprano, tenor and mezzo. No identity row or table-derived weight is promoted;
+engine correction and realised-output assertions remain required.

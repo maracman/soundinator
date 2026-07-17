@@ -36,7 +36,10 @@ from scripts.tone_match.sung_consonant_audit import (
 )
 from scripts.tone_match.sung_exchange_status import extract as extract_exchange
 from scripts.tone_match.sung_pass_state import _selection_key
-from scripts.tone_match.sung_pass_snapshot import build as build_pass_snapshot
+from scripts.tone_match.sung_pass_snapshot import (
+    _strict_summary,
+    build as build_pass_snapshot,
+)
 from scripts.tone_match.sung_spectral_triage import fit_global_dynamic_amount
 from scripts.tone_match.sung_source_tables import (
     DYNAMIC_COMPOSITION,
@@ -427,6 +430,19 @@ def test_exchange_status_update_is_applied_only_to_its_named_id(tmp_path):
     assert entries["T-002"]["sungStatus"] == "blocked"
 
 
+def test_exchange_status_update_does_not_cross_an_intervening_update(tmp_path):
+    exchange = tmp_path / "exchange.md"
+    exchange.write_text(
+        "### T-001 · First\nStatus: sung=pending\n\n"
+        "### T-002 · Second\nStatus: sung=pending\n\n"
+        "Status update — engine: T-001\nengine=incorporated\n\n"
+        "Status update — sung: T-002\nsung=blocked-live\n"
+    )
+    entries = {row["id"]: row for row in extract_exchange(exchange)["entries"]}
+    assert entries["T-001"]["sungStatus"] == "pending"
+    assert entries["T-002"]["sungStatus"] == "blocked-live"
+
+
 def test_sung_leaderboard_closes_strict_cells_before_composite():
     def entry(strict_fail, composite):
         return {
@@ -526,3 +542,32 @@ def test_pass_snapshot_preserves_legacy_and_leader_gate_rows(tmp_path):
     assert all(len(row["entries"]) == 2 for row in gates["voices"].values())
     assert gates["snapshotSha256"]
     assert table["tableSha256"]
+
+
+def test_pass_snapshot_summarises_strict_cells_in_hierarchy_order():
+    summary = _strict_summary({
+        "run": "source-law", "meanComposite": 3.5,
+        "construction": {"passed": False, "assertions": [
+            {"status": "pass"}, {"status": "fail"},
+        ]},
+        "vowelBodyConsumption": {"passed": True, "passedRows": 10,
+                                  "requiredRows": 10},
+        "vowelClassification": {"passed": True, "passedRows": 10,
+                                 "requiredRows": 10},
+        "tripwires": {
+            "strictPassed": False,
+            "activeBars": ["partial-table", "mel-spectrogram", "attack-t90",
+                           "band-balance"],
+            "cells": [
+                {"bar": "partial-table", "status": "fail"},
+                {"bar": "mel-spectrogram", "status": "pass"},
+                {"bar": "attack-t90", "status": "fail"},
+                {"bar": "band-balance", "status": "missing"},
+            ],
+        },
+    })
+    assert list(summary["cellsByCriterion"]) == [
+        "partial-table", "mel-spectrogram", "attack-t90", "band-balance",
+    ]
+    assert summary["cellsByCriterion"]["mel-spectrogram"]["pass"] == 1
+    assert summary["cellsByCriterion"]["band-balance"]["missing"] == 1

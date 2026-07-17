@@ -347,3 +347,19 @@ row is active. `scripts/tone_match/sung_source_audit.py` is the consuming-side
 partial/mel/band output audit. No strict cell may be rerun or promoted from the
 draft until these contracts and the existing assertions pass in a committed
 canonical landing.
+
+Pass-08 post-landing audit (2026-07-17): Agent A's `b4ff0c4`/`ec7cdff`
+surface path landed and was consumed on shared head `9bd8b77`, but the two
+review blockers remain in the canonical implementation. `sourcePartialsAt`
+still f0-clamps independently inside each velocity slice before velocity
+interpolation, which rectangularises soprano's sparse joint hull, and
+`_spectralFingerprint` still applies the generic dynamic exponent
+unconditionally after selecting a dynamic-specific table row. Four-voice
+active/absent output audits prove large partial and mel response, but exactly
+zero `band_balance_db` response, so all four remain `not-clean`. Fresh strict
+comparators improve the upstream partial mean for every voice yet pass zero
+aggregate cells; soprano, tenor and mezzo also regress the required paired
+vowel-body consumption gate. No source-law candidate or feature weight is
+promoted. Required correction remains: joint-hull interpolation/projection,
+generic-dynamic suppression while a row is active, and an output assertion on
+realised post-transform amplitudes plus the sung partial/mel/band audit.

@@ -12,8 +12,9 @@ import re
 
 HEADING = re.compile(r"^### (T-\d+) · (.+)$", re.MULTILINE)
 SUNG_STATUS = re.compile(r"\bsung=([^\s]+)")
-STATUS_UPDATE = re.compile(
-    r"Status update[^\n]*:\s*(T-\d+)[\s\S]*?\bsung=([^\s]+)",
+STATUS_UPDATE_BLOCK = re.compile(
+    r"^Status update[^\n]*:\s*(T-\d+)([\s\S]*?)"
+    r"(?=^Status update|^### |\Z)",
     re.MULTILINE,
 )
 
@@ -36,9 +37,10 @@ def extract(path: Path) -> dict:
                 "sungStatus": statuses[0].rstrip(".,;)"),
             })
     by_id = {entry["id"]: entry for entry in entries}
-    for technique_id, status in STATUS_UPDATE.findall(text):
-        if technique_id in by_id:
-            by_id[technique_id]["sungStatus"] = status.rstrip(".,;)")
+    for technique_id, block in STATUS_UPDATE_BLOCK.findall(text):
+        statuses = SUNG_STATUS.findall(block)
+        if technique_id in by_id and statuses:
+            by_id[technique_id]["sungStatus"] = statuses[-1].rstrip(".,;)")
     return {
         "schemaVersion": 1,
         "source": str(path),
