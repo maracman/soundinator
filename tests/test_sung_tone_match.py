@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import json
 import numpy as np
+import pytest
 
 from scripts.tone_match.assertions import normalize_instrument
+from scripts.tone_match.controllability import objective_contract_hash
+from scripts.tone_match.score import SCORER_CONTRACT_VERSION
+from scripts.tone_match.sung_audition import _consume_audit
 from scripts.tone_match.sung_features import (
     SungObservation,
     compare_rendered_vowel_body_transfer,
@@ -131,6 +136,21 @@ def test_soprano_above_passaggio_scale_role_is_explicit_and_firewalled():
         singer="female2", singer_short="f2", context="scales",
         technique="slow_piano", vowel="a",
     ), "soprano", "high") == ["floor"]
+
+
+def test_sung_audition_rejects_a_stale_renderer_audit(tmp_path):
+    path = tmp_path / "controllability.json"
+    path.write_text(json.dumps({
+        "instrument": "tenor",
+        "finalWeights": {},
+        "objectiveHash": objective_contract_hash("tenor", [], {}),
+        "scorerContractVersion": SCORER_CONTRACT_VERSION,
+        "rendererContractHash": "stale-renderer",
+        "clean": True,
+        "responsiveParameters": {},
+    }))
+    with pytest.raises(ValueError, match="renderer contract changed"):
+        _consume_audit(path, "tenor", [])
 
 
 def test_alternating_fit_separates_one_source_from_five_bodies():

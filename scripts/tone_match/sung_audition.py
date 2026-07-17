@@ -15,6 +15,7 @@ import numpy as np
 from scripts.tone_match.assertions import ConstructionSample, evaluate_construction
 from scripts.tone_match.controllability import objective_contract_hash
 from scripts.tone_match.score import (
+    SCORER_CONTRACT_VERSION,
     compare_features,
     extract_features,
 )
@@ -31,6 +32,8 @@ from scripts.tone_match.tripwires import (
 
 
 def _consume_audit(path: Path, voice_class: str, references: list[dict]) -> dict:
+    from scripts.tone_match.iterate import _renderer_contract_hash
+
     if not path.exists():
         raise ValueError(f"missing sung controllability audit: {path}")
     audit = json.loads(path.read_text())
@@ -40,6 +43,10 @@ def _consume_audit(path: Path, voice_class: str, references: list[dict]) -> dict
         errors.append(f"instrument {audit.get('instrument')!r} != {voice_class!r}")
     if audit.get("objectiveHash") != objective_contract_hash(voice_class, references, weights):
         errors.append("reference/weight objective hash mismatch")
+    if audit.get("scorerContractVersion") != SCORER_CONTRACT_VERSION:
+        errors.append("scorer contract changed after controllability audit")
+    if audit.get("rendererContractHash") != _renderer_contract_hash():
+        errors.append("renderer contract changed after controllability audit")
     if not audit.get("clean"):
         errors.append("audit is not clean")
     uncontrolled = [

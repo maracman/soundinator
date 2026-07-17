@@ -39,9 +39,9 @@ failing ship gates.
 | Preset / entry | Composite | Construction | Strict §3 | Emitted body | Vowel | §2.5c Human | Overall |
 |---|---:|---|---|---|---|---|---|
 | Tenor legacy baseline, pass03 | 4.289207 | FAIL 9/10 | FAIL | unmeasured / FAIL | FAIL 0/10 | not run | **FAIL** |
-| Tenor pass04 candidate | 4.289166 | FAIL 9/10 | FAIL, 36 cells | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
-| Soprano legacy-initialized entry 1 | 4.955281 | PASS 9/9 | FAIL, 27 cells + 1 missing | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
-| Mezzo legacy-initialized entry 1 | 4.079115 | FAIL 8/9 | FAIL, 36 cells | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
+| Tenor pass04 candidate | 4.289171 | FAIL 9/10 | FAIL, 36 cells | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
+| Soprano legacy-initialized entry 1 | 4.955247 | PASS 9/9 | FAIL, 27 cells + 1 missing | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
+| Mezzo legacy-initialized entry 1 | 4.079181 | FAIL 8/9 | FAIL, 36 cells | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
 
 Tenor's candidate leads its current comparable objective because it closes two
 hard gates without a composite regression.  It does not overwrite or pretend
@@ -70,11 +70,13 @@ rejects.
 ## Controllability and prior ledger
 
 All positive-weight features have at least one measured responder.  The exact
-audits below are consumed by the canonical runner before rendering.
+audits below are consumed by the canonical runner before rendering.  After
+merging the latest shared engine, all three audits were fully regenerated and
+match renderer contract hash `9d21ecad9acce077`.
 
 | Voice | Objective hash | Manifest hash | Repeatability | Zeroed unstable watch | Clean |
 |---|---|---|---|---|---|
-| Tenor | `8933926c01eeb666` | `72c3dc64fddc64e1` | stable | none | yes |
+| Tenor | `8933926c01eeb666` | `3ce7106e74cde4b9` | stable | none | yes |
 | Soprano | `45c9829cd0af41a5` | `3ce7106e74cde4b9` | watch zeroed | `inharmonicity_log_ratio` | yes |
 | Mezzo-soprano | `bd875841a4b89802` | `3ce7106e74cde4b9` | stable | none | yes |
 
