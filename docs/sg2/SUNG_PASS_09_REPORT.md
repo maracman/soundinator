@@ -14,7 +14,9 @@ shared advanced during the pass with the measured harp/glock activation and
 F13 protocol update. The lane merged that shared tip, resolved the exchange as
 a union of the sung and struck/plucked records, and rejected the now-stale
 renderer binding. Every source, identity and strict comparator result below was
-rerun on renderer contract `3629da50977f0fc1` before finalisation.
+rerun on renderer contract `f116e1dfdfafdb27` before finalisation. Earlier
+pass-09 strict directories were retained as `pass09-source-law-strict-pre-f116`;
+the authoritative directories were rendered clean from an empty target.
 
 ## Outcome
 
@@ -46,16 +48,16 @@ separately pending and breath values/weight remain neutral.
 |---|---:|---|---|---|---|---|---|
 | Tenor legacy | 4.289210 | FAIL 10/11 | FAIL 0 pass / 36 fail / 0 missing | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
 | Tenor prior leader | 4.191012 | FAIL 10/11 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
-| Tenor pass-09 selected | **3.947980** | FAIL 10/11 | FAIL 0 / 36 / 0 | FAIL 8/10 | FAIL 8/10 | masked | **FAIL** |
+| Tenor pass-09 selected | **3.948006** | FAIL 10/11 | FAIL 0 / 36 / 0 | FAIL 8/10 | FAIL 8/10 | masked | **FAIL** |
 | Soprano legacy | 4.955311 | PASS 10/10 | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
 | Soprano prior leader | 4.510623 | PASS 10/10 | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
-| Soprano pass-09 selected | **4.256073** | PASS 10/10 | FAIL 0 / 27 / 1 | FAIL 9/10 | FAIL 9/10 | masked | **FAIL** |
+| Soprano pass-09 selected | **4.256034** | PASS 10/10 | FAIL 0 / 27 / 1 | FAIL 9/10 | FAIL 9/10 | masked | **FAIL** |
 | Bass legacy | 4.155330 | FAIL 10/11 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
 | Bass prior leader | 4.147851 | FAIL 10/11 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
-| Bass pass-09 selected | **3.569309** | FAIL 10/11 | FAIL 0 / 36 / 0 | FAIL 7/10 | FAIL 7/10 | masked | **FAIL** |
+| Bass pass-09 selected | **3.569329** | FAIL 10/11 | FAIL 0 / 36 / 0 | FAIL 7/10 | FAIL 7/10 | masked | **FAIL** |
 | Mezzo current-objective legacy | 4.079154 | FAIL 9/10 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
 | Mezzo prior leader | 4.074528 | FAIL 9/10 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | not run | **FAIL** |
-| Mezzo pass-09 selected | **3.817482** | FAIL 9/10 | FAIL 0 / 36 / 0 | FAIL 9/10 | FAIL 9/10 | masked | **FAIL** |
+| Mezzo pass-09 selected | **3.817499** | FAIL 9/10 | FAIL 0 / 36 / 0 | FAIL 9/10 | FAIL 9/10 | masked | **FAIL** |
 
 Soprano high/p sustained band balance remains missing evidence rather than a
 fitted failure. Tenor, bass and mezzo retain the neutral pitch-synchronous
@@ -70,10 +72,10 @@ at the still-failing partial tier in every voice:
 
 | Voice | Composite, prior → pass 09 | Normalized mean partial residual, prior → pass 09 | Decision |
 |---|---:|---:|---|
-| Tenor | 4.191012 → **3.947980** | 7.195435 → **5.884976** | promote interim leader |
-| Soprano | 4.510623 → **4.256073** | 8.479788 → **6.608431** | promote interim leader |
-| Bass | 4.147851 → **3.569309** | 8.451584 → **5.971764** | promote interim leader |
-| Mezzo | 4.074528 → **3.817482** | 6.529021 → **5.349979** | promote interim leader |
+| Tenor | 4.191012 → **3.948006** | 7.195435 → **5.884976** | promote interim leader |
+| Soprano | 4.510623 → **4.256034** | 8.479788 → **6.608437** | promote interim leader |
+| Bass | 4.147851 → **3.569329** | 8.451584 → **5.971775** | promote interim leader |
+| Mezzo | 4.074528 → **3.817499** | 6.529021 → **5.349978** | promote interim leader |
 
 No strict partial aggregate reaches the 3 dB bar, so the hierarchy does not
 claim that downstream mel, attack or band regressions are solved. The paired
@@ -88,10 +90,10 @@ Current-head source audit hashes are:
 
 | Voice | Source audit SHA-256 | Partial | Log-mel | Band balance | Status |
 |---|---|---|---|---|---|
-| Tenor | `0c58ddccf8f9d26ae1f22e0b8b528037513cce12408d5725f695dc25d50eb02c` | responsive | responsive | responsive | clean |
-| Soprano | `c9cbd36200496ee5915cd3c42c732525b0ccf08186445b0258d84f8fcd8744a7` | responsive | responsive | responsive | clean |
-| Bass | `99dbf39015a586719755504aa66c6a1d355cef768b5ee9455ff6ae1713d48e09` | responsive | responsive | responsive | clean |
-| Mezzo | `78581bce4df836e1d23f3fe102806e57a5444392f8f3b1b9332feed3ede5adf7` | responsive | responsive | responsive | clean |
+| Tenor | `b956c42370566fdbecc0d8b1504ddb39feea934523932b2bbba050bb8ef8dc75` | responsive | responsive | responsive | clean |
+| Soprano | `ebeb0566b309c62ece3feabbf584513ccaf483efc0ca95e14758ed581ec73335` | responsive | responsive | responsive | clean |
+| Bass | `d42204a7d7a91163614ac37169004aa3b2f9a115789df3424a2feefd26929bbd` | responsive | responsive | responsive | clean |
+| Mezzo | `52ff354137d9ddc2f4c91b7fdcc85610ba6400356203d4db9ff813b9d8b1fc46` | responsive | responsive | responsive | clean |
 
 All four identity audits use only the pre-existing minimum responder
 `partialTilt`, manifest hash `a579e74e30d52b3b`, and their unchanged objective
@@ -102,11 +104,11 @@ positive-weight identity objective remains adjustable; it does not grant any
 new weight to breath or Human.
 
 Pass snapshot SHA-256:
-`c3dbe55b232a323b97cc035a483512f98a0c8e63d2c555c2dfc841860dce8eb5`.
+`7ab44cbf4372b525d84bcfa1fcf4aa3bbc6739eea5fc5dea6a825baf398468da`.
 Controllability table SHA-256:
-`b5fbf6fce314166cc25c841df1e027191749cc0f3027cc85e85fdf5aa315236e`.
+`75dd0da3c8db23dbad828fb5176c64ad350ae22b20d1cde19f38355353ce6972`.
 Final exchange source SHA-256:
-`ce318f9b76eba2dc91934ee859cd3a2f65105c1695426edd3a6bcb27bf75a9f7`.
+`8c704c80053c5ff7502043620b74ffe09751fbcb9fa6855c4b530131eab31828`.
 
 ## T-067, F13 and §2.5c
 
@@ -139,7 +141,7 @@ voices, and the rebuilt `sg2-data/listen.html` was checked to link the selected
 - `node scripts/verify_tone_model.mjs` — all tone-model v2 assertions pass
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q` — pass
 - `node scripts/render_note.mjs --verify` — pass,
-  `2327d3987aa4010e6789477423b72f096c8b83ae208e58be837799e4fd668835`
+  `e532d0213fcb9c2986378991742706a4be3cb6b26d5cfb9652eb79e0ad05b47f`
 
 ## Pass-end artifacts and next work
 
