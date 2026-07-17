@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -128,13 +129,15 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     renders = output_dir / "renders"
     renders.mkdir(exist_ok=True)
 
-    # variant parameter sets: base + one per perturbed param
-    variants: dict[str, dict[str, Any]] = {"__base__": dict(baseline_params)}
+    # Variant parameter sets: one fully specified base plus one changed key.
+    # Building the base first prevents early variants from omitting defaults
+    # belonging to later keys in the manifest.
+    base_params = dict(baseline_params)
     for key, (base_value, perturbed, _alt) in free_params.items():
-        params = dict(baseline_params)
-        params[key] = base_value
-        variants["__base__"].setdefault(key, base_value)
-        perturbed_params = dict(variants["__base__"])
+        base_params.setdefault(key, base_value)
+    variants: dict[str, dict[str, Any]] = {"__base__": base_params}
+    for key, (_base_value, perturbed, _alt) in free_params.items():
+        perturbed_params = dict(base_params)
         perturbed_params[key] = perturbed
         variants[key] = perturbed_params
     # T-041: repeat the exact baseline in independent offline render
@@ -242,16 +245,21 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
     for key in free_params:
         perturbed = distances(key)
         matrix[key] = {}
+        direct_rows = []
+        for ref_index in np.flatnonzero(base_ok):
+            try:
+                direct_rows.append(compare_features(
+                    render_bundle("__base__", int(ref_index)),
+                    render_bundle(key, int(ref_index)), weights))
+            except ValueError:
+                continue
         for feature in base:
-            base_vals = np.asarray(base[feature], dtype=float)[base_ok]
-            pert_vals = np.asarray(perturbed[feature], dtype=float)[base_ok]
-            deltas = pert_vals - base_vals
-            finite = deltas[np.isfinite(deltas)]
-            # analysis failures are recorded separately, NOT as responses:
-            # knife-edge references fail under unrelated perturbations (the
-            # seeded noise realisation shifts), and folding that into the
-            # response matrix marked every feature "controllable".
-            matrix[key][feature] = float(np.max(np.abs(finite))) if finite.size else 0.0
+            finite = [float(row["normalized"][feature]) for row in direct_rows
+                      if np.isfinite(row["normalized"].get(feature, math.nan))]
+            # T-007/T-024: controllability is the direct perceptual response
+            # to one changed parameter, not a difference between two
+            # reference losses (which can cancel around an equidistant take).
+            matrix[key][feature] = max(finite, default=0.0)
         any_pert = np.asarray(perturbed[next(iter(base))], dtype=float)[base_ok]
         render_failures[key] = int(np.isnan(any_pert).sum())
 
@@ -264,6 +272,22 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "feature": feature,
             "previousWeight": final_weights[feature],
             "reason": "repeat renders crossed the controllability threshold",
+            "status": "watch-metric",
+        })
+        final_weights[feature] = 0.0
+
+    responsive = {
+        feature: sorted(key for key in matrix
+                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
+        for feature in DEFAULT_WEIGHTS
+    }
+    for feature, weight in sorted(final_weights.items()):
+        if float(weight) <= 0 or responsive.get(feature):
+            continue
+        zero_weighted.append({
+            "feature": feature,
+            "previousWeight": weight,
+            "reason": "no audited free parameter crossed the response threshold",
             "status": "watch-metric",
         })
         final_weights[feature] = 0.0
@@ -284,11 +308,6 @@ def run_audit(instrument: str, baseline_params: dict[str, Any],
             "status": status,
         })
 
-    responsive = {
-        feature: sorted(key for key in matrix
-                        if matrix[key].get(feature, 0.0) >= RESPONSE_THRESHOLD)
-        for feature in DEFAULT_WEIGHTS
-    }
     watch_metrics = [v["feature"] for v in verdicts if v["status"] == "watch-metric"]
     uncontrolled = [v["feature"] for v in verdicts if v["status"] == "UNCONTROLLABLE"]
     objective_references = objective_references or references
