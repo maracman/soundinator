@@ -74,7 +74,7 @@ neutral exponent, preset activation, and the MIDI-90 firewall.
 The integrated T-069 grand response contract is clean with no uncontrolled
 weighted feature: objective `4a867d8f089f7e16`, manifest
 `d2195c508a024123`, parameter manifest `f564a2007ad0e9bf`, renderer
-`d471847ddc6b89a3`, initial `b715bc41ddafb1bd`, and references
+`d35cbe802578e938`, initial `b715bc41ddafb1bd`, and references
 `2b006aeeab6c2d1c`. Repeatability is stable for weighted features; unstable
 watch metrics remain zero. Both controls respond to partial, log-mel, attack,
 and onset-noise observables; the anomaly control is the band-balance responder.
@@ -160,7 +160,8 @@ automation events. No state or leaderboard row is promoted.
 
 After T-072, the integrated first render passes the median mode-1/mode-2 T60
 ratio at 7.404, the all-anchor centre-strike mode-2 dip, six-mode economy, and
-B=0. It still fails the 35-cent ratio gate in upper audible modes: mode 6 at
+B=0. The current shared-head renderer-files hash is `66b07f0af4e365d9`.
+It still fails the 35-cent ratio gate in upper audible modes: mode 6 at
 MIDI 79/84, mode 4 at MIDI 96, and mode 3 at MIDI 103. Those rows lie roughly
 16.9-19 kHz and need a bandwidth-aware output estimator or corrected emitted
 upper-mode level/selection; their failure is not permission to reintroduce B.
@@ -249,6 +250,20 @@ Exit state is protocol §2.5(b), named limiting factors with filed fixes:
 
 ## Verification
 
-Final verification is recorded on the pass-end commit after the listening-page
-rebuild. Targeted damper, L16, L17, L18, bar, and impulse-class assertions pass
-before the full suite is invoked.
+- Zenph damper-reference rebuild: PASS, 333 admitted takes, 23/24 cells.
+- Handoff installer `--check`: PASS, schema
+  `sg2-piano-engine-handoffs-v2`, reference SHA-256
+  `69b869391d45c233da3f43182fcdaa95e0e8c3a0c5ea8593427162aedf3395f0`.
+- Corrected L16 synthetic gate and nylon triage: PASS.
+- Targeted damper/anatomy/bar/impulse-class tests: PASS.
+- `npm test`: PASS, 11/11.
+- `node scripts/verify_tone_model.mjs`: PASS, all tone-model v2 assertions.
+- Full project Python suite: PASS, 256/256.
+- `node scripts/render_note.mjs --verify`: PASS,
+  `faf18ea5a17a9f4acc559f0179e9af55db717ae087dc8b775444c0ed0797c39f`.
+- Current shared-head T-069 audit: clean, renderer contract
+  `d35cbe802578e938`, no uncontrolled weighted feature.
+- Current shared-head T-072 first render: expected residual FAIL only at the
+  upper audible-mode ratio gate; renderer-files hash `66b07f0af4e365d9`.
+- Global `sg2-data/listen.html` rebuild: PASS with fresh harp/glock renders.
+- `git diff --check`: PASS.
