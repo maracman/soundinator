@@ -190,6 +190,14 @@ def test_humanisation_group_is_separate_from_stopping_floor_group():
     assert _pair_group(reference) == reference["humanisationGroup"]
 
 
+def test_bowed_release_metrics_wait_for_a_labelled_bow_lift_contract():
+    for instrument in ("violin", "cello"):
+        weights = weights_for_instrument(instrument)
+        assert weights["release_ring_ms"] == 0
+        assert weights["release_damp_db_per_s"] == 0
+        assert weights["release_noise_db"] == 0
+
+
 def test_human_candidate_requires_double_dissociation_in_both_directions():
     from scripts.tone_match.humanisation import _double_dissociation
     left = {"excitationPosition": .08}
