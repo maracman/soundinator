@@ -167,7 +167,19 @@ async function main() {
         params: { ...job.params, partialMaterial: 0.4, polarisationAmount: 1,
           polarisationSplitCents: 6, polarisationDecayRatio: 2 },
       };
-      const [a, b, inert, coupled] = await renderJobs([job, job, inertJob, coupledJob]);
+      const bowBase = {
+        params: { spectralProfile: "violin", excitationType: "bow", seed: 54054,
+          spectralPartials: 32, spectralMix: 1, excitationHuman: 0,
+          vibratoProb: 0, reverbWet: 0 },
+        midi: 69, velocity: .62, durationSec: .75, sampleRate: 24000,
+      };
+      const bowZero = { ...bowBase,
+        params: { ...bowBase.params, bowNoiseLevel: 0 } };
+      const bowEnabled = { ...bowBase,
+        params: { ...bowBase.params, bowNoiseLevel: 1 } };
+      const [a, b, inert, coupled, bowLegacy, bowOff, bowOnA, bowOnB] =
+        await renderJobs([job, job, inertJob, coupledJob,
+          bowBase, bowZero, bowEnabled, bowEnabled]);
       const pcmDiff = (left, right) => {
         let maxDiff = 0, meanDiff = 0, count = 0;
         for (let ch = 0; ch < left.channels.length; ch++) {
@@ -196,6 +208,18 @@ async function main() {
         total + channel.reduce((sum, sample) => sum + sample * sample, 0), 0);
       if (!(coupledEnergy > 0) || !Number.isFinite(coupledEnergy)) {
         throw new Error(`polarisation render is silent/non-finite: ${coupledEnergy}`);
+      }
+      const bowOffDiff = pcmDiff(bowLegacy, bowOff);
+      if (bowOffDiff.maxDiff > 1 / 32768) {
+        throw new Error(`bowNoiseLevel 0 changed legacy PCM: max diff ${bowOffDiff.maxDiff}`);
+      }
+      const bowRepeatDiff = pcmDiff(bowOnA, bowOnB);
+      if (bowRepeatDiff.maxDiff > 1 / 32768) {
+        throw new Error(`seeded bow-noise render is not deterministic: max diff ${bowRepeatDiff.maxDiff}`);
+      }
+      const bowConsumerDiff = pcmDiff(bowOff, bowOnA);
+      if (bowConsumerDiff.meanDiff <= 1e-7) {
+        throw new Error(`pinned bow-noise consumer is silent: mean diff ${bowConsumerDiff.meanDiff}`);
       }
       const left = a.channels[0], right = a.channels[1];
       let delta = 0, energy = 0;

@@ -27,6 +27,8 @@ import {
   breathVelocityGain,
   toneBreathLevelFor,
   onsetSpectrumGain,
+  bowOnsetWanderPlan,
+  bowScratchPlan,
   registerAttackNoiseAt,
   registerAttackStaggerAt,
   registerEnvelopeAttackAt,
@@ -42,7 +44,12 @@ import {
   bodyAmountFor,
   bodyLogGainAt,
   bodyResponse,
+  bodyAmAutomationEvents,
   bodyResponsesForPartials,
+  bowNoiseBodyFilterDbAt,
+  bowNoisePreBodyGainDbAt,
+  bowNoiseVelocityGain,
+  buildBowNoiseImpulse,
   FORMANT_PRESETS,
   migrateToneParams,
   spaceArrivalDelay,
@@ -408,6 +415,54 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     [1, 2, 8, 32].every(n => onsetSpectrumGain(n, 0) === 1));
   check("positive onset tilt brightens only the transient harmonic print",
     onsetSpectrumGain(16, .5) > onsetSpectrumGain(2, .5));
+  const seeded = (seed) => () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const bowSigns = Array.from({ length: 16 }, (_, seed) => bowOnsetWanderPlan(
+    seeded(Math.imul(seed + 1, 0x9e3779b9) >>> 0), {
+      excitationType: "bow", human: 1, articulationStrength: .2,
+      depthCents: 60, settlePeriods: 12, frequency: 440,
+    }).cents);
+  check("T-031 bow onset wander produces both seeded signs",
+    bowSigns.some(value => value < 0) && bowSigns.some(value => value > 0));
+  check("T-031 bow Human 0 and every non-bow onset remain exact pitch",
+    bowOnsetWanderPlan(seeded(1), {
+      excitationType: "bow", human: 0, articulationStrength: .2,
+      depthCents: 120, settlePeriods: 12, frequency: 440,
+    }).cents === 0 &&
+    bowOnsetWanderPlan(seeded(1), {
+      excitationType: "blow", human: 1, articulationStrength: .2,
+      depthCents: 120, settlePeriods: 12, frequency: 440,
+    }).cents === 0);
+  const scratchBase = { level: .2, freq: 1000, q: .84, decay: .08 };
+  const floated = bowScratchPlan(scratchBase, {
+    excitationType: "bow", articulationStrength: .2, level: 1,
+    durationPeriods: 12, frequency: 220,
+  });
+  const accented = bowScratchPlan(scratchBase, {
+    excitationType: "bow", articulationStrength: .9, level: 1,
+    durationPeriods: 12, frequency: 220,
+  });
+  const highScratch = bowScratchPlan(scratchBase, {
+    excitationType: "bow", articulationStrength: .2, level: 1,
+    durationPeriods: 12, frequency: 440,
+  });
+  check("T-031 scratch colour flips around the measured centroid with articulation",
+    floated.freq > scratchBase.freq && accented.freq < scratchBase.freq);
+  check("T-031 scratch lock-in is period-scaled across pitch",
+    near(floated.decay, highScratch.decay * 2, 1e-12));
+  check("T-031 scratch is bow-only and level zero is exact legacy identity",
+    bowScratchPlan(scratchBase, { excitationType: "blow", level: 1 }) === null &&
+    bowScratchPlan(scratchBase, { excitationType: "bow", level: 0 }) === null);
+  const bowFingerprint = new GenerationEngine({
+    seed: 901, voiceMode: "fourier", spectralProfile: "violin",
+    excitationType: "bow", excitationHuman: 1, onsetWanderCents: 48,
+    onsetWanderSettlePeriods: 10, bowScratchLevel: .8,
+  })._spectralFingerprint(.4, 440, 0);
+  check("T-031 fitted bow controls reach the render fingerprint",
+    bowFingerprint.excitationType === "bow" && bowFingerprint.onsetWanderCents === 48 &&
+    bowFingerprint.onsetWanderSettlePeriods === 10 && bowFingerprint.bowScratchLevel === .8);
 }
 
 console.log("T2: engine excitation transform (normalised against profile default)");
@@ -675,6 +730,37 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
   check("vibrato swing produces AM on a body slope, stillness at the peak",
     dAt(slopeF) > 5 * dAt(730), `slope ${dAt(slopeF).toFixed(4)} vs peak ${dAt(730).toFixed(4)}`);
 
+  const fmT0 = 12;
+  const fmT1 = 14;
+  const fmEvents = Array.from({ length: 221 }, (_, i) => {
+    const time = fmT0 + (fmT1 - fmT0) * i / 220;
+    return { time, cents: 18 * Math.sin(2 * Math.PI * 5.5 * (time - fmT0)) };
+  });
+  const fmNote = {
+    bodyBands: [{ freq: 1210, gain: 5, width: .08 }],
+    bodyAmount: 1,
+    duration: fmT1 - fmT0,
+    _vibratoEvents: fmEvents,
+    _wanderEvents: [{ time: .75, cents: 3 }],
+  };
+  const bodyAm = bodyAmAutomationEvents(fmNote, 1115, fmT0, fmT1, 1, 100);
+  const amDb = bodyAm.map(e => 20 * Math.log10(e.gain));
+  const maxBodyStep = Math.max(...bodyAm.slice(1).map((e, i) => e.time - bodyAm[i].time));
+  check("T-029 body-AM consumer updates at least 100 times per second",
+    bodyAm.length >= 201 && maxBodyStep <= .0100001,
+    `${bodyAm.length} points, max step ${maxBodyStep}`);
+  check("T-029 instantaneous-frequency body gain is audible across 18-cent vibrato",
+    Math.max(...amDb) - Math.min(...amDb) >= 3,
+    `${(Math.max(...amDb) - Math.min(...amDb)).toFixed(3)} dB`);
+  const wanderBefore = bodyAm.filter(e => e.time < fmT0 + .75).at(-1);
+  const wanderAt = bodyAm.find(e => near(e.time, fmT0 + .75, 1e-9));
+  check("T-029 body-AM consumes the shared wander trajectory",
+    wanderBefore && wanderAt && wanderAt.frequency > wanderBefore.frequency,
+    `${wanderBefore?.frequency} -> ${wanderAt?.frequency}`);
+  check("T-029 static body notes preserve the exact legacy graph",
+    bodyAmAutomationEvents({ ...fmNote, _vibratoEvents: [], _wanderEvents: [] },
+      1115, fmT0, fmT1).length === 0);
+
   // Audit A7: the per-partial reg grids are dead
   const GEN5 = {
     seed: 3, tempo: 104, beatDivisions: 2, motifCount: 2, motifLengthBeats: 4,
@@ -701,6 +787,74 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
     auto && vowel && auto.harmonicPartials.some((p, i) => Math.abs(p.amp - vowel.harmonicPartials[i].amp) > 1e-6));
   check("note carries bodyBands + bodyAmount for the renderer",
     vowel && Array.isArray(vowel.bodyBands) && vowel.bodyBands.length === 5 && vowel.bodyAmount > 0);
+}
+
+console.log("T-054: pinned violin bow-noise consumer");
+{
+  const component = MEASURED_PROFILES.violin?.bowNoise;
+  const rows = component?.profile || [];
+  const bands = SPECTRAL_PROFILES.violin?.resonances || [];
+  check("T-054 analysis table reaches the engine as immutable measured data",
+    component?.profilePinned === true && rows.length === 37 && bands.length > 0);
+  const errors = rows.map(row => Math.abs(
+    bowNoisePreBodyGainDbAt(rows, bands, row.freqHz, 48000) +
+    bowNoiseBodyFilterDbAt(bands, row.freqHz, 48000, 1) - row.gainDb));
+  const sorted = errors.slice().sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? Infinity;
+  const p95 = sorted[Math.min(sorted.length - 1,
+    Math.floor(sorted.length * .95))] ?? Infinity;
+  check("T-054 pre-body deconvolution reconstructs the pinned post-body spectrum",
+    median <= 2 && p95 <= 4,
+    `median ${median.toFixed(3)} dB, p95 ${p95.toFixed(3)} dB`);
+  const bodyColour = rows.map(row => Math.abs(
+    bowNoiseBodyFilterDbAt(bands, row.freqHz, 48000, 1)));
+  check("T-054 body bypass measurably removes fixed-frequency colour",
+    Math.max(...bodyColour) >= 1);
+  const impulse = buildBowNoiseImpulse(rows, bands, 48000, 2048);
+  const impulseEnergy = impulse.reduce((sum, sample) => sum + sample * sample, 0);
+  check("T-054 deterministic pre-body FIR is finite and energy-normalised",
+    impulse.length === 2048 && impulse.every(Number.isFinite) &&
+    near(impulseEnergy, 1, 1e-5));
+  const firOffsets = rows.map(row => {
+    const omega = 2 * Math.PI * row.freqHz / 48000;
+    let real = 0, imag = 0;
+    for (let i = 0; i < impulse.length; i++) {
+      real += impulse[i] * Math.cos(omega * i);
+      imag -= impulse[i] * Math.sin(omega * i);
+    }
+    return 20 * Math.log10(Math.max(1e-12, Math.hypot(real, imag))) +
+      bowNoiseBodyFilterDbAt(bands, row.freqHz, 48000, 1) - row.gainDb;
+  });
+  const firMedianOffset = firOffsets.slice().sort((a, b) => a - b)
+    [Math.floor(firOffsets.length / 2)];
+  const firErrors = firOffsets.map(value => Math.abs(value - firMedianOffset))
+    .sort((a, b) => a - b);
+  const firMedian = firErrors[Math.floor(firErrors.length / 2)];
+  const firP95 = firErrors[Math.min(firErrors.length - 1,
+    Math.floor(firErrors.length * .95))];
+  check("T-054 emitted FIR plus unity body recovers the pinned table",
+    firMedian <= 2 && firP95 <= 4,
+    `median ${firMedian.toFixed(3)} dB, p95 ${firP95.toFixed(3)} dB`);
+  check("T-054 fitted velocity law is sublinear and compensates the shared envelope",
+    near(component.levelLaw.velocityExponent, .9309, 1e-6) &&
+    bowNoiseVelocityGain(.2, component.levelLaw.velocityExponent) > 1);
+  const fp = new GenerationEngine({
+    seed: 540, voiceMode: "fourier", spectralProfile: "violin",
+    excitationType: "bow", bowNoiseLevel: 1,
+  })._spectralFingerprint(.2, 440, 0);
+  check("T-054 pinned profile, level and exponent reach the render fingerprint",
+    fp.bowNoise?.profile === component.profile && fp.bowNoiseLevel === 1 &&
+    near(fp.bowNoiseVelocityExponent, .9309, 1e-6));
+  const manifestText = await (await import("node:fs/promises")).readFile(
+    new URL("./tone_match/manifest.json", import.meta.url), "utf8");
+  const freeKeys = JSON.parse(manifestText).continuous.map(row => row.key);
+  check("T-054 pinned spectrum and exponent are absent from the optimiser manifest",
+    !freeKeys.includes("bowNoiseVelocityExponent") &&
+    !freeKeys.includes("bowNoiseProfile") && !freeKeys.includes("bowNoise.profile"));
+  const pp = component.levelLaw.rungs.find(row => row.dynamic === "pp");
+  const ff = component.levelLaw.rungs.find(row => row.dynamic === "ff");
+  check("T-054 measured pp NHR exceeds ff by at least 2 dB",
+    pp.noiseToHarmonicDb - ff.noiseToHarmonicDb >= 2);
 }
 
 console.log("T6: preset migration (T-B9 partial)");
