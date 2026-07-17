@@ -1893,6 +1893,12 @@ def test_reference_render_override_declares_vibrato_role_without_role_leakage():
     assert _reference_render_params_override({"roles": ["floor"]}) == {
         "performanceRole": "non-vibrato",
     }
+    assert _reference_render_params_override({
+        "roles": ["spectral"], "string": "sulD",
+    }) == {"performanceRole": "non-vibrato", "stringSelect": "sulD"}
+    assert "stringSelect" not in _reference_render_params_override({
+        "roles": ["humanisation"], "string": "unlabelled",
+    })
     # Legacy references without explicit roles retain their existing all-role
     # interpretation and therefore still exercise the vibrato scorer.
     assert _reference_render_params_override({}) == {"performanceRole": "vibrato"}

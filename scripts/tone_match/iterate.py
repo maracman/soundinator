@@ -475,7 +475,14 @@ def _feature_analysis_kwargs(instrument: str, reference: dict[str, Any]) -> dict
 def _reference_render_params_override(reference: dict[str, Any]) -> dict[str, str]:
     """Declare the reference role that may alter deterministic render policy."""
     role = "vibrato" if "vibrato" in reference_roles(reference) else "non-vibrato"
-    return {"performanceRole": role}
+    result = {"performanceRole": role}
+    # T-033: a named-string reference must exercise that measured table.
+    # Auto fingering intentionally chooses the lowest playable string, which
+    # is often not the string named by a corpus run at overlapping pitches.
+    string = reference.get("string")
+    if isinstance(string, str) and string.startswith("sul"):
+        result["stringSelect"] = string
+    return result
 
 
 def _render_ship_variants(
