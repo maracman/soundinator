@@ -2,7 +2,7 @@
 
 Date: 2026-07-17  
 Lane: Agent A / engine + blown  
-Base integrated head: `fb63253`  
+Base integrated head: `f537bd3`
 Exit state: **limiting-factor** for all five blown presets  
 Owner decision: **none**
 
@@ -21,8 +21,9 @@ Nothing coherent was lost.
 Two older `sustain-source-r6` result sets had timestamps before the final
 hierarchy gate and evaluated every measured row as active. They are retained as
 non-authoritative crash provenance only. All tables below come from fresh
-current-head audits and `sustain-source-r6-recovery-gated` runs made after the
-gate was final.
+integrated-head audits and `sustain-source-r6-recovery-integrated` runs made
+after the gate was final and the harp/glockenspiel plus bowed/struck landings
+were merged.
 
 The recovered `BLOWN-SUSTAIN-01` handoff remains complete for every required
 cell and preserves every attempted measured row. Activation is deliberately
@@ -51,7 +52,7 @@ consumer is `web/static/measured_profiles.js`.
 ## Current-head controllability
 
 Controllability was rerun before any new FIT evaluation. Every audit is clean
-and repeat-stable, uses renderer contract `fdddf3b9681d1ec7`, and reports no
+and repeat-stable, uses renderer contract `095c293b83ebd244`, and reports no
 uncontrolled weighted feature. `decay_log_ratio` and `vibrato` remain explicit
 zero-weight watch metrics in all five audits.
 
@@ -80,16 +81,16 @@ current objective and fresh SHIP comparison.
 
 | Preset | Loss | Construction pass/fail | Strict tripwire pass/fail/N/A | Missing strict bar-cells | Distribution | Overall |
 |---|---:|---:|---:|---:|---:|---|
-| Flute candidate | 3.738816 | 8/4 | 2/24/49 | 4 | 21/36/4 | FAIL |
-| Flute legacy | 3.738816 | —/4 | —/28/— | — | 21/33/7 | FAIL |
-| Clarinet candidate | 2.855051 | 10/5 | 3/21/42 | 0 | 9/19/5 | FAIL |
-| Clarinet legacy | 2.855051 | —/5 | —/21/— | — | 12/18/3 | FAIL |
-| Alto sax candidate | 3.791824 | 11/5 | 1/23/48 | 6 | 22/35/4 | FAIL |
-| Alto sax legacy | 3.791824 | —/5 | —/29/— | — | 18/35/8 | FAIL |
-| Trumpet candidate | 3.295428 | 10/4 | 1/23/18 | 6 | 2/7/0 | FAIL |
-| Trumpet legacy | 3.295428 | —/4 | —/29/— | — | 4/5/0 | FAIL |
-| French horn candidate | 2.825734 | 14/8 | 5/25/48 | 0 | 20/32/3 | FAIL |
-| French horn legacy | 2.825734 | —/8 | —/25/— | — | 23/26/6 | FAIL |
+| Flute candidate | 3.738809 | 8/4 | 2/24/49 | 4 | 16/39/6 | FAIL |
+| Flute legacy | 3.738809 | —/4 | —/28/— | — | 26/30/5 | FAIL |
+| Clarinet candidate | 2.855045 | 10/5 | 3/21/42 | 0 | 9/21/3 | FAIL |
+| Clarinet legacy | 2.855045 | —/5 | —/21/— | — | 12/17/4 | FAIL |
+| Alto sax candidate | 3.791879 | 11/5 | 1/23/48 | 6 | 23/32/6 | FAIL |
+| Alto sax legacy | 3.791879 | —/5 | —/29/— | — | 20/37/4 | FAIL |
+| Trumpet candidate | 3.295428 | 10/4 | 1/23/18 | 6 | 4/5/0 | FAIL |
+| Trumpet legacy | 3.295428 | —/4 | —/29/— | — | 3/6/0 | FAIL |
+| French horn candidate | 2.825698 | 14/8 | 5/25/48 | 0 | 27/21/7 | FAIL |
+| French horn legacy | 2.825698 | —/8 | —/25/— | — | 23/24/8 | FAIL |
 
 The current strict consumer names missing evidence by bar × register ×
 dynamic. Flute lacks low/pp band-balance plus three pp envelope-peak cells;
@@ -105,7 +106,7 @@ leaderboards remain under `sg2-data/state/<instrument>/leaderboard.json`; the
 three previously selected blown `best.json` backstops remain byte-unchanged,
 and trumpet/horn still have no selected freeze artifact to fabricate. Fresh
 summaries are copied to
-`sg2-data/state/<instrument>/sustain-source-r6-recovery-gated-summary.json`.
+`sg2-data/state/<instrument>/sustain-source-r6-recovery-integrated-summary.json`.
 
 ## Legacy-prior identity
 
@@ -132,11 +133,17 @@ assertions land. No source value is guessed in this pass. T-064 consequently
 remains a neutral later-family adaptation rather than permission to transfer
 struck/plucked values into sung or blown presets.
 
+The newly integrated T-072 bar-mode contract is also correctly preserved as
+`engine=pending-Agent-A`; later status prose for incorporated T-033, T-065 and
+held-strike/pluck T-067 no longer overwrites that separate bar consumer.
+
 ## Listening page, verification and next work
 
-`sg2-data/listen.html` was rebuilt from the current worktree in SHIP mode with
-fresh seeds. The final build seed and section count are recorded in the command
-output and the generated page metadata.
+`sg2-data/listen.html` was rebuilt from integrated engine `f537bd3` in SHIP
+mode with fresh build seed `1784291636`. It contains 16 instruments and this
+build re-rendered 12 sections: alto sax, cello, clarinet, flute, French horn,
+glockenspiel, grand piano, nylon guitar, harp, upright piano, trumpet and
+violin.
 
 Pass-end verification:
 

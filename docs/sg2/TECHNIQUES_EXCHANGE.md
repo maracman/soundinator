@@ -1877,10 +1877,11 @@ prove `envelopeSustain` 0.05 versus 1.0 is PCM-identical. Bow/blow retain their
 existing ADSR semantics. Physical damper tables remain absent where Agent C
 classified the evidence incomplete.
 
-Status update — Agent A recovery reconciliation, 2026-07-17: engine=n/a.
-T-071 is an analysis evidence-admission rule; the preceding named T-033,
-T-065 and T-067 updates belong to those entries and do not make T-071 an
-engine law.
+Status update — Agent A recovery reconciliation, 2026-07-17:
+engine=pending-Agent-A. This status belongs to the T-072 bar-mode consumer;
+the preceding named T-033, T-065 and held-strike/pluck T-067 updates retain
+their own incorporated statuses and do not complete bar-mode T60, free-beam
+strike-position or B-firewall consumption.
 
 ### T-073 · Cello matched-take ranges are measured but decomposition-masked
 Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: cello values only; method shared
