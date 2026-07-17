@@ -104,6 +104,11 @@ Consuming-side assertions:
 6. A preset cannot enable the layer without provenance naming a QC'd licensed
    consonant corpus; until then every consonant score weight is zero.
 
+Landing status (shared head `b5f91b7`, observed during pass-06 finalisation):
+the neutral/provenance-gated A-VOICE-03 class planner and renderer consumer are
+present with executable assertions. No licensed sung consonant row or
+envelope-anomaly class has been activated; their score weights remain zero.
+
 ## A-VOICE-04 · Pitch-synchronous breath in the Fourier/blow path (Agent A, BLOCKS mezzo)
 
 Problem: the current `voiceBreathSync` oscillator exists only in
@@ -156,6 +161,15 @@ Consuming-side assertions (required in the same Agent A landing):
 Defaults-neutral proof: `voiceBreathSync=0` does not create an oscillator or
 automation event.  The new branch is opt-in and affects no non-sung preset
 unless it explicitly enables the already-public parameter.
+
+Landing status (shared head `b5f91b7`, observed during pass-06 finalisation):
+the Fourier/blow consumer, zero-identity proof, octave-tracking proof and body
+route proof are present. Fresh audits at renderer contract
+`6528359e37786bc0` name `voiceBreathSync` as an audible responder for all four
+adult voices. The dedicated `pitch_sync_breath_db` analysis observable and
+corpus-fitted nonzero values remain pending, so construction stays failing at
+the neutral value; this is now an analysis/activation task rather than a
+missing engine consumer.
 
 ## D-VOICE-01 · Sung scorer/runner contracts (Agent D)
 

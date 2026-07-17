@@ -33,6 +33,7 @@ from scripts.tone_match.tail_audit import audit_references
 
 VELOCITY = {"pp": 0.2, "p": 0.28, "mp": 0.45, "mf": 0.62,
             "f": 0.82, "ff": 0.92}
+STRUCK_OBJECTIVE_ROLES = ("spectral", "onset")
 
 VSCO_SOURCE = "https://versilian-studios.com/vsco-community/"
 VSCO_METADATA = "https://freesound.org/people/sgossner/packs/21055/"
@@ -170,7 +171,9 @@ def write_limited_vsco_contracts(samples_root: Path,
                 "midi": row["midi"],
                 "velocity": row["velocity"],
                 "dynamic": row["dynamic"],
-                "roles": ["spectral", "onset", "decay"],
+                # Evidence roles use the shared tripwire taxonomy. Decay is
+                # measured by the spectral objective, not a standalone role.
+                "roles": list(STRUCK_OBJECTIVE_ROLES),
                 "sourceClass": row["sourceClass"],
             } for row in notes],
             "limitations": limitation,
@@ -482,6 +485,15 @@ def rebase_fitted_preset(fitted: dict[str, Any],
     if not isinstance(params, dict):
         raise ValueError("fitted preset must be a parameter object or contain params")
     rebased = dict(params)
+    # A saved best may be the ship-mode listening preset. Rebasing it must
+    # restore the deterministic fit contract and current prior provenance;
+    # iterate also enforces Human=0 at render time, but the manifest itself
+    # must not claim that fitting starts in ship mode.
+    for key in ("excitationHuman", "_sg2Mode", "_sg2Prior"):
+        if key in refreshed_seed:
+            rebased[key] = refreshed_seed[key]
+        else:
+            rebased.pop(key, None)
     # These anchors are generated from measured-profile pitch evidence and are
     # not optimizer-owned. Keeping an old copy after a profile correction
     # silently reintroduces the superseded register model.
@@ -547,7 +559,9 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
                 "dynamic": dynamic,
                 "register": anchor["register"], "durationSec": duration,
                 "articulation": spec["excitation"], "vibrato": "nonvib",
-                "roles": ["spectral", "onset", "decay"],
+                # Evidence roles use the shared tripwire taxonomy. Decay is
+                # measured by the spectral objective, not a standalone role.
+                "roles": list(STRUCK_OBJECTIVE_ROLES),
                 **({"string": anchor["string"]} if anchor.get("string") else {}),
                 "floorGroup": (
                     f"{midi}|{dynamic}|{spec['excitation']}|"

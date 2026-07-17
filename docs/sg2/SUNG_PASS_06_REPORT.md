@@ -19,7 +19,7 @@ No partial or mel strict aggregate cell closed. The residual is not repairable
 with the renderer's one pooled explicit source table: after exact fitted-vowel
 body subtraction, a register × dynamic source counterfactual lowers median
 partial error by 34.6–52.7% across the four voices. `A-VOICE-05` and exchange
-item T-064 therefore specify the missing consuming law. The counterfactual
+item T-065 therefore specify the missing consuming law. The counterfactual
 tables remain diagnostic; no register/dynamic residual was folded into vowel
 bodies or unrelated identity parameters.
 
@@ -93,12 +93,15 @@ present.
 ## L16 disposition
 
 L16's envelope-anomaly mechanism is adapted for possible future sung onsets in
-T-063. A consonant or glottal-onset component may eventually need an onset
+T-064. A consonant or glottal-onset component may eventually need an onset
 boost plus faster per-frequency decay separated from the baseline envelope.
 Piano values and class assignments do not transfer. Sung activation requires
 its own per-partial onset tracks, fixed-Hz versus harmonic-rank separation,
 synthetic round-trip and licensed sung-onset evidence. With A-VOICE-03 still
-unconsumed and zero-weight, no envelope-anomaly fit was run this pass.
+unconsumed during the fit and zero-weight, no envelope-anomaly fit was run this
+pass. Shared head `b5f91b7` landed the neutral, provenance-gated base consonant
+consumer during finalisation; the anomaly-specific law and licensed sung
+evidence remain absent, so activation correctly remains off.
 
 ## Mezzo work outside the breath blocker
 
@@ -107,7 +110,10 @@ current-objective incumbent re-render before comparison. The audit is clean and
 stable; the 0.95 dynamic scalar improves the upstream partial residual and the
 composite from 4.079154 to 4.074528. Emitted vowel bodies and the calibrated
 classifier stay 10/10. A-VOICE-04 remains only the construction failure and was
-not used to idle the source fit.
+not used to idle the source fit. Its engine consumer landed during finalisation
+and fresh audits now prove `voiceBreathSync` is audible, but the fitted values
+remain neutral and the required dedicated analysis observable is still
+pending; no value was invented after the spectral fit.
 
 ## Controllability and prior ledger
 
@@ -115,12 +121,14 @@ not used to idle the source fit.
 |---|---|---|---|---|
 | Tenor | `b6d4a7fe678e2af3` | `a579e74e30d52b3b` | stable | yes |
 | Soprano | `fd6c4e9cf0facd4e` | `a579e74e30d52b3b` | unstable watch zeroed | yes |
-| Bass | `bb1f5ca5bb748c98` | `a579e74e30d52b3b` | stable | yes |
+| Bass | `ba8081c6e2063ac0` | `a579e74e30d52b3b` | stable | yes |
 | Mezzo | `570e3a53d5189bb3` | `a579e74e30d52b3b` | stable | yes |
 
 After merging the advancing shared head, all audits were refreshed and all ten
-objective-comparator score sets were revalidated without metric drift. They
-consume renderer hash `e55f961366e8aad3`. Every fit retains the
+objective-comparator score sets were revalidated without metric drift. The
+final A-VOICE consumer sync changed only bass's objective seal by activating
+previously dead responders; its score values did not drift. All audits consume
+renderer hash `6528359e37786bc0`. Every fit retains the
 pinned `vocal` prior at tag `sg2-legacy`, commit
 `e8d3ac123c0f1c2647c4dbf03d48934b1966564d`, parameter hash
 `8b1047dfbe83d6ba`. FIT scoring is deterministic; selected listening renders
@@ -131,7 +139,8 @@ are fresh-seeded SHIP mode.
 No reconstruction stabilised enough to qualify. Every active voice still
 fails all partial and mel aggregate cells, and deterministic source/body
 reconstruction remains above the 1 dB bar. Tenor, bass and mezzo additionally
-lack the A-VOICE-04 breath consumer. No differential identity widening or
+retain the pitch-sync construction failure at their neutral fitted value; the
+consumer landed only during finalisation. No differential identity widening or
 `humanRanges` claim was emitted; T-055 remains
 `adapted-not-run-identity-unstable` under the §2.5c.1b double-dissociation rule.
 
@@ -148,7 +157,8 @@ No owner decision is required. Next pass order is:
 
 1. consume A-VOICE-05, emit synthetic-round-trip-validated pinned source rows,
    and re-run partial then mel cells;
-2. consume A-VOICE-04 and re-run tenor/bass/mezzo construction;
+2. fit A-VOICE-04 only after its dedicated rendered observable lands, then
+   re-run tenor/bass/mezzo construction;
 3. keep soprano high/p band balance missing until an eligible sustained row is
    acquired; do not weaken the evidence rule;
 4. retain the bass `/a/` classifier watch at 8/10 until its fitted F2 enters

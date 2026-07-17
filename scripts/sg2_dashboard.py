@@ -92,7 +92,7 @@ section{{display:none}}section.sel{{display:block}}</style>
 <code>python3 scripts/sg2_dashboard.py [--render]</code></span></h1>
 <div>{lane_html}</div>
 <nav><button data-t=fleet class=sel>Fleet</button><button data-t=listen>Listen</button>
-<button data-t=progress>Progress</button></nav></header>
+<button data-t=progress>Progress</button><button data-t=versions>Versions</button></nav></header>
 <section id=fleet class=sel><table>
 <tr><th>instrument</th><th>current best</th><th>loss</th><th>vs legacy</th>
 <th>gates (latest pass)</th><th>updated</th></tr>
@@ -101,6 +101,7 @@ section{{display:none}}section.sel{{display:block}}</style>
 instrument's latest run summary. Full per-criterion history in the Progress tab.</p></section>
 <section id=listen><iframe src='listen.html'></iframe></section>
 <section id=progress><iframe src='progress.html'></iframe></section>
+<section id=versions><iframe src='compare.html'></iframe></section>
 <script>document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{{
 document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('sel'));
 b.classList.add('sel');document.getElementById(b.dataset.t).classList.add('sel');}});</script>"""
