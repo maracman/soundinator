@@ -31,6 +31,13 @@ FEATURE_RESPONDERS = {
     "consonant_f2_transition_hz_s": ("locus-low", "locus-high"),
 }
 
+VOICE_AUDIT_MIDI = {
+    "voice-bass": 48,
+    "voice-tenor": 60,
+    "voice-mezzo": 67,
+    "voice-soprano": 72,
+}
+
 
 def _pcm(path: Path) -> tuple[np.ndarray, int]:
     samples, sample_rate = sf.read(path, dtype="float32", always_2d=True)
@@ -78,9 +85,14 @@ def _class_params(fit: dict, name: str) -> dict:
     return common
 
 
-def _render_output_audit(repo_root: Path, fit: dict, tenor_best: Path,
-                         run_root: Path, render_script: Path) -> dict:
-    best = json.loads(tenor_best.read_text())
+def _render_output_audit(repo_root: Path, fit: dict, instrument: str,
+                         voice_best: Path, run_root: Path,
+                         render_script: Path) -> dict:
+    best = json.loads(voice_best.read_text())
+    if best.get("instrument") != instrument:
+        raise ValueError(
+            f"{voice_best} belongs to {best.get('instrument')!r}, not {instrument!r}"
+        )
     base = dict(best["paramsByVowel"]["a"])
     base.update({
         "seed": 70703,
@@ -133,10 +145,11 @@ def _render_output_audit(repo_root: Path, fit: dict, tenor_best: Path,
     render_root = run_root / "renders"
     render_root.mkdir(parents=True, exist_ok=True)
     jobs = []
+    midi = VOICE_AUDIT_MIDI[instrument]
     for name, override in candidates.items():
         jobs.append({
             "params": {**base, **override},
-            "midi": 60,
+            "midi": midi,
             "velocity": 0.62,
             "durationSec": 0.8,
             "sampleRate": 24000,
@@ -157,7 +170,7 @@ def _render_output_audit(repo_root: Path, fit: dict, tenor_best: Path,
         if rate != sample_rate:
             raise ValueError("consonant audit renders have inconsistent sample rates")
     (run_root / "consonant-listening-manifest.json").write_text(json.dumps({
-        "title": "voice-tenor · first fitted consonant onsets (pass 07)",
+        "title": f"{instrument} · fitted consonant onsets (pass 08)",
         "status": "provisional LibriSpeech spoken-to-sung adaptation",
         "baseline": str(render_root / "neutral.wav"),
         "rows": [
@@ -189,7 +202,8 @@ def _render_output_audit(repo_root: Path, fit: dict, tenor_best: Path,
     return {
         "renderer": str(render_script),
         "sampleRate": sample_rate,
-        "midi": 60,
+        "instrument": instrument,
+        "midi": midi,
         "velocity": 0.62,
         "fitMode": True,
         "vowelOnlyToClassRelativeDifferenceDb": neutral_difference,
@@ -213,7 +227,7 @@ def _write_calibration(path: Path, payload: dict) -> None:
     output_audit = payload["outputAudit"]
     calibration = {
         "schemaVersion": 1,
-        "instrument": "voice-tenor",
+        "instrument": payload["instrument"],
         "scope": "first-consonant-onset-classes",
         "status": "fitted-spoken-fallback-provisional-sung-adaptation",
         "sourceFitSha256": payload["fitSha256"],
@@ -244,7 +258,7 @@ def _write_calibration(path: Path, payload: dict) -> None:
                 output_audit["repeatNoiseFloorRelativeDifferenceDb"],
         },
         "activation": (
-            "available to tenor consonant-onset renders; not a replacement "
+            f"available to {payload['instrument']} consonant-onset renders; not a replacement "
             "for the vowel-only identity leaderboard entry"
         ),
     }
@@ -253,8 +267,19 @@ def _write_calibration(path: Path, payload: dict) -> None:
 
 
 def audit(repo_root: Path, fit_path: Path, output: Path, *,
+          instrument: str = "voice-tenor", voice_best: Path | None = None,
           tenor_best: Path | None = None, run_root: Path | None = None,
           render_script: Path | None = None) -> dict:
+    if instrument not in VOICE_AUDIT_MIDI:
+        raise ValueError(
+            f"unsupported voice {instrument!r}; expected one of {sorted(VOICE_AUDIT_MIDI)}"
+        )
+    if voice_best is not None and tenor_best is not None:
+        raise ValueError("pass only one of voice_best or the legacy tenor_best alias")
+    if tenor_best is not None:
+        if instrument != "voice-tenor":
+            raise ValueError("tenor_best alias may only be used with voice-tenor")
+        voice_best = tenor_best
     fit = json.loads(fit_path.read_text())
     params_text = (repo_root / "web/static/params.js").read_text()
     synth_text = (repo_root / "web/static/synth.js").read_text()
@@ -274,9 +299,9 @@ def audit(repo_root: Path, fit_path: Path, output: Path, *,
                       for key in ("plosive", "nasal", "fricative"))
     output_audit = None
     if (generator_landed and consuming_assertion_landed and enough_rows
-            and tenor_best is not None and run_root is not None):
+            and voice_best is not None and run_root is not None):
         output_audit = _render_output_audit(
-            repo_root, fit, tenor_best, run_root,
+            repo_root, fit, instrument, voice_best, run_root,
             render_script or repo_root / "scripts/render_note.mjs",
         )
     output_clean = bool(output_audit and output_audit["passed"])
@@ -290,21 +315,22 @@ def audit(repo_root: Path, fit_path: Path, output: Path, *,
     )
     if not generator_landed or not consuming_assertion_landed:
         status = "blocked-generator-consumer-absent"
-        tenor_fit = "not-run-generator-consumer-absent"
+        voice_fit = "not-run-generator-consumer-absent"
     elif not enough_rows:
         status = "blocked-adapted-evidence-insufficient"
-        tenor_fit = "not-run-adapted-evidence-insufficient"
+        voice_fit = "not-run-adapted-evidence-insufficient"
     elif output_audit is None:
         status = "pending-output-controllability-audit"
-        tenor_fit = "not-run-output-audit-required"
+        voice_fit = "not-run-output-audit-required"
     elif not output_clean:
         status = "blocked-output-controllability"
-        tenor_fit = "not-run-output-audit-failed"
+        voice_fit = "not-run-output-audit-failed"
     else:
-        status = "ready-for-tenor-onset-fit"
-        tenor_fit = "eligible"
+        status = "ready-for-voice-onset-fit"
+        voice_fit = "eligible"
     payload = {
         "schemaVersion": 1,
+        "instrument": instrument,
         "status": status,
         "generatorLanded": generator_landed,
         "consumingAssertionLanded": consuming_assertion_landed,
@@ -317,7 +343,7 @@ def audit(repo_root: Path, fit_path: Path, output: Path, *,
         "earnedFeatureWeights": earned_weights,
         "zeroWeightSafe": zero_weight_safe,
         "classCounts": fitted_classes,
-        "tenorOnsetFit": tenor_fit,
+        "voiceOnsetFit": voice_fit,
         "outputAudit": output_audit,
         "requiredNextAssertion": (
             "A-VOICE-03 neutral PCM + burst/VOT/transition + shared-latent "
@@ -326,13 +352,21 @@ def audit(repo_root: Path, fit_path: Path, output: Path, *,
         "fitPath": str(fit_path),
         "fitSha256": hashlib.sha256(fit_path.read_bytes()).hexdigest(),
     }
+    if voice_best is not None:
+        payload["voiceBestPath"] = str(voice_best)
+        payload["voiceBestSha256"] = hashlib.sha256(voice_best.read_bytes()).hexdigest()
+    if instrument == "voice-tenor":
+        # Compatibility for pass-07 artifacts and existing consumers.
+        payload["tenorOnsetFit"] = voice_fit
     render_note_path = repo_root / "web/static/render-note.js"
     payload["rendererSha256"] = hashlib.sha256(
         synth_text.encode()
         + (render_note_path.read_bytes() if render_note_path.exists() else b"")
     ).hexdigest()
     objective_contract = {
+        "instrument": instrument,
         "fitSha256": payload["fitSha256"],
+        "voiceBestSha256": payload.get("voiceBestSha256"),
         "rendererSha256": payload["rendererSha256"],
         "featureResponders": (output_audit or {}).get("featureResponders", {}),
         "earnedFeatureWeights": earned_weights,
@@ -354,6 +388,9 @@ def main() -> None:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--fit", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--instrument", choices=sorted(VOICE_AUDIT_MIDI),
+                        default="voice-tenor")
+    parser.add_argument("--voice-best", type=Path)
     parser.add_argument("--tenor-best", type=Path)
     parser.add_argument("--run-root", type=Path)
     parser.add_argument("--render-script", type=Path)
@@ -361,18 +398,22 @@ def main() -> None:
     args = parser.parse_args()
     result = audit(
         args.repo_root, args.fit, args.out,
+        instrument=args.instrument, voice_best=args.voice_best,
         tenor_best=args.tenor_best, run_root=args.run_root,
         render_script=args.render_script,
     )
     if args.calibration_out:
         if not result["activationAllowed"]:
-            raise ValueError("refusing to emit tenor consonant fit before clean output audit")
+            raise ValueError(
+                f"refusing to emit {args.instrument} consonant fit before clean output audit"
+            )
         _write_calibration(args.calibration_out, result)
     print(json.dumps({
         "status": result["status"],
         "generatorLanded": result["generatorLanded"],
         "consumingAssertionLanded": result["consumingAssertionLanded"],
-        "tenorOnsetFit": result["tenorOnsetFit"],
+        "instrument": result["instrument"],
+        "voiceOnsetFit": result["voiceOnsetFit"],
     }, indent=2))
 
 

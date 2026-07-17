@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "instrument": "voice-mezzo",
+  "scope": "first-consonant-onset-classes",
+  "status": "fitted-spoken-fallback-provisional-sung-adaptation",
+  "sourceFitSha256": "16d5382ef9c97fcc43e788b51411e49cc5a6d860cce2c3ef17ae381c9aa39b29",
+  "objectiveHash": "0d2b9c4f92e0b3f8",
+  "controllabilityAuditSha256": "54b0c0c4f15bd00595fb01389b84f3bb1c4c48534e94152792b44aec234ea146",
+  "rendererSha256": "dae86a8fc19f34f896c7a61c1276a19c1f9da71fb0438b3fcc48bbf67795a32b",
+  "featureWeights": {
+    "consonant_burst_centroid_hz": 1.0,
+    "consonant_burst_duration_ms": 1.0,
+    "consonant_vot_ms": 1.0,
+    "consonant_f1_transition_hz_s": 1.0,
+    "consonant_f2_transition_hz_s": 1.0
+  },
+  "classes": {
+    "plosive": {
+      "consonantClass": "plosive",
+      "consonantPlace": "alveolar",
+      "consonantVoiced": false,
+      "consonantStrength": 0.75,
+      "consonantBurstDurationMs": 23.8,
+      "consonantVotMs": 24.7,
+      "consonantF2LocusHz": 1800,
+      "consonantTransitionMs": 52.5,
+      "consonantPreBeatMs": 120,
+      "consonantBurstHz": 3210.0884
+    },
+    "nasal": {
+      "consonantClass": "nasal",
+      "consonantPlace": "labial",
+      "consonantVoiced": true,
+      "consonantStrength": 0.75,
+      "consonantBurstDurationMs": 56.0,
+      "consonantVotMs": 0,
+      "consonantF2LocusHz": 1100,
+      "consonantTransitionMs": 52.5,
+      "consonantPreBeatMs": 115.5,
+      "consonantNasalZeroHz": 1000
+    },
+    "fricative": {
+      "consonantClass": "fricative",
+      "consonantPlace": "alveolar",
+      "consonantVoiced": false,
+      "consonantStrength": 0.75,
+      "consonantBurstDurationMs": 70.0,
+      "consonantVotMs": 0,
+      "consonantF2LocusHz": 1800,
+      "consonantTransitionMs": 52.5,
+      "consonantPreBeatMs": 120,
+      "consonantFricativeHz": 5566.5651
+    }
+  },
+  "provenance": {
+    "source": "LibriSpeech dev-clean + LibriSpeech Alignments",
+    "license": "CC BY 4.0",
+    "qc": true,
+    "sourceMode": "spoken-fallback",
+    "sungAdaptationCaveat": "Durations/VOT are provisional speech-to-singing transforms; vowel onset is beat-anchored and the gesture anticipates it. Replace from a licensed sung corpus when available."
+  },
+  "outputVerification": {
+    "passed": true,
+    "vowelOnlyToClassRelativeDifferenceDb": {
+      "plosive": -31.0275,
+      "nasal": -30.1469,
+      "fricative": -36.6137
+    },
+    "featurePerturbationRelativeDifferenceDb": {
+      "consonant_burst_centroid_hz": -40.5416,
+      "consonant_burst_duration_ms": -41.0051,
+      "consonant_vot_ms": -16.4591,
+      "consonant_f1_transition_hz_s": -29.0435,
+      "consonant_f2_transition_hz_s": -34.8604
+    },
+    "provenanceGateNeutral": true,
+    "repeatNoiseFloorRelativeDifferenceDb": -99.6756
+  },
+  "activation": "available to voice-mezzo consonant-onset renders; not a replacement for the vowel-only identity leaderboard entry"
+}

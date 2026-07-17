@@ -1755,3 +1755,37 @@ Affects: L16 bowed profile schema / T-069 consumer / release scorer admission /
 violin plateau interpretation.
 Status: analysis=incorporated bowed=measured-fixedHz-class
 engine=pending-generic-T-069-bowed-consumer L18=blocked-labelled-bow-lift-evidence
+
+Status update — Agent A engine pass, 2026-07-17: T-065/A-VOICE-05 final law
+engine=incorporated+output-audited. Sparse source rows now interpolate only
+inside the joint log-f0/velocity measured hull and project to its nearest
+boundary outside; a missing soprano corner is never manufactured. A singer
+table explicitly owns its observed dynamic source shape and suppresses the
+generic dynamic-brightness law, while blown residual tables retain their
+separately fitted composition. Fresh output audits name the table consumer as
+a clean responder for partial, log-mel and sustain band-balance features in
+tenor `9ba74296`, soprano `f30f2591`, bass `f04db298`, and mezzo `f06aa8d8`.
+
+Status update — Agent A engine pass, 2026-07-17: T-033/T-043
+engine=incorporated. Violin/cello auto selection uses the lowest playable
+string, guitar auto uses minimum fret with the lower-course tie break, explicit
+unplayable selections reject, and selected tables carry their own partial B.
+Headless assertions cover directionality at the same pitch, exact pooled
+fallback and invalid selections for all three instrument layouts.
+
+Status update — Agent A engine pass, 2026-07-17: T-065/A-VOICE-05
+engine=incorporated. All four pinned singer surfaces now interpolate in log-f0
+and velocity before the shared vowel-body stage, clamp at their evidence hull,
+override generic scalar means, and retain the scalar path exactly when absent.
+Assertions prove all fitted tables reach the profile, vowels share the same
+pre-body source, and body transfer remains downstream. Fresh sung campaign
+response audits remain with the sung lane before any new feature weighting.
+
+Status update — Agent A engine pass, 2026-07-17: T-067 held strike/pluck law
+engine=incorporated. Strike/pluck sustain and decay ADSR fields no longer own
+the hold: every resonant mode, including mode 1, continuously free-decays and
+note-off begins fitted register/frequency damper contact or the exact legacy
+fallback. Eight-second output checks pass L18's slope/no-plateau bars and
+prove `envelopeSustain` 0.05 versus 1.0 is PCM-identical. Bow/blow retain their
+existing ADSR semantics. Physical damper tables remain absent where Agent C
+classified the evidence incomplete.

@@ -30,11 +30,20 @@ from scripts.tone_match.sung_consonants import (
     adapt_spoken_measurement,
     parse_phone_tier,
 )
-from scripts.tone_match.sung_consonant_audit import audit as audit_consonant_generator
+from scripts.tone_match.sung_consonant_audit import (
+    VOICE_AUDIT_MIDI,
+    audit as audit_consonant_generator,
+)
 from scripts.tone_match.sung_exchange_status import extract as extract_exchange
 from scripts.tone_match.sung_pass_state import _selection_key
 from scripts.tone_match.sung_spectral_triage import fit_global_dynamic_amount
-from scripts.tone_match.sung_source_tables import _emit_rows, synthetic_round_trip
+from scripts.tone_match.sung_source_tables import (
+    DYNAMIC_COMPOSITION,
+    INTERPOLATION_CONTRACT,
+    _emit_rows,
+    synthetic_round_trip,
+)
+from scripts.tone_match.sung_source_audit import AUDIT_DURATION_SEC, summarize_responses
 from scripts.tone_match.sung_prior import (
     LEGACY_VOCAL_CRAFT,
     LEGACY_VOCAL_PRIOR_HASH,
@@ -313,6 +322,54 @@ def test_consonant_audit_keeps_weights_zero_when_generator_consumer_is_absent(tm
     assert result["tenorOnsetFit"] == "not-run-generator-consumer-absent"
 
 
+def test_consonant_audit_enumerates_all_standard_voice_sections(tmp_path):
+    assert VOICE_AUDIT_MIDI == {
+        "voice-bass": 48,
+        "voice-tenor": 60,
+        "voice-mezzo": 67,
+        "voice-soprano": 72,
+    }
+    repo = tmp_path / "repo"
+    (repo / "web/static").mkdir(parents=True)
+    (repo / "scripts").mkdir()
+    (repo / "web/static/params.js").write_text("")
+    (repo / "web/static/synth.js").write_text("")
+    (repo / "scripts/verify_tone_model.mjs").write_text("")
+    fit = tmp_path / "fit.json"
+    fit.write_text(json.dumps({
+        "featureWeights": CONSONANT_FEATURE_WEIGHTS,
+        "classes": {name: {"count": 8} for name in ("plosive", "nasal", "fricative")},
+    }))
+    for instrument in VOICE_AUDIT_MIDI:
+        result = audit_consonant_generator(
+            repo, fit, tmp_path / f"{instrument}.json", instrument=instrument,
+        )
+        assert result["instrument"] == instrument
+        assert result["voiceOnsetFit"] == "not-run-generator-consumer-absent"
+        assert ("tenorOnsetFit" in result) == (instrument == "voice-tenor")
+
+
+def test_consonant_objective_hash_is_voice_scoped(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "web/static").mkdir(parents=True)
+    (repo / "scripts").mkdir()
+    (repo / "web/static/params.js").write_text("")
+    (repo / "web/static/synth.js").write_text("")
+    (repo / "scripts/verify_tone_model.mjs").write_text("")
+    fit = tmp_path / "fit.json"
+    fit.write_text(json.dumps({
+        "featureWeights": CONSONANT_FEATURE_WEIGHTS,
+        "classes": {name: {"count": 8} for name in ("plosive", "nasal", "fricative")},
+    }))
+    tenor = audit_consonant_generator(
+        repo, fit, tmp_path / "tenor.json", instrument="voice-tenor",
+    )
+    soprano = audit_consonant_generator(
+        repo, fit, tmp_path / "soprano.json", instrument="voice-soprano",
+    )
+    assert tenor["objectiveHash"] != soprano["objectiveHash"]
+
+
 def test_a_voice_05_source_emitter_pools_vowels_without_creating_vowel_sources():
     residuals = []
     for vowel in "ai":
@@ -333,6 +390,29 @@ def test_a_voice_05_source_emitter_passes_synthetic_body_deconvolution_round_tri
     result = synthetic_round_trip()
     assert result["passed"]
     assert result["maxAbsShapeErrorDb"] <= result["toleranceDb"]
+
+
+def test_a_voice_05_contract_forbids_sparse_hull_extrapolation_and_dynamic_double_count():
+    assert "never rectangular extrapolation" in INTERPOLATION_CONTRACT
+    assert "suppress generic spectralDynamicAmount" in DYNAMIC_COMPOSITION
+
+
+def test_a_voice_05_output_audit_requires_partial_mel_and_band_responders():
+    assert AUDIT_DURATION_SEC - .25 - .10 >= 1.0
+    rows = [{
+        "pcmDistinct": True,
+        "repeatNormalized": {
+            "partials_db": 0.0, "log_mel_db": 0.0, "band_balance_db": 0.0,
+        },
+        "surfaceVsFallbackNormalized": {
+            "partials_db": 0.6, "log_mel_db": 0.4, "band_balance_db": 0.2,
+        },
+    }]
+    assert summarize_responses(rows)["passed"]
+    rows[0]["surfaceVsFallbackNormalized"]["band_balance_db"] = 0.01
+    summary = summarize_responses(rows)
+    assert not summary["passed"]
+    assert not summary["responsiveFeatures"]["band_balance_db"]
 
 
 def test_exchange_status_update_is_applied_only_to_its_named_id(tmp_path):

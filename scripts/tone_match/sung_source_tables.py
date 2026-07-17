@@ -23,6 +23,14 @@ from scripts.tone_match.sung_spectral_triage import _reference_residuals
 
 
 VOICE_ORDER = ("tenor", "soprano", "bass", "mezzo")
+INTERPOLATION_CONTRACT = (
+    "joint log-f0 x velocity measured-hull interpolation; project to "
+    "the nearest measured hull boundary outside; never rectangular extrapolation"
+)
+DYNAMIC_COMPOSITION = (
+    "rows contain observed source shape at their measured velocity; "
+    "suppress generic spectralDynamicAmount while a table row is active"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -176,7 +184,8 @@ def build(specs: dict[str, Path]) -> dict[str, Any]:
         "schemaVersion": 1,
         "handoff": "A-VOICE-05",
         "status": "pinned-evidence-ready-engine-consumer-pending",
-        "interpolationContract": "log-f0 x velocity; clamp outside measured hull",
+        "interpolationContract": INTERPOLATION_CONTRACT,
+        "dynamicComposition": DYNAMIC_COMPOSITION,
         "firewall": "one source table per primary singer; rows pooled across vowels",
         "activation": "neutral/pending until engine consumer and fresh controllability audit",
         "syntheticRoundTrip": round_trip,

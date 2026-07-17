@@ -2,7 +2,8 @@
   "schemaVersion": 1,
   "handoff": "A-VOICE-05",
   "status": "pinned-evidence-ready-engine-consumer-pending",
-  "interpolationContract": "log-f0 x velocity; clamp outside measured hull",
+  "interpolationContract": "joint log-f0 x velocity measured-hull interpolation; project to the nearest measured hull boundary outside; never rectangular extrapolation",
+  "dynamicComposition": "rows contain observed source shape at their measured velocity; suppress generic spectralDynamicAmount while a table row is active",
   "firewall": "one source table per primary singer; rows pooled across vowels",
   "activation": "neutral/pending until engine consumer and fresh controllability audit",
   "syntheticRoundTrip": {
@@ -5269,5 +5270,5 @@
       }
     }
   },
-  "evidenceSha256": "4dd80c25716c0054ab3c3cfa6866b8989c8bd438d36c45c6acfcec14fd1433ff"
+  "evidenceSha256": "7caa2ca6bc9268d7aa4e622413bce706812d8a34dc966cfa6724475b9713db7f"
 }

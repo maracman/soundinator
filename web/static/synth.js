@@ -514,11 +514,24 @@ for (const [key, label, seed] of [
   ["voice-tenor", "Tenor voice", "vocal"],
   ["voice-bass", "Bass voice", "vocal"],
   ["voice-mezzo", "Mezzo-soprano voice", "vocal"],
+  ["voice-soprano", "Soprano voice", "vocal"],
 ]) {
   SPECTRAL_PROFILES[key] = {
     label,
     partials: SPECTRAL_PROFILES[seed].partials.map(partial => ({ ...partial })),
   };
+}
+// Source-only soprano identity has no pooled measured row to extend the
+// legacy craft tail. Extend that neutral fallback monotonically; A-VOICE-05
+// replaces these amplitudes whenever its fitted table has evidence.
+while (SPECTRAL_PROFILES["voice-soprano"].partials.length < 64) {
+  const partials = SPECTRAL_PROFILES["voice-soprano"].partials;
+  const previous = partials[partials.length - 1];
+  partials.push({
+    amp: previous.amp * .82,
+    spread: Math.min(.8, (previous.spread ?? .7) + .01),
+    dyn: (previous.dyn ?? 2.2) + .12,
+  });
 }
 
 export function spectralDefaultRegisterSensitivity(index, count = 20) {
@@ -576,6 +589,7 @@ const BODY_FALLBACK_SEEDS = {
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
   "piano-upright": "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
+  "voice-soprano": "vocal",
 };
 
 /** T-035/T-007: resolve the measured-body contract before any consumer.
@@ -1437,6 +1451,7 @@ for (const [key, seed] of Object.entries({
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
   "piano-upright": "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
+  "voice-soprano": "vocal",
 })) {
   SPECTRAL_PERFORMANCE[key] = {
     ...SPECTRAL_PERFORMANCE[seed],
@@ -1480,8 +1495,20 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
   if (Array.isArray(m.partialsByRegister) && m.partialsByRegister.length) {
     prof.partialsByRegister = m.partialsByRegister;
   }
+  if (m.partialsByString && typeof m.partialsByString === "object" &&
+      !Array.isArray(m.partialsByString)) {
+    prof.partialsByString = m.partialsByString;
+  }
+  if (m.spectralPartialsByRegisterDynamic &&
+      Array.isArray(m.spectralPartialsByRegisterDynamic.rows)) {
+    prof.spectralPartialsByRegisterDynamic =
+      m.spectralPartialsByRegisterDynamic;
+  }
   if (Array.isArray(m.attackByRegister) && m.attackByRegister.length) {
     prof.attackByRegister = m.attackByRegister;
+  }
+  if (Array.isArray(m.damperByRegister) && m.damperByRegister.length) {
+    prof.damperByRegister = m.damperByRegister;
   }
   if (m.bowNoise?.profilePinned === true && Array.isArray(m.bowNoise.profile)) {
     prof.bowNoise = m.bowNoise;
@@ -1516,6 +1543,18 @@ for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
     notesAnalysed: m.notesAnalysed || 0,
     vowelFormants: m.vowelFormants || null,
   };
+}
+
+// A-VOICE-05 may have a source-only identity (currently soprano) without a
+// pooled measured partial row. Do not make the generic row a prerequisite for
+// consuming its independently synthetic-gated source surface.
+for (const [profileKey, m] of Object.entries(MEASURED_PROFILES)) {
+  const prof = SPECTRAL_PROFILES[profileKey];
+  if (prof && m?.spectralPartialsByRegisterDynamic &&
+      Array.isArray(m.spectralPartialsByRegisterDynamic.rows)) {
+    prof.spectralPartialsByRegisterDynamic =
+      m.spectralPartialsByRegisterDynamic;
+  }
 }
 
 // ── Tone model v2: resonator core (docs/TONE_MODEL_V2_DESIGN.md §3.2) ──
@@ -1595,6 +1634,173 @@ export function registerProfileAt(profile, fundamentalHz) {
   const ba = Number.isFinite(a.partialB) ? a.partialB : (profile?.performance?.partialB ?? 0);
   const bb = Number.isFinite(b.partialB) ? b.partialB : (profile?.performance?.partialB ?? 0);
   return { partials, partialB: ba + (bb - ba) * t };
+}
+
+const STRING_LAYOUTS = Object.freeze({
+  violin: { policy: "lowest-covering", opens: { sulG: 55, sulD: 62, sulA: 69, sulE: 76 } },
+  cello: { policy: "lowest-covering", opens: { sulC: 36, sulG: 43, sulD: 50, sulA: 57 } },
+  "guitar-nylon": { policy: "minimum-fret", opens: { string6: 40, string5: 45, string4: 50, string3: 55, string2: 59, string1: 64 } },
+  "guitar-steel": { policy: "minimum-fret", opens: { string6: 40, string5: 45, string4: 50, string3: 55, string2: 59, string1: 64 } },
+  guitar: { policy: "minimum-fret", opens: { string6: 40, string5: 45, string4: 50, string3: 55, string2: 59, string1: 64 } },
+});
+
+/** Resolve T-033's physical string/course law. Invalid explicit keys fail. */
+export function resolveStringSelection(profileKey, midi, selection = "auto") {
+  const layout = STRING_LAYOUTS[profileKey];
+  if (!layout) {
+    if (selection !== "auto" && selection != null) {
+      throw new RangeError(`${profileKey} does not support string selection ${selection}`);
+    }
+    return null;
+  }
+  const note = Math.round(Number(midi));
+  const playable = Object.entries(layout.opens)
+    .filter(([, open]) => note >= open && note - open <= 24)
+    .map(([key, open]) => ({ key, open, fret: note - open }));
+  if (selection && selection !== "auto") {
+    if (!(selection in layout.opens)) {
+      throw new RangeError(`${selection} is not valid for ${profileKey}`);
+    }
+    const row = playable.find(candidate => candidate.key === selection);
+    if (!row) throw new RangeError(`${selection} cannot play MIDI ${note}`);
+    return row.key;
+  }
+  if (!playable.length) return null;
+  playable.sort(layout.policy === "minimum-fret"
+    ? (a, b) => a.fret - b.fret || a.open - b.open
+    : (a, b) => a.open - b.open);
+  return playable[0].key;
+}
+
+/** Select a pinned string table, retaining the exact pooled fallback. */
+export function stringProfileAt(profile, profileKey, fundamentalHz,
+                                selection = "auto") {
+  const pooled = registerProfileAt(profile, fundamentalHz);
+  if (!profile?.partialsByString) return pooled;
+  const midi = 69 + 12 * Math.log2(Math.max(1, fundamentalHz) / 440);
+  const key = resolveStringSelection(profileKey, midi, selection);
+  const rows = key && profile.partialsByString[key];
+  if (!Array.isArray(rows) || !rows.length) return pooled;
+  return registerProfileAt({
+    partials: profile.partials,
+    partialsByRegister: rows,
+    performance: profile.performance,
+  }, fundamentalHz);
+}
+
+function interpolatePartials(a, b, t) {
+  const left = Array.isArray(a) ? a : [];
+  const right = Array.isArray(b) ? b : [];
+  const count = Math.max(left.length, right.length);
+  return Array.from({ length: count }, (_, index) => {
+    const av = Number(left[index]?.amp ?? left[index] ?? 0);
+    const bv = Number(right[index]?.amp ?? right[index] ?? 0);
+    return av + (bv - av) * t;
+  });
+}
+
+function sourcePointPartials(points, weights) {
+  return points.reduce((sum, point, index) =>
+    interpolatePartials(sum, point.partials, weights[index] /
+      Math.max(1e-12, weights.slice(0, index + 1).reduce((a, b) => a + b, 0))), []);
+}
+
+/** A-VOICE-05/T-065: linear interpolation inside the joint measured hull. */
+export function sourcePartialsAt(surface, fundamentalHz, velocity) {
+  const rows = Array.isArray(surface) ? surface
+    : Array.isArray(surface?.rows) ? surface.rows : [];
+  const usable = rows.filter(row => Number.isFinite(row?.velocity) &&
+    Number.isFinite(row?.f0Hz ?? row?.f0) && Array.isArray(row?.partials));
+  if (!usable.length) return null;
+  const raw = usable.map(row => ({
+    x: Math.log(Math.max(1, row.f0Hz ?? row.f0)),
+    y: row.velocity,
+    partials: row.partials,
+  }));
+  const xs = raw.map(point => point.x), ys = raw.map(point => point.y);
+  const xMin = Math.min(...xs), xSpan = Math.max(...xs) - xMin;
+  const yMin = Math.min(...ys), ySpan = Math.max(...ys) - yMin;
+  const points = raw.map(point => ({ ...point,
+    nx: xSpan > 1e-12 ? (point.x - xMin) / xSpan : 0,
+    ny: ySpan > 1e-12 ? (point.y - yMin) / ySpan : 0,
+  }));
+  const query = {
+    nx: xSpan > 1e-12
+      ? (Math.log(Math.max(1, Number(fundamentalHz) || 1)) - xMin) / xSpan : 0,
+    ny: ySpan > 1e-12
+      ? ((Number.isFinite(velocity) ? velocity : yMin) - yMin) / ySpan : 0,
+  };
+  const exact = points.find(point =>
+    Math.abs(point.nx - query.nx) <= 1e-12 &&
+    Math.abs(point.ny - query.ny) <= 1e-12);
+  if (exact) return exact.partials.map(partial => partial?.amp ?? partial);
+  if (points.length === 1) {
+    return points[0].partials.map(partial => partial?.amp ?? partial);
+  }
+  // A one-dimensional measured hull (one velocity or one register) retains
+  // exact endpoint clamping without inventing a missing second dimension.
+  if (xSpan <= 1e-12 || ySpan <= 1e-12) {
+    const coordinate = xSpan > 1e-12 ? "nx" : "ny";
+    const q = query[coordinate];
+    const sorted = points.slice().sort((a, b) => a[coordinate] - b[coordinate]);
+    let hi = sorted.findIndex(point => point[coordinate] >= q);
+    if (hi < 0) return sorted[sorted.length - 1].partials.map(p => p?.amp ?? p);
+    if (hi === 0) return sorted[0].partials.map(p => p?.amp ?? p);
+    const a = sorted[hi - 1], b = sorted[hi];
+    const t = (q - a[coordinate]) / (b[coordinate] - a[coordinate]);
+    return interpolatePartials(a.partials, b.partials, t);
+  }
+  const barycentric = (a, b, c) => {
+    const denominator = (b.ny - c.ny) * (a.nx - c.nx) +
+      (c.nx - b.nx) * (a.ny - c.ny);
+    if (Math.abs(denominator) <= 1e-12) return null;
+    const wa = ((b.ny - c.ny) * (query.nx - c.nx) +
+      (c.nx - b.nx) * (query.ny - c.ny)) / denominator;
+    const wb = ((c.ny - a.ny) * (query.nx - c.nx) +
+      (a.nx - c.nx) * (query.ny - c.ny)) / denominator;
+    return { weights: [wa, wb, 1 - wa - wb], area: Math.abs(denominator) };
+  };
+  let local = null;
+  for (let i = 0; i < points.length - 2; i++) {
+    for (let j = i + 1; j < points.length - 1; j++) {
+      for (let k = j + 1; k < points.length; k++) {
+        const candidate = barycentric(points[i], points[j], points[k]);
+        if (!candidate || candidate.weights.some(weight => weight < -1e-10)) continue;
+        if (!local || candidate.area < local.area) {
+          local = { ...candidate, points: [points[i], points[j], points[k]] };
+        }
+      }
+    }
+  }
+  if (local) return sourcePointPartials(local.points, local.weights);
+
+  // Outside the convex hull, project to its nearest boundary segment. This
+  // is the sparse-passaggio firewall: never clamp each axis independently.
+  const cross = (o, a, b) =>
+    (a.nx - o.nx) * (b.ny - o.ny) - (a.ny - o.ny) * (b.nx - o.nx);
+  const sorted = points.slice().sort((a, b) => a.nx - b.nx || a.ny - b.ny);
+  const half = input => {
+    const hull = [];
+    for (const point of input) {
+      while (hull.length >= 2 && cross(
+        hull[hull.length - 2], hull[hull.length - 1], point) <= 0) hull.pop();
+      hull.push(point);
+    }
+    return hull;
+  };
+  const hull = half(sorted).slice(0, -1).concat(half(sorted.slice().reverse()).slice(0, -1));
+  let nearest = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const dx = b.nx - a.nx, dy = b.ny - a.ny;
+    const t = Math.max(0, Math.min(1,
+      ((query.nx - a.nx) * dx + (query.ny - a.ny) * dy) /
+      Math.max(1e-12, dx * dx + dy * dy)));
+    const d2 = (query.nx - a.nx - t * dx) ** 2 +
+      (query.ny - a.ny - t * dy) ** 2;
+    if (!nearest || d2 < nearest.d2) nearest = { a, b, t, d2 };
+  }
+  return interpolatePartials(nearest.a.partials, nearest.b.partials, nearest.t);
 }
 
 // Legacy conversion: the old spectralStretchCents pinned a quadratic cents
@@ -1699,6 +1905,48 @@ export function twoStageDecayPlan(freqHz, material, amount = 0, lateRatio = 1) {
   const a = Math.max(0, Math.min(1, Number(amount) || 0));
   const ratio = Math.max(1, Math.min(8, Number(lateRatio) || 1));
   return { earlyT60, lateT60: earlyT60 * (1 + a * (ratio - 1)), breakpointDb: -18 };
+}
+
+/** L18: interpolate measured note-off damper contact in log-register space. */
+export function damperByRegisterAt(rows, fundamentalHz) {
+  const entries = Array.isArray(rows) ? rows.filter(row =>
+    Number.isFinite(row?.f0) &&
+    Number.isFinite(row?.dampDbPerSecondAtFundamental) &&
+    Number.isFinite(row?.frequencyExponent) &&
+    row.dampDbPerSecondAtFundamental > 0).slice().sort((a, b) => a.f0 - b.f0) : [];
+  if (!entries.length) return null;
+  const hz = Math.max(1, Number(fundamentalHz) || entries[0].f0);
+  let hi = entries.findIndex(row => row.f0 >= hz);
+  if (hi < 0) return { ...entries[entries.length - 1] };
+  if (hi === 0) return { ...entries[0] };
+  const a = entries[hi - 1], b = entries[hi];
+  const t = Math.max(0, Math.min(1, Math.log(hz / a.f0) / Math.log(b.f0 / a.f0)));
+  return {
+    f0: hz,
+    dampDbPerSecondAtFundamental: a.dampDbPerSecondAtFundamental +
+      (b.dampDbPerSecondAtFundamental - a.dampDbPerSecondAtFundamental) * t,
+    frequencyExponent: a.frequencyExponent +
+      (b.frequencyExponent - a.frequencyExponent) * t,
+  };
+}
+
+/** Fitted damper T60 for one resonant mode; null preserves T-023 fallback. */
+export function damperT60Seconds(damper, modeFrequency, fundamentalHz) {
+  if (!damper) return null;
+  const f0 = Math.max(1, Number(fundamentalHz) || 1);
+  const frequency = Math.max(1, Number(modeFrequency) || f0);
+  const rate = Math.max(1e-6, damper.dampDbPerSecondAtFundamental) *
+    Math.pow(frequency / f0, damper.frequencyExponent);
+  return Math.max(.005, Math.min(8, 60 / rate));
+}
+
+/** Pure L18 ADSR disposition used by the renderer and headless contract. */
+export function struckEnvelopePlan(excitationType, attack, sustain) {
+  return usesFreeDecay(excitationType)
+    ? { attack: Math.max(.001, Number(attack) || .004), holdGain: 1,
+        sustainIgnored: true }
+    : { attack: Math.max(.001, Number(attack) || .008), holdGain:
+        Math.max(.05, Math.min(1, Number(sustain) || .6)), sustainIgnored: false };
 }
 
 /** T-021: two close orthogonal modes for string polarisation/unison beating.
@@ -3495,14 +3743,25 @@ export class GenerationEngine {
 
   _spectralFingerprint(velocity = 0.6, fundamentalHz = 261.63, degree = 0,
                        formantPos = null, humanEpisode = null) {
-    const profile = SPECTRAL_PROFILES[this.p.spectralProfile] || SPECTRAL_PROFILES.violin;
-    const registerProfile = registerProfileAt(profile, fundamentalHz);
+    const profileKey = this.p.spectralProfile || "violin";
+    const profile = SPECTRAL_PROFILES[profileKey] || SPECTRAL_PROFILES.violin;
+    const registerProfile = stringProfileAt(
+      profile, profileKey, fundamentalHz, this.p.stringSelect ?? "auto");
     const profilePartials = registerProfile.partials.length ? registerProfile.partials : profile.partials;
     const count = Math.max(1, Math.min(profilePartials.length, Math.round(this.p.spectralPartials ?? 12)));
     const dynamicsAmount = Math.max(0, this.p.spectralDynamicAmount ?? 0.8);
     const resonanceAmount = bodyAmountFor(this.p, profile);
     const velocityRatio = Math.max(0.08, velocity / 0.62);
-    const means = Array.isArray(this.p.spectralPartialMeans) ? this.p.spectralPartialMeans : [];
+    const explicitSourceSurface = this.p.spectralPartialsByRegisterDynamic;
+    const sourceSurface = explicitSourceSurface &&
+      Array.isArray(explicitSourceSurface?.rows ?? explicitSourceSurface)
+      ? explicitSourceSurface : profile.spectralPartialsByRegisterDynamic;
+    const tableMeans = sourcePartialsAt(sourceSurface, fundamentalHz, velocity);
+    const tableOwnsDynamics = Boolean(tableMeans &&
+      typeof sourceSurface?.dynamicComposition === "string" &&
+      sourceSurface.dynamicComposition.includes("suppress generic spectralDynamicAmount"));
+    const means = tableMeans ||
+      (Array.isArray(this.p.spectralPartialMeans) ? this.p.spectralPartialMeans : []);
     const sds = Array.isArray(this.p.spectralPartialSds) ? this.p.spectralPartialSds : [];
     // The Body stage (T5): fixed-Hz resonance bands — instrument body by
     // default ("auto"), or any BODY_PRESETS entry incl. the vowels. This
@@ -3563,7 +3822,7 @@ export class GenerationEngine {
       const harmonic = i + 1;
       // Dynamic-brightness law (T2, audit A14): the per-partial dyn grids
       // are retired — louder playing brightens the top by one global law.
-      const dynamics = Math.pow(velocityRatio,
+      const dynamics = tableOwnsDynamics ? 1 : Math.pow(velocityRatio,
         dynamicBrightness(harmonic, this.p.dynamicBlare, velocityRatio) * dynamicsAmount);
       // Realised mode frequency (T1 law) — body resonances and hardness
       // rolloff both act on where the partial actually sits.
@@ -3586,6 +3845,9 @@ export class GenerationEngine {
         harmonic,
         amp: sampled,
         mean: dynamicMean,
+        // Pre-body pinned source amplitude for A-VOICE-05/T-058 consuming
+        // assertions. This is diagnostic note metadata, not a second path.
+        sourceAmp: amp,
         sd,
         sens,
         registerResponse,
@@ -3706,6 +3968,9 @@ export class GenerationEngine {
       voiceBreathSync: this._clamp(this.p.voiceBreathSync ?? 0, 0, 1),
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
       releaseDamping: this._clamp(this.p.releaseDamping ?? 0, 0, 1),
+      damperByRegister: Array.isArray(this.p.damperByRegister)
+        ? this.p.damperByRegister
+        : (Array.isArray(profile.damperByRegister) ? profile.damperByRegister : null),
       polarisationAmount: this._clamp(this.p.polarisationAmount ?? 0, 0, 1),
       polarisationSplitCents: this._clamp(this.p.polarisationSplitCents ?? 0, 0, 6),
       polarisationDecayRatio: this._clamp(this.p.polarisationDecayRatio ?? 1, 0.25, 4),
@@ -6061,7 +6326,7 @@ export class SynthEngine {
       };
 
       const connectDecay = (tail, modeFreq, modeDecayRatio) => {
-        if (!(material > 0 && harmonic > 1 && usesFreeDecay(note.excitationType))) {
+        if (!usesFreeDecay(note.excitationType)) {
           tail.connect(env);
           return;
         }
@@ -6081,6 +6346,22 @@ export class SynthEngine {
           decayG.gain.setTargetAtTime(0.0001, breakpointTime,
             Math.max(0.02, lateT60 / 6.91));
         }
+        // L18: the held resonator never reaches an ADSR plateau. At note-off
+        // freeze the instantaneous free-decay value and start the independent
+        // damper/contact tail. Positive measured exponents damp highs first.
+        const damper = damperByRegisterAt(note.damperByRegister, note.frequency);
+        const fittedDamperT60 = damperT60Seconds(damper, modeFreq, note.frequency);
+        const fallbackDamperT60 = Math.max(.005, releaseRingSeconds(
+          note.partialMaterial, note.frequency, note.releaseDamping));
+        const damperT60 = fittedDamperT60 ?? fallbackDamperT60;
+        if (typeof decayG.gain.cancelAndHoldAtTime === "function") {
+          decayG.gain.cancelAndHoldAtTime(t1);
+        } else {
+          decayG.gain.cancelScheduledValues(t1);
+        }
+        decayG.gain.setTargetAtTime(0.0001, t1,
+          Math.max(.001, damperT60 / 6.91));
+        note._ringSec = Math.max(note._ringSec || 0, Math.min(8, damperT60));
         tail.connect(decayG);
         decayG.connect(env);
       };
@@ -6530,12 +6811,17 @@ export class SynthEngine {
     const noteDur = Math.max(0.01, t1 - t0);
     const atk = Math.min(noteDur * 0.45, note.envelopeAttack ?? 0.008);
     const dec = Math.min(noteDur * 0.45, note.envelopeDecay ?? 0.04);
-    const sus = vel * Math.max(0.05, Math.min(1, note.envelopeSustain ?? 0.6));
+    const envelopePlan = struckEnvelopePlan(
+      note.excitationType, note.envelopeAttack, note.envelopeSustain);
+    const sus = vel * envelopePlan.holdGain;
     const rel = Math.min(note.envelopeRelease ?? 0.08, noteDur * 0.55);
     // Q8 release ring: material keeps the resonator ringing past note-off
     // at its own T60 instead of the envelope's hard cut (renderers extend
     // their oscillator stop times by note._ringSec to let the tail sound).
-    const ring = releaseRingSeconds(note.partialMaterial, note.frequency, note.releaseDamping);
+    const damper = damperByRegisterAt(note.damperByRegister, note.frequency);
+    const fittedDamperT60 = damperT60Seconds(damper, note.frequency, note.frequency);
+    const ring = fittedDamperT60 ?? releaseRingSeconds(
+      note.partialMaterial, note.frequency, note.releaseDamping);
     const doubleDecay = this._clamp(note.decaySecondStage ?? 0, 0, 1);
     const doubleRatio = this._clamp(note.decaySecondRatio ?? 1, 1, 8);
     note._ringSec = Math.min(3.5, ring * (1 + doubleDecay * (doubleRatio - 1) * 0.5));
@@ -6546,6 +6832,15 @@ export class SynthEngine {
         g.gain.linearRampToValueAtTime(0.0001, t1);
       }
     };
+    if (envelopePlan.sustainIgnored) {
+      // Strike/pluck amplitude after the short attack is owned entirely by
+      // per-mode free decay and the note-off damper law. Keep this shared gate
+      // open so envelopeDecay/envelopeSustain cannot manufacture a plateau.
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(vel, t0 + atk);
+      g.gain.setValueAtTime(vel, t1 + Math.max(.01, note._ringSec || ring));
+      return g;
+    }
     if (note.legatoFromPrevious) {
       const joinFade = Math.min(0.006, noteDur * 0.12);
       g.gain.setValueAtTime(0.0001, t0);

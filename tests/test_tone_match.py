@@ -834,6 +834,23 @@ def test_ship_calibration_scales_only_the_declared_midi_draws():
         midi=62, seed=9) == ship_human_overrides(params, midi=62, seed=9)
 
 
+def test_ship_calibration_nonfinite_midi_scale_is_missing_not_renderer_nan():
+    params = {
+        "excitationHuman": 1.0, "excitationPosition": .13,
+        "humanRanges": {"ranges": {
+            "excitationPosition": {
+                "status": "measured", "drawHalfRange": .1},
+        }},
+    }
+    plain = ship_human_overrides(params, midi=84, seed=9)
+    fitted = ship_human_overrides({
+        **params, "shipHumanCalibration": {
+            "byMidi": {"84": {"excitationPosition": float("nan")}}}},
+        midi=84, seed=9)
+    assert fitted == plain
+    assert all(np.isfinite(value) for value in fitted.values())
+
+
 def test_t031_bowed_controls_are_auditable_but_not_identity_fit_dimensions():
     manifest = json.loads((
         iterate_module.ROOT / "scripts/tone_match/manifest.json").read_text())
