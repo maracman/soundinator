@@ -8552,9 +8552,9 @@ export const MEASURED_PROFILES = {
       "measuredLevelRatio": 0.025
     },
     "humanRanges": {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "instrument": "cello",
-      "method": "matched-take-human-only-differential-v3-double-dissociation-f13-evidence",
+      "method": "matched-take-human-only-differential-v4-double-dissociation-f13-evidence",
       "evidence": {
         "basis": "same-note/dynamic/articulation humanisation plus per-dimension lossless within-run adjacent-note variation",
         "groups": 6,
@@ -8745,6 +8745,7 @@ export const MEASURED_PROFILES = {
         "adjacentTrendPairs": 47,
         "evidenceByDimension": {
           "excitationPosition": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -8752,6 +8753,7 @@ export const MEASURED_PROFILES = {
             "goal": "per-note SHIP variation"
           },
           "vibratoRateHz": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -8759,6 +8761,7 @@ export const MEASURED_PROFILES = {
             "durationMismatchAffectsGoal": false
           },
           "vibratoDepthCents": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -8766,6 +8769,7 @@ export const MEASURED_PROFILES = {
             "durationMismatchAffectsGoal": false
           },
           "vibratoOnsetDelayMs": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -8773,6 +8777,7 @@ export const MEASURED_PROFILES = {
             "durationMismatchAffectsGoal": false
           },
           "vibratoRampMs": {
+            "evidenceGrade": "B-common-window-repeat",
             "strength": "weaker-evidence",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -8780,6 +8785,7 @@ export const MEASURED_PROFILES = {
             "reason": "codec/duration can affect this observable"
           },
           "vibratoRateDriftHzPerSecond": {
+            "evidenceGrade": "B-common-window-repeat",
             "strength": "weaker-evidence",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -8787,6 +8793,7 @@ export const MEASURED_PROFILES = {
             "reason": "codec/duration can affect this observable"
           },
           "sustainNoiseDb": {
+            "evidenceGrade": "B-common-window-repeat",
             "strength": "weaker-evidence",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -8794,6 +8801,7 @@ export const MEASURED_PROFILES = {
             "reason": "codec/duration can affect this observable"
           },
           "onsetNoiseDb": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -8801,6 +8809,7 @@ export const MEASURED_PROFILES = {
             "goal": "per-note SHIP variation"
           },
           "onsetNoiseCentroidOct": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -8808,6 +8817,7 @@ export const MEASURED_PROFILES = {
             "goal": "per-note SHIP variation"
           },
           "noiseLeadMs": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -8815,6 +8825,7 @@ export const MEASURED_PROFILES = {
             "goal": "per-note SHIP variation"
           },
           "onsetWanderCents": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -8822,6 +8833,7 @@ export const MEASURED_PROFILES = {
             "goal": "per-note SHIP variation"
           },
           "onsetSettleMs": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -8829,12 +8841,19 @@ export const MEASURED_PROFILES = {
             "goal": "per-note SHIP variation"
           },
           "attackNoiseLevel": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
             "matchedRepeatPairs": 12,
             "goal": "per-note SHIP variation"
           }
+        },
+        "gradeScale": {
+          "A-lossless-adjacent": "full-strength direct per-note width after within-run register-trend removal",
+          "A-duration-robust-repeat": "full-strength same-note repeat evidence for a duration-robust observable",
+          "B-common-window-repeat": "usable repeat evidence weakened by codec, duration, floor, or window sensitivity",
+          "U-insufficient": "no eligible evidence"
         },
         "doctrine": "F13: evidence strength is per dimension; spec fallbacks never impose a blanket downgrade"
       },
@@ -8961,6 +8980,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -8989,6 +9009,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9017,6 +9038,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9045,6 +9067,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9073,6 +9096,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "B-common-window-repeat",
             "strength": "weaker-evidence",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9101,6 +9125,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9129,6 +9154,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9157,6 +9183,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9185,6 +9212,7 @@ export const MEASURED_PROFILES = {
             "criterion": "both directions required: v1 improves take 1 and worsens take 2; v2 improves take 2 and worsens take 1"
           },
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9206,6 +9234,7 @@ export const MEASURED_PROFILES = {
           "takes": 73,
           "pairs": 47,
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9225,6 +9254,7 @@ export const MEASURED_PROFILES = {
           "takes": 15,
           "pairs": 12,
           "evidence": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9244,6 +9274,7 @@ export const MEASURED_PROFILES = {
           "takes": 15,
           "pairs": 12,
           "evidence": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9263,6 +9294,7 @@ export const MEASURED_PROFILES = {
           "takes": 15,
           "pairs": 12,
           "evidence": {
+            "evidenceGrade": "A-duration-robust-repeat",
             "strength": "full-strength",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9282,6 +9314,7 @@ export const MEASURED_PROFILES = {
           "takes": 15,
           "pairs": 12,
           "evidence": {
+            "evidenceGrade": "B-common-window-repeat",
             "strength": "weaker-evidence",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9301,6 +9334,7 @@ export const MEASURED_PROFILES = {
           "takes": 15,
           "pairs": 12,
           "evidence": {
+            "evidenceGrade": "B-common-window-repeat",
             "strength": "weaker-evidence",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9320,6 +9354,7 @@ export const MEASURED_PROFILES = {
           "takes": 15,
           "pairs": 12,
           "evidence": {
+            "evidenceGrade": "B-common-window-repeat",
             "strength": "weaker-evidence",
             "primaryBasis": "same-note-repeat-common-window",
             "adjacentPairs": 0,
@@ -9339,6 +9374,7 @@ export const MEASURED_PROFILES = {
           "takes": 73,
           "pairs": 47,
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9358,6 +9394,7 @@ export const MEASURED_PROFILES = {
           "takes": 73,
           "pairs": 47,
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9377,6 +9414,7 @@ export const MEASURED_PROFILES = {
           "takes": 73,
           "pairs": 47,
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9396,6 +9434,7 @@ export const MEASURED_PROFILES = {
           "takes": 73,
           "pairs": 47,
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9415,6 +9454,7 @@ export const MEASURED_PROFILES = {
           "takes": 73,
           "pairs": 47,
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,
@@ -9434,6 +9474,7 @@ export const MEASURED_PROFILES = {
           "takes": 73,
           "pairs": 47,
           "evidence": {
+            "evidenceGrade": "A-lossless-adjacent",
             "strength": "full-strength",
             "primaryBasis": "lossless-within-run-adjacent-note-trend-removed",
             "adjacentPairs": 47,

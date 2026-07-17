@@ -58,6 +58,7 @@ from scripts.tone_match.iterate import (
     _write_run_report,
 )
 from scripts.tone_match.legacy_prior import resolve_legacy_prior
+from scripts.tone_match.bowed_source_tables import _string_partials
 from scripts.tone_match.humanisation import fit_excitation_position, ship_human_overrides
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, STRUCK_OBJECTIVE_ROLES, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, iowa_filename_span, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
@@ -236,6 +237,7 @@ def test_f13_adjacent_note_variation_removes_register_trend_per_dimension():
     assert max(result["deltas"]["onsetWanderCents"]) > 0
     evidence = _dimension_evidence(
         "excitationPosition", matched_pairs=2, adjacent_pairs=3)
+    assert evidence["evidenceGrade"] == "A-lossless-adjacent"
     assert evidence["strength"] == "full-strength"
     assert evidence["primaryBasis"] == \
         "lossless-within-run-adjacent-note-trend-removed"
@@ -248,8 +250,26 @@ def test_f13_duration_robust_repeat_is_not_blanket_downgraded():
     noise_floor = _dimension_evidence(
         "vibratoRateDriftHzPerSecond", matched_pairs=4, adjacent_pairs=0)
     assert onset["strength"] == "full-strength"
+    assert onset["evidenceGrade"] == "A-duration-robust-repeat"
     assert onset["durationMismatchAffectsGoal"] is False
     assert noise_floor["strength"] == "weaker-evidence"
+    assert noise_floor["evidenceGrade"] == "B-common-window-repeat"
+
+
+def test_bowed_source_attempt_uses_only_the_named_local_string_table():
+    params = {"partialsByString": {
+        "sulC": [
+            {"f0": 60.0, "partials": [{"amp": 1.0}, {"amp": .2}]},
+            {"f0": 120.0, "partials": [{"amp": .5}, {"amp": .8}]},
+        ],
+        "sulA": [
+            {"f0": 60.0, "partials": [{"amp": .1}, {"amp": 1.0}]},
+        ],
+    }}
+    amount = np.log(90 / 60) / np.log(120 / 60)
+    assert _string_partials(params, "sulC", 90) == pytest.approx(
+        [1.0 + (.5 - 1.0) * amount, .2 + (.8 - .2) * amount])
+    assert _string_partials(params, "sulA", 90) == pytest.approx([.1, 1.0])
 
 
 def test_native_human_episode_requires_hashed_delivery_and_feature_response():

@@ -1263,6 +1263,15 @@ paired assertion.
 Affects: sung_audition.py / sung_features.py / V0.1/V1 / T-007/F4.
 Status: sung=incorporated analysis=ack-required engine=no-escalation-evidenced
 
+Status update — Agent D bowed/analysis pass 06, 2026-07-17: T-058
+analysis=incorporated-paired-consumer-fix. The former pair compared the full
+FIT chain against a body bypass even though downstream `partialTransfer` is
+scheduled after body gain; the activated source surface therefore contaminated
+the body ratio. A dedicated body-audit render now holds the exact measured
+source surface fixed, neutralises partial transfer, attack/breath noise and
+vibrato in both arms, and changes only `bodyBands`. T-058 classification now
+consumes that pair; full FIT scoring remains unchanged.
+
 Status update — Agent E, 2026-07-17: T-055
 sung=adapted-not-run-identity-unstable.  Female2 repeats are admissible soprano
 Human evidence but cannot calibrate female1's identity; tenor, female1 soprano
@@ -1702,6 +1711,16 @@ voice receive nonzero `voiceBreathSync`.
 Affects: A-VOICE-04 / sung_features or shared analysis / construction breath row / tenor,bass,mezzo activation.
 Status: sung=spec-filed-values-neutral analysis=pending-review engine=incorporated-base-consumer
 
+Status update — Agent D bowed/analysis pass 06, 2026-07-17: T-067
+analysis=observable-incorporated-values-still-neutral. The tracked-f0 harmonic-
+subtraction residual-envelope observable is implemented. Its known harmonic +
+body-filtered AM-noise round trip meets the 2% peak and 1 dB prominence
+tolerances. Partial-muted same-seed engine pairs pass: enabled low/high
+prominence is 27.84/28.72 dB, enabled exceeds zero by 21.09 dB, and octave
+tracking error is 0.136%. Lossless VocalSet rows are emitted separately from
+exclusions, but room residuals remain unassessed; `activationEligible=false`,
+feature weight remains zero and every adult `voiceBreathSync` value stays zero.
+
 Status update — Agent D bowed pass 04, 2026-07-17: T-033 remains
 `engine=pending-Agent-A`, with both guitar and bowed contracts ready for the
 same table-selection seam. The live Agent A pass-04 snapshot still records
@@ -2042,3 +2061,25 @@ or fresh responder exists for `pitch_sync_breath_db`; the engine-only consumer
 proof therefore still cannot earn breath weight or a nonzero adult-voice
 `voiceBreathSync` value. With every identity strict aggregate cell failing,
 §2.5c remains `INCONCLUSIVE-MASKED` and no Human range is widened.
+
+Status update — Agent D bowed/analysis pass 06, 2026-07-17: T-073
+analysis=F13-per-dimension-grades-incorporated. Cello emits 47 lossless
+adjacent pairs as grade A for note-local dimensions and retains all 12 matched
+Philharmonia repeats at grade A for duration-robust vibrato rate, depth and
+onset delay. Window/floor-sensitive repeat dimensions are grade B rather than
+blanket-downgrading the fit. The final current-head native-episode audit is
+clean and stable at renderer `bde97ef9a7eddcff`; 4/9 adapters respond and the
+decomposition remains `INCONCLUSIVE-MASKED` pending T-074.
+
+### T-074 · Human adapter audits must isolate the measured causal dimension
+Author: Agent D / bowed analysis · 2026-07-17 · Firewall: method; values per instrument
+Finding: a clean aggregate `excitationHuman` perturbation does not prove every
+measured range is consumed. The current bowed audit responds for 4/9 qualified
+dimensions. Rate and depth sit just below the 0.05 threshold, onset delay is
+zero, scratch multiplies a zero prior and attack-noise consumes its ratio width
+without the declared ×10 calibration. Full mechanisms and five consuming
+assertions are filed in `BOWED_ENGINE_HANDOFFS.md`.
+Affects: measuredHumanEpisode / bowedHumanLevels / vibrato episode prerequisites /
+attack-noise calibration / §2.5c decomposition gate.
+Status: analysis=incorporated bowed=audited-4of9+masked
+engine=pending-five-isolated-adapters sung=adapt-method struck/plucked=adapt-method

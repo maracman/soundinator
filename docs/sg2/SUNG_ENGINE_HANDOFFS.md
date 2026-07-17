@@ -363,3 +363,17 @@ vowel-body consumption gate. No source-law candidate or feature weight is
 promoted. Required correction remains: joint-hull interpolation/projection,
 generic-dynamic suppression while a row is active, and an output assertion on
 realised post-transform amplitudes plus the sung partial/mel/band audit.
+
+Pass-06 Agent D analysis receipt (2026-07-17): the T-067 observable now exists
+in `scripts/tone_match/sung_breath.py`. Its known-residual synthetic round trip
+passes the 2% frequency and 1 dB prominence gates. The partial-muted same-seed
+sync 0/0.8 low pair and octave-high pair also pass (21.09 dB enabled-over-zero,
+0.136% octave error). Lossless VocalSet measurements retain room disposition
+per row; because the current rows are not explicitly room-screened, activation
+remains false and no adult source value or feature weight changes.
+
+The T-058 scorer now uses a dedicated body-on/body-bypass pair with the exact
+source surface fixed and downstream partial transfer, attack/breath noise and
+vibrato neutralised in both arms. This measures the emitted vowel body rather
+than a source-surface/partial-transfer interaction; full FIT identity scoring
+is unchanged.
