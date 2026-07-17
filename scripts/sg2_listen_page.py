@@ -104,6 +104,28 @@ def resolve_best(inst):
         if p: return p, f"{os.path.basename(os.path.dirname(cand))} (newest best)", {}
     return None, None, {}
 
+def resolve_pinned_ship_candidate(inst):
+    """Prefer a verified non-neutral pinned-component SHIP candidate.
+
+    This does not promote or rewrite the identity leaderboard. It prevents the
+    listening page from silently rendering a pre-L17 leaderboard row whose
+    omitted exact-neutral control would mute an installed measured component.
+    """
+    audit_path = f"{SG2}/state/{inst}/pinned-component-activation-l17.json"
+    if not os.path.exists(audit_path): return None
+    audit = json.load(open(audit_path))
+    params_path = audit.get("paramsFile")
+    if not audit.get("passed") or not params_path or not os.path.exists(params_path):
+        raise RuntimeError(f"{inst}: invalid pinned-component SHIP activation audit")
+    params = unwrap(json.load(open(params_path)))
+    if not params:
+        raise RuntimeError(f"{inst}: pinned-component SHIP params are not renderable")
+    active = [row for row in audit.get("components", [])
+              if row.get("applicable") and row.get("active")]
+    if not active:
+        raise RuntimeError(f"{inst}: activation audit contains no active component")
+    return params, "blown-l17-ship-r5 (verified SHIP candidate)", {}
+
 def baseline_params(inst, refs):
     profile = {"piano-grand": "piano", "guitar-nylon": "guitar"}.get(inst, inst)
     exc = {"violin": "bow", "cello": "bow", "harp": "pluck", "glockenspiel": "strike",
@@ -160,6 +182,8 @@ def main():
     for inst in insts:
         refs = json.load(open(f"{SG2}/campaigns/{inst}/references.json"))
         params, label, audition_audio = resolve_best(inst)
+        pinned_ship = resolve_pinned_ship_candidate(inst)
+        if pinned_ship: params, label, audition_audio = pinned_ship
         tag, style = (label, "background:#2a3d2a;color:#9fd89f") if params else \
                      ("BASELINE — no fitted preset yet", "background:#3d332a;color:#d8bd9f")
         if not params: params = baseline_params(inst, refs)

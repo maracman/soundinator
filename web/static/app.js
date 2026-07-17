@@ -674,6 +674,7 @@ const PARAM_DESC = {
   bowScratchLevel: "Level of the period-scaled broadband bow-contact scratch; 0 preserves the legacy onset and fitted values use the shared articulation draw",
   bowNoiseLevel: "Level of the separately measured sustained bow-hair residual; violin uses the pinned L14 spectrum and 0 is exact legacy identity",
   bowNoiseVelocityExponent: "Pinned bow-noise velocity exponent; lower than 1 retains relatively more bow noise at pianissimo without reshaping its measured spectrum",
+  windBreathLevel: "Level of the pinned per-instrument wind-breath component; its measured spectrum, pre-onset placement and independent envelope remain immutable",
   onsetScoopDepthCents: "Measured maximum phrase-start pitch approach from below for weak articulation at full Human; Human 0 hits pitch exactly and depth 0 disables the fitted scoop model",
   onsetScoopSettle: "Measured time for an onset pitch scoop to settle onto the target",
   onsetScoopRearticulatedScale: "Scoop depth retained for a separately tongued note inside a phrase; legato always has zero scoop",
@@ -9093,7 +9094,7 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetWanderCents","onsetWanderSettlePeriods","bowScratchLevel","bowNoiseLevel","bowNoiseVelocityExponent","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","windBreathLevel","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetWanderCents","onsetWanderSettlePeriods","bowScratchLevel","bowNoiseLevel","bowNoiseVelocityExponent","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
     "dynamicBlare","decaySecondStage","decaySecondRatio","releaseDamping","polarisationAmount","polarisationSplitCents","polarisationDecayRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
@@ -14418,6 +14419,7 @@ function chInspectorHTML(p) {
           ${controlRow("breathVelocityExponent", "Air velocity curve", p.breathVelocityExponent ?? 1, 0, 2, 0.01)}
           ${controlRow("breathTurbulence", "Air turbulence", p.breathTurbulence ?? 0, 0, 1, 0.01)}
           ${controlRow("breathBodyAmount", "Air through body", p.breathBodyAmount ?? 0, 0, 1, 0.01)}
+          ${controlRow("windBreathLevel", "Pinned wind breath", p.windBreathLevel ?? 0, 0, 2, 0.01)}
           ${controlRow("attackNoiseDirect", "Independent onset", p.attackNoiseDirect ?? 0, 0, 1, 0.01)}
           ${controlRow("attackNoiseVelocityExponent", "Onset velocity curve", p.attackNoiseVelocityExponent ?? 1, 0, 2, 0.01)}
           ${controlRow("onsetSpectrumTilt", "Onset harmonic tilt", p.onsetSpectrumTilt ?? 0, -1, 1, 0.01)}
