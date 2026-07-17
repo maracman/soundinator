@@ -133,7 +133,7 @@ def render_if_stale(inst, params, refs, commit, profile_hash):
         return p
     jobs = [{"params": job_params(r, i), "midi": r["midi"], "velocity": r["velocity"],
              "durationSec": r["durationSec"], "sampleRate": 48000,
-             "out": f"{outdir}/note-{i}.wav"} for i, r in enumerate(refs)]
+             "out": f"{outdir}/.new-note-{i}.wav"} for i, r in enumerate(refs)]
     jobs_path = f"{outdir}/jobs.json"
     json.dump(jobs, open(jobs_path, "w"))
     # Agents merge to the served branch continuously; a batch can catch a
@@ -146,6 +146,8 @@ def render_if_stale(inst, params, refs, commit, profile_hash):
     else:
         raise subprocess.CalledProcessError(r.returncode, r.args,
                                             output=r.stdout, stderr=r.stderr)
+    for i in range(len(refs)):
+        os.replace(f"{outdir}/.new-note-{i}.wav", f"{outdir}/note-{i}.wav")
     json.dump(want, open(stamp_path, "w"))
     return True
 
