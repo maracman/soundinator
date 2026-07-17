@@ -288,6 +288,28 @@ Every run report includes the controllability table, so "the agent is
 being scored on something it cannot adjust" is impossible by
 construction.
 
+**Empirical criteria hierarchy (owner, 2026-07-17).** The validation
+criteria form a dependency hierarchy. A theoretical ordering exists
+(T0 pitch/partial-membership → spectral amplitudes → temporal →
+modulation → noise/transients → humanisation; upstream failure masks
+downstream measurement), but the hierarchy is also TRACKED EMPIRICALLY:
+1. Every accepted optimiser step persists the full per-feature loss
+   vector (already computed each evaluation).
+2. Directed drift events are logged: step improves criterion A while
+   degrading criterion B beyond the noise floor ⇒ event A⊣B. The
+   accumulated asymmetry matrix (across passes and instruments) defines
+   measured edges: A→B when drift is significantly asymmetric.
+3. The measured graph's topological order is the working hierarchy;
+   emitted to `sg2-data/state/criteria-drift.json` for the owner
+   progress page. Disagreements with the theoretical tiers are flagged
+   findings: either an unpredicted physical coupling, or two features
+   measuring the same thing (strong SYMMETRIC coupling ⇒ candidates for
+   merging/reweighting — a scorer-redundancy detector for free).
+4. Consumption: triage order and masking flags follow the MEASURED
+   hierarchy once it has evidence (falling back to theoretical tiers
+   where sparse); optimisers converge upstream criteria before spending
+   budget downstream.
+
 Composite = weighted sum; weights start uniform-per-feature and are tuned
 once against ear judgements on the first converged family (a single
 listening session), then frozen so scores stay comparable across
@@ -429,12 +451,35 @@ stopping floor (§2.5). Additionally:
    depth/settle, drive level, vibrato depth/phase, onset noise level).
    The per-parameter deltas between matched takes are MEASUREMENTS of
    human variation.
-2. **Decomposition validation (falsifiable)**: if matched takes cannot be
-   reconciled within the Human-designated set — if identity parameters
-   (body bands, B, material, base tables) must move to explain
-   take-to-take differences — the model has misfiled human variation as
-   instrument structure. That is a §2.5(b) limiting factor; file it, do
-   not widen the identity set to absorb it.
+1b. **Qualification criterion — DOUBLE DISSOCIATION (owner, 2026-07-17)**:
+   a parameter qualifies as a humanisation parameter for an instrument
+   only if it TRADES OFF between matched takes: frozen at v₁ it improves
+   the match to take 1 AND worsens take 2; frozen at v₂ it improves
+   take 2 AND worsens take 1. The playing range is the interval swept
+   between per-take optima (pooled across pairs → the humanRanges
+   distribution). A parameter that improves both takes at the same value
+   is an IDENTITY parameter mis-filed as human — move it to the identity
+   fit. A parameter that never trades off is not humanisation for that
+   instrument. Because qualified parameters are physical playing
+   properties, every value inside the swept range corresponds to
+   something a real player did — which is the naturalness guarantee for
+   per-note draws.
+2. **Decomposition validation (falsifiable, THREE-VALUED — owner
+   correction 2026-07-17)**: the verdict distinguishes two failure causes
+   that must never be conflated:
+   - **PASS**: matched takes reconcile within Human-designated params.
+   - **FAIL-MISSING-DOF**: takes do not reconcile AND the per-take
+     identity fit is itself good (each take individually fits near the
+     §3 bars through a fully-functional render path) — only THEN is the
+     residual evidence of a missing human degree of freedom.
+   - **INCONCLUSIVE-MASKED**: takes do not reconcile but the identity
+     fit is poor or any consumed render component is non-functional —
+     the residual is dominated by model/renderer misfit and says nothing
+     about the human axis yet. Re-run after the masking defect clears.
+   In all non-PASS cases: file the limiting factor, never widen the
+   identity set to absorb it. The measured take-pair spread tables are
+   valid standalone evidence regardless of verdict (they are
+   model-independent measurements).
 3. **Calibrated ranges**: the observed delta distributions become the
    per-instrument humanisation ranges — the Human dial at 1.0 spans the
    measured take spread, so any draw within range is a humanly-possible
@@ -869,6 +914,41 @@ regressions.
    (§2.5), and every session must end with an improvement, a named
    limiting factor + filed fix, or that demonstration. Best-so-far presets
    are never regressed.
+14. **Soundscape synth phase — PROPOSED, GATED** (owner, 2026-07-17):
+    a future SG2 extension for non-instrument sounds fitting the app's
+    philosophy — rainfall, wind, engine sounds, breathing, fans, etc.
+    Phase shape when unlocked: (a) brainstorm + research annex of
+    synthesisable-and-useful sounds, taxonomised into CONTINUOUS
+    (wind, fans, engines, breathing) vs HITS (drips, impacts, gusts);
+    (b) recorded-reference availability check per candidate BEFORE any
+    modelling (same corpus methodology; licence-checked); (c) campaign
+    per accepted sound under the standard loop. Technical note: the
+    engine's newest machinery is unusually well-suited (noise-floor
+    architecture T-001, envelope-anomaly classes L16, bar/membrane
+    resonator classes, stochastic per-note draws) — rain is an ensemble
+    of hits, an engine is periodic+noise, wind is a body-filtered noise
+    floor. **HARD GATE (owner: "before embarking I need to see the
+    current models reach a higher level of accuracy — I'm not confident
+    we can get there")**: no soundscape work of any kind until [proposed
+    unlock, owner-adjustable]: at least two instrument families have
+    presets passing ALL gate families (construction + tripwires +
+    distributional) with an owner listening verdict of "same instrument,
+    different player". Until then this decision exists only so the idea
+    and gate are on record.
+13. **Criteria-gap verdicts** (owner, 2026-07-17): (a) **Loudness stays
+    normalised** — sources are inconsistently level-normalised, so
+    absolute-loudness fitting would fit recording levels, not
+    instruments; "ff feels ff" is carried by normalisation-surviving
+    features (tilt, blare, noise ratio). Do not add a loudness
+    criterion. (b) **Release/note-off criterion commissioned,
+    corpus-gated**: a mechanical TAIL AUDIT first labels every
+    reference `hasRelease` (energy decays into the noise floor before
+    file end) vs truncated; release features (post-note-off ring time,
+    damp rate, release noise) exist ONLY on hasRelease rows, and
+    acquisition prefers full-tail takes. (c) **Note transitions remain
+    out of scope** (single-note fitting) — the tail audit additionally
+    tags phrase/legato takes (Philharmonia has them) as future
+    transition material, unscored for now.
 12. **Sung targets revised to standard voice sections** (2026-07-17):
     the sung family targets are now the typical section types —
     **soprano, mezzo-soprano, tenor, bass** — each fitted from its
