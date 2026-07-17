@@ -12,7 +12,7 @@ The live renderer does not implement the owner's piano envelope law. Its
 the fundamental. The new L18 construction metric makes this audible plateau
 an automatic struck/plucked failure. On the existing ship renders, all 10
 grand notes and all 21 upright notes fail the plateau-fraction bound. The
-engine law and exact consuming assertions are filed to Agent A as T-066.
+engine law and exact consuming assertions are filed to Agent A as T-067.
 
 One synthetic-gated extractor now measures the four composed anatomy parts:
 baseline/two-stage hold decay, a separate damper knee, envelope-deviant
@@ -23,7 +23,7 @@ Durable artifacts are under `sg2-data/analysis/piano-anatomy/`.
 
 Nylon spectral fitting did not resume. L18 changes the render graph against
 which every partial/mel/band residual is measured; optimising the old graph
-would make the residual comparison stale immediately. T-066 is therefore the
+would make the residual comparison stale immediately. T-067 is therefore the
 named engine blocker for grand, upright, and nylon continuation.
 
 ## L18 — held key is free decay; release is damper re-contact
@@ -88,7 +88,7 @@ The grand/upright sets overlap only partly and have different lowest classes.
 That is the requested free validation: the extractor did not copy one generic
 piano transient table. The absence of real fixed-Hz classes is also retained
 as negative evidence, even though the synthetic 2.8 kHz fixture proves that
-the fixed-Hz branch is detectable. T-068 files the immutable class schema and
+the fixed-Hz branch is detectable. T-069 files the immutable class schema and
 render consumer to Agent A.
 
 ## L17 — piano action noise as the pre-onset validation case
@@ -106,9 +106,10 @@ pre-onset transient with a measured post-peak fall, and rendered median
 | Iowa grand | measured | 5 usable lossless notes; pp profile from 2 pitches (peak -5 ms, -20 dB release 5 ms) and ff profile from 3 pitches (peak -25 ms, release 25 ms); pooled median lead 81.270 ms; 2 rows rejected for no usable pre-roll and 3 for no >=8 dB broadband pre-strike transient |
 | VSCO upright | insufficient pre-roll | all 21 files begin within 2–3 ms of action/strike; no grand values transferred |
 
-T-067 files the shared negative-time scheduler and independent-envelope
-consumer to Agent A. No action component is activated in a preset until that
-consumer assertion passes. The upright needs source files with genuine
+T-068 records the piano adapter for the now-landed shared negative-time
+scheduler and independent-envelope consumer. No piano action component is
+activated until that adapter preserves the fitted point envelope and the
+preset assertion passes. The upright needs source files with genuine
 pre-roll; this is a corpus gap, not permission to infer action noise from the
 grand.
 
@@ -124,7 +125,7 @@ of the old objectives, but v6 correctly invalidates them for any new fit.
 | Nylon guitar | pass15-band-attack | yes | `7bb86235d85a5123` | `340412ce5aa8a9ca` | stale — L18 consumer pending |
 
 No positive-weight uncontrolled feature was present in any of those exact
-contracts. A fresh audit is mandatory after T-066/T-067/T-068 consumption;
+contracts. A fresh audit is mandatory after T-067/T-068/T-069 consumption;
 L16/L17 weights remain zero until their exact engine responders pass it.
 
 ## Gate table
@@ -140,7 +141,7 @@ shipped or interim-shippable.
 | L18 no-plateau construction | **FAIL (10/10 notes)** | **FAIL (21/21 notes)** | PASS metric; semantics blocked |
 | Latest comparable tripwires | FAIL (7 pass / 40 fail / 13 N/A) | FAIL (2 / 80 / 44) | FAIL (6 / 18 / 12) |
 | L16 extractor synthetic gate | PASS | PASS | PASS method-only |
-| L17 preset activation | BLOCKED engine | BLOCKED corpus + engine | N/A |
+| L17 preset activation | BLOCKED piano profile adapter | BLOCKED corpus + profile adapter | N/A |
 | Resource tripwire | PASS | PASS | PASS |
 | Distributional ship gate | INSUFFICIENT | INSUFFICIENT | INSUFFICIENT |
 | Reference-variability floor | INSUFFICIENT | INSUFFICIENT | INSUFFICIENT |
@@ -165,9 +166,9 @@ Generated from the live exchange file for this pass's new obligations:
 
 | Entry | Struck/plucked status |
 |---|---|
-| T-066 held strike/pluck + damper law | analysis assertion incorporated; engine pending Agent A; physical damper table incomplete |
-| T-067 pinned pre-onset independent envelope | extraction and preset assertion incorporated; engine pending Agent A; upright pre-roll blocked |
-| T-068 envelope-deviation classes | both-piano extraction incorporated; engine pending Agent A |
+| T-067 held strike/pluck + damper law | analysis assertion incorporated; engine pending Agent A; physical damper table incomplete |
+| T-068 pinned pre-onset independent envelope | shared generic consumer landed; piano point-envelope adapter and activation pending; upright pre-roll blocked |
+| T-069 envelope-deviation classes | both-piano extraction incorporated; engine pending Agent A |
 | T-059 criterion drift | no optimiser step this pass; no fabricated edge |
 | T-060 release audit | adapted; full-tail is no longer conflated with proven key-off |
 | T-063 measured Human episodes | adapted; no new Human range emitted without qualified consumers |
@@ -176,12 +177,12 @@ Generated from the live exchange file for this pass's new obligations:
 
 Exit state §2.5(b): named, evidenced limiting factors with filed fixes.
 
-1. T-066: Agent A must remove struck/plucked sustain semantics, include mode
+1. T-067: Agent A must remove struck/plucked sustain semantics, include mode
    1 in free decay, and consume per-register frequency-dependent damper rates.
-2. T-067: Agent A must support negative-time pinned components with their own
-   fitted envelopes; grand activation remains blocked until the exact consumer
-   passes.
-3. T-068: Agent A must consume pinned envelope-anomaly classes before their
+2. T-068: adapt the grand point envelope and spectra to the landed
+   `pinnedNoiseComponents` consumer without loss, then pass the mandatory
+   preset activation assertion.
+3. T-069: Agent A must consume pinned envelope-anomaly classes before their
    measured assignments enter piano presets.
 4. Acquire note-off-aligned lossless damper takes for grand mid/treble and all
    upright registers, plus upright takes with genuine pre-roll.

@@ -1396,7 +1396,7 @@ all family campaign adapters.
 Status: engine=incorporated `b5f91b7` analysis=pending-review
 struck/plucked=adapt-method sung=adapt-method bowed=adapt-method
 
-### T-066 · ENGINE LAW SPEC (Agent A): held strike/pluck = free decay, note-off = damper contact
+### T-067 · ENGINE LAW SPEC (Agent A): held strike/pluck = free decay, note-off = damper contact
 Author: Agent C / struck-plucked · 2026-07-17 · Firewall: mechanism; decay and damper values per instrument
 Finding: owner L18 makes an ADSR sustain plateau a construction error for
 impulse-driven resonators. The live renderer still schedules
@@ -1457,7 +1457,7 @@ are NOT emitted as engine values. L18 release status is therefore
 `blocked-incomplete-physical-damper-fit`; acquire note-off-aligned damper
 takes for the uncovered registers. This does not weaken the no-plateau law.
 
-### T-067 · ENGINE SPEC (Agent A): pinned pre-onset components carry independent envelopes
+### T-068 · ENGINE SPEC (Agent A): pinned pre-onset components carry independent envelopes
 Author: Agent C / struck-plucked · 2026-07-17 · Firewall: component architecture; spectrum/envelope/level values per instrument
 Finding: L17 extraction on the lossless Iowa grand corpus confirms an audible
 pitch-invariant `pianoActionNoise` component leading harmonic tone onset.
@@ -1502,11 +1502,13 @@ and rendered median
 
 Affects: note scheduling/pre-roll / shared pinned-noise renderer / measured
 profile schema / L17 items 2–5 / piano action-noise preset.
-Status: engine=pending-Agent-A analysis=incorporated (synthetic round trip,
-grand extraction, upright insufficiency classification, activation assertion)
-struck/plucked=blocked-consumer before profile activation
+Status: engine=incorporated-generic-L17-consumer analysis=incorporated
+(synthetic round trip, grand extraction, upright insufficiency classification,
+activation assertion) struck/plucked=blocked-piano-schema-adapter-and-profile-
+activation; the shared consumer uses `pinnedNoiseComponents`, so the fitted
+point envelope must be mapped without loss and pass its preset audit
 
-### T-068 · ENGINE SPEC (Agent A): pinned envelope-deviation classes
+### T-069 · ENGINE SPEC (Agent A): pinned envelope-deviation classes
 Author: Agent C / struck-plucked · 2026-07-17 · Firewall: mechanism; class assignments and values per instrument
 Finding: the L16 synthetic round trip recovers both an injected harmonic-rank
 class and fixed-Hz class after fitting the baseline T60(f) law. Real grand
@@ -1537,6 +1539,53 @@ measured profile schema / L16 / piano, guitar, harp, and bar consumers.
 Status: engine=pending-Agent-A analysis=incorporated (round trip + both-piano
 extractions) struck/plucked=blocked-consumer before anomaly classes can enter
 a preset
+### T-066 · Pinned pre-onset noise is a component contract, not a tone-ADSR colour
+Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-instrument data
+Finding: L14's cross-pitch residual separator generalises to L17 only when the
+output retains four independent measured parts: pinned spectrum, established
+family level law, pre-onset placement from the canonical `noise_lead_ms`
+sense, and a component-owned swell/peak/settle/release envelope.  Lossless
+source provenance and codec are both checked before extraction, and each real
+instrument/component artifact must match its own passing engine-synthetic
+round-trip artifact.  A common `pinnedNoiseComponents.<id>` schema prevents
+bow/wind/piano implementations from forking while preserving violin's legacy
+`bowNoise` adapter.
+
+Wind result: six Iowa AIFF-derived rows per instrument (three pitches each at
+pp/ff) pass the synthetic gate.  Flute and clarinet pass the <=3 dB median
+cross-pitch commonality gate at both dynamics and emit separate pp/ff tables;
+their cross-dynamic shapes are not stable, so pooling them into one dynamic-
+neutral shape would discard evidence.  Alto sax's first three-pitch rung
+failed at 5.086 dB pp / 4.006 dB ff and remains preserved.  The next admissible
+rung segments all six underlying lossless chromatic runs with the canonical
+campaign selector: 64 unique notes (32 pp/32 ff).  All six source-run pools
+then pass at 1.464--2.813 dB median error; 26 bands survive artifact/floor
+screening with +2.169 dB minimum p25 source-floor margin.  The dense result,
+not the failed sparse table, is installed.  This preserves L14's analysis-
+then-simulation discipline without relaxing a gate or inventing values.
+The durable first-rung blocker is `wind-breath/records.json` (5.086/4.006 dB);
+the passing evidence is `wind-breath/records-dense.json` plus
+`wind-breath/profile-dense.json` (source-run errors pp 2.446/1.464/2.813 dB,
+ff 2.440/1.983/2.362 dB).
+
+Consuming assertions: a profile-bearing component is immutable to the
+optimiser; `engineContract.excitationTypes` prevents borrowed profiles from
+activating on the wrong excitation; ship presets activate the named level
+control; rendered component onset precedes harmonic t0 by the interpolated
+placement law; and the applied envelope independently reproduces measured
+swell, peak, settle and release rather than following tone ADSR alone.
+
+Affects: `bow_noise.py` / measured profile generation / shared pinned-noise
+renderer / activation assertions / wind and future piano action extraction.
+Status: analysis=incorporated blown=incorporated-flute-clarinet-alto-sax
+engine=pending-consumer bowed=legacy-compatible
+struck/plucked=adapt-method sung=adapt-method
+
+Status update — integration audit, 2026-07-17: engine=incorporated. The live
+tone-model verifier proves measured positive pre-onset placement, independent
+component envelope consumption, separate pp/ff pinned spectra, non-neutral
+factory-preset activation, and engine-wide activation coverage for all three
+wind profiles plus violin's legacy bow adapter.
 
 ### T-064 · Envelope-anomaly classes may transfer to sung onsets, not values
 Author: owner L16 / sung lane disposition · 2026-07-17 · Firewall: mechanism only

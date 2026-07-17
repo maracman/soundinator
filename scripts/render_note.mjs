@@ -169,6 +169,7 @@ async function renderJobs(jobs, { retainPcm = true } = {}) {
         midi: Number(job.midi ?? 60), velocity: Number(job.velocity ?? 0.62),
         durationSec: Number(job.durationSec ?? job.duration ?? 1.5),
         sampleRate: Number(job.sampleRate ?? 48000),
+        preRollSec: Number(job.preRollSec ?? 0),
       } });
       const wav = wavBytes(rendered.channels, rendered.sampleRate);
       if (job.out) await writeFile(job.out, wav);
@@ -231,11 +232,27 @@ async function main() {
       const breathBody = { ...breathSyncLow,
         params: { ...breathSyncLow.params, breathBodyAmount: 1,
           bodyBands: [{ freq: 2200, gain: 2, width: .18 }] } };
+      const windBase = {
+        params: { spectralProfile: "flute", excitationType: "blow",
+          seed: 171717, spectralPartials: 32, spectralMix: 1,
+          toneBreath: .24, windBreathLevel: 0,
+          breathLevelScale: 1, breathVelocityExponent: 1,
+          breathTurbulence: 0, excitationHuman: 0, vibratoProb: 0,
+          envelopeAttack: .28, envelopeDecay: .01, envelopeSustain: 1,
+          envelopeRelease: .03, reverbWet: 0 },
+        midi: 60, velocity: .2, durationSec: .9, sampleRate: 24000,
+        preRollSec: .4,
+      };
+      const windOff = windBase;
+      const windOn = { ...windBase,
+        params: { ...windBase.params, windBreathLevel: 1 } };
       const [a, b, inert, coupled, bowLegacy, bowOff, bowOnA, bowOnB,
-        syncLegacy, syncZero, syncLow, syncHigh, syncBody] =
+        syncLegacy, syncZero, syncLow, syncHigh, syncBody,
+        windSilent, windActiveA, windActiveB] =
         await renderJobs([job, job, inertJob, coupledJob,
           bowBase, bowZero, bowEnabled, bowEnabled,
-          breathOmitted, breathZero, breathSyncLow, breathSyncHigh, breathBody]);
+          breathOmitted, breathZero, breathSyncLow, breathSyncHigh, breathBody,
+          windOff, windOn, windOn]);
       const pcmDiff = (left, right) => {
         let maxDiff = 0, meanDiff = 0, count = 0;
         for (let ch = 0; ch < left.channels.length; ch++) {
@@ -276,6 +293,24 @@ async function main() {
       const bowConsumerDiff = pcmDiff(bowOff, bowOnA);
       if (bowConsumerDiff.meanDiff <= 1e-7) {
         throw new Error(`pinned bow-noise consumer is silent: mean diff ${bowConsumerDiff.meanDiff}`);
+      }
+      const windRepeatDiff = pcmDiff(windActiveA, windActiveB);
+      if (windRepeatDiff.maxDiff > 1 / 32768) {
+        throw new Error(`seeded wind-breath component is not deterministic: max diff ${windRepeatDiff.maxDiff}`);
+      }
+      const windConsumerDiff = pcmDiff(windSilent, windActiveA);
+      if (windConsumerDiff.meanDiff <= 1e-7) {
+        throw new Error(`pinned wind-breath consumer is silent: mean diff ${windConsumerDiff.meanDiff}`);
+      }
+      const windToneT0 = windOn.preRollSec;
+      const preEnd = Math.max(1, Math.floor((windToneT0 - .005) * windActiveA.sampleRate));
+      let preEnergy = 0, offPreEnergy = 0;
+      for (let i = 0; i < preEnd; i++) {
+        preEnergy += windActiveA.channels[0][i] ** 2;
+        offPreEnergy += windSilent.channels[0][i] ** 2;
+      }
+      if (!(windToneT0 > .02 && preEnergy > Math.max(1e-10, offPreEnergy * 4))) {
+        throw new Error(`L17 wind component did not audibly precede harmonic t0: lead ${windToneT0}, on ${preEnergy}, off ${offPreEnergy}`);
       }
       const syncZeroDiff = pcmDiff(syncLegacy, syncZero);
       if (syncZeroDiff.maxDiff > 1 / 32768) {

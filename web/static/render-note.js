@@ -7,7 +7,17 @@
  * a transparent parametric listener.
  */
 
-import { GenerationEngine, SeededRNG, SynthEngine, releaseRingSeconds } from "./synth.js";
+import {
+  GenerationEngine,
+  SeededRNG,
+  SynthEngine,
+  maxPinnedNoiseLeadForParams,
+  pinnedNoiseActivationReport,
+  pinnedNoiseComponentsFor,
+  pinnedNoiseEnvelopeAt,
+  releaseRingSeconds,
+  SPECTRAL_PROFILES,
+} from "./synth.js";
 import { DEFAULTS, engineParams } from "./params.js";
 
 export const OFFLINE_NOTE_DEFAULTS = Object.freeze({
@@ -77,8 +87,27 @@ export async function renderNoteOffline(soundParams = {}, options = {}) {
   const second = finite(params.decaySecondStage, 0, 0, 1);
   const ratio = finite(params.decaySecondRatio, 1, 1, 8);
   const ring = Math.min(3.5, baseRing * (1 + second * (ratio - 1) * 0.5));
-  const leadSec = 0.02;
-  const tailSec = Math.max(0.25, release + ring + 0.08);
+  const profile = SPECTRAL_PROFILES[String(params.spectralProfile || "")];
+  const componentActivation = new Map(pinnedNoiseActivationReport(
+    profile, { ...params, velocity }, true).map(row => [row.id, row]));
+  const componentRelease = pinnedNoiseComponentsFor(profile).reduce(
+    (maximum, component) => {
+      const active = componentActivation.get(component.id);
+      return active?.applicable && active.active
+        ? Math.max(maximum,
+          pinnedNoiseEnvelopeAt(component, velocity).releaseMs / 1000)
+        : maximum;
+    }, 0);
+  // The former fixed 20 ms pre-roll made a measured 50–300 ms component
+  // physically impossible in offline/SHIP renders.  Keep 20 ms for presets
+  // without L17 evidence and otherwise allocate the measured lead plus a
+  // small scheduling margin.
+  const requestedPreRoll = Number(options.preRollSec);
+  const leadSec = Math.max(0.02,
+    Number.isFinite(requestedPreRoll) ? Math.min(1, requestedPreRoll) : 0,
+    maxPinnedNoiseLeadForParams(params, velocity) + 0.015);
+  const tailSec = Math.max(0.25, release + ring + 0.08,
+    componentRelease + 0.04);
   const frameCount = Math.ceil((leadSec + durationSec + tailSec) * sampleRate);
   const Offline = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext;
   if (!Offline) throw new Error("OfflineAudioContext is unavailable in this browser");
