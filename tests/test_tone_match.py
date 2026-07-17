@@ -378,10 +378,15 @@ def test_controllability_contract_asserts_exact_consumer_inputs():
 
 def test_struck_preflight_has_dense_piano_and_source_matched_nylon_anchors():
     piano = STRUCK_CAMPAIGNS["grand-piano"]
+    upright = STRUCK_CAMPAIGNS["piano-upright"]
     nylon = STRUCK_CAMPAIGNS["guitar-nylon"]
     assert len(piano["anchors"]) >= 5
     assert [row["midi"] for row in piano["anchors"]] == [24, 36, 60, 84, 108]
     assert piano["dynamics"] == ("pp", "ff")
+    assert len(upright["anchors"]) >= 5
+    assert [row["midi"] for row in upright["anchors"]] == [21, 37, 53, 69, 85, 101, 108]
+    assert upright["dynamics"] == ("p", "mf", "ff")
+    assert upright["velocity"] == {"p": 30 / 127, "mf": 85 / 127, "ff": 119 / 127}
     assert len(nylon["anchors"]) >= 3
     assert nylon["source"].startswith("Philharmonia")
     assert [row["string"] for row in nylon["anchors"]] == \
@@ -423,6 +428,9 @@ def test_single_note_corpus_filenames_supply_trusted_pitch_anchors():
     assert expected_single_note_f0("phil.guitar_G3_very-long_piano_normal.mp3") == \
         pytest.approx(195.997718, rel=1e-6)
     assert expected_single_note_f0("Piano.pp.C1.aiff") == pytest.approx(32.703196, rel=1e-6)
+    assert expected_single_note_f0("vsco2.Player_dyn1_rr1_000.wav") == pytest.approx(27.5)
+    assert expected_single_note_f0("vsco2.Player_dyn2_rr1_020.wav") == pytest.approx(277.182631, rel=1e-6)
+    assert expected_single_note_f0("vsco2.Player_dyn3_rr1_044.wav") == pytest.approx(4186.009045, rel=1e-6)
     assert expected_single_note_f0("Guitar.ff.sulE.E2B2.mono.aif") is None
 
 
@@ -456,6 +464,23 @@ def test_struck_seed_keeps_family_defaults_neutral_and_consumes_register_tables(
     assert seed["decaySecondStage"] == 0
     assert seed["spectralResonanceAmount"] == 1
     assert "partialB" not in seed
+
+
+def test_upright_alias_consumes_piano_construction_and_struck_scoring_policy():
+    assert normalize_instrument("piano-upright") == "piano"
+    weights = weights_for_instrument("piano-upright")
+    assert weights["vibrato"] == 0
+    assert weights["onset_noise_db"] == 1
+    assert weights["decay_log_ratio"] == 1
+
+
+def test_upright_measured_profile_retains_five_region_b_curve():
+    measured = json.loads(
+        (iterate_module.ROOT / "web/static/measured_profiles.json").read_text())
+    anchors = measured["piano-upright"]["partialsByRegister"]
+    assert len(anchors) == 5
+    assert anchors[0]["partialB"] > anchors[2]["partialB"]
+    assert anchors[-1]["partialB"] > anchors[2]["partialB"]
 
 
 def test_profile_rebase_refreshes_structural_anchors_but_keeps_fitted_controls():

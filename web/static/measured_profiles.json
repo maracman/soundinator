@@ -21010,6 +21010,4099 @@
    ]
   }
  },
+ "piano-upright": {
+  "partials": [
+   {
+    "amp": 1.0,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.2658,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.12459,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.04731,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.03113,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.01768,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0115,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0071,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00134,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00304,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00336,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0028,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00304,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00252,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00298,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00271,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00087,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00074,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00108,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00057,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00061,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00053,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0008,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00095,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0004,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00048,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00031,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00036,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00052,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00052,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00041,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00021,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00029,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00029,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00017,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00014,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00024,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0004,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00013,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00019,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00016,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00012,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00011,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00023,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00015,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00011,
+    "spread": 0.8
+   },
+   {
+    "amp": 6e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00013,
+    "spread": 0.8
+   },
+   {
+    "amp": 8e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 7e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 8e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 7e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00026,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00017,
+    "spread": 0.8
+   },
+   {
+    "amp": 2e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 6e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00025,
+    "spread": 0.8
+   },
+   {
+    "amp": 9e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.0001,
+    "spread": 0.8
+   },
+   {
+    "amp": 8e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00019,
+    "spread": 0.8
+   },
+   {
+    "amp": 4e-05,
+    "spread": 0.8
+   },
+   {
+    "amp": 3e-05,
+    "spread": 0.8
+   }
+  ],
+  "partialB": 0.00021006,
+  "partialBByNote": [
+   {
+    "note": "A0",
+    "f0": 27.5,
+    "B": 0.00076061
+   },
+   {
+    "note": "C#1",
+    "f0": 34.65,
+    "B": 0.00039399
+   },
+   {
+    "note": "F1",
+    "f0": 43.65,
+    "B": 0.00037782
+   },
+   {
+    "note": "A1",
+    "f0": 55.0,
+    "B": 0.00025212
+   },
+   {
+    "note": "C#2",
+    "f0": 69.3,
+    "B": 0.00029317
+   },
+   {
+    "note": "F2",
+    "f0": 87.31,
+    "B": 0.0003035
+   },
+   {
+    "note": "A2",
+    "f0": 110.0,
+    "B": 0.00022877
+   },
+   {
+    "note": "C#3",
+    "f0": 138.59,
+    "B": 0.00012792
+   },
+   {
+    "note": "F3",
+    "f0": 174.61,
+    "B": 0.00031979
+   },
+   {
+    "note": "A3",
+    "f0": 220.0,
+    "B": 0.00030135
+   },
+   {
+    "note": "C#4",
+    "f0": 277.18,
+    "B": 1.646e-05
+   },
+   {
+    "note": "F4",
+    "f0": 349.23,
+    "B": 0.00044449
+   },
+   {
+    "note": "A4",
+    "f0": 440.0,
+    "B": 0.0
+   },
+   {
+    "note": "C#5",
+    "f0": 554.37,
+    "B": 8.1e-06
+   },
+   {
+    "note": "F5",
+    "f0": 698.46,
+    "B": 0.0
+   },
+   {
+    "note": "A5",
+    "f0": 880.0,
+    "B": 0.0
+   },
+   {
+    "note": "C#6",
+    "f0": 1108.73,
+    "B": 0.00015495
+   },
+   {
+    "note": "F6",
+    "f0": 1396.91,
+    "B": 0.0
+   },
+   {
+    "note": "A6",
+    "f0": 1760.0,
+    "B": 0.00107853
+   },
+   {
+    "note": "C#7",
+    "f0": 2217.46,
+    "B": 0.0
+   },
+   {
+    "note": "F7",
+    "f0": 2793.83,
+    "B": 0.00054432
+   },
+   {
+    "note": "A7",
+    "f0": 3520.0,
+    "B": null
+   },
+   {
+    "note": "A0",
+    "f0": 27.5,
+    "B": 0.00064423
+   },
+   {
+    "note": "C#1",
+    "f0": 34.65,
+    "B": 0.00038703
+   },
+   {
+    "note": "F1",
+    "f0": 43.65,
+    "B": 0.00040327
+   },
+   {
+    "note": "A1",
+    "f0": 55.0,
+    "B": 0.00025549
+   },
+   {
+    "note": "C#2",
+    "f0": 69.3,
+    "B": 0.00020982
+   },
+   {
+    "note": "F2",
+    "f0": 87.31,
+    "B": 0.00017781
+   },
+   {
+    "note": "A2",
+    "f0": 110.0,
+    "B": 0.0002103
+   },
+   {
+    "note": "C#3",
+    "f0": 138.59,
+    "B": 0.0002014
+   },
+   {
+    "note": "F3",
+    "f0": 174.61,
+    "B": 0.00035969
+   },
+   {
+    "note": "A3",
+    "f0": 220.0,
+    "B": 0.00033066
+   },
+   {
+    "note": "C#4",
+    "f0": 277.18,
+    "B": 0.00035961
+   },
+   {
+    "note": "F4",
+    "f0": 349.23,
+    "B": 0.00049334
+   },
+   {
+    "note": "A4",
+    "f0": 440.0,
+    "B": 0.0
+   },
+   {
+    "note": "C#5",
+    "f0": 554.37,
+    "B": 2.111e-05
+   },
+   {
+    "note": "F5",
+    "f0": 698.46,
+    "B": 0.0
+   },
+   {
+    "note": "A5",
+    "f0": 880.0,
+    "B": 0.0
+   },
+   {
+    "note": "C#6",
+    "f0": 1108.73,
+    "B": 8.197e-05
+   },
+   {
+    "note": "F6",
+    "f0": 1396.91,
+    "B": 0.0
+   },
+   {
+    "note": "A6",
+    "f0": 1760.0,
+    "B": 0.00051826
+   },
+   {
+    "note": "C#7",
+    "f0": 2217.46,
+    "B": 0.00045259
+   },
+   {
+    "note": "F7",
+    "f0": 2793.83,
+    "B": null
+   },
+   {
+    "note": "A7",
+    "f0": 3520.0,
+    "B": null
+   },
+   {
+    "note": "A0",
+    "f0": 27.5,
+    "B": 0.0
+   },
+   {
+    "note": "C#1",
+    "f0": 34.65,
+    "B": 0.00038219
+   },
+   {
+    "note": "F1",
+    "f0": 43.65,
+    "B": 0.00040062
+   },
+   {
+    "note": "A1",
+    "f0": 55.0,
+    "B": 0.00025499
+   },
+   {
+    "note": "C#2",
+    "f0": 69.3,
+    "B": 0.00027875
+   },
+   {
+    "note": "F2",
+    "f0": 87.31,
+    "B": 0.000275
+   },
+   {
+    "note": "A2",
+    "f0": 110.0,
+    "B": 0.00020844
+   },
+   {
+    "note": "C#3",
+    "f0": 138.59,
+    "B": 0.00016668
+   },
+   {
+    "note": "F3",
+    "f0": 174.61,
+    "B": 0.00036171
+   },
+   {
+    "note": "A3",
+    "f0": 220.0,
+    "B": 0.00026944
+   },
+   {
+    "note": "C#4",
+    "f0": 277.18,
+    "B": 0.00042415
+   },
+   {
+    "note": "F4",
+    "f0": 349.23,
+    "B": 0.00045683
+   },
+   {
+    "note": "A4",
+    "f0": 440.0,
+    "B": 0.0
+   },
+   {
+    "note": "C#5",
+    "f0": 554.37,
+    "B": 2.759e-05
+   },
+   {
+    "note": "F5",
+    "f0": 698.46,
+    "B": 0.0
+   },
+   {
+    "note": "A5",
+    "f0": 880.0,
+    "B": 0.0
+   },
+   {
+    "note": "C#6",
+    "f0": 1108.73,
+    "B": 2.051e-05
+   },
+   {
+    "note": "F6",
+    "f0": 1396.91,
+    "B": 8.148e-05
+   },
+   {
+    "note": "A6",
+    "f0": 1760.0,
+    "B": 0.0
+   },
+   {
+    "note": "C#7",
+    "f0": 2217.46,
+    "B": 2.48e-05
+   },
+   {
+    "note": "F7",
+    "f0": 2793.83,
+    "B": 0.00186524
+   },
+   {
+    "note": "A7",
+    "f0": 3520.0,
+    "B": null
+   }
+  ],
+  "partialsByRegister": [
+   {
+    "f0": 61.735,
+    "partialB": 0.00027688,
+    "partials": [
+     {
+      "amp": 0.03224,
+      "spread": 0.8
+     },
+     {
+      "amp": 1.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.97134,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.28895,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.25176,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.11867,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.09437,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.02743,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00341,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01922,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.02411,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.02029,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01613,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01688,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01865,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0286,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01705,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00307,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00488,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0098,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00895,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00907,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01071,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01358,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0145,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00894,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00135,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00366,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00222,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00295,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00175,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00138,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00142,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00242,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00113,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00043,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00049,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00086,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00188,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00183,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00197,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00077,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00103,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00089,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00051,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00039,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00031,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0005,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0006,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0012,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00062,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00029,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00052,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00025,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00037,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00016,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00033,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00024,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00022,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0003,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00012,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0015,
+      "spread": 0.8
+     },
+     {
+      "amp": 6e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00032,
+      "spread": 0.8
+     }
+    ]
+   },
+   {
+    "f0": 155.563,
+    "partialB": 0.00024911,
+    "partials": [
+     {
+      "amp": 1.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.35595,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.2,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.10221,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.03842,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.03816,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.04145,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01356,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00177,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00801,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00348,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00381,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0039,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00252,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00276,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00195,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00155,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00074,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00085,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00146,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00063,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00089,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00101,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0012,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00118,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00048,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00034,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00034,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00041,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00028,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00034,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00017,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00036,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00024,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00014,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00014,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00026,
+      "spread": 0.8
+     },
+     {
+      "amp": 7e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 8e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00015,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00012,
+      "spread": 0.8
+     },
+     {
+      "amp": 9e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00011,
+      "spread": 0.8
+     },
+     {
+      "amp": 9e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 7e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 6e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 6e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 7e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00024,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0001,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     }
+    ]
+   },
+   {
+    "f0": 391.995,
+    "partialB": 2.435e-05,
+    "partials": [
+     {
+      "amp": 1.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.28418,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.09032,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.05337,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.03239,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01373,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00738,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00235,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00046,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00062,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00065,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00062,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00079,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00066,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00173,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00099,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00047,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00031,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00022,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00033,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00021,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0001,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00026,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 9e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 9e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 1e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 8e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 7e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 1e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 6e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00011,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 1e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 5e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 2e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 4e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 8e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 9e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     }
+    ]
+   },
+   {
+    "f0": 987.767,
+    "partialB": 0.0,
+    "partials": [
+     {
+      "amp": 1.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.16111,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.06414,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0149,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01252,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00681,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00273,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00113,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00061,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00081,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00039,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00023,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00034,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00029,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00022,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0002,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00013,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00034,
+      "spread": 0.8
+     },
+     {
+      "amp": 8e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00013,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00028,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00011,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00027,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00027,
+      "spread": 0.8
+     },
+     {
+      "amp": 8e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00019,
+      "spread": 0.8
+     },
+     {
+      "amp": 6e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 6e-05,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00028,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     }
+    ]
+   },
+   {
+    "f0": 2489.016,
+    "partialB": 0.00048543,
+    "partials": [
+     {
+      "amp": 1.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.04581,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00493,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00138,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00053,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00044,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00236,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0001,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00022,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00024,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     }
+    ]
+   }
+  ],
+  "resonances": [
+   {
+    "freq": 109.1,
+    "gain": -1.2006,
+    "width": 0.2035
+   },
+   {
+    "freq": 182.2,
+    "gain": -0.1665,
+    "width": 0.2035
+   },
+   {
+    "freq": 235.5,
+    "gain": 0.8088,
+    "width": 0.2035
+   },
+   {
+    "freq": 304.3,
+    "gain": 0.8227,
+    "width": 0.2035
+   },
+   {
+    "freq": 393.3,
+    "gain": 1.3449,
+    "width": 0.2035
+   },
+   {
+    "freq": 508.2,
+    "gain": 0.569,
+    "width": 0.2035
+   },
+   {
+    "freq": 656.8,
+    "gain": 0.8131,
+    "width": 0.2035
+   },
+   {
+    "freq": 1096.8,
+    "gain": 0.9618,
+    "width": 0.2035
+   },
+   {
+    "freq": 1831.7,
+    "gain": -0.2781,
+    "width": 0.2035
+   },
+   {
+    "freq": 3059.0,
+    "gain": -0.7217,
+    "width": 0.2035
+   },
+   {
+    "freq": 3953.1,
+    "gain": -1.1719,
+    "width": 0.2035
+   },
+   {
+    "freq": 5108.5,
+    "gain": -1.428,
+    "width": 0.2035
+   },
+   {
+    "freq": 6601.7,
+    "gain": -1.5,
+    "width": 0.2035
+   },
+   {
+    "freq": 8531.3,
+    "gain": -1.5,
+    "width": 0.2035
+   }
+  ],
+  "resonancesFit": {
+   "method": "ensemble-rank-note-body-v3",
+   "bands": 14,
+   "points": 1342,
+   "notes": 66,
+   "widthLog2": 0.2035,
+   "prunedUnstableBands": 4,
+   "lowestF0Hz": 27.5,
+   "reconstructionAmount": 1,
+   "bodyClampMaxDb": 0.0,
+   "reconstructionNotes": 60,
+   "splitHalfCorr": 0.955,
+   "peakHzA": 374.7,
+   "peakHzB": 385.1,
+   "roundTripShapeMaxDb": 0.006
+  },
+  "vowelFormants": {},
+  "tailSlopeDbPerOct": -13.5,
+  "material": {
+   "t60Ref": 13.6576,
+   "slope": 0.5097,
+   "suggestedMaterial": 0.0,
+   "nPoints": 926,
+   "basis": "struck free decay",
+   "freqRangeHz": [
+    27.5,
+    10560.0
+   ]
+  },
+  "performance": {
+   "envelopeAttack": 0.016,
+   "envelopeAttackSd": 0.0324,
+   "envelopeDecay": 0.9977,
+   "envelopeSustain": 0.1091,
+   "envelopeRelease": 3.8612,
+   "vibratoProb": 0.0,
+   "vibratoRate": null,
+   "vibratoRateSd": null,
+   "vibratoDepth": null,
+   "vibratoDepthSd": null,
+   "onsetScoopProb": 0.8939,
+   "onsetScoopDepthCents": 34.8337,
+   "onsetScoopDepthSd": 40.1266,
+   "onsetScoopSettleMs": 53.4467,
+   "onsetArticulationCorrelation": 0.2849,
+   "onsetPitchNotes": 66,
+   "attackNoise": {
+    "level": 0.6,
+    "freq": 389.0,
+    "q": 0.9,
+    "decay": 0.25,
+    "measuredBandwidthHz": 188.0,
+    "measuredLevelRatio": 2.018
+   }
+  },
+  "attack": {
+   "bandT90ms": {
+    "125": 29.9,
+    "250": 17.5,
+    "500": 17.5,
+    "1000": 16.2,
+    "2000": 15.0,
+    "4000": 7.5,
+    "8000": 5.0
+   },
+   "lowToHighStaggerMs": -17.5,
+   "byRegister": [
+    {
+     "f0": 61.735,
+     "envelopeAttack": 0.0514,
+     "bandT90ms": {
+      "125": 63.6,
+      "250": 34.9,
+      "500": 36.2,
+      "1000": 22.4,
+      "2000": 16.2,
+      "4000": 23.7
+     },
+     "lowToHighStaggerMs": -29.3
+    },
+    {
+     "f0": 155.563,
+     "envelopeAttack": 0.014,
+     "bandT90ms": {
+      "125": 24.9,
+      "250": 15.0,
+      "500": 22.4,
+      "1000": 23.7,
+      "2000": 27.4,
+      "4000": 12.5
+     },
+     "lowToHighStaggerMs": 0.0
+    },
+    {
+     "f0": 391.995,
+     "envelopeAttack": 0.019,
+     "bandT90ms": {
+      "125": 17.5,
+      "250": 10.0,
+      "500": 17.5,
+      "1000": 18.7,
+      "2000": 16.2,
+      "4000": 3.7,
+      "8000": 6.2
+     },
+     "lowToHighStaggerMs": -8.7
+    },
+    {
+     "f0": 987.767,
+     "envelopeAttack": 0.0115,
+     "bandT90ms": {
+      "125": 27.4,
+      "250": 8.7,
+      "500": 11.2,
+      "1000": 10.0,
+      "2000": 13.7,
+      "4000": 7.5,
+      "8000": 5.0
+     },
+     "lowToHighStaggerMs": -11.8
+    },
+    {
+     "f0": 2489.016,
+     "envelopeAttack": 0.012,
+     "bandT90ms": {
+      "125": 39.9,
+      "250": 29.9,
+      "500": 13.7,
+      "1000": 8.7,
+      "2000": 5.0,
+      "4000": 5.0,
+      "8000": 2.5
+     },
+     "lowToHighStaggerMs": -31.2
+    }
+   ]
+  },
+  "notesAnalysed": [
+   {
+    "file": "vsco2.Player_dyn1_rr1_000.wav",
+    "note": "A0",
+    "f0": 27.5,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 7.831762172882303,
+     "settleMs": 200.0,
+     "wanderCents": 57.51018439867261,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_002.wav",
+    "note": "C#1",
+    "f0": 34.65,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 21.609808309612692,
+     "settleMs": 200.0,
+     "wanderCents": 42.50644646985962,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_004.wav",
+    "note": "F1",
+    "f0": 43.65,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 6.868866516899903,
+     "settleMs": 80.49886621315193,
+     "wanderCents": 30.606710791677283,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_006.wav",
+    "note": "A1",
+    "f0": 55.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 11.496096704338896,
+     "settleMs": 159.50113378684807,
+     "wanderCents": 15.502868542822538,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_008.wav",
+    "note": "C#2",
+    "f0": 69.3,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 16.649110845950773,
+     "settleMs": 53.44671201814059,
+     "wanderCents": 16.649110845950773,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_010.wav",
+    "note": "F2",
+    "f0": 87.31,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 19.871741636805087,
+     "settleMs": 147.18820861678006,
+     "wanderCents": 19.871741636805087,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_012.wav",
+    "note": "A2",
+    "f0": 110.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 0.0,
+     "settleMs": 0.0,
+     "wanderCents": 99.98337995516945,
+     "direction": "stable",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_014.wav",
+    "note": "C#3",
+    "f0": 138.59,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 20.891118197765476,
+     "settleMs": 178.11791383219955,
+     "wanderCents": 20.891118197765476,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_016.wav",
+    "note": "F3",
+    "f0": 174.61,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 37.718431599976235,
+     "settleMs": 56.39455782312925,
+     "wanderCents": 37.718431599976235,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_018.wav",
+    "note": "A3",
+    "f0": 220.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 34.83368507650055,
+     "settleMs": 200.0,
+     "wanderCents": 51.3165607570295,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_020.wav",
+    "note": "C#4",
+    "f0": 277.18,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 0.0,
+     "settleMs": 0.0,
+     "wanderCents": 87.38369767669668,
+     "direction": "stable",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_022.wav",
+    "note": "F4",
+    "f0": 349.23,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 3.961591160150166,
+     "settleMs": 35.69160997732426,
+     "wanderCents": 63.1746376573532,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_024.wav",
+    "note": "A4",
+    "f0": 440.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 41.951000165935255,
+     "settleMs": 29.727891156462587,
+     "wanderCents": 41.951000165935255,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_026.wav",
+    "note": "C#5",
+    "f0": 554.37,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 11.458319560080952,
+     "settleMs": 69.65986394557822,
+     "wanderCents": 11.458319560080952,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_028.wav",
+    "note": "F5",
+    "f0": 698.46,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 145.53187843035138,
+     "settleMs": 41.56462585034014,
+     "wanderCents": 145.53187843035138,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_030.wav",
+    "note": "A5",
+    "f0": 880.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 141.75204177558703,
+     "settleMs": 36.3718820861678,
+     "wanderCents": 141.75204177558703,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_032.wav",
+    "note": "C#6",
+    "f0": 1108.73,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 114.9230002568092,
+     "settleMs": 18.820861678004537,
+     "wanderCents": 114.9230002568092,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_034.wav",
+    "note": "F6",
+    "f0": 1396.91,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 197.28921585174226,
+     "settleMs": 25.07936507936508,
+     "wanderCents": 197.28921585174226,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_036.wav",
+    "note": "A6",
+    "f0": 1760.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 23.00631882351762,
+     "settleMs": 45.646258503401356,
+     "wanderCents": 23.00631882351762,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_038.wav",
+    "note": "C#7",
+    "f0": 2217.46,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 71.15270462009583,
+     "settleMs": 42.22222222222222,
+     "wanderCents": 71.15270462009583,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_040.wav",
+    "note": "F7",
+    "f0": 2793.83,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 95.33396916381682,
+     "settleMs": 17.732426303854876,
+     "wanderCents": 95.33396916381682,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn1_rr1_042.wav",
+    "note": "A7",
+    "f0": 3520.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 94.8193531528495,
+     "settleMs": 64.37641723356009,
+     "wanderCents": 94.8193531528495,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_000.wav",
+    "note": "A0",
+    "f0": 27.5,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 9.151526272909111,
+     "settleMs": 163.80952380952382,
+     "wanderCents": 57.53569726502518,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_002.wav",
+    "note": "C#1",
+    "f0": 34.65,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 42.269613359199354,
+     "settleMs": 221.70068027210885,
+     "wanderCents": 61.68529949209292,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_004.wav",
+    "note": "F1",
+    "f0": 43.65,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 6.010812605935732,
+     "settleMs": 74.87528344671202,
+     "wanderCents": 25.511873912592872,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_006.wav",
+    "note": "A1",
+    "f0": 55.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 13.31537433516745,
+     "settleMs": 127.61904761904763,
+     "wanderCents": 83.52122734736389,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_008.wav",
+    "note": "C#2",
+    "f0": 69.3,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 22.099139241196827,
+     "settleMs": 52.10884353741497,
+     "wanderCents": 22.099139241196827,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_010.wav",
+    "note": "F2",
+    "f0": 87.31,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 7.57005477659743,
+     "settleMs": 94.17233560090703,
+     "wanderCents": 7.57005477659743,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_012.wav",
+    "note": "A2",
+    "f0": 110.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 12.379419186273505,
+     "settleMs": 30.294784580498867,
+     "wanderCents": 12.379419186273505,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_014.wav",
+    "note": "C#3",
+    "f0": 138.59,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 7.277203242368626,
+     "settleMs": 30.20408163265306,
+     "wanderCents": 7.277203242368626,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_016.wav",
+    "note": "F3",
+    "f0": 174.61,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 46.385447134652885,
+     "settleMs": 50.13605442176871,
+     "wanderCents": 46.385447134652885,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_018.wav",
+    "note": "A3",
+    "f0": 220.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 98.3071517591877,
+     "settleMs": 39.0702947845805,
+     "wanderCents": 98.3071517591877,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_020.wav",
+    "note": "C#4",
+    "f0": 277.18,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 0.0,
+     "settleMs": 0.0,
+     "wanderCents": 90.45058421226005,
+     "direction": "stable",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_022.wav",
+    "note": "F4",
+    "f0": 349.23,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 0.0,
+     "settleMs": 0.0,
+     "wanderCents": 68.43270747889626,
+     "direction": "stable",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_024.wav",
+    "note": "A4",
+    "f0": 440.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 43.10541729994351,
+     "settleMs": 76.48526077097506,
+     "wanderCents": 43.10541729994351,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_026.wav",
+    "note": "C#5",
+    "f0": 554.37,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 15.041094379861486,
+     "settleMs": 59.20634920634921,
+     "wanderCents": 15.041094379861486,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_028.wav",
+    "note": "F5",
+    "f0": 698.46,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 81.43936688818212,
+     "settleMs": 43.53741496598639,
+     "wanderCents": 81.43936688818212,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_030.wav",
+    "note": "A5",
+    "f0": 880.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 40.93950012960917,
+     "settleMs": 36.64399092970522,
+     "wanderCents": 40.93950012960917,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_032.wav",
+    "note": "C#6",
+    "f0": 1108.73,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 7.867755626771547,
+     "settleMs": 49.229024943310655,
+     "wanderCents": 15.924798105585397,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_034.wav",
+    "note": "F6",
+    "f0": 1396.91,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 47.381979858941754,
+     "settleMs": 57.84580498866213,
+     "wanderCents": 47.381979858941754,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_036.wav",
+    "note": "A6",
+    "f0": 1760.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 81.69593554818678,
+     "settleMs": 14.807256235827664,
+     "wanderCents": 81.69593554818678,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_038.wav",
+    "note": "C#7",
+    "f0": 2217.46,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 38.95265000984365,
+     "settleMs": 33.78684807256236,
+     "wanderCents": 38.95265000984365,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_040.wav",
+    "note": "F7",
+    "f0": 2793.83,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 16.613180247067664,
+     "settleMs": 168.63945578231292,
+     "wanderCents": 16.613180247067664,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn2_rr1_042.wav",
+    "note": "A7",
+    "f0": 3520.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 68.86504116293878,
+     "settleMs": 99.90929705215419,
+     "wanderCents": 68.86504116293878,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_000.wav",
+    "note": "A0",
+    "f0": 27.5,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 0.0,
+     "settleMs": 0.0,
+     "wanderCents": 49.388851317117876,
+     "direction": "stable",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_002.wav",
+    "note": "C#1",
+    "f0": 34.65,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 47.35763441905925,
+     "settleMs": 247.3469387755102,
+     "wanderCents": 73.7408071095975,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_004.wav",
+    "note": "F1",
+    "f0": 43.65,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 5.198099627102311,
+     "settleMs": 83.60544217687074,
+     "wanderCents": 20.270788726282767,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_006.wav",
+    "note": "A1",
+    "f0": 55.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 18.98391250567051,
+     "settleMs": 155.578231292517,
+     "wanderCents": 109.06776245875292,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_008.wav",
+    "note": "C#2",
+    "f0": 69.3,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 12.137116124396854,
+     "settleMs": 41.904761904761905,
+     "wanderCents": 12.137116124396854,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_010.wav",
+    "note": "F2",
+    "f0": 87.31,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 27.89894175864557,
+     "settleMs": 39.863945578231295,
+     "wanderCents": 27.89894175864557,
+     "direction": "from-below",
+     "harmonic": 3
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_012.wav",
+    "note": "A2",
+    "f0": 110.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 0.0,
+     "settleMs": 0.0,
+     "wanderCents": 57.16772118574719,
+     "direction": "stable",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_014.wav",
+    "note": "C#3",
+    "f0": 138.59,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 19.19041762705088,
+     "settleMs": 55.91836734693877,
+     "wanderCents": 19.19041762705088,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_016.wav",
+    "note": "F3",
+    "f0": 174.61,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 48.25592287546103,
+     "settleMs": 58.16326530612245,
+     "wanderCents": 48.25592287546103,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_018.wav",
+    "note": "A3",
+    "f0": 220.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 51.50110587787654,
+     "settleMs": 48.11791383219954,
+     "wanderCents": 51.50110587787654,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_020.wav",
+    "note": "C#4",
+    "f0": 277.18,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 89.12961619591724,
+     "settleMs": 29.501133786848072,
+     "wanderCents": 89.12961619591724,
+     "direction": "from-below",
+     "harmonic": 2
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_022.wav",
+    "note": "F4",
+    "f0": 349.23,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 0.0,
+     "settleMs": 0.0,
+     "wanderCents": 68.13976278650927,
+     "direction": "stable",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_024.wav",
+    "note": "A4",
+    "f0": 440.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 38.731859210284384,
+     "settleMs": 84.48979591836735,
+     "wanderCents": 38.731859210284384,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_026.wav",
+    "note": "C#5",
+    "f0": 554.37,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 12.390153363083838,
+     "settleMs": 90.68027210884354,
+     "wanderCents": 12.390153363083838,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_028.wav",
+    "note": "F5",
+    "f0": 698.46,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 46.218055707677244,
+     "settleMs": 39.54648526077097,
+     "wanderCents": 46.218055707677244,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_030.wav",
+    "note": "A5",
+    "f0": 880.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 47.3861731441936,
+     "settleMs": 47.84580498866213,
+     "wanderCents": 47.3861731441936,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_032.wav",
+    "note": "C#6",
+    "f0": 1108.73,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 24.809870958561895,
+     "settleMs": 32.811791383219955,
+     "wanderCents": 24.809870958561895,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_034.wav",
+    "note": "F6",
+    "f0": 1396.91,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 104.1273702628766,
+     "settleMs": 31.11111111111111,
+     "wanderCents": 104.1273702628766,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_036.wav",
+    "note": "A6",
+    "f0": 1760.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 69.01298647451621,
+     "settleMs": 29.97732426303855,
+     "wanderCents": 69.01298647451621,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_038.wav",
+    "note": "C#7",
+    "f0": 2217.46,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 30.278620052950423,
+     "settleMs": 29.569160997732425,
+     "wanderCents": 30.278620052950423,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_040.wav",
+    "note": "F7",
+    "f0": 2793.83,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 32.27121811941851,
+     "settleMs": 163.96825396825395,
+     "wanderCents": 32.27121811941851,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   },
+   {
+    "file": "vsco2.Player_dyn3_rr1_042.wav",
+    "note": "A7",
+    "f0": 3520.0,
+    "percussive": true,
+    "onsetPitch": {
+     "depthCents": 66.20003234923969,
+     "settleMs": 101.31519274376417,
+     "wanderCents": 66.20003234923969,
+     "direction": "from-below",
+     "harmonic": 1
+    }
+   }
+  ],
+  "provenance": {
+   "instrument": "piano-upright",
+   "generated": "2026-07-17",
+   "audioPolicy": "analysis-only external corpus; never commit or redistribute audio",
+   "sourceIdentity": {
+    "library": "Versilian Studios Chamber Orchestra 2 Community Edition",
+    "instrument": "Upright Piano",
+    "performer": "Simon Dalzell",
+    "location": "UK medium room",
+    "microphone": "Rode NT5 spaced pair, player position",
+    "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication)."
+   },
+   "files": [
+    {
+     "file": "vsco2.Player_dyn1_rr1_000.wav",
+     "bytes": 4105066,
+     "sha256": "e61aeb988bf05181b5666ec1ff24b3f4ca375517c7ea47b87a009bc116fca56d",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 21,
+     "note": "A0",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_002.wav",
+     "bytes": 4109632,
+     "sha256": "a09c3877aa0c5c33259a4122d732000975915ff64d7862cf37586c7404248424",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 25,
+     "note": "C#1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_004.wav",
+     "bytes": 4128814,
+     "sha256": "511af05989eb9636cb79d2c10caf58fe6d3c07f907f4380951b5640c5f11e06d",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 29,
+     "note": "F1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_006.wav",
+     "bytes": 4063450,
+     "sha256": "485d6822e74b73f6bb38ff221fd7c4b55316c5653cf10d1edfcf471a32adf3dd",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 33,
+     "note": "A1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_008.wav",
+     "bytes": 5470924,
+     "sha256": "3b4cdd096b01b23a81b2ad8ad880c409c8a78d69cd0306fe9bf66795cd62acca",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 37,
+     "note": "C#2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_010.wav",
+     "bytes": 5770636,
+     "sha256": "6bdbe8457f7b921ddfd2456aa5dd5932e60a687ca6fb255b3b80ffc6eecbd199",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 41,
+     "note": "F2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_012.wav",
+     "bytes": 3870382,
+     "sha256": "16be23a8378185f1b392600d3fa800a206945543866548640f7573534f76faf2",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 45,
+     "note": "A2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_014.wav",
+     "bytes": 2270980,
+     "sha256": "f3d00b63bb178680fdd4d9ed7ea43d1df1cf29e00b567ccb022c2bd411a20607",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 49,
+     "note": "C#3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_016.wav",
+     "bytes": 3546940,
+     "sha256": "f1a3a542cf70a13aa865ce130d50d72cd735449e605d1c5a45dc06b5a60b27fd",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 53,
+     "note": "F3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_018.wav",
+     "bytes": 3002200,
+     "sha256": "01387cb5318c5abf11410ae8e2f4ef6aa83ec03254b4bccfe865aba262a2e412",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 57,
+     "note": "A3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_020.wav",
+     "bytes": 3134164,
+     "sha256": "08242e8d1c865c8cdc794cc7921d3d9663bedb5a12bfefe0de13aaa86fd23133",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 61,
+     "note": "C#4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_022.wav",
+     "bytes": 4126858,
+     "sha256": "660e57ad8fd868ed9c56fe36e4862a6aff1cb65b7838a568d4c4f2f0865ad1ab",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 65,
+     "note": "F4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_024.wav",
+     "bytes": 2222998,
+     "sha256": "916c3ec2d61fb421e74fb4866ef75d3ef17e9d88e9dc858da24159846489d33f",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 69,
+     "note": "A4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_026.wav",
+     "bytes": 3558112,
+     "sha256": "254be5d34270e5eb78bbda3f7425c3e82b9596845db2c065b13179f23c23196b",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 73,
+     "note": "C#5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_028.wav",
+     "bytes": 1935304,
+     "sha256": "a9fbd1af0703b294d3267f8f88fca4b4366e3b772f7d780acf2de1cbf2056355",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 77,
+     "note": "F5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_030.wav",
+     "bytes": 3120676,
+     "sha256": "d3d47e12108098d25a490fbac30cbbf29dfac801bbebd62b969cc1fe7a8342e5",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 81,
+     "note": "A5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_032.wav",
+     "bytes": 1746142,
+     "sha256": "2a903396ee7130c42a75aa10497c6ee018445e0934dde135e7f168f07d3b8a07",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 85,
+     "note": "C#6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_034.wav",
+     "bytes": 1303534,
+     "sha256": "c9bdc616f2f289c16ebf40a33dd26c8cd55db92d6cfa6cda0792805ebfbf25dc",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 89,
+     "note": "F6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_036.wav",
+     "bytes": 1304218,
+     "sha256": "6dfbe8f959d75a52eadfa5802ac05e52684e8acacb5cb4ed39e858f7359e0385",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 93,
+     "note": "A6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_038.wav",
+     "bytes": 915352,
+     "sha256": "3176c8eec715cccf5991efe99e1507d063f111060d97e91a74cf37ef1c111441",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 97,
+     "note": "C#7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_040.wav",
+     "bytes": 642772,
+     "sha256": "43cd5b95a890fd482c56fa1c49c87e63026e8968633272eed88a89abceb30d47",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 101,
+     "note": "F7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_042.wav",
+     "bytes": 571294,
+     "sha256": "4bc64bcdbe1be494cc9c82246c2de8e7808432d18bd3d4dc0868fc9dd72de698",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 105,
+     "note": "A7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn1_rr1_044.wav",
+     "bytes": 377608,
+     "sha256": "ab25ca49f0e9fbc0d14be7321a1d08fdd61a37f56d47c3140720d91c89cc34b1",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "p",
+     "velocityCenter": 30,
+     "midi": 108,
+     "note": "C8",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_000.wav",
+     "bytes": 4500238,
+     "sha256": "32f3cda282b64a65c6b2b071c91d98019514e8ffe80154a915431fa03443ee93",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 21,
+     "note": "A0",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_002.wav",
+     "bytes": 6074254,
+     "sha256": "2ba9838d073b9dec7ed19a4b2b3ba608f62a8a1c89694d7ef1f1afd47406683f",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 25,
+     "note": "C#1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_004.wav",
+     "bytes": 5625058,
+     "sha256": "ea7f8c8e997794656422b9c19f3a96f8ba03a0282ee664b97437c13b5ed2865c",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 29,
+     "note": "F1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_006.wav",
+     "bytes": 4936726,
+     "sha256": "80ade36a6030d83d868b6abbd1e9ab6f85ec2494cfe25d2affffd88f453e81e0",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 33,
+     "note": "A1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_008.wav",
+     "bytes": 6862312,
+     "sha256": "52be11ac2a57389f2d12cbd82df9b175da7b60e423d8a1154e1d7fc3340ecd6e",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 37,
+     "note": "C#2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_010.wav",
+     "bytes": 7572904,
+     "sha256": "324c53abf03b2b32ff74f52886806ab5d4a7a37f6eb9c746558799037d7e12da",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 41,
+     "note": "F2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_012.wav",
+     "bytes": 6306106,
+     "sha256": "9accd92b779985736589d7bf25b93f1d6d508830d2f2aad3e76a481549cc1ca2",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 45,
+     "note": "A2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_014.wav",
+     "bytes": 6180628,
+     "sha256": "0bdf66b89c2cd8042118b2cf9898aab334820fff7538b8553655a3d11d2ba107",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 49,
+     "note": "C#3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_016.wav",
+     "bytes": 4643212,
+     "sha256": "87b90b8161b5ddac5f1e81cce7895c726aff220e735586059c7ed684a5ae82dc",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 53,
+     "note": "F3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_018.wav",
+     "bytes": 5748202,
+     "sha256": "fb39ae501f7dde4aa3626d2e382b3709962cbe5d48b6c001ba7c911d1ffb6aeb",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 57,
+     "note": "A3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_020.wav",
+     "bytes": 4346848,
+     "sha256": "dc314226819e7af0768cd7fc08933f5e5b550083145e05af630fd7556f4d3913",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 61,
+     "note": "C#4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_022.wav",
+     "bytes": 4476550,
+     "sha256": "9a4e03fa389b7e59ea6b3a6719eef52be8d607844283c7163662030f57b60942",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 65,
+     "note": "F4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_024.wav",
+     "bytes": 3204940,
+     "sha256": "a00ae1a2b2a78c154b067a9709afc1ce2d3be9f08d9f4ad3c9c869a7db80eb75",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 69,
+     "note": "A4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_026.wav",
+     "bytes": 2656870,
+     "sha256": "4e668e75c3922c79ef06bd46806224dbf8dbfa0be1569847a1cd17e573a967ec",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 73,
+     "note": "C#5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_028.wav",
+     "bytes": 3008866,
+     "sha256": "84fe87bd24dc93d354213f730517a29f485c40715d5959af97976b364110b70a",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 77,
+     "note": "F5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_030.wav",
+     "bytes": 3144364,
+     "sha256": "4b558995c108f7f1dcede12c7e0444caa2658205fea34a314abf485dc6b7e710",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 81,
+     "note": "A5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_032.wav",
+     "bytes": 2888572,
+     "sha256": "8a4b127b8420c276d8935495d13b4e493c3eaa8f8aaef75bbc4f74d6437160f2",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 85,
+     "note": "C#6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_034.wav",
+     "bytes": 2605408,
+     "sha256": "c5305eb820902b66b0a55768733956ff21d98692810d6e2cec24d68879ef5fcd",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 89,
+     "note": "F6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_036.wav",
+     "bytes": 2254930,
+     "sha256": "87ef3cb2e7f234b56ca70ff323e2714bccd80d771fc6ac02dfef3405c217085c",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 93,
+     "note": "A6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_038.wav",
+     "bytes": 1425370,
+     "sha256": "ace4ec29aa6ae232566174c6b74ae861ce24e38e2cb3ab1d1ea5cf8e145ebdbd",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 97,
+     "note": "C#7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_040.wav",
+     "bytes": 667948,
+     "sha256": "25028a985a79b059659b785ecb29388bb8c173cf3a1b2e185fb8c64491d0f476",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 101,
+     "note": "F7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_042.wav",
+     "bytes": 633034,
+     "sha256": "11dce969f3f159c10fbcdf4a743e4f18937b59e5e259fc24d197965fc241514d",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 105,
+     "note": "A7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn2_rr1_044.wav",
+     "bytes": 581164,
+     "sha256": "8dbeca4e4254bd3635fdb7be54bbe57cddd751a3d0a0bda64e85baf02a4de999",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "mf",
+     "velocityCenter": 85,
+     "midi": 108,
+     "note": "C8",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_000.wav",
+     "bytes": 6918652,
+     "sha256": "529ef60490fcb922cf3d469c420608a2205042b9b329db04abc0147aa5f4ea63",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 21,
+     "note": "A0",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_002.wav",
+     "bytes": 6462502,
+     "sha256": "3937efc793df279be101d0964cb46e3b2480f855ddb95d55f7e250eaaf725fac",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 25,
+     "note": "C#1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_004.wav",
+     "bytes": 6156106,
+     "sha256": "f2eae20cd065108f5ea9ba3b6c3fcaeada1f0a3b12566e1a5a719389233ce6ec",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 29,
+     "note": "F1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_006.wav",
+     "bytes": 6210712,
+     "sha256": "565fb26f15632002fb75c0cd42defcab8fa4cb23a504655d287b4a5b8642b7a0",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 33,
+     "note": "A1",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_008.wav",
+     "bytes": 7063150,
+     "sha256": "19080adc5446961073aaeca7d5f5594cdd7c409ee0ffb95231400dfd8c2fd947",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 37,
+     "note": "C#2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_010.wav",
+     "bytes": 6946702,
+     "sha256": "e5fe5e4ec9c4d4818a9ce651b284eee61d25deb228c7d9d3b46b1f90f894403b",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 41,
+     "note": "F2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_012.wav",
+     "bytes": 6153220,
+     "sha256": "ac6644ffc1aa25d194f024d3abdae4f06d6dff1ae42ba2a7e8edc1fddcdff12b",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 45,
+     "note": "A2",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_014.wav",
+     "bytes": 5030746,
+     "sha256": "d1d7318686f6a5ae0e78560c171bb8f9cb4bffa3d2115f6e1ed32b5d4d07f81b",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 49,
+     "note": "C#3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_016.wav",
+     "bytes": 5759260,
+     "sha256": "bbf92571a777aeadee8751bba780b8a9a0b5913980c252d805acde2069bedb89",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 53,
+     "note": "F3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_018.wav",
+     "bytes": 5608348,
+     "sha256": "0914913456c74ec906e7cfed81a4b2986658c8a006e2f278dfa49784215b1a4b",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 57,
+     "note": "A3",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_020.wav",
+     "bytes": 5212972,
+     "sha256": "515e6d85e51050867174eb901dd2fdc8018e7be0e8f320d23cdeb854531ea4c8",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 61,
+     "note": "C#4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_022.wav",
+     "bytes": 4898926,
+     "sha256": "c2c1f3d7f6ffa05d2a840094a3191537445436bc1ef6efe01af7f0876a39d06e",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 65,
+     "note": "F4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_024.wav",
+     "bytes": 4721116,
+     "sha256": "cc8b22d1779248f6edc88fa5d072b8ce8b51b06fbe62be3d3d19a324d1da9030",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 69,
+     "note": "A4",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_026.wav",
+     "bytes": 3849658,
+     "sha256": "d89966bb53c4bdabdfe453c15d9779cf1eebae10069aaa7f78bd8074bad98b1a",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 73,
+     "note": "C#5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_028.wav",
+     "bytes": 2854090,
+     "sha256": "bf6c7d1bbf94b66e4167ecafef413835eee568f6f750dae30c2f3b9250fd89f5",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 77,
+     "note": "F5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_030.wav",
+     "bytes": 3738850,
+     "sha256": "d19dfdb6db0ade3b2cb7a5f6d152adc8824c86c79b4b9da0a82ac0c8bb58c02e",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 81,
+     "note": "A5",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_032.wav",
+     "bytes": 3372646,
+     "sha256": "403a1f1a4b9df06be59fb45382af40728755c92a225d9e7c3455159ed3ae3ba7",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 85,
+     "note": "C#6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_034.wav",
+     "bytes": 2808244,
+     "sha256": "5263ea569e710d4cddb1da780b7806cd8dcbc4d3dee6f145f900fbba0fc972b1",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 89,
+     "note": "F6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_036.wav",
+     "bytes": 1487410,
+     "sha256": "06f39cb4f41cb2cb46f126b60b302269307cc397ead376c9186f182c4260cd78",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 93,
+     "note": "A6",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_038.wav",
+     "bytes": 927712,
+     "sha256": "8b8a0f6d9789467736bc582c65ad0402798ec9c43d009e41985de4f5faa8e72c",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 97,
+     "note": "C#7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_040.wav",
+     "bytes": 725854,
+     "sha256": "df8692ef3371510f8492d45af6ddf9c576d5cfd88aac817c86f36afcb40866e2",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 101,
+     "note": "F7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_042.wav",
+     "bytes": 472108,
+     "sha256": "9690e7ef1935f22787898a3766fc9cd96f83e18dcee9dae1e8338674386dc190",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 105,
+     "note": "A7",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    },
+    {
+     "file": "vsco2.Player_dyn3_rr1_044.wav",
+     "bytes": 615094,
+     "sha256": "5625c4930fa958ff18e92106002e6b63ef73a1a37f99c57cf7b7900abaf8ccd3",
+     "sourceClass": "VSCO 2 CE",
+     "source": "https://versilian-studios.com/vsco-community/",
+     "metadataSource": "https://freesound.org/people/sgossner/packs/21055/",
+     "licence": "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication).",
+     "downloaded": "2026-07-16",
+     "dynamic": "ff",
+     "velocityCenter": 119,
+     "midi": 108,
+     "note": "C8",
+     "vibrato": "nonvib",
+     "roundRobin": 1
+    }
+   ]
+  }
+ },
  "trombone": {
   "partials": [
    {

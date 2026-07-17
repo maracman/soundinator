@@ -2,7 +2,7 @@
 
 Derived by `scripts/tone_match/iterate.py`; lower loss is better. Instrument
 rows are appended only when a run becomes the best-so-far result. The private
-leaderboards and rendered audio remain under `/private/tmp/sg2/`.
+leaderboards and rendered audio remain under the durable `SG2_DATA` root.
 
 ## alto-sax — wp5-alto-sax-pass3
 
@@ -487,3 +487,28 @@ Composite loss: `4.853343`
 | `partialTransfer` | 0.3 | 0.012623 |
 | `spectralResonanceAmount` | 1.0 | 0.015312 |
 | `velocityHardnessCoupling` | 0.26585481862241056 | 0.012769 |
+
+## grand piano ↔ upright piano — WP-9 morph evidence (upright pass 01)
+
+The upright seed resolves from `piano-upright ← legacy piano craft; fitted
+upright identity` at prior hash
+`4a3ec5f017315885a35bbfa1602a69d7d1d6c74ede6bc9699c3666cd125c0684`.
+It therefore retains the legacy piano strike/string mechanism while replacing
+measured identity fields from the independent VSCO upright corpus.
+
+| Differentiating axis | Grand | Upright | Grand → upright evidence |
+|---|---:|---:|---|
+| Bass B, median over comparable 55–132 Hz notes | 1.2916e−4 | 2.53555e−4 | **1.963×**, inside the annex C7 same-note upright ratios 1.91× and 2.81× |
+| Lowest fitted B anchor | 1.4257e−4 @ 119.747 Hz | 2.7688e−4 @ 61.735 Hz | **1.942×**; anchors differ in centre, so the comparable-band statistic above is the morph gate |
+| Aggregate B (diagnostic only) | 1.4817e−4 | 2.1006e−4 | 1.418×; whole-keyboard pooling is not the gate |
+| B-table resolution | 3 legacy regions | **5 regions** | Upright now satisfies the research-annex minimum and exposes the measured V-shape: 2.7688e−4, 2.4911e−4, 2.435e−5, 0, 4.8543e−4 |
+| Free-decay T60 proxy @ C4 | 16.2109 s | 13.6576 s | **0.8425×**, correct shorter-upright direction; medium-room tail remains a capture confound |
+| Dominant fitted body band | 820.5 Hz / +1.1269 log2 gain | 393.3 Hz / +1.3449 log2 gain | Separately fitted bodies; upright split-half corr 0.955 and round-trip shape error 0.006 dB |
+| Envelope attack | 21 ms | 16 ms | Corpus-owned onset difference, not a class-wide literature claim |
+| Onset-noise centre / measured level ratio | 730 Hz / 1.703 | 389 Hz / 2.018 | Lower, relatively stronger upright onset measurement; retain as a fit axis |
+| Mechanism firewall | strike + string | strike + string | **unchanged**, as required; ratio class, comb law, and impulsive gate do not morph |
+
+The body and late-decay comparison is explicitly provisional because the
+upright was captured in a UK medium room at player position. No same-note
+repeat exists (`rr1` only), so this pair does not claim a measured
+reference-variability floor or a frozen humanisation distribution.

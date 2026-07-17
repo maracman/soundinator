@@ -37,6 +37,7 @@ ALIASES = {
     "tenor sax": "tenor-sax", "tenor saxophone": "tenor-sax", "tenorsax": "tenor-sax",
     "french horn": "french-horn", "horn": "french-horn",
     "grand piano": "piano", "grand-piano": "piano",
+    "upright piano": "piano", "upright-piano": "piano", "piano-upright": "piano",
     "acoustic guitar": "guitar", "classical guitar": "guitar",
     "guitar-nylon": "guitar", "nylon-string acoustic guitar": "guitar",
     "nylon-string-acoustic-guitar": "guitar",

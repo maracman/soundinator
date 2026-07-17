@@ -121,7 +121,7 @@ async function paramsFor(job) {
   return { ...base, ...override };
 }
 
-async function renderJobs(jobs) {
+async function renderJobs(jobs, { retainPcm = true } = {}) {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
@@ -146,7 +146,12 @@ async function renderJobs(jobs) {
       } });
       const wav = wavBytes(rendered.channels, rendered.sampleRate);
       if (job.out) await writeFile(job.out, wav);
-      results.push({ ...rendered, wav, sha256: createHash("sha256").update(wav).digest("hex") });
+      const sha256 = createHash("sha256").update(wav).digest("hex");
+      // Large campaign batches only consume the digest after each WAV has
+      // been written. Retaining every decoded channel plus every encoded WAV
+      // made memory scale with the entire batch (hundreds of long notes can
+      // exhaust V8). Verification callers keep the PCM by default.
+      results.push(retainPcm ? { ...rendered, wav, sha256 } : { sha256 });
     }
     return results;
   } finally {
@@ -252,7 +257,7 @@ async function main() {
         durationSec: args.duration, sampleRate: args["sample-rate"] }];
     }
     const started = performance.now();
-    const results = await renderJobs(jobs);
+    const results = await renderJobs(jobs, { retainPcm: !args.batch });
     console.log(JSON.stringify({ renders: results.length, elapsedSec: (performance.now() - started) / 1000,
       outputs: jobs.map((job, i) => ({ out: job.out, sha256: results[i].sha256 })) }, null, 2));
   } finally {

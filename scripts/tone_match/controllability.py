@@ -145,11 +145,32 @@ def _manifest_contract(manifest: dict[str, Any], baseline: dict[str, Any],
 def _render_batch(jobs: list[dict[str, Any]], repo_root: Path) -> None:
     jobs_path = Path(jobs[0]["out"]).parent / "audit-jobs.json"
     jobs_path.write_text(json.dumps(jobs))
-    process = subprocess.run(
-        ["node", "scripts/render_note.mjs", "--batch", str(jobs_path)],
-        cwd=repo_root, capture_output=True, text=True, timeout=1800)
-    if process.returncode != 0:
-        raise RuntimeError(f"render batch failed: {process.stderr[-2000:]}")
+    pending = []
+    for job in jobs:
+        output = Path(job["out"])
+        try:
+            with output.open("rb") as handle:
+                valid_wav = output.stat().st_size > 44 and handle.read(4) == b"RIFF"
+        except FileNotFoundError:
+            valid_wav = False
+        if not valid_wav:
+            pending.append(job)
+    if not pending:
+        return
+    pending_path = jobs_path.with_name("audit-jobs-pending.json")
+    pending_path.write_text(json.dumps(pending))
+    # Chromium's OfflineAudioContext retains graph memory within a page even
+    # after the encoded PCM has been released by render_note.mjs. Bound each
+    # browser lifetime and make every chunk independently resumable.
+    for offset in range(0, len(pending), 64):
+        chunk_path = jobs_path.with_name(
+            f"audit-jobs-pending-{offset // 64:03d}.json")
+        chunk_path.write_text(json.dumps(pending[offset:offset + 64]))
+        process = subprocess.run(
+            ["node", "scripts/render_note.mjs", "--batch", str(chunk_path)],
+            cwd=repo_root, capture_output=True, text=True, timeout=1800)
+        if process.returncode != 0:
+            raise RuntimeError(f"render batch failed: {process.stderr[-2000:]}")
 
 
 def run_audit(instrument: str, baseline_params: dict[str, Any],

@@ -510,6 +510,7 @@ for (const [key, label, seed] of [
   ["alto-sax", "Alto saxophone", "clarinet"],
   ["french-horn", "French horn", "trombone"],
   ["guitar", "Acoustic guitar", "piano"],
+  ["piano-upright", "Upright piano", "piano"],
   ["voice-tenor", "Tenor voice", "vocal"],
   ["voice-bass", "Bass voice", "vocal"],
   ["voice-mezzo", "Mezzo-soprano voice", "vocal"],
@@ -573,6 +574,7 @@ const LEGACY_SPECTRAL_RESONANCES = Object.fromEntries(
     [key, bands.map(band => ({ ...band }))]));
 const BODY_FALLBACK_SEEDS = {
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
+  "piano-upright": "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
 };
 
@@ -1263,6 +1265,7 @@ const SPECTRAL_PERFORMANCE = {
 
 for (const [key, seed] of Object.entries({
   "alto-sax": "clarinet", "french-horn": "trombone", guitar: "piano",
+  "piano-upright": "piano",
   "voice-tenor": "vocal", "voice-bass": "vocal", "voice-mezzo": "vocal",
 })) {
   SPECTRAL_PERFORMANCE[key] = {

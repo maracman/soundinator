@@ -10,8 +10,10 @@ the controllability audit.  Audio remains under the durable SG2 data root.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +30,252 @@ from scripts.tone_match.paths import sg2_data_root
 from scripts.tone_match.legacy_prior import resolve_legacy_prior
 
 
-VELOCITY = {"pp": 0.2, "p": 0.28, "f": 0.82, "ff": 0.92}
+VELOCITY = {"pp": 0.2, "p": 0.28, "mp": 0.45, "mf": 0.62,
+            "f": 0.82, "ff": 0.92}
+
+VSCO_SOURCE = "https://versilian-studios.com/vsco-community/"
+VSCO_METADATA = "https://freesound.org/people/sgossner/packs/21055/"
+VSCO_LICENCE = "Creative Commons Zero 1.0 (CC0-1.0; public domain dedication)."
+VSCO_DYNAMICS = {
+    "dyn1": {"dynamic": "p", "velocityCenter": 30},
+    "dyn2": {"dynamic": "mf", "velocityCenter": 85},
+    "dyn3": {"dynamic": "ff", "velocityCenter": 119},
+}
+
+LIMITED_VSCO_RE = {
+    "glockenspiel": re.compile(
+        r"^vsco2\.glock_(medium)_([A-G](?:#|b)?-?\d)\.wav$", re.IGNORECASE),
+    "harp": re.compile(
+        r"^vsco2\.KSHarp_([A-G](?:#|b)?-?\d)_(mp|mf|f)\.wav$", re.IGNORECASE),
+}
+
+
+def _midi_from_note_name(note: str) -> int:
+    match = re.fullmatch(r"([A-Ga-g])([#b]?)(-?\d)", note)
+    if not match:
+        raise ValueError(f"invalid note label: {note}")
+    natural = {"C": 0, "D": 2, "E": 4, "F": 5,
+               "G": 7, "A": 9, "B": 11}[match.group(1).upper()]
+    accidental = {"": 0, "#": 1, "b": -1}[match.group(2)]
+    return (int(match.group(3)) + 1) * 12 + natural + accidental
+
+
+def write_limited_vsco_contracts(samples_root: Path,
+                                 prep_root: Path) -> list[dict[str, Any]]:
+    """Record honest sparse handoffs for the landed glock and harp WAVs."""
+    prep_root.mkdir(parents=True, exist_ok=True)
+    summaries = []
+    for instrument in ("glockenspiel", "harp"):
+        corpus = samples_root / instrument
+        matcher = LIMITED_VSCO_RE[instrument]
+        rows = []
+        for path in sorted(corpus.glob("*.wav")):
+            match = matcher.match(path.name)
+            if not match:
+                raise RuntimeError(f"unrecognised {instrument} filename: {path.name}")
+            if instrument == "glockenspiel":
+                dynamic_label, note = match.groups()
+                dynamic = "mf"
+                velocity = 0.62
+                velocity_evidence = f"source filename label: {dynamic_label}"
+            else:
+                note, dynamic = match.groups()
+                velocity = VELOCITY[dynamic]
+                velocity_evidence = f"source filename label: {dynamic}"
+            midi = _midi_from_note_name(note)
+            info = sf.info(path)
+            rows.append({
+                "file": path.name,
+                "bytes": path.stat().st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "sourceClass": "VSCO 2 CE",
+                "source": VSCO_SOURCE,
+                "licence": VSCO_LICENCE,
+                "acquired": "present in landed Agent C handoff by 2026-07-17",
+                "dynamic": dynamic,
+                "velocity": velocity,
+                "velocityEvidence": velocity_evidence,
+                "midi": midi,
+                "note": _note_name(midi),
+                "sampleRate": info.samplerate,
+                "channels": info.channels,
+                "subtype": info.subtype,
+                "roundRobin": None,
+            })
+        expected = 6 if instrument == "glockenspiel" else 23
+        if len(rows) != expected:
+            raise RuntimeError(
+                f"expected {expected} landed {instrument} WAVs, found {len(rows)}")
+        provenance = {
+            "instrument": instrument,
+            "generated": "2026-07-17",
+            "audioPolicy": "analysis-only external corpus; never commit or redistribute audio",
+            "sourceIdentity": {
+                "library": "Versilian Studios Chamber Orchestra 2 Community Edition",
+                "instrument": instrument,
+                "performer": "not present in landed handoff",
+                "capture": "not present in landed handoff",
+                "licence": VSCO_LICENCE,
+            },
+            "files": rows,
+        }
+        (corpus / "PROVENANCE.json").write_text(
+            json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
+
+        dynamics = sorted({row["dynamic"] for row in rows})
+        notes = sorted(rows, key=lambda row: row["midi"])
+        if instrument == "glockenspiel":
+            limitation = (
+                "Six pitch anchors and one labelled medium dynamic support a "
+                "register-spanning bar-class reference prep only. Dynamic, "
+                "repeatability, and §2.5c distributional claims are blocked.")
+            class_note = (
+                "The future campaign must retain `resonatorClass=bar`; failures "
+                "of bar-mode controls are engine specs, never a reason to bend B.")
+        else:
+            limitation = (
+                "Twenty-three pitch anchors span the harp, but 20 are mf and "
+                "only three files cover mp/f. Register identity is supported; "
+                "a balanced dynamic grid and repeated-take floor are not.")
+            class_note = (
+                "These are plucked-string references; no glock/bar or piano "
+                "construction parameters are borrowed.")
+        coverage = [
+            f"# Coverage — {instrument}\n\n",
+            f"Durable corpus: **{len(rows)} VSCO 2 CE WAV files**, spanning ",
+            f"{notes[0]['note']} (MIDI {notes[0]['midi']})–",
+            f"{notes[-1]['note']} (MIDI {notes[-1]['midi']}).\n\n",
+            f"- Source/licence: VSCO 2 Community Edition, CC0-1.0.\n",
+            "- Performer/capture: absent from the landed handoff; explicitly unresolved.\n",
+            f"- Dynamics present: {', '.join(dynamics)}.\n",
+            f"- Coverage verdict: {limitation}\n",
+            f"- Construction firewall: {class_note}\n",
+            "- Steel-string guitar remains corpus-absent and is not inferred from these files.\n\n",
+            "## Landed reference inventory\n\n",
+            "| MIDI | Note | Dynamic | File |\n",
+            "|---:|---|---|---|\n",
+        ]
+        for row in notes:
+            coverage.append(
+                f"| {row['midi']} | {row['note']} | {row['dynamic']} | `{row['file']}` |\n")
+        (corpus / "COVERAGE.md").write_text("".join(coverage), encoding="utf-8")
+
+        prep = {
+            "instrument": instrument,
+            "status": "reference-prep-only",
+            "constructionClass": "bar" if instrument == "glockenspiel" else "string",
+            "references": [{
+                "path": str(corpus / row["file"]),
+                "midi": row["midi"],
+                "velocity": row["velocity"],
+                "dynamic": row["dynamic"],
+                "roles": ["spectral", "onset", "decay"],
+                "sourceClass": row["sourceClass"],
+            } for row in notes],
+            "limitations": limitation,
+        }
+        prep_path = prep_root / f"{instrument}.json"
+        prep_path.write_text(json.dumps(prep, indent=2) + "\n", encoding="utf-8")
+        summaries.append({
+            "instrument": instrument, "files": len(rows),
+            "dynamics": dynamics, "prep": str(prep_path),
+        })
+    return summaries
+
+
+def vsco_upright_midi(sample_index: int) -> int:
+    """Map the VSCO upright sample-zone index to its declared MIDI root."""
+    if sample_index == 44:
+        return 108
+    if 0 <= sample_index <= 42 and sample_index % 2 == 0:
+        return 21 + 2 * sample_index
+    raise ValueError(f"invalid VSCO upright sample index: {sample_index}")
+
+
+def _note_name(midi: int) -> str:
+    names = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    return f"{names[midi % 12]}{midi // 12 - 1}"
+
+
+def write_upright_contract(corpus: Path) -> dict[str, Any]:
+    """Reconstruct the missing atomic COVERAGE/PROVENANCE handoff."""
+    audio = sorted(corpus.glob("vsco2.Player_dyn[123]_rr1_*.wav"))
+    if len(audio) != 69:
+        raise RuntimeError(f"expected 69 VSCO upright WAVs, found {len(audio)}")
+    rows = []
+    pitch_counts: dict[int, int] = {}
+    dynamic_counts = {key: 0 for key in VSCO_DYNAMICS}
+    for path in audio:
+        parts = path.stem.split("_")
+        dynamic_code = parts[1]
+        index = int(parts[-1])
+        midi = vsco_upright_midi(index)
+        pitch_counts[midi] = pitch_counts.get(midi, 0) + 1
+        dynamic_counts[dynamic_code] += 1
+        dynamic = VSCO_DYNAMICS[dynamic_code]
+        rows.append({
+            "file": path.name,
+            "bytes": path.stat().st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "sourceClass": "VSCO 2 CE",
+            "source": VSCO_SOURCE,
+            "metadataSource": VSCO_METADATA,
+            "licence": VSCO_LICENCE,
+            "downloaded": "2026-07-16",
+            "dynamic": dynamic["dynamic"],
+            "velocityCenter": dynamic["velocityCenter"],
+            "midi": midi,
+            "note": _note_name(midi),
+            "vibrato": "nonvib",
+            "roundRobin": 1,
+        })
+    if set(pitch_counts.values()) != {3} or len(pitch_counts) != 23:
+        raise RuntimeError("upright acquisition is not 23 pitches x 3 dynamics")
+    provenance = {
+        "instrument": "piano-upright",
+        "generated": "2026-07-17",
+        "audioPolicy": "analysis-only external corpus; never commit or redistribute audio",
+        "sourceIdentity": {
+            "library": "Versilian Studios Chamber Orchestra 2 Community Edition",
+            "instrument": "Upright Piano",
+            "performer": "Simon Dalzell",
+            "location": "UK medium room",
+            "microphone": "Rode NT5 spaced pair, player position",
+            "licence": VSCO_LICENCE,
+        },
+        "files": rows,
+    }
+    (corpus / "PROVENANCE.json").write_text(
+        json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
+
+    anchors = CAMPAIGNS["piano-upright"]["anchors"]
+    lines = [
+        "# Coverage — piano-upright\n\n",
+        "Durable corpus: **69 VSCO 2 CE Upright Piano WAV files** ",
+        "(23 sampled pitches × 3 velocity layers, one round robin).\n\n",
+        "- Source/licence: Versilian Studios VSCO 2 Community Edition, CC0-1.0.\n",
+        "- Capture: Simon Dalzell; UK medium room; Rode NT5 spaced pair at player position.\n",
+        "- Format: stereo, 44.1 kHz, 24-bit lossless WAV.\n",
+        "- Pitch span: A0 (MIDI 21)–C8 (MIDI 108); major-third anchors through A7 plus C8.\n",
+        "- Dynamics: p/MIDI 30, mf/MIDI 85, ff/MIDI 119; 23 files each.\n",
+        "- Campaign grid: seven registers × p/mf/ff (21 strict cells), exceeding the preflight five-anchor floor.\n",
+        "- Fit role: spectral, onset, decay, body and inharmonicity identity. No repeated same-pitch/same-dynamic takes exist (rr1 only), so §2.5c remains proxy-calibrated and no distributional freeze may be claimed.\n",
+        "- Room note: the medium-room/player-position capture can colour body and late decay; room-suspected residuals stay separate per the operating protocol.\n\n",
+        "## Required campaign files\n\n",
+        "| Register | MIDI | Note | p | mf | ff |\n",
+        "|---|---:|---:|---|---|---|\n",
+    ]
+    for anchor in anchors:
+        lines.append(
+            f"| {anchor['register']} | {anchor['midi']} | {_note_name(anchor['midi'])} | "
+            f"`{anchor['p']}` | `{anchor['mf']}` | `{anchor['ff']}` |\n")
+    lines.extend([
+        "\nAll 21 required campaign files and all 69 provenance-declared audio files were present and hashed at contract reconstruction on 2026-07-17.\n",
+        "Steel-string guitar remains corpus-absent; no upright sample is repurposed for it.\n",
+    ])
+    (corpus / "COVERAGE.md").write_text("".join(lines), encoding="utf-8")
+    return {"files": len(rows), "pitches": len(pitch_counts),
+            "dynamics": dynamic_counts, "campaignAnchors": len(anchors)}
 
 # Piano uses five anchors because its measured B changes strongly across the
 # keyboard (STRUCK_PLUCKED_PREFLIGHT S3).  The guitar set stays source-matched
@@ -49,6 +296,31 @@ CAMPAIGNS: dict[str, dict[str, Any]] = {
         ],
         "dynamics": ("pp", "ff"),
         "source": "Iowa MIS",
+    },
+    "piano-upright": {
+        "instrument": "piano-upright",
+        "corpus": "piano-upright",
+        "profile": "piano-upright",
+        "excitation": "strike",
+        "anchors": [
+            {"register": "bass", "midi": 21,
+             "p": "vsco2.Player_dyn1_rr1_000.wav", "mf": "vsco2.Player_dyn2_rr1_000.wav", "ff": "vsco2.Player_dyn3_rr1_000.wav"},
+            {"register": "low", "midi": 37,
+             "p": "vsco2.Player_dyn1_rr1_008.wav", "mf": "vsco2.Player_dyn2_rr1_008.wav", "ff": "vsco2.Player_dyn3_rr1_008.wav"},
+            {"register": "low-mid", "midi": 53,
+             "p": "vsco2.Player_dyn1_rr1_016.wav", "mf": "vsco2.Player_dyn2_rr1_016.wav", "ff": "vsco2.Player_dyn3_rr1_016.wav"},
+            {"register": "mid", "midi": 69,
+             "p": "vsco2.Player_dyn1_rr1_024.wav", "mf": "vsco2.Player_dyn2_rr1_024.wav", "ff": "vsco2.Player_dyn3_rr1_024.wav"},
+            {"register": "upper-mid", "midi": 85,
+             "p": "vsco2.Player_dyn1_rr1_032.wav", "mf": "vsco2.Player_dyn2_rr1_032.wav", "ff": "vsco2.Player_dyn3_rr1_032.wav"},
+            {"register": "treble", "midi": 101,
+             "p": "vsco2.Player_dyn1_rr1_040.wav", "mf": "vsco2.Player_dyn2_rr1_040.wav", "ff": "vsco2.Player_dyn3_rr1_040.wav"},
+            {"register": "top", "midi": 108,
+             "p": "vsco2.Player_dyn1_rr1_044.wav", "mf": "vsco2.Player_dyn2_rr1_044.wav", "ff": "vsco2.Player_dyn3_rr1_044.wav"},
+        ],
+        "dynamics": ("p", "mf", "ff"),
+        "velocity": {"p": 30 / 127, "mf": 85 / 127, "ff": 119 / 127},
+        "source": "VSCO 2 CE Upright Piano",
     },
     "guitar-nylon": {
         "instrument": "guitar-nylon",
@@ -80,7 +352,8 @@ def midi_of(f0: float) -> int:
 
 
 def _filename_declares_single_note(path: Path) -> bool:
-    return path.name.startswith("Piano.") or path.name.startswith("phil.guitar_")
+    return (path.name.startswith("Piano.") or path.name.startswith("phil.guitar_") or
+            path.name.startswith("vsco2.Player_"))
 
 
 def select_note(path: Path, target_midi: int) -> tuple[np.ndarray, int, float, dict[str, Any]]:
@@ -227,6 +500,15 @@ def _take_pairs(instrument: str, corpus: Path) -> dict[str, Any]:
             for path in sorted(corpus.glob("Guitar.*.aif"))
         ]
         reason = "No true repeated take at the same pitch/dynamic; Iowa chromatic runs are proxy evidence."
+    elif instrument == "piano-upright":
+        proxies = [
+            {"files": [f"vsco2.Player_{dynamic}_rr1_{left:03d}.wav",
+                       f"vsco2.Player_{dynamic}_rr1_{right:03d}.wav"],
+             "method": "adjacent sampled pitches with register trend removed"}
+            for dynamic in ("dyn1", "dyn2", "dyn3")
+            for left, right in zip(range(0, 42, 2), range(2, 44, 2))
+        ]
+        reason = "VSCO upright acquisition has one round robin only; adjacent-pitch proxy is weaker than true repetition evidence."
     else:
         proxies = [
             {"files": [f"Piano.{dynamic}.C{octave}.aiff", f"Piano.{dynamic}.C{octave + 1}.aiff"],
@@ -260,9 +542,11 @@ def build(instrument: str, samples_root: Path, measured_path: Path,
             references.append({
                 "path": str(target), "midi": midi, "detectedF0": round(f0, 3),
                 "pitchEvidence": pitch_evidence,
-                "velocity": VELOCITY[dynamic], "dynamic": dynamic,
+                "velocity": spec.get("velocity", VELOCITY)[dynamic],
+                "dynamic": dynamic,
                 "register": anchor["register"], "durationSec": duration,
                 "articulation": spec["excitation"], "vibrato": "nonvib",
+                "roles": ["spectral", "onset", "decay"],
                 **({"string": anchor["string"]} if anchor.get("string") else {}),
                 "floorGroup": (
                     f"{midi}|{dynamic}|{spec['excitation']}|"
@@ -318,19 +602,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--measured", type=Path, default=Path("web/static/measured_profiles.json"))
     parser.add_argument("--output", type=Path, default=data_root / "campaigns")
     parser.add_argument(
+        "--write-upright-contract", action="store_true",
+        help="reconstruct the missing VSCO upright COVERAGE/PROVENANCE sidecars",
+    )
+    parser.add_argument(
+        "--write-secondary-contracts", action="store_true",
+        help="write sparse glockenspiel/harp contracts and prep manifests",
+    )
+    parser.add_argument(
         "--rebase-state", type=Path,
         help="carry fitted parameters from a best.json while refreshing "
              "profile-derived structural anchors (single instrument only)",
     )
     args = parser.parse_args(argv)
-    instruments = args.instrument or list(CAMPAIGNS)
+    if args.write_upright_contract:
+        contract = write_upright_contract(args.samples / "piano-upright")
+        print(json.dumps({"uprightContract": contract}, indent=2))
+    if args.write_secondary_contracts:
+        secondary = write_limited_vsco_contracts(
+            args.samples, sg2_data_root() / "reference-prep")
+        print(json.dumps({"secondaryContracts": secondary}, indent=2))
+    instruments = args.instrument or (
+        [] if args.write_upright_contract or args.write_secondary_contracts
+        else list(CAMPAIGNS))
     if args.rebase_state and len(instruments) != 1:
         parser.error("--rebase-state requires exactly one --instrument")
     summaries = [
         build(name, args.samples, args.measured, args.output, args.rebase_state)
         for name in instruments
     ]
-    print(json.dumps(summaries, indent=2))
+    if summaries:
+        print(json.dumps(summaries, indent=2))
     return 0
 
 

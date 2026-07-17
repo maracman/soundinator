@@ -6,7 +6,9 @@ audio ships in this repository. The July 2026 WP-3 refresh analysed 11 covered
 instruments; the earlier flute and trombone fits remain for saved-preset
 compatibility, giving 13 measured catalogue entries in total. A subsequent
 owner-requested addition promoted flute into the same refreshed corpus, so 12
-entries now use the current WP-3 contract and only trombone remains legacy.
+entries use the refreshed WP-3 contract and only trombone remains legacy. The
+upright-piano pass adds a 14th measured catalogue entry under the same atomic
+coverage/provenance contract.
 
 ## Reproduce the fit
 
@@ -15,17 +17,17 @@ The corpus handoff is complete only when every instrument folder has both
 
 ```bash
 PYTHONPATH=src:. python3 scripts/tone_match/finalize_corpus.py \
-  --samples /private/tmp/sg2/samples \
-  --vocalset-root /private/tmp/sg2/vocalset_extract/FULL
+  --samples "$SG2_DATA/samples" \
+  --vocalset-root "$SG2_DATA/vocalset_extract/FULL"
 
 PYTHONPATH=src:. python3 -m scripts.tone_match.strings_prep \
   --instrument violin \
-  --samples /private/tmp/sg2/samples \
-  --output /private/tmp/sg2/campaigns
+  --samples "$SG2_DATA/samples" \
+  --output "$SG2_DATA/campaigns"
 
 PYTHONPATH=src:. python3 scripts/fit_profiles_from_samples.py \
-  --samples /private/tmp/sg2/samples \
-  --body-references /private/tmp/sg2/campaigns \
+  --samples "$SG2_DATA/samples" \
+  --body-references "$SG2_DATA/campaigns" \
   --out web/static/measured_profiles.json \
   --partials 64 --require-contract
 
@@ -35,7 +37,8 @@ node scripts/verify_tone_model.mjs
 
 `finalize_corpus.py` does not download anything. It selects material already
 present in the external corpus, records file-level provenance, and writes the
-strict handoff contracts. Audio stays under `/private/tmp/sg2`.
+strict handoff contracts. Audio stays under the durable, gitignored
+`SG2_DATA` root.
 
 ## Sources and licences
 
@@ -43,6 +46,7 @@ strict handoff contracts. Audio stays under `/private/tmp/sg2`.
 |---|---|---|
 | [University of Iowa Musical Instrument Samples](https://theremin.music.uiowa.edu/MIS.html) | flute, violin, cello, piano, guitar, clarinet, alto saxophone, trumpet, French horn | Public downloads; Iowa permits use in projects. Only derived parameters are committed. |
 | [Philharmonia Orchestra sound samples](https://philharmonia.co.uk/resources/sound-samples/) | alternate string, guitar, and horn takes | Free project use under Philharmonia's sample terms; raw samples are not redistributed. |
+| [VSCO 2 Community Edition](https://versilian-studios.com/vsco-community/) | upright piano; sparse glockenspiel and harp prep | CC0-1.0. Upright capture metadata is retained file-by-file; glock/harp performer and capture remain unresolved. |
 | [VocalSet, Zenodo record 1193957](https://zenodo.org/records/1193957) | adult voice measurements | CC BY 4.0. The dataset paper describes 20 professional singers and the recording/technique design. |
 
 The authoritative, file-by-file source URL and licence statement lives in each
@@ -51,7 +55,9 @@ external instrument folder's `PROVENANCE.json`.
 ## Stored measurements
 
 - `partials` contains the 64-partial aggregate table; `partialsByRegister`
-  contains three log-f0 anchors consumed by `registerProfileAt()`.
+  normally contains three log-f0 anchors consumed by `registerProfileAt()`.
+  Piano-class stiff-string fits use five anchors so the V-shaped B curve meets
+  the struck/plucked research preflight.
 - `partialB` and `partialBByNote` store stiff-string inharmonicity.
 - `material` stores the fitted T60 power law and closest engine material.
 - `performance` stores ADSR, attack-noise, vibrato, and slow f0-drift
@@ -74,7 +80,8 @@ guitar and piano it is a free-decay estimate.
 | clarinet | 126 | 146–1924 | 0 | 0.180 / −0.220 | 3.41 / 3.74 | 0.45 | −8.2 |
 | French horn | 110 | 56–699 | 0 | 0.467 / −0.236 | 4.33 / 5.67 | 1.03 | −15.6 |
 | acoustic guitar | 25 | 59–1424 | 5.83e−5 | 4.849 / 0.827 | — | 2.20 | −9.2 |
-| piano | 23 | 66–1104 | 1.16e−4 | 16.211 / 0.637 | — | 0.03 | −11.3 |
+| piano | 22 | 66–1094 | 1.48e−4 | 16.211 / 0.637 | — | 0.02 | −3.5 |
+| upright piano | 66 | 27.5–3520 | 2.10e−4 | 13.658 / 0.510 | — | — | −13.5 |
 | trumpet | 107 | 164–1254 | 4.0e−8 | 0.325 / −0.231 | 4.81 / 6.18 | 1.30 | −14.9 |
 | violin | 117 | 195–2039 | 0 | 1.274 / −0.088 | 5.91 / 30.34 | 1.00 | −15.5 |
 | bass-voice proxy | 27 | 127–841 | 0 | 0.471 / −0.292 | 5.38 / 82.12 | 11.80 | −14.0 |
@@ -110,9 +117,17 @@ guitar and piano it is a free-decay estimate.
   performance tables. **Cello:** partial spread remains high because
   adjacent notes move through strong fixed-Hz body resonances; per-register
   tables reduce, but do not eliminate, that source/body confound.
-- **Piano:** the larger corpus revises the old four-note B estimate downward
-  to 1.16e−4. The register anchors retain the per-register progression, and
+- **Piano:** the larger corpus revises the old four-note B estimate downward.
+  The register anchors retain the per-register progression, and
   the 16.2 s T60 remains outside the engine's single-stage material range.
+- **Upright piano:** 66 accepted VSCO notes cover A0–A7 at p/mf/ff; all three
+  very short C8 files remain in coverage but were rejected by the analyser.
+  Five log-frequency anchors recover the required B-table V-shape. Over the
+  comparable 55–132 Hz bass band, its median B is 1.963× the grand corpus,
+  matching the annex's published upright direction. Its independent body fit
+  has split-half correlation 0.955 and 0.006 dB round-trip shape error. The
+  13.658 s decay and low-mid body colour remain room-suspected because the
+  source was captured in a medium room at player position.
 - **Guitar:** non-zero B and a two-stage-feeling decay support the G4/G5
   struck/plucked campaign, but the vibrato detector output is not consumed as
   a guitar performance default.

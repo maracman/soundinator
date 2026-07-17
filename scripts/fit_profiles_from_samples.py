@@ -83,6 +83,8 @@ SLOPE_MIN, SLOPE_SPAN = 0.25, 1.1
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 VOWEL_RE = re.compile(r"_([aeiou])\.(?:wav|aif|aiff|flac|ogg|mp3)$", re.IGNORECASE)
 SINGLE_NOTE_RE = re.compile(r"(?:^|[._])([A-Ga-g])([#b]?)(-?\d)(?=[._-]|$)")
+VSCO_UPRIGHT_RE = re.compile(
+    r"^(?:vsco2\.)?Player_dyn[123]_rr1_(\d{3})\.wav$", re.IGNORECASE)
 GUITAR_OPEN_MIDI = {
     "string6": 40,
     "string5": 45,
@@ -116,6 +118,19 @@ def hz_to_note_name(f: float) -> str:
 def expected_single_note_f0(filename: str) -> float | None:
     """Return the pitch declared by a known single-note corpus filename."""
     name = os.path.basename(filename)
+    upright = VSCO_UPRIGHT_RE.match(name)
+    if upright:
+        sample_index = int(upright.group(1))
+        # VSCO 2 CE Upright Piano samples major-third anchors from A0 through
+        # A7, then clips the final zone to the acoustic-piano endpoint C8.
+        # The original pack metadata declares these MIDI roots explicitly.
+        if sample_index == 44:
+            midi = 108
+        elif 0 <= sample_index <= 42 and sample_index % 2 == 0:
+            midi = 21 + 2 * sample_index
+        else:
+            return None
+        return 440.0 * 2 ** ((midi - 69) / 12)
     if not (name.startswith("phil.") or name.startswith("Piano.")):
         return None
     match = SINGLE_NOTE_RE.search(name)
@@ -1620,7 +1635,7 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
                          body_stability_gate: dict | None = None,
                          body_diagnostic_centres_hz: tuple[float, ...] = (),
                          body_notes: list[NoteAnalysis] | None = None,
-                         string_selector=None):
+                         string_selector=None, register_group_count: int = 3):
     """Combine per-note measurements into one engine-shaped record."""
     # analyse_note already rejects f0 <= 40 Hz.  The historical 100 Hz
     # spectral cutoff silently removed the practical low register of horn,
@@ -1668,8 +1683,10 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
             spread[i] = float(min(0.8, ref + 0.04))
         last = spread[i]
 
-    # G1 register storage: three log-f0 regions retain the measured source
-    # spectrum instead of collapsing the whole instrument into one table.
+    # G1 register storage: log-f0 regions retain the measured source spectrum
+    # instead of collapsing the whole instrument into one table. Piano-class
+    # stiff-string fits use at least five regions because the documented
+    # V-shaped B curve cannot be represented honestly by only three anchors.
     # The engine interpolates these anchors continuously; instruments with
     # fewer than three analysed pitches simply omit the field.
     partials_by_register = []
@@ -1678,7 +1695,8 @@ def aggregate_instrument(notes: list[NoteAnalysis], vib_notes: list[NoteAnalysis
         ordered = sorted(spec_notes, key=lambda item: item.f0)
         register_groups = [list(group) for group in
                            np.array_split(np.asarray(ordered, dtype=object),
-                                          min(3, len(ordered))) if len(group)]
+                                          min(register_group_count, len(ordered)))
+                           if len(group)]
         for group in register_groups:
             group = list(group)
             g_amp = np.zeros(n_partials)
@@ -2093,7 +2111,8 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
                     trust_expected_f0=expected_f0_hz is not None,
                     force_percussive=(True if expected_f0_hz is not None and
                                       ("guitar" in fn.lower() or
-                                       fn.startswith("Piano.")) else None),
+                                       fn.startswith("Piano.") or
+                                       VSCO_UPRIGHT_RE.match(fn)) else None),
                 )
                 if note is not None:
                     result.append(note)
@@ -2136,7 +2155,10 @@ def analyse_instrument(inst_dir: str, n_partials: int, verbose=True,
                                body_diagnostic_centres_hz=
                                BOWED_BODY_DIAGNOSTIC_CENTRES.get(instrument_name, ()),
                                body_notes=body_reference_notes or notes,
-                               string_selector=string_selector)
+                               string_selector=string_selector,
+                               register_group_count=(
+                                   5 if instrument_name in {"piano", "piano-upright"}
+                                   else 3))
     if agg.get("resonancesFit") and body_reference_notes:
         agg["resonancesFit"]["bodyReferenceNotes"] = len(body_reference_notes)
     mode_evidence = validate_bowed_body_modes(

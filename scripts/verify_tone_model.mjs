@@ -474,6 +474,15 @@ console.log("Sound Generator 2.0 neutral engine extensions");
   check("D4 above the top register anchor holds the highest table",
     registerProfileAt(mock, 880).partials === mock.partialsByRegister[1].partials &&
     registerProfileAt(mock, 880).partials !== mock.partialsByRegister[0].partials);
+  const upright = SPECTRAL_PROFILES["piano-upright"];
+  check("WP-9 upright profile reaches the consumer with five B anchors",
+    upright?.partialsByRegister?.length === 5 &&
+    near(registerProfileAt(upright, 61.735).partialB, 2.7688e-4, 1e-10));
+  check("WP-9 upright body is independently fitted from grand piano",
+    upright?.resonances?.length >= 3 &&
+    SPECTRAL_PROFILES.piano?.resonances?.length >= 3 &&
+    upright.resonances !== SPECTRAL_PROFILES.piano.resonances &&
+    upright.resonances[0].freq !== SPECTRAL_PROFILES.piano.resonances[0].freq);
   check("G2 conical tube carries the full harmonic series",
     [1, 2, 3, 8].every(n => resonatorRatio("conicalTube", n) === n));
   check("G3 blare is neutral at zero and enriches forte",
@@ -1117,7 +1126,7 @@ console.log("CH-B1 rev 2: articulation manipulates the SELECTED body");
 
 console.log("CH-B3: measured instrument fits folded into presets");
 {
-  for (const key of ["flute", "clarinet", "violin", "cello", "trumpet", "trombone", "piano",
+  for (const key of ["flute", "clarinet", "violin", "cello", "trumpet", "trombone", "piano", "piano-upright",
     "alto-sax", "french-horn", "guitar", "voice-tenor", "voice-bass", "voice-mezzo"]) {
     const prof = SPECTRAL_PROFILES[key];
     check(`${key}: 64 measured partials, all sane, dyn curve extended`,

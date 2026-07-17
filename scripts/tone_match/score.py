@@ -53,7 +53,7 @@ _BLOWN_INSTRUMENTS = {
 }
 
 _STRUCK_PLUCKED_INSTRUMENTS = {
-    "piano", "grand-piano", "upright-piano", "guitar", "guitar-nylon",
+    "piano", "grand-piano", "upright-piano", "piano-upright", "guitar", "guitar-nylon",
     "guitar-steel", "harp", "glockenspiel",
 }
 
@@ -844,7 +844,7 @@ def score_files(
     if expected_f0_hz is None and context.get("midi") is not None:
         expected_f0_hz = 440.0 * 2 ** ((float(context["midi"]) - 69) / 12)
     force_percussive = instrument in {
-        "piano", "grand-piano", "upright-piano", "guitar", "guitar-nylon",
+        "piano", "grand-piano", "upright-piano", "piano-upright", "guitar", "guitar-nylon",
         "guitar-steel", "harp", "glockenspiel",
     }
     ref = extract_features(ref_path, active_duration_s=context.get("durationSec"),
