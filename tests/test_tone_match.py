@@ -816,6 +816,11 @@ def test_ship_calibration_nonfinite_midi_scale_is_missing_not_renderer_nan():
         midi=84, seed=9)
     assert fitted == plain
     assert all(np.isfinite(value) for value in fitted.values())
+    null_fitted = ship_human_overrides({
+        **params, "shipHumanCalibration": {
+            "byMidi": {"84": {"excitationPosition": None}}}},
+        midi=84, seed=9)
+    assert null_fitted == plain
 
 
 def test_t031_bowed_controls_are_auditable_but_not_identity_fit_dimensions():

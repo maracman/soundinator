@@ -643,6 +643,8 @@ console.log("T-033 per-string + pinned register × dynamic source surfaces");
     JSON.stringify(absentA._spectralFingerprint(.62, 220).harmonicPartials) ===
     JSON.stringify(absentB._spectralFingerprint(.62, 220).harmonicPartials));
 
+  const blownActivated = { flute: 0, clarinet: 3, "alto-sax": 1,
+    trumpet: 2, "french-horn": 4 };
   for (const instrument of ["flute", "clarinet", "alto-sax", "trumpet", "french-horn"]) {
     const fitted = SPECTRAL_PROFILES[instrument]?.spectralPartialsByRegisterDynamic;
     const cells = new Set((fitted?.rows || []).map(row =>
@@ -654,6 +656,17 @@ console.log("T-033 per-string + pinned register × dynamic source surfaces");
       fitted.rows.every(row => sourcePartialsAt(
         fitted, row.f0Hz, row.velocity).every((amp, index) =>
           near(amp, row.partials[index], 1e-12))));
+    check(`blown sustain ${instrument} activates only hierarchy-improving cells`,
+      fitted.rows.filter(row =>
+        row.activationStatus === "accepted-upstream-partial-improvement").length ===
+        blownActivated[instrument]);
+    check(`blown sustain ${instrument} neutralized cells are exact pooled anchors`,
+      fitted.rows.filter(row => row.activationStatus.startsWith("neutralized"))
+        .every(row => {
+          const pooled = registerProfileAt(SPECTRAL_PROFILES[instrument], row.f0Hz).partials;
+          return row.partials.every((amp, index) =>
+            near(amp, pooled[index]?.amp ?? pooled[index], 2e-5));
+        }));
   }
   const fluteSurface = SPECTRAL_PROFILES.flute.spectralPartialsByRegisterDynamic;
   const fluteAnchor = fluteSurface.rows.find(row =>

@@ -478,6 +478,17 @@ def _reference_render_params_override(reference: dict[str, Any]) -> dict[str, st
     return {"performanceRole": role}
 
 
+def _strict_json_value(value: Any) -> Any:
+    """Preserve calibration provenance without emitting JavaScript-invalid NaN."""
+    if isinstance(value, dict):
+        return {key: _strict_json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_strict_json_value(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 def _render_ship_variants(
     run_dir: Path,
     label: str,
@@ -497,7 +508,7 @@ def _render_ship_variants(
     target.mkdir(parents=True, exist_ok=True)
     ship_params = _mode_params(params, SHIP_MODE)
     if ship_calibration:
-        ship_params["shipHumanCalibration"] = ship_calibration
+        ship_params["shipHumanCalibration"] = _strict_json_value(ship_calibration)
     params_path = target / "params.json"
     human_range_overrides = []
     jobs_path = target / "jobs.json"
