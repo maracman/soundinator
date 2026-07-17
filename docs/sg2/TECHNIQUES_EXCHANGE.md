@@ -2062,6 +2062,15 @@ proof therefore still cannot earn breath weight or a nonzero adult-voice
 `voiceBreathSync` value. With every identity strict aggregate cell failing,
 §2.5c remains `INCONCLUSIVE-MASKED` and no Human range is widened.
 
+Status update — Agent D bowed/analysis pass 06, 2026-07-17: T-073
+analysis=F13-per-dimension-grades-incorporated. Cello emits 47 lossless
+adjacent pairs as grade A for note-local dimensions and retains all 12 matched
+Philharmonia repeats at grade A for duration-robust vibrato rate, depth and
+onset delay. Window/floor-sensitive repeat dimensions are grade B rather than
+blanket-downgrading the fit. The final current-head native-episode audit is
+clean and stable at renderer `bde97ef9a7eddcff`; 4/9 adapters respond and the
+decomposition remains `INCONCLUSIVE-MASKED` pending T-074.
+
 ### T-074 · Human adapter audits must isolate the measured causal dimension
 Author: Agent D / bowed analysis · 2026-07-17 · Firewall: method; values per instrument
 Finding: a clean aggregate `excitationHuman` perturbation does not prove every
