@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from scripts.tone_match.sung_body_constraints import constrain
 from scripts.tone_match.sung_breath_seed import seed_breath
@@ -133,6 +134,85 @@ def test_source_refinement_pools_one_correction_across_vowels(tmp_path, monkeypa
     for vowel in "eiou":
         other = json.loads((out / f"initial-{vowel}.json").read_text())
         assert other["spectralPartialsByRegisterDynamic"] == surface
+
+
+def test_source_refinement_is_cumulative_and_relocates_quarantined_renders(
+        tmp_path, monkeypatch):
+    fit = tmp_path / "fit"
+    baseline = tmp_path / "baseline-renderer-contract"
+    out = tmp_path / "out"
+    _write_fit(fit)
+    source_fit_path = fit / "SOURCE_VOWEL_FIT.json"
+    source_fit = json.loads(source_fit_path.read_text())
+    source_fit["baseParams"]["spectralPartialsByRegisterDynamic"] = {
+        "schemaVersion": 1,
+        "handoff": "T-064",
+        "evidenceSha256": "evidence",
+        "sourceIdentity": "one-source",
+        "interpolation": "joint-hull",
+        "dynamicComposition": "measured-only",
+        "rows": [{
+            "register": "low", "dynamic": "mf",
+            "partials": [1.0, 0.5, 0.25, 0.125],
+        }],
+    }
+    source_fit_path.write_text(json.dumps(source_fit))
+    references = [{
+        "roles": ["spectral"], "voiceClass": "tenor", "vowel": vowel,
+        "register": "low", "dynamic": "mf", "velocity": 0.6,
+        "sourceFile": f"{vowel}.wav", "expectedF0Hz": 220.0,
+    } for vowel in "aeiou"]
+    references_path = tmp_path / "references.json"
+    references_path.write_text(json.dumps(references))
+    (baseline / "fit-renders").mkdir(parents=True)
+    manifest = []
+    for index, vowel in enumerate("aeiou"):
+        relocated = baseline / "fit-renders" / f"{index:03d}-{vowel}.wav"
+        relocated.write_bytes(b"render")
+        manifest.append({
+            "reference": f"ref-{vowel}",
+            "fitRender": str(tmp_path / "old-run" / relocated.name),
+        })
+    (baseline / "audition-manifest.json").write_text(json.dumps(manifest))
+    calibration = tmp_path / "source.json"
+    calibration.write_text(json.dumps({
+        "schemaVersion": 1, "handoff": "T-064",
+        "evidenceSha256": "evidence", "interpolationContract": "joint-hull",
+        "dynamicComposition": "measured-only",
+        "voices": {"tenor": {"sourceIdentity": "one-source", "rows": [{
+            "register": "low", "dynamic": "mf", "partials": [1.0] * 4,
+        }]}},
+    }))
+
+    def fake_analysis(path, **_kwargs):
+        assert str(path).startswith("ref-") or Path(path).parent == baseline / "fit-renders"
+        amps = np.ones(4)
+        if str(path).startswith("ref-"):
+            amps[1] = 2.0
+        return SimpleNamespace(
+            partial_amps=amps,
+            partial_snr_ok=np.ones(4, dtype=bool),
+        )
+
+    monkeypatch.setattr(
+        "scripts.tone_match.sung_source_refine.analyse_audio_file",
+        fake_analysis,
+    )
+    result = refine(
+        references_path, fit, baseline, calibration, out,
+        correction_fraction=1.0, minimum_vowels=2,
+    )
+
+    emitted = json.loads((out / "initial-a.json").read_text())[
+        "spectralPartialsByRegisterDynamic"
+    ]["rows"][0]["partials"]
+    assert result["renderDomainSourceRefinement"]["startingSurface"] == \
+        "selected-fit-cumulative-surface"
+    assert result["renderDomainSourceRefinement"]["analysedRows"] == 5
+    assert result["renderDomainSourceRefinement"]["rejectedRows"] == []
+    # The old selected partial 2 was 0.5.  Refinement doubles it to 1.0;
+    # resetting to the calibration seed would incorrectly emit 2.0.
+    assert emitted[1] == pytest.approx(0.99763116)
 
 
 def test_breath_seed_requires_clean_lossless_activation_evidence(tmp_path):
