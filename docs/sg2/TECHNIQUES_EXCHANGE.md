@@ -2083,3 +2083,41 @@ Affects: measuredHumanEpisode / bowedHumanLevels / vibrato episode prerequisites
 attack-noise calibration / §2.5c decomposition gate.
 Status: analysis=incorporated bowed=audited-4of9+masked
 engine=pending-five-isolated-adapters sung=adapt-method struck/plucked=adapt-method
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: T-068 and T-069
+are now incorporated and preset-active for grand piano. The lossless point
+envelope is preserved rather than reduced to an ADSR, corrected L16 classes
+are consumed as onset-only excess above their own early law, and the exact
+two-control grand responder audit is clean with no uncontrolled weighted
+feature. Upright remains evidence-blocked: exhaustive audit of all 69 landed
+files finds 0/69 with the required >=10 ms true pre-roll (range 0.000-6.984
+ms), and no grand action value transfers.
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: the L18 Zenph
+handoff is incorporated as `sg2-piano-engine-handoffs-v2`. All 333 verified
+damped takes become 23 measured register x dynamic contact cells after
+subtracting the velocity-matched OLPC legato free-decay baseline. Treble-pp is
+the sole missing cell. The broadband report does not identify a per-mode
+frequency exponent, so the consumer holds it neutral/zero-weight rather than
+misreading rate-vs-register as mode damping. MIDI 90+ bypasses contact and
+continues natural free decay; it never clamps the last damped row upward.
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: T-072 is
+incorporated. The integrated glock render now passes the mode-1/mode-2 T60
+hierarchy (median ratio 7.404), all-anchor centre-strike mode-2 dip, six-mode
+economy and B=0 firewall. The 35-cent ratio gate still fails for upper audible
+modes around 16.9-19 kHz, so no bar leaderboard row is promoted. The
+pre-T-072 safe four-key search improved loss only 0.48% and cleared no strict
+gate. Harp's fresh current-profile audit is clean; its hierarchy-first search
+clears one strict failure via pluck position but improves composite only
+0.013%. The construction checklist now correctly treats both harp and bars as
+L18 impulsive/free-decaying families rather than demanding sustained notes.
+
+Status update — Agent C struck/plucked pass 18, 2026-07-17: nylon's corrected
+L16 triage finds ten valid transient classes (five harmonic-rank, five fixed
+Hz), but they do not explain its 18 spectral failures. All six middle-half
+partial cells fail while all six attack cells pass, so the mandatory hierarchy
+stops at steady per-course/register/dynamic partial identity; mel and band
+balance remain masked downstream diagnostics. T-069 may consume the retained
+nylon transient rows, but it may not waive or down-rank that partial-table
+failure.
