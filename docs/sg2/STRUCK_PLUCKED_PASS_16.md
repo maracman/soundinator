@@ -200,5 +200,5 @@ better-scoped evidence, not a policy choice.
 - `npm test`: 11/11 PASS.
 - `node scripts/verify_tone_model.mjs`: PASS.
 - `node scripts/render_note.mjs --verify`: PASS,
-  `6aabb93a16f7cd9677fcf96f66adba9f477299ddde718be1b7420681c176c562`.
+  `9aa602ef6cf7545cb210f9fb8c994ca76297a051222757f5ce6f974448342454`.
 - Listening page rebuild: PASS (ship mode, fresh seeds).
