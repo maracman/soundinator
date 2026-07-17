@@ -183,7 +183,19 @@ artifact SHA-256
 
 The owner listening page is rebuilt from merged shared head with fresh seeds.
 Its cello row resolves the verified active pinned-component SHIP candidate,
-not the older neutral leaderboard row.
+not the older neutral leaderboard row. The build re-rendered all 16 instruments
+at engine `aaf01bf`; `sg2-data/listen.html` has SHA-256
+`d266b4353cac86fd2853fef9205d7b51f906ee31186a83f43edf05b750172923`.
+
+Final shared-head verification is green:
+
+- `npm test`: 11/11 PASS;
+- `node scripts/verify_tone_model.mjs`: every assertion PASS, including the
+  exhaustive applicable-factory-preset activation gate;
+- `PYTHONPATH=src:. .venv/bin/python -m pytest -q`: full suite PASS;
+- `PYTHON=.venv/bin/python node scripts/render_note.mjs --verify`: PASS,
+  renderer hash
+  `bc6f43aecbb23ad8923daf4c4504d9d0631f708057571b87d2eee3f0918f1987`.
 
 Pending mandates:
 
