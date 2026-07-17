@@ -211,6 +211,8 @@ def main():
                 os.path.normpath(os.path.join(base or SG2, path)),
                 os.path.normpath(os.path.join(SG2, path)),
                 os.path.normpath(os.path.join(SG2, "campaigns", inst, path))]
+            if "sg2-data/" in path:  # wandering-relative agent paths: re-root at the data dir
+                cands.append(os.path.join(os.path.dirname(SG2), path[path.index("sg2-data/"):]))
             for c in cands:
                 if os.path.exists(c):
                     return f"<td><audio controls preload=none src='file://{html.escape(c)}'></audio></td>"
