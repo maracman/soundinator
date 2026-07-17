@@ -115,6 +115,12 @@ def build_reference(report_path: Path, output: Path,
             "legatoToStaccatoT40Ratio": float(source["legStaT40Ratio"]),
         })
 
+    dynamic_anchors: dict[str, float] = {}
+    for dynamic, _, _ in DYNAMICS:
+        samples = [row["velocity"] for row in admitted
+                   if row["dynamic"] == dynamic]
+        if samples:
+            dynamic_anchors[dynamic] = float(np.median(samples))
     cells: list[dict[str, Any]] = []
     for register, midi_low, midi_high in REGISTERS:
         for dynamic, velocity_low, velocity_high in DYNAMICS:
@@ -129,7 +135,10 @@ def build_reference(report_path: Path, output: Path,
                 })
                 continue
             midi_anchor = float(np.median([row["midi"] for row in members]))
-            velocity_anchor = float(np.median([row["velocity"] for row in members]))
+            cell_velocity_median = float(np.median([
+                row["velocity"] for row in members
+            ]))
+            velocity_anchor = dynamic_anchors[dynamic]
             cells.append({
                 "register": register, "dynamic": dynamic,
                 "midiSpan": [midi_low, midi_high],
@@ -138,6 +147,7 @@ def build_reference(report_path: Path, output: Path,
                 "midiAnchor": round(midi_anchor, 3),
                 "velocityAnchorMidi": round(velocity_anchor, 3),
                 "velocityAnchor": round(velocity_anchor / 127.0, 6),
+                "cellVelocityMedianMidi": round(cell_velocity_median, 3),
                 "f0": round(440 * 2 ** ((midi_anchor - 69) / 12), 4),
                 "observedPostKneeDbPerSecond": _percentiles([
                     row["observedPostKneeDbPerSecond"] for row in members]),
