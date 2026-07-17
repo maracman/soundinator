@@ -129,6 +129,23 @@ def main():
                 "levelLaw": bow_noise.get("levelLaw", {}),
                 "engineContract": bow_noise.get("engineContract", {}),
             }
+        # L17: component-generic pinned pre-onset noise.  Preserve measured
+        # timing and independent envelope evidence; these are immutable
+        # consumer inputs, not optimiser dimensions.
+        pinned_components = v.get("pinnedNoiseComponents")
+        if isinstance(pinned_components, dict):
+            kept_components = {}
+            for component_id, component in sorted(pinned_components.items()):
+                if not isinstance(component, dict) or component.get("profilePinned") is not True:
+                    continue
+                kept_components[component_id] = {
+                    key: component.get(key) for key in (
+                        "componentClass", "method", "source", "bandHz",
+                        "profilePinned", "profile", "profilesByDynamic",
+                        "levelLaw", "placementLaw", "envelope", "engineContract")
+                }
+            if kept_components:
+                entry["pinnedNoiseComponents"] = kept_components
         # §2.5c/T-007: calibrated player-variation ranges are engine-facing
         # measured data.  Preserve the complete physical-unit contract so a
         # consumer assertion can reject absent or silently ignored ranges.

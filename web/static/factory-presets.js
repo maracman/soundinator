@@ -43,6 +43,10 @@ const profileSounds = [
   sound(`factory-sub-${id}`, name, description, tags, {
     voiceMode: "fourier", spectralProfile, spectralMix: 0.9,
     excitationType, excitationPosition, excitationHardness, excitationHuman: 0.35,
+    ...(excitationType === "blow" && ["flute", "clarinet", "alto-sax"].includes(spectralProfile)
+      ? { toneBreath: 0.03, windBreathLevel: 1 } : {}),
+    ...(excitationType === "bow" && spectralProfile === "violin"
+      ? { bowNoiseLevel: 1 } : {}),
     envelopeAttack: excitationType === "strike" ? 0.006 : 0.06,
     envelopeRelease: excitationType === "strike" ? 0.28 : 0.28,
   }));
@@ -64,6 +68,7 @@ const fittedSounds = [
       excitationPosition: 0.08315571358214188,
       excitationHuman: 0.364403648667616,
       toneBreath: 0.3055728090000841,
+      windBreathLevel: 1,
       breathNoiseColor: 0.03606797749978963,
       breathLevelScale: 2.0233281560585272,
       breathVelocityExponent: 0.23432013743870406,
@@ -94,6 +99,7 @@ const fittedSounds = [
       envelopeSustain: 0.9699, envelopeRelease: 0.0798, vibratoProb: 0,
       excitationPosition: 0.15, excitationHuman: 0.5,
       toneBreath: 0.03, breathNoiseColor: 0,
+      windBreathLevel: 1,
       partialTransfer: 0.05, partialTilt: 0,
       spectralResonanceAmount: 1, spectralDynamicAmount: 0.8,
       dynamicBlare: 0,
@@ -136,6 +142,10 @@ const acousticSounds = [
     voiceMode: "fourier", spectralProfile, spectralMix: 0.9,
     excitationType, excitationPosition: excitationType === "bow" ? 0.13 : 0.2,
     excitationHardness, excitationHuman: 0.35, partialTilt, partialMaterial,
+    ...(excitationType === "blow" && ["flute", "clarinet", "alto-sax"].includes(spectralProfile)
+      ? { toneBreath: 0.03, windBreathLevel: 1 } : {}),
+    ...(excitationType === "bow" && spectralProfile === "violin"
+      ? { bowNoiseLevel: 1 } : {}),
     envelopeAttack: excitationType === "strike" ? 0.004 : 0.045,
     envelopeRelease: excitationType === "strike" ? 0.2 : 0.3,
   }));
@@ -192,6 +202,8 @@ const hitSounds = [
   sound(`factory-sub-${id}`, name, description, tags, {
     voiceMode: "fourier", spectralProfile, spectralMix: 0.82,
     excitationType, excitationPosition: 0.12, excitationHardness, partialMaterial,
+    ...(excitationType === "blow" && ["flute", "clarinet", "alto-sax"].includes(spectralProfile)
+      ? { toneBreath: 0.03, windBreathLevel: 1 } : {}),
     envelopeAttack: 0.002, envelopeDecay: 0.035, envelopeSustain: 0.04, envelopeRelease: 0.07,
     attackNoiseLevel: 1.4,
   }, ["sub-note", "percussion-hit"]));
@@ -208,6 +220,7 @@ const characterSounds = [
   sound(`factory-sub-${id}`, name, description, tags, {
     voiceMode: "fourier", spectralProfile, spectralMix: 0.88,
     excitationType: spectralProfile === "piano" ? "strike" : "bow",
+    ...(spectralProfile === "violin" ? { bowNoiseLevel: 1 } : {}),
     excitationPosition: 0.16, excitationHardness: 0.6, excitationHuman: 0.45,
     partialTilt, partialComb, partialCombFreq: 5, partialMaterial,
     envelopeAttack: 0.035, envelopeRelease: 0.45,

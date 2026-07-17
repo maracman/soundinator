@@ -367,6 +367,7 @@ export const DEFAULTS = {
   bowScratchLevel: 0,
   bowNoiseLevel: 0,
   bowNoiseVelocityExponent: null,
+  windBreathLevel: 0,
   onsetScoopDepthCents: 0,
   onsetScoopSettle: 0.06,
   onsetScoopRearticulatedScale: 0.35,
