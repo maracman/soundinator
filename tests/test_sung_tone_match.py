@@ -36,6 +36,7 @@ from scripts.tone_match.sung_consonant_audit import (
 )
 from scripts.tone_match.sung_exchange_status import extract as extract_exchange
 from scripts.tone_match.sung_pass_state import _selection_key
+from scripts.tone_match.sung_pass_snapshot import build as build_pass_snapshot
 from scripts.tone_match.sung_spectral_triage import fit_global_dynamic_amount
 from scripts.tone_match.sung_source_tables import (
     DYNAMIC_COMPOSITION,
@@ -497,3 +498,31 @@ def test_listening_page_uses_selected_sung_ship_manifest(tmp_path):
     assert selected_audition_manifest({"scoresPath": str(scores)}) == {
         "/real/a.wav": "/ship/a.wav",
     }
+
+
+def test_pass_snapshot_preserves_legacy_and_leader_gate_rows(tmp_path):
+    state = tmp_path / "state"
+    run = tmp_path / "run"
+    for voice in ("tenor", "soprano", "bass", "mezzo"):
+        root = state / f"voice-{voice}"
+        root.mkdir(parents=True)
+        rows = [{
+            "entryNumber": 1, "kind": "legacy-baseline", "run": "legacy",
+            "status": "interim-gates-failing", "shipEligible": False,
+            "meanComposite": 2.0, "objectiveHash": f"objective-{voice}",
+            "manifestHash": "manifest", "gates": {"strict": {"passed": False}},
+            "isLeader": False,
+        }, {
+            "entryNumber": 2, "kind": "candidate", "run": "candidate",
+            "status": "interim-gates-failing", "shipEligible": False,
+            "meanComposite": 1.0, "objectiveHash": f"objective-{voice}",
+            "manifestHash": "manifest", "gates": {"strict": {"passed": False}},
+            "isLeader": True,
+        }]
+        (root / "leaderboard.json").write_text(json.dumps({
+            "objectiveHash": f"objective-{voice}", "runs": rows, "best": rows[1],
+        }))
+    gates, table = build_pass_snapshot("sung-test", state, run)
+    assert all(len(row["entries"]) == 2 for row in gates["voices"].values())
+    assert gates["snapshotSha256"]
+    assert table["tableSha256"]

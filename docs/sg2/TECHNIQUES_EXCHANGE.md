@@ -1713,3 +1713,43 @@ Affects: criteria_drift.py evidence admission / optimiser reports / empirical
 hierarchy interpretation.
 Status: analysis=validation-incorporated+edge-quarantined
 bowed=incorporated engine=n/a struck/plucked=adapt-method sung=adapt-method
+
+Status update — Agent E sung pass 08, 2026-07-17: T-064
+sung=incorporated-four-voice-base-consonant-fit-anomaly-still-neutral. The
+same output-verification bar now passes on the current soprano, tenor, bass and
+mezzo identities at representative MIDI 72/60/48/67. Every class is distinct,
+all five burst/VOT/transition perturbations clear the same-seed repeat floor,
+and the provenance-gated unlicensed gesture remains neutral. The fitted values
+remain provisional LibriSpeech spoken-to-sung adaptations; L16/T-064 envelope-
+anomaly classes still have no sung extraction or round trip and remain neutral.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-065
+sung=blocked-prelanding-contract-review. The pinned emitter is strengthened to
+declare joint measured-hull interpolation and observed-dynamic composition.
+Review of Agent A's uncommitted draft found two activation blockers: independent
+f0 clamps per velocity rectangularise soprano's sparse hull, and the observed
+dynamic rows are multiplied again by generic `spectralDynamicAmount`. The new
+output audit at `c7ea902` binds the renderer/table/incumbent hashes and requires
+partial, mel and band-balance response above a same-seed floor. No source-law
+strict cell is claimed until a corrected canonical consumer commit lands.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-067
+sung=values-neutral-weight-zero analysis=pending-unimplemented. A read-only
+audit of clean Agent D tip `c8a8fe8` found no `pitch_sync_breath_db`
+implementation, synthetic residual-envelope round trip, corpus measurement,
+responder test or artifact. The `b5f91b7` engine-only zero identity, envelope-
+line, octave and body-route proofs remain incorporated but cannot earn breath
+weight or a nonzero fitted `voiceBreathSync` value.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-070
+sung=adapted-component-envelope-method-values-neutral. The independent
+component-envelope mechanism is applicable to aspiration and future sung onset
+residuals, but violin timing/level values do not transfer. Sung activation
+still requires its own lossless residual extraction and synthetic trust gate.
+
+Status update — Agent E sung pass 08, 2026-07-17: T-071
+sung=incorporated-edge-quarantine. Raw drift evidence remains stored, but an
+edge cannot steer the sung hierarchy unless both features are active for that
+voice, exceed nonzero feature-specific repeat floors, and represent independent
+intervention lineages. The quarantined cross-family inharmonicity/release-noise
+edge is not used for sung triage.

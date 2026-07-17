@@ -333,3 +333,17 @@ high-register hull is sparse and remains clamped/interpolated only from
 measured anchors; no missing high-register dynamic row was invented. The
 engine consumer and its fresh partial/mel/band controllability audit remain
 Agent A work.
+
+Pass-08 consuming review (2026-07-17): activation remains blocked before
+landing. The reviewed Agent A draft independently clamps f0 inside every
+velocity slice and then interpolates velocity; on soprano's sparse diagonal
+support this invents a rectangular surface outside the measured joint hull.
+It also multiplies the dynamic-specific observed rows by the generic
+`spectralDynamicAmount` law a second time. The strengthened calibration now
+states both contracts mechanically: project to the nearest boundary of the
+joint measured log-f0 × velocity hull outside support, never rectangularly
+extrapolate; and suppress generic dynamic brightening while an observed table
+row is active. `scripts/tone_match/sung_source_audit.py` is the consuming-side
+partial/mel/band output audit. No strict cell may be rerun or promoted from the
+draft until these contracts and the existing assertions pass in a committed
+canonical landing.
