@@ -51,7 +51,7 @@ DEFAULT_WEIGHTS = {
     "release_noise_db": 0.0,
 }
 
-SCORER_CONTRACT_VERSION = "sg2-score-release-tail-struck-hold-v6"
+SCORER_CONTRACT_VERSION = "sg2-score-bowed-release-anchor-v7"
 
 _BLOWN_INSTRUMENTS = {
     "flute", "clarinet", "alto-sax", "tenor-sax", "trumpet", "french-horn",
@@ -154,13 +154,12 @@ def weights_for_instrument(instrument: str | None,
     if normalized_instrument in _BOWED_INSTRUMENTS:
         for key in _BOWED_WATCH_METRICS:
             weights[key] = 0.0
-    if normalized_instrument == "violin":
-        # T-060: the releaseDamping consumer is live and pass 03 audits all
-        # mechanically eligible full-tail violin rows.  Other bowed
-        # instruments remain at zero until their own tail audit passes.
-        for key in ("release_ring_ms", "release_damp_db_per_s",
-                    "release_noise_db"):
-            weights[key] = 1.0
+    # T-072 supersedes T-060's mechanical full-tail admission.  A complete
+    # recording is not a labelled bow lift: without note-off/bow-lift time,
+    # harmonic post-drive decay, residual bow contact and the room/noise
+    # floor cannot be assigned to one release law.  Bowed release sensors
+    # therefore retain the DEFAULT_WEIGHTS zero until an anchored corpus can
+    # introduce an explicit, reference-bound override.
     if (instrument or "").strip().lower() in _STRUCK_PLUCKED_INSTRUMENTS:
         for key in _STRUCK_FIREWALL_FEATURES:
             weights[key] = 0.0

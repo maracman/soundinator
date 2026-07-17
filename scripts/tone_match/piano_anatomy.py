@@ -133,7 +133,14 @@ def _component_rows(samples: np.ndarray, sample_rate: int, f0: float,
                      if row["rank"] == 1), None)
     if rank_one is not None:
         for row in partials:
-            row["onsetBoostDb"] = row["onsetLevelDb"] - rank_one
+            # Keep the temporal boost returned by _track_metrics.  L16 asks
+            # whether THIS mode is louder at onset than its own extrapolated
+            # early-decay baseline.  Relative-to-fundamental level is a
+            # useful spectral descriptor, but overwriting onsetBoostDb with
+            # it made positive onset prominence impossible for most upper
+            # modes and admitted onset-quiet false classes.
+            row["onsetLevelRelativeToFundamentalDb"] = (
+                row["onsetLevelDb"] - rank_one)
 
     centres = 100 * 2 ** (np.arange(int(math.log2(min(14000, freqs[-1]) / 100)
                                               * BANDS_PER_OCTAVE) + 1) /
@@ -152,7 +159,8 @@ def _component_rows(samples: np.ndarray, sample_rate: int, f0: float,
     if bands:
         centre_level = float(np.median([row["onsetLevelDb"] for row in bands]))
         for row in bands:
-            row["onsetBoostDb"] = row["onsetLevelDb"] - centre_level
+            row["onsetLevelRelativeToBandMedianDb"] = (
+                row["onsetLevelDb"] - centre_level)
     return partials, bands, {"toneOnsetSec": onset, "freqs": freqs,
                              "times": times, "power": power,
                              "samples": samples, "sampleRate": sample_rate}
@@ -188,7 +196,11 @@ def _baseline_and_deviants(rows: list[dict[str, Any]], key: str) -> dict[str, An
         boosts = np.asarray([row["onsetBoostDb"] for row in members])
         velocity_slope = (float(np.polyfit(velocities, boosts, 1)[0])
                           if len(np.unique(np.round(velocities, 3))) >= 2 else 0.0)
-        if excess >= 2.0 and velocity_slope >= 2.0:
+        # L16 classes are onset-prominent, fast-decaying, and stronger at
+        # higher velocity.  All three signs are required; a fast-decaying
+        # but onset-quiet mode is ordinary envelope structure, not the
+        # owner's anomaly class.
+        if onset >= 2.0 and excess >= 2.0 and velocity_slope >= 2.0:
             deviants.append({
                 key: group, "notes": distinct,
                 "onsetBoostDb": round(onset, 3),
@@ -566,15 +578,22 @@ def _synthetic_note(f0: float, velocity: float, *, sample_rate: int = 24000,
         rate = 3 + 1.5 * math.log2(max(frequency, 100) / 440)
         rate = max(1, rate)
         amp = 1 / rank
+        transient_db = np.zeros_like(times)
         if rank == 6:
-            amp *= 10 ** ((1 + 7 * velocity) / 20)
+            # L16 is an onset-only excess over the mode's sustained decay,
+            # not merely a loud upper partial.  Keep the injected excess out
+            # of the 80--380 ms baseline-fit window so the round trip tests
+            # the temporal quantity that the extractor reports.
+            transient_db = (3 + 9 * velocity) * np.exp(-active / .018)
             rate += 16
         release_decay = 120 * (rank ** .35) * np.maximum(0.0, times - release)
-        envelope = 10 ** (-(rate * active + release_decay) / 20) * (times >= tone_onset)
+        envelope = 10 ** ((transient_db - rate * active - release_decay) / 20)
+        envelope *= times >= tone_onset
         samples += amp * envelope * np.sin(2 * np.pi * frequency * active)
-    fixed_amp = .04 * 10 ** (10 * velocity / 20)
+    fixed_amp = .04
+    fixed_transient_db = (4 + 11 * velocity) * np.exp(-active / .018)
     fixed_release = 120 * (2800 / f0) ** .35 * np.maximum(0.0, times - release)
-    samples += fixed_amp * 10 ** (-(35 * active + fixed_release) / 20) * (times >= tone_onset) * np.sin(
+    samples += fixed_amp * 10 ** ((fixed_transient_db - 35 * active - fixed_release) / 20) * (times >= tone_onset) * np.sin(
         2 * np.pi * 2800 * active)
     rng = np.random.default_rng(round(f0 * 10 + velocity * 100))
     noise = signal.lfilter([1, -.7], [1], rng.normal(0, 1, len(times)))

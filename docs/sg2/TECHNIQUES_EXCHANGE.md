@@ -1396,6 +1396,14 @@ all family campaign adapters.
 Status: engine=incorporated `b5f91b7` analysis=pending-review
 struck/plucked=adapt-method sung=adapt-method bowed=adapt-method
 
+Status update — Agent D bowed pass 05, 2026-07-17: T-063
+bowed=incorporated. Bow noise and scratch levels now consume the single
+engine-native zero-inflated episode as dB deltas around the strongest-prior
+controls. Campaign SHIP jobs detect profile-native `humanRanges`, retire the
+second Python draw, and reject stale saved jobs that contain manual Human
+overrides. A headless assertion covers both bowed level consumers; FIT/Human
+zero and profiles without ranges retain their exact fallback.
+
 ### T-067 · ENGINE LAW SPEC (Agent A): held strike/pluck = free decay, note-off = damper contact
 Author: Agent C / struck-plucked · 2026-07-17 · Firewall: mechanism; decay and damper values per instrument
 Finding: owner L18 makes an ADSR sustain plateau a construction error for
@@ -1753,6 +1761,48 @@ edge cannot steer the sung hierarchy unless both features are active for that
 voice, exceed nonzero feature-specific repeat floors, and represent independent
 intervention lineages. The quarantined cross-family inharmonicity/release-noise
 edge is not used for sung triage.
+### T-072 · Bowed L16 fixed-Hz envelopes and L18 bow-lift semantics stay separate
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: shared method; violin values only
+Finding: the family-generic L16 extractor now has a synthetic round trip that
+requires all three defining signs: positive onset excess over the mode's own
+early-decay law, excess decay over the fitted frequency baseline, and a
+positive dynamic slope. The violin audit deduplicates role trims by
+source-file/note/dynamic/string and uses nine lossless onset/spectral notes.
+It finds no harmonic-rank class. One fixed-Hz body/radiation class survives
+all nine notes at 356.359 Hz, with 3.796 dB median onset boost, 5.832 dB/s
+excess early decay, and +6.414 dB per velocity unit. These values are violin
+identity evidence and do not transfer to another bowed instrument.
+
+Gate correction: the earlier canonical extractor overwrote temporal
+`onsetBoostDb` with onset level relative to the fundamental/band median, and
+its synthetic fixture raised an entire mode rather than injecting an
+onset-only transient. Those quantities are now separate fields and the gate
+injects a transient that is gone before the baseline-fit window. Any L16 real
+assignment emitted by the older gate, including the prior piano artifacts,
+must be re-extracted before consumption; the old class rows are not evidence
+for a renderer value merely because the previous synthetic check passed.
+
+The L18 bow-lift analogue is not established by the held violin references.
+Nine unique lossless full tails contain six detected final knees but zero
+labelled bow-lift/note-off times; their measured release floor spans -22.802
+to -7.520 dB. Thus `releaseNoiseDb` is a recording/room-floor observable,
+while `releaseDamping` changes harmonic ring. The pass-04 discontinuity in
+the release-floor probe is a scorer/semantic mismatch, not evidence that one
+scalar is the physical bow-lift law. Ring, damping-slope and floor features
+remain watch-only until a labelled anchor separates pre/post-lift harmonic
+decay, residual bow-contact noise, and room tail.
+
+Consuming assertions: extend the generic T-069 fixed-Hz anomaly consumer to
+bowed profiles without enabling a harmonic-rank class; the 356.359-Hz row
+changes only its assigned absolute-frequency band during onset and returns to
+the unchanged sustained body law; absence is PCM-identical. A future L18
+consumer requires lossless notes with labelled bow-lift, measurable pre/post
+harmonic envelopes, and separately tracked residual-contact/room tails.
+Affects: L16 bowed profile schema / T-069 consumer / release scorer admission /
+violin plateau interpretation.
+Status: analysis=incorporated bowed=measured-fixedHz-class
+engine=pending-generic-T-069-bowed-consumer L18=blocked-labelled-bow-lift-evidence
+
 ### T-072 · ENGINE SPEC (Agent A): bar modes own decay and strike-position laws
 Author: Agent C / struck-plucked · 2026-07-17 · Firewall: bar mechanism; values per instrument/preset
 Finding: the first gated glockenspiel extraction validates the existing
@@ -1851,6 +1901,55 @@ multiplied after selecting an observed-dynamic row. Fresh hierarchy runs pass
 zero strict aggregate cells and regress paired vowel-body consumption for
 soprano, tenor and mezzo. No identity row or table-derived weight is promoted;
 engine correction and realised-output assertions remain required.
+### T-073 · Cello matched-take ranges are measured but decomposition-masked
+Author: Agent D / bowed-analysis · 2026-07-17 · Firewall: cello values only; method shared
+Finding: the pass-05 cello acquisition supplies six same-note/dynamic/
+articulation cells (C2/G3/E5 × pp/ff), 15 common-window takes and 12 within-cell
+pairs. The source gap remains explicit: every take is duration-mismatched MP3,
+the Philharmonia session identity is presumed, and sulC/sulD/sulA are planned
+fingerings rather than source labels. These rows are therefore Human-only and
+cannot enter the lossless stopping floor or release/noise-floor extraction.
+
+The §2.5c double-dissociation qualifies 9/11 candidates on at least one pair:
+excitation position, vibrato rate/depth/onset delay, bow-noise and bow-scratch
+level, attack-noise level, onset wander and onset settle. Vibrato ramp and rate
+drift do not qualify. Examples of pooled p90 pair spread are 0.13975
+fraction-of-string for excitation position, 10.9968 dB sustain bow noise,
+13.6355 dB onset scratch, 71.8415 cents onset wander and 149.576 ms settling.
+All 12 decompositions fail after the allowed Human removal, but the verdict is
+`INCONCLUSIVE-MASKED`: the per-take identity rows are not yet near the §3 core
+bars and the qualified cello Human consumers lack a dedicated response audit.
+This is not evidence of a missing Human DOF and never widens identity.
+
+Consuming assertions: measured ranges remain in the cello profile despite the
+masked verdict; T-063's one native zero-inflated episode owns the draw; stale
+manual SHIP overrides are rejected; distribution PASS waits for a fresh
+cello-specific Human response audit and two-sided seeded spread gate.
+Affects: cello `humanRanges` / §2.5c report / campaign-role firewall / T-063.
+Status: analysis=incorporated bowed=measured-ranges+inconclusive-masked
+engine=incorporated-native-episode distribution=blocked-cello-response-audit
+
+Status update — Agent D crash recovery/F13, 2026-07-17: F13 is now applied
+per dimension. Eleven lossless source/dynamic/string runs supply 47 adjacent
+semitone pairs; a local linear register trend is removed before first
+differences become the primary per-note SHIP width. Bow position, onset
+scratch, attack noise, onset wander and settling therefore have full-strength
+lossless-adjacent evidence. Vibrato rate/depth/onset delay retain full-strength
+same-note common-window evidence because duration mismatch does not affect
+those goals. Sustained bow noise, vibrato ramp and rate drift remain weaker.
+The invalid 81.7 dB generic adjacent sustain-floor result is explicitly
+excluded: harmonic-subtraction/room-floor error masks it, and L14 owns any
+future lossless promotion.
+
+The fresh hashed `excitationHuman=0.4` native-episode audit is clean and
+repeat-stable. Four of nine qualified adapters cross the 0.05 response bar:
+bow position (partials 0.0776), sustained bow noise (0.1594), onset wander
+(0.1950) and onset settle (0.0719). Vibrato rate/depth/delay, scratch and
+attack-noise do not. Decomposition therefore remains `INCONCLUSIVE-MASKED`;
+distribution remains blocked on those consumers plus the two-sided seeded
+spread gate. Status: analysis=F13-incorporated bowed=response-audited-4of9
+engine=native-episode-partial distribution=blocked-consumers+two-sided-gate
+
 Status update — Agent C pass 17 post-merge chase, 2026-07-17: the held
 strike/pluck L18 law is now incorporated at shared commit `b4ff0c4`; nylon is
 therefore reopened for a renderer-hash-specific residual re-audit. T-068's

@@ -76,6 +76,7 @@ import {
   layerMixPlan,
   measuredHumanEpisode,
   measuredHumanDelta,
+  bowedHumanLevels,
   consonantProvenanceReady,
   consonantGesturePlan,
   consonantTransitionGain,
@@ -111,6 +112,13 @@ console.log("Measured SHIP episodes + sung onset consumers");
   check("§2.5c engine adapter consumes physical observables, not bow-specific labels",
     measuredHumanDelta(measured, "sustainNoiseDb") ===
       measured.deltas.bowNoiseLevelDb);
+  const bowedLevels = bowedHumanLevels(1, 1, {
+    deltas: { noise: 6, scratch: -6 },
+    observables: { noise: "sustainNoiseDb", scratch: "onsetNoiseDb" },
+  });
+  check("T-063 bowed noise/scratch consume the one native episode exactly once",
+    near(bowedLevels.bowNoiseLevel, Math.pow(10, 6 / 20), 1e-12) &&
+    near(bowedLevels.bowScratchLevel, Math.pow(10, -6 / 20), 1e-12));
   let episodeDraw = 0;
   const skipped = measuredHumanEpisode(
     MEASURED_PROFILES.flute.humanRanges, .35, () => ++episodeDraw === 1 ? .8 : 1);
