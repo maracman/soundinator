@@ -366,7 +366,7 @@ CAMPAIGNS: dict[str, dict[str, Any]] = {
     "harp": {
         "instrument": "harp",
         "corpus": "harp",
-        "profile": "guitar",
+        "profile": "harp",
         "analysisProfile": "harp",
         "excitation": "pluck",
         "resonator": "string",
@@ -406,7 +406,7 @@ CAMPAIGNS: dict[str, dict[str, Any]] = {
     "glockenspiel": {
         "instrument": "glockenspiel",
         "corpus": "glockenspiel",
-        "profile": "piano",
+        "profile": "glockenspiel",
         "analysisProfile": "glockenspiel",
         "excitation": "strike",
         "resonator": "bar",
@@ -524,9 +524,13 @@ def seed_preset(spec: dict[str, Any], measured: dict[str, Any], *,
         "decaySecondRatio": 1.0,
         # Direct Fourier is the valid temporary home for a measured identity
         # whose named profile still awaits Agent A's activation adapter.
-        "spectralPartialMeans": [float(row.get("amp", 0))
-                                 for row in profile.get("partials", [])],
     }
+    if spec["instrument"] not in {"harp", "glockenspiel"}:
+        # Legacy instruments without a named measured-profile activation use
+        # this temporary direct Fourier surface. Harp/glock now consume their
+        # own named profiles so their dense register tables remain live.
+        measured_identity["spectralPartialMeans"] = [
+            float(row.get("amp", 0)) for row in profile.get("partials", [])]
     material = (profile.get("material") or {}).get("suggestedMaterial")
     if material is not None:
         measured_identity["partialMaterial"] = material

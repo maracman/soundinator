@@ -519,9 +519,11 @@ def test_harp_and_glock_campaigns_keep_dense_strings_and_bar_firewall():
     harp = STRUCK_CAMPAIGNS["harp"]
     glock = STRUCK_CAMPAIGNS["glockenspiel"]
     assert len(harp["anchors"]) == 23
+    assert harp["profile"] == "harp"
     assert {row["register"] for row in harp["anchors"]} == \
         {"wire-bass", "gut-mid", "nylon-top"}
     assert glock["resonator"] == "bar"
+    assert glock["profile"] == "glockenspiel"
     assert glock["spectralPartials"] == len(BAR_RATIOS) == 6
     assert [row["midi"] for row in glock["anchors"]] == [79, 84, 91, 96, 103, 108]
 
