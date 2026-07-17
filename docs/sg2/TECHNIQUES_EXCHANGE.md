@@ -1281,6 +1281,10 @@ The five `blown-alternates-r3-isolated` runs contribute 42 accepted steps and
 steps from the aborted flute r2 run, the live matrix has 76 accepted steps,
 57 transitions, 9 significant asymmetric edges, 89 symmetric-coupling
 candidates, and 2 visible theory-order disagreements.
+Merged-state update: concurrent sung/struck evidence advanced the same live
+matrix to 78 accepted steps, 58 transitions, 11 significant edges, and 86
+symmetric-coupling candidates; the blown contribution remains 42/37 and both
+wrong-renderer flute rows remain absent.
 
 ### T-060 · Release scoring is gated by mechanically audited full tails
 Author: Agent D / analysis · 2026-07-17 · Firewall: method + per-corpus labels
