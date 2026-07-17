@@ -2321,3 +2321,55 @@ activate all five measured consonant classes for tenor, soprano, bass and
 mezzo. The family enumeration is therefore complete: there is no remaining
 adult voice to extend, and consonant values remain the voice-owned sung
 adaptations rather than cross-family defaults.
+
+Status update — Agent D bowed/analysis pass 08, 2026-07-18: T-075
+analysis=incorporated-gates-cleared bowed=incorporated-cello-L14-profile-pinned.
+The exact-body paired audit now passes 6/6 after excluding ratios unless both
+arms exceed the declared -36 dB audibility floor. The cello L14 extraction
+passes 12/12 cross-pitch pools under T-076's source-run-balanced estimator;
+the cello-owned bow-noise profile is pinned, independently enveloped, and
+active in every applicable factory preset. Ordinary cello identity still
+misses core partial/log-mel/attack bars, so the locked Human decomposition
+remains `INCONCLUSIVE-MASKED` rather than becoming a missing-DoF claim.
+
+### T-076 · Cross-pitch residual pools weight source runs, not segment counts
+Author: Agent D / bowed analysis · 2026-07-18 · Firewall: method only; values per instrument
+Finding: `sulG/mf` mixed four lossless Iowa source runs with unequal segment
+counts (11/6/4/4). The legacy note-weighted pool reported 3.607 dB median
+shape error; the unbalanced per-note diagnostic reported 2.941 dB. Taking a
+median within each source run and then an equal-weight median across runs gives
+1.781 dB with 0.9467 pitch correlation. No note, run, dynamic, or string is
+deleted, and the 3 dB bar is unchanged. All twelve cello string×dynamic pools
+then pass. The former failure was segmentation-count weighting, not corpus
+contamination.
+Consuming rule: when multiple source runs contribute unequal numbers of
+segments to one cross-pitch residual pool, aggregate within run first and
+weight runs equally; retain the unbalanced estimators as diagnostics and do
+not use this method to hide a failing within-run or cross-run distribution.
+Affects: residual component extraction / cross-pitch pooling / source-run provenance.
+Status: analysis=incorporated bowed=incorporated-cello-L14
+engine=n/a-method-only sung=adapt-method struck/plucked=adapt-method
+
+### T-077 · Register/dynamic air level is a bounded source-edge probe, not a body substitute
+Author: Agent A / engine + blown · 2026-07-18 · Firewall: mechanism only; values per instrument
+Finding: a scalar flute `windBreathLevel` sweep moved the active
+`band_balance_db` criterion but exposed incompatible register preferences.
+The engine now accepts an optional measured-hull
+`windBreathLevelByRegisterDynamic` surface whose rows contain `f0Hz`,
+`velocity`, and `levelScale`; its joint log-f0 × velocity interpolation
+multiplies the existing master air level, and absence is exact identity. A
+flute-only mid/ff scale of 0.70 reduced that construction cell from
+3.070/6.251 dB mean/max to 3.031/5.845 dB and improved the cross-run composite
+from 3.193881 to 3.186308 while preserving the other anchors. A lower 0.45
+row worsened the mean to 3.120 dB even as the maximum fell to 5.601 dB.
+Neither row cleared the 3 dB mean bar, so no fitted surface was promoted into
+the factory preset and no body/source value was inferred from this probe.
+Consuming rule: use this surface only when independent register × dynamic air
+evidence exists; retain a scalar master, exact-null identity, measured-hull
+interpolation, and an instrument-owned table. When a bounded row reaches this
+non-monotonic plateau, extract a stable post-source/post-air octave residual
+before considering a body refit.
+Affects: blown excitation level / register-dynamic interpolation / band-balance triage.
+Status: engine=incorporated (`cb50b68`, shared `4810c30`)
+blown=incorporated-limiting-factor analysis=adapt-method
+sung=adapt-method-if-independently-measured bowed=n/a struck/plucked=n/a

@@ -2004,6 +2004,26 @@ export function sourcePartialsAt(surface, fundamentalHz, velocity) {
   return interpolatePartials(nearest.a.partials, nearest.b.partials, nearest.t);
 }
 
+/** Interpolate a scalar register x dynamic surface through the same joint-hull
+ * law as the pinned source tables.  Rows are `{f0Hz, velocity, levelScale}`;
+ * absence is exact-neutral at one.  Keeping this as a multiplier leaves the
+ * existing scalar as the performer-facing master and prevents fitted cell
+ * values from leaking between instruments. */
+export function registerDynamicLevelScaleAt(surface, fundamentalHz, velocity) {
+  const rows = Array.isArray(surface?.rows) ? surface.rows
+    : Array.isArray(surface) ? surface : [];
+  const scalarRows = rows.filter(row =>
+    Number.isFinite(row?.f0Hz) && Number.isFinite(row?.velocity) &&
+    Number.isFinite(row?.levelScale)).map(row => ({
+      f0Hz: row.f0Hz,
+      velocity: row.velocity,
+      partials: [Math.max(0, Math.min(2, row.levelScale))],
+    }));
+  if (!scalarRows.length) return 1;
+  return Math.max(0, Math.min(2,
+    sourcePartialsAt({ rows: scalarRows }, fundamentalHz, velocity)?.[0] ?? 1));
+}
+
 // Legacy conversion: the old spectralStretchCents pinned a quadratic cents
 // ramp to the top of a 32-partial table. Map it to the B whose detune at
 // n=32 matches (negative "compression" has no stiff-string analogue → 0).
@@ -4344,7 +4364,14 @@ export class GenerationEngine {
       pianoActionNoiseLevel: this._clamp(this.p.pianoActionNoiseLevel ?? 0, 0, 2),
       envelopeAnomalyClasses,
       envelopeAnomalyLevel: this._clamp(this.p.envelopeAnomalyLevel ?? 0, 0, 2),
-      windBreathLevel: this._clamp(this.p.windBreathLevel ?? 0, 0, 2),
+      // Blown pass 07: the independent measured air component needs a
+      // register x dynamic level surface once one scalar cannot clear the
+      // sustained band-balance cells. The scalar remains the master; absent
+      // rows multiply by exactly one and preserve every existing preset.
+      windBreathLevel: this._clamp((this.p.windBreathLevel ?? 0) *
+        registerDynamicLevelScaleAt(
+          this.p.windBreathLevelByRegisterDynamic,
+          fundamentalHz, velocity), 0, 2),
       onsetScoopDepthCents: this._clamp(this.p.onsetScoopDepthCents ?? 0, 0, 180),
       onsetScoopSettle: this._clamp(this.p.onsetScoopSettle ?? 0.06, 0.015, 0.35),
       onsetScoopRearticulatedScale: this._clamp(this.p.onsetScoopRearticulatedScale ?? 0.35, 0, 1),

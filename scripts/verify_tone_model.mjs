@@ -1676,6 +1676,29 @@ console.log("L17: pinned pre-onset component class + preset activation");
   }
   check("every applicable factory preset activates every pinned component in SHIP mode",
     failures.length === 0, failures.join(", "));
+
+  const airSurface = { rows: [
+    { f0Hz: 100, velocity: .2, levelScale: .5 },
+    { f0Hz: 400, velocity: .2, levelScale: 1.5 },
+    { f0Hz: 100, velocity: 1, levelScale: 1 },
+    { f0Hz: 400, velocity: 1, levelScale: 2 },
+  ] };
+  const airFingerprint = (instrument, f0, velocity, surface = airSurface) =>
+    new GenerationEngine({
+      seed: 1718, voiceMode: "fourier", spectralProfile: instrument,
+      excitationType: "blow", toneBreath: .2, windBreathLevel: .8,
+      windBreathLevelByRegisterDynamic: surface,
+    })._spectralFingerprint(velocity, f0, 0);
+  check("blown air level surface resolves anchors and the log-f0 midpoint",
+    near(airFingerprint("flute", 100, .2).windBreathLevel, .4, 1e-12) &&
+    near(airFingerprint("flute", 200, .2).windBreathLevel, .8, 1e-12) &&
+    near(airFingerprint("flute", 400, 1).windBreathLevel, 1.6, 1e-12));
+  check("absent blown air level surface is exact scalar identity",
+    airFingerprint("flute", 200, .6, null).windBreathLevel === .8);
+  for (const instrument of ["flute", "clarinet", "alto-sax", "trumpet", "french-horn"]) {
+    check(`blown air level surface is available without cross-instrument values: ${instrument}`,
+      near(airFingerprint(instrument, 100, .2).windBreathLevel, .4, 1e-12));
+  }
   const violinFoundation = FACTORY_PRESETS.find(row => row.id === "factory-sub-violin-natural");
   const violinActivation = pinnedNoiseActivationReport(
     SPECTRAL_PROFILES.violin, violinFoundation?.parameters, true);

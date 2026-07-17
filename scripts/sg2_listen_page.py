@@ -124,7 +124,8 @@ def resolve_pinned_ship_candidate(inst):
               if row.get("applicable") and row.get("active")]
     if not active:
         raise RuntimeError(f"{inst}: activation audit contains no active component")
-    return params, "blown-l17-ship-r5 (verified SHIP candidate)", {}
+    label = audit.get("label") or "pinned-component SHIP (verified)"
+    return params, label, {}
 
 def resolve_complete_struck_ship_candidate(inst):
     """Prefer a PCM-verified L16+L17+L18 struck SHIP candidate.
