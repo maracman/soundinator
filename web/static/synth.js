@@ -1287,6 +1287,31 @@ export function twoStageDecayPlan(freqHz, material, amount = 0, lateRatio = 1) {
   return { earlyT60, lateT60: earlyT60 * (1 + a * (ratio - 1)), breakpointDb: -18 };
 }
 
+/** T-021: two close orthogonal modes for string polarisation/unison beating.
+ * Amount 0 is an exact one-mode identity. Squared gains sum to A^2, so the
+ * split preserves modal energy; fitted values only decide how much occupies
+ * the second mode, its frequency separation, and its independent decay. */
+export function polarisationModePlan(amplitude, amount = 0, splitCents = 0,
+                                     decayRatio = 1) {
+  const amp = Math.max(0, Number(amplitude) || 0);
+  const a = Math.max(0, Math.min(1, Number(amount) || 0));
+  const w = 0.5 * a;
+  const split = Math.max(0, Math.min(6, Number(splitCents) || 0));
+  const decay = Math.max(0.25, Math.min(4, Number(decayRatio) || 1));
+  return {
+    primaryGain: amp * Math.sqrt(1 - w),
+    secondaryGain: amp * Math.sqrt(w),
+    frequencyRatio: Math.pow(2, split / 1200),
+    secondaryDecayRatio: decay,
+  };
+}
+
+export function polarisationBeatHz(freqHz, splitCents = 0) {
+  const f = Math.max(0, Number(freqHz) || 0);
+  const split = Math.max(0, Math.min(6, Number(splitCents) || 0));
+  return f * (Math.pow(2, split / 1200) - 1);
+}
+
 /** Blend between legacy ADSR-bound and independently enveloped onset noise. */
 export function attackNoiseRouting(amount = 0) {
   const directGain = Math.max(0, Math.min(1, Number(amount) || 0));
@@ -2851,6 +2876,9 @@ export class GenerationEngine {
       voiceBreathSync: this._clamp(this.p.voiceBreathSync ?? 0, 0, 1),
       partialTransfer: this._clamp(this.p.partialTransfer ?? 0.15, 0, 1),
       releaseDamping: this._clamp(this.p.releaseDamping ?? 0, 0, 1),
+      polarisationAmount: this._clamp(this.p.polarisationAmount ?? 0, 0, 1),
+      polarisationSplitCents: this._clamp(this.p.polarisationSplitCents ?? 0, 0, 6),
+      polarisationDecayRatio: this._clamp(this.p.polarisationDecayRatio ?? 1, 0.25, 4),
       // Body stage (T5): carried on the note so the renderer can evaluate
       // the body against MODULATED frequencies (vibrato FM → body AM).
       bodyBands,
@@ -5025,77 +5053,124 @@ export class SynthEngine {
       // print are dead weight (typical live set stays at 20-40 oscillators).
       if (!partialIsAudible(Math.max(part.amp, part.mean), norm, harmonic,
                             note.spectralCullThreshold)) return;
-      const osc = this.ctx.createOscillator();
-      osc.type = "sine";
-      this._setFrequency(osc.frequency, freq, t0, note, multiplier);
-      const g = this.ctx.createGain();
       // T2 (audit A8): the hidden 1.4/√n rolloff is gone — what the print
       // shows is exactly what renders; spectral shaping lives only in the
       // model (excitation × macros × material × body).
-      const gainScale = mix / norm;
+      const baseGainScale = mix / norm;
       // Q8 attack stagger: low partials speak first on bow/blow onsets
       // (never on legato joins — the column of air / string is already going)
       const onsetDelay = note.legatoFromPrevious
         ? 0
         : partialOnsetDelay(harmonic, note.excitationType, note.attackStaggerMs);
-      scheduled.push({ param: g.gain, part, gainScale, onsetDelay });
-      osc.connect(g);
-      let tail = g;
-      // FM→AM through the body (T5): the SAME vibrato events that bend the
-      // pitch re-evaluate the body gain at the modulated frequency, so a
-      // partial sitting on a body ridge shimmers in amplitude exactly in
-      // phase with the vibrato. Only partials on meaningful slopes get the
-      // extra node; symmetric peaks stay still, as physics says they should.
       const vibEvents = note._vibratoEvents || [];
-      if (vibEvents.length > 2 && note.bodyBands && note.bodyBands.length && (note.bodyAmount || 0) > 0) {
-        const r0 = bodyResponse(note.bodyBands, freq, note.bodyAmount);
-        let minC = 0, maxC = 0;
-        for (const e of vibEvents) { if (e.cents < minC) minC = e.cents; if (e.cents > maxC) maxC = e.cents; }
-        const rHi = bodyResponse(note.bodyBands, freq * Math.pow(2, maxC / 1200), note.bodyAmount);
-        const rLo = bodyResponse(note.bodyBands, freq * Math.pow(2, minC / 1200), note.bodyAmount);
-        if (Math.abs(rHi - rLo) / r0 > 0.03) {
-          const am = this.ctx.createGain();
-          am.gain.setValueAtTime(1, t0);
-          const stride = Math.max(1, Math.ceil(vibEvents.length / 96));
-          for (let k = 1; k < vibEvents.length; k += stride) {
-            const e = vibEvents[k];
-            const r = bodyResponse(note.bodyBands, freq * Math.pow(2, e.cents / 1200), note.bodyAmount);
-            am.gain.linearRampToValueAtTime(r / r0, e.time);
-          }
-          g.connect(am);
-          tail = am;
-        }
-      }
       // Material damping law, tone v2 (T1): each partial decays with the
       // instrument's T60 at that partial's REAL frequency (audits A2/A3) —
       // a 4 kHz mode rings the same whether it is n=4 of a high note or
       // n=16 of a low one, and decay no longer depends on note duration.
       // Wood/felt kills the highs, glass/metal lets them ring.
       const material = Math.max(0, Math.min(1, note.partialMaterial ?? 0));
-      // A bowed string or blown air column is continuously driven: its
-      // upper modes must not free-decay from note onset while excitation is
-      // still present. Frequency-dependent material decay belongs only to
-      // impulse-driven strike/pluck notes (release remains envelope-driven).
-      if (material > 0 && harmonic > 1 && usesFreeDecay(note.excitationType)) {
+
+      const bodyTail = (gainNode, modeFreq) => {
+        let tail = gainNode;
+        // FM→AM through the body (T5): every polarisation mode traverses
+        // the same body law. Close modes may sit on slightly different parts
+        // of a ridge, but neither gets a separate body implementation.
+        if (vibEvents.length > 2 && note.bodyBands && note.bodyBands.length &&
+            (note.bodyAmount || 0) > 0) {
+          const r0 = bodyResponse(note.bodyBands, modeFreq, note.bodyAmount);
+          let minC = 0, maxC = 0;
+          for (const e of vibEvents) {
+            if (e.cents < minC) minC = e.cents;
+            if (e.cents > maxC) maxC = e.cents;
+          }
+          const rHi = bodyResponse(note.bodyBands,
+            modeFreq * Math.pow(2, maxC / 1200), note.bodyAmount);
+          const rLo = bodyResponse(note.bodyBands,
+            modeFreq * Math.pow(2, minC / 1200), note.bodyAmount);
+          if (Math.abs(rHi - rLo) / r0 > 0.03) {
+            const am = this.ctx.createGain();
+            am.gain.setValueAtTime(1, t0);
+            const stride = Math.max(1, Math.ceil(vibEvents.length / 96));
+            for (let k = 1; k < vibEvents.length; k += stride) {
+              const e = vibEvents[k];
+              const r = bodyResponse(note.bodyBands,
+                modeFreq * Math.pow(2, e.cents / 1200), note.bodyAmount);
+              am.gain.linearRampToValueAtTime(r / r0, e.time);
+            }
+            gainNode.connect(am);
+            tail = am;
+          }
+        }
+        return tail;
+      };
+
+      const connectDecay = (tail, modeFreq, modeDecayRatio) => {
+        if (!(material > 0 && harmonic > 1 && usesFreeDecay(note.excitationType))) {
+          tail.connect(env);
+          return;
+        }
         const decayG = this.ctx.createGain();
-        const plan = twoStageDecayPlan(freq, material, note.decaySecondStage, note.decaySecondRatio);
-        const tau = Math.max(0.02, plan.earlyT60 / 6.91); // setTargetAtTime hits -60 dB at ~6.91τ
+        const plan = twoStageDecayPlan(modeFreq, material,
+          note.decaySecondStage, note.decaySecondRatio);
+        const earlyT60 = plan.earlyT60 * modeDecayRatio;
+        const lateT60 = plan.lateT60 * modeDecayRatio;
+        const tau = Math.max(0.02, earlyT60 / 6.91);
         decayG.gain.setValueAtTime(1, t0);
         decayG.gain.setTargetAtTime(0.0001, t0 + 0.01, tau);
-        if ((note.decaySecondStage || 0) > 0 && plan.lateT60 > plan.earlyT60) {
+        if ((note.decaySecondStage || 0) > 0 && lateT60 > earlyT60) {
           const breakpointGain = Math.pow(10, plan.breakpointDb / 20);
-          const breakpointTime = t0 + 0.01 + plan.earlyT60 * Math.abs(plan.breakpointDb) / 60;
+          const breakpointTime = t0 + 0.01 +
+            earlyT60 * Math.abs(plan.breakpointDb) / 60;
           decayG.gain.setValueAtTime(breakpointGain, breakpointTime);
-          decayG.gain.setTargetAtTime(0.0001, breakpointTime, Math.max(0.02, plan.lateT60 / 6.91));
+          decayG.gain.setTargetAtTime(0.0001, breakpointTime,
+            Math.max(0.02, lateT60 / 6.91));
         }
-        tail.connect(decayG); // tail is g, or the body-AM node when vibrato rides a ridge
+        tail.connect(decayG);
         decayG.connect(env);
-        tail = null;
+      };
+
+      let primarySchedule = null;
+      const renderMode = (modeFreq, modeMultiplier, modeGain,
+                          modeDecayRatio = 1, quadrature = false) => {
+        const osc = this.ctx.createOscillator();
+        if (quadrature) {
+          const real = new Float32Array([0, 1]);
+          const imag = new Float32Array([0, 0]);
+          osc.setPeriodicWave(this.ctx.createPeriodicWave(real, imag,
+            { disableNormalization: true }));
+        } else {
+          osc.type = "sine";
+        }
+        this._setFrequency(osc.frequency, modeFreq, t0, note, modeMultiplier);
+        const g = this.ctx.createGain();
+        const schedule = {
+          param: g.gain,
+          gainScale: baseGainScale * modeGain,
+        };
+        if (!primarySchedule) {
+          primarySchedule = { ...schedule, part, onsetDelay, followers: [] };
+          scheduled.push(primarySchedule);
+        } else {
+          primarySchedule.followers.push(schedule);
+        }
+        osc.connect(g);
+        connectDecay(bodyTail(g, modeFreq), modeFreq, modeDecayRatio);
+        osc.start(t0);
+        osc.stop(t1 + 0.04 + (note._ringSec || 0));
+        this._track(osc);
+      };
+
+      let modePlan = polarisationModePlan(1, note.polarisationAmount,
+        note.polarisationSplitCents, note.polarisationDecayRatio);
+      const secondFreq = freq * modePlan.frequencyRatio;
+      const secondAudible = modePlan.secondaryGain > 0 &&
+        secondFreq <= this.ctx.sampleRate * 0.45 && secondFreq <= 16000;
+      if (!secondAudible) modePlan = polarisationModePlan(1, 0, 0, 1);
+      renderMode(freq, multiplier, modePlan.primaryGain, 1, false);
+      if (secondAudible) {
+        renderMode(secondFreq, multiplier * modePlan.frequencyRatio,
+          modePlan.secondaryGain, modePlan.secondaryDecayRatio, true);
       }
-      if (tail) tail.connect(env);
-      osc.start(t0);
-      osc.stop(t1 + 0.04 + (note._ringSec || 0)); // Q8: let the ring sound
-      this._track(osc);
     });
     this._schedulePartialAmplitudes(scheduled, note, t0, t1);
     if ((note.excitationType || "") === "blow") this._renderBlowFloor(note, t0, t1, env);
@@ -5108,23 +5183,27 @@ export class SynthEngine {
   // over the sustain. Both share one merged automation timeline.
   _schedulePartialAmplitudes(partials, note, t0, t1) {
     if (partials.length === 0) return;
+    const modesFor = item => [item, ...(item.followers || [])];
     partials.forEach(item => {
-      const target = item.gainScale * Math.max(0, item.part.amp);
       const onsetTilt = (note.onsetSpectrumTilt || 0) *
         (note._articulationOnset?.transientGain ?? 1);
       const onsetGain = onsetSpectrumGain(item.part.harmonic, onsetTilt);
-      const onsetTarget = target * onsetGain;
-      // Q8 attack stagger: delayed partials fade in over their delay
-      if ((item.onsetDelay || 0) > 0.001) {
-        item.param.setValueAtTime(0.0001, t0);
-        item.param.linearRampToValueAtTime(onsetTarget, t0 + item.onsetDelay);
-      } else {
-        item.param.setValueAtTime(onsetTarget, t0);
-      }
-      if (Math.abs(onsetGain - 1) > 1e-9) {
-        const settle = Math.max(item.onsetDelay || 0, note.onsetSpectrumDecay || 0.06);
-        item.param.linearRampToValueAtTime(target, t0 + settle);
-      }
+      modesFor(item).forEach(mode => {
+        const target = mode.gainScale * Math.max(0, item.part.amp);
+        const onsetTarget = target * onsetGain;
+        // Q8 attack stagger: all coupled modes share the primary partial's
+        // onset timing and colour, while retaining their energy split.
+        if ((item.onsetDelay || 0) > 0.001) {
+          mode.param.setValueAtTime(0.0001, t0);
+          mode.param.linearRampToValueAtTime(onsetTarget, t0 + item.onsetDelay);
+        } else {
+          mode.param.setValueAtTime(onsetTarget, t0);
+        }
+        if (Math.abs(onsetGain - 1) > 1e-9) {
+          const settle = Math.max(item.onsetDelay || 0, note.onsetSpectrumDecay || 0.06);
+          mode.param.linearRampToValueAtTime(target, t0 + settle);
+        }
+      });
     });
     const human = this._clamp(note.excitationHuman ?? 0, 0, 1);
     const trace = humanFluctuationTrace(() => this._nextRandom(), t1 - t0, note.excitationType || "bow", human);
@@ -5149,7 +5228,9 @@ export class SynthEngine {
         const sens = item.part.sens ?? 0.3;
         let v = item.part.amp * (1 + human * sens * pt.f * humanPartialShape(n));
         if (anyBloom) v += deltas[i] * bloom;
-        item.param.linearRampToValueAtTime(item.gainScale * Math.max(0, v), t0 + pt.t);
+        modesFor(item).forEach(mode => {
+          mode.param.linearRampToValueAtTime(mode.gainScale * Math.max(0, v), t0 + pt.t);
+        });
       });
     }
   }

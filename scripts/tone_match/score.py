@@ -149,6 +149,13 @@ PERCEPTUAL_UNITS = {
     "onset_lockin_periods": 9.0,  # C18: half the 18-period acceptance bound
 }
 
+THIRD_OCTAVE_CENTRES = np.asarray([
+    100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000,
+    1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
+], dtype=float)
+OCTAVE_CENTRES = np.asarray([63, 125, 250, 500, 1000, 2000, 4000, 8000],
+                            dtype=float)
+
 
 @dataclass
 class FeatureBundle:
@@ -164,6 +171,8 @@ class FeatureBundle:
     band_profile_db: np.ndarray | None = None   # 21 x 1/3-oct, dB re total
     ltas_rolloff_db_oct: float | None = None    # 3-8 kHz sustained slope
     onset_lockin_periods: float | None = None   # aperiodic window / period
+    band_balance_db: np.ndarray | None = None
+    octave_balance_db: np.ndarray | None = None
 
 
 def band_profile(samples: np.ndarray, sample_rate: int) -> np.ndarray | None:
@@ -204,6 +213,53 @@ def band_profile(samples: np.ndarray, sample_rate: int) -> np.ndarray | None:
     return 10 * np.log10(np.maximum(energies / total, 1e-12))
 
 
+def _active_sample_span(samples: np.ndarray, sample_rate: int) -> tuple[int, int] | None:
+    """Return the audible held-note span using a smoothed -40 dB gate."""
+    samples = np.asarray(samples, dtype=float)
+    if samples.size == 0:
+        return None
+    window = max(1, round(sample_rate * .02))
+    energy = np.convolve(samples * samples, np.ones(window) / window, mode="same")
+    peak = float(np.max(energy)) if energy.size else 0.0
+    active = np.flatnonzero(energy >= peak * 1e-4)
+    if peak <= 1e-20 or active.size == 0:
+        return None
+    return int(active[0]), int(active[-1] + 1)
+
+
+def _fractional_octave_profile(samples: np.ndarray, sample_rate: int,
+                               centres: np.ndarray, bands_per_octave: int) -> np.ndarray | None:
+    """Sustained fractional-octave energy in dB re total band energy.
+
+    RESEARCH_SUSTAIN_BALANCE C22-C24: exclude onset/offset, use unweighted
+    Welch energy, and normalise by total sustained energy so uniform gain
+    cancels without hiding broadband tilt.
+    """
+    span = _active_sample_span(samples, sample_rate)
+    if span is None:
+        return None
+    start = span[0] + round(.25 * sample_rate)
+    stop = span[1] - round(.10 * sample_rate)
+    if stop - start < sample_rate:
+        return None
+    sustain = np.asarray(samples[start:stop], dtype=float)
+    nperseg = min(4096, sustain.size)
+    freqs, psd = signal.welch(
+        sustain, fs=sample_rate, window="hann", nperseg=nperseg,
+        noverlap=min(nperseg - 1, round(nperseg * .75)), scaling="density")
+    ratio = 2 ** (1 / (2 * bands_per_octave))
+    energies = np.asarray([
+        float(np.trapezoid(psd[(freqs >= centre / ratio) & (freqs < centre * ratio)],
+                             freqs[(freqs >= centre / ratio) & (freqs < centre * ratio)]))
+        if np.count_nonzero((freqs >= centre / ratio) & (freqs < centre * ratio)) >= 2 else 0.0
+        for centre in centres
+    ])
+    total = float(np.sum(energies))
+    if total <= 1e-20:
+        return None
+    return 10 * np.log10(np.maximum(energies / total, 1e-12))
+
+
 def octave_summary_db(profile_db: np.ndarray) -> np.ndarray:
     """Octave summaries (energy sums of consecutive 1/3-oct triples)."""
     linear = 10 ** (np.asarray(profile_db, dtype=float) / 10)
@@ -226,6 +282,40 @@ def ltas_rolloff(profile_db: np.ndarray | None) -> float | None:
     if np.all(values <= -119):
         return None
     return float(np.polyfit(np.log2(centres[mask]), values, 1)[0])
+
+
+def band_balance_report(ref: FeatureBundle, render: FeatureBundle) -> dict[str, Any]:
+    """Paired 1/3-octave and octave distances from the shared LTAS path."""
+    third_ref = ref.band_balance_db
+    third_render = render.band_balance_db
+    octave_ref = ref.octave_balance_db
+    octave_render = render.octave_balance_db
+    if any(value is None for value in (third_ref, third_render, octave_ref, octave_render)):
+        return {"status": "not-applicable", "meanDb": None, "maxOctaveDb": None,
+                "validBands": 0, "octaveReference": None, "octaveRender": None}
+    third_ref = np.asarray(third_ref, dtype=float)
+    third_render = np.asarray(third_render, dtype=float)
+    octave_ref = np.asarray(octave_ref, dtype=float)
+    octave_render = np.asarray(octave_render, dtype=float)
+    # Bands wholly below the played fundamental contain no harmonic evidence;
+    # masking them prevents room/noise-floor residue from becoming the max bar.
+    valid = (np.isfinite(third_ref) & np.isfinite(third_render) & (third_ref > -60) &
+             (THIRD_OCTAVE_CENTRES * 2 ** (1 / 6) >= ref.note.f0 * .95))
+    valid_octave = (np.isfinite(octave_ref) & np.isfinite(octave_render) & (octave_ref > -60) &
+                    (OCTAVE_CENTRES * math.sqrt(2) >= ref.note.f0 * .95))
+    if not np.any(valid) or not np.any(valid_octave):
+        return {"status": "not-applicable", "meanDb": None, "maxOctaveDb": None,
+                "validBands": int(np.count_nonzero(valid)),
+                "octaveReference": octave_ref.tolist(), "octaveRender": octave_render.tolist()}
+    return {
+        "status": "measured",
+        "meanDb": float(np.mean(np.abs(third_render[valid] - third_ref[valid]))),
+        "maxOctaveDb": float(np.max(np.abs(octave_render[valid_octave] - octave_ref[valid_octave]))),
+        "validBands": int(np.count_nonzero(valid)),
+        "octaveCentresHz": OCTAVE_CENTRES.tolist(),
+        "octaveReference": octave_ref.tolist(),
+        "octaveRender": octave_render.tolist(),
+    }
 
 
 def _noise_and_onset_observables(
@@ -401,12 +491,17 @@ def extract_features(
      onset_noise_centroid_oct, noise_lead_ms,
      lockin_periods) = _noise_and_onset_observables(power, freqs, times, note.f0)
     profile = band_profile(samples, sample_rate)
+    third_octave = _fractional_octave_profile(samples, sample_rate,
+                                              THIRD_OCTAVE_CENTRES, 3)
+    octave = _fractional_octave_profile(samples, sample_rate, OCTAVE_CENTRES, 1)
     return FeatureBundle(note, partial_db, _resample_time(mel_db),
                          _resample_time(centroid)[0], sustain_noise_db, onset_tilt,
                          onset_noise_db, onset_noise_centroid_oct, noise_lead_ms,
                          band_profile_db=profile,
                          ltas_rolloff_db_oct=ltas_rolloff(profile),
-                         onset_lockin_periods=lockin_periods)
+                         onset_lockin_periods=lockin_periods,
+                         band_balance_db=third_octave,
+                         octave_balance_db=octave)
 
 
 def _paired(values_a: dict, values_b: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -561,6 +656,7 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
     both_vibrato = bool(vr.get("present")) and bool(vs.get("present"))
     trajectory = lambda key: abs(number(vs.get(key)) - number(vr.get(key))) \
         if both_vibrato else 0.0
+    band_balance = band_balance_report(ref, render)
     values = {
         "partials_db": partial_db, "log_mel_db": mel_db,
         "centroid_semitones": centroid, "attack_ms": attack,
@@ -596,7 +692,82 @@ def compare_features(ref: FeatureBundle, render: FeatureBundle, weights: dict[st
     active_weight = sum(weights[key] for key in values if weights[key] > 0)
     composite = sum(normalized[key] * weights[key] for key in values) / max(active_weight, 1e-9)
     return {"features": values, "normalized": normalized, "weights": weights,
-            "composite": float(composite), "refF0": ref.note.f0, "renderF0": render.note.f0}
+            "composite": float(composite), "refF0": ref.note.f0,
+            "renderF0": render.note.f0, "bandBalance": band_balance}
+
+
+def _tripwire_row(name: str, observed: Any, limit: str,
+                  passed: bool | None) -> dict[str, Any]:
+    return {"name": name, "status": "pass" if passed is True else
+            "fail" if passed is False else "not-applicable",
+            "observed": observed, "limit": limit}
+
+
+def quantitative_tripwires(ref: FeatureBundle, render: FeatureBundle,
+                           result: dict[str, Any],
+                           instrument: str | None = None) -> dict[str, Any]:
+    """Evaluate the SOUND_GENERATOR_2_PLAN §3 quantitative ship bars."""
+    rows = [
+        _tripwire_row("partial-table", result["features"]["partials_db"],
+                      "mean <= 3 dB", result["features"]["partials_db"] <= 3),
+        _tripwire_row("mel-spectrogram", result["features"]["log_mel_db"],
+                      "mean <= 4 dB", result["features"]["log_mel_db"] <= 4),
+    ]
+    ref_attack, render_attack = _paired(ref.note.band_t90, render.note.band_t90)
+    if ref_attack.size:
+        differences_ms = np.abs(render_attack - ref_attack) * 1000
+        limits_ms = np.maximum(20.0, np.abs(ref_attack) * 300.0)
+        attack_pass = bool(np.all(differences_ms <= limits_ms))
+        attack_observed = {"maxDifferenceMs": float(np.max(differences_ms)),
+                           "maxAllowedMs": float(np.max(limits_ms))}
+    else:
+        attack_pass, attack_observed = None, None
+    rows.append(_tripwire_row("attack-t90", attack_observed,
+                              "every band within max(30%, 20 ms)", attack_pass))
+
+    ref_vib, render_vib = ref.note.vibrato or {}, render.note.vibrato or {}
+    ref_present, render_present = bool(ref_vib.get("present")), bool(render_vib.get("present"))
+    if not ref_present and not render_present:
+        vibrato_pass, vibrato_observed = True, {"reference": False, "render": False}
+    elif ref_present != render_present:
+        vibrato_pass = False
+        vibrato_observed = {"reference": ref_present, "render": render_present}
+    else:
+        ref_rate, render_rate = float(ref_vib.get("rate", 0)), float(render_vib.get("rate", 0))
+        ref_depth, render_depth = float(ref_vib.get("depth", 0)), float(render_vib.get("depth", 0))
+        rate_error = abs(render_rate - ref_rate)
+        depth_error = abs(render_depth - ref_depth) / max(abs(ref_depth), 1e-9)
+        vibrato_pass = rate_error <= .3 and depth_error <= .3
+        vibrato_observed = {"rateErrorHz": rate_error, "depthErrorFraction": depth_error}
+    rows.append(_tripwire_row("vibrato", vibrato_observed,
+                              "presence matches; rate +/-0.3 Hz; depth +/-30%", vibrato_pass))
+
+    b_ref, b_render = ref.note.B or 0, render.note.B or 0
+    if (instrument or "").strip().lower() in _BLOWN_INSTRUMENTS:
+        b_pass, b_observed = None, {"reason": "not a stiff-string observable for blown excitation"}
+    elif b_ref > 0:
+        factor = max(b_render, 1e-12) / b_ref
+        b_pass, b_observed = 1 / 1.5 <= factor <= 1.5, {"factor": factor}
+    else:
+        b_pass, b_observed = None, None
+    rows.append(_tripwire_row("inharmonicity-b", b_observed,
+                              "within factor 1.5 where measured", b_pass))
+
+    balance = result["bandBalance"]
+    measured = balance.get("status") == "measured"
+    rows.append(_tripwire_row("band-balance-mean", balance.get("meanDb"),
+                              "mean <= 3 dB (or measured take floor)",
+                              balance.get("meanDb") <= 3 if measured else None))
+    rows.append(_tripwire_row("band-balance-max-octave", balance.get("maxOctaveDb"),
+                              "max octave <= 6 dB (or measured take floor)",
+                              balance.get("maxOctaveDb") <= 6 if measured else None))
+    failed = [row for row in rows if row["status"] == "fail"]
+    missing = [row for row in rows if row["status"] == "not-applicable" and
+               row["name"] != "inharmonicity-b"]
+    return {"passed": not failed and not missing, "rows": rows,
+            "counts": {"pass": sum(row["status"] == "pass" for row in rows),
+                       "fail": len(failed), "notApplicable": len(rows) - len(failed) -
+                       sum(row["status"] == "pass" for row in rows)}}
 
 
 def score_files(
@@ -611,6 +782,7 @@ def score_files(
     ref = extract_features(ref_path)
     render = extract_features(render_path)
     result = compare_features(ref, render, weights_for_instrument(instrument, weights))
+    result["tripwires"] = quantitative_tripwires(ref, render, result, instrument)
     if instrument:
         # Local import avoids an import cycle: assertions operates on the
         # FeatureBundle defined by this module.

@@ -15,7 +15,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-from .score import FeatureBundle
+from .score import FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, band_balance_report
 
 
 @dataclass(frozen=True)
@@ -28,6 +28,8 @@ class ConstructionSample:
     dynamic: str | float | None = None
     velocity: float | None = None
     roles: frozenset[str] | None = None
+    band_mean_limit_db: float = 3.0
+    band_max_octave_limit_db: float = 6.0
 
 
 ALIASES = {
@@ -131,6 +133,45 @@ def _band_prominence(bundle: FeatureBundle, low_hz: float, high_hz: float) -> fl
     if not np.any(inside) or not np.any(flank):
         return math.nan
     return float(np.mean(db[inside]) - np.mean(db[flank]))
+
+
+def _band_profile(bundle: FeatureBundle) -> np.ndarray | None:
+    """Owner-readable octave LTAS from the same path used by the scorer."""
+    if bundle.octave_balance_db is None:
+        return None
+    profile = np.asarray(bundle.octave_balance_db, dtype=float)
+    return profile if profile.shape == OCTAVE_CENTRES.shape else None
+
+
+def _profile_peak(bundle: FeatureBundle) -> float | None:
+    profile = _band_profile(bundle)
+    if profile is None or not np.any(np.isfinite(profile)):
+        return None
+    return float(OCTAVE_CENTRES[int(np.nanargmax(profile))])
+
+
+def _dynamic_subset(samples: list[ConstructionSample], *, soft: bool) -> list[ConstructionSample]:
+    rows = []
+    for sample in samples:
+        value = _dynamic_value(sample)
+        if value is not None and ((soft and value <= .35) or (not soft and value >= .75)):
+            rows.append(sample)
+    return rows
+
+
+def _median_octave_profile(samples: list[ConstructionSample]) -> np.ndarray | None:
+    profiles = [_band_profile(sample.render) for sample in samples]
+    profiles = [profile for profile in profiles if profile is not None]
+    return np.median(np.stack(profiles), axis=0) if profiles else None
+
+
+def _high_side_slope(profile: np.ndarray | None) -> float | None:
+    if profile is None:
+        return None
+    mask = (OCTAVE_CENTRES >= 1000) & np.isfinite(profile) & (profile > -60)
+    if np.count_nonzero(mask) < 3:
+        return None
+    return float(np.polyfit(np.log2(OCTAVE_CENTRES[mask]), profile[mask], 1)[0])
 
 
 def _dynamic_value(sample: ConstructionSample) -> float | None:
@@ -318,6 +359,121 @@ def evaluate_construction(
                                 stability_info.get("omittedReason"),
                                 "empty bodyBands must carry omittedReason 'unstable-air-jet-body'",
                                 strict_evidence=strict_evidence))
+
+    if FAMILY.get(name) == "blown":
+        balance_rows = []
+        for sample in sample_list:
+            if sample.reference is None:
+                continue
+            distance = band_balance_report(sample.reference, sample.render)
+            balance_rows.append({"register": sample.register, "dynamic": sample.dynamic,
+                                 **distance})
+        measured_balance = [row for row in balance_rows if row["status"] == "measured"]
+        balance_pass = None if not measured_balance or len(measured_balance) != len(sample_list) else all(
+            row["meanDb"] <= sample.band_mean_limit_db and
+            row["maxOctaveDb"] <= sample.band_max_octave_limit_db
+            for row, sample in zip(balance_rows, sample_list))
+        for row, sample in zip(balance_rows, sample_list):
+            row["meanLimitDb"] = sample.band_mean_limit_db
+            row["maxOctaveLimitDb"] = sample.band_max_octave_limit_db
+        rows.append(_result(
+            f"{name}.band-balance", "Sustained broad-band balance matches paired references",
+            balance_pass, balance_rows,
+            "every register/dynamic pair: mean <= 3 dB and max octave <= 6 dB (or measured take floor)",
+            strict_evidence=strict_evidence))
+
+        soft_samples = _dynamic_subset(sample_list, soft=True)
+        loud_samples = _dynamic_subset(sample_list, soft=False)
+        soft_profile = _median_octave_profile(soft_samples)
+        loud_profile = _median_octave_profile(loud_samples)
+        all_profile = _median_octave_profile(sample_list)
+        peak = lambda profile: None if profile is None else float(
+            OCTAVE_CENTRES[int(np.nanargmax(profile))])
+
+        if name in {"alto-sax", "tenor-sax"}:
+            expected_peak = 500.0
+            drop_required = 12.0 if name == "alto-sax" else 15.0
+            peak_band = peak(all_profile)
+            index_500 = int(np.argmin(np.abs(OCTAVE_CENTRES - 500)))
+            index_2k = int(np.argmin(np.abs(OCTAVE_CENTRES - 2000)))
+            drop = None if all_profile is None else float(all_profile[index_500] - all_profile[index_2k])
+            rows.append(_result(
+                f"{name}.envelope-peak", "Published saxophone envelope anchors the sustained mid-band",
+                None if peak_band is None or drop is None else peak_band == expected_peak and drop >= drop_required,
+                {"peakHz": peak_band, "drop500To2kDb": drop},
+                f"peak octave = 500 Hz and 2 kHz at least {drop_required:g} dB below it",
+                strict_evidence=strict_evidence))
+
+        if name == "clarinet":
+            soft_third = [np.asarray(sample.render.band_balance_db, dtype=float)
+                          for sample in soft_samples
+                          if sample.render.band_balance_db is not None]
+            below_fraction = None
+            if soft_third:
+                profile = np.median(np.stack(soft_third), axis=0)
+                power = np.power(10.0, profile / 10)
+                below_fraction = float(np.sum(power[THIRD_OCTAVE_CENTRES < 1500]) /
+                                       max(np.sum(power), 1e-12))
+            low_samples = registers.get("low", []) or registers.get("chalumeau", [])
+            low_soft = _dynamic_subset(low_samples, soft=True)
+            low_loud = _dynamic_subset(low_samples, soft=False)
+            centroid = lambda items: float(np.median([
+                np.mean(item.render.centroid_hz) for item in items])) if items else None
+            soft_centroid, loud_centroid = centroid(low_soft), centroid(low_loud)
+            centroid_ratio = None if not soft_centroid or loud_centroid is None else loud_centroid / soft_centroid
+            rows.append(_result(
+                "clarinet.band-concentration", "Clarinet balance follows its tonehole cutoff and dynamics",
+                None if below_fraction is None or centroid_ratio is None else
+                below_fraction >= .8 and centroid_ratio >= 1.8,
+                {"softEnergyBelow1500": below_fraction, "lowRegisterLoudSoftCentroidRatio": centroid_ratio},
+                "at piano >= 80% energy below 1.5 kHz; low-register centroid loud/soft >= 1.8",
+                strict_evidence=strict_evidence))
+
+        if name == "trumpet":
+            loud_peak = peak(loud_profile)
+            pp_drops = []
+            for sample in soft_samples:
+                profile = _band_profile(sample.render)
+                if profile is None:
+                    continue
+                fundamental_index = int(np.argmin(np.abs(np.log2(
+                    np.maximum(OCTAVE_CENTRES, 1) / max(sample.render.note.f0, 1)))))
+                high = profile[OCTAVE_CENTRES >= 2000]
+                if high.size:
+                    pp_drops.append(float(profile[fundamental_index] - np.max(high)))
+            pp_drop = float(np.median(pp_drops)) if pp_drops else None
+            rows.append(_result(
+                "trumpet.envelope-peak", "Trumpet formant and pp collapse match published balance",
+                None if loud_peak is None or pp_drop is None else
+                loud_peak in {1000.0, 2000.0} and pp_drop >= 20,
+                {"loudPeakHz": loud_peak, "ppFundamentalToHighDropDb": pp_drop},
+                "loud peak octave in 1-2 kHz; pp fundamental band >= 20 dB above bands >= 2 kHz",
+                strict_evidence=strict_evidence))
+
+        if name == "french-horn":
+            peaks = [_profile_peak(sample.render) for sample in sample_list]
+            peaks = [value for value in peaks if value is not None]
+            soft_slope, loud_slope = _high_side_slope(soft_profile), _high_side_slope(loud_profile)
+            horn_pass = None if not peaks or soft_slope is None or loud_slope is None else (
+                all(value in {250.0, 500.0} for value in peaks) and
+                -25 <= soft_slope <= -6 and -25 <= loud_slope <= -6 and
+                loud_slope > soft_slope)
+            rows.append(_result(
+                "french-horn.envelope-peak", "Horn warmth peak and high-side slope follow dynamics",
+                horn_pass, {"peakHz": peaks, "softSlopeDbOct": soft_slope,
+                            "loudSlopeDbOct": loud_slope},
+                "peak octave contains 340 Hz; high slope -25..-6 dB/oct and shallower when loud",
+                strict_evidence=strict_evidence))
+
+        if name == "flute":
+            soft_peak, loud_peak = peak(soft_profile), peak(loud_profile)
+            rows.append(_result(
+                "flute.envelope-peak", "Flute broad envelope follows the measured air-jet formant",
+                None if soft_peak is None or loud_peak is None else
+                soft_peak <= 500 and loud_peak in {500.0, 1000.0},
+                {"softPeakHz": soft_peak, "loudPeakHz": loud_peak},
+                "soft peak <= 500 Hz; loud peak octave in 500-1000 Hz",
+                strict_evidence=strict_evidence))
 
     if name == "clarinet":
         low = registers.get("low", []) or registers.get("chalumeau", [])

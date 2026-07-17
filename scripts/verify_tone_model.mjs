@@ -20,6 +20,8 @@ import {
   glottalSourceGain,
   velocityHardness,
   twoStageDecayPlan,
+  polarisationModePlan,
+  polarisationBeatHz,
   attackNoiseRouting,
   attackNoiseVelocityGain,
   breathVelocityGain,
@@ -155,6 +157,74 @@ console.log("T-B2: material damping is a law over real Hz");
   check("compression cull is neutral by default and preserves modes 1-8",
     partialIsAudible(0.0005, 1, 9) && !partialIsAudible(0.00049, 1, 9) &&
     partialIsAudible(0, 1, 8, 0.01));
+}
+
+console.log("T-021: coupled polarisation modes");
+{
+  const amplitude = 0.37;
+  const neutral = polarisationModePlan(amplitude, 0, 6, 4);
+  check("amount 0 is the exact one-mode identity",
+    neutral.primaryGain === amplitude && neutral.secondaryGain === 0);
+
+  const enabled = polarisationModePlan(amplitude, 1, 6, 1);
+  const energyDb = 20 * Math.log10(
+    Math.hypot(enabled.primaryGain, enabled.secondaryGain) / amplitude);
+  check("two-mode energy is preserved within 0.25 dB",
+    Math.abs(energyDb) <= 0.25, `${energyDb.toFixed(6)} dB`);
+
+  // Measure the difference-frequency component in a block-energy trace.
+  // The renderer uses quadrature modes, so the low-frequency cross term is
+  // unambiguous after averaging away the audio-rate sum component.
+  const f0 = 440, split = 6, sampleRate = 48000, duration = 16;
+  const blockSize = 240;
+  const blockRate = sampleRate / blockSize;
+  const trace = [];
+  let sum = 0, count = 0;
+  for (let i = 0; i < sampleRate * duration; i++) {
+    const t = i / sampleRate;
+    const x = enabled.primaryGain * Math.sin(2 * Math.PI * f0 * t) +
+      enabled.secondaryGain * Math.cos(2 * Math.PI * f0 * enabled.frequencyRatio * t);
+    sum += x * x;
+    if (++count === blockSize) {
+      trace.push(sum / blockSize);
+      sum = 0;
+      count = 0;
+    }
+  }
+  const mean = trace.reduce((a, b) => a + b, 0) / trace.length;
+  let peakHz = 0, peakPower = -Infinity;
+  for (let hz = 0.5; hz <= 3; hz += 0.005) {
+    let re = 0, im = 0;
+    for (let i = 0; i < trace.length; i++) {
+      const phase = 2 * Math.PI * hz * i / blockRate;
+      const value = trace[i] - mean;
+      re += value * Math.cos(phase);
+      im -= value * Math.sin(phase);
+    }
+    const power = re * re + im * im;
+    if (power > peakPower) { peakPower = power; peakHz = hz; }
+  }
+  const predictedHz = polarisationBeatHz(f0, split);
+  check("measured envelope-modulation peak matches the modal split within 5%",
+    Math.abs(peakHz - predictedHz) / predictedHz <= 0.05,
+    `measured ${peakHz.toFixed(3)} Hz, predicted ${predictedHz.toFixed(3)} Hz`);
+
+  const decayWindowRatio = decayRatio => {
+    const plan = polarisationModePlan(1, 1, split, decayRatio);
+    const beatEnergyAt = t => {
+      const primaryEnvelope = Math.exp(-6.91 * t / 3);
+      const secondaryEnvelope = Math.exp(-6.91 * t / (3 * plan.secondaryDecayRatio));
+      return Math.pow(2 * plan.primaryGain * plan.secondaryGain *
+        primaryEnvelope * secondaryEnvelope, 2);
+    };
+    return beatEnergyAt(2.5) / beatEnergyAt(0.25);
+  };
+  const shortSecond = polarisationModePlan(1, 1, split, 0.5);
+  const longSecond = polarisationModePlan(1, 1, split, 2);
+  check("decay ratio changes late/early beat energy without moving modal frequencies",
+    decayWindowRatio(2) > decayWindowRatio(0.5) * 100 &&
+    shortSecond.frequencyRatio === longSecond.frequencyRatio,
+    `${decayWindowRatio(0.5).toExponential(2)} vs ${decayWindowRatio(2).toExponential(2)}`);
 }
 
 console.log("Resonator ratio tables");

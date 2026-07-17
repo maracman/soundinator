@@ -135,22 +135,45 @@ async function main() {
   try {
     if (args.verify) {
       const job = { params: { spectralProfile: "clarinet", seed: 7331, spectralPartials: 32, spectralMix: 1 }, midi: 60, durationSec: 0.5, sampleRate: 24000 };
-      const [a, b] = await renderJobs([job, job]);
-      if (a.sha256 !== b.sha256) {
+      const inertJob = {
+        ...job,
+        params: { ...job.params, polarisationAmount: 0,
+          polarisationSplitCents: 6, polarisationDecayRatio: 4 },
+      };
+      const coupledJob = {
+        ...job,
+        params: { ...job.params, partialMaterial: 0.4, polarisationAmount: 1,
+          polarisationSplitCents: 6, polarisationDecayRatio: 2 },
+      };
+      const [a, b, inert, coupled] = await renderJobs([job, job, inertJob, coupledJob]);
+      const pcmDiff = (left, right) => {
         let maxDiff = 0, meanDiff = 0, count = 0;
-        for (let ch = 0; ch < a.channels.length; ch++) {
-          for (let i = 0; i < a.channels[ch].length; i++) {
-            const diff = Math.abs(a.channels[ch][i] - b.channels[ch][i]);
+        for (let ch = 0; ch < left.channels.length; ch++) {
+          for (let i = 0; i < left.channels[ch].length; i++) {
+            const diff = Math.abs(left.channels[ch][i] - right.channels[ch][i]);
             maxDiff = Math.max(maxDiff, diff); meanDiff += diff; count++;
           }
         }
+        return { maxDiff, meanDiff: meanDiff / Math.max(1, count) };
+      };
+      if (a.sha256 !== b.sha256) {
+        const { maxDiff, meanDiff } = pcmDiff(a, b);
         // Chromium's OfflineAudioContext may differ by a few last-place float
         // bits between contexts because its DSP graph is evaluated in parallel.
         // Treat sub-16-bit differences as identical; anything audible or able
         // to move PCM by more than 1/32768 remains a hard failure.
         if (maxDiff > 1 / 32768) {
-          throw new Error(`determinism failed: ${a.sha256} != ${b.sha256} (max PCM diff ${maxDiff}, mean ${meanDiff / count})`);
+          throw new Error(`determinism failed: ${a.sha256} != ${b.sha256} (max PCM diff ${maxDiff}, mean ${meanDiff})`);
         }
+      }
+      const inactiveDiff = pcmDiff(a, inert);
+      if (inactiveDiff.maxDiff > 1 / 32768) {
+        throw new Error(`polarisation amount 0 changed PCM: max diff ${inactiveDiff.maxDiff}`);
+      }
+      const coupledEnergy = coupled.channels.reduce((total, channel) =>
+        total + channel.reduce((sum, sample) => sum + sample * sample, 0), 0);
+      if (!(coupledEnergy > 0) || !Number.isFinite(coupledEnergy)) {
+        throw new Error(`polarisation render is silent/non-finite: ${coupledEnergy}`);
       }
       const left = a.channels[0], right = a.channels[1];
       let delta = 0, energy = 0;

@@ -29,8 +29,9 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .assertions import ConstructionSample, evaluate_construction
+from .audition import build as build_audition
 from .controllability import objective_contract_hash, manifest_contract_hash
-from .score import compare_features, extract_features, weights_for_instrument
+from .score import compare_features, extract_features, score_files, weights_for_instrument, write_report
 from .tripwires import (
     aggregate_by_cell,
     evaluate_tripwires,
@@ -98,7 +99,8 @@ def _reference_variability(references: list[dict[str, Any]], feature_loader=extr
             for right in indices[offset + 1:]:
                 result = compare_features(cache[left], cache[right], weights)
                 pairs.append({"left": left, "right": right, "composite": result["composite"],
-                              "features": result["features"], "normalized": result["normalized"]})
+                              "features": result["features"], "normalized": result["normalized"],
+                              "bandBalance": result.get("bandBalance")})
         feature_keys = pairs[0]["features"]
         rows.append({
             "group": key,
@@ -107,6 +109,13 @@ def _reference_variability(references: list[dict[str, Any]], feature_loader=extr
             "floorComposite": float(np.median([row["composite"] for row in pairs])),
             "floorFeatures": {name: float(np.median([row["features"][name] for row in pairs]))
                               for name in feature_keys},
+            "floorBandMaxOctaveDb": float(np.median([
+                row["bandBalance"]["maxOctaveDb"] for row in pairs
+                if row.get("bandBalance") and
+                row["bandBalance"].get("maxOctaveDb") is not None
+            ])) if any(row.get("bandBalance") and
+                       row["bandBalance"].get("maxOctaveDb") is not None
+                       for row in pairs) else None,
             "pairs": pairs,
         })
     return {"status": "measured", "groups": rows,
@@ -133,6 +142,52 @@ def _floor_evidence(variability: dict[str, Any], best: dict[str, Any]) -> dict[s
             "constructionPassed": construction_passed,
             "tripwirePassed": tripwire_passed, "groups": groups,
             "eligibleReferences": variability["eligibleReferences"]}
+
+
+def _band_limits_for_reference(index: int, variability: dict[str, Any]) -> tuple[float, float]:
+    """T-005 bars widen to measured duplicate-take variability, never shrink."""
+    if variability.get("status") == "measured":
+        for group in variability.get("groups", []):
+            if index in group.get("referenceIndices", []):
+                mean_floor = group.get("floorFeatures", {}).get("band_balance_db")
+                max_floor = group.get("floorBandMaxOctaveDb")
+                return (max(3.0, float(mean_floor)) if mean_floor is not None else 3.0,
+                        max(6.0, float(max_floor)) if max_floor is not None else 6.0)
+    return 3.0, 6.0
+
+
+def _tripwire_gate(scores: list[dict[str, Any]], references: list[dict[str, Any]],
+                   variability: dict[str, Any], construction: dict[str, Any]) -> dict[str, Any]:
+    """Campaign-level §3 gate with owner-readable rows per register/dynamic."""
+    rows = []
+    failure_count = 0
+    for index, (score, reference) in enumerate(zip(scores, references)):
+        mean_limit, max_limit = _band_limits_for_reference(index, variability)
+        checks = []
+        for original in score.get("tripwires", {}).get("rows", []):
+            check = dict(original)
+            if check["name"] == "band-balance-mean":
+                observed = check.get("observed")
+                check.update(status="pass" if observed is not None and observed <= mean_limit else "fail",
+                             limit=f"<= {mean_limit:.3f} dB (3 dB or take floor)")
+            elif check["name"] == "band-balance-max-octave":
+                observed = check.get("observed")
+                check.update(status="pass" if observed is not None and observed <= max_limit else "fail",
+                             limit=f"<= {max_limit:.3f} dB (6 dB or take floor)")
+            checks.append(check)
+        failed = [row for row in checks if row["status"] == "fail"]
+        missing = [row for row in checks if row["status"] == "not-applicable" and
+                   row["name"] != "inharmonicity-b"]
+        passed = not failed and not missing
+        failure_count += len(failed) + len(missing)
+        rows.append({"referenceIndex": index, "register": reference.get("register"),
+                     "dynamic": reference.get("dynamic"), "midi": reference.get("midi"),
+                     "passed": passed, "checks": checks,
+                     "bandBalance": score.get("bandBalance")})
+    return {"passed": bool(construction.get("passed")) and failure_count == 0,
+            "constructionPassed": bool(construction.get("passed")),
+            "failureCount": failure_count + int(construction.get("counts", {}).get("fail", 0)),
+            "rows": rows}
 
 
 def _dominant_residual(best: dict[str, Any]) -> dict[str, Any] | None:
@@ -162,6 +217,53 @@ def _file_work_item(instrument: str, run_dir: Path, factor: str, action: str) ->
     return path
 
 
+def _benchmark_resources(run_dir: Path, instrument: str, best: dict[str, Any]) -> dict[str, Any]:
+    params_path = run_dir / "best-params.json"
+    params_path.write_text(json.dumps(best["params"], indent=2) + "\n")
+    output_path = run_dir / "resource-benchmark.json"
+    process = subprocess.run([
+        "node", "scripts/tone_match/benchmark_preset.mjs", "--params", str(params_path),
+        "--id", instrument, "--iterations", "500", "--out", str(output_path),
+    ], cwd=ROOT, text=True, capture_output=True)
+    if process.returncode:
+        return {"passed": False, "error": process.stderr or process.stdout}
+    return _load(output_path)
+
+
+def _build_listening_page(run_dir: Path, instrument: str, best: dict[str, Any],
+                          references: list[dict[str, Any]]) -> dict[str, Any]:
+    render_dir = run_dir / "renders" / f"eval-{int(best['evaluation']):04d}"
+    manifest = [{
+        "label": f"{instrument} · {reference.get('register', '?')} · {reference.get('dynamic', '?')}",
+        "instrument": instrument, "reference": reference["path"],
+        "render": str(render_dir / f"note-{index}.wav"),
+    } for index, reference in enumerate(references)]
+    manifest_path = run_dir / "audition-manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    listen_path = run_dir / f"listen-{instrument}-{run_dir.name}.html"
+    build_audition(str(manifest_path), str(listen_path))
+    return {"bestRenderDirectory": str(render_dir), "listeningPage": str(listen_path),
+            "auditionManifest": str(manifest_path)}
+
+
+def _technique_exchange_statuses() -> list[dict[str, str]]:
+    path = ROOT / "docs" / "sg2" / "TECHNIQUES_EXCHANGE.md"
+    if not path.exists():
+        return [{"id": "exchange", "title": "techniques exchange",
+                 "engine": "FAIL: file missing from branch"}]
+    statuses, current_id, title = [], None, ""
+    for line in path.read_text().splitlines():
+        if line.startswith("### T-"):
+            heading = line[4:].strip()
+            current_id, _, title = heading.partition(" · ")
+        elif current_id and line.startswith("Status:"):
+            engine = line.split("engine=", 1)[1].split(" analysis=", 1)[0].strip() \
+                if "engine=" in line else "missing"
+            statuses.append({"id": current_id, "title": title, "engine": engine})
+            current_id = None
+    return statuses
+
+
 def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
     floor = summary["referenceVariabilityFloor"]
     lines = [f"# SG2 run report — {summary['instrument']} / {summary['run']}\n\n",
@@ -170,30 +272,33 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
              f"Best loss: `{summary['bestLoss']:.6f}`  \n",
              f"Improvement: `{summary['improvement']:.6f}`  \n",
              f"Construction gate: `{'pass' if summary['constructionPassed'] else 'fail'}`  \n",
-             f"§3 tripwire gate: `{'pass' if summary['tripwirePassed'] else 'fail'}`  \n",
+             f"§3 tripwire gate: `{'pass' if summary.get('tripwirePassed', summary.get('automatedGatePassed')) else 'fail'}`  \n",
              f"Reference-variability status: `{floor['status']}`\n\n"]
-    lines.extend(["## Controllability contract\n\n",
-                  f"Objective hash: `{summary['controllability']['objectiveHash']}`  \n",
-                  f"Manifest hash: `{summary['controllability']['manifestHash']}`  \n",
-                  f"Verdict: `{'CLEAN' if summary['controllability']['clean'] else 'NOT CLEAN'}`\n\n",
-                  "| Feature | Weight | Responsive parameters | Status |\n",
-                  "|---|---:|---|---|\n"])
-    for verdict in summary["controllability"]["verdicts"]:
-        responders = summary["controllability"]["responsiveParameters"].get(
-            verdict["feature"], [])
-        lines.append(f"| `{verdict['feature']}` | {verdict['weight']} | "
-                     f"{', '.join(f'`{key}`' for key in responders) or '—'} | "
-                     f"{verdict['status']} |\n")
-    repeatability = summary["controllability"].get("repeatability", {})
-    lines.extend([
-        "\n## Repeat-render stability\n\n",
-        f"Status: `{repeatability.get('status', 'missing')}`  \n",
-        "Unstable features: " +
-        (", ".join(f"`{feature}`" for feature in
-                   repeatability.get("unstableFeatures", [])) or "none") +
-        "\n\n",
-    ])
-    lines.extend(["\n", tripwire_table_markdown(summary["tripwires"]), "\n"])
+    controllability = summary.get("controllability")
+    if controllability:
+        lines.extend(["## Controllability contract\n\n",
+                      f"Objective hash: `{controllability['objectiveHash']}`  \n",
+                      f"Manifest hash: `{controllability['manifestHash']}`  \n",
+                      f"Verdict: `{'CLEAN' if controllability['clean'] else 'NOT CLEAN'}`\n\n",
+                      "| Feature | Weight | Responsive parameters | Status |\n",
+                      "|---|---:|---|---|\n"])
+        for verdict in controllability["verdicts"]:
+            responders = controllability["responsiveParameters"].get(
+                verdict["feature"], [])
+            lines.append(f"| `{verdict['feature']}` | {verdict['weight']} | "
+                         f"{', '.join(f'`{key}`' for key in responders) or '—'} | "
+                         f"{verdict['status']} |\n")
+        repeatability = controllability.get("repeatability", {})
+        lines.extend([
+            "\n## Repeat-render stability\n\n",
+            f"Status: `{repeatability.get('status', 'missing')}`  \n",
+            "Unstable features: " +
+            (", ".join(f"`{feature}`" for feature in
+                       repeatability.get("unstableFeatures", [])) or "none") +
+            "\n\n",
+        ])
+    if summary.get("tripwires"):
+        lines.extend(["\n", tripwire_table_markdown(summary["tripwires"]), "\n"])
     if floor.get("groups"):
         lines.extend(["## Reference-variability evidence\n\n",
                       "| Same-note/dynamic group | Take↔take floor | Render↔reference | Ratio | At/below |\n",
@@ -212,6 +317,56 @@ def _write_run_report(path: Path, summary: dict[str, Any]) -> None:
         lines.extend(["\n## Filed limiting factor\n\n",
                       f"Factor: {outcome['limitingFactor']}\n\n",
                       f"Fix: {outcome['workItem']}\n"])
+    gate = summary.get("tripwireGate")
+    if gate is not None:
+        check_names = [row["name"] for row in gate["rows"][0]["checks"]] if gate.get("rows") else []
+        lines.extend(["\n## Automated §3 gate — " + ("PASS" if summary.get("automatedGatePassed") else "FAIL") + "\n\n",
+                      "| Register | Dynamic | MIDI | " + " | ".join(check_names) + " | Row |\n",
+                      "|---|---|---:|" + "---:|" * len(check_names) + "---:|\n"])
+        for row in gate.get("rows", []):
+            by_name = {check["name"]: check for check in row["checks"]}
+            marks = [("PASS" if by_name[name]["status"] == "pass" else
+                      "N/A" if by_name[name]["status"] == "not-applicable" else "FAIL")
+                     for name in check_names]
+            lines.append(f"| {row.get('register') or '?'} | {row.get('dynamic') or '?'} | "
+                         f"{row.get('midi') or '?'} | " + " | ".join(marks) +
+                         f" | {'PASS' if row['passed'] else 'FAIL'} |\n")
+    construction = summary.get("construction", {})
+    lines.extend(["\n### Construction checklist\n\n",
+                  "| Assertion | Status | Requirement |\n|---|:---:|---|\n"])
+    for row in construction.get("assertions", []):
+        lines.append(f"| `{row['id']}` | {row['status'].upper()} | {row['requirement']} |\n")
+    resource = summary.get("resourceTripwire", {})
+    lines.extend(["\n### Resource tripwire\n\n",
+                  f"Overall: **{'PASS' if resource.get('passed') else 'FAIL'}**.  \n",
+                  f"Oscillators: `{resource.get('preset', {}).get('oscillators', 'n/a')}`; "
+                  f"automation events/note: `{resource.get('preset', {}).get('automationEventsPerNote', 'n/a')}`; "
+                  f"model ms/note: `{resource.get('preset', {}).get('modelMsPerNote', 'n/a')}`.\n"])
+    lines.extend(["\n## Controllability\n\n",
+                  "| Parameter | Fitted | −10% loss | +10% loss | Mean increase |\n",
+                  "|---|---:|---:|---:|---:|\n"])
+    for key in summary.get("freeParameters", []):
+        sensitivity = summary.get("sensitivity", {}).get(key)
+        if sensitivity:
+            lines.append(f"| `{key}` | {summary['bestParams'].get(key)} | "
+                         f"{sensitivity['minus']:.6f} | {sensitivity['plus']:.6f} | "
+                         f"{sensitivity['increase']:.6f} |\n")
+        else:
+            lines.append(f"| `{key}` | {summary['bestParams'].get(key)} | not run | not run | not run |\n")
+    lines.extend(["\n## Techniques exchange statuses\n\n",
+                  "| Entry | Engine/blown status |\n|---|---|\n"])
+    for row in summary.get("exchangeStatuses", []):
+        lines.append(f"| `{row['id']}` {row['title']} | {row['engine']} |\n")
+    board = summary["leaderboardState"]
+    lines.extend(["\n## Leaderboard state\n\n",
+                  f"Reference set: `{summary['referenceSet']}`. Current run is "
+                  f"**{'leader' if board['isLeader'] else 'not leader'}**; "
+                  f"previous comparable best: `{board.get('previousBestLoss')}`; "
+                  f"current loss: `{summary['bestLoss']:.6f}`.\n",
+                  "\n## Owner render directories\n\n",
+                  f"Best renders: `{summary['renderArtifacts']['bestRenderDirectory']}`  \n",
+                  f"Listening page: `{summary['renderArtifacts']['listeningPage']}`  \n",
+                  f"Manifest: `{summary['renderArtifacts']['auditionManifest']}`\n"])
     path.write_text("".join(lines), encoding="utf-8")
 
 
@@ -236,11 +391,13 @@ def _params(manifest: dict, initial: dict, only: list[str] | None) -> list[FreeP
 class ToneMatcher:
     def __init__(self, instrument: str, initial: dict, references: list[dict],
                  free: list[FreeParam], run_dir: Path, repo_root: Path = ROOT,
-                 weights: dict[str, float] | None = None):
+                 weights: dict[str, float] | None = None,
+                 variability: dict[str, Any] | None = None):
         self.instrument, self.initial, self.references, self.free = instrument, initial, references, free
         self.run_dir = run_dir
         self.repo_root = repo_root
         self.weights = weights or weights_for_instrument(instrument)
+        self.variability = variability or {}
         self.evaluations: list[dict] = []
         self.best: dict | None = None
         self._objective_cache: dict[str, tuple[float, float]] = {}
@@ -306,10 +463,14 @@ class ToneMatcher:
             scores.append(score)
             roles = reference_roles(ref)
             if roles != {"floor"}:
+                mean_limit, max_limit = _band_limits_for_reference(
+                    ref_index, self.variability)
                 construction_samples.append(ConstructionSample(
                     render=render_bundle, reference=reference_bundle,
                     register=ref.get("register"), dynamic=ref.get("dynamic"),
-                    velocity=ref.get("velocity"), roles=frozenset(roles)))
+                    velocity=ref.get("velocity"), roles=frozenset(roles),
+                    band_mean_limit_db=mean_limit,
+                    band_max_octave_limit_db=max_limit))
             tripwire_notes.append({
                 "register": ref.get("register"),
                 "dynamic": ref.get("dynamic"),
@@ -560,7 +721,8 @@ def main(argv: list[str] | None = None) -> int:
     (run_dir / "run.json").write_text(
         json.dumps(vars(args), indent=2, default=str) + "\n")
     matcher = ToneMatcher(args.instrument, initial, references, free, run_dir,
-                          repo_root=args.repo_root, weights=scoring_weights)
+                          repo_root=args.repo_root, weights=scoring_weights,
+                          variability=variability)
     x0 = np.asarray([p.default for p in free])
     bounds = [(p.lo, p.hi) for p in free]
     matcher.evaluate(x0, retain_audio=True)
@@ -576,6 +738,8 @@ def main(argv: list[str] | None = None) -> int:
     sensitivity = {} if args.skip_sensitivity else _sensitivity(matcher, best)
     best = matcher.best or best
     (run_dir / "sensitivity.json").write_text(json.dumps(sensitivity, indent=2) + "\n")
+    resource = _benchmark_resources(run_dir, args.instrument, best)
+    render_artifacts = _build_listening_page(run_dir, args.instrument, best, references)
     reference_set = _reference_set_id(
         references, args.instrument, weights=scoring_weights)
     improved, previous_best_loss = _update_leaderboard(args.instrument, run_dir, best, reference_set)
@@ -610,7 +774,16 @@ def main(argv: list[str] | None = None) -> int:
                "tripwirePassed": bool(best.get("tripwires", {}).get("strictPassed")),
                "tripwires": best.get("tripwires", {}),
                "controllability": controllability,
+               "construction": best.get("construction", {}),
+               "resourceTripwire": resource,
                "referenceVariabilityFloor": floor, "dominantResidual": _dominant_residual(best),
+               "sensitivity": sensitivity,
+               "freeParameters": [spec.key for spec in free],
+               "bestParams": best.get("params", {}),
+               "exchangeStatuses": _technique_exchange_statuses(),
+               "leaderboardState": {"isLeader": improved,
+                                    "previousBestLoss": previous_best_loss},
+               "renderArtifacts": render_artifacts,
                "sessionOutcome": outcome}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     _write_run_report(run_dir / "RUN_REPORT.md", summary)

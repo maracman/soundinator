@@ -20,6 +20,7 @@ from scripts.tone_match.iterate import (
     FreeParam,
     ToneMatcher,
     _append_ledger,
+    _band_limits_for_reference,
     _candidate_fingerprint,
     _consume_controllability_audit,
     _dominant_residual,
@@ -28,10 +29,12 @@ from scripts.tone_match.iterate import (
     _params,
     _reference_set_id,
     _reference_variability,
+    _tripwire_gate,
     _update_leaderboard,
+    _write_run_report,
 )
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
-from scripts.tone_match.score import FeatureBundle, _BOWED_P1_FEATURES, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, weights_for_instrument
+from scripts.tone_match.score import FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, band_balance_distance, band_balance_report, band_profile, compare_features, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
 
@@ -49,6 +52,39 @@ def test_time_resampling_is_stable_at_endpoints():
     assert result.shape == (1, 9)
     assert result[0, 0] == 1.0
     assert result[0, -1] == 4.0
+
+
+def test_sustained_band_profile_is_gain_invariant_and_uses_third_octaves():
+    sr = 44_100
+    t = np.arange(int(1.7 * sr)) / sr
+    envelope = np.minimum(1, t / .03) * np.minimum(1, (1.7 - t) / .05)
+    tone = envelope * (np.sin(2 * np.pi * 500 * t) + .3 * np.sin(2 * np.pi * 2000 * t))
+    profile = _fractional_octave_profile(tone, sr, THIRD_OCTAVE_CENTRES, 3)
+    quieter = _fractional_octave_profile(tone * .07, sr, THIRD_OCTAVE_CENTRES, 3)
+    assert profile is not None and profile.shape == (21,)
+    assert quieter is not None
+    assert np.max(np.abs(profile - quieter)) < 1e-8
+    assert THIRD_OCTAVE_CENTRES[int(np.argmax(profile))] == 500
+
+
+def test_band_balance_distance_and_tripwires_expose_octave_tilt():
+    reference = _bundle()
+    rendered = _bundle()
+    reference.band_balance_db = np.full(21, -20.0)
+    rendered.band_balance_db = reference.band_balance_db.copy()
+    reference.octave_balance_db = np.full(8, -12.0)
+    rendered.octave_balance_db = reference.octave_balance_db.copy()
+    rendered.band_balance_db[-4:] += 4
+    rendered.octave_balance_db[-1] += 7
+    distance = band_balance_report(reference, rendered)
+    assert distance["status"] == "measured"
+    assert distance["meanDb"] == pytest.approx(16 / distance["validBands"])
+    assert distance["maxOctaveDb"] == 7
+    result = compare_features(reference, rendered, weights_for_instrument("flute"))
+    gates = quantitative_tripwires(reference, rendered, result, "flute")
+    by_name = {row["name"]: row for row in gates["rows"]}
+    assert by_name["band-balance-mean"]["status"] == "pass"
+    assert by_name["band-balance-max-octave"]["status"] == "fail"
 
 
 def test_active_render_analysis_excludes_release_tail(monkeypatch):
@@ -369,6 +405,73 @@ def test_reference_variability_floor_requires_alternate_takes():
         lambda _: _bundle(),
     )
     assert result["status"] == "insufficient-evidence"
+
+
+def test_band_tripwire_only_widens_to_measured_take_variability():
+    variability = {"status": "measured", "groups": [{
+        "referenceIndices": [0, 1],
+        "floorFeatures": {"band_balance_db": 4.5},
+        "floorBandMaxOctaveDb": 8.0,
+    }]}
+    assert _band_limits_for_reference(0, variability) == (4.5, 8.0)
+    assert _band_limits_for_reference(2, variability) == (3.0, 6.0)
+    lower = {"status": "measured", "groups": [{
+        "referenceIndices": [0], "floorFeatures": {"band_balance_db": 1.0},
+        "floorBandMaxOctaveDb": 2.0,
+    }]}
+    assert _band_limits_for_reference(0, lower) == (3.0, 6.0)
+
+
+def test_campaign_tripwire_table_applies_floor_and_keeps_other_failures():
+    checks = [
+        {"name": "partial-table", "status": "fail", "observed": 4.0, "limit": "<=3"},
+        {"name": "inharmonicity-b", "status": "not-applicable", "observed": None, "limit": "n/a"},
+        {"name": "band-balance-mean", "status": "fail", "observed": 4.0, "limit": "<=3"},
+        {"name": "band-balance-max-octave", "status": "fail", "observed": 7.0, "limit": "<=6"},
+    ]
+    score = {"tripwires": {"rows": checks}, "bandBalance": {}}
+    variability = {"status": "measured", "groups": [{
+        "referenceIndices": [0], "floorFeatures": {"band_balance_db": 5.0},
+        "floorBandMaxOctaveDb": 9.0,
+    }]}
+    gate = _tripwire_gate([score], [{"register": "low", "dynamic": "pp", "midi": 60}],
+                          variability, {"passed": True, "counts": {"fail": 0}})
+    by_name = {row["name"]: row for row in gate["rows"][0]["checks"]}
+    assert by_name["band-balance-mean"]["status"] == "pass"
+    assert by_name["band-balance-max-octave"]["status"] == "pass"
+    assert by_name["partial-table"]["status"] == "fail"
+    assert not gate["passed"]
+
+
+def test_run_report_ends_with_required_owner_pass_artifacts(tmp_path):
+    check = {"name": "band-balance-mean", "status": "pass", "observed": 2.0,
+             "limit": "<= 3 dB"}
+    construction = {"passed": True, "assertions": [{"id": "flute.band-balance",
+                    "status": "pass", "requirement": "paired profile"}]}
+    summary = {
+        "instrument": "flute", "run": "pass", "baselineLoss": 2.0,
+        "bestLoss": 1.5, "improvement": .5, "constructionPassed": True,
+        "construction": construction, "automatedGatePassed": True,
+        "referenceVariabilityFloor": {"status": "above-floor", "groups": []},
+        "dominantResidual": None, "sessionOutcome": {"state": "improvement"},
+        "tripwireGate": {"rows": [{"register": "low", "dynamic": "pp", "midi": 60,
+                            "passed": True, "checks": [check]}]},
+        "resourceTripwire": {"passed": True, "preset": {"oscillators": 20,
+                                "automationEventsPerNote": 100, "modelMsPerNote": .1}},
+        "freeParameters": ["toneBreath"], "bestParams": {"toneBreath": .2},
+        "sensitivity": {"toneBreath": {"minus": 1.6, "plus": 1.7, "increase": .15}},
+        "exchangeStatuses": [{"id": "T-005", "title": "bands", "engine": "incorporated"}],
+        "leaderboardState": {"isLeader": True, "previousBestLoss": 2.0},
+        "referenceSet": "abc", "renderArtifacts": {"bestRenderDirectory": "/tmp/renders",
+            "listeningPage": "/tmp/listen-flute.html", "auditionManifest": "/tmp/audition.json"},
+    }
+    path = tmp_path / "RUN_REPORT.md"
+    _write_run_report(path, summary)
+    report = path.read_text()
+    for heading in ("Automated §3 gate", "Controllability", "Techniques exchange statuses",
+                    "Leaderboard state", "Owner render directories"):
+        assert heading in report
+    assert report.rstrip().endswith("`/tmp/audition.json`")
 
 
 def test_blown_scoring_does_not_fit_stiff_string_inharmonicity():
