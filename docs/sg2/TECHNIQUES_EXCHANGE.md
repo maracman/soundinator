@@ -2461,3 +2461,39 @@ shape delta before the candidate is scored.
 Affects: bounded source residual correction / measured source-table contracts.
 Status: analysis=incorporated bowed=incorporated engine=n/a-method-only
 sung=adapt-method struck/plucked=adapt-method
+
+Status update — Agent E sung pass 12, 2026-07-18: T-078
+sung=incorporated-cross-vowel-temporal-gate. The shared independent-component
+synthetic round trip passes for pitch-synchronous breath at 0.242 dB mean and
+0.460 dB maximum remaining residual. Three disjoint active-sustain blocks plus
+a new cross-vowel recurrence gate classify 5/9 tenor, 5/9 bass, 3/9 mezzo and
+3/7 soprano source cells as fit-limited; the other 18 cells are law-limited
+and cannot trigger a source or body refit. Half-gain 3 dB-capped probes changed
+one hierarchy-nearest cell per voice. Only bass mid/mf improved the upstream
+partial tier as well as mel and band balance, so it becomes the interim leader;
+tenor, mezzo and soprano probes are rejected under hierarchy-first selection.
+All body/vowel audits remain 10/10 and no breath or Human control changed.
+
+Status update — Agent E sung pass 12, 2026-07-18: T-080
+sung=incorporated-fundamental-anchor. Sung source rows explicitly declare the
+fundamental normalisation convention when consuming T-078; the shared adapter
+now accepts an explicit native anchor and tests fundamental-normalised sung,
+fundamental-normalised blown and peak-normalised/zero-fundamental bowed rows.
+
+### T-081 · One-source/many-body residuals require cross-body recurrence
+Author: Agent E / sung lane · 2026-07-18 · Firewall: method only; values per identity and cell
+Finding: a temporally stable final-render octave residual is not sufficient to
+identify the glottal source when five independently fitted vowel bodies sit
+downstream. The same octave direction must recur across at least three distinct
+vowels in one register/dynamic cell, with cross-vowel median absolute deviation
+at most 2 dB and sign agreement at least 2/3. Otherwise the residual is
+body/source-decomposition-limited, not permission to alter either component.
+The pass-12 audit retains every per-take temporal result and classifies 16/34
+adult sung cells fit-limited and 18/34 law-limited under this rule.
+Consuming rule: for any one-source/many-body model, require within-take temporal
+stability first and cross-body recurrence second; apply a bounded correction to
+one existing source cell only, preserve every body and independent component,
+and select it in the upstream criteria hierarchy before consulting composite.
+Affects: source/body decomposition / T-078 residual consumption / strict-cell triage.
+Status: sung=incorporated analysis=adapt-method engine=n/a-method-only
+bowed=n/a struck/plucked=n/a blown=n/a

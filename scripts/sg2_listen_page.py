@@ -65,6 +65,11 @@ def params_for_ref(params, ref):
 
 def selected_audition_manifest(best):
     """Return reference→SHIP audio for a leaderboard-selected sung audition."""
+    # §2.5c.6(c) is stronger than the convenience of an already-rendered
+    # audition: a normal page build must draw fresh SHIP seeds.  Only the
+    # explicit --cached mode may reuse a selected manifest's audio.
+    if FRESH:
+        return {}
     scores = best.get("scoresPath") if isinstance(best, dict) else None
     if not scores:
         return {}

@@ -192,6 +192,7 @@ def apply_residual_to_params(
     gain: float,
     cap_db: float = 3.0,
     component_class: str = "air",
+    normalization_anchor: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Apply a bounded correction to exactly one existing source cell."""
     if evidence.get("status") != "pass":
@@ -210,18 +211,23 @@ def apply_residual_to_params(
     partials = np.asarray(row.get("partials", []), dtype=float)
     if partials.size < 2 or not np.any(partials > 0):
         raise ValueError("selected source row has no normalisable partial table")
-    if component_class == "air" and partials[0] <= 0:
-        raise ValueError("air source row has no normalisable fundamental")
+    anchor = normalization_anchor or (
+        "fundamental" if component_class == "air" else "row-peak")
+    if anchor not in {"fundamental", "row-peak"}:
+        raise ValueError(f"unknown source normalization anchor: {anchor}")
+    if anchor == "fundamental" and partials[0] <= 0:
+        raise ValueError(
+            f"{component_class} source row has no normalisable fundamental")
     f0 = float(row.get("f0Hz") or evidence["f0Hz"])
     raw_db = _partial_correction_db(
         evidence, f0 * np.arange(1, partials.size + 1), cap_db=cap_db)
     bounded_db = gain * raw_db
     corrected = partials * 10 ** (bounded_db / 20)
     corrected[partials <= 0] = 0.0
-    normalization_anchor = (
-        float(corrected[0]) if component_class == "air"
+    normalization_value = (
+        float(corrected[0]) if anchor == "fundamental"
         else float(np.max(corrected)))
-    corrected /= normalization_anchor
+    corrected /= normalization_value
     # Record the effective correction after the source's native
     # normalisation convention is restored.
     effective_db = np.zeros_like(corrected)
@@ -241,8 +247,7 @@ def apply_residual_to_params(
         "schema": SCHEMA,
         "startingSurface": "selected-fit-cumulative-surface",
         "independentComponentClass": component_class,
-        "normalizationAnchor": (
-            "fundamental" if component_class == "air" else "row-peak"),
+        "normalizationAnchor": anchor,
         "evidenceSha256": evidence_hash,
         "gain": float(gain),
         "capDb": float(cap_db),
@@ -265,8 +270,7 @@ def apply_residual_to_params(
             candidate.get("windBreathLevelByRegisterDynamic") !=
             params.get("windBreathLevelByRegisterDynamic")),
         "independentComponentClass": component_class,
-        "normalizationAnchor": (
-            "fundamental" if component_class == "air" else "row-peak"),
+        "normalizationAnchor": anchor,
         "medianAbsEffectiveDb": float(np.median(np.abs(effective_db[active]))),
         "maxAbsEffectiveDb": float(np.max(np.abs(effective_db[active]))),
         "evidenceSha256": evidence_hash,

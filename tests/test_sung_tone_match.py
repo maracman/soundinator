@@ -60,7 +60,7 @@ from scripts.tone_match.sung_prior import (
     prior_provenance,
 )
 from scripts.tone_match.tripwires import reference_roles
-from scripts.sg2_listen_page import selected_audition_manifest
+import scripts.sg2_listen_page as listen_page
 
 
 def test_vocalset_parser_carries_identity_vowel_and_technique():
@@ -609,7 +609,7 @@ def test_sung_dynamic_scalar_is_recovered_from_debodied_source_rows():
     assert result["medianPartialErrorDb"] < 1e-6
 
 
-def test_listening_page_uses_selected_sung_ship_manifest(tmp_path):
+def test_cached_listening_page_uses_selected_sung_ship_manifest(tmp_path, monkeypatch):
     run = tmp_path / "run"
     run.mkdir()
     scores = run / "baseline-scores.json"
@@ -617,7 +617,8 @@ def test_listening_page_uses_selected_sung_ship_manifest(tmp_path):
     (run / "audition-manifest.json").write_text(json.dumps([
         {"reference": "/real/a.wav", "render": "/ship/a.wav"},
     ]))
-    assert selected_audition_manifest({"scoresPath": str(scores)}) == {
+    monkeypatch.setattr(listen_page, "FRESH", False)
+    assert listen_page.selected_audition_manifest({"scoresPath": str(scores)}) == {
         "/real/a.wav": "/ship/a.wav",
     }
 
