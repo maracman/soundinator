@@ -119,13 +119,13 @@ seed and engine commit are retained in each row's durable `stamp.json`.
 
 ## Verification and next work
 
-The required landing suite is rerun after the final shared-head merge:
+The required landing suite passes after the final shared-head merge:
 
 - `npm test` — 11/11 pass;
 - `node scripts/verify_tone_model.mjs` — all tone-model v2 assertions pass;
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q` — pass;
 - `PYTHON="$PWD/../../../.venv/bin/python" node scripts/render_note.mjs --verify`
-  — pass, `5cc732ff9fe5fccf59463f3d1f51da34f288b36e12abb92a904bd728a9e354e2`.
+  — pass, `6178fa984dd184d91d2c6edef3b0485b349d62037e9554323f1683c2a712ce90`.
 
 The next sung pass should resume per voice at the partial tier: use
 harmonic-rank same-cell residuals for hierarchy-nearest fit-limited cells,
