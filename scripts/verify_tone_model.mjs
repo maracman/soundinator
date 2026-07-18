@@ -908,6 +908,16 @@ console.log("T-033 per-string + pinned register × dynamic source surfaces");
     (() => { try { resolveStringSelection("violin", 55, "sulE"); return false; } catch { return true; } })() &&
     (() => { try { resolveStringSelection("cello", 57, "sulE"); return false; } catch { return true; } })());
   const measuredGuitar = SPECTRAL_PROFILES.guitar;
+  check("T-033/T-072 measured plucked tables use a pluck unity source while struck families remain struck",
+    measuredGuitar.performance?.excitation?.type === "pluck" &&
+    SPECTRAL_PROFILES.harp.performance?.excitation?.type === "pluck" &&
+    SPECTRAL_PROFILES["piano-upright"].performance?.excitation?.type === "strike" &&
+    SPECTRAL_PROFILES.glockenspiel.performance?.excitation?.type === "strike");
+  check("T-033/T-072 craft anchors survive the excitation-class correction",
+    near(measuredGuitar.performance.excitation.position, .12, 1e-12) &&
+    near(measuredGuitar.performance.excitation.hardness, .62, 1e-12) &&
+    near(SPECTRAL_PROFILES.harp.performance.excitation.position, .12, 1e-12) &&
+    near(SPECTRAL_PROFILES.harp.performance.excitation.hardness, .62, 1e-12));
   const nylonSix = stringProfileAt(measuredGuitar, "guitar", 82.407, "string6");
   const nylonThree = stringProfileAt(measuredGuitar, "guitar", 195.998, "string3");
   const nylonOne = stringProfileAt(measuredGuitar, "guitar", 659.255, "string1");
@@ -1778,6 +1788,26 @@ console.log("L17: pinned pre-onset component class + preset activation");
     pianoFingerprint.envelopeAnomalyLevel === 1 &&
     anomalyEvents.length > 2 && anomalyEvents[0].gain >
       anomalyEvents[anomalyEvents.length - 1].gain);
+
+  const uprightProfile = SPECTRAL_PROFILES["piano-upright"];
+  const uprightMeasured = MEASURED_PROFILES["piano-upright"];
+  const uprightAnomalies = envelopeAnomalyClassesFor(uprightProfile);
+  const uprightFingerprint = new GenerationEngine({ seed: 691,
+    voiceMode: "fourier", spectralProfile: "piano-upright",
+    excitationType: "strike", envelopeAnomalyLevel: 1,
+  })._spectralFingerprint(.62, 440);
+  check("T-007 upright corrected L16 classes reach the renderer",
+    uprightAnomalies.length === 15 &&
+    uprightAnomalies.length === uprightMeasured.envelopeAnomalyClasses.length &&
+    uprightAnomalies.every(row => row.onsetBoostDb > 0 &&
+      row.excessDecayDbPerSecond > 0 && row.velocitySlopeDbPerUnit > 0) &&
+    uprightFingerprint.envelopeAnomalyClasses?.length === 15 &&
+    uprightFingerprint.envelopeAnomalyLevel === 1);
+  check("T-007 upright evidence limits block L17/L18 value transfer",
+    !uprightMeasured.preOnsetComponents?.length &&
+    !uprightMeasured.damperByRegister?.length &&
+    pinnedNoiseComponentsFor(uprightProfile).length === 0 &&
+    !uprightFingerprint.damperProfile);
 }
 
 console.log("T6: preset migration (T-B9 partial)");
