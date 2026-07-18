@@ -27,7 +27,7 @@ evidence. Harp improves deterministic loss by 0.044711 and passes construction
 and resources, but retains 84 raw tripwire failures, two strict evidence
 holes, and no matched-take distributional evidence.
 
-## T-080 measured source-class correction
+## T-081 measured source-class correction
 
 `SPECTRAL_PERFORMANCE.guitar` and `.harp` now identify `pluck` as the unity
 excitation class. Their legacy piano prior still supplies the documented
@@ -180,8 +180,8 @@ created for absent-corpus steel guitar.
 
 Generated exchange snapshot:
 `sg2-data/analysis/struck-pass20/exchange-statuses.json`; source SHA-256
-`936d88046eb48d505802ceb2e098479ef32ceff2894c0b7302af844afe093a63`,
-83 parsed entries. T-080 is incorporated in struck/plucked; other lanes are
+`8c5a0a47bd11d1fe84f3fa1a833effe77abb14efb7b4b6c418059d4f39ec9f7f`,
+84 parsed entries. T-081 is incorporated in struck/plucked; other lanes are
 marked adapted because the method transfers but values never do.
 
 ## §2.5 exit state
@@ -204,7 +204,7 @@ blocked by upstream identity plus missing repeat evidence.
 ## Verification
 
 - `npm test`: PASS, 11/11.
-- `node scripts/verify_tone_model.mjs`: PASS, including T-080 excitation
+- `node scripts/verify_tone_model.mjs`: PASS, including T-081 excitation
   unity/craft-anchor assertions and upright L16/L17/L18 firewall assertions.
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: PASS.
 - `node scripts/render_note.mjs --verify`: PASS,

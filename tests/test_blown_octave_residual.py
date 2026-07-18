@@ -16,6 +16,14 @@ def test_blown_octave_extractor_passes_harmonic_plus_air_roundtrip():
     assert result["maxAbsResidualAfterDb"] <= .75
 
 
+def test_octave_extractor_labels_independent_bow_roundtrip_without_air():
+    result = synthetic_roundtrip(component_class="bow")
+    assert result["status"] == "pass"
+    assert result["includesIndependentAir"] is False
+    assert result["includesIndependentComponent"] is True
+    assert result["independentComponentClass"] == "bow"
+
+
 def test_octave_residual_changes_only_selected_cumulative_source_cell():
     params = {
         "bodyBands": [{"freq": 900, "gain": 1, "width": .2}],
@@ -55,3 +63,55 @@ def test_octave_residual_changes_only_selected_cumulative_source_cell():
     assert audit["changedRows"] == 1
     assert audit["bodyChanged"] is False
     assert audit["airSurfaceChanged"] is False
+
+
+def test_octave_residual_adapts_metadata_for_independent_bow_component():
+    params = {
+        "bodyBands": [{"freq": 900, "gain": 1, "width": .2}],
+        "spectralPartialsByRegisterDynamic": {
+            "rows": [{"register": "mid", "dynamic": "ff", "f0Hz": 500,
+                      "partials": [1, .4, .2, .1]}],
+        },
+    }
+    evidence = {
+        "status": "pass", "f0Hz": 500,
+        "octaveCentresHz": [63, 125, 250, 500, 1000, 2000, 4000, 8000],
+        "medianResidualDb": [0, 0, 0, 0, 2, -2, 0, 0],
+        "stableBands": [False, False, False, True, True, True, True, True],
+        "sourceAddressable": [False, False, False, True, True, True, True, True],
+    }
+    candidate, audit = apply_residual_to_params(
+        params, evidence, register="mid", dynamic="ff", gain=.5,
+        component_class="bow")
+
+    changed = candidate["spectralPartialsByRegisterDynamic"]["rows"][0]
+    assert "postSourceAirOctaveCorrection" not in changed
+    assert changed["postSourceBowOctaveCorrection"][
+        "independentComponentClass"] == "bow"
+    assert audit["independentComponentClass"] == "bow"
+    assert audit["normalizationAnchor"] == "row-peak"
+    assert audit["bodyChanged"] is False
+
+
+def test_bow_octave_residual_preserves_zero_fundamental_and_peak_normalization():
+    params = {
+        "spectralPartialsByRegisterDynamic": {
+            "rows": [{"register": "high", "dynamic": "pp", "f0Hz": 1000,
+                      "partials": [0, 1, .4, .2]}],
+        },
+    }
+    evidence = {
+        "status": "pass", "f0Hz": 1000,
+        "octaveCentresHz": [63, 125, 250, 500, 1000, 2000, 4000, 8000],
+        "medianResidualDb": [0, 0, 0, 0, 2, -2, 0, 0],
+        "stableBands": [False, False, False, False, True, True, True, True],
+        "sourceAddressable": [False, False, False, False, True, True, True, True],
+    }
+    candidate, audit = apply_residual_to_params(
+        params, evidence, register="high", dynamic="pp", gain=1,
+        component_class="bow")
+
+    changed = candidate["spectralPartialsByRegisterDynamic"]["rows"][0]
+    assert changed["partials"][0] == 0
+    assert max(changed["partials"]) == 1
+    assert audit["maxAbsEffectiveDb"] <= 6
