@@ -1,6 +1,6 @@
 # Agent D pass 10 report
 
-Date: 2026-07-18  
+Date: 2026-07-18
 Exit state: `limiting-factor` — bounded full-rank source refinement and the
 T-078 stable post-source/post-bow octave method were applied to violin and
 cello. Violin retains its three score-applicable partial-table PASS cells and

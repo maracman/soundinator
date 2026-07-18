@@ -2462,7 +2462,45 @@ Affects: bounded source residual correction / measured source-table contracts.
 Status: analysis=incorporated bowed=incorporated engine=n/a-method-only
 sung=adapt-method struck/plucked=adapt-method
 
-### T-081 · Broad-octave temporal stability uses pitch-aware cycle support
+### T-081 · Measured source tables must be normalised against their own excitation class
+Author: Agent C / struck-plucked · 2026-07-18 · Firewall: method shared; values stay instrument-owned
+Finding: guitar and harp inherited piano craft defaults, including the seed's
+`strike` excitation type, before their measured profiles were folded into the
+renderer. Both presets explicitly requested `pluck`, so the fingerprint
+divided the selected measured source table by a strike response and multiplied
+it by a pluck response. The measured table was therefore not the unity source:
+every nylon course and every harp register received an unintended second
+spectral transform. Setting only the guitar/harp profile excitation class to
+`pluck` restores unity while preserving their legacy position/hardness craft
+anchors; upright, grand, and glockenspiel remain `strike`. Equal-pitch nylon
+course separations then measure 21.824/25.771/6.777 dB in real PCM and all
+three hashes remain distinct.
+Consuming rule: whenever a measured source table is installed, its profile
+normalisation excitation class must match the construction class used to
+measure and render it. A cross-family craft prior may seed bounded controls,
+but may not silently become the denominator of an instrument-owned measured
+source. Assert both the corrected class and unchanged craft anchors.
+Affects: measured-source identity / excitation normalisation / prior firewall.
+Status: engine=incorporated struck/plucked=incorporated-nylon+harp
+analysis=n/a bowed=adapt-method sung=adapt-method
+
+Status update — Agent C struck/plucked pass 20, 2026-07-18: T-068/T-069
+engine=incorporated-upright-L16-only struck/plucked=evidence-limited-output-pass.
+The corrected upright extraction installs 15 positive, velocity-coupled L16
+classes and the PCM consumer audit passes. L17 remains absent because all 69
+VSCO files fail pre-roll; the BiVib record-2573232 scout is checksum-verified
+and specifies the next nine-cell audio fetch. Six detected L18 knees retain
+negative modal exponents and emit zero gated damper rows, so no grand action
+or damper value transfers to upright.
+
+Status update — Agent C struck/plucked pass 20, 2026-07-18: T-033/T-072
+struck/plucked=incorporated-current-renderer-output. T-033's three nylon course
+tables remain distinct at equal pitch after the T-081 correction. T-072's
+target-aware glock audit again passes every audible mode within 35 cents,
+including MIDI79/mode6 (+0.098 cents), MIDI96/mode4 (+1.237), and
+MIDI103/mode3 (-5.962), with the 7.404 decay hierarchy and exact B=0 intact.
+
+### T-082 · Broad-octave temporal stability uses pitch-aware cycle support
 Author: Agent D / bowed analysis · 2026-07-18 · Firewall: method only
 Finding: T-078's fixed three-by-250-ms requirement conflated evidence length
 with spectral instability. After the unchanged 250 ms onset and 100 ms
