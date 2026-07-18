@@ -898,6 +898,45 @@ export function bodyResponse(bands, freqHz, amount) {
   return Math.max(0.2, Math.min(4.5, Math.pow(2, logGain)));
 }
 
+/** A-VOICE-01: the carrying cluster belongs to the fitted singer class, not
+ * one hard-coded tenor-ish frequency.  Zero amount creates no band, and an
+ * omitted centre retains the former 3 kHz path exactly. */
+export function singerFormantBand(amount = 0, centreHz = 3000) {
+  const gain = Math.max(0, Math.min(1.5, Number(amount) || 0));
+  if (gain <= 0) return null;
+  const freq = Number.isFinite(Number(centreHz))
+    ? Math.max(1800, Math.min(3600, Number(centreHz))) : 3000;
+  return { freq, gain: gain * 1.4, width: 0.22, singerFormant: true };
+}
+
+/** A-VOICE-02: above the fitted F1 threshold, high mezzo/soprano phonation
+ * may tune R1 to the glottal fundamental.  Only the first vowel-body band is
+ * moved; the marker lets the render-time FM->AM consumer follow instantaneous
+ * f0 while F2-F5 remain fixed. */
+export function tuneVowelFirstFormant(bands, fundamentalHz, ratio = 0) {
+  const source = Array.isArray(bands) ? bands : [];
+  const tune = Math.max(0, Math.min(1.2, Number(ratio) || 0));
+  const f0 = Number(fundamentalHz);
+  const fittedF1 = Number(source[0]?.freq);
+  if (tune <= 0 || !Number.isFinite(f0) || !Number.isFinite(fittedF1) ||
+      f0 <= fittedF1) return source;
+  return source.map((band, index) => index === 0 ? {
+    ...band,
+    freq: tune * f0,
+    fittedFreq: fittedF1,
+    tuneToFundamentalRatio: tune,
+  } : band);
+}
+
+/** Resolve only explicitly tuned bands at an instantaneous fundamental. */
+export function bodyBandsAtFundamental(bands, fundamentalHz) {
+  if (!Array.isArray(bands)) return [];
+  const f0 = Math.max(1, Number(fundamentalHz) || 1);
+  return bands.map(band => Number.isFinite(band?.tuneToFundamentalRatio)
+    ? { ...band, freq: band.tuneToFundamentalRatio * f0 }
+    : band);
+}
+
 function interpolatedPitchCentsAt(events, time) {
   if (!Array.isArray(events) || events.length === 0) return 0;
   if (time <= events[0].time) return Number(events[0].cents) || 0;
@@ -979,11 +1018,15 @@ export function bodyAmAutomationEvents(note, modeFrequency, t0, t1,
     const time = t0 + (Number(point.time) || 0);
     if (time > t0 && time < t1) times.add(time);
   }
-  const nominal = bodyResponse(bands, target, amount);
+  const nominalFundamental = target / Math.max(1e-12, modeMultiplier);
+  const nominal = bodyResponse(
+    bodyBandsAtFundamental(bands, nominalFundamental), target, amount);
   return [...times].sort((a, b) => a - b).map(time => ({
     time,
     frequency: frequencyAt(time),
-    gain: bodyResponse(bands, frequencyAt(time), amount) / nominal,
+    gain: bodyResponse(bodyBandsAtFundamental(
+      bands, frequencyAt(time) / Math.max(1e-12, modeMultiplier)),
+    frequencyAt(time), amount) / nominal,
   }));
 }
 
@@ -4155,15 +4198,18 @@ export class GenerationEngine {
     // is the ONLY register-dependent shaping now: the per-partial reg
     // grids are retired (audit A7 — register timbre emerges from where
     // the partials fall against fixed-Hz bands, not hand-set exponents).
-    const baseBands = Array.isArray(this.p.bodyBands)
+    let baseBands = Array.isArray(this.p.bodyBands)
       ? this.p.bodyBands                       // preset used as a starting point, then band-edited
       : bodyBandsFor(this.p, profile);
+    if (profileKey.startsWith("voice-")) {
+      baseBands = tuneVowelFirstFormant(
+        baseBands, fundamentalHz, this.p.formantTuneToF0);
+    }
     const artic = this._articulatedBands(formantPos);
     let bodyBands = artic ? baseBands.concat(artic) : baseBands;
-    const singerFormant = this._clamp(this.p.singerFormantAmount ?? 0, 0, 1.5);
-    if (singerFormant > 0) {
-      bodyBands = bodyBands.concat([{ freq: 3000, gain: singerFormant * 1.4, width: 0.22 }]);
-    }
+    const singerFormant = singerFormantBand(
+      this.p.singerFormantAmount, this.p.singerFormantHz);
+    if (singerFormant) bodyBands = bodyBands.concat([singerFormant]);
     // Tone v2 (T2): resolve the excitation once per note. Current settings
     // are applied as a transform NORMALISED against the profile's own
     // excitation defaults — the measured amplitude tables already embody

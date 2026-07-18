@@ -64,6 +64,9 @@ import {
   bodyAmountFor,
   bodyLogGainAt,
   bodyResponse,
+  singerFormantBand,
+  tuneVowelFirstFormant,
+  bodyBandsAtFundamental,
   bodyAmAutomationEvents,
   bodyResponsesForPartials,
   bowNoiseBodyFilterDbAt,
@@ -1130,6 +1133,27 @@ console.log("Sound Generator 2.0 neutral engine extensions");
     near(double.lateT60, double.earlyT60 * 4, 1e-12));
   check("G6 glottal source tilt is neutral at zero and darkens upper partials",
     glottalSourceGain(16, 0) === 1 && glottalSourceGain(16, 0.8) < glottalSourceGain(2, 0.8));
+  check("A-VOICE-01 zero amount is independent of fitted singer centre",
+    singerFormantBand(0, 2400) === null && singerFormantBand(0, 2800) === null);
+  check("A-VOICE-01 fitted class centre replaces only the carrying cluster",
+    singerFormantBand(.8, 2400).freq === 2400 &&
+    singerFormantBand(.8, 2800).freq === 2800 &&
+    singerFormantBand(.8).freq === 3000);
+  const vowelBands = [
+    { freq: 500, gain: 1, width: .2 },
+    { freq: 1500, gain: .8, width: .2 },
+    { freq: 2500, gain: .5, width: .2 },
+  ];
+  check("A-VOICE-02 zero and below-threshold branches leave the vowel body exact",
+    tuneVowelFirstFormant(vowelBands, 700, 0) === vowelBands &&
+    tuneVowelFirstFormant(vowelBands, 400, 1.1) === vowelBands);
+  const tunedVowel = tuneVowelFirstFormant(vowelBands, 600, 1.1);
+  check("A-VOICE-02 moves only F1 above threshold and retains F2-F5",
+    near(tunedVowel[0].freq, 660, 1e-12) &&
+    tunedVowel[1] === vowelBands[1] && tunedVowel[2] === vowelBands[2]);
+  check("A-VOICE-02 tuned F1 follows instantaneous f0 while fixed bands do not",
+    near(bodyBandsAtFundamental(tunedVowel, 630)[0].freq, 693, 1e-12) &&
+    bodyBandsAtFundamental(tunedVowel, 630)[1].freq === 1500);
   check("G7 velocity-hardness coupling is neutral at zero",
     velocityHardness(0.6, 1, 0) === 0.6);
   check("G7 harder velocity brightens an opted-in strike",
@@ -1367,6 +1391,69 @@ console.log("T-B6: body stage — vowels as bodies, FM→AM, reg grids retired")
       "aeiou".split("").every(vowel => BODY_PRESETS[`${profile}-${vowel}`]?.measured)));
   check("instrument bodies present (violin, piano)",
     !!BODY_PRESETS.violin && !!BODY_PRESETS.piano);
+
+  const sungBodyParams = {
+    seed: 1601, voiceMode: "fourier", spectralPartials: 24,
+    excitationType: "blow", excitationHuman: 0,
+    bodyBands: [
+      { freq: 500, gain: 1, width: .2 },
+      { freq: 1500, gain: .8, width: .2 },
+      { freq: 2500, gain: .5, width: .2 },
+      { freq: 3200, gain: .4, width: .2 },
+      { freq: 4100, gain: .3, width: .2 },
+    ],
+    spectralResonanceAmount: 1,
+  };
+  const bassCarrying = new GenerationEngine({
+    ...sungBodyParams, spectralProfile: "voice-bass",
+    singerFormantAmount: .8, singerFormantHz: 2400,
+  })._spectralFingerprint(.62, 220, 0);
+  const legacyCarrying = new GenerationEngine({
+    ...sungBodyParams, spectralProfile: "voice-bass",
+    singerFormantAmount: .8,
+  })._spectralFingerprint(.62, 220, 0);
+  check("A-VOICE-01 bass seed consumes its fitted centre in the sounded body",
+    bassCarrying.bodyBands.some(band => band.singerFormant && band.freq === 2400));
+  check("A-VOICE-01 omitted centre retains the exact former 3 kHz consumer",
+    legacyCarrying.bodyBands.some(band => band.singerFormant && band.freq === 3000));
+  const neutralCentreA = new GenerationEngine({
+    ...sungBodyParams, spectralProfile: "voice-bass",
+    singerFormantAmount: 0, singerFormantHz: 2400,
+  })._spectralFingerprint(.62, 220, 0);
+  const neutralCentreB = new GenerationEngine({
+    ...sungBodyParams, spectralProfile: "voice-bass",
+    singerFormantAmount: 0, singerFormantHz: 3000,
+  })._spectralFingerprint(.62, 220, 0);
+  check("A-VOICE-01 centre is inert in the real fingerprint at zero amount",
+    JSON.stringify(neutralCentreA.harmonicPartials) ===
+      JSON.stringify(neutralCentreB.harmonicPartials) &&
+    JSON.stringify(neutralCentreA.bodyBands) === JSON.stringify(neutralCentreB.bodyBands));
+
+  const mezzoTuned = new GenerationEngine({
+    ...sungBodyParams, spectralProfile: "voice-mezzo", formantTuneToF0: 1.1,
+  })._spectralFingerprint(.62, 600, 0);
+  const mezzoBelow = new GenerationEngine({
+    ...sungBodyParams, spectralProfile: "voice-mezzo", formantTuneToF0: 1.1,
+  })._spectralFingerprint(.62, 400, 0);
+  const tenorNeutral = new GenerationEngine({
+    ...sungBodyParams, spectralProfile: "voice-tenor",
+  })._spectralFingerprint(.62, 600, 0);
+  check("A-VOICE-02 mezzo consumer tunes only above its fitted F1 threshold",
+    near(mezzoTuned.bodyBands[0].freq, 660, 1e-12) &&
+    mezzoTuned.bodyBands.slice(1).every((band, index) =>
+      band === sungBodyParams.bodyBands[index + 1]) &&
+    mezzoBelow.bodyBands === sungBodyParams.bodyBands);
+  check("A-VOICE-02 tenor/bass neutral default leaves the fitted body fixed",
+    tenorNeutral.bodyBands === sungBodyParams.bodyBands);
+  const tunedAm = bodyAmAutomationEvents({
+    bodyBands: mezzoTuned.bodyBands, bodyAmount: 1, frequency: 600,
+    duration: 1, envelopeAttack: .02,
+    _vibratoEvents: [{ time: 0, cents: 0 }, { time: .5, cents: 20 },
+      { time: 1, cents: 0 }],
+  }, 1200, 0, 1, 2, 100);
+  check("A-VOICE-02 render-time body consumer tracks tuned F1 at instantaneous f0",
+    tunedAm.length >= 101 && tunedAm.every(event => Number.isFinite(event.gain)) &&
+    tunedAm.some(event => Math.abs(event.frequency - 1200) > 1));
 
   const legacyFlute = [{ freq: 900, gain: .18, width: .65 }];
   const omissionWarnings = [];

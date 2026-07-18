@@ -686,7 +686,9 @@ const PARAM_DESC = {
   decaySecondStage: "Amount of double decay after the first 18 dB: 0 uses one T60; higher values reveal a slower aftersound for piano strings and plucked bodies",
   decaySecondRatio: "Late-to-early T60 ratio for double decay. Has no effect while Second stage is 0",
   glottalTilt: "Vocal glottal-source spectral tilt. Positive values darken upper harmonics as a softer/less pressed glottal source would; 0 is neutral",
-  singerFormantAmount: "Adds the clustered vocal radiation band around 3 kHz associated with carrying singer presence",
+  singerFormantAmount: "Adds the clustered vocal radiation band associated with carrying singer presence",
+  singerFormantHz: "Centre of the singer-formant cluster; fitted per voice class rather than fixed at 3 kHz",
+  formantTuneToF0: "Above the fitted F1 threshold, tunes only the first vowel resonance to this multiple of sung f0; 0 leaves every vowel body fixed",
   voiceBreathSync: "Makes vocal breath noise pulse at the sung fundamental, coupling breathiness to glottal cycles instead of using only steady noise",
   excitationHuman: "The player: one seeded fluctuation per note wobbles bow pressure / breath support, moving the whole spectrum together (brighter when pushed), with bow slips or breath bursts. Struck/plucked notes get per-note velocity and hardness jitter instead. 0 = machine",
   partialTransfer: "Sympathetic resonance: energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Inharmonicity detunes pairs out of resonance, weakening the transfer — exactly like real sympathetic strings",
@@ -9097,7 +9099,7 @@ function renderExplore() {
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
     "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","windBreathLevel","pianoActionNoiseLevel","envelopeAnomalyLevel","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetWanderCents","onsetWanderSettlePeriods","bowScratchLevel","bowNoiseLevel","bowNoiseVelocityExponent","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
-    "dynamicBlare","decaySecondStage","decaySecondRatio","releaseDamping","polarisationAmount","polarisationSplitCents","polarisationDecayRatio","glottalTilt","singerFormantAmount","voiceBreathSync","resonatorClass",
+    "dynamicBlare","decaySecondStage","decaySecondRatio","releaseDamping","polarisationAmount","polarisationSplitCents","polarisationDecayRatio","glottalTilt","singerFormantAmount","singerFormantHz","formantTuneToF0","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF1Level","formantF2Level","formantF3Level","formantF4Level","formantF5Level","formantBandwidth","bodyArticulation",
@@ -14531,6 +14533,8 @@ function chInspectorHTML(p) {
         <div class="controls-grid">
           ${controlRow("glottalTilt", "Glottal tilt", p.glottalTilt ?? 0, -1, 1, 0.01)}
           ${controlRow("singerFormantAmount", "Singer formant", p.singerFormantAmount ?? 0, 0, 1.5, 0.01)}
+          ${controlRow("singerFormantHz", "Singer centre Hz", p.singerFormantHz ?? 3000, 1800, 3600, 10)}
+          ${controlRow("formantTuneToF0", "F1 / f0 tuning", p.formantTuneToF0 ?? 0, 0, 1.2, 0.01)}
           ${controlRow("voiceBreathSync", "Cyclic breath", p.voiceBreathSync ?? 0, 0, 1, 0.01)}
         </div>
       </details>

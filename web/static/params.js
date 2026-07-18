@@ -517,6 +517,9 @@ export const DEFAULTS = {
   decaySecondRatio: 1,
   glottalTilt: 0,
   singerFormantAmount: 0,
+  // A-VOICE-01/02: omitted/neutral values retain the former fixed body.
+  singerFormantHz: 3000,
+  formantTuneToF0: 0,
   voiceBreathSync: 0,
   partialTransfer: 0.15,
   bodyType: "auto",
