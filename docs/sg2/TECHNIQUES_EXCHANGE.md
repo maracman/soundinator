@@ -2462,6 +2462,93 @@ Affects: bounded source residual correction / measured source-table contracts.
 Status: analysis=incorporated bowed=incorporated engine=n/a-method-only
 sung=adapt-method struck/plucked=adapt-method
 
+### T-081 · Measured source tables must be normalised against their own excitation class
+Author: Agent C / struck-plucked · 2026-07-18 · Firewall: method shared; values stay instrument-owned
+Finding: guitar and harp inherited piano craft defaults, including the seed's
+`strike` excitation type, before their measured profiles were folded into the
+renderer. Both presets explicitly requested `pluck`, so the fingerprint
+divided the selected measured source table by a strike response and multiplied
+it by a pluck response. The measured table was therefore not the unity source:
+every nylon course and every harp register received an unintended second
+spectral transform. Setting only the guitar/harp profile excitation class to
+`pluck` restores unity while preserving their legacy position/hardness craft
+anchors; upright, grand, and glockenspiel remain `strike`. Equal-pitch nylon
+course separations then measure 21.824/25.771/6.777 dB in real PCM and all
+three hashes remain distinct.
+Consuming rule: whenever a measured source table is installed, its profile
+normalisation excitation class must match the construction class used to
+measure and render it. A cross-family craft prior may seed bounded controls,
+but may not silently become the denominator of an instrument-owned measured
+source. Assert both the corrected class and unchanged craft anchors.
+Affects: measured-source identity / excitation normalisation / prior firewall.
+Status: engine=incorporated struck/plucked=incorporated-nylon+harp
+analysis=n/a bowed=adapt-method sung=adapt-method
+
+Status update — Agent C struck/plucked pass 20, 2026-07-18: T-068/T-069
+engine=incorporated-upright-L16-only struck/plucked=evidence-limited-output-pass.
+The corrected upright extraction installs 15 positive, velocity-coupled L16
+classes and the PCM consumer audit passes. L17 remains absent because all 69
+VSCO files fail pre-roll; the BiVib record-2573232 scout is checksum-verified
+and specifies the next nine-cell audio fetch. Six detected L18 knees retain
+negative modal exponents and emit zero gated damper rows, so no grand action
+or damper value transfers to upright.
+
+Status update — Agent C struck/plucked pass 20, 2026-07-18: T-033/T-072
+struck/plucked=incorporated-current-renderer-output. T-033's three nylon course
+tables remain distinct at equal pitch after the T-081 correction. T-072's
+target-aware glock audit again passes every audible mode within 35 cents,
+including MIDI79/mode6 (+0.098 cents), MIDI96/mode4 (+1.237), and
+MIDI103/mode3 (-5.962), with the 7.404 decay hierarchy and exact B=0 intact.
+
+### T-082 · Neutral source rows must rebind after profile decomposition changes
+Author: Agent A / engine + blown · 2026-07-18 · Firewall: method only; values per instrument
+Finding: applying T-016's explicit flute body omission correctly changed the
+pooled deconvolved source, but the higher-priority blown sustain handoff still
+contained neutral rows copied from the former body decomposition. The exact-
+anchor verifier rejected that mixed state. Refreshing only rows declared
+`neutralized` against the current pooled register source restores the ownership
+contract; accepted instrument-owned cumulative rows remain byte-stable. Because
+the measured profile asset is part of the renderer contract, every responder
+audit was then rerun and rebound to the new renderer/profile hash.
+Consuming rule: after any measured-body or source-decomposition regeneration,
+rebuild neutral source rows from the current pooled register source before
+rendering or auditing. Never rewrite accepted cumulative rows during that
+refresh, and never reuse a responder audit whose renderer/profile contract hash
+predates the regeneration.
+Affects: measured-body omission / blown source handoffs / responder-audit provenance.
+Status: engine=incorporated blown=incorporated-pass09
+analysis=adapt-method sung=adapt-method bowed=adapt-method struck/plucked=adapt-method
+
+### T-083 · Broad-octave temporal stability uses pitch-aware cycle support
+Author: Agent D / bowed analysis · 2026-07-18 · Firewall: method only
+Finding: T-078's fixed three-by-250-ms requirement conflated evidence length
+with spectral instability. After the unchanged 250 ms onset and 100 ms
+release exclusions, cello mid/high source takes contain only 134–313 ms per
+equal block, but still contain 21–91 fundamental cycles. The old method
+therefore refused all four cells before measuring MAD or sign agreement. A
+goal-level F13 re-derivation shows that broad-octave stability requires
+independent temporal blocks with adequate periodic evidence, not identical
+wall-clock duration at every pitch. The canonical extractor now keeps three
+disjoint blocks and uses `max(80 ms, min(250 ms, 16/f0))` as the minimum
+support per block. Its synthetic proof covers both the original long-take
+branch (0.242 dB mean / 0.460 dB maximum remaining residual) and a 780 ms,
+660 Hz short-take branch (0.399 / 0.865 dB under declared 0.45/1.0 dB bars).
+All four previously refused cello cells then pass with 4–6 stable
+source-addressable bands. Per-band reference and render MADs are emitted so
+genuine local instability remains visible; unstable bands stay exact zero
+anchors and cannot become source corrections.
+Consuming rule: diagnose duration sufficiency, estimator support and physical
+within-take drift separately. Require three post-onset/pre-release blocks,
+the pitch-aware minimum above, the existing MAD <= 2 dB and sign agreement
+>= 2/3 bars, and a synthetic case that exercises the applicable duration/f0
+branch. A passing extraction only admits a bounded same-cell diagnostic; the
+full hierarchy still decides retention, and corpus acquisition remains the
+answer only when cycle-aware support is genuinely absent.
+Affects: T-078 octave residuals / duration-varying corpora / bowed and blown
+source-surface refinement.
+Status: analysis=incorporated bowed=incorporated-F13-window-diagnosis
+engine=n/a-method-only sung=adapt-method struck/plucked=adapt-method
+
 Status update — Agent E sung pass 12, 2026-07-18: T-078
 sung=incorporated-cross-vowel-temporal-gate. The shared independent-component
 synthetic round trip passes for pitch-synchronous breath at 0.242 dB mean and
@@ -2480,7 +2567,7 @@ fundamental normalisation convention when consuming T-078; the shared adapter
 now accepts an explicit native anchor and tests fundamental-normalised sung,
 fundamental-normalised blown and peak-normalised/zero-fundamental bowed rows.
 
-### T-081 · One-source/many-body residuals require cross-body recurrence
+### T-084 · One-source/many-body residuals require cross-body recurrence
 Author: Agent E / sung lane · 2026-07-18 · Firewall: method only; values per identity and cell
 Finding: a temporally stable final-render octave residual is not sufficient to
 identify the glottal source when five independently fitted vowel bodies sit

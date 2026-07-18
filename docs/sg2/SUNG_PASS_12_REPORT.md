@@ -7,7 +7,8 @@ Exit state: §2.5 state **(a)** — bass records a measurable hierarchy-first cu
 
 ## Outcome
 
-Pass 12 re-synchronised from shared head `a391375`, evaluated the shared T-078
+Pass 12 re-synchronised from shared head `c7ae812` (including the audible
+renderer changes through `34f14c7`), evaluated the shared T-078
 post-source/post-independent-component octave residual on every adult sung
 source cell, and added the missing one-source/many-body firewall. A residual is
 now source-addressable only after it passes both three-block temporal stability
@@ -21,17 +22,17 @@ The audit classifies 16/34 cells fit-limited by an existing source row and
 
 | Voice | Fit-limited | Law-limited | Hierarchy-nearest bounded probe | Verdict |
 |---|---:|---:|---|---|
-| Tenor | 5/9 | 4/9 | high/pp | reject — partial tier 3.255735 -> 3.258110 |
-| Bass | 5/9 | 4/9 | mid/mf | **promote** — partial tier 3.738461 -> 3.636226 |
-| Mezzo | 3/9 | 6/9 | high/mf | reject — partial tier 2.490917 -> 2.493306 |
-| Soprano | 3/7 | 4/7 | mid/pp | reject — partial tier 6.305642 -> 6.308318 |
+| Tenor | 5/9 | 4/9 | high/pp | reject — partial tier 3.255731 -> 3.258117 |
+| Bass | 5/9 | 4/9 | mid/mf | **promote** — partial tier 3.738466 -> 3.636217 |
+| Mezzo | 3/9 | 6/9 | high/mf | reject — partial tier 2.490944 -> 2.493301 |
+| Soprano | 3/7 | 4/7 | mid/pp | reject — partial tier 6.305639 -> 6.308310 |
 
 All probes use gain 0.5 with a 3 dB cap, start from the selected pass-11
 cumulative `r2` surface, change exactly one existing source row, retain the
 fundamental normalisation anchor, and leave every body, breath, consonant and
-Human field unchanged. Bass mid/mf also improves mel 2.293797 -> 2.290857,
-attack 6.121801 -> 6.118238 and band balance 2.278655 -> 2.243005. Its full-grid
-composite improves 3.437700 -> **3.432146**. Tenor, mezzo and soprano improve
+Human field unchanged. Bass mid/mf also improves mel 2.293827 -> 2.290868 and
+band balance 2.278654 -> 2.242984. Its full-grid composite improves 3.437833 ->
+**3.432158**. Tenor, mezzo and soprano improve
 some lower spectral tiers but are correctly rejected because partial identity
 is upstream.
 
@@ -46,17 +47,17 @@ leaderboard or listening-page row.
 | Voice / entry | Composite | Construction | Strict cells | Body | Vowel | Human | Overall |
 |---|---:|---|---|---|---|---|---|
 | Tenor legacy | **3.683254** | FAIL 10/11 | FAIL 0 pass / 36 fail / 0 missing | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Tenor incumbent | 3.757606 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Tenor T-078 | 3.757844 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL — rejected** |
+| Tenor incumbent | 3.757798 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Tenor T-078 | 3.757964 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL — rejected** |
 | Soprano legacy | 4.464968 | FAIL 9/10 | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Soprano incumbent | **4.101324** | **PASS 10/10** | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Soprano T-078 | 4.101580 | **PASS 10/10** | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL — rejected** |
+| Soprano incumbent | **4.101228** | **PASS 10/10** | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Soprano T-078 | 4.101497 | **PASS 10/10** | FAIL 0 / 27 / 1 | PASS 10/10 | PASS 10/10 | masked | **FAIL — rejected** |
 | Bass legacy | 3.436431 | FAIL 10/11 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Bass incumbent | 3.437700 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Bass T-078 | **3.432146** | **PASS 11/11** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL — interim leader** |
+| Bass incumbent | 3.437833 | **PASS 11/11** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Bass T-078 | **3.432158** | **PASS 11/11** | FAIL 0 / 36 / 0 | **PASS 10/10** | **PASS 10/10** | masked | **FAIL — interim leader** |
 | Mezzo legacy | **3.733439** | FAIL 9/10 | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Mezzo incumbent | 3.743150 | **PASS 10/10** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
-| Mezzo T-078 | 3.741613 | **PASS 10/10** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL — rejected** |
+| Mezzo incumbent | 3.743206 | **PASS 10/10** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL** |
+| Mezzo T-078 | 3.741681 | **PASS 10/10** | FAIL 0 / 36 / 0 | PASS 10/10 | PASS 10/10 | masked | **FAIL — rejected** |
 
 Soprano high/p band balance remains missing evidence. No preset is shipped,
 frozen or described as identity-stable.
@@ -73,7 +74,7 @@ The 18 law-limited cells do not repeat across vowel bodies strongly enough to
 identify the glottal source. They remain decomposition/model-law findings: no
 source widening, body refit or room component is permitted. For the rejected
 fit-limited probes, the next upstream rung is same-cell harmonic-rank residual
-fitting from the selected surface, not a larger octave correction. T-081 records
+fitting from the selected surface, not a larger octave correction. T-084 records
 this distinction in the live exchange.
 
 ## §2.5c identity-clearing check
@@ -87,13 +88,16 @@ that clears masking.
 
 ## Controllability, prior and durable artifacts
 
-Renderer contract remains `de30a803305d06c4`. The four identity audits remain
+Renderer contract is rebound to `21e9ce780a8ee56a`. The four identity audits remain
 clean, repeat-stable and objective/manifest-bound; the source table remains a
-responder for partial, mel and band balance. Pass-end artifact seals:
+responder for partial, mel and band balance. Bass uses the stable
+incumbent-centred identity audit because the candidate-centred repeat probe was
+zero-weighted; the promoted candidate is scored against the same unchanged
+objective and manifest. Pass-end semantic seals:
 
-- gate snapshot: `33b3ec7abad6dbd4bc7148c00603c0363c80d8d74a5c5b03b9f8a56766324576`;
-- controllability table: `858a550486f59e50fc3592ec9bfa6e18442dac0e1fffe8dabb9d873131d042ec`;
-- live exchange source: `7e76423c6b091c234e264ac31eae9eb43b56e59f411735709bc344cc3974d8d8`.
+- gate snapshot: `47a626fe527b39b30d74f1420d22cdf5285c1e4766e87000de1ed5c38355926b`;
+- controllability table: `c21bebc7cab55d4bf3cd0e74f0eca0488c2ae089e8446af7281bc316517fd6c5`;
+- live exchange source: `e934039ad6c67ebd3052df4ed7fc118b107c33b6c769a6f54725ecca2d589b2b`.
 
 Leaderboard and `best.json` backstops are copied under
 `sg2-data/state/voice-*`. Tenor, soprano and mezzo retain the pass-11 leader;
@@ -108,13 +112,14 @@ Pass-end verification found that selected sung audition manifests bypassed the
 normal fresh-seed path, so a normal page build could reuse stale SHIP audio (or
 the bass scoring-only FIT comparator). The builder now ignores selected
 audition audio on normal builds and reuses it only under explicit `--cached`.
-The same-pass test proves both branches. A full 16-instrument rebuild then
-regenerated every row; voice-bass resolves the promoted parameter bundle and
-all four sung families use fresh `listen-live` PCM with build seed 1784349061.
+The same-pass test proves both branches. The final full 16-instrument rebuild
+regenerates every row after landing; voice-bass resolves the promoted parameter
+bundle and all four sung families use fresh `listen-live` PCM. The exact build
+seed and engine commit are retained in each row's durable `stamp.json`.
 
 ## Verification and next work
 
-The required landing suite passes:
+The required landing suite is rerun after the final shared-head merge:
 
 - `npm test` — 11/11 pass;
 - `node scripts/verify_tone_model.mjs` — all tone-model v2 assertions pass;

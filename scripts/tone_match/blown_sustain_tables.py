@@ -54,6 +54,41 @@ def _profile_partials(profile: dict[str, Any], f0: float) -> np.ndarray:
     return a + (b - a) * amount
 
 
+def refresh_neutralized_rows(handoff: dict[str, Any], profiles: dict[str, Any],
+                             instrument: str) -> dict[str, Any]:
+    """Rebind neutral source rows after a profile-only deconvolution refresh.
+
+    Accepted rows are cumulative fitted evidence and remain immutable.  A row
+    explicitly labelled neutral, however, promises to equal the instrument's
+    current pooled register source.  T-016 can legitimately replace flute's
+    body/residual decomposition while omitting the unstable body, so carrying
+    the old v2 pooled anchor would silently keep the rejected decomposition
+    alive through the higher-priority source surface.
+    """
+    result = json.loads(json.dumps(handoff))
+    table = result.get("instruments", {}).get(instrument)
+    profile = profiles.get(instrument)
+    if not isinstance(table, dict) or not isinstance(profile, dict):
+        raise ValueError(f"missing handoff/profile for {instrument!r}")
+    changed = 0
+    for row in table.get("rows", []):
+        if not str(row.get("activationStatus", "")).startswith("neutralized"):
+            continue
+        partials = _profile_partials(profile, float(row["f0Hz"]))
+        peak = float(np.max(partials))
+        if not np.isfinite(peak) or peak <= 0:
+            raise ValueError(f"{instrument}: invalid pooled source at {row['f0Hz']}")
+        row["partials"] = [round(float(value / peak), 8) for value in partials]
+        row["neutralizedAgainst"] = "current-pooled-register-source"
+        changed += 1
+    if not changed:
+        raise ValueError(f"{instrument}: no neutralized rows to refresh")
+    result["evidenceSha256"] = hashlib.sha256(json.dumps(
+        {key: value for key, value in result.items() if key != "evidenceSha256"},
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return result
+
+
 def fit_instrument(instrument: str, references_path: Path,
                    jobs_path: Path,
                    accepted_cells: set[tuple[str, str]]) -> dict[str, Any]:

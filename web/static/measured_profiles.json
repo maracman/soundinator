@@ -31914,7 +31914,7 @@
      "left": "BbClar.pp.D3B3.aiff",
      "right": "phil.clarinet_Fs3_15_pianissimo_normal.mp3",
      "humanDelta": {
-      "excitationPosition": NaN,
+      "excitationPosition": null,
       "vibratoRateHz": 0.0,
       "vibratoDepthCents": 0.0,
       "vibratoOnsetDelayMs": 0.0,
@@ -32372,7 +32372,7 @@
      "left": "BbClar.pp.C5B5.aiff",
      "right": "phil.clarinet_C5_15_pianissimo_normal.mp3",
      "humanDelta": {
-      "excitationPosition": NaN,
+      "excitationPosition": null,
       "vibratoRateHz": 0.0,
       "vibratoDepthCents": 0.0,
       "vibratoOnsetDelayMs": 0.0,
@@ -33378,139 +33378,135 @@
     "spread": 0.8
    },
    {
-    "amp": 0.26021,
-    "spread": 0.734
+    "amp": 0.25389,
+    "spread": 0.754
    },
    {
-    "amp": 0.1423,
-    "spread": 0.622
+    "amp": 0.13226,
+    "spread": 0.638
    },
    {
-    "amp": 0.0514,
+    "amp": 0.03811,
     "spread": 0.8
    },
    {
-    "amp": 0.03977,
+    "amp": 0.02463,
     "spread": 0.8
    },
    {
-    "amp": 0.03323,
+    "amp": 0.01933,
     "spread": 0.8
    },
    {
-    "amp": 0.02064,
+    "amp": 0.01246,
     "spread": 0.8
    },
    {
-    "amp": 0.02121,
+    "amp": 0.01124,
     "spread": 0.8
    },
    {
-    "amp": 0.01801,
+    "amp": 0.00948,
     "spread": 0.8
    },
    {
-    "amp": 0.0148,
-    "spread": 0.786
-   },
-   {
-    "amp": 0.01415,
+    "amp": 0.0076,
     "spread": 0.8
    },
    {
-    "amp": 0.0175,
-    "spread": 0.619
+    "amp": 0.00729,
+    "spread": 0.8
    },
    {
-    "amp": 0.01177,
-    "spread": 0.59
+    "amp": 0.00819,
+    "spread": 0.709
    },
    {
-    "amp": 0.01016,
-    "spread": 0.595
+    "amp": 0.00705,
+    "spread": 0.654
    },
    {
-    "amp": 0.0096,
-    "spread": 0.577
+    "amp": 0.00557,
+    "spread": 0.613
    },
    {
-    "amp": 0.01191,
-    "spread": 0.5
+    "amp": 0.00506,
+    "spread": 0.568
    },
    {
-    "amp": 0.00874,
-    "spread": 0.622
+    "amp": 0.00471,
+    "spread": 0.545
    },
    {
-    "amp": 0.00958,
-    "spread": 0.54
+    "amp": 0.00314,
+    "spread": 0.629
    },
    {
-    "amp": 0.01291,
-    "spread": 0.662
+    "amp": 0.00386,
+    "spread": 0.585
    },
    {
-    "amp": 0.01067,
-    "spread": 0.58
+    "amp": 0.00502,
+    "spread": 0.669
    },
    {
-    "amp": 0.0111,
-    "spread": 0.702
+    "amp": 0.00603,
+    "spread": 0.625
    },
    {
-    "amp": 0.00555,
-    "spread": 0.62
+    "amp": 0.00577,
+    "spread": 0.709
    },
    {
-    "amp": 0.00969,
-    "spread": 0.742
+    "amp": 0.00226,
+    "spread": 0.665
    },
    {
-    "amp": 0.01455,
-    "spread": 0.66
+    "amp": 0.00677,
+    "spread": 0.749
    },
    {
-    "amp": 0.00834,
-    "spread": 0.782
+    "amp": 0.0056,
+    "spread": 0.705
    },
    {
-    "amp": 0.00654,
-    "spread": 0.7
+    "amp": 0.00374,
+    "spread": 0.789
    },
    {
-    "amp": 0.00963,
+    "amp": 0.00314,
+    "spread": 0.745
+   },
+   {
+    "amp": 0.00371,
     "spread": 0.8
    },
    {
     "amp": 0.0,
-    "spread": 0.74
-   },
-   {
-    "amp": 0.0,
-    "spread": 0.8
-   },
-   {
-    "amp": 0.00851,
-    "spread": 0.78
-   },
-   {
-    "amp": 0.00512,
-    "spread": 0.8
+    "spread": 0.785
    },
    {
     "amp": 0.0,
     "spread": 0.8
    },
    {
-    "amp": 0.0,
+    "amp": 0.00327,
     "spread": 0.8
    },
    {
-    "amp": 0.0,
+    "amp": 0.00224,
     "spread": 0.8
    },
    {
-    "amp": 0.0,
+    "amp": 0.00213,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00067,
+    "spread": 0.8
+   },
+   {
+    "amp": 0.00212,
     "spread": 0.8
    },
    {
@@ -33522,7 +33518,7 @@
     "spread": 0.8
    },
    {
-    "amp": 0.0,
+    "amp": 3e-05,
     "spread": 0.8
    },
    {
@@ -33610,7 +33606,7 @@
     "spread": 0.8
    },
    {
-    "amp": 0.0,
+    "amp": 0.00067,
     "spread": 0.8
    },
    {
@@ -33626,7 +33622,11 @@
     "spread": 0.8
    },
    {
-    "amp": 0.0,
+    "amp": 0.00077,
+    "spread": 0.8
+   },
+   {
+    "amp": 7e-05,
     "spread": 0.8
    }
   ],
@@ -34145,120 +34145,112 @@
   ],
   "partialsByRegister": [
    {
-    "f0": 332.612,
-    "partialB": 9.6e-07,
+    "f0": 328.206,
+    "partialB": 9e-07,
     "partials": [
      {
       "amp": 1.0,
       "spread": 0.8
      },
      {
-      "amp": 0.73771,
-      "spread": 0.734
+      "amp": 0.84329,
+      "spread": 0.754
      },
      {
-      "amp": 0.25545,
-      "spread": 0.622
+      "amp": 0.48914,
+      "spread": 0.638
      },
      {
-      "amp": 0.08312,
+      "amp": 0.19077,
       "spread": 0.8
      },
      {
-      "amp": 0.06251,
+      "amp": 0.14381,
       "spread": 0.8
      },
      {
-      "amp": 0.0804,
+      "amp": 0.15499,
       "spread": 0.8
      },
      {
-      "amp": 0.04644,
+      "amp": 0.05928,
       "spread": 0.8
      },
      {
-      "amp": 0.03196,
+      "amp": 0.04643,
       "spread": 0.8
      },
      {
-      "amp": 0.0414,
+      "amp": 0.035,
       "spread": 0.8
      },
      {
-      "amp": 0.02655,
-      "spread": 0.786
-     },
-     {
-      "amp": 0.02321,
+      "amp": 0.02362,
       "spread": 0.8
      },
      {
-      "amp": 0.02449,
-      "spread": 0.619
+      "amp": 0.0165,
+      "spread": 0.8
      },
      {
-      "amp": 0.01584,
-      "spread": 0.59
+      "amp": 0.01921,
+      "spread": 0.709
      },
      {
-      "amp": 0.01672,
-      "spread": 0.595
+      "amp": 0.01175,
+      "spread": 0.654
      },
      {
-      "amp": 0.01636,
-      "spread": 0.577
+      "amp": 0.00987,
+      "spread": 0.613
      },
      {
-      "amp": 0.01658,
-      "spread": 0.5
+      "amp": 0.00971,
+      "spread": 0.568
      },
      {
-      "amp": 0.01106,
-      "spread": 0.622
+      "amp": 0.00816,
+      "spread": 0.545
      },
      {
-      "amp": 0.01718,
-      "spread": 0.54
+      "amp": 0.00648,
+      "spread": 0.629
      },
      {
-      "amp": 0.01291,
-      "spread": 0.662
+      "amp": 0.00842,
+      "spread": 0.585
      },
      {
-      "amp": 0.01666,
-      "spread": 0.58
+      "amp": 0.00928,
+      "spread": 0.669
      },
      {
-      "amp": 0.01514,
-      "spread": 0.702
+      "amp": 0.01016,
+      "spread": 0.625
+     },
+     {
+      "amp": 0.00861,
+      "spread": 0.709
      },
      {
       "amp": 0.0,
-      "spread": 0.62
+      "spread": 0.665
      },
      {
-      "amp": 0.00969,
-      "spread": 0.742
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.66
-     },
-     {
-      "amp": 0.00834,
-      "spread": 0.782
-     },
-     {
-      "amp": 0.00654,
-      "spread": 0.7
+      "amp": 0.0081,
+      "spread": 0.749
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.705
      },
      {
-      "amp": 0.0,
-      "spread": 0.74
+      "amp": 0.00456,
+      "spread": 0.789
+     },
+     {
+      "amp": 0.00376,
+      "spread": 0.745
      },
      {
       "amp": 0.0,
@@ -34266,14 +34258,18 @@
      },
      {
       "amp": 0.0,
-      "spread": 0.78
+      "spread": 0.785
      },
      {
-      "amp": 0.00512,
+      "amp": 0.0,
       "spread": 0.8
      },
      {
       "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00368,
       "spread": 0.8
      },
      {
@@ -34294,6 +34290,272 @@
      },
      {
       "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0008,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00093,
+      "spread": 0.8
+     },
+     {
+      "amp": 8e-05,
+      "spread": 0.8
+     }
+    ]
+   },
+   {
+    "f0": 634.374,
+    "partialB": 1.19e-06,
+    "partials": [
+     {
+      "amp": 1.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.36807,
+      "spread": 0.754
+     },
+     {
+      "amp": 0.25914,
+      "spread": 0.638
+     },
+     {
+      "amp": 0.04118,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.02417,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.02064,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.01206,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0114,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00903,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00552,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00648,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00518,
+      "spread": 0.709
+     },
+     {
+      "amp": 0.00476,
+      "spread": 0.654
+     },
+     {
+      "amp": 0.00469,
+      "spread": 0.613
+     },
+     {
+      "amp": 0.0038,
+      "spread": 0.568
+     },
+     {
+      "amp": 0.00365,
+      "spread": 0.545
+     },
+     {
+      "amp": 0.00261,
+      "spread": 0.629
+     },
+     {
+      "amp": 0.00283,
+      "spread": 0.585
+     },
+     {
+      "amp": 0.00502,
+      "spread": 0.669
+     },
+     {
+      "amp": 0.00454,
+      "spread": 0.625
+     },
+     {
+      "amp": 0.00564,
+      "spread": 0.709
+     },
+     {
+      "amp": 0.00226,
+      "spread": 0.665
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.749
+     },
+     {
+      "amp": 0.0056,
+      "spread": 0.705
+     },
+     {
+      "amp": 0.00368,
+      "spread": 0.789
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.745
+     },
+     {
+      "amp": 0.00371,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.785
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00327,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00141,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00213,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00067,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.00212,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 0.0,
+      "spread": 0.8
+     },
+     {
+      "amp": 3e-05,
       "spread": 0.8
      },
      {
@@ -34407,204 +34669,112 @@
     ]
    },
    {
-    "f0": 641.601,
-    "partialB": 1.05e-06,
+    "f0": 1330.384,
+    "partialB": 6e-08,
     "partials": [
      {
       "amp": 1.0,
       "spread": 0.8
      },
      {
-      "amp": 0.20427,
-      "spread": 0.734
+      "amp": 0.10675,
+      "spread": 0.754
      },
      {
-      "amp": 0.1499,
-      "spread": 0.622
+      "amp": 0.04213,
+      "spread": 0.638
      },
      {
-      "amp": 0.04183,
+      "amp": 0.01605,
       "spread": 0.8
-     },
-     {
-      "amp": 0.0394,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.03305,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0202,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.02452,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.01708,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0126,
-      "spread": 0.786
-     },
-     {
-      "amp": 0.01541,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.01136,
-      "spread": 0.619
-     },
-     {
-      "amp": 0.00957,
-      "spread": 0.59
-     },
-     {
-      "amp": 0.00877,
-      "spread": 0.595
-     },
-     {
-      "amp": 0.00711,
-      "spread": 0.577
-     },
-     {
-      "amp": 0.00751,
-      "spread": 0.5
-     },
-     {
-      "amp": 0.00454,
-      "spread": 0.622
-     },
-     {
-      "amp": 0.00504,
-      "spread": 0.54
-     },
-     {
-      "amp": 0.0099,
-      "spread": 0.662
-     },
-     {
-      "amp": 0.00823,
-      "spread": 0.58
-     },
-     {
-      "amp": 0.00707,
-      "spread": 0.702
-     },
-     {
-      "amp": 0.00555,
-      "spread": 0.62
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.742
-     },
-     {
-      "amp": 0.01455,
-      "spread": 0.66
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.782
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.7
      },
      {
       "amp": 0.00963,
       "spread": 0.8
      },
      {
-      "amp": 0.0,
-      "spread": 0.74
-     },
-     {
-      "amp": 0.0,
+      "amp": 0.00646,
       "spread": 0.8
      },
      {
-      "amp": 0.00851,
-      "spread": 0.78
-     },
-     {
-      "amp": 0.0,
+      "amp": 0.006,
       "spread": 0.8
      },
      {
-      "amp": 0.0,
+      "amp": 0.00509,
       "spread": 0.8
      },
      {
-      "amp": 0.0,
+      "amp": 0.00479,
       "spread": 0.8
      },
      {
-      "amp": 0.0,
+      "amp": 0.0042,
       "spread": 0.8
      },
      {
-      "amp": 0.0,
+      "amp": 0.00451,
       "spread": 0.8
      },
      {
-      "amp": 0.0,
-      "spread": 0.8
+      "amp": 0.00436,
+      "spread": 0.709
+     },
+     {
+      "amp": 0.00286,
+      "spread": 0.654
+     },
+     {
+      "amp": 0.00248,
+      "spread": 0.613
+     },
+     {
+      "amp": 0.00293,
+      "spread": 0.568
+     },
+     {
+      "amp": 0.00146,
+      "spread": 0.545
+     },
+     {
+      "amp": 0.00079,
+      "spread": 0.629
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.585
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.669
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.625
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.709
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.665
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.749
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.705
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.789
      },
      {
       "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.745
      },
      {
       "amp": 0.0,
@@ -34612,7 +34782,7 @@
      },
      {
       "amp": 0.0,
-      "spread": 0.8
+      "spread": 0.785
      },
      {
       "amp": 0.0,
@@ -34621,176 +34791,6 @@
      {
       "amp": 0.0,
       "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     }
-    ]
-   },
-   {
-    "f0": 1349.3,
-    "partialB": 0.0,
-    "partials": [
-     {
-      "amp": 1.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.17924,
-      "spread": 0.734
-     },
-     {
-      "amp": 0.12082,
-      "spread": 0.622
-     },
-     {
-      "amp": 0.05082,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.03192,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.02497,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.01994,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.01481,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.01238,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.01088,
-      "spread": 0.786
-     },
-     {
-      "amp": 0.01148,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.01021,
-      "spread": 0.619
-     },
-     {
-      "amp": 0.0061,
-      "spread": 0.59
-     },
-     {
-      "amp": 0.00523,
-      "spread": 0.595
-     },
-     {
-      "amp": 0.00586,
-      "spread": 0.577
-     },
-     {
-      "amp": 0.00317,
-      "spread": 0.5
-     },
-     {
-      "amp": 0.00317,
-      "spread": 0.622
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.54
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.662
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.58
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.702
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.62
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.742
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.66
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.782
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.7
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.74
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.8
-     },
-     {
-      "amp": 0.0,
-      "spread": 0.78
      },
      {
       "amp": 0.0,
@@ -34931,87 +34931,23 @@
     ]
    }
   ],
-  "resonances": [
-   {
-    "freq": 467.6,
-    "gain": 0.1492,
-    "width": 0.1805
-   },
-   {
-    "freq": 587.1,
-    "gain": 0.155,
-    "width": 0.1805
-   },
-   {
-    "freq": 737.1,
-    "gain": 0.5127,
-    "width": 0.1805
-   },
-   {
-    "freq": 925.3,
-    "gain": 0.6949,
-    "width": 0.1805
-   },
-   {
-    "freq": 1161.7,
-    "gain": 0.95,
-    "width": 0.1805
-   },
-   {
-    "freq": 1458.4,
-    "gain": 0.9883,
-    "width": 0.1805
-   },
-   {
-    "freq": 1831.0,
-    "gain": 1.0287,
-    "width": 0.1805
-   },
-   {
-    "freq": 2298.7,
-    "gain": 0.9046,
-    "width": 0.1805
-   },
-   {
-    "freq": 2885.8,
-    "gain": 0.1206,
-    "width": 0.1805
-   },
-   {
-    "freq": 3623.0,
-    "gain": -0.3571,
-    "width": 0.1805
-   },
-   {
-    "freq": 4548.4,
-    "gain": 0.1929,
-    "width": 0.1805
-   },
-   {
-    "freq": 5710.2,
-    "gain": -0.5929,
-    "width": 0.1805
-   },
-   {
-    "freq": 7168.8,
-    "gain": -0.4881,
-    "width": 0.1805
-   },
-   {
-    "freq": 9000.0,
-    "gain": -0.4378,
-    "width": 0.1805
-   }
-  ],
+  "resonances": [],
   "resonancesFit": {
-   "method": "ensemble-rank-note-body-v2",
-   "bands": 14,
-   "points": 1125,
-   "notes": 102,
-   "widthLog2": 0.1805,
-   "splitHalfCorr": 0.825,
-   "peakHzA": 1427.5,
-   "peakHzB": 1852.1
+   "method": "ensemble-rank-note-body-v3",
+   "bands": 0,
+   "points": 1174,
+   "notes": 108,
+   "widthLog2": 0.1814,
+   "prunedUnstableBands": 2,
+   "lowestF0Hz": 246.9,
+   "reconstructionAmount": 1,
+   "bodyClampMaxDb": 0.0,
+   "reconstructionNotes": 108,
+   "splitHalfCorr": 0.865,
+   "peakHzA": 1439.0,
+   "peakHzB": 1824.3,
+   "omittedReason": "unstable-air-jet-body",
+   "roundTripShapeMaxDb": 0.0
   },
   "vowelFormants": {},
   "tailSlopeDbPerOct": -4.3,
@@ -38455,7 +38391,7 @@
      "left": "Flute.nonvib.pp.C6Bb6.aiff",
      "right": "phil.flute_C6_05_piano_normal.mp3",
      "humanDelta": {
-      "excitationPosition": NaN,
+      "excitationPosition": null,
       "vibratoRateHz": 5.183919,
       "vibratoDepthCents": 4.722174,
       "vibratoOnsetDelayMs": 46.439909,
@@ -62576,8 +62512,256 @@
      "vibrato": "nonvib",
      "roundRobin": 1
     }
-   ]
-  }
+   ],
+   "engineHandoffs": {
+    "schema": "sg2-upright-engine-handoffs-v1",
+    "l16Sha256": "a7d5b4c45c33b37e6e1457da5b1de0f59a43b8dbaa5baef130d67f34e611f707",
+    "l16Status": "measured-installed",
+    "l16AnomalyClasses": 15,
+    "l17Status": "blocked-insufficient-pre-roll",
+    "l17ScoutSha256": "338fc5b1068066ba5213adfc6a79f587f1968ee714a12e7f02516680f136f086",
+    "l17ScoutDecision": "fetch-upright-archive",
+    "l18Status": "blocked-incomplete-physical-damper-fit",
+    "l18DetectedKnees": 6,
+    "l18InstalledDamperRows": 0,
+    "constructionFirewall": "no grand-piano L17/L18 value transfer"
+   }
+  },
+  "envelopeAnomalyClasses": [
+   {
+    "id": "piano-harmonic-rank-31",
+    "home": "harmonicRank",
+    "ranks": [
+     31
+    ],
+    "notes": 4,
+    "onsetBoostDb": 6.233,
+    "excessDecayDbPerSecond": 3.746,
+    "velocitySlopeDbPerUnit": 7.557,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-32",
+    "home": "harmonicRank",
+    "ranks": [
+     32
+    ],
+    "notes": 3,
+    "onsetBoostDb": 5.544,
+    "excessDecayDbPerSecond": 4.506,
+    "velocitySlopeDbPerUnit": 6.094,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-12",
+    "home": "harmonicRank",
+    "ranks": [
+     12
+    ],
+    "notes": 5,
+    "onsetBoostDb": 4.391,
+    "excessDecayDbPerSecond": 4.548,
+    "velocitySlopeDbPerUnit": 4.333,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-30",
+    "home": "harmonicRank",
+    "ranks": [
+     30
+    ],
+    "notes": 4,
+    "onsetBoostDb": 3.799,
+    "excessDecayDbPerSecond": 3.466,
+    "velocitySlopeDbPerUnit": 10.331,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-29",
+    "home": "harmonicRank",
+    "ranks": [
+     29
+    ],
+    "notes": 4,
+    "onsetBoostDb": 3.831,
+    "excessDecayDbPerSecond": 2.844,
+    "velocitySlopeDbPerUnit": 6.528,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-11",
+    "home": "harmonicRank",
+    "ranks": [
+     11
+    ],
+    "notes": 5,
+    "onsetBoostDb": 2.607,
+    "excessDecayDbPerSecond": 12.566,
+    "velocitySlopeDbPerUnit": 5.354,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-2",
+    "home": "harmonicRank",
+    "ranks": [
+     2
+    ],
+    "notes": 7,
+    "onsetBoostDb": 3.026,
+    "excessDecayDbPerSecond": 7.024,
+    "velocitySlopeDbPerUnit": 2.533,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-harmonic-rank-15",
+    "home": "harmonicRank",
+    "ranks": [
+     15
+    ],
+    "notes": 4,
+    "onsetBoostDb": 2.973,
+    "excessDecayDbPerSecond": 6.003,
+    "velocitySlopeDbPerUnit": 4.722,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+   },
+   {
+    "id": "piano-fixed-800hz",
+    "home": "fixedHz",
+    "frequencyHz": 800.0,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 7,
+    "onsetBoostDb": 14.161,
+    "excessDecayDbPerSecond": 2.083,
+    "velocitySlopeDbPerUnit": 7.898,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   },
+   {
+    "id": "piano-fixed-713hz",
+    "home": "fixedHz",
+    "frequencyHz": 712.7189745122715,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 7,
+    "onsetBoostDb": 13.164,
+    "excessDecayDbPerSecond": 7.505,
+    "velocitySlopeDbPerUnit": 4.916,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   },
+   {
+    "id": "piano-fixed-449hz",
+    "home": "fixedHz",
+    "frequencyHz": 448.9848193237491,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 7,
+    "onsetBoostDb": 13.584,
+    "excessDecayDbPerSecond": 2.321,
+    "velocitySlopeDbPerUnit": 4.888,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   },
+   {
+    "id": "piano-fixed-566hz",
+    "home": "fixedHz",
+    "frequencyHz": 565.685424949238,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 7,
+    "onsetBoostDb": 10.562,
+    "excessDecayDbPerSecond": 5.714,
+    "velocitySlopeDbPerUnit": 4.074,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   },
+   {
+    "id": "piano-fixed-1600hz",
+    "home": "fixedHz",
+    "frequencyHz": 1600.0,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 7,
+    "onsetBoostDb": 6.893,
+    "excessDecayDbPerSecond": 10.585,
+    "velocitySlopeDbPerUnit": 4.761,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   },
+   {
+    "id": "piano-fixed-1008hz",
+    "home": "fixedHz",
+    "frequencyHz": 1007.9368399158985,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 7,
+    "onsetBoostDb": 7.169,
+    "excessDecayDbPerSecond": 7.627,
+    "velocitySlopeDbPerUnit": 8.508,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   },
+   {
+    "id": "piano-fixed-1131hz",
+    "home": "fixedHz",
+    "frequencyHz": 1131.370849898476,
+    "widthOctaves": 0.16666666666666666,
+    "notes": 7,
+    "onsetBoostDb": 6.888,
+    "excessDecayDbPerSecond": 10.255,
+    "velocitySlopeDbPerUnit": 8.436,
+    "velocityReference": 0.62,
+    "level": 1,
+    "levelControl": "envelopeAnomalyLevel",
+    "classificationPinned": true,
+    "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+   }
+  ]
  },
  "trombone": {
   "partials": [
