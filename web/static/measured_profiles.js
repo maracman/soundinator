@@ -36232,6 +36232,254 @@ export const MEASURED_PROFILES = {
       "decay": 0.25,
       "measuredBandwidthHz": 188.0,
       "measuredLevelRatio": 2.018
+    },
+    "envelopeAnomalyClasses": [
+      {
+        "id": "piano-harmonic-rank-31",
+        "home": "harmonicRank",
+        "ranks": [
+          31
+        ],
+        "notes": 4,
+        "onsetBoostDb": 6.233,
+        "excessDecayDbPerSecond": 3.746,
+        "velocitySlopeDbPerUnit": 7.557,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-harmonic-rank-32",
+        "home": "harmonicRank",
+        "ranks": [
+          32
+        ],
+        "notes": 3,
+        "onsetBoostDb": 5.544,
+        "excessDecayDbPerSecond": 4.506,
+        "velocitySlopeDbPerUnit": 6.094,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-harmonic-rank-12",
+        "home": "harmonicRank",
+        "ranks": [
+          12
+        ],
+        "notes": 5,
+        "onsetBoostDb": 4.391,
+        "excessDecayDbPerSecond": 4.548,
+        "velocitySlopeDbPerUnit": 4.333,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-harmonic-rank-30",
+        "home": "harmonicRank",
+        "ranks": [
+          30
+        ],
+        "notes": 4,
+        "onsetBoostDb": 3.799,
+        "excessDecayDbPerSecond": 3.466,
+        "velocitySlopeDbPerUnit": 10.331,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-harmonic-rank-29",
+        "home": "harmonicRank",
+        "ranks": [
+          29
+        ],
+        "notes": 4,
+        "onsetBoostDb": 3.831,
+        "excessDecayDbPerSecond": 2.844,
+        "velocitySlopeDbPerUnit": 6.528,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-harmonic-rank-11",
+        "home": "harmonicRank",
+        "ranks": [
+          11
+        ],
+        "notes": 5,
+        "onsetBoostDb": 2.607,
+        "excessDecayDbPerSecond": 12.566,
+        "velocitySlopeDbPerUnit": 5.354,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-harmonic-rank-2",
+        "home": "harmonicRank",
+        "ranks": [
+          2
+        ],
+        "notes": 7,
+        "onsetBoostDb": 3.026,
+        "excessDecayDbPerSecond": 7.024,
+        "velocitySlopeDbPerUnit": 2.533,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-harmonic-rank-15",
+        "home": "harmonicRank",
+        "ranks": [
+          15
+        ],
+        "notes": 4,
+        "onsetBoostDb": 2.973,
+        "excessDecayDbPerSecond": 6.003,
+        "velocitySlopeDbPerUnit": 4.722,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy harmonic-rank assignment"
+      },
+      {
+        "id": "piano-fixed-800hz",
+        "home": "fixedHz",
+        "frequencyHz": 800.0,
+        "widthOctaves": 0.16666666666666666,
+        "notes": 7,
+        "onsetBoostDb": 14.161,
+        "excessDecayDbPerSecond": 2.083,
+        "velocitySlopeDbPerUnit": 7.898,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+      },
+      {
+        "id": "piano-fixed-713hz",
+        "home": "fixedHz",
+        "frequencyHz": 712.7189745122715,
+        "widthOctaves": 0.16666666666666666,
+        "notes": 7,
+        "onsetBoostDb": 13.164,
+        "excessDecayDbPerSecond": 7.505,
+        "velocitySlopeDbPerUnit": 4.916,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+      },
+      {
+        "id": "piano-fixed-449hz",
+        "home": "fixedHz",
+        "frequencyHz": 448.9848193237491,
+        "widthOctaves": 0.16666666666666666,
+        "notes": 7,
+        "onsetBoostDb": 13.584,
+        "excessDecayDbPerSecond": 2.321,
+        "velocitySlopeDbPerUnit": 4.888,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+      },
+      {
+        "id": "piano-fixed-566hz",
+        "home": "fixedHz",
+        "frequencyHz": 565.685424949238,
+        "widthOctaves": 0.16666666666666666,
+        "notes": 7,
+        "onsetBoostDb": 10.562,
+        "excessDecayDbPerSecond": 5.714,
+        "velocitySlopeDbPerUnit": 4.074,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+      },
+      {
+        "id": "piano-fixed-1600hz",
+        "home": "fixedHz",
+        "frequencyHz": 1600.0,
+        "widthOctaves": 0.16666666666666666,
+        "notes": 7,
+        "onsetBoostDb": 6.893,
+        "excessDecayDbPerSecond": 10.585,
+        "velocitySlopeDbPerUnit": 4.761,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+      },
+      {
+        "id": "piano-fixed-1008hz",
+        "home": "fixedHz",
+        "frequencyHz": 1007.9368399158985,
+        "widthOctaves": 0.16666666666666666,
+        "notes": 7,
+        "onsetBoostDb": 7.169,
+        "excessDecayDbPerSecond": 7.627,
+        "velocitySlopeDbPerUnit": 8.508,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+      },
+      {
+        "id": "piano-fixed-1131hz",
+        "home": "fixedHz",
+        "frequencyHz": 1131.370849898476,
+        "widthOctaves": 0.16666666666666666,
+        "notes": 7,
+        "onsetBoostDb": 6.888,
+        "excessDecayDbPerSecond": 10.255,
+        "velocitySlopeDbPerUnit": 8.436,
+        "velocityReference": 0.62,
+        "level": 1,
+        "levelControl": "envelopeAnomalyLevel",
+        "classificationPinned": true,
+        "source": "corrected L16 piano-anatomy fixed-Hz assignment"
+      }
+    ],
+    "engineHandoffs": {
+      "schema": "sg2-upright-engine-handoffs-v1",
+      "l16Sha256": "a7d5b4c45c33b37e6e1457da5b1de0f59a43b8dbaa5baef130d67f34e611f707",
+      "l16Status": "measured-installed",
+      "l16AnomalyClasses": 15,
+      "l17Status": "blocked-insufficient-pre-roll",
+      "l17ScoutSha256": "338fc5b1068066ba5213adfc6a79f587f1968ee714a12e7f02516680f136f086",
+      "l17ScoutDecision": "fetch-upright-archive",
+      "l18Status": "blocked-incomplete-physical-damper-fit",
+      "l18DetectedKnees": 6,
+      "l18InstalledDamperRows": 0,
+      "constructionFirewall": "no grand-piano L17/L18 value transfer"
     }
   },
   "trombone": {

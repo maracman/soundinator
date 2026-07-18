@@ -1572,6 +1572,14 @@ for (const [key, seed] of Object.entries({
   };
 }
 
+// T-033/T-072: measured plucked-string tables are ratios against a pluck
+// excitation, not the piano strike seed used only for their craft defaults.
+// Keeping the excitation class aligned makes the measured table the unity
+// source instead of silently re-EQing it by strike/pluck response ratios.
+for (const key of ["guitar", "harp"]) {
+  SPECTRAL_PERFORMANCE[key].excitation.type = "pluck";
+}
+
 for (const [profileKey, performance] of Object.entries(SPECTRAL_PERFORMANCE)) {
   if (SPECTRAL_PROFILES[profileKey]) SPECTRAL_PROFILES[profileKey].performance = performance;
 }

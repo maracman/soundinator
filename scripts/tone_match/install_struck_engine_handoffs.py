@@ -121,6 +121,10 @@ def install(check_only: bool = False) -> dict:
     provenance_path = data / "samples" / "piano-grand" / "PROVENANCE.json"
     damper_reference_path = (data / "analysis" / "struck-pass18" /
                              "zenph-damper-reference.json")
+    upright_l16_path = (data / "analysis" / "struck-pass20" /
+                        "piano-upright-corrected.json")
+    upright_scout_path = (data / "acquisition" / "piano-upright" /
+                          "bivib-2573232" / "scout" / "SCOUT.json")
     l17 = _load(l17_path).get("L17", {})
     l16 = _load(l16_path).get("L16", {})
     if l17.get("status") != "measured" or l17.get("profilePinned") is not True:
@@ -149,9 +153,40 @@ def install(check_only: bool = False) -> dict:
         "undampedFromMidi": 90,
         "undampedPolicy": "natural held-string decay; never extrapolate lower-note damper contact",
     }
+    upright_artifact = _load(upright_l16_path)
+    upright_l16 = upright_artifact.get("L16", {})
+    upright_l17 = upright_artifact.get("L17", {})
+    upright_l18 = upright_artifact.get("L18", {})
+    if upright_l17.get("status") != "insufficient-pre-roll":
+        raise ValueError("upright L17 must remain blocked until pre-roll is measured")
+    if upright_l18.get("status") != "blocked-incomplete-physical-damper-fit":
+        raise ValueError("unexpected upright L18 gate status")
+    if upright_l18.get("damperByRegister"):
+        raise ValueError("upright L18 may not install ungated damper diagnostics")
+    upright = profiles["piano-upright"]
+    upright["envelopeAnomalyClasses"] = _anomaly_classes(upright_l16)
+    # Deliberately omit preOnsetComponents and damperByRegister. The source
+    # corpus cannot identify the former, while the latter failed its physical
+    # modal-fit gate. Grand-piano action and damper values are not transferable.
+    upright.setdefault("provenance", {})["engineHandoffs"] = {
+        "schema": "sg2-upright-engine-handoffs-v1",
+        "l16Sha256": _sha256(upright_l16_path),
+        "l16Status": "measured-installed",
+        "l16AnomalyClasses": len(upright["envelopeAnomalyClasses"]),
+        "l17Status": "blocked-insufficient-pre-roll",
+        "l17ScoutSha256": _sha256(upright_scout_path),
+        "l17ScoutDecision": "fetch-upright-archive",
+        "l18Status": "blocked-incomplete-physical-damper-fit",
+        "l18DetectedKnees": len(upright_l18.get("damperDetections", [])),
+        "l18InstalledDamperRows": 0,
+        "constructionFirewall": "no grand-piano L17/L18 value transfer",
+    }
     if not check_only:
         PROFILE_PATH.write_text(json.dumps(profiles, indent=1) + "\n")
-    return piano["provenance"]["engineHandoffs"]
+    return {
+        "piano": piano["provenance"]["engineHandoffs"],
+        "piano-upright": upright["provenance"]["engineHandoffs"],
+    }
 
 
 def main() -> None:

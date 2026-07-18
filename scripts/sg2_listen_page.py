@@ -151,6 +151,25 @@ def resolve_complete_struck_ship_candidate(inst):
         raise RuntimeError(f"{inst}: complete struck SHIP params are not renderable")
     return params, audit.get("label", "pass19 L16+L17+L18 (PCM verified)"), {}
 
+def resolve_evidence_limited_upright_candidate(inst):
+    """Select the PCM-verified upright anatomy without claiming L17/L18 fits."""
+    if inst != "piano-upright": return None
+    audit_path = f"{SG2}/state/{inst}/evidence-limited-anatomy-pass20.json"
+    if not os.path.exists(audit_path): return None
+    audit = json.load(open(audit_path))
+    params_path = audit.get("paramsFile")
+    required = ("l16AnomalyConsumer", "l18FreeDecayHold",
+                "l17BlockedNotInvented", "l18BlockedDamperFitNotInvented")
+    gates = audit.get("gates") or {}
+    if (not audit.get("passed") or not params_path or
+            not os.path.exists(params_path) or
+            not all(gates.get(key) is True for key in required)):
+        raise RuntimeError(f"{inst}: invalid evidence-limited anatomy audit")
+    params = unwrap(json.load(open(params_path)))
+    if not params:
+        raise RuntimeError(f"{inst}: anatomy params are not renderable")
+    return params, audit.get("label", "pass20 upright evidence-limited anatomy"), {}
+
 def baseline_params(inst, refs):
     profile = {"piano-grand": "piano", "guitar-nylon": "guitar"}.get(inst, inst)
     exc = {"violin": "bow", "cello": "bow", "harp": "pluck", "glockenspiel": "strike",
@@ -208,6 +227,7 @@ def main():
         refs = json.load(open(f"{SG2}/campaigns/{inst}/references.json"))
         params, label, audition_audio = resolve_best(inst)
         pinned_ship = (resolve_complete_struck_ship_candidate(inst) or
+                       resolve_evidence_limited_upright_candidate(inst) or
                        resolve_pinned_ship_candidate(inst))
         if pinned_ship: params, label, audition_audio = pinned_ship
         tag, style = (label, "background:#2a3d2a;color:#9fd89f") if params else \

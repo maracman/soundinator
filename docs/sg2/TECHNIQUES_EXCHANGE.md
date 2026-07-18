@@ -2431,7 +2431,76 @@ Affects: bowed source extraction / sparse measured hulls / partial, mel and band
 Status: analysis=incorporated bowed=incorporated-partial-pass
 engine=n/a sung=adapt-method struck/plucked=adapt-method
 
-### T-080 · Neutral source rows must rebind after profile decomposition changes
+Status update — Agent D bowed/analysis pass 10, 2026-07-18: T-078
+bowed=incorporated-post-bow-temporal-gate. The shared extractor now labels
+the independent component class and passed a harmonic+independent-bow
+synthetic recovery at 0.242 dB mean / 0.460 dB maximum residual. All five
+violin cells and cello low/pp + low/ff passed the three-block temporal gate;
+cello mid/high refused extraction because their active sustains cannot supply
+three 250 ms post-onset/pre-release blocks. Gain-one, 3 dB-capped same-cell
+probes keep body, independent bow component and Human controls fixed. Violin
+retains three partial PASS cells but still fails their mel/band bars; cello
+retains only low/ff partial PASS and trails its pass-09 incumbent. Current
+matched-take audits remain 0/14 and 0/15 good, so neither §2.5c decomposition
+was rerun and both verdicts remain `INCONCLUSIVE-MASKED`.
+
+### T-080 · Residual source correction preserves the surface's native normalisation anchor
+Author: Agent D / bowed analysis · 2026-07-18 · Firewall: method only
+Finding: T-078's blown source rows are fundamental-normalised, but measured
+bowed source rows are peak-normalised and may legitimately carry a zero
+fundamental with audible upper ranks. Reusing fundamental normalisation on
+those rows turned a nominal 3 dB residual cap into 7–24 dB effective shifts
+and rejected a valid high/pp row. The correction must retain absent harmonics
+at zero and restore the source contract's own anchor: fundamental for the
+existing blown surface, row peak for bowed. Synthetic/consumer tests now
+cover both conventions and a zero-fundamental bowed row.
+Consuming rule: a render-domain residual method may change shape only; it
+must declare and preserve the selected surface's normalisation convention,
+must not activate missing ranks, and must audit the effective post-anchor
+shape delta before the candidate is scored.
+Affects: bounded source residual correction / measured source-table contracts.
+Status: analysis=incorporated bowed=incorporated engine=n/a-method-only
+sung=adapt-method struck/plucked=adapt-method
+
+### T-081 · Measured source tables must be normalised against their own excitation class
+Author: Agent C / struck-plucked · 2026-07-18 · Firewall: method shared; values stay instrument-owned
+Finding: guitar and harp inherited piano craft defaults, including the seed's
+`strike` excitation type, before their measured profiles were folded into the
+renderer. Both presets explicitly requested `pluck`, so the fingerprint
+divided the selected measured source table by a strike response and multiplied
+it by a pluck response. The measured table was therefore not the unity source:
+every nylon course and every harp register received an unintended second
+spectral transform. Setting only the guitar/harp profile excitation class to
+`pluck` restores unity while preserving their legacy position/hardness craft
+anchors; upright, grand, and glockenspiel remain `strike`. Equal-pitch nylon
+course separations then measure 21.824/25.771/6.777 dB in real PCM and all
+three hashes remain distinct.
+Consuming rule: whenever a measured source table is installed, its profile
+normalisation excitation class must match the construction class used to
+measure and render it. A cross-family craft prior may seed bounded controls,
+but may not silently become the denominator of an instrument-owned measured
+source. Assert both the corrected class and unchanged craft anchors.
+Affects: measured-source identity / excitation normalisation / prior firewall.
+Status: engine=incorporated struck/plucked=incorporated-nylon+harp
+analysis=n/a bowed=adapt-method sung=adapt-method
+
+Status update — Agent C struck/plucked pass 20, 2026-07-18: T-068/T-069
+engine=incorporated-upright-L16-only struck/plucked=evidence-limited-output-pass.
+The corrected upright extraction installs 15 positive, velocity-coupled L16
+classes and the PCM consumer audit passes. L17 remains absent because all 69
+VSCO files fail pre-roll; the BiVib record-2573232 scout is checksum-verified
+and specifies the next nine-cell audio fetch. Six detected L18 knees retain
+negative modal exponents and emit zero gated damper rows, so no grand action
+or damper value transfers to upright.
+
+Status update — Agent C struck/plucked pass 20, 2026-07-18: T-033/T-072
+struck/plucked=incorporated-current-renderer-output. T-033's three nylon course
+tables remain distinct at equal pitch after the T-081 correction. T-072's
+target-aware glock audit again passes every audible mode within 35 cents,
+including MIDI79/mode6 (+0.098 cents), MIDI96/mode4 (+1.237), and
+MIDI103/mode3 (-5.962), with the 7.404 decay hierarchy and exact B=0 intact.
+
+### T-082 · Neutral source rows must rebind after profile decomposition changes
 Author: Agent A / engine + blown · 2026-07-18 · Firewall: method only; values per instrument
 Finding: applying T-016's explicit flute body omission correctly changed the
 pooled deconvolved source, but the higher-priority blown sustain handoff still
