@@ -55,6 +55,49 @@ instrument's effective body equals its fitted bands. The horn improved
 despite this because its refit likely carries explicit `bodyBands` in
 params, bypassing the profile plumbing — verify that too.
 
+### L19 · Temporal regions are NOT equal — identity-weighted region scoring (owner, 2026-07-18)
+Owner: "check that we aren't scoring every temporal portion of the note as
+equal when matching. Certain sound characteristics make up the identity of
+an instrument — the onset might be equally important to get right as the
+whole held note, even though the hold goes for longer; especially where
+the hold portion requires less complex overtones to simulate. By onset I
+mean from the note start to the point where the characteristic
+frequencies of the onset are less audible or have decayed — this could be
+any time after the onset; there is NO fixed interval."
+
+Verified current state: the discrete onset features are separately
+weighted (correct), but the dominant continuous distances (log-mel,
+band-balance) average per-frame over the whole note — DURATION-
+PROPORTIONAL weighting. A 100 ms onset is ~5% of a 2 s note's mel
+distance. The fits show the predictable distortion: holds converge
+(simple, quasi-stationary), onsets lag, composite rewards the easy part.
+
+Requirements (analysis lane; scoring change → one-time §2.3-style
+recalibration + P5.2 re-baseline when it lands):
+1. **Content-defined region segmentation per note** — never a fixed
+   interval: ONSET-IDENTITY region runs from t0 until the
+   onset-characteristic components decay below audibility against the
+   ongoing tone. Detector basis exists: the L16 anomaly-class envelopes
+   and transient/noise trackers measure exactly this decay — the
+   audibility crossover IS the boundary. Per-note, per-instrument
+   (piano's onset region is hundreds of ms; a flute chiff tens).
+   Remaining regions: HOLD (post-onset to note-off) and RELEASE (tail
+   audit's domain).
+2. **Region-weighted distances**: compute the continuous spectral
+   distances (mel, band-balance, centroid trajectory) PER REGION and
+   combine by identity-importance weights, not duration. Starting
+   weights: onset-region ≈ hold-region (per the owner's judgement and
+   the attack-identity perception literature already cited in the
+   annexes); refine via the criteria-drift/§2.3 evidence like any
+   weights. Release region weighted where hasRelease.
+3. Report per-region residuals separately in gate tables so "onset
+   matches, hold matches, but boundary behaviour is off" becomes
+   visible — currently all three blur into one number.
+4. Existing discrete onset features remain; this rule fixes the
+   CONTINUOUS distances that were silently duration-weighted.
+Boundary detector validates by synthetic round-trip (protocol §4) and
+against the L16 envelopes where both exist.
+
 ### L18 · Piano: artificial sustain — the held-key/damper envelope model (owner, 2026-07-17)
 Owner: "the piano settings are quite good but the samples have an
 artificial sustain that doesn't work for a struck instrument. The
