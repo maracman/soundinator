@@ -722,6 +722,18 @@ export function migrateToneParams(p) {
     "spectralProb", "spectralDriftProb", "spectralDriftDepth", "spectralDriftRate",
     "spectralLoudnessNorm", "spectralRegisterAmount", "spectralPartialDyns", "spectralPartialRegs",
   ]) delete out[dead];
+  // Unified-shape patches carry their sounds INSIDE layers[] — migrate each
+  // one too, or engineParams hoists an unmigrated layers[0].sound straight
+  // back over the migrated top level (found 2026-07-18: saved formant-era
+  // patches regressed to the retired formant voice on reload).
+  if (Array.isArray(out.layers)) {
+    out.layers = out.layers.map(layer => {
+      const sound = layer?.sound || layer?.subnote;
+      if (!sound || typeof sound !== "object") return layer;
+      const migrated = migrateToneParams(sound);
+      return layer.sound ? { ...layer, sound: migrated } : { ...layer, subnote: migrated };
+    });
+  }
   return out;
 }
 
