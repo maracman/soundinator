@@ -2461,3 +2461,33 @@ shape delta before the candidate is scored.
 Affects: bounded source residual correction / measured source-table contracts.
 Status: analysis=incorporated bowed=incorporated engine=n/a-method-only
 sung=adapt-method struck/plucked=adapt-method
+
+### T-081 · Broad-octave temporal stability uses pitch-aware cycle support
+Author: Agent D / bowed analysis · 2026-07-18 · Firewall: method only
+Finding: T-078's fixed three-by-250-ms requirement conflated evidence length
+with spectral instability. After the unchanged 250 ms onset and 100 ms
+release exclusions, cello mid/high source takes contain only 134–313 ms per
+equal block, but still contain 21–91 fundamental cycles. The old method
+therefore refused all four cells before measuring MAD or sign agreement. A
+goal-level F13 re-derivation shows that broad-octave stability requires
+independent temporal blocks with adequate periodic evidence, not identical
+wall-clock duration at every pitch. The canonical extractor now keeps three
+disjoint blocks and uses `max(80 ms, min(250 ms, 16/f0))` as the minimum
+support per block. Its synthetic proof covers both the original long-take
+branch (0.242 dB mean / 0.460 dB maximum remaining residual) and a 780 ms,
+660 Hz short-take branch (0.399 / 0.865 dB under declared 0.45/1.0 dB bars).
+All four previously refused cello cells then pass with 4–6 stable
+source-addressable bands. Per-band reference and render MADs are emitted so
+genuine local instability remains visible; unstable bands stay exact zero
+anchors and cannot become source corrections.
+Consuming rule: diagnose duration sufficiency, estimator support and physical
+within-take drift separately. Require three post-onset/pre-release blocks,
+the pitch-aware minimum above, the existing MAD <= 2 dB and sign agreement
+>= 2/3 bars, and a synthetic case that exercises the applicable duration/f0
+branch. A passing extraction only admits a bounded same-cell diagnostic; the
+full hierarchy still decides retention, and corpus acquisition remains the
+answer only when cycle-aware support is genuinely absent.
+Affects: T-078 octave residuals / duration-varying corpora / bowed and blown
+source-surface refinement.
+Status: analysis=incorporated bowed=incorporated-F13-window-diagnosis
+engine=n/a-method-only sung=adapt-method struck/plucked=adapt-method

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import copy
 
+import numpy as np
+import pytest
+
 from scripts.tone_match.blown_octave_residual import (
+    _sustain_blocks,
     apply_residual_to_params,
     synthetic_roundtrip,
 )
@@ -14,6 +18,24 @@ def test_blown_octave_extractor_passes_harmonic_plus_air_roundtrip():
     assert result["includesIndependentAir"] is True
     assert result["meanAbsResidualAfterDb"] <= .35
     assert result["maxAbsResidualAfterDb"] <= .75
+    assert result["adaptiveShortTakeCase"]["status"] == "pass"
+    assert result["adaptiveShortTakeCase"]["meanAbsResidualAfterDb"] <= .45
+    assert result["adaptiveShortTakeCase"]["maxAbsResidualAfterDb"] <= 1.0
+
+
+def test_octave_extractor_uses_cycle_normalised_mid_high_windows():
+    samples = np.ones(round(.78 * 24_000))
+    blocks = _sustain_blocks(
+        samples, 24_000, f0_hz=660, active_duration_s=.78)
+    assert len(blocks) == 3
+    assert min(block.size / 24_000 for block in blocks) >= .08
+
+
+def test_octave_extractor_keeps_conservative_low_note_support():
+    samples = np.ones(round(.78 * 24_000))
+    with pytest.raises(ValueError, match="cycle-normalised"):
+        _sustain_blocks(
+            samples, 24_000, f0_hz=65.4, active_duration_s=.78)
 
 
 def test_octave_extractor_labels_independent_bow_roundtrip_without_air():
