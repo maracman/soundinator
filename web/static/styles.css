@@ -9256,6 +9256,11 @@ body.explore-mode .view {
   margin-bottom: 0;
   padding-bottom: 7px;
   border-bottom-color: rgba(58,75,92,0.72);
+  /* label left, panel dice right */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .m2-inspector .macro-card-head > div:first-child {
@@ -9317,6 +9322,32 @@ body.explore-mode .view {
   margin-bottom: 6px;
   font-size: 0.55rem;
 }
+
+/* Subtle panel dice — sits at the right of the panel header, quiet by default
+   (dimmed, no chrome), brightens on hover. Kept small so it reads as an
+   affordance, not a primary control. */
+.m2-inspector .panel-rand-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -3px -2px -3px 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(140,160,180,0.55);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.m2-inspector .panel-rand-btn:hover {
+  color: rgba(225,235,245,0.95);
+  background: rgba(140,160,180,0.14);
+}
+.m2-inspector .panel-rand-btn:active { transform: translateY(0.5px); }
+.m2-inspector .panel-rand-btn .tb-ico { width: 15px; height: 15px; }
 
 .m2-inspector .macro-controls .control-row,
 .m2-inspector .breaks-grid .control-row {

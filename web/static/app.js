@@ -9240,6 +9240,17 @@ function renderExplore() {
   const octUp = v.querySelector("#octUp");
   if (octUp) octUp.onclick = () => octShift(1);
 
+  // Panel dice: roll every active control in this macro-probability panel, then
+  // re-render (swaps dials, redraws distributions) and keep playback going.
+  v.querySelectorAll("[data-panel-rand]").forEach(btn => {
+    btn.onclick = () => {
+      const wasPlaying = synth.isPlaying;
+      randomiseMacroPanel(btn.dataset.panelRand);
+      renderExplore();
+      if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
+    };
+  });
+
   // Rotary knobs (tone chain): vertical drag, shift = fine, double-click
   // resets to the stage default. Every change lights up the overlay it
   // controls in the tone print (comb / ridge / afterglow / arcs).
@@ -9958,6 +9969,7 @@ function m2InspectorHTML(p) {
   return `
     <div class="macro-card-head">
       <div class="section-label">Macro Probability — ${label}</div>
+      ${panelRandBtn(macroTab)}
     </div>
     ${macroPanelHTML(p)}`;
 }
@@ -10724,6 +10736,14 @@ function macroWorkspaceHTML(p) {
 
 function macroTabButton(key, label) {
   return `<button class="macro-tab${macroTab === key ? " active" : ""}" data-macro-tab="${key}">${label}</button>`;
+}
+
+// A subtle dice for the header of a macro-probability panel. It rolls new
+// values for that whole panel (see randomiseMacroPanel), skipping any section
+// the user has switched off. tab is the macroTab ("melody" | "tuning" |
+// "duration" | "dynamics").
+function panelRandBtn(tab) {
+  return `<button class="panel-rand-btn" type="button" data-panel-rand="${tab}" title="Randomise this panel" aria-label="Randomise this panel">${tbIcon("dice")}</button>`;
 }
 
 function macroPanelHTML(p) {
@@ -17042,6 +17062,98 @@ function randomiseParams() {
   p.motifLengthBeats = ri(2, 8);
   p.sequenceProb = rf(0.3, 1.0);
   p.motifSurpriseProb = rf(0.0, 0.5);
+}
+
+// Panel-level randomiser for the macro-probability panels. Rolls new values for
+// every active control in one panel (tab = "melody" | "tuning" | "duration" |
+// "dynamics"), reusing the same ranges as randomiseParams() so a panel dice
+// matches what the top-bar dice would roll for that group. Sections the user has
+// switched off are skipped and left untouched — a disabled Surprise keeps its
+// values and its off state, and only the dials visible for the current mode
+// (Walk vs Arp, Glide vs Ring) are rolled. The caller re-renders + restarts
+// playback.
+function randomiseMacroPanel(tab) {
+  const ri = (lo, hi) => Math.floor(lo + Math.random() * (hi - lo + 1));
+  const rf = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(3);
+  const p = exploreParams;
+  const pattern = p.melodyPattern || "walk";
+  switch (tab) {
+    case "melody":
+      // Generation — only the dials for the active pattern are visible; the
+      // hidden set (walk dials under Arp, or vice versa) stays put
+      if (pattern === "walk") {
+        p.intervalPeakedness = rf(0.2, 3.5);
+        p.intervalRange = ri(2, 16);
+        p.momentum = rf(0, 0.9);
+      } else {
+        p.arpStep = ri(1, 4);
+        p.arpOctaves = ri(1, 3);
+      }
+      // Accuracy
+      p.motifHitProb = rf(0.75, 1.0);
+      p.motifHitRange = ri(1, 5);
+      // Register
+      p.registerCenter = ri(-12, 12);
+      p.registerWidth = ri(4, 24);
+      p.registerSkew = rf(-0.6, 0.6);
+      // Surprise — only when on AND Walk (arp surprise is deterministic/disabled)
+      if (p.surprisePitchEnabled && pattern === "walk") {
+        p.melSurpriseAmount = rf(0.2, 0.9);
+        p.surprisePitchDistance = rf(0.35, 1);
+      }
+      break;
+    case "tuning":
+      // Accuracy
+      p.precision = rf(0.7, 1.0);
+      p.precisionRange = ri(0, 35);
+      // Surprise
+      if (p.surpriseTuningEnabled) {
+        p.tunSurpriseAmount = rf(0.2, 0.9);
+        p.surpriseTuningDistance = rf(0.35, 1);
+      }
+      break;
+    case "duration":
+      // Generation
+      p.beatDivisions = ri(1, 4);
+      p.onBeatProb = rf(0.5, 1.0);
+      p.offBeatProb = rf(0.0, 0.5);
+      p.sameLengthProb = rf(0.0, 0.7);
+      p.restMotifStartRatio = rf(0.0, 0.25);
+      p.restOnMeterRatio = rf(0.0, 0.35);
+      p.restOffMeterRatio = rf(0.0, 0.55);
+      // Surprise
+      if (p.surpriseRhythmEnabled) {
+        p.durSurpriseAmount = rf(0.2, 0.9);
+        p.surpriseRhythmDistance = rf(0.35, 1);
+      }
+      // Breaks & Slides — the slide-speed dial only shows for Glide
+      p.gapProb = rf(0.4, 1.0);
+      p.gapMin = rf(-0.35, 0.22);
+      p.gapMax = rf(Math.max(p.gapMin, -0.05), 0.55);
+      p.gapDistanceSlope = rf(0.0, 1.0);
+      p.gapTimingRange = rf(0.0, 0.22);
+      p.phraseGap = rf(0.1, 0.5);
+      if ((p.noteConnection || "glide") === "glide") p.slideSpeed = rf(0.2, 1.0);
+      break;
+    case "dynamics":
+      // Generation
+      p.dynamicsRange = rf(0.08, 0.45);
+      // Accuracy
+      p.dynamicsPrecision = rf(0.45, 0.95);
+      p.dynamicsHitRange = ri(0, 75);
+      // Loudness Register
+      p.dynamicsLevel = rf(0.42, 0.78);
+      p.loudnessRange = rf(0.3, 0.9);
+      // Surprise
+      if (p.surpriseDynamicsEnabled) {
+        p.dynSurpriseAmount = rf(0.2, 0.9);
+        p.surpriseDynamicsDistance = rf(0.35, 1);
+      }
+      break;
+    default:
+      return;
+  }
+  syncSurpriseFeatureParams(p);
 }
 
 // Parameter-adjustment telemetry: changes buffer up per control and flush as
