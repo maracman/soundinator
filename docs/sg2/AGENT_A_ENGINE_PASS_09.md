@@ -2,7 +2,7 @@
 
 Date: 2026-07-18  
 Lane: Agent A / engine + blown  
-Shared code landing: `8e37641`  
+First shared code landing: `8e37641`; combined-head reconciliation: `b7b0082`
 Exit state: **§2.5(b), named limiting factor**; no preset promotion or freeze
 
 ## Outcome and crash recovery
@@ -152,23 +152,24 @@ reference floor still block §2.5c decomposition. No owner decision is pending.
 
 ## Exchange, merge and verification
 
-The live exchange snapshot contains 85 parsed entries and includes T-082. It
+The live exchange snapshot contains 86 parsed entries and includes T-082. It
 is bound to source SHA-256
-`6f9ae7c2296109ecc8caeb0ce8587f9d10e722ed6772d4d174634601042f9c92`
+`16264348baed4d909536189c79fbfda49b350d9384a9c58c476561caa113e76f`
 and stored at `sg2-data/state/agent-a-pass09-exchange-statuses.json`, snapshot
-SHA-256 `8e0ec4dac3a0d64ab55c37001cad72c1e270364daf165193d805b406d90f9bcf`.
+SHA-256 `eba65e74fa0f1bf5cc6d53c5d0cbd34cd498c352d2be1fe82dcc1df32b442c3c`.
 
 The crash-recovery checkpoint is `aebc716`; the combined shared-code landing is
-`8e37641`. The shared T-078 generalisation preserves blown fundamental
-normalisation while adding bowed peak-normalisation metadata; its combined-head
-tests pass without changing the completed blown measurements.
+`8e37641`. The shared T-078/T-083 generalisation preserves blown fundamental
+normalisation while adding bowed peak-normalisation and pitch-aware temporal
+support; its combined-head tests pass without changing the completed blown
+measurements.
 
 - `npm test`: PASS, 11/11;
 - `node scripts/verify_tone_model.mjs`: PASS, all assertions;
 - `PYTHONPATH=src:. ../../../.venv/bin/python -m pytest -q`: PASS;
 - `PYTHON="$PWD/../../../.venv/bin/python" node scripts/render_note.mjs --verify`:
   PASS, PCM SHA-256
-  `16d46e40d86744c719af8154224bed215c03bfef391caef655fba7d13d23a6ca`;
+  `f793dd5d6284a77e86dd66bfcd2643efce3886a8012edce2876383eabec87930`;
 - leaderboard/state comparisons and `git diff --check`: PASS.
 
 The global ship-mode listening page is rebuilt after the pass report landing so
