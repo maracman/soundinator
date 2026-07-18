@@ -6065,13 +6065,6 @@ body.explore-mode #app {
 }
 .layer-fx-tag:not(.off) .layer-fx-name { color: var(--text); }
 .layer-fx-wet { width: 34px; height: 10px; }
-/* The always-present BASE row (owner 2026-07-09) */
-.layer-row.base-row { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
-.layer-row.base-row.sel { box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px -8px var(--accent); }
-.layer-base-badge {
-  font-size: 0.5rem; font-weight: 700; letter-spacing: 0.08em; color: var(--accent);
-  border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px;
-}
 /* Editable layer titles (double-click to rename) */
 .layer-name-row { display: flex; align-items: center; gap: 5px; margin-bottom: 1px; }
 .layer-name {

@@ -706,10 +706,8 @@ const PARAM_DESC = {
   headDensity: "How strongly your head shadows the far ear (0–1). 0.5 = the published spherical-head model (Brown & Duda 1998: lows diffract around, highs shadow up to -20 dB); 0 = transparent, 1 = doubled",
   spaceOwnHead: "Keep this patch's own ear span and head density even when the producer's global space is active (normally the global listener overrides them)",
   degreeTuning: "Each degree's true pitch centre, in cents off the equal grid — how just intonation, maqamat and other tuning traditions place their notes. Drag a node around the scale circle to set it by hand",
-  layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
-  baseLayerGain: "The base layer's level relative to the rest of the sound stack",
-  baseLayerSolo: "Solo the base layer; other layers are silent unless they are soloed too",
-  layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
+  layers: "The sound modules stacked as this instrument — each renders the same notes through its own tone, position and level",
+  layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
   layerEnvProb: "How often the shared variation trigger fires (per note) when synchronisation is on",
   layerEnvAttackSd: "The shared attack variation magnitude — applied to the base and every layer while synchronised",
   layerEnvDecaySd: "The shared decay variation magnitude — applied to the base and every layer while synchronised",
@@ -9167,7 +9165,10 @@ function renderExplore() {
       exploreParams[key] = sel.value;
       if (key === "spectralProfile") {
         resetSpectralPartialParams(exploreParams);
-        delete exploreParams.spectralProfileName;
+        // clear via the accessor (delete would tear it off exploreParams and
+        // break the layer-name mapping) — the row/title then fall back to the
+        // new module's label
+        exploreParams.spectralProfileName = undefined;
       }
       const out = v.querySelector(`#out_${key}`);
       if (out) out.textContent = fmtOutput(key, sel.value);
@@ -10196,38 +10197,15 @@ function m2PresetParamsById(id) {
   return null;
 }
 
-// Load a browser entry as the BASE sound (sub-note mode): a recipe re-seats
-// the instrument exactly like the old instrument cards did; any preset —
-// sound module or full patch — contributes only its sound half. The shared
-// space (room, head, air) and the macro half stay untouched.
-function loadSoundModuleById(id) {
-  if (id.startsWith("r:")) {
-    const key = id.slice(2);
-    if (!SPECTRAL_PROFILES[key] || exploreParams.spectralProfile === key) return;
-    noteParamChange("spectralProfile", exploreParams.spectralProfile, key);
-    exploreParams.spectralProfile = key;
-    delete exploreParams.spectralProfileName;
-    resetSpectralPartialParams(exploreParams);
-    if ((exploreParams.bodyType || "auto") === "auto") {
-      delete exploreParams.bodyBands;
-      _chBodySel = null;
-    }
-  } else {
-    const params = m2PresetParamsById(id);
-    if (!params) return;
-    const migrated = migrateParamsShape(migrateToneParams({ ...params }));
-    const sound = { ...(migrated.layers?.[0]?.sound || {}) };
-    for (const k of Object.keys(sound)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete sound[k];
-    if (!Object.keys(sound).length) return;
-    Object.assign(exploreParams, sound);
-    if (!Object.prototype.hasOwnProperty.call(sound, "spectralProfileName")) delete exploreParams.spectralProfileName;
-    if ((exploreParams.bodyType || "auto") === "auto") {
-      delete exploreParams.bodyBands;
-      _chBodySel = null;
-    }
-  }
-  synth.updateGenerationParams(enginePlayParams());
-  renderExplore();
+// The browser entry's display name — layers stacked from a module carry it,
+// so the LAYERS strip reads as the modules that were placed (owner 2026-07-18).
+function m2PresetNameById(id) {
+  if (!id) return null;
+  if (id.startsWith("r:")) return SPECTRAL_PROFILES[id.slice(2)]?.label || null;
+  if (id.startsWith("f:")) return FACTORY_PRESETS.find(f => `f:${f.id}` === id)?.name || null;
+  if (id.startsWith("m:")) return loadPresets().find(e => `m:${e.id}` === id)?.name || null;
+  if (id.startsWith("g:")) return (_m2LibCommunity || []).find((e, i) => `g:${e.id ?? i}` === id)?.name || null;
+  return null;
 }
 
 // Resolve a browser id to its sound-half params WITHOUT applying it — used by
@@ -10288,7 +10266,7 @@ function stopSubnotePreview(rerender = true) {
 // any layers the preset carries ride along. Only the sound module comes
 // across (plus per-layer position) — the shared space (room, head, air)
 // stays the instrument's own.
-function addPresetAsLayers(params) {
+function addPresetAsLayers(params, moduleName = null) {
   if (!params) return false;
   const incoming = migrateParamsShape(migrateToneParams({ ...params }));
   let added = false;
@@ -10298,6 +10276,9 @@ function addPresetAsLayers(params) {
     const layer = {
       ...source,
       id: crypto.randomUUID(),
+      // the row is named for the module that was placed there; a multi-layer
+      // preset's own layer names win over the preset's title
+      name: (source.name && String(source.name).trim()) || moduleName || "",
       hue: (36 + exploreParams.layers.length * 70) % 360,
       sound: { ...sound, effectsChain: cloneFxChain(sound.effectsChain) },
       space: { ...(source.space || { angle: 0, dist: 2.5 }) },
@@ -10328,7 +10309,8 @@ function bindLayerDropTarget(target) {
   target.ondrop = (e) => {
     e.preventDefault();
     target.classList.remove("drop-ok");
-    addPresetAsLayers(m2PresetParamsById(e.dataTransfer.getData("application/x-preset-id")));
+    const droppedId = e.dataTransfer.getData("application/x-preset-id");
+    addPresetAsLayers(m2PresetParamsById(droppedId), m2PresetNameById(droppedId));
   };
 }
 
@@ -11220,9 +11202,14 @@ function layerStripHTML(p, compact = false) {
   const rows = layers.map((layer, index) => {
     const sound = layer.sound || layer.subnote || {};
     const envStr = layerEnvLineText({ ...layer, subnote: sound }, p);
-    const title = (layer.name && String(layer.name).trim()) || (index === 0 ? "Untitled" : `Layer ${index + 1}`);
+    // Unnamed rows read as the sound module sitting in the slot (owner
+    // 2026-07-18: a layer's name should correspond to what was placed there);
+    // "Layer N" only when even the module is unknown.
+    const title = (layer.name && String(layer.name).trim())
+      || SPECTRAL_PROFILES[sound.spectralProfile]?.label
+      || `Layer ${index + 1}`;
     return `
-    <div class="layer-row${index === 0 ? " base-row" : ""}${layer.id === selectedId ? " sel" : ""}" data-layer-row="${layer.id}" style="--layer-hue:${layer.hue ?? (36 + index * 70) % 360}" title="Layer ${index + 1} — click to edit it in the stages above">
+    <div class="layer-row${layer.id === selectedId ? " sel" : ""}" data-layer-row="${layer.id}" style="--layer-hue:${layer.hue ?? (36 + index * 70) % 360}" title="Layer ${index + 1} — click to edit it in the stages above">
       <span class="layer-row-tag">${index + 1}</span>
       <span class="space-target-control layer-space-target">
         <canvas class="layer-minipad compact-space-target" data-layer-pad="${layer.id}" width="40" height="40"></canvas>
@@ -11231,13 +11218,12 @@ function layerStripHTML(p, compact = false) {
       <div class="layer-row-lines">
         <div class="layer-name-row">
           <span class="layer-name" data-layer-name="${layer.id}" title="Double-click to rename this layer">${esc(title)}</span>
-          ${index === 0 ? '<span class="layer-base-badge">BASE</span>' : ""}
         </div>
         <div class="layer-row-space">
           <label class="sp-ctl">Vol <input type="range" data-layer-gain="${layer.id}" min="0" max="1.5" step="0.01" value="${layer.gain ?? 1}" title="This layer's level"/></label>
           <button class="pal-btn layer-solo${layer.solo ? " on" : ""}" data-layer-solo="${layer.id}" title="Solo this layer">S</button>
-          ${index === 0 ? "" : `<button class="pal-btn" data-layer-recapture="${layer.id}" title="Copy the selected layer's sound into this layer">⟳</button>
-          <button class="pal-btn" data-layer-remove="${layer.id}" title="Remove this layer">×</button>`}
+          <button class="pal-btn" data-layer-recapture="${layer.id}" title="Copy the selected layer's sound into this layer">⟳</button>
+          ${layers.length > 1 ? `<button class="pal-btn" data-layer-remove="${layer.id}" title="Remove this layer">×</button>` : ""}
         </div>
         <div class="layer-env" title="This layer's envelope baseline">${esc(envStr)}</div>
         ${fxTagsHTML(layer.id, sound.effectsChain, sound.stageEffectsOn === false)}
@@ -11702,7 +11688,8 @@ function wireSubnoteTitle(v) {
           exploreParams.spectralProfileName = next;
         } else if (prev) {
           noteParamChange("spectralProfileName", prev, "");
-          delete exploreParams.spectralProfileName;
+          // accessor-safe clear (delete would remove the accessor itself)
+          exploreParams.spectralProfileName = undefined;
         }
       }
       renderExplore();
@@ -15670,7 +15657,8 @@ function wireLayerStrip(v) {
   v.querySelectorAll("[data-layer-remove]").forEach(el => {
     el.onclick = () => {
       const index = exploreParams.layers.findIndex(layer => layer.id === el.dataset.layerRemove);
-      if (index <= 0) return;
+      // any row may go — including the first — as long as one layer remains
+      if (index < 0 || exploreParams.layers.length <= 1) return;
       const wasSelected = exploreParams.layers[index].id === exploreParams.selectedLayerId;
       exploreParams.layers.splice(index, 1);
       if (wasSelected) {
