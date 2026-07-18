@@ -73,6 +73,7 @@ from scripts.tone_match.humanisation import fit_excitation_position, ship_human_
 from scripts.tone_match.struck_plucked_prep import CAMPAIGNS as STRUCK_CAMPAIGNS, STRUCK_OBJECTIVE_ROLES, rebase_fitted_preset, seed_preset
 from scripts.tone_match.strings_prep import BODY_REFERENCE_RUNS, ONSET_ROLE_MIDIS, PHIL_ANCHOR_NOTES, STRING_CAMPAIGNS, VIBRATO_ROLE_FILES, bowed_seed, find_catalogue_duplicates, inventory_take_pairs, iowa_filename_span, parse_phil_name, parse_string_label, screen_outliers, trim_to_single_bow
 from scripts.tone_match.score import SCORER_CONTRACT_VERSION, FeatureBundle, OCTAVE_CENTRES, THIRD_OCTAVE_CENTRES, _BOWED_P1_FEATURES, _fractional_octave_profile, _mel_bank, _noise_and_onset_observables, _resample_time, _trajectory_power, band_balance_distance, band_balance_report, band_profile, compare_features, hold_decay_metrics, inharmonicity_comparison, ltas_rolloff, octave_summary_db, quantitative_tripwires, weights_for_instrument
+from scripts.tone_match.blown_sustain_tables import refresh_neutralized_rows
 from scripts.tone_match.build_campaign import _run_start_midi
 from scripts.tone_match.tripwires import aggregate_by_cell, evaluate_tripwires, reference_roles, required_cells_by_bar, tripwire_table_markdown
 from scripts.tone_match.exclusions import OWNER_EXCLUDED_TAKES, assert_no_excluded, is_excluded
@@ -1581,6 +1582,45 @@ def test_partial_profile_refresh_can_use_an_immutable_merge_base():
     assert "piano" in merged
 
 
+def test_explicit_unstable_body_omission_replaces_stale_merge_base_bands():
+    new = {"flute": {
+        "resonances": [],
+        "resonancesFit": {
+            "method": "ensemble-rank-note-body-v3",
+            "omittedReason": "unstable-air-jet-body",
+        },
+    }}
+    previous = {"flute": {
+        "resonances": [{"freq": 1430, "gain": 3, "width": 1}],
+        "resonancesFit": {"method": "ensemble-rank-note-body-v2"},
+    }}
+    merged = merge_profile_sets(new, previous)
+    assert merged["flute"]["resonances"] == []
+    assert merged["flute"]["resonancesFit"]["omittedReason"] == \
+        "unstable-air-jet-body"
+
+
+def test_t016_refreshes_only_neutralized_source_rows_after_body_omission():
+    handoff = {
+        "instruments": {"flute": {"rows": [
+            {"f0Hz": 100, "activationStatus": "neutralized-old", "partials": [1, .1]},
+            {"f0Hz": 200, "activationStatus": "accepted-fit", "partials": [1, .8]},
+        ]}},
+        "evidenceSha256": "old",
+    }
+    profiles = {"flute": {"partialsByRegister": [
+        {"f0": 100, "partials": [{"amp": 1}, {"amp": .4}]},
+        {"f0": 200, "partials": [{"amp": 1}, {"amp": .2}]},
+    ]}}
+    refreshed = refresh_neutralized_rows(handoff, profiles, "flute")
+    rows = refreshed["instruments"]["flute"]["rows"]
+    assert rows[0]["partials"] == [1, .4]
+    assert rows[0]["neutralizedAgainst"] == "current-pooled-register-source"
+    assert rows[1]["partials"] == [1, .8]
+    assert refreshed["evidenceSha256"] != "old"
+    assert handoff["instruments"]["flute"]["rows"][0]["partials"] == [1, .1]
+
+
 def test_reference_variability_floor_uses_only_matching_take_groups():
     bundles = {
         "take-a": _bundle(partials=[1, .2, .7, .1, .4, .08]),
@@ -2902,6 +2942,23 @@ def test_blown_checklist_requires_instrument_specific_measured_body():
     })
     by_id = {row["id"]: row for row in fitted["assertions"]}
     assert by_id["french-horn.measured-body"]["status"] == "pass"
+
+
+def test_flute_unstable_body_omission_satisfies_measured_body_contract():
+    samples = [ConstructionSample(_bundle(), _bundle(), register, dynamic, dynamic)
+               for register in ("low", "mid", "high") for dynamic in (.25, .9)]
+    base = {"excitationType": "blow", "resonatorClass": "openTube",
+            "bodyBands": []}
+    unexplained = evaluate_construction("flute", samples, params=base)
+    by_id = {row["id"]: row for row in unexplained["assertions"]}
+    assert by_id["flute.measured-body"]["status"] == "fail"
+    omitted = evaluate_construction("flute", samples, params={
+        **base,
+        "bodyStability": {"omittedReason": "unstable-air-jet-body"},
+    })
+    by_id = {row["id"]: row for row in omitted["assertions"]}
+    assert by_id["flute.measured-body"]["status"] == "pass"
+    assert by_id["flute.body-stability"]["status"] == "pass"
 
 
 def test_corpus_sidecar_filename_classification():

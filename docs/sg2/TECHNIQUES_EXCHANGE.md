@@ -2430,3 +2430,22 @@ be re-audited in hierarchy order.
 Affects: bowed source extraction / sparse measured hulls / partial, mel and band-balance identity.
 Status: analysis=incorporated bowed=incorporated-partial-pass
 engine=n/a sung=adapt-method struck/plucked=adapt-method
+
+### T-080 · Neutral source rows must rebind after profile decomposition changes
+Author: Agent A / engine + blown · 2026-07-18 · Firewall: method only; values per instrument
+Finding: applying T-016's explicit flute body omission correctly changed the
+pooled deconvolved source, but the higher-priority blown sustain handoff still
+contained neutral rows copied from the former body decomposition. The exact-
+anchor verifier rejected that mixed state. Refreshing only rows declared
+`neutralized` against the current pooled register source restores the ownership
+contract; accepted instrument-owned cumulative rows remain byte-stable. Because
+the measured profile asset is part of the renderer contract, every responder
+audit was then rerun and rebound to the new renderer/profile hash.
+Consuming rule: after any measured-body or source-decomposition regeneration,
+rebuild neutral source rows from the current pooled register source before
+rendering or auditing. Never rewrite accepted cumulative rows during that
+refresh, and never reuse a responder audit whose renderer/profile contract hash
+predates the regeneration.
+Affects: measured-body omission / blown source handoffs / responder-audit provenance.
+Status: engine=incorporated blown=incorporated-pass09
+analysis=adapt-method sung=adapt-method bowed=adapt-method struck/plucked=adapt-method

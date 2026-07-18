@@ -2232,12 +2232,19 @@ def merge_profile_sets(out: dict, previous: dict) -> dict:
         prior = previous.get(inst)
         if not isinstance(prior, dict):
             continue
+        explicit_body_omission = (
+            profile.get("resonances") == []
+            and isinstance(profile.get("resonancesFit"), dict)
+            and profile["resonancesFit"].get("omittedReason")
+        )
         # A sparse single-note refresh can replace corrupt pitch/spectral
         # evidence without pretending it also re-measured the body.
         # These are independently fitted campaign contracts.  A spectral /
         # body regeneration must not silently erase them merely because this
         # analyser does not re-run the differential/noise extractor (F3/F4).
         for key in ("resonances", "resonancesFit", "humanRanges", "bowNoise"):
+            if key == "resonances" and explicit_body_omission:
+                continue
             if not profile.get(key) and prior.get(key):
                 profile[key] = prior[key]
     for inst, profile in previous.items():

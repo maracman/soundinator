@@ -439,10 +439,20 @@ def evaluate_construction(
                       max(row["freq"] for row in valid_bands) /
                       min(row["freq"] for row in valid_bands) >= 2 and
                       max(abs(row["gain"]) for row in valid_bands) >= .05)
+        stability_info = params.get("bodyStability") \
+            if isinstance(params.get("bodyStability"), dict) else {}
+        evidence_backed_flute_omission = (
+            name == "flute" and not valid_bands and
+            stability_info.get("omittedReason") == "unstable-air-jet-body"
+        )
         rows.append(_result(f"{name}.measured-body",
-                            "Fixed-Hz body is fitted from this instrument's corpus",
-                            body_valid, len(valid_bands),
-                            "at least 3 non-neutral fitted body bands spanning an octave",
+                            "Body treatment is fitted from this instrument's corpus",
+                            body_valid or evidence_backed_flute_omission,
+                            ({"bands": len(valid_bands),
+                              "omittedReason": stability_info.get("omittedReason")}
+                             if evidence_backed_flute_omission else len(valid_bands)),
+                            "at least 3 non-neutral fitted body bands spanning an octave; "
+                            "flute may explicitly omit an unstable T-016 body",
                             strict_evidence=strict_evidence))
 
     pitch_errors = []
