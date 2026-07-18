@@ -2584,3 +2584,28 @@ and select it in the upstream criteria hierarchy before consulting composite.
 Affects: source/body decomposition / T-078 residual consumption / strict-cell triage.
 Status: sung=incorporated analysis=adapt-method engine=n/a-method-only
 bowed=n/a struck/plucked=n/a blown=n/a
+
+### T-085 · Matched-take decomposition gates require per-take identity fits
+Author: Agent D / bowed analysis · 2026-07-18 · Firewall: diagnostic method only
+Finding: aggregate identity scores can hide take-level non-identities and must
+not trigger Human decomposition. Starting from the exact incumbent, pass 12
+enumerated only physically playable string choices and then fitted each matched
+take independently with bounded existing source and attack controls. Violin
+remained 0/14 GOOD (fit=0, law=9, corpus=5); cello remained 0/15 GOOD (fit=0,
+law=4, corpus=11). Mixed pitch-estimator verdicts within a matched group, or a
+consistent conflict between planned and selected strings, are corpus-identity
+ambiguities. A residual that survives the bounded local fit is law-limited.
+Only a take that becomes GOOD is fit-limited. The local drift matrix also makes
+candidate regressions directional: for cello, temporal-identity improvements
+stole from continuous-spectrum identity in 8 transitions; partial and pitch
+improvements each stole from continuous spectrum in 6.
+Consuming rule: before any Human decomposition, fit every matched take against
+one frozen incumbent and require every take to be GOOD under the upstream tier
+order (pitch membership, partial identity, continuous spectrum, temporal
+identity). Build drift only from within-take candidate transitions. Route mixed
+identity evidence to corpus, persistent bounded-fit residuals to law, and GOOD
+takes to fit; never promote take-local diagnostic parameters as a preset.
+Affects: Human decomposition trigger / per-take residual routing / candidate
+tier-regression diagnosis.
+Status: analysis=incorporated bowed=incorporated-pass12 engine=n/a-method-only
+sung=adapt-method struck/plucked=adapt-method blown=adapt-method
