@@ -26,7 +26,20 @@ from scripts.fit_profiles_from_samples import load_mono
 from scripts.tone_match.score import OCTAVE_CENTRES, _active_sample_span
 
 
-SCHEMA = "sg2-blown-post-source-air-octave-v1"
+SCHEMA = "sg2-blown-post-source-air-octave-v2"
+
+
+def _minimum_block_duration_s(f0_hz: float) -> float:
+    """Goal-level temporal support for a broad-octave stability estimate.
+
+    The original fixed 250 ms floor was suitable for low notes, but it made
+    short mid/high bowed takes untestable even when each shorter block held
+    dozens of periods.  Preserve that conservative ceiling at low f0 while
+    allowing a minimum of 16 periods, bounded below by 80 ms.
+    """
+    if not math.isfinite(f0_hz) or f0_hz <= 0:
+        raise ValueError("octave residual needs a positive finite f0")
+    return max(.08, min(.25, 16.0 / f0_hz))
 
 
 def _sha(path: Path) -> str:
@@ -34,6 +47,7 @@ def _sha(path: Path) -> str:
 
 
 def _sustain_blocks(samples: np.ndarray, sample_rate: int, *,
+                    f0_hz: float,
                     active_duration_s: float | None = None,
                     block_count: int = 3) -> list[np.ndarray]:
     values = np.asarray(samples, dtype=float)
@@ -47,11 +61,17 @@ def _sustain_blocks(samples: np.ndarray, sample_rate: int, *,
     if stop <= start:
         raise ValueError("no post-onset/pre-release sustain for octave residual")
     sustain = values[start:stop]
-    # Three blocks are the real-data stability minimum.  Each must retain at
-    # least 250 ms so the result is not a single FFT-frame accident.
-    if sustain.size < block_count * round(.25 * sample_rate):
+    # Three blocks are the real-data stability minimum.  Temporal support is
+    # cycle-normalised because broad octave energy needs period evidence, not
+    # the same wall-clock window at every pitch.  The 250 ms legacy floor is
+    # retained as the low-note ceiling; mid/high notes may use shorter blocks
+    # only when each still contains at least the declared cycle support.
+    minimum_block_s = _minimum_block_duration_s(f0_hz)
+    if sustain.size < block_count * round(minimum_block_s * sample_rate):
         raise ValueError(
-            f"stable octave residual needs {block_count} x 250 ms sustain blocks")
+            "stable octave residual needs "
+            f"{block_count} x {minimum_block_s * 1000:.1f} ms "
+            f"cycle-normalised sustain blocks at f0={f0_hz:.3f} Hz")
     edges = np.linspace(0, sustain.size, block_count + 1, dtype=int)
     return [sustain[left:right] for left, right in zip(edges[:-1], edges[1:])]
 
@@ -90,17 +110,26 @@ def extract_stable_residual_samples(
     """Return temporally stable reference-minus-render octave residuals."""
     render_rate = int(render_sample_rate or sample_rate)
     ref_blocks = _sustain_blocks(
-        reference, sample_rate, active_duration_s=active_duration_s,
+        reference, sample_rate, f0_hz=f0_hz,
+        active_duration_s=active_duration_s,
         block_count=block_count)
     render_blocks = _sustain_blocks(
-        rendered, render_rate, active_duration_s=active_duration_s,
+        rendered, render_rate, f0_hz=f0_hz,
+        active_duration_s=active_duration_s,
         block_count=block_count)
-    residuals = np.asarray([
-        _octave_profile(ref, sample_rate) - _octave_profile(render, render_rate)
-        for ref, render in zip(ref_blocks, render_blocks)
-    ])
+    reference_profiles = np.asarray([
+        _octave_profile(ref, sample_rate) for ref in ref_blocks])
+    render_profiles = np.asarray([
+        _octave_profile(render, render_rate) for render in render_blocks])
+    residuals = reference_profiles - render_profiles
     median = np.median(residuals, axis=0)
     mad = np.median(np.abs(residuals - median), axis=0)
+    reference_median = np.median(reference_profiles, axis=0)
+    render_median = np.median(render_profiles, axis=0)
+    reference_mad = np.median(
+        np.abs(reference_profiles - reference_median), axis=0)
+    render_mad = np.median(
+        np.abs(render_profiles - render_median), axis=0)
     sign_agreement = np.mean(
         np.sign(residuals) == np.sign(median)[None, :], axis=0)
     # The played fundamental is the first source-addressable evidence.  Room
@@ -114,10 +143,21 @@ def extract_stable_residual_samples(
         "status": "pass" if np.any(stable) else "fail",
         "f0Hz": float(f0_hz),
         "blockCount": block_count,
+        "minimumBlockDurationSec": _minimum_block_duration_s(f0_hz),
+        "referenceBlockDurationsSec": [
+            block.size / sample_rate for block in ref_blocks],
+        "renderBlockDurationsSec": [
+            block.size / render_rate for block in render_blocks],
+        "minimumCyclesPerBlock": min(
+            min(block.size / sample_rate for block in ref_blocks),
+            min(block.size / render_rate for block in render_blocks),
+        ) * f0_hz,
         "octaveCentresHz": OCTAVE_CENTRES.tolist(),
         "residualsDb": residuals.tolist(),
         "medianResidualDb": median.tolist(),
         "medianAbsoluteDeviationDb": mad.tolist(),
+        "referenceProfileMedianAbsoluteDeviationDb": reference_mad.tolist(),
+        "renderProfileMedianAbsoluteDeviationDb": render_mad.tolist(),
         "signAgreement": sign_agreement.tolist(),
         "sourceAddressable": source_addressable.tolist(),
         "stableBands": stable.tolist(),
@@ -125,6 +165,9 @@ def extract_stable_residual_samples(
             "maximumMadDb": maximum_mad_db,
             "minimumSignAgreement": minimum_sign_agreement,
             "minimumBlocks": 3,
+            "windowPolicy": (
+                "three equal post-onset/pre-release blocks; minimum each is "
+                "max(80 ms, min(250 ms, 16/f0))"),
         },
     }
 
@@ -287,9 +330,11 @@ def _synth_note(partials: np.ndarray, *, sample_rate: int, duration_s: float,
     return (tone + air) * np.maximum(ramp, 0.0)
 
 
-def synthetic_roundtrip(*, component_class: str = "air") -> dict[str, Any]:
-    """Prove recovery on a known harmonic source plus independent air."""
-    sample_rate, duration_s, f0 = 24_000, 2.4, 500.0
+def _synthetic_roundtrip_case(*, component_class: str, duration_s: float,
+                              f0: float, mean_bar_db: float,
+                              maximum_bar_db: float) -> dict[str, Any]:
+    """Prove one duration/f0 branch on a known source plus component."""
+    sample_rate = 24_000
     count = 16
     base = 1 / np.arange(1, count + 1, dtype=float) ** 1.15
     known_centres = np.asarray([500, 1000, 2000, 4000, 8000], dtype=float)
@@ -326,8 +371,8 @@ def synthetic_roundtrip(*, component_class: str = "air") -> dict[str, Any]:
         "schema": SCHEMA,
         "status": "pass" if (
             extracted["status"] == "pass" and
-            float(np.mean(np.abs(after))) <= .35 and
-            float(np.max(np.abs(after))) <= .75) else "fail",
+            float(np.mean(np.abs(after))) <= mean_bar_db and
+            float(np.max(np.abs(after))) <= maximum_bar_db) else "fail",
         "includesIndependentAir": component_class == "air",
         "includesIndependentComponent": True,
         "independentComponentClass": component_class,
@@ -336,10 +381,30 @@ def synthetic_roundtrip(*, component_class: str = "air") -> dict[str, Any]:
         "meanAbsResidualBeforeDb": float(np.mean(np.abs(before))),
         "meanAbsResidualAfterDb": float(np.mean(np.abs(after))),
         "maxAbsResidualAfterDb": float(np.max(np.abs(after))),
-        "bars": {"meanAbsAfterDb": .35, "maxAbsAfterDb": .75},
+        "durationSec": duration_s,
+        "f0Hz": f0,
+        "bars": {
+            "meanAbsAfterDb": mean_bar_db,
+            "maxAbsAfterDb": maximum_bar_db,
+        },
         "extraction": extracted,
         "remaining": remaining,
     }
+    return result
+
+
+def synthetic_roundtrip(*, component_class: str = "air") -> dict[str, Any]:
+    """Prove both the long-take and adaptive short/high-take branches."""
+    result = _synthetic_roundtrip_case(
+        component_class=component_class, duration_s=2.4, f0=500.0,
+        mean_bar_db=.35, maximum_bar_db=.75)
+    short_take = _synthetic_roundtrip_case(
+        component_class=component_class, duration_s=.78, f0=660.0,
+        mean_bar_db=.45, maximum_bar_db=1.0)
+    result["adaptiveShortTakeCase"] = short_take
+    result["status"] = (
+        "pass" if result["status"] == "pass" and
+        short_take["status"] == "pass" else "fail")
     return result
 
 
