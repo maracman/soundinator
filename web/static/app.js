@@ -1,5 +1,5 @@
 /**
- * app.js — Resona web application.
+ * app.js — Soundinator web application.
  *
  * Two-arm architecture:
  *   Arm 1 (Study)   – structured paradigms (slider, pairwise)
@@ -1229,7 +1229,7 @@ let profilePlayback = null; // inline profile player: { itemId, prevArrangement,
 // tail) because the boot route() call below reads it via experimentsEnabled().
 let authState = { user: null, authRequired: false, openSignup: false, features: { experiments: false, community: true } };
 
-// Locked deployment (RESONA_AUTH_REQUIRED) + no session: the server serves the
+// Locked deployment (SOUNDINATOR_AUTH_REQUIRED) + no session: the server serves the
 // app shell so visitors see the welcome screen, but every view past it — and
 // every data API server-side — needs an account.
 function lockedOut() {
@@ -2440,6 +2440,11 @@ function updatePlayhead(beat) {
   if (pos && beat != null && beat >= 0) {
     pos.textContent = `${Math.floor(beat / BEATS_PER_BAR) + 1}.${(Math.floor(beat) % BEATS_PER_BAR) + 1}`;
   }
+  // The track heads' space dots read the thread AT the playhead, so every
+  // playhead move repaints them (three small canvases). The rAF below only
+  // adds the smooth in-between frames — it can be parked by the browser in a
+  // background tab, so correctness must not depend on it.
+  repaintTrackSpaceDots();
   // page-follow during playback (spec T11)
   if (arrPlay && line) {
     const scroller = document.querySelector(".timeline-grid");
@@ -2486,6 +2491,7 @@ function playArrangement(fromBeat = 0) {
   const lastBeat = Math.max(...ends) - 1;
   arrPlay = { beat: Math.max(0, Math.floor(fromBeat)), lastBeat, timer: null };
   _kickSpAnim(); // restart the global-space animation for this performance
+  _kickTrackDotAnim(); // …and the track heads' playhead-following space dots
   const step = () => {
     if (!arrPlay) return;
     let b = arrPlay.beat;
@@ -5121,7 +5127,9 @@ function compactSpaceTargetText(pos) {
 
 // Shared compact spatial target. Track headers, layer rows and patch rows all
 // use this one drawing language instead of separate pan/angle/distance widgets.
-function drawCompactSpaceTarget(cv, pos, hue = 205, muted = false) {
+// `bright` lifts the dot a notch (lighter, stronger glow, faint halo ring) —
+// used by the track head to say "this one is grabbable right here".
+function drawCompactSpaceTarget(cv, pos, hue = 205, muted = false, bright = false) {
   if (!cv) return;
   const g2 = crisp2d(cv);
   const ctx = g2.ctx, w = g2.w, h = g2.h;
@@ -5138,9 +5146,14 @@ function drawCompactSpaceTarget(cv, pos, hue = 205, muted = false) {
   const rad = ((pos?.angle ?? 0) - 90) * Math.PI / 180;
   const r = _spaceDistToR(clamp(pos?.dist ?? 2.5, SPACE_DMIN, SPACE_DMAX), rMax);
   const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
-  ctx.fillStyle = muted ? "hsla(215,12%,58%,0.9)" : `hsla(${hue},78%,64%,1)`;
-  ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = muted ? 0 : 5;
-  ctx.beginPath(); ctx.arc(x, y, Math.max(2.7, Math.min(3.6, rMax * 0.24)), 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
+  const rDot = Math.max(2.7, Math.min(3.6, rMax * 0.24));
+  if (bright && !muted) {
+    ctx.strokeStyle = `hsla(${hue},85%,72%,0.34)`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, rDot + 2.2, 0, 2 * Math.PI); ctx.stroke();
+  }
+  ctx.fillStyle = muted ? "hsla(215,12%,52%,0.72)" : `hsla(${hue},${bright ? 88 : 78}%,${bright ? 72 : 64}%,1)`;
+  ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = muted ? 0 : (bright ? 9 : 5);
+  ctx.beginPath(); ctx.arc(x, y, rDot, 0, 2 * Math.PI); ctx.fill(); ctx.shadowBlur = 0;
   cv.title = `Spatial target — drag left/right to rotate, up/down for distance · ${compactSpaceTargetText(pos)}`;
   const readout = cv.parentElement?.querySelector("[data-space-target-readout]");
   if (readout) readout.textContent = compactSpaceTargetText(pos);
@@ -5177,17 +5190,59 @@ function wireCompactSpaceTarget(cv, cfg) {
   return { redraw: paint };
 }
 
+// How close the playhead must sit to an anchor for the head dot to grab it.
+const SP_ANCHOR_GRAB_BEATS = 0.26;
+
+// Can a drag on the track head actually move the thread AT THIS BEAT? Mirrors
+// what the drag handler does: free when the global space is off or the track
+// has no anchors, and — when it is anchored — only where the playhead is
+// sitting on one of its anchors (that anchor is what the drag edits).
+function _spTrackDotMovable(track, beat) {
+  const sp = arrangement.space || {};
+  if (!sp.enabled) return true;
+  const anchors = sp.tracks?.[track.id];
+  if (!anchors || !anchors.length) return true;
+  return anchors.some(a => Math.abs(a.beat - beat) < SP_ANCHOR_GRAB_BEATS);
+}
+
 // Compact spatial "target" for the track head: concentric rings with the
-// listener at centre and a coloured dot at the track thread's (angle, distance).
-// A greyed dot means the track is anchored in the global space (dragging it
-// snaps back — you edit anchors in the cross-section, same rule as the mixer).
+// listener at centre and a coloured dot where the track's thread is AT THE
+// PLAYHEAD (it follows along live during playback and while scrubbing).
+// Brighter = movable from here; greyed = the thread is anchored elsewhere in
+// the global space, so a drag snaps back (edit it in the cross-section).
 function drawTrackSpaceDot(cv, track) {
-  const anchored = !!(arrangement.space?.tracks?.[track.id] || []).length;
   const hue = track.hue ?? _spHue(arrangement.tracks.indexOf(track));
   const drag = _threadDrag && _threadDrag.trackId === track.id ? _threadDrag.pos : null;
-  const pos = drag || _spTrackPos(track, curPlayBeat());
-  drawCompactSpaceTarget(cv, pos, hue, anchored);
-  cv.title += anchored ? " · edit its anchor in Global space" : " · double-click to inherit the patch position";
+  const beat = curPlayBeat();
+  const pos = drag || _spTrackPos(track, beat);
+  const movable = !!drag || _spTrackDotMovable(track, beat);
+  drawCompactSpaceTarget(cv, pos, hue, !movable, movable);
+  cv.title = `Thread at the playhead — ${compactSpaceTargetText(pos)}`;
+  cv.title += movable
+    ? " · drag left/right to rotate, up/down for distance · double-click to inherit the patch position"
+    : " · anchored in Global space — park the playhead on one of its anchors to drag it";
+}
+
+// The track heads' dots track the playhead, so they repaint on every scrub and
+// on every frame of playback (same settle-and-stop rule as the space rAF).
+let _trackDotRaf = null;
+function repaintTrackSpaceDots() {
+  document.querySelectorAll("[data-track-space-dot]").forEach(cv => {
+    const t = arrangement.tracks.find(t => t.id === cv.dataset.trackSpaceDot);
+    if (t) drawTrackSpaceDot(cv, t);
+  });
+}
+function _kickTrackDotAnim() {
+  if (!_trackDotRaf && document.querySelector("[data-track-space-dot]")) {
+    _trackDotRaf = requestAnimationFrame(_trackDotAnim);
+  }
+}
+function _trackDotAnim() {
+  _trackDotRaf = null; // clear first: a throw below must not wedge the kick guard
+  if (!document.querySelector("[data-track-space-dot]")) return;
+  repaintTrackSpaceDots();
+  // one last frame after playback stops, then idle until something moves again
+  _trackDotRaf = (arrPlay || _threadDrag) ? requestAnimationFrame(_trackDotAnim) : null;
 }
 
 function _sizeMasterFader() {
@@ -7749,6 +7804,7 @@ function wireProduce(v) {
       const sx = e.clientX, sy = e.clientY;
       const base = { ..._spTrackPos(track, curPlayBeat()) };
       _threadDrag = { trackId: track.id, pos: { ...base }, moved: false };
+      _kickTrackDotAnim();
       const move = (ev) => {
         const dx = ev.clientX - sx, dy = ev.clientY - sy;
         if (Math.abs(dx) + Math.abs(dy) > 2) _threadDrag.moved = true;
@@ -7770,7 +7826,7 @@ function wireProduce(v) {
           return;
         }
         const anchors = sp.tracks[track.id];
-        const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < 0.26);
+        const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < SP_ANCHOR_GRAB_BEATS);
         if (a) { a.angle = drag.pos.angle; a.dist = drag.pos.dist; saveArrangement("move space anchor"); renderProduce(); }
         else if (!anchors || !anchors.length) { sp.static = sp.static || {}; sp.static[track.id] = { ...drag.pos }; saveArrangement("move track in space"); renderProduce(); }
         else { drawTrackSpaceDot(cv, track); } // anchored elsewhere — snaps back
@@ -7792,6 +7848,7 @@ function wireProduce(v) {
       saveArrangement("reset track spatial target"); renderProduce();
     };
   });
+  _kickTrackDotAnim(); // keep the dots on the playhead across re-renders
 
   // Per-track gain (live on the playing voice)
   v.querySelectorAll("[data-track-gain]").forEach(sl => {
@@ -19402,7 +19459,7 @@ route();
 
 // ─── Accounts, invite gate & cloud patches ───────────────────
 // Server-side user profiles are optional: the account bar only shows when the
-// server reports an account layer. When the deployment sets RESONA_AUTH_REQUIRED
+// server reports an account layer. When the deployment sets SOUNDINATOR_AUTH_REQUIRED
 // the server has already gated page loads, so unauthenticated users never reach
 // this code — they're bounced to /login. Signed-in users get private, per-account
 // "cloud patches" backed by /api/patches (see src/synthesiser/web/accounts.py).
@@ -19431,7 +19488,7 @@ async function refreshAuth() {
 }
 
 // The research/study surfaces are hidden for the community launch but kept in
-// the codebase: enable server-side with RESONA_EXPERIMENTS=1, or locally with
+// the codebase: enable server-side with SOUNDINATOR_EXPERIMENTS=1, or locally with
 // ?experiments=1 / localStorage phase0.devExperiments.v1.
 function experimentsEnabled() {
   if (authState.features && authState.features.experiments) return true;
