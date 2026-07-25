@@ -31,7 +31,7 @@ from synthesiser.web.accounts import AccountStore
 from synthesiser.web.community import CommunityStore
 
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "community_seed" / "items.json"
-SEED_DOMAIN = "seed.resona.dev"
+SEED_DOMAIN = "seed.soundinator.dev"
 SEED_PASSWORD = "seed-dev-only-1"
 
 USERS = [

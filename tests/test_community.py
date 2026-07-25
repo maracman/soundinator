@@ -273,7 +273,7 @@ def _make_static(tmp_path) -> None:
     static = tmp_path / "web" / "static"
     static.mkdir(parents=True)
     (static / "index.html").write_text('<div id="app"></div>', encoding="utf-8")
-    (static / "login.html").write_text("<title>Resona login</title>", encoding="utf-8")
+    (static / "login.html").write_text("<title>Soundinator login</title>", encoding="utf-8")
 
 
 def _serve(server):
@@ -321,7 +321,7 @@ def test_community_api_over_http(tmp_path) -> None:
         ]:
             assert _req(anon, base, method, path, body)[0] == 401
 
-        # Legacy experiment endpoints are gone unless RESONA_EXPERIMENTS is set.
+        # Legacy experiment endpoints are gone unless SOUNDINATOR_EXPERIMENTS is set.
         assert _req(anon, base, "GET", "/api/presets/global")[0] == 404
         assert _req(anon, base, "POST", "/api/study/submit", {"responses": []})[0] == 404
         me = _json(_req(anon, base, "GET", "/api/auth/me")[1])

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Update the deployed Soundinator to the latest commit and restart the service.
 #
-# Runs ON the VPS as the `resona` user (see docs/HOSTINGER_DEPLOY.md §9):
+# Runs ON the VPS as the `resona` service account (see docs/HOSTINGER_DEPLOY.md
+# §9). `resona` is the app's old working title, kept as the server-side unix
+# user / service / path names only — the product is Soundinator.
 #
 #     ssh resona@<vps> 'resona-app/scripts/vps_update.sh'
 #

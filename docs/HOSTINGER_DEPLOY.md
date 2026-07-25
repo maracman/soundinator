@@ -10,11 +10,19 @@ standard library** (no external database, no Supabase, no monthly service bill).
 Turn it on with one env var; leave it off and the server behaves exactly as it
 did before (open, anonymous research mode).
 
-> **Production status (2026-07-14):** this runbook has been executed —
-> Soundinator is live at [thesoundinator.com](https://thesoundinator.com)
-> (Hostinger KVM 1, fully locked: `RESONA_AUTH_REQUIRED=1`,
-> `RESONA_COOKIE_SECURE=1`; DNS at Hover). Ship updates with
-> `scripts/vps_update.sh` — see §9.
+> **Production status:** this runbook has been executed end-to-end and runs a
+> live deployment in the fully locked configuration (`SOUNDINATOR_AUTH_REQUIRED=1`,
+> `SOUNDINATOR_COOKIE_SECURE=1`). Ship updates with `scripts/vps_update.sh` — see §9.
+
+> **A note on the name `resona`.** The app's working title was *Resona*; the
+> product is now **Soundinator** (thesoundinator.com). Everything user-facing has
+> been renamed, but the *server-side* identifiers below deliberately have not —
+> the unix user `resona`, `/home/resona`, `resona.env`, `resona.service`, and the
+> nginx site file. Those are internal ids attached to the live box's user
+> account, data directory, and service registration; renaming them means moving
+> live user data and re-registering the service, for no user-visible gain. Treat
+> `resona` here as "the service account", not as the product name. Env *settings*
+> were renamed to `SOUNDINATOR_*` and are backward compatible — see §3.
 
 ---
 
@@ -74,21 +82,38 @@ Create `/home/resona/resona.env` (owned by `resona`, `chmod 600`):
 HOST=127.0.0.1
 PORT=8765
 PHASE0_DATA_DIR=/home/resona/data
-RESONA_COOKIE_SECURE=1      # session cookie only sent over HTTPS (nginx terminates TLS)
+SOUNDINATOR_COOKIE_SECURE=1      # session cookie only sent over HTTPS (nginx terminates TLS)
 PHASE0_ADMIN_TOKEN=<long-random-string>   # optional: enables /api/export.csv
-# RESONA_AUTH_REQUIRED=1    # optional: lock EVERY page behind /login (see below)
-# RESONA_OPEN_SIGNUP=1      # leave UNSET — keeps registration invite-only
-# RESONA_EXPERIMENTS=1      # leave UNSET — hides the old study/research surfaces
+# SOUNDINATOR_AUTH_REQUIRED=1    # optional: lock EVERY page behind /login (see below)
+# SOUNDINATOR_OPEN_SIGNUP=1      # leave UNSET — keeps registration invite-only
+# SOUNDINATOR_EXPERIMENTS=1      # leave UNSET — hides the old study/research surfaces
+```
+
+**Migrating an existing env file.** A box provisioned before the rename has these
+keys spelled `RESONA_*`. They are still honoured, so an un-migrated box keeps
+running unchanged — the new spelling simply takes precedence when both are
+present. To migrate in place, rewrite the keys and restart:
+
+```bash
+sudo sed -i 's/^RESONA_/SOUNDINATOR_/' /home/resona/resona.env && sudo systemctl restart resona
+```
+
+Then confirm the gate is still in the state you expect — `auth_required` in the
+response below must match your intent, because a *misspelled* flag reads as unset
+and silently unlocks the site rather than failing loudly:
+
+```bash
+curl -s https://thesoundinator.com/api/auth/me
 ```
 
 The community-launch posture is **open to try, invite-gated to participate**:
 
-- With `RESONA_AUTH_REQUIRED` unset, anyone with the link can play the synth
+- With `SOUNDINATOR_AUTH_REQUIRED` unset, anyone with the link can play the synth
   (their work lives in their browser's localStorage). Everything under
   `/api/community/*`, `/api/profile*`, `/api/users/*`, and `/api/patches`
   still requires a signed-in session — saving or sharing pops the in-app
   create-profile overlay, and registration needs an invite code.
-- Set `RESONA_AUTH_REQUIRED=1` only if you want the fully locked behaviour.
+- Set `SOUNDINATOR_AUTH_REQUIRED=1` only if you want the fully locked behaviour.
   The welcome screen (`/`) stays visible so visitors see what they're being
   invited to; the client shows an "early access — invite only" notice when
   they try to enter the studio, and every data API returns 401 without a
@@ -98,8 +123,8 @@ The community-launch posture is **open to try, invite-gated to participate**:
   `feedback_shots/`) and export via
   `/api/export.csv?table=feedback&token=$PHASE0_ADMIN_TOKEN`.
 - Registration is **invite-only by default** — a valid invite code is required
-  to create an account unless you explicitly set `RESONA_OPEN_SIGNUP=1`.
-- `RESONA_EXPERIMENTS` stays unset in production: the legacy study routes and
+  to create an account unless you explicitly set `SOUNDINATOR_OPEN_SIGNUP=1`.
+- `SOUNDINATOR_EXPERIMENTS` stays unset in production: the legacy study routes and
   the anonymous preset-contribute endpoints return 404, and the study cards
   disappear from the landing page.
 
@@ -186,7 +211,7 @@ certbot --nginx -d studio.yourdomain.com     # free Let's Encrypt cert + auto-HT
 ```
 
 Certbot rewrites the nginx block to serve HTTPS and redirect HTTP → HTTPS. Because
-`RESONA_COOKIE_SECURE=1`, the session cookie is now only sent over that TLS
+`SOUNDINATOR_COOKIE_SECURE=1`, the session cookie is now only sent over that TLS
 connection.
 
 ## 8. Verify
@@ -200,7 +225,7 @@ connection.
   the community browser; right-clicking one of your presets offers
   **Share to community…**.
 - `https://studio.yourdomain.com/#study/consent` falls through to the studio
-  (experiments hidden) unless `RESONA_EXPERIMENTS=1`.
+  (experiments hidden) unless `SOUNDINATOR_EXPERIMENTS=1`.
 
 ---
 
@@ -256,7 +281,7 @@ Everything lives in `PHASE0_DATA_DIR` (`/home/resona/data`):
 |---|---|---|
 | `accounts.db` | users (salted+hashed passwords), invites, sessions, private patches, **and all community data** (profiles, avatars, shared items, ratings, tags, libraries) | **high — never commit or share** |
 | `study_sessions.jsonl`, `explore_events.jsonl` | anonymous research data | consented research data |
-| `global_presets.json` | legacy shared preset library (only served when `RESONA_EXPERIMENTS=1`) | public |
+| `global_presets.json` | legacy shared preset library (only served when `SOUNDINATOR_EXPERIMENTS=1`) | public |
 
 `accounts.db` is a single SQLite file — back it up with a nightly cron:
 
@@ -274,10 +299,10 @@ committed to the repo.
 - Passwords are stored as `pbkdf2_sha256` (600k iterations, per-user salt),
   verified in constant time — no plaintext, no reversible storage.
 - Sessions are opaque random tokens in an **HttpOnly, SameSite=Lax** cookie
-  (with `Secure` when `RESONA_COOKIE_SECURE=1`). SameSite=Lax blocks the common
+  (with `Secure` when `SOUNDINATOR_COOKIE_SECURE=1`). SameSite=Lax blocks the common
   cross-site POST CSRF vector for this beta-scale deployment.
 - Registration is closed by default — no invite code, no account.
-- Keep `RESONA_OPEN_SIGNUP` **unset** unless you deliberately want anyone to
+- Keep `SOUNDINATOR_OPEN_SIGNUP` **unset** unless you deliberately want anyone to
   self-register.
 - Run one instance only (the SQLite store and JSONL appends assume a single box).
 

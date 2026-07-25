@@ -61,7 +61,7 @@ def test_phase0_server_render_and_global_library(tmp_path) -> None:
     (tmp_path / "web" / "static").mkdir(parents=True)
     (tmp_path / "web" / "static" / "index.html").write_text("ok", encoding="utf-8")
     server = build_server("127.0.0.1", 0, root=tmp_path)
-    server.experiments = True  # legacy library now lives behind RESONA_EXPERIMENTS
+    server.experiments = True  # legacy library now lives behind SOUNDINATOR_EXPERIMENTS
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     host, port = server.server_address

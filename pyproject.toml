@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "resona"
+name = "soundinator"
 version = "0.1.0"
-description = "Resona — a probabilistic, physically-modelled music studio and stimulus toolkit for research into music's aesthetics and origins."
+description = "Soundinator — a probabilistic, physically-modelled music studio and stimulus toolkit for research into music's aesthetics and origins."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Marcus Anderson" }]

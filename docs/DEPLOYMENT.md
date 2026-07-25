@@ -16,9 +16,16 @@ pilot study.
 | `PHASE0_CACHE_DIR`   | no       | Server-render cache; safe to lose (regenerable)     |
 | `PHASE0_ADMIN_TOKEN` | recommended | Enables `/api/export.csv`; keep it secret        |
 | `PHASE0_RATE_LIMIT`  | no       | POSTs/min/IP (default 120; 0 disables)              |
-| `RESONA_AUTH_REQUIRED` | no     | `1` locks the whole app behind sign-in (logged-out → `/login`, protected APIs → 401). Unset = open, anonymous mode (default). |
-| `RESONA_OPEN_SIGNUP` | no       | `1` allows self-registration without a code. Leave unset to keep registration **invite-only** (the default). |
-| `RESONA_COOKIE_SECURE` | no     | `1` marks the session cookie `Secure` (set it whenever the app is served over HTTPS). |
+| `SOUNDINATOR_AUTH_REQUIRED` | no     | `1` locks the whole app behind sign-in (logged-out → `/login`, protected APIs → 401). Unset = open, anonymous mode (default). |
+| `SOUNDINATOR_OPEN_SIGNUP` | no       | `1` allows self-registration without a code. Leave unset to keep registration **invite-only** (the default). |
+| `SOUNDINATOR_COOKIE_SECURE` | no     | `1` marks the session cookie `Secure` (set it whenever the app is served over HTTPS). |
+| `SOUNDINATOR_EXPERIMENTS` | no    | `1` re-exposes the legacy study/research surfaces. Leave unset in production. |
+
+> **Legacy names.** The app's working title was *Resona*. Every `SOUNDINATOR_*`
+> setting above is still accepted under its old `RESONA_*` name, and the old
+> name is used only when the new one is absent. Existing env files therefore
+> keep working untouched — but migrate them, because these flags fail *open*:
+> an unread `SOUNDINATOR_AUTH_REQUIRED` unlocks the site rather than erroring.
 
 Process command (already in `Procfile`):
 
@@ -63,12 +70,12 @@ web: PYTHONPATH=src python3 -m synthesiser.web.server --host 0.0.0.0
 ## Accounts & invite codes (optional, self-hosted)
 
 The server ships an optional, dependency-light account layer (SQLite + stdlib
-crypto — no external database). It is **off unless `RESONA_AUTH_REQUIRED=1`**, so
+crypto — no external database). It is **off unless `SOUNDINATOR_AUTH_REQUIRED=1`**, so
 the anonymous research/explore flows above are unchanged by default.
 
 To run an invite-only deployment (per-user profiles + private "cloud patches"):
 
-1. Set `RESONA_AUTH_REQUIRED=1` and `RESONA_COOKIE_SECURE=1` (behind HTTPS).
+1. Set `SOUNDINATOR_AUTH_REQUIRED=1` and `SOUNDINATOR_COOKIE_SECURE=1` (behind HTTPS).
 2. Seed the first owner and mint invites with the CLI (writes to
    `PHASE0_DATA_DIR/accounts.db`):
 

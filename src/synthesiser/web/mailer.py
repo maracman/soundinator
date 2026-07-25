@@ -1,10 +1,12 @@
 """Transactional email via the Resend HTTPS API — standard library only.
 
-Configuration comes from the environment (resona.env in production):
+Configuration comes from the environment (the service's env file in production).
+Each setting is also accepted under its legacy ``RESONA_*`` name — see
+``synthesiser.web.env``:
 
-    RESONA_EMAIL_API_KEY   Resend API key; email is silently disabled when unset
-    RESONA_EMAIL_FROM      e.g. "Soundinator <no-reply@thesoundinator.com>"
-    RESONA_PUBLIC_URL      canonical site origin used in emailed links
+    SOUNDINATOR_EMAIL_API_KEY  Resend API key; email is silently disabled when unset
+    SOUNDINATOR_EMAIL_FROM     e.g. "Soundinator <no-reply@thesoundinator.com>"
+    SOUNDINATOR_PUBLIC_URL     canonical site origin used in emailed links
 
 When no API key is configured, ``send_email`` returns False and the caller is
 expected to print the would-have-been link to the server log instead — that
@@ -17,26 +19,27 @@ can never stall a registration request.
 from __future__ import annotations
 
 import json
-import os
 import threading
 import urllib.error
 import urllib.request
+
+from synthesiser.web.env import env_value
 
 RESEND_ENDPOINT = "https://api.resend.com/emails"
 SEND_TIMEOUT_S = 10.0
 
 
 def email_configured() -> bool:
-    return bool(os.environ.get("RESONA_EMAIL_API_KEY", "").strip())
+    return bool(env_value("EMAIL_API_KEY"))
 
 
 def public_url() -> str:
-    return os.environ.get("RESONA_PUBLIC_URL", "").strip().rstrip("/") or "http://127.0.0.1:8765"
+    return env_value("PUBLIC_URL").rstrip("/") or "http://127.0.0.1:8765"
 
 
 def _send_now(to: str, subject: str, text: str) -> bool:
-    api_key = os.environ.get("RESONA_EMAIL_API_KEY", "").strip()
-    sender = os.environ.get("RESONA_EMAIL_FROM", "").strip()
+    api_key = env_value("EMAIL_API_KEY")
+    sender = env_value("EMAIL_FROM")
     if not api_key or not sender:
         return False
     payload = json.dumps({

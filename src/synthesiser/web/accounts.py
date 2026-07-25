@@ -6,9 +6,9 @@ third-party dependencies, so this runs anywhere the Phase 0 server already runs
 (a Hostinger VPS, a free PaaS, or locally).
 
 The account layer is **opt-in**. The web server only enforces sign-in when
-``RESONA_AUTH_REQUIRED`` is set; with it off, the existing anonymous
+``SOUNDINATOR_AUTH_REQUIRED`` is set; with it off, the existing anonymous
 research/explore flows are untouched. Registration is always gated by an
-**invite code** unless ``RESONA_OPEN_SIGNUP`` is explicitly enabled.
+**invite code** unless ``SOUNDINATOR_OPEN_SIGNUP`` is explicitly enabled.
 
 Design notes:
 

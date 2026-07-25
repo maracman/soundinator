@@ -1,4 +1,4 @@
-// ─── Resona factory starter sessions ──────────────────────────────────────
+// ─── Soundinator factory starter sessions ──────────────────────────────────────
 //
 // These are arrangement recipes rather than saved user documents.  The
 // Producer resolves the referenced full patches into a fresh editable

@@ -1,4 +1,4 @@
-// ─── Resona factory library ────────────────────────────────────────────────
+// ─── Soundinator factory library ────────────────────────────────────────────────
 //
 // Factory entries are authored as composable section modules, then resolved
 // into full patches. `moduleIds` is provenance for the next-generation library;

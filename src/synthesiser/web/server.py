@@ -49,6 +49,7 @@ from synthesiser.web.community import (
     CommunityStore,
 )
 from synthesiser.web import mailer
+from synthesiser.web.env import env_flag
 from synthesiser.web.phase0 import (
     PHASE0_SCHEMA_VERSION,
     SYNTH_VERSION_HASH,
@@ -61,8 +62,11 @@ from synthesiser.web.phase0 import (
 # field addition/rename so exports can branch on record shape.
 EXPLORE_EVENT_SCHEMA_VERSION = "explore-event-1.0"
 
-# Name of the session cookie set on sign-in.
-SESSION_COOKIE = "resona_session"
+# Name of the session cookie set on sign-in. Sessions issued under the working
+# title are still honoured on read, so the rename does not sign anyone out; the
+# next sign-in re-issues under the current name.
+SESSION_COOKIE = "soundinator_session"
+LEGACY_SESSION_COOKIE = "resona_session"
 
 # Sentinel so current_user() can cache a None result for the request's lifetime.
 _UNSET = object()
@@ -96,8 +100,9 @@ def _sniff_image_ext(blob: bytes) -> str:
     raise ValueError("screenshot must be a PNG, JPEG, or WebP image")
 
 
-def _env_flag(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+def _env_flag(suffix: str) -> bool:
+    """Truthiness of ``SOUNDINATOR_<suffix>`` (legacy ``RESONA_<suffix>``)."""
+    return env_flag(suffix)
 
 
 def project_root() -> Path:
@@ -200,7 +205,7 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
             })
             return
 
-        # ── Access gate (no-op unless RESONA_AUTH_REQUIRED is set) ──
+        # ── Access gate (no-op unless SOUNDINATOR_AUTH_REQUIRED is set) ──
         if self._page_requires_login(path) and not self.current_user():
             self.redirect("/login")
             return
@@ -390,7 +395,7 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
             jar.load(raw)
         except Exception:
             return None
-        morsel = jar.get(SESSION_COOKIE)
+        morsel = jar.get(SESSION_COOKIE) or jar.get(LEGACY_SESSION_COOKIE)
         return morsel.value if morsel else None
 
     def current_user(self) -> dict[str, Any] | None:
@@ -422,7 +427,7 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
         Patch, community, and profile endpoints always require a signed-in
         owner (the community is invite-only even on an open deployment); every
         other API requires auth only when the whole app is locked
-        (RESONA_AUTH_REQUIRED). Health and the auth endpoints stay open.
+        (SOUNDINATOR_AUTH_REQUIRED). Health and the auth endpoints stay open.
         """
         if path.startswith(("/api/patches", "/api/community", "/api/profile", "/api/users")):
             return True
@@ -437,9 +442,13 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
         return (f"{SESSION_COOKIE}={token}; Max-Age={max_age}; Path=/; "
                 f"HttpOnly; SameSite=Lax{secure}")
 
-    def _clear_cookie_header(self) -> str:
+    def _clear_cookie_headers(self) -> list[str]:
+        """Expire the session cookie under both the current and legacy names."""
         secure = "; Secure" if getattr(self.server, "cookie_secure", False) else ""
-        return f"{SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{secure}"
+        return [
+            f"{name}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{secure}"
+            for name in (SESSION_COOKIE, LEGACY_SESSION_COOKIE)
+        ]
 
     def redirect(self, location: str) -> None:
         self.send_response(HTTPStatus.FOUND)
@@ -522,7 +531,7 @@ class Phase0RequestHandler(CommunityRoutes, BaseHTTPRequestHandler):
         store = getattr(self.server, "accounts", None)
         if store is not None:
             store.delete_session(self._session_token())
-        self.send_json({"ok": True}, cookies=[self._clear_cookie_header()])
+        self.send_json({"ok": True}, cookies=self._clear_cookie_headers())
 
     def handle_change_password(self, payload: dict[str, Any]) -> None:
         """Logged-in password change: verify the current password, set the new
@@ -1001,13 +1010,13 @@ def build_server(
     server.login_failures = {}  # type: ignore[attr-defined]
     server.admin_token = os.environ.get("PHASE0_ADMIN_TOKEN", "")  # type: ignore[attr-defined]
     # Accounts / invite gate. The store is always available (so profiles work
-    # locally), but sign-in is only *enforced* when RESONA_AUTH_REQUIRED is set.
+    # locally), but sign-in is only *enforced* when SOUNDINATOR_AUTH_REQUIRED is set.
     server.accounts = AccountStore(data / "accounts.db")  # type: ignore[attr-defined]
     server.community = CommunityStore(data / "accounts.db")  # type: ignore[attr-defined]
-    server.auth_required = _env_flag("RESONA_AUTH_REQUIRED")  # type: ignore[attr-defined]
-    server.open_signup = _env_flag("RESONA_OPEN_SIGNUP")  # type: ignore[attr-defined]
-    server.cookie_secure = _env_flag("RESONA_COOKIE_SECURE")  # type: ignore[attr-defined]
-    server.experiments = _env_flag("RESONA_EXPERIMENTS")  # type: ignore[attr-defined]
+    server.auth_required = _env_flag("AUTH_REQUIRED")  # type: ignore[attr-defined]
+    server.open_signup = _env_flag("OPEN_SIGNUP")  # type: ignore[attr-defined]
+    server.cookie_secure = _env_flag("COOKIE_SECURE")  # type: ignore[attr-defined]
+    server.experiments = _env_flag("EXPERIMENTS")  # type: ignore[attr-defined]
     return server
 
 
@@ -1034,7 +1043,7 @@ def main(argv: list[str] | None = None) -> None:
         signup = "open" if getattr(server, "open_signup", False) else "invite-only"
         print(f"  Access         : LOCKED — sign-in required ({signup} registration)")
     else:
-        print(f"  Access         : open (accounts optional; set RESONA_AUTH_REQUIRED=1 to lock)")
+        print(f"  Access         : open (accounts optional; set SOUNDINATOR_AUTH_REQUIRED=1 to lock)")
     print(f"  Ctrl+C to stop\n")
     try:
         server.serve_forever()

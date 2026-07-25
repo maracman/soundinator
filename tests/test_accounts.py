@@ -125,7 +125,7 @@ def _make_static(tmp_path) -> None:
     static = tmp_path / "web" / "static"
     static.mkdir(parents=True)
     (static / "index.html").write_text('<div id="app"></div>', encoding="utf-8")
-    (static / "login.html").write_text("<title>Resona login</title>", encoding="utf-8")
+    (static / "login.html").write_text("<title>Soundinator login</title>", encoding="utf-8")
 
 
 def _serve(server):
@@ -162,7 +162,7 @@ def _req(opener, base, method, path, body=None):
 def test_locked_server_full_flow(tmp_path) -> None:
     _make_static(tmp_path)
     server = build_server("127.0.0.1", 0, root=tmp_path)
-    server.auth_required = True  # simulate RESONA_AUTH_REQUIRED without env
+    server.auth_required = True  # simulate SOUNDINATOR_AUTH_REQUIRED without env
     base = _serve(server)
     opener, cookies = _opener()
     try:
@@ -200,7 +200,7 @@ def test_locked_server_full_flow(tmp_path) -> None:
         )
         assert status == 201
         assert json.loads(raw)["user"]["email"] == "u@b.com"
-        assert any(c.name == "resona_session" for c in cookies)
+        assert any(c.name == "soundinator_session" for c in cookies)
 
         # 5. Now the session unlocks protected APIs and /api/auth/me.
         me = json.loads(_req(opener, base, "GET", "/api/auth/me")[1])
@@ -221,6 +221,36 @@ def test_locked_server_full_flow(tmp_path) -> None:
         # 7. Logout clears the session.
         assert _req(opener, base, "POST", "/api/auth/logout")[0] == 200
         assert json.loads(_req(opener, base, "GET", "/api/auth/me")[1])["user"] is None
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_legacy_session_cookie_still_authenticates(tmp_path) -> None:
+    """A session issued under the working title's cookie name is still honoured.
+
+    The cookie was renamed resona_session -> soundinator_session; reading the old
+    name keeps already-signed-in users from being silently logged out on deploy.
+    """
+    _make_static(tmp_path)
+    server = build_server("127.0.0.1", 0, root=tmp_path)
+    server.auth_required = True
+    base = _serve(server)
+    try:
+        user = server.accounts.register(
+            "legacy@b.com", "password1", invite_code=None, require_invite=False
+        )
+        token = server.accounts.create_session(user["id"])
+
+        def me(cookie: str) -> dict:
+            request = urllib.request.Request(
+                base + "/api/auth/me", headers={"Cookie": cookie}
+            )
+            return json.loads(urllib.request.urlopen(request, timeout=20).read())
+
+        assert me(f"resona_session={token}")["user"]["email"] == "legacy@b.com"
+        assert me(f"soundinator_session={token}")["user"]["email"] == "legacy@b.com"
+        assert me("soundinator_session=bogus")["user"] is None
     finally:
         server.shutdown()
         server.server_close()
