@@ -5831,7 +5831,10 @@ body.explore-mode #app {
   position: relative;
   min-height: 20px;
   background: var(--surface2);
-  border: 1px solid var(--border);
+  /* Outline drawn INSIDE the box: a real border would inset the canvas by
+     1px and knock the guide out of alignment with the ruler and lanes. */
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
   border-radius: 4px;
 }
 .gs-strip.off { opacity: 0.45; }
@@ -5886,9 +5889,11 @@ body.explore-mode #app {
   background: var(--surface);
   color: var(--text3);
 }
-.gs-cell.gs-scale { background: rgba(148,196,255,0.22); color: #b8d8ff; border-color: rgba(148,196,255,0.4); }
-.gs-cell.gs-sub { background: rgba(245,166,35,0.22); color: var(--accent2); border-color: rgba(245,166,35,0.45); }
-.gs-cell.gs-root { background: rgba(180,142,222,0.3); color: #d9c2f0; border-color: rgba(180,142,222,0.55); }
+/* Role colours match the Scale Lab's (.sl-deg-dot): violet root, green
+   sub-scale, neutral in-scale — distinguishable without red/green. */
+.gs-cell.gs-scale { background: rgba(190,205,220,0.16); color: #cfd8e3; border-color: rgba(190,205,220,0.5); }
+.gs-cell.gs-sub { background: rgba(76,175,125,0.24); color: #7fd6a6; border-color: #4caf7d; }
+.gs-cell.gs-root { background: rgba(139,124,246,0.3); color: #c3bafb; border-color: var(--rootc); }
 .tl2-gsbtn.on { color: #b8d8ff; border-color: rgba(148,196,255,0.5); }
 
 /* ── Q10: MIDI recording ─────────────────────────────────── */
@@ -6065,13 +6070,6 @@ body.explore-mode #app {
 }
 .layer-fx-tag:not(.off) .layer-fx-name { color: var(--text); }
 .layer-fx-wet { width: 34px; height: 10px; }
-/* The always-present BASE row (owner 2026-07-09) */
-.layer-row.base-row { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
-.layer-row.base-row.sel { box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px -8px var(--accent); }
-.layer-base-badge {
-  font-size: 0.5rem; font-weight: 700; letter-spacing: 0.08em; color: var(--accent);
-  border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px;
-}
 /* Editable layer titles (double-click to rename) */
 .layer-name-row { display: flex; align-items: center; gap: 5px; margin-bottom: 1px; }
 .layer-name {
@@ -6184,7 +6182,10 @@ body.explore-mode #app {
 .sp-cyl-wrap { position: relative; }
 #spSection, #spCylinder {
   background: var(--surface);
-  border: 1px solid var(--border);
+  /* Inset outline, not a border: a border would shift the cylinder 1px right
+     of the lanes it is supposed to be beat-aligned with. */
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
   border-radius: 4px;
   cursor: crosshair;
 }
@@ -8208,15 +8209,18 @@ body.dragging { cursor: grabbing; user-select: none; }
 .tl2-sp-row.sp-collapsed-row { align-items: flex-start; }
 .sp-cyl-wrap.sp-cyl-collapsed {
   min-height: 0;
-  border: 1px solid rgba(56,189,248,0.26);
+  /* Inset outline again — a border here shifted the slim cylinder 1px off the
+     lanes it is beat-aligned with. */
+  border: 0;
   border-radius: 5px;
   overflow: hidden;
-  box-shadow: inset 0 0 16px -7px rgba(56,189,248,0.45);
+  box-shadow: inset 0 0 0 1px rgba(56,189,248,0.26),
+              inset 0 0 16px -7px rgba(56,189,248,0.45);
 }
 
 .gs-strip {
   background: #0c1117;
-  border-color: rgba(58,66,80,0.72);
+  box-shadow: inset 0 0 0 1px rgba(58,66,80,0.72);
 }
 
 .tl2 { padding-bottom: 6px; }
@@ -9256,6 +9260,11 @@ body.explore-mode .view {
   margin-bottom: 0;
   padding-bottom: 7px;
   border-bottom-color: rgba(58,75,92,0.72);
+  /* label left, panel dice right */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .m2-inspector .macro-card-head > div:first-child {
@@ -9317,6 +9326,32 @@ body.explore-mode .view {
   margin-bottom: 6px;
   font-size: 0.55rem;
 }
+
+/* Subtle panel dice — sits at the right of the panel header, quiet by default
+   (dimmed, no chrome), brightens on hover. Kept small so it reads as an
+   affordance, not a primary control. */
+.m2-inspector .panel-rand-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -3px -2px -3px 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(140,160,180,0.55);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.m2-inspector .panel-rand-btn:hover {
+  color: rgba(225,235,245,0.95);
+  background: rgba(140,160,180,0.14);
+}
+.m2-inspector .panel-rand-btn:active { transform: translateY(0.5px); }
+.m2-inspector .panel-rand-btn .tb-ico { width: 15px; height: 15px; }
 
 .m2-inspector .macro-controls .control-row,
 .m2-inspector .breaks-grid .control-row {
@@ -9766,7 +9801,9 @@ body.explore-mode .view {
 
 .sp-left {
   position: relative;
-  width: 150px;
+  /* Must match .tl2-head — this column is what pushes the cylinder into
+     beat alignment with the lanes. At 150px it sat 40px to their left. */
+  width: 190px;
   height: 105px;
   min-height: 105px;
   padding: 0;
@@ -11097,6 +11134,11 @@ body.explore-mode .view {
 .tb-producer .tb-util-btn:hover { border-color: var(--accent); color: var(--text); }
 .tb-producer .tb-util-btn.tb-icon-only { width: 32px; padding: 0; justify-content: center; }
 .tb-producer .tb-util-btn .tb-ico { width: 16px; height: 16px; }
+/* Musical typing: the lit state says "letter keys are notes right now",
+   and the badge carries the two live values (base octave · velocity). */
+.tb-producer .tb-util-btn.on { border-color: var(--accent); color: var(--text); background: rgba(139,124,246,0.16); }
+.tb-producer .kbd-oct { font-size: 0.66rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.tb-producer .kbd-hint { font-size: 0.7rem; color: var(--text3); white-space: nowrap; }
 /* Zoom's two buttons read as one control (shared context) without a group box. */
 .tb-producer .daw-zoom { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 
@@ -11187,3 +11229,203 @@ body.explore-mode .view {
 .gate-secondary:hover { color: var(--text2); }
 .gate-foot { position: relative; margin: 16px 0 0; font-size: 0.74rem; color: var(--text3); line-height: 1.5; }
 .gate-foot b { color: var(--text2); font-weight: 600; }
+
+/* ── Palette: patches and their variants (producer hierarchy, 2026-07-28) ──
+   A variant is the same patch with one module changed, so it renders as an
+   indented child labelled by the diff — never "v2". Two levels, always. */
+.palette-item.variant {
+  margin-left: 14px; border-left: 2px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+}
+.palette-item.variant::before {
+  content: "└"; position: absolute; left: -11px; top: 6px;
+  color: var(--text3); font-size: 0.7rem; line-height: 1;
+}
+.palette-item.variant { position: relative; }
+.palette-item.variant .pal-name { font-weight: 500; }
+.pal-variant-diff { display: inline-flex; align-items: center; opacity: 0.9; }
+
+/* How many takes play this row, and whether any of them have their own edits. */
+.pal-take-count {
+  flex: 0 0 auto; min-width: 15px; padding: 1px 4px; border-radius: 4px;
+  background: var(--surface2); color: var(--text3); text-align: center;
+  font-size: 0.55rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* The name is the identity — it gets the room. The badge is a count. */
+.pal-top > .pal-name { flex: 1 1 auto; min-width: 0; }
+.daw-palette.min .pal-kind { display: none; }
+.pal-diverged { color: var(--accent); font-style: normal; font-size: 0.8em; vertical-align: 1px; }
+
+/* Staging strip: this take has edits that belong to no patch yet. Shown only
+   while the take is selected — the persistent form is the ● above. */
+.pal-stage-strip {
+  margin: 2px 0 4px 14px; padding: 6px 7px; border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface2));
+  display: flex; flex-direction: column; gap: 5px;
+}
+.pal-stage-what { color: var(--text2); font-size: 0.6rem; line-height: 1.3; }
+.pal-stage-what b { color: var(--text); font-weight: 600; }
+.pal-stage-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.pal-stage-actions .btn { padding: 2px 7px; font-size: 0.58rem; }
+.daw-palette.min .pal-stage-what { display: none; }
+
+/* ── Superseded modules (producer hierarchy, 2026-07-28) ──────────────────
+   A superseded control stays VISIBLE and readable — it shows the value that
+   is actually winning and names who won. Hiding it is what made the
+   hierarchy unguessable in the first place. */
+.module-owner-chip {
+  flex: 0 0 auto; margin-left: 5px; padding: 0 4px; border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: color-mix(in srgb, var(--accent) 80%, var(--text));
+  font-size: 0.5rem; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
+  text-transform: uppercase; cursor: help;
+}
+.patch-pane.superseded .patch-degrees,
+.patch-pane.superseded .patch-engine-knobs,
+.patch-scale.superseded .patch-degrees { opacity: 0.5; }
+.patch-pane.superseded .patch-pane-name { color: var(--text3); }
+.superseded-note { color: color-mix(in srgb, var(--accent) 62%, var(--text3)); }
+
+/* The inspector says what it is editing, truthfully. */
+.patch-inspector-badges .patch-local-badge.diverged {
+  color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+/* Note-engine quick dials */
+.patch-engine-knobs {
+  display: flex; flex-wrap: wrap; gap: 2px; align-items: flex-start;
+  padding: 2px 0 4px;
+}
+.patch-engine-knobs .knob-cell { width: 46px; }
+.patch-surprise-dims { display: flex; gap: 3px; padding-bottom: 4px; }
+.patch-surprise-dims i {
+  padding: 0 3px; border-radius: 3px; background: var(--surface2);
+  color: var(--text3); font-style: normal; font-size: 0.5rem; font-weight: 600;
+}
+.patch-own-head {
+  display: flex; align-items: center; gap: 4px;
+  color: var(--text3); font-size: 0.56rem; cursor: pointer;
+}
+.patch-own-head input { accent-color: var(--accent); }
+
+/* Percussion group header doubles as its Library route and drop target. */
+.patch-lyr-group { display: flex; align-items: center; gap: 5px; }
+.patch-lyr-group .saem-route { flex: 0 0 auto; }
+.patch-lyr-group .patch-lyr-edit {
+  margin-left: auto; padding: 0 4px; border: 0; background: none;
+  color: var(--text3); font-size: 0.62rem; cursor: pointer;
+}
+.patch-lyr-group .patch-lyr-edit:hover { color: var(--text); }
+
+/* A drop that cannot work must not look like one that can. */
+.drop-reject {
+  outline: 1px dashed color-mix(in srgb, #e0524d 70%, var(--border));
+  outline-offset: 2px; border-radius: 6px; cursor: not-allowed;
+}
+
+/* ── Thread head: only what the ARRANGEMENT owns (2026-07-28) ─────────────
+   Two flags, because only two facts are true of a whole thread — a thread can
+   carry takes from several patches, so anything take-level would change
+   meaning as the playhead crossed regions. Those markers live on the region. */
+/* Compact glyphs on the controls row. As their own row they made every head
+   taller than its lane, which showed up as a gap under each track. */
+.tl2-flag {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 15px; padding: 0; border: 1px solid var(--border);
+  border-radius: 3px; background: none; color: var(--text3);
+  font-size: 0.66rem; line-height: 1; cursor: pointer;
+}
+.tl2-flag:hover { border-color: var(--text3); color: var(--text2); }
+.tl2-flag.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: color-mix(in srgb, var(--accent) 85%, var(--text));
+}
+/* Drawn flag icons: a room with a source in it, and the circle of fifths.
+   Two unicode circles read as the same button at this size. */
+.tl2-flag-svg { width: 13px; height: 13px; display: block; }
+.tl2-flag-svg .ring { fill: none; stroke: currentColor; stroke-width: 1; opacity: 0.5; }
+.tl2-flag-svg .head { fill: currentColor; opacity: 0.55; }
+.tl2-flag-svg .src  { fill: currentColor; opacity: 0.9; }
+.tl2-flag-svg .deg  { fill: currentColor; opacity: 0.4; }
+.tl2-flag-svg .deg.on { fill: currentColor; opacity: 1; }
+.tl2-flag.on .tl2-flag-svg .ring { opacity: 0.75; }
+.tl2-takes {
+  flex: 0 0 auto; padding: 0 3px; border-radius: 3px; background: var(--surface2);
+  color: var(--text3); font-size: 0.52rem; font-variant-numeric: tabular-nums;
+}
+
+/* Per-take markers on the region — one patch per region, so unambiguous. */
+.tl2-mark {
+  position: absolute; top: 2px; font-size: 0.6rem; line-height: 1;
+  color: var(--accent); text-shadow: 0 1px 2px rgba(0,0,0,.8); pointer-events: auto; cursor: help;
+}
+.tl2-mark-own { right: 14px; }
+.tl2-mark-baked { right: 3px; color: color-mix(in srgb, var(--text) 70%, var(--accent)); }
+
+.tl2-head-ctl .tl2-db { color: var(--text3); font-size: 0.52rem; font-variant-numeric: tabular-nums; }
+
+/* A module the patch does not have must not look like one it does — the
+   defaults would otherwise read as the patch's own settings. */
+.patch-pane-absent {
+  padding: 8px 7px; border: 1px dashed var(--border); border-radius: 5px;
+  background: color-mix(in srgb, var(--surface2) 60%, transparent);
+  color: var(--text3); font-size: 0.6rem; line-height: 1.35;
+}
+
+/* The Harmonic-guide editor opens beneath the change point it edits. It stays
+   in normal flow so its row GROWS with the divisions — absolutely positioned,
+   a 12-division guide wrapped to two rows and the second was clipped. */
+.gs-editor { flex: 0 0 auto; align-self: flex-start; }
+.gs-editor .gs-roll { flex-wrap: wrap; }
+/* Delete the anchor under the playhead, in the space area's top-right. */
+/* Sits in the cross-section's corner — the slice whose anchor it removes. */
+.sp-left { position: relative; }
+.sp-anchor-del {
+  position: absolute; top: 2px; right: 3px; z-index: 5;
+  padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px;
+  background: color-mix(in srgb, var(--surface2) 88%, transparent);
+  color: var(--text2); font-size: 0.72rem; line-height: 1.2; cursor: pointer;
+}
+.sp-anchor-del:hover { border-color: #e0524d; color: #e0524d; }
+.sp-addall {
+  padding: 0 5px; border: 1px solid var(--border); border-radius: 3px;
+  background: none; color: var(--text3); font-size: 0.55rem; cursor: pointer;
+}
+.sp-addall:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Provisional vs committed takes (owner 2026-07-28) ────────────────────
+   Both region bodies now show their real notes, so the shape alone no longer
+   says which kind of take you are looking at. The distinction that matters is
+   whether the notes can still change:
+
+     generative — one roll of the dice. Reroll or edit the patch and these
+                  notes change. Drawn soft: rounded caps, feathered ends, a
+                  little glow. It reads as "about here".
+     baked      — frozen, editable note data. Drawn crisp: square caps, full
+                  strength, no bloom. It reads as "exactly here".
+
+   Corner/edge softness carries the meaning; the region outline (dashed vs
+   solid) and the ▦ marker say the same thing again for anyone who does not
+   read the texture. */
+.tl2-roll-generative .tl2-mini-note {
+  height: 3px;
+  border-radius: 2px;                       /* rounded — provisional */
+  opacity: 0.82;
+  filter: blur(0.35px);                     /* soft edges */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 78%, transparent 100%);
+  box-shadow: 0 0 6px hsla(var(--track-h, 36), 85%, 60%, calc(var(--a) * 0.45));
+}
+.tl2-roll-baked .tl2-mini-note {
+  height: 4px;
+  border-radius: 0;                         /* square — committed */
+  opacity: 1;
+  filter: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+  box-shadow: none;
+  outline: 0.5px solid hsla(var(--track-h, 36), 70%, 22%, 0.7);
+}

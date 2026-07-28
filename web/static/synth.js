@@ -42,6 +42,99 @@ export class SeededRNG {
  * as the captured layers. Kept pure so UI and audio behaviour can be verified
  * without constructing a Web Audio graph.
  */
+
+// ── Musical typing: the computer keyboard as a note source (Q10b) ──
+const KBD_NOTE_CODES = Object.freeze({
+  KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6,
+  KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11, KeyK: 12, KeyO: 13,
+  KeyL: 14, KeyP: 15, Semicolon: 16, Quote: 17,
+});
+export function kbdMidiNote(code, octaveShift = 0) {
+  const semis = KBD_NOTE_CODES[code];
+  if (semis === undefined || !Number.isFinite(octaveShift)) return null;
+  const note = 60 + Math.round(octaveShift) * 12 + semis;
+  return note >= 0 && note <= 127 ? note : null;
+}
+export function kbdIsNoteCode(code) {
+  return Object.prototype.hasOwnProperty.call(KBD_NOTE_CODES, code);
+}
+
+// Everything _buildScale() reads. A change to any of these means a running
+// engine's Scale is stale and has to be rebuilt.
+const SCALE_INPUT_KEYS = ["scaleMode", "scalePreset", "edoDivisions", "customDegrees",
+  "subScaleNotes", "subScaleWeight", "tonicHz", "degreeTuning"];
+function sameScaleInput(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((v, i) => v === b[i]);
+  }
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const ka = Object.keys(a), kb = Object.keys(b);
+    return ka.length === kb.length && ka.every(k => a[k] === b[k]);
+  }
+  return a === b;
+}
+
+/**
+ * Merge params into a RUNNING engine, rebuilding its Scale if any scale input
+ * moved. The Scale is built once in the constructor, so without this a take
+ * already sounding when a Harmonic-guide change point arrives would keep
+ * generating from the scale it started in — p would say one thing and the
+ * pitches another. Only rebuilt when an input actually changed.
+ */
+export function applyEngineParams(engine, params = {}) {
+  if (!engine) return;
+  const before = engine.p;
+  engine.p = engineParams({ ...before, ...params });
+  if (SCALE_INPUT_KEYS.some(key => !sameScaleInput(before[key], engine.p[key]))) {
+    engine.scale = engine._buildScale();
+  }
+}
+
+/**
+ * Capture a span the way it will PLAY, including params that change part-way
+ * through. `paramsAtBeat(beat)` returns what is in force at that beat; when it
+ * changes the running engine is updated in place — one engine, so the motif
+ * and the walk carry across the boundary exactly as they do live. This is what
+ * lets a region's drawing show a Harmonic-guide change point mid-take.
+ */
+export function captureSpanEvolving(initialParams, spanSec, paramsAtBeat = null) {
+  const params = engineParams(initialParams);
+  const engine = new GenerationEngine(params);
+  engine.initialise();
+  const beatDiv = params.beatDivisions || 1;
+  const divSec = 60 / ((params.tempo || 104) * beatDiv);
+  const notes = [];
+  let offsetDivs = 0, guard = 0, lastKey = null;
+  while (offsetDivs * divSec < spanSec && guard++ < 4000) {
+    if (paramsAtBeat) {
+      const at = paramsAtBeat(offsetDivs / beatDiv);
+      if (at && at.key !== lastKey) {
+        if (lastKey !== null) applyEngineParams(engine, at.params);
+        lastKey = at.key;
+      }
+    }
+    const note = engine.nextNote();
+    if (!note) break;
+    const noteDur = note.durationDivs * divSec;
+    if (offsetDivs * divSec + noteDur > spanSec + 1e-6) break;
+    notes.push({ ...note, offsetDivs, performance: notePerformance(note) });
+    offsetDivs += note.durationDivs;
+  }
+  return notes;
+}
+
+/**
+ * The grid a BAKED take is scheduled on. Notes carry the grid they were baked
+ * with; scheduling used to read the live params instead, so changing a patch's
+ * grid after baking rescaled the take in time while the roll drew the old one.
+ */
+export function bakedGridFor(notes, params = {}) {
+  const stored = (Array.isArray(notes) ? notes : [])
+    .find(note => Number.isFinite(note?.beatDivisions))?.beatDivisions;
+  return stored || params.beatDivisions || 1;
+}
+
 export function layerMixPlan(params = {}, layerRenders = []) {
   const normalized = engineParams(params);
   const rawGain = Number(normalized.baseLayerGain ?? 1);
@@ -3537,7 +3630,7 @@ export class SynthEngine {
     this._percLayers = this._normalizePercLayers(params);
     this._percussionOnly = !!params.percussionOnly;
     this._engine = new GenerationEngine(params); // rng for render-time draws
-    const beatDiv = params.beatDivisions || 1;
+    const beatDiv = bakedGridFor(notes, params);
     const divSec = 60 / ((params.tempo || 104) * beatDiv);
     // Loop semantics (bake design): an extended baked region repeats its
     // stored notes every loopBeats, clipped to totalBeats.
@@ -3792,7 +3885,7 @@ export class SynthEngine {
 
   updateGenerationParams(params = {}) {
     if (!this._engine) return;
-    this._engine.p = engineParams({ ...this._engine.p, ...params });
+    applyEngineParams(this._engine, params);
   }
 
   // Live-apply percussion edits (owner 2026-07-10): rebuild the normalised

@@ -93,6 +93,187 @@ export function capturePartsFor(params = {}, section = "full", explicit = null) 
   return out;
 }
 
+// ── Module slices (producer hierarchy) ──────────────────────
+// A patch is five addressable modules. Flat keys already classify via
+// capturePartForParam, but the two STRUCTURAL fields do not: `layers` belongs
+// to no part at all, and `percLayers` maps wholly to percussion even though
+// each layer's `space` is really the space module's. Splitting them here is
+// what makes "change only that part of the patch" expressible.
+//
+// Both helpers work on the SERIALIZED form, because migrateParamsShape makes
+// every sound key a non-enumerable accessor — an Object.entries() loop over a
+// migrated patch sees no sound at all, which is why module swaps silently did
+// nothing before this existed.
+//
+//   notes       layers[].sound + gain/solo/mute/name/hue/id, flat sound mirror
+//   space       layers[].space, percLayers[].space, space*/reverb*/ear/pinna
+//   percussion  percLayers minus .space, perc* scalars
+//   stave/clef  flat keys only
+
+const MODULE_STRUCTURAL_KEYS = new Set(["layers", "percLayers", "layerSpace", "percSpace"]);
+
+function layerWithoutSpace(layer) {
+  const { space: _space, subnote: _subnote, ...rest } = layer || {};
+  return { ...rest, sound: { ...(layer?.sound || layer?.subnote || {}) } };
+}
+
+/** The slice of `params` owned by `part`. */
+export function extractModule(params = {}, part) {
+  return sliceOf(serializeParams(params), part);
+}
+
+// The same work on an ALREADY-serialized patch. serializeParams is the
+// expensive step (it re-normalizes every layer and clones fx chains), so
+// anything comparing several modules of the same patch serializes once and
+// calls this — divergedModules used to pay for it ten times over.
+function sliceOf(ser, part) {
+  const out = {};
+  for (const [key, value] of Object.entries(ser)) {
+    if (MODULE_STRUCTURAL_KEYS.has(key)) continue;
+    if (capturePartForParam(key) === part) out[key] = value;
+  }
+  if (part === "notes") {
+    out.layers = (ser.layers || []).map(layerWithoutSpace);
+  } else if (part === "space") {
+    out.layerSpace = (ser.layers || []).map(layer => ({ ...(layer.space || {}) }));
+    out.percSpace = (ser.percLayers || []).map(layer => (layer?.space ? { ...layer.space } : null));
+  } else if (part === "percussion") {
+    out.percLayers = (ser.percLayers || []).map(layer => {
+      const { space: _space, ...rest } = layer || {};
+      return { ...rest };
+    });
+  }
+  return out;
+}
+
+function sliceHasPart(slice, part) {
+  if (part === "notes" && Array.isArray(slice?.layers)) return true;
+  if (part === "space" && (Array.isArray(slice?.layerSpace) || Array.isArray(slice?.percSpace))) return true;
+  if (part === "percussion" && Array.isArray(slice?.percLayers)) return true;
+  return Object.keys(slice || {}).some(key =>
+    !MODULE_STRUCTURAL_KEYS.has(key) && capturePartForParam(key) === part);
+}
+
+/** `params` with `part` replaced by `slice`. Returns the serialized shape. */
+export function applyModule(params = {}, part, slice = {}) {
+  const ser = serializeParams(params);
+  if (!sliceHasPart(slice, part)) return ser;
+  const next = { ...ser };
+  for (const key of Object.keys(next)) {
+    if (MODULE_STRUCTURAL_KEYS.has(key)) continue;
+    if (capturePartForParam(key) === part) delete next[key];
+  }
+  for (const [key, value] of Object.entries(slice || {})) {
+    if (MODULE_STRUCTURAL_KEYS.has(key)) continue;
+    if (capturePartForParam(key) === part) next[key] = value;
+  }
+  const prevLayers = Array.isArray(ser.layers) ? ser.layers : [];
+  const prevPerc = Array.isArray(ser.percLayers) ? ser.percLayers : [];
+
+  if (part === "notes") {
+    // A legacy slice carries only flat sound keys; ensureLayers turns those
+    // into the canonical single base layer so both shapes land the same way.
+    const incoming = Array.isArray(slice.layers) && slice.layers.length
+      ? slice.layers : ensureLayers(slice).layers;
+    // Swapping a SOUND must never teleport sources: positions stay put, and a
+    // deeper incoming stack inherits the base position for its new layers.
+    const baseSpace = prevLayers[0]?.space
+      || { angle: ser.spaceAzimuth ?? 0, dist: ser.spaceDistance ?? 2.5 };
+    next.layers = incoming.map((layer, i) => ({
+      ...layerWithoutSpace(layer),
+      space: { ...(prevLayers[i]?.space || baseSpace) },
+    }));
+  } else if (part === "space") {
+    const spaces = Array.isArray(slice.layerSpace) ? slice.layerSpace : null;
+    if (spaces && prevLayers.length) {
+      const fallback = spaces[0] || { angle: 0, dist: 2.5 };
+      next.layers = prevLayers.map((layer, i) => ({ ...layer, space: { ...(spaces[i] || fallback) } }));
+    }
+    const percSpaces = Array.isArray(slice.percSpace) ? slice.percSpace : null;
+    if (percSpaces && prevPerc.length) {
+      next.percLayers = prevPerc.map((layer, i) => ({
+        ...layer, space: percSpaces[i] ? { ...percSpaces[i] } : (layer.space || null),
+      }));
+    }
+  } else if (part === "percussion") {
+    const incoming = Array.isArray(slice.percLayers) ? slice.percLayers : null;
+    if (incoming) {
+      // Hits keep whatever position the space module put them at.
+      next.percLayers = incoming.map((layer, i) => ({
+        ...layer,
+        space: prevPerc[i]?.space ? { ...prevPerc[i].space } : (layer?.space ? { ...layer.space } : null),
+      }));
+    }
+  }
+  return serializeParams(migrateParamsShape(next));
+}
+
+// Key-order-independent structural equality, so "has this module actually
+// changed?" cannot be answered wrongly by two objects that merely serialize in
+// a different order.
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (typeof a !== "object") return Number.isNaN(a) && Number.isNaN(b);
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    return a.length === b.length && a.every((item, i) => deepEqual(item, b[i]));
+  }
+  const ka = Object.keys(a), kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  return ka.every(key => Object.prototype.hasOwnProperty.call(b, key) && deepEqual(a[key], b[key]));
+}
+
+/** Do two patches carry the same `part`? Drives divergence and auto-dissolve. */
+export function modulesEqual(a, b, part) {
+  return deepEqual(sliceOf(serializeParams(a || {}), part), sliceOf(serializeParams(b || {}), part));
+}
+
+/**
+ * Does this slice actually CARRY the module, or is it an empty husk?
+ *
+ * The pre-2026-07-28 inspector forked a take by cloning `regionPatch()`, which
+ * could fall through to an empty `track.instrumentParams`. Diffing that husk
+ * against a real patch reports "the sound differs" — and applying it gives the
+ * take a sound source with no source in it, i.e. silence. An absent module is
+ * not a deliberate edit, so it must never become an override.
+ */
+// Keys that exist on every normalized patch whether or not anything was ever
+// set: an empty fx chain and the base layer's own bookkeeping. They must not
+// count as "this module has content".
+const HOLLOW_NOTE_KEYS = new Set(["baseLayerGain", "baseLayerSolo", "spectralProfileName", "effectsChain", "stageEffectsOn"]);
+function hasRealKeys(obj) {
+  return Object.entries(obj || {}).some(([key, value]) => {
+    if (HOLLOW_NOTE_KEYS.has(key)) return Array.isArray(value) ? value.length > 0 : false;
+    return value !== undefined;
+  });
+}
+
+export function moduleSliceIsEmpty(slice, part) {
+  if (!slice || typeof slice !== "object") return true;
+  const flat = Object.fromEntries(Object.entries(slice).filter(([key]) =>
+    !MODULE_STRUCTURAL_KEYS.has(key) && capturePartForParam(key) === part));
+  if (part === "notes") {
+    const layers = Array.isArray(slice.layers) ? slice.layers : [];
+    // normalizeLayer gives every layer `sound: { effectsChain: [] }`, so an
+    // untouched husk looks populated unless the hollow keys are discounted.
+    return !layers.some(layer => hasRealKeys(layer?.sound)) && !hasRealKeys(flat);
+  }
+  if (part === "percussion") {
+    return !(Array.isArray(slice.percLayers) && slice.percLayers.length) && !hasRealKeys(flat);
+  }
+  if (part === "space") {
+    return !(Array.isArray(slice.layerSpace) && slice.layerSpace.length) && !hasRealKeys(flat);
+  }
+  return !hasRealKeys(flat);
+}
+
+/** Which of the five modules differ between two patches. */
+export function divergedModules(a, b) {
+  const sa = serializeParams(a || {}), sb = serializeParams(b || {});
+  return CAPTURE_PARTS.filter(part => !deepEqual(sliceOf(sa, part), sliceOf(sb, part)));
+}
+
 export function extractInstrumentParams(params = {}) {
   const out = {};
   for (const [key, value] of Object.entries(serializeParams(params))) {
@@ -349,6 +530,46 @@ export const DEFAULTS = {
   intervalPeakedness: 2.0,
   melodyPattern: "walk",
   attackNoiseLevel: 1,
+  attackNoiseDirect: 0,
+  attackNoiseVelocityExponent: 1,
+  attackNoiseByRegister: [],
+  envelopeAttackByRegister: [],
+  envelopeAttackByRegisterDynamic: [],
+  vibratoByRegisterDynamic: [],
+  performanceRole: null,
+  onsetSpectrumTilt: 0,
+  onsetSpectrumDecay: 0.06,
+  articulationCoupling: 0,
+  articulationStrength: 0.5,
+  articulationVariation: 0,
+  articulationVelocitySlope: 0,
+  onsetWanderCents: 0,
+  onsetWanderSettlePeriods: 12,
+  bowScratchLevel: 0,
+  bowNoiseLevel: 0,
+  bowNoiseVelocityExponent: null,
+  windBreathLevel: 0,
+  pianoActionNoiseLevel: 0,
+  envelopeAnomalyLevel: 0,
+  onsetScoopDepthCents: 0,
+  onsetScoopSettle: 0.06,
+  onsetScoopRearticulatedScale: 0.35,
+  onsetScoopRegisterSlope: 0,
+  onsetScoopVelocitySlope: 0,
+  // A-VOICE-03: neutral until a licensed/QC consonant corpus is named.
+  consonantClass: "none",
+  consonantPlace: "alveolar",
+  consonantVoiced: true,
+  consonantStrength: 0,
+  consonantBurstHz: 0,
+  consonantBurstDurationMs: 0,
+  consonantVotMs: 0,
+  consonantF2LocusHz: 0,
+  consonantTransitionMs: 0,
+  consonantNasalZeroHz: 0,
+  consonantFricativeHz: 0,
+  consonantPreBeatMs: 0,
+  consonantProvenance: null,
   arpStep: 2,
   arpOctaves: 1,
   intervalRange: 7,
@@ -455,12 +676,39 @@ export const DEFAULTS = {
   vibratoRate: 5.5,
   vibratoRateSd: 0.7,
   spectralProfile: "violin",
+  // T-033: automatic physical string/course selection, or an explicit
+  // instrument-valid sul*/string* key. Per-string tables remain pinned data.
+  stringSelect: "auto",
   // Tone v2 excitation (T2): how energy enters the resonator. Defaults
   // match the default profile (violin); choosing a profile re-seats them.
   excitationType: "bow",
   excitationPosition: 0.13,
   excitationHardness: 0.6,
   excitationHuman: 0.4,
+  // Sound Generator 2.0 model extensions are neutral until a fitted preset
+  // opts in, preserving every existing factory/user sound.
+  velocityHardnessCoupling: 0,
+  breathNoiseColor: 0,
+  breathLevelScale: 1,
+  breathVelocityExponent: 1,
+  breathTurbulence: 0,
+  breathBodyAmount: 0,
+  dynamicBlare: 0,
+  decaySecondStage: 0,
+  decaySecondRatio: 1,
+  // Zero coefficients defer to the measured profile.  The blend amount is
+  // exact-neutral; Loss remains a relative transform around the fit anchor.
+  materialT60Ref: 0,
+  materialT60Slope: 0,
+  materialT60Anchor: 0.45,
+  materialT60FitAmount: 0,
+  glottalTilt: 0,
+  glottalTiltDynamicSlope: 0,
+  singerFormantAmount: 0,
+  // A-VOICE-01/02: omitted/neutral values retain the former fixed body.
+  singerFormantHz: 3000,
+  formantTuneToF0: 0,
+  voiceBreathSync: 0,
   partialTransfer: 0.15,
   bodyType: "auto",
   bodyArticulation: 0,
@@ -498,18 +746,50 @@ export const DEFAULTS = {
   spectralProb: 1,
   spectralMix: 0.65,
   spectralPartials: 20,
+  // Renderer-only audibility floor; fitted prints remain full resolution.
+  spectralCullThreshold: 0.0005,
   spectralSpread: 0.45,
   spectralPartialMeans: null,
   spectralPartialSds: null,
+  // A-VOICE-05 / T-065: pinned register x dynamic source rows. null consumes
+  // the measured profile table when one exists; absent everywhere preserves
+  // the legacy explicit-means/register path exactly.
+  spectralPartialsByRegisterDynamic: null,
+  // Optional instrument-owned multiplier rows for the pinned wind-breath
+  // component: {f0Hz, velocity, levelScale}. Null is exact-neutral.
+  windBreathLevelByRegisterDynamic: null,
   spectralPartialDyns: null,
   spectralPartialRegs: null,
   spectralDynamicAmount: 0.8,
   spectralRegisterAmount: 0.55,
-  spectralResonanceAmount: 0.35,
+  // T-004: fitted residual tables have the measured body divided out, so
+  // amount 1 reconstructs reality. Legacy saved presets that explicitly
+  // carry another value retain it.
+  spectralResonanceAmount: 1,
   spectralLoudnessNorm: 0.65,
   // Material damping law: 0 = glass/metal (all partials ring), 1 = wood/felt
   // (high partials die fast). Per-instrument defaults ride the profile.
   partialMaterial: 0.45,
+  // Independent note-off damping: 0 preserves the material ring; 1 models
+  // firm damper/hand contact without changing the held-note decay law.
+  releaseDamping: 0,
+  // T-099: bowed release has three independent, profile-owned states.
+  // Null is exact legacy; values are admitted only from instrument-owned
+  // release analysis and never transfer between violin and cello.
+  releasePartialDecayByStringRank: null,
+  releaseBodyModes: null,
+  bowLiftResidual: null,
+  // L18/T-066: pinned note-off damper-contact rows. The serialized ADSR
+  // sustain remains for migration but cannot sustain strike/pluck modes.
+  damperByRegister: null,
+  // T-072: profile-owned per-mode bar controls. null is exact legacy and
+  // lets a measured glock/mallet profile supply its structured rows.
+  barModeRatioOffsetsCentsByRegister: null,
+  barModeT60ByRegister: null,
+  barStrikePositionWeights: null,
+  polarisationAmount: 0,
+  polarisationSplitCents: 0,
+  polarisationDecayRatio: 1,
   // Partial macros: transforms over the whole harmonic set (see
   // docs/PARTIAL_MACROS_DESIGN.md). Tilt = spectral slope; odd/even
   // balance; comb = movable boost of a related-frequency group; six
@@ -529,6 +809,7 @@ export const DEFAULTS = {
   spectralDriftDepth: 0.35,
   spectralDriftRate: 6,
   spectralStretchCents: 0,
+  resonatorClass: "string",
   envelopeProb: 0.35,
   envelopeRange: 0.2,
   envelopeAttack: 0.008,

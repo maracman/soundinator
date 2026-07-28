@@ -43,6 +43,8 @@ import {
   globalScaleAt,
   trackSpaceAt,
   midiMapDegree,
+  kbdMidiNote,
+  kbdIsNoteCode,
   CULTURAL_SCALES,
   itdSeconds,
   headShadowDb,
@@ -53,6 +55,8 @@ import {
   spaceArrivalDelay,
   EAR_MODELS,
   earlyReflectionPattern,
+  bakedGridFor,
+  captureSpanEvolving,
 } from "./synth.js";
 import { FACTORY_PRESETS } from "./factory-presets.js";
 import { FACTORY_SESSIONS } from "./factory-sessions.js";
@@ -66,11 +70,46 @@ import {
   CAPTURE_PARTS,
   capturePartForParam,
   capturePartsFor,
+  extractModule,
+  applyModule,
+  modulesEqual,
+  divergedModules,
+  moduleSliceIsEmpty,
   extractInstrumentParams,
   ensurePercLayers,
   resolvePercEnabled,
   cloneFxChain,
 } from "./params.js";
+// The resolution law lives in its own DOM-free module so it can be asserted
+// headlessly (tests/js/producer-hierarchy.test.js). app.js keeps thin wrappers
+// that supply the module-global `arrangement`.
+import {
+  SESSION_CONTEXT_PARAMS,
+  defaultArrangementContext,
+  spCentroid as _spCentroid,
+  spTrackSources as _spTrackSources,
+  spIsMulti as _spIsMulti,
+  spTransformSources,
+  spApplyThreadToPatch,
+  isPercussionOnlyPatch,
+  palettePatchFor,
+  staticTrackPos,
+  harmonicMarkerIdAt,
+  regionOverriddenParts,
+  paletteById as _paletteById,
+  rootPatchOf as _rootPatchOf,
+  paletteVariantsOf as _paletteVariantsOf,
+  variantDiffParts as _variantDiffParts,
+  takesOfPatch as _takesOfPatch,
+  divergedTakesOfPatch as _divergedTakesOfPatch,
+  variantForTake,
+  variantLabel,
+  redundantVariants,
+  applyModulePlan,
+  moduleAuthority as _moduleAuthority,
+  regionVoiceParams as _resolveRegionVoiceParams,
+  regionPlayParams as _resolveRegionPlayParams,
+} from "./producer-resolve.js";
 // EFFECTS stage (docs/EFFECTS_CONTRACT.md) — browser/stack/faces are driven
 // from this registry. Importing also registers the whole effect roster.
 import {
@@ -90,7 +129,7 @@ const ENGAGE_KEY = "phase0.engagement.v3";
 // Bump APP_VERSION whenever generation semantics change: it is folded into
 // every stimulus_id, so identical parameters across app versions do not
 // collide in analysis.
-const APP_VERSION = "sound-studio-0.11.0"; // measured KEMAR HRIR convolution ear model (route 2) alongside the parametric fit
+const APP_VERSION = "sound-studio-0.14.0"; // Measured per-instrument bodies plus Human onset articulation
 // Visible build tag: semantic version + the asset build number, read from
 // this module's own ?v= cache-buster so the display can never drift from
 // what the browser actually loaded.
@@ -236,21 +275,54 @@ function capturePartList(parts) { return CAPTURE_PARTS.filter(part => parts?.[pa
 
 function extractCaptureParams(params, selected) {
   const out = {};
-  const serialized = serializeParams(params || {});
-  const selectedLayer = params?.layers?.find(layer => layer.id === params.selectedLayerId) || params?.layers?.[0];
-  const source = { ...serialized };
-  if (selected?.notes && selectedLayer) {
-    for (const key of Object.keys(source)) {
-      if (capturePartForParam(key) === "notes") delete source[key];
-    }
-    Object.assign(source, selectedLayer.sound || selectedLayer.subnote || {});
+  for (const part of CAPTURE_PARTS) {
+    if (selected?.[part]) Object.assign(out, extractModule(params, part));
   }
-  for (const [key, value] of Object.entries(source)) {
-    const part = capturePartForParam(key);
-    if (part && selected?.[part]) out[key] = value;
+  // Studio nuance, preserved: saving SOUND while a stacked layer is under edit
+  // saves THAT layer — it is the one you are hearing and shaping. (Before the
+  // module helpers existed this dropped the layer stack entirely.)
+  if (selected?.notes) {
+    const layers = params?.layers || [];
+    const sel = layers.find(layer => layer.id === params?.selectedLayerId);
+    if (sel && sel.id !== layers[0]?.id) {
+      const solo = extractModule(migrateParamsShape({ layers: [{ ...sel, id: "base" }] }), "notes");
+      for (const key of Object.keys(out)) if (capturePartForParam(key) === "notes") delete out[key];
+      delete out.layers;
+      Object.assign(out, solo);
+    }
   }
   return out;
 }
+
+// The two thread-level flags get drawn icons rather than glyphs: the unicode
+// marks for space and scale were both circles, so at 15px they read as the
+// same button. These say what they are at a glance —
+//   space   a listener at the centre of a room, one source off to the side
+//   guide   the circle of fifths: twelve positions, a few of them in play
+const THREAD_FLAG_ICON = {
+  space: `<svg viewBox="0 0 16 16" aria-hidden="true" class="tl2-flag-svg">
+    <circle cx="8" cy="9" r="6.2" class="ring"/><circle cx="8" cy="9" r="3.4" class="ring"/>
+    <circle cx="8" cy="9" r="1.5" class="head"/><circle cx="12.1" cy="5.1" r="1.7" class="src"/>
+  </svg>`,
+  clef: `<svg viewBox="0 0 16 16" aria-hidden="true" class="tl2-flag-svg">
+    <circle cx="8" cy="8" r="6" class="ring"/>
+    ${Array.from({ length: 12 }, (_, i) => {
+      const a = (i * 30 - 90) * Math.PI / 180;
+      const on = i === 0 || i === 4 || i === 7;   // a triad's worth, lit
+      return `<circle cx="${(8 + Math.cos(a) * 6).toFixed(2)}" cy="${(8 + Math.sin(a) * 6).toFixed(2)}" r="${on ? 1.6 : 0.85}" class="${on ? "deg on" : "deg"}"/>`;
+    }).join("")}
+  </svg>`,
+};
+
+// The five modules as single marks, for surfaces too tight for the full
+// notation icon (which always draws all five slots and needs ~40px).
+const MODULE_GLYPH = {
+  notes: "\u25eb",       // sound — split block
+  space: "\u233e",       // space — source in a room
+  stave: "\u266a",       // note engine
+  clef: "\u2299",        // scale & harmony
+  percussion: "\u229a",  // percussion hits
+};
 
 function notationIconHTML(parts, { compact = false, title = "" } = {}) {
   const active = Array.isArray(parts) ? new Set(parts) : new Set(capturePartList(parts));
@@ -345,6 +417,7 @@ const TB_ICONS = {
   zoomOut: `<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.7-4.7"/><path d="M7.5 10.5h6"/>`,
   zoomIn:  `<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.7-4.7"/><path d="M7.5 10.5h6M10.5 7.5v6"/>`,
   midi:    `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="7" r="1.15" fill="currentColor" stroke="none"/><circle cx="7.4" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="16.6" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="8.8" cy="15" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="15" r="1.15" fill="currentColor" stroke="none"/>`,
+  kbd:     `<rect x="3" y="6.5" width="18" height="11" rx="1.5"/><path d="M7.5 6.5v6.5M12 6.5v6.5M16.5 6.5v6.5"/>`,
 };
 
 // Inline SVG for a top-bar control. `mods` adds extra classes (e.g. an icon
@@ -511,17 +584,8 @@ function wireSmartCombos(root, onSelect) {
 // shared space) which the session provides and the instrument inherits.
 // Loading an instrument therefore merges over the current state, leaving
 // the musical context untouched.
-const SESSION_CONTEXT_PARAMS = new Set([
-  // A palette patch now owns both its Macro and Sub-note modules. Only the
-  // transport seed/tempo belong to the session; scale, root, dynamics and
-  // percussion remain editable parts of the patch (global scale still wins
-  // later for tracks that opt in).
-  "seed", "tempo",
-  // Owner 07-07: reverb/space keys are no longer session context — each
-  // patch owns its space (SPACE inspector) and the GLOBAL space overrides
-  // it only when activated. Instruments saved before this change simply
-  // lack the keys and inherit the arrangement context defaults as before.
-]);
+// SESSION_CONTEXT_PARAMS now lives in producer-resolve.js alongside the rest
+// of the resolution law (only the transport belongs to the session).
 
 
 // ── Q1: patch transparency badges + module halves ───────────
@@ -556,6 +620,13 @@ function saveInstruments(list) {
 const PARAM_DESC = {
   tempo: "Playback speed in beats per minute",
   attackNoiseLevel: "Scales the instrument's onset transient (bow scratch, breath chiff, hammer thump): 0 = removed, 1 = as measured/designed, 2 = exaggerated",
+  attackNoiseDirect: "Lets the measured onset transient use its own fast envelope instead of being suppressed by the sustained note ADSR; 0 preserves legacy routing, 1 is fully independent",
+  attackNoiseVelocityExponent: "Shapes onset-noise response to velocity: 1 is the legacy linear law, lower values retain more measured transient at soft dynamics",
+  attackNoiseByRegister: "Pinned measured onset frequency, Q, decay, and level scaling across register; empty preserves the instrument profile's single transient",
+  envelopeAttackByRegister: "Pinned measured amplitude-envelope attack across register; empty preserves the global Attack control",
+  envelopeAttackByRegisterDynamic: "Pinned bowed attack table across register and playing dynamic; empty preserves the register/scalar attack path",
+  vibratoByRegisterDynamic: "Pinned bowed vibrato probability, rate, and depth across register and playing dynamic; empty preserves the scalar vibrato controls",
+  performanceRole: "Analysis render role declaration; vibrato forces a measured vibrato-role take present, non-vibrato suppresses it, and live playing retains the scalar probability",
   melodyPattern: "How the melody chooses notes: Walk = the probabilistic interval walk shaped by the dials below; Arp = a deterministic cycle over a fixed set of in-scale notes (up, down, or up-and-down) — rhythm, rests, dynamics and surprise still apply on top",
   arpStep: "Arp stride in scale steps: 2 = every other scale note (thirds, triad-like), 3 = wider voicings, 1 = a scale run",
   arpOctaves: "How many octaves the arp cycle spans before it wraps",
@@ -625,7 +696,7 @@ const PARAM_DESC = {
   toneColorProb: "Chance that a note receives sub-note tone-colour variation",
   toneFormantDrift: "Maximum probabilistic shift of formant positions",
   toneResonanceDrift: "Maximum probabilistic change in filter resonance",
-  toneBreath: "Amount of probabilistic breath/noise mixed into the tone",
+  toneBreath: "Airflow/breath level mixed into the tone; deterministic for blown instruments, with Human controlling continuous texture rather than gating",
   vibratoProb: "Chance that a connected phrase receives vibrato",
   vibratoDepth: "Mean vibrato depth in cents",
   vibratoDepthSd: "Standard deviation of vibrato depth, sampled once per vibrato cycle",
@@ -634,18 +705,62 @@ const PARAM_DESC = {
   spectralProb: "Chance that each new note samples every harmonic amplitude from its mean/SD distribution. Otherwise it uses the means; Hold drift handles changes during a held note",
   spectralMix: "How strongly the harmonic tone print is mixed into the tone",
   spectralPartials: "Number of harmonic partials in the tone print",
+  spectralCullThreshold: "Playback-only audibility floor for weak upper modes; the first eight modes are always retained and the fitted print is unchanged",
   spectralSpread: "Global scale for each harmonic's amplitude distribution",
   spectralDynamicAmount: "How strongly note dynamics reshape each harmonic amplitude",
   spectralRegisterAmount: "How strongly note range reshapes each harmonic amplitude",
   spectralResonanceAmount: "How strongly fixed instrument resonances reshape absolute harmonic frequencies",
   partialMaterial: "Damping law for the harmonic partials: low values let every partial ring (glass, metal); high values make the upper partials die away quickly (wood, felt). Applied per note, faster decay for higher harmonics",
+  materialT60Ref: "Measured early-decay T60 at middle C. Zero uses the instrument's pinned profile fit when available; fitted presets may override it from their own free-decay evidence",
+  materialT60Slope: "Measured frequency exponent for early decay: higher values make upper modes die faster. A zero T60 override uses the instrument's pinned profile slope",
+  materialT60Anchor: "Loss-factor value at which the fitted T60 and slope reproduce the measurement exactly",
+  materialT60FitAmount: "Blend from the legacy material law to the measured T60/slope law. Zero is exact legacy and one is the full measured fit",
+  releaseDamping: "Independent damping applied only after note-off: 0 preserves the material ring; 1 models firm damper or hand contact without changing the held-note spectrum or decay",
+  polarisationAmount: "Energy placed in a second close mode for string-polarisation or unison beating; 0 is the exact one-mode sound",
+  polarisationSplitCents: "Frequency separation of the coupled polarisation mode in cents; inert while polarisation amount is 0",
+  polarisationDecayRatio: "Second-mode T60 relative to the primary mode; changes the late/early beating balance without moving either frequency",
   excitationType: "How energy enters the resonator: bow (continuous drive), pluck (displacement release), strike (force impulse), blow (air jet). Sets the physical drive spectrum",
   excitationPosition: "Where the string/tube/membrane is excited (0.02 near the edge to 0.5 the middle). Modes with a node at this point go silent — 0.5 kills every even partial, 0.33 every third. Applied relative to the instrument's natural position",
   excitationHardness: "Contact hardness for strike/pluck: soft (felt hammer, long contact) rolls off the highs; hard (wood, short contact) lets them through. No effect on bow/blow",
+  velocityHardnessCoupling: "How strongly playing velocity changes contact hardness. At 0 the selected hardness is fixed; higher values make forceful piano/guitar attacks brighter and soft attacks darker",
+  breathNoiseColor: "Spectral colour of the sustained air noise for blown sounds: negative is darker/turbulent, positive is brighter/hissier",
+  breathLevelScale: "Overall level of the continuous blown-air layer; 1 preserves the legacy level",
+  breathVelocityExponent: "How sustained air responds to playing pressure: 1 is legacy linear scaling, lower values retain proportionally more separate breath at pp",
+  breathTurbulence: "Seeded continuous variation in air-noise level and colour; 0 is uniform/legacy, higher values add turbulent texture",
+  breathBodyAmount: "Routes sustained air through the same fitted body resonances as the harmonic tone so the noise fuses with the instrument; 0 is neutral",
+  onsetSpectrumTilt: "Temporary harmonic tilt at the start of a blown note: positive is a brighter plosive, negative darker; 0 leaves the sustain print unchanged",
+  onsetSpectrumDecay: "Time for the onset-only harmonic colour to settle into the sustained tone; inert while onset tilt is 0",
+  articulationCoupling: "Couples one seeded articulation-strength draw across the onset: stronger tongue raises the plosive, reduces breath lead, and suppresses pitch scoop; 0 is neutral",
+  articulationStrength: "Mean onset articulation from breath-started (0) to strongly tongued/accented (1)",
+  articulationVariation: "Human-scaled per-note variation around articulation strength; all onset consequences share this one draw",
+  articulationVelocitySlope: "Within-instrument dynamic slope of the shared articulation draw: positive makes forte more firmly articulated and soft starts more breath-led; 0 is neutral",
+  onsetWanderCents: "Bowed-onset pitch wander in cents at full Human: seeded starts may fall below or above pitch, then settle; 0 is neutral and never creates the blown scoop",
+  onsetWanderSettlePeriods: "Bowed-onset lock-in duration in nominal f0 periods, so low cello starts legitimately take more milliseconds than high violin starts",
+  bowScratchLevel: "Level of the period-scaled broadband bow-contact scratch; 0 preserves the legacy onset and fitted values use the shared articulation draw",
+  bowNoiseLevel: "Level of the separately measured sustained bow-hair residual; violin uses the pinned L14 spectrum and 0 is exact legacy identity",
+  bowNoiseVelocityExponent: "Pinned bow-noise velocity exponent; lower than 1 retains relatively more bow noise at pianissimo without reshaping its measured spectrum",
+  windBreathLevel: "Level of the pinned per-instrument wind-breath component; its measured spectrum, pre-onset placement and independent envelope remain immutable",
+  pianoActionNoiseLevel: "Level of the measured piano action component; its literal pre-strike point envelope and pinned spectrum remain immutable",
+  envelopeAnomalyLevel: "Amount of the corrected measured piano onset-anomaly classes; 0 is exact-neutral and 1 preserves the fitted transient",
+  onsetScoopDepthCents: "Measured maximum phrase-start pitch approach from below for weak articulation at full Human; Human 0 hits pitch exactly and depth 0 disables the fitted scoop model",
+  onsetScoopSettle: "Measured time for an onset pitch scoop to settle onto the target",
+  onsetScoopRearticulatedScale: "Scoop depth retained for a separately tongued note inside a phrase; legato always has zero scoop",
+  onsetScoopRegisterSlope: "Fitted log-register scaling of scoop depth: positive values give lower notes a deeper approach",
+  onsetScoopVelocitySlope: "Fitted within-instrument dynamic scaling of scoop depth: negative values give softer, underplayed starts a deeper approach",
+  dynamicBlare: "Nonlinear forte brightening: upper partials enrich increasingly above the normal dynamic pivot, modelling brass blare and high-force bowed edge. 0 preserves the ordinary law",
+  decaySecondStage: "Amount of double decay after the first 18 dB: 0 uses one T60; higher values reveal a slower aftersound for piano strings and plucked bodies",
+  decaySecondRatio: "Late-to-early T60 ratio for double decay. Has no effect while Second stage is 0",
+  glottalTilt: "Vocal glottal-source spectral tilt. Positive values darken upper harmonics as a softer/less pressed glottal source would; 0 is neutral",
+  glottalTiltDynamicSlope: "Voice-class glottal tilt response to effort: positive values darken soft phonation and brighten loud phonation around the fitted mf anchor",
+  singerFormantAmount: "Adds the clustered vocal radiation band associated with carrying singer presence",
+  singerFormantHz: "Centre of the singer-formant cluster; fitted per voice class rather than fixed at 3 kHz",
+  formantTuneToF0: "Above the fitted F1 threshold, tunes only the first vowel resonance to this multiple of sung f0; 0 leaves every vowel body fixed",
+  voiceBreathSync: "Makes vocal breath noise pulse at the sung fundamental, coupling breathiness to glottal cycles instead of using only steady noise",
   excitationHuman: "The player: one seeded fluctuation per note wobbles bow pressure / breath support, moving the whole spectrum together (brighter when pushed), with bow slips or breath bursts. Struck/plucked notes get per-note velocity and hardness jitter instead. 0 = machine",
   partialTransfer: "Sympathetic resonance: energy flows between partials whose ACTUAL frequencies sit near simple ratios (octave strongest, then fifth, fourth…), blooming quiet partials near strong relatives over the sustain. Inharmonicity detunes pairs out of resonance, weakening the transfer — exactly like real sympathetic strings",
   bodyType: "The box around the resonator: a set of fixed-Hz resonance bands. Auto keeps the instrument's own measured body; vowels are bodies too (F1–F5 bands). With vibrato, partials on body slopes shimmer in amplitude — real FM→AM",
   partialB: "Stiff-string inharmonicity: partials sharpen as f·n·√(1+Bn²). Piano bass ≈ 1e-4, treble ≈ 1e-3; 0 = perfectly harmonic. Rising B detunes partial pairs out of sympathetic resonance, weakening Transfer",
+  resonatorClass: "Physical mode series: strings, open/conical tubes use the full harmonic series; a closed cylindrical tube uses odd modes; membranes and bars use their measured inharmonic mode ratios",
   spaceDistance: "How far the instrument stands from you (0.3–30 m). Distance delays the sound's arrival (~3 ms/m), rolls off the highs (air absorption), lowers the direct level against the room, and inside ~1 m adds the proximity bass lift",
   spaceAzimuth: "The instrument's bearing, all the way around you (−180°…180°): per-ear arrival times, far-ear head shadow, and a pinna cue that makes sounds behind you duller than in front — real binaural physics, not simple panning",
   earDistance: "Your ear-to-ear span (0.12–0.25 m). Wider ears = bigger interaural time differences AND head shadowing from lower frequencies (the shadow corner is c/2πa)",
@@ -657,10 +772,8 @@ const PARAM_DESC = {
   headDensity: "How strongly your head shadows the far ear (0–1). 0.5 = the published spherical-head model (Brown & Duda 1998: lows diffract around, highs shadow up to -20 dB); 0 = transparent, 1 = doubled",
   spaceOwnHead: "Keep this patch's own ear span and head density even when the producer's global space is active (normally the global listener overrides them)",
   degreeTuning: "Each degree's true pitch centre, in cents off the equal grid — how just intonation, maqamat and other tuning traditions place their notes. Drag a node around the scale circle to set it by hand",
-  layers: "Extra sound modules stacked on this instrument — each renders the same notes through its own tone, position and level",
-  baseLayerGain: "The base layer's level relative to the rest of the sound stack",
-  baseLayerSolo: "Solo the base layer; other layers are silent unless they are soloed too",
-  layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on the base sound and every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
+  layers: "The sound modules stacked as this instrument — each renders the same notes through its own tone, position and level",
+  layerEnvOverride: "Sync the envelope variation across layers: one trigger per note fires the variation on every layer AT ONCE, at the shared magnitudes — each keeps its own envelope means",
   layerEnvProb: "How often the shared variation trigger fires (per note) when synchronisation is on",
   layerEnvAttackSd: "The shared attack variation magnitude — applied to the base and every layer while synchronised",
   layerEnvDecaySd: "The shared decay variation magnitude — applied to the base and every layer while synchronised",
@@ -1403,14 +1516,68 @@ let _rollGeom = null;      // geometry from the last roll draw
 
 // Tier 1 session context owned by the arrangement (docs/DAW_MODE_DESIGN.md):
 // the musical "room and piece" every track inherits live.
-function defaultArrangementContext() {
-  const ctx = {};
-  for (const k of SESSION_CONTEXT_PARAMS) {
-    if (k !== "seed" && k in DEFAULTS) ctx[k] = DEFAULTS[k];
+// Takes used to fork the WHOLE patch the instant their inspector opened, which
+// severed every module — sound, space, scale — from the palette even when only
+// the note engine had been touched. Diff each legacy fork against its patch and
+// keep only the modules that genuinely differ; accidental forks collapse back
+// to inheriting, so a patch edit reaches them again.
+//
+// Only `notes` and `space` carry the layer shape, so only those slices need
+// re-normalising — running serializeParams over a partial would re-inflate it
+// into a whole patch and undo the whole point.
+function migrateRegionOverrides(a, track, region) {
+  if (region?.overrides) {
+    for (const part of CAPTURE_PARTS) {
+      if (!region.overrides[part]) continue;
+      // Repair: an earlier migration could mint an override from an EMPTY
+      // legacy fork, handing the take a sound with no source in it — audible
+      // as a thread that meters but makes no sound. An empty module is not an
+      // edit, so drop it and let the take inherit its patch again.
+      if (moduleSliceIsEmpty(region.overrides[part], part)) { delete region.overrides[part]; continue; }
+      if (part === "notes" || part === "space") {
+        region.overrides[part] = extractModule(
+          serializeParams(migrateParamsShape(applyModule({}, part, region.overrides[part]))), part);
+      }
+    }
+    if (!Object.keys(region.overrides).length) delete region.overrides;
+    return;
   }
-  ctx.customDegrees = [...(SCALE_PRESETS[ctx.scalePreset]?.degrees || SCALE_PRESETS.major.degrees)];
-  ctx.reverbWet = 0.16;
-  return ctx;
+  if (!region?.paramsOverride) return;
+  const forked = serializeParams(migrateParamsShape(region.paramsOverride));
+  const pal = (a.palette || []).find(pl => pl.id === region.paletteId);
+  if (!pal?.params) { region.paramsOverride = forked; return; }  // dangling patch: keep the blob
+  // Only count a module as diverged if the fork actually CARRIES it — the old
+  // fork-on-open path could clone an empty object, and "absent" is not "edited".
+  const diverged = divergedModules(pal.params, forked)
+    .filter(part => !moduleSliceIsEmpty(extractModule(forked, part), part));
+  if (diverged.length) {
+    region.overrides = {};
+    for (const part of diverged) region.overrides[part] = extractModule(forked, part);
+  }
+  delete region.paramsOverride;
+}
+
+// Global space used to be one arrangement-wide switch. It is now per thread,
+// like the Harmonic guide: the space is always there, and each thread chooses
+// whether its position follows a path through it. Threads that were actually
+// participating (they had anchors or a placed position) join; the rest keep
+// the position they had, now as a static one.
+function migrateGlobalSpaceMembership(a) {
+  const sp = a.space;
+  if (!sp || sp.perThread) return;
+  const wasOn = !!sp.enabled;
+  for (const track of a.tracks || []) {
+    if (typeof track.useGlobalSpace === "boolean") continue;
+    const had = !!(sp.tracks?.[track.id]?.length || sp.static?.[track.id]);
+    track.useGlobalSpace = wasOn && had;
+    // Carry the thread's last global position across as its own static place,
+    // so opting out never teleports it back to the patch's raw position.
+    if (!track.useGlobalSpace && !track.space && sp.static?.[track.id]) {
+      track.space = { ...sp.static[track.id] };
+    }
+  }
+  sp.perThread = true;
+  sp.enabled = true;   // the space itself is always available now
 }
 
 function normaliseArrangement(a) {
@@ -1421,11 +1588,10 @@ function normaliseArrangement(a) {
   for (const patch of a.palette || []) {
     if (patch?.params) patch.params = serializeParams(migrateParamsShape(patch.params));
   }
+  migrateGlobalSpaceMembership(a);
   for (const track of a.tracks || []) {
     if (track?.instrumentParams) track.instrumentParams = serializeParams(migrateParamsShape(track.instrumentParams));
-    for (const region of track?.regions || []) {
-      if (region?.paramsOverride) region.paramsOverride = serializeParams(migrateParamsShape(region.paramsOverride));
-    }
+    for (const region of track?.regions || []) migrateRegionOverrides(a, track, region);
   }
   // Legacy producer tracks used a stereo pan value. Preserve its audible
   // intent once as a real spatial bearing, then retire pan so the binaural
@@ -1485,6 +1651,9 @@ let _lastSavedAt = 0; // autosave indicator
 
 function saveArrangement(label = "edit") {
   if (!arrangement) return;
+  invalidateVariantDiffs();
+  invalidateVoiceParamCache();
+  invalidateTakePreviews();
   if (!arrangement.id) arrangement.id = crypto.randomUUID();
   const reg = loadArrangementRegistry();
   // The registry still holds the pre-mutation state — that IS the undo point.
@@ -1512,6 +1681,10 @@ function saveArrangement(label = "edit") {
 function undoArrangement() {
   const entry = _undoStack.pop();
   if (!entry) return;
+  invalidateRegionEdit();
+  invalidateVariantDiffs();
+  invalidateVoiceParamCache();
+  invalidateTakePreviews();
   _redoStack.push({ label: entry.label, json: JSON.stringify(arrangement) });
   arrangement = normaliseArrangement(JSON.parse(entry.json));
   const reg = loadArrangementRegistry();
@@ -1525,6 +1698,10 @@ function undoArrangement() {
 function redoArrangement() {
   const entry = _redoStack.pop();
   if (!entry) return;
+  invalidateRegionEdit();
+  invalidateVariantDiffs();
+  invalidateVoiceParamCache();
+  invalidateTakePreviews();
   _undoStack.push({ label: entry.label, json: JSON.stringify(arrangement) });
   arrangement = normaliseArrangement(JSON.parse(entry.json));
   const reg = loadArrangementRegistry();
@@ -1635,14 +1812,23 @@ function commitPaletteEdit() {
   const state = paletteEditState();
   if (!state) return false;
   arrangement = arrangement || loadArrangement();
-  // Region-scoped edit: the take's own paramsOverride is what plays, so that
-  // is what the round-trip writes back to. The shared palette item is left
-  // alone — other regions using the same patch keep their sound.
+  // Region-scoped edit: the Studio hands back a whole patch, so diff it
+  // module by module and record only the ones that actually changed. A trip
+  // to the Studio to nudge the melody must not silently freeze the sound.
   if (state.regionId) {
     const track = (arrangement.tracks || []).find(t => t.id === state.trackId);
     const region = track?.regions.find(r => r.id === state.regionId);
     if (!region) return false;
-    region.paramsOverride = extractInstrumentParams(exploreParams);
+    const edited = extractInstrumentParams(exploreParams);
+    const base = regionBaseParams(track, region);
+    region.overrides = region.overrides || {};
+    for (const part of divergedModules(base, edited)) region.overrides[part] = extractModule(edited, part);
+    for (const part of CAPTURE_PARTS) {
+      if (region.overrides[part] && modulesEqual(base, edited, part)) delete region.overrides[part];
+    }
+    if (!Object.keys(region.overrides).length) delete region.overrides;
+    delete region.paramsOverride;          // the legacy whole-patch fork is gone
+    invalidateRegionEdit(region.id);
     saveArrangement("edit region patch");
     return true;
   }
@@ -1696,17 +1882,155 @@ function paletteIsPlayable(pl) {
   // playable on its own (it plays/bakes just its hits, no pitched voice).
   return !!((parts.notes && parts.stave) || parts.percussion);
 }
-// True when a patch is percussion only — has percussion but no sound source, so
-// its pitched voice is silenced while the beat grid still drives the hits.
-function isPercussionOnlyPatch(pl) {
-  const parts = capturePartsFor(pl?.params || {}, "full", pl?.captureParts);
-  return !!parts.percussion && !parts.notes;
-}
 function paletteDisplayName(pl) {
   if (pl?.customName) return pl.customName;
+  // A variant is named for what it CHANGES, not for the patch it came from —
+  // it inherits its parent's module names, so the composed name would just
+  // repeat the parent's and every variant would look identical. Regenerated
+  // from the live diff so editing a variant renames it to match; a name you
+  // typed yourself (customName, above) always wins.
+  if (pl?.parentId) {
+    const diff = variantDiffParts(pl);
+    return diff.length ? variantLabel(pl.params, diff) : (pl.name || "Variant");
+  }
   const s = pl?.parts?.subnoteName, m = pl?.parts?.macroName;
   return s && m ? (s === m ? s : `${s} × ${m}`) : (s || m || pl?.name || "Untitled patch");
 }
+// ── Variants ────────────────────────────────────────────────
+// Editing a patch that is already on a thread must change only that take. When
+// you want to keep the change, it becomes a VARIANT: an ordinary palette entry
+// carrying a parent and the list of modules that differ from it.
+//
+// Variants are FLAT — a variant's parent is always a root patch, never another
+// variant — so the rack is exactly two levels deep no matter how long you work.
+// The label is generated from the diff ("Sparse Walk", "Phrygian"), never
+// "v2", so a row says what it IS rather than when it was made.
+
+function paletteById(id) { return _paletteById(arrangement, id); }
+function rootPatchOf(pl) { return _rootPatchOf(arrangement, pl); }
+function paletteVariantsOf(patchId) { return _paletteVariantsOf(arrangement, patchId); }
+// A variant's diff is recomputed rather than stored (so later edits show up),
+// but it is read many times per render — every palette row AND every region
+// label — and comparing two patches is not cheap. Cache it per render-ish
+// window; saveArrangement drops the cache, which is the only way the answer
+// can change.
+let _variantDiffCache = new Map();
+function invalidateVariantDiffs() { _variantDiffCache = new Map(); }
+function variantDiffParts(pl) {
+  if (!pl?.parentId) return [];
+  const hit = _variantDiffCache.get(pl.id);
+  if (hit) return hit;
+  const parts = _variantDiffParts(arrangement, pl);
+  _variantDiffCache.set(pl.id, parts);
+  return parts;
+}
+function takesOfPatch(patchId) { return _takesOfPatch(arrangement, patchId); }
+function divergedTakesOfPatch(patchId) { return _divergedTakesOfPatch(arrangement, patchId); }
+
+/**
+ * Keep a take's edits as a palette variant. Returns the entry, or the root
+ * patch when nothing actually differs (a variant identical to its parent has
+ * no reason to exist, so it is never created).
+ */
+function promoteTakeToVariant(track, region) {
+  const plan = variantForTake(arrangement, track, region);
+  if (!plan) return null;
+  const { root, params: resolved, parts, label } = plan;
+  if (!parts.length) {
+    region.paletteId = root.id;
+    delete region.overrides;
+    invalidateRegionEdit(region.id);
+    saveArrangement("revert take to patch");
+    return root;
+  }
+  const variant = {
+    id: crypto.randomUUID(),
+    name: label,
+    kindLabel: "Variant",
+    sourceId: root.sourceId || null,
+    params: resolved,
+    parts: { ...(palettePatchFor(arrangement, region)?.parts || root.parts || {}) },
+    captureParts: capturePartsFor(resolved, "full"),
+    originTempo: root.originTempo ?? null,
+    originScale: root.originScale ?? null,
+    parentId: root.id,
+    variantParts: parts,
+  };
+  arrangement.palette.push(variant);
+  region.paletteId = variant.id;
+  delete region.overrides;
+  invalidateRegionEdit(region.id);
+  saveArrangement(`keep variant: ${variant.name}`);
+  return variant;
+}
+
+/**
+ * Push a take's edit of one module up into the patch itself, so every take
+ * that still INHERITS that module follows. Takes that have their own edit of
+ * the same module are deliberately left alone — and reported, so nobody has to
+ * guess why they did not move.
+ */
+function applyModuleToAllTakes(track, region, part) {
+  const current = palettePatchFor(arrangement, region);
+  if (!current) return { applied: 0, skipped: 0 };
+  const target = rootPatchOf(current);
+  const slice = region.overrides?.[part] || extractModule(serializeParams(regionVoiceParams(track, region)), part);
+  target.params = applyModule(target.params || {}, part, slice);
+  target.captureParts = capturePartsFor(target.params, "full", target.captureParts);
+
+  const plan = applyModulePlan(arrangement, region, part);
+  const applied = plan.follow.length, skipped = plan.keepOwn.length;
+  // The take that made the edit now agrees with its patch, so drop its override.
+  if (region.overrides) {
+    delete region.overrides[part];
+    if (!Object.keys(region.overrides).length) delete region.overrides;
+  }
+  if (current.id !== target.id) region.paletteId = target.id;
+  invalidateRegionEdit();
+  dissolveRedundantVariants();
+  saveArrangement(`apply ${CAPTURE_PART_LABELS[part]} to all takes`);
+  return { applied: applied + 1, skipped };
+}
+
+/** Give a take (or one of its modules) back to its patch. */
+function revertTakeToPatch(region, part = null) {
+  if (!region) return false;
+  const current = palettePatchFor(arrangement, region);
+  let changed = false;
+  if (part) {
+    if (region.overrides?.[part]) {
+      delete region.overrides[part];
+      if (!Object.keys(region.overrides).length) delete region.overrides;
+      changed = true;
+    }
+  } else if (region.overrides) {
+    delete region.overrides;
+    changed = true;
+  }
+  // Reverting everything also sends a take on a variant back to the root.
+  if (!part && current?.parentId) { region.paletteId = current.parentId; changed = true; }
+  if (!changed) return false;
+  invalidateRegionEdit(region.id);
+  dissolveRedundantVariants();
+  saveArrangement("revert take to patch");
+  return true;
+}
+
+/**
+ * A variant that no longer differs from its parent is noise: re-point its
+ * takes at the parent and delete the row. This is what stops the rack filling
+ * up when you edit something and then edit it back.
+ */
+function dissolveRedundantVariants() {
+  const doomed = redundantVariants(arrangement);
+  if (!doomed.length) return false;
+  for (const [variantId, parentId] of doomed) {
+    for (const { region } of takesOfPatch(variantId)) region.paletteId = parentId;
+    arrangement.palette = arrangement.palette.filter(p => p.id !== variantId);
+  }
+  return true;
+}
+
 function createEmptyPalettePatch() {
   const pl = {
     id: crypto.randomUUID(), name: "Untitled patch", kindLabel: "Patch", params: {},
@@ -1728,10 +2052,12 @@ function applyItemToPalettePatch(pl, item, half = null) {
   } else {
     const allowed = requested === "subnote" ? PALETTE_SUBNOTE_SECTIONS : PALETTE_MACRO_SECTIONS;
     if (!allowed.has(item.section)) return false;
-    const next = { ...(pl.params || {}) };
-    for (const [key, value] of Object.entries(incoming)) {
-      if (allowed.has(sectionForParam(key))) next[key] = value;
-    }
+    // Same fix as applyItemCapturePart: go module by module rather than
+    // looping Object.entries over a migrated patch, which never sees the
+    // sound half at all. Half → the capture parts that half is made of.
+    const parts = requested === "subnote" ? ["notes", "space"] : ["stave", "clef", "percussion"];
+    let next = pl.params || {};
+    for (const part of parts) next = applyModule(next, part, extractModule(incoming, part));
     pl.params = next;
     if (requested === "subnote") {
       pl.parts.subnote = item.id; pl.parts.subnoteName = item.name;
@@ -1753,15 +2079,19 @@ function applyItemToPalettePatch(pl, item, half = null) {
 
 function applyItemCapturePart(pl, item, part, { regionScoped = false } = {}) {
   if (!pl || !item || !CAPTURE_PARTS.includes(part) || !item.captureParts?.[part]) return false;
-  // Regions play from paramsOverride, palette items from params — write the
-  // swapped-in module into whichever store this subject actually plays.
-  const store = regionScoped ? "paramsOverride" : "params";
-  const incoming = voiceParamsFor(item);
-  const next = { ...(pl[store] || {}) };
-  for (const key of Object.keys(next)) if (capturePartForParam(key) === part) delete next[key];
-  for (const [key, value] of Object.entries(incoming)) if (capturePartForParam(key) === part) next[key] = value;
-  pl[store] = next;
-  pl.captureParts = { ...capturePartsFor(pl[store], "full", pl.captureParts), [part]: true };
+  // applyModule works on the serialized shape and understands `layers` /
+  // `percLayers`; the old Object.entries loop saw neither (sound keys are
+  // non-enumerable accessors), so swapping a SOUND was a silent no-op.
+  const slice = extractModule(voiceParamsFor(item), part);
+  if (regionScoped) {
+    // On a take, a module swap IS a per-module divergence — nothing else moves.
+    pl.overrides = pl.overrides || {};
+    pl.overrides[part] = slice;
+    invalidateRegionEdit(pl.id);
+  } else {
+    pl.params = applyModule(pl.params || {}, part, slice);
+    pl.captureParts = { ...capturePartsFor(pl.params, "full", pl.captureParts), [part]: true };
+  }
   pl.parts = pl.parts || {};
   const moduleName = moduleNameFromItem(item, part);
   if (part === "notes") {
@@ -1865,6 +2195,31 @@ function produceSources() {
 function _trackVol(trackGain, regionGain) {
   return (arrangement?.master ?? 1) * (trackGain ?? 1) * (regionGain ?? 1);
 }
+// Transient line in the producer toolbar (the slot mixdown progress uses).
+// Anything the app declines to do silently gets said here instead.
+function producerStatus(message, ms = 4000) {
+  const el = document.getElementById("mixStatus");
+  if (!el) return;
+  el.textContent = message;
+  clearTimeout(producerStatus._t);
+  producerStatus._t = setTimeout(() => { if (el.textContent === message) el.textContent = ""; }, ms);
+}
+
+// Editing a palette patch must be audible immediately on every thread still
+// playing it — previously only region-scoped edits updated the live voice, so
+// patch edits during playback appeared to do nothing until the next replay.
+function refreshVoicesForPatch(patchId) {
+  if (!patchId) return;
+  const beat = arrPlay ? arrPlay.beat : playheadBeat;
+  for (const track of arrangement?.tracks || []) {
+    const voice = producerVoices.get(track.id);
+    if (!voice?.playing) continue;
+    const region = regionAtBeat(track, beat);
+    if (region?.paletteId !== patchId) continue;
+    voice.updateGenerationParams?.(regionPlayParams(track, region, beat));
+  }
+}
+
 // Re-push every playing voice's level (used when the master fader moves).
 function applyMasterToVoices() {
   const b = arrPlay ? arrPlay.beat : playheadBeat;
@@ -1874,84 +2229,19 @@ function applyMasterToVoices() {
   }
 }
 
+// Thin wrappers over the DOM-free resolution law in producer-resolve.js —
+// they exist only to supply the module-global `arrangement` to the ~30 call
+// sites that already read like `regionPlayParams(track, region)`.
 function regionVoiceParams(track, region) {
-  if (region?.paramsOverride) return migrateParamsShape(region.paramsOverride);
-  const pal = (arrangement?.palette || []).find(pl => pl.id === region.paletteId);
-  return migrateParamsShape(pal ? pal.params : (track.instrumentParams || {}));
+  return _resolveRegionVoiceParams(arrangement, track, region);
 }
 
 function regionPlayParams(track, region, atBeat = null) {
-  // Tier 1 session context (owned by the arrangement, inherited live) +
-  // Tier 2 instrument (from the palette) + Tier 3 take
-  const context = arrangement?.context || defaultArrangementContext();
-  const params = migrateParamsShape({ ...DEFAULTS, ...context, ...regionVoiceParams(track, region), seed: region.seed });
-  // Percussion-only patches keep the note grid (for percussion timing) but the
-  // pitched voice stays silent.
-  const srcPatch = (arrangement?.palette || []).find(p => p.id === region.paletteId);
-  if (region.percussionOnly || (srcPatch && isPercussionOnlyPatch(srcPatch))) params.percussionOnly = true;
-  // Q5 Harmonic guide: an opted-in track regenerates under the marker in
-  // force at the region's position. Applied AFTER the voice so the marker
-  // wins; baked regions replay stored degrees and are untouched by
-  // construction (pitch derives from degree + division, not this list).
-  if (track?.useGlobalScale) {
-    // Opting a track in (its HG button) IS the activation — no separate enable
-    // (owner 2026-07-09): force enabled so the marker in force applies.
-    const marker = globalScaleAt({ ...(arrangement?.globalScale || {}), enabled: true }, region.startBeat ?? 0);
-    if (marker) {
-      if (marker.scaleMode) params.scaleMode = marker.scaleMode;
-      if (Number.isFinite(marker.edoDivisions)) params.edoDivisions = marker.edoDivisions;
-      params.customDegrees = [...marker.degrees];
-      params.subScaleNotes = [...(marker.subScaleNotes || [])];
-      params.rootNotes = [...(marker.rootNotes || [0])];
-    }
-  }
-  // Q9 C: a track's own space (mini-pad in the track head) overrides the
-  // voice; the Q6 global space below supersedes it when enabled.
-  if (track?.space) {
-    if (Number.isFinite(track.space.angle)) params.spaceAzimuth = track.space.angle;
-    if (Number.isFinite(track.space.dist)) params.spaceDistance = track.space.dist;
-  }
-  // Q6 global space: designer threads position each track over time. The
-  // patch/region decides whether its own source positions move as a centred
-  // constellation or additively. There is deliberately no global
-  // override/offset policy any more.
-  const sp = arrangement?.space;
-  if (sp?.enabled && track) {
-    // anchors interpolate over time; an unanchored track that was dragged
-    // freely sits at its static designer position
-    const pos = trackSpaceAt(sp.tracks?.[track.id], atBeat ?? region.startBeat ?? 0)
-      || sp.static?.[track.id] || null;
-    if (pos) spApplyThreadToPatch(params, pos);
-    if (sp.head && !params.spaceOwnHead) {
-      // the global listener overrides the patch head — unless the patch's
-      // SPACE section opted out (owner 07-07)
-      if (Number.isFinite(sp.head.earDistance)) params.earDistance = sp.head.earDistance;
-      if (Number.isFinite(sp.head.headDensity)) params.headDensity = sp.head.headDensity;
-      if (Number.isFinite(sp.head.pinnaScale)) params.pinnaScale = sp.head.pinnaScale;
-      if (sp.head.earModel) params.earModel = sp.head.earModel;
-      if (sp.head.reverbType) {
-        params.reverbType = sp.head.reverbType;
-        // the shared room's design rides with its type: unset designer
-        // values fall back to THAT room's character, not the patch's
-        params.reverbSize = sp.head.reverbSize ?? null;
-        params.reverbDamping = sp.head.reverbDamping ?? null;
-        params.reverbDiffusion = sp.head.reverbDiffusion ?? null;
-      }
-      if (Number.isFinite(sp.head.reverbWet)) params.reverbWet = sp.head.reverbWet;
-      if (Number.isFinite(sp.head.reverbDecay)) params.reverbDecay = sp.head.reverbDecay;
-      // Head yaw: turning the listener rotates every source's bearing relative
-      // to the ears — world sources stay put, but what you HEAR shifts. The
-      // cross-section shows this as the head visibly turned (owner 2026-07-10).
-      const facing = Number(sp.head.facing) || 0;
-      if (facing) {
-        const rot = (a) => { const v = (Number(a) || 0) - facing; return ((v + 180) % 360 + 360) % 360 - 180; };
-        params.spaceAzimuth = rot(params.spaceAzimuth);
-        if (Array.isArray(params.layers)) params.layers = params.layers.map(l => l?.space ? { ...l, space: { ...l.space, angle: rot(l.space.angle) } } : l);
-        if (Array.isArray(params.percLayers)) params.percLayers = params.percLayers.map(l => l?.space ? { ...l, space: { ...l.space, angle: rot(l.space.angle) } } : l);
-      }
-    }
-  }
-  return params;
+  return _resolveRegionPlayParams(arrangement, track, region, atBeat);
+}
+
+function moduleAuthority(track, region, part) {
+  return _moduleAuthority(arrangement, track, region, part);
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -2174,8 +2464,39 @@ function wireBrowserPalette(v) {
       }
       _palLastClickId = id; _palLastClickAt = now;
       palettePreviewId = id;
-      const match = arrangement.tracks.flatMap(track => (track.regions || []).map(region => ({ track, region }))).find(x => x.region.paletteId === id);
-      selectedRegion = match ? { trackId: match.track.id, regionId: match.region.id } : null;
+      // Selecting a patch must NOT select one of its takes. It used to, and
+      // because the inspector prefers a selected region, double-clicking a
+      // patch then edited the first take that happened to use it — silently,
+      // and only for patches that were already placed.
+      renderProduce();
+    };
+  });
+  // Staging strip: decide what happens to a take's own edits.
+  v.querySelectorAll("[data-stage-strip]").forEach(strip => {
+    const er = editorRegion();
+    const keep = strip.querySelector("[data-stage-keep]");
+    if (keep) keep.onclick = () => {
+      if (!er) return;
+      const variant = promoteTakeToVariant(er.track, er.region);
+      if (variant) palettePreviewId = variant.id;
+      renderProduce();
+    };
+    const apply = strip.querySelector("[data-stage-apply]");
+    if (apply) apply.onclick = () => {
+      if (!er) return;
+      const parts = regionOverriddenParts(er.region);
+      let applied = 0, skipped = 0;
+      for (const part of parts) {
+        const res = applyModuleToAllTakes(er.track, er.region, part);
+        applied = Math.max(applied, res.applied); skipped += res.skipped;
+      }
+      // Never let a take silently not follow: say which ones kept their own.
+      renderProduce();
+      if (skipped) producerStatus(`Applied to ${applied} take${applied === 1 ? "" : "s"}. ${skipped} kept ${skipped === 1 ? "its" : "their"} own edit.`);
+    };
+    const revert = strip.querySelector("[data-stage-revert]");
+    if (revert) revert.onclick = () => {
+      if (er) revertTakeToPatch(er.region);
       renderProduce();
     };
   });
@@ -2195,16 +2516,13 @@ function wireBrowserPalette(v) {
     };
   });
   v.querySelectorAll("[data-palette-edit]").forEach(btn => {
-    btn.onclick = () => {
-      const pl = (arrangement.palette || []).find(x => x.id === btn.dataset.paletteEdit);
-      if (!pl) return;
-      stopArrangement();
-      synth.stop();
-      setPaletteEditState({ paletteId: pl.id, name: pl.name });
-      // Load the voice as it sounds in the arrangement: session context + voice
-      exploreParams = migrateParamsShape(migrateToneParams({ ...DEFAULTS, ...arrangement.context, ...pl.params }));
-      workspaceTab = "subnote";
-      navigate("explore");
+    // ✎ opens the patch in the inspector BELOW, not the Studio. It is the most
+    // obvious affordance on the row, so it should do the least drastic thing;
+    // leaving the Producer entirely is a deliberate second step, taken from the
+    // inspector's per-module ✎ once you can see what you are editing.
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openPaletteInEditor(btn.dataset.paletteEdit);
     };
   });
 
@@ -2460,6 +2778,7 @@ function pauseArrangement() {
   if (!arrPlay) return;
   playheadBeat = arrPlay.beat; // resume point
   stopArrangement();
+  _kickSpAnim(); // run the settle frames so the threads visibly come to rest
 }
 
 function stopArrangement(ringOut = false) {
@@ -2540,6 +2859,25 @@ function playArrangement(fromBeat = 0) {
         voice.finish();
       }
       // mid-region beats: leave the voice playing through its span
+    }
+    // The Harmonic guide has to reach takes that are ALREADY SOUNDING, not
+    // only ones that start after a change point (owner 2026-07-28). When the
+    // marker in force moves, re-point every playing voice on a thread that
+    // follows the guide — generative takes pick the new scale up from their
+    // next note. Baked takes are frozen and stay out of it.
+    const markerNow = harmonicMarkerIdAt(arrangement, b);
+    if (markerNow !== arrPlay.lastMarkerId) {
+      const first = arrPlay.lastMarkerId === undefined;
+      arrPlay.lastMarkerId = markerNow;
+      if (!first) {
+        for (const track of arrangement.tracks) {
+          if (!track.useGlobalScale) continue;
+          const region = regionAtBeat(track, b);
+          if (!region || region.type === "baked" || region.muted) continue;
+          const voice = producerVoices.get(track.id);
+          if (voice?.playing) voice.updateGenerationParams?.(regionPlayParams(track, region, b));
+        }
+      }
     }
     // Q6: global-space threads evolve DURING playback — retarget each
     // sounding voice's spatial chain at the current beat (cheap: the IR
@@ -2769,9 +3107,12 @@ function drawGsStrip() {
       const role = sc.rootNotes?.includes(d) ? "root"
         : sc.subScaleNotes?.includes(d) ? "sub"
         : sc.degrees?.includes(d) ? "scale" : "off";
-      ctx.fillStyle = role === "root" ? "rgba(139,124,246,0.5)"
-        : role === "sub" ? "rgba(245,166,35,0.42)"
-        : role === "scale" ? "rgba(148,196,255,0.3)"
+      // Same roles, same colours as the Scale Lab (violet root / green
+      // sub-scale / neutral scale) — chosen to stay distinguishable without
+      // relying on a red-green distinction.
+      ctx.fillStyle = role === "root" ? "rgba(139,124,246,0.55)"
+        : role === "sub" ? "rgba(76,175,125,0.5)"
+        : role === "scale" ? "rgba(190,205,220,0.3)"
         : "rgba(0,0,0,0.35)";
       const y = h - (d + 1) * rowH;
       ctx.fillRect(x, y, ww, Math.max(1, rowH - 0.5));
@@ -2878,15 +3219,29 @@ function globalScaleStripHTML(laneW) {
   const active = globalScaleActive();
   const sel = gs.markers?.[_gsSelMarker];
   const div = _gsDivCount();
+  // The editor opens UNDER the change point it belongs to, not at the far left
+  // of the row — clicking a marker near the right edge used to pop the palette
+  // hundreds of pixels away from the thing you clicked. Clamped so it never
+  // runs off the end of the lane.
+  // Roughly how wide the editor will be, so the clamp keeps it on the lane
+  // without pinning it to a fixed width — a 24-EDO guide needs twice the room
+  // a 12-tone one does, and a fixed width just clipped the extra rows.
+  const GS_EDITOR_W = Math.min(560, 150 + div * 27);
+  const selLeft = sel ? Math.max(0, Math.min(Math.max(0, laneW - GS_EDITOR_W), sel.atBeat * pxPerBeat)) : 0;
   const editorRow = (_gsOpen && sel) ? `
       <div class="tl2-row">
         <div class="tl2-head tl2-corner"></div>
-        <div class="gs-editor">
+        <div class="gs-editor" style="margin-left:${selLeft}px;width:${GS_EDITOR_W}px">
           <span class="gs-editor-title">change point @ beat ${sel.atBeat}</span>
           <div class="gs-roll" role="group" title="Click a note division to cycle its role: off → in scale → sub-scale → root (same operators as the patch scale card). Click anywhere off this editor to close it.">
             ${Array.from({ length: div }, (_, d) => {
               const st = sel.rootNotes?.includes(d) ? "root" : sel.subScaleNotes?.includes(d) ? "sub" : sel.degrees?.includes(d) ? "scale" : "off";
-              return `<button class="gs-cell gs-${st}" data-gs-cell="${d}" title="division ${d}: ${st}">${d}</button>`;
+              const said = { root: "Root — the melody is pulled toward this",
+                sub: "Sub-scale — the walk prefers this degree",
+                scale: "In scale — available, no special weight",
+                off: "Off — not in the scale" }[st];
+              const next = { off: "in scale", scale: "sub-scale", sub: "root", root: "off" }[st];
+              return `<button class="gs-cell gs-${st}" data-gs-cell="${d}" title="Division ${d} — ${said}. Click for ${next}.">${d}</button>`;
             }).join("")}
           </div>
           <button class="pal-btn" id="gsDeleteMarker" title="Remove this change point">×</button>
@@ -2897,7 +3252,7 @@ function globalScaleStripHTML(laneW) {
         <div class="tl2-head tl2-corner gs-head">
           <button class="gs-chevron${active ? " gs-active" : ""}" id="gsToggle" title="Harmonic guide — choose a starting scale, then add and edit timeline change points. It applies to tracks with HG on.">${notationIconHTML(["clef"], { compact: true })}<span class="gs-head-label">Harmonic guide</span>${active ? `<span class="gs-onpip" title="Active — tracks are following it">●</span>` : ""}<span class="gs-caret">${_gsOpen ? "▾" : "▸"}</span></button>
         </div>
-        ${_gsOpen ? `<div class="gs-strip${active ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><div class="hg-head">${harmonicGuidePickerHTML()}</div><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The Harmonic guide over time — rows are note divisions, colours are roles (lit = scale, gold = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
+        ${_gsOpen ? `<div class="gs-strip${active ? "" : " off"} open" id="gsStrip" style="width:${laneW}px"><div class="hg-head">${harmonicGuidePickerHTML()}</div><canvas id="gsCanvas" width="${laneW}" height="${GS_STRIP_H}" style="width:${laneW}px;height:${GS_STRIP_H}px" title="The Harmonic guide over time — rows are note divisions, colours are roles, matching the Scale Lab (neutral = in scale, green = sub-scale, violet = root). Double-click at a bar line to add a change point; click a change-point line to edit it."></canvas></div>` : ""}
       </div>${editorRow}`;
 }
 
@@ -2965,105 +3320,37 @@ function ensureGlobalSpace() {
 //     (drawn slightly in front of the head so it can be grabbed); every
 //     source shifts by the same vector.
 
+// The cylinder redraws every thread by sampling ~150 points along its length,
+// per track, at 60fps — and each sample used to re-resolve the patch's whole
+// parameter set just to read a position. That is ~150x more work than the
+// answer needs: the voice only changes when the REGION under the beat changes,
+// never between two pixels of the same region. Cache per (thread, take);
+// saveArrangement drops it, which is the only way the answer can change.
+//
+// Callers treat the result as READ-ONLY (they read positions and layer counts).
+// Playback does not come through here — regionPlayParams resolves its own copy
+// before mutating it.
+let _vpCache = new Map();
+function invalidateVoiceParamCache() { _vpCache = new Map(); }
 function _spTrackVoiceParams(track, beat = playheadBeat) {
   const region = regionAtBeat(track, beat) || track.regions?.[0];
-  return region ? regionVoiceParams(track, region) : (track.instrumentParams || {});
+  if (!region) return track.instrumentParams || {};
+  const key = `${track.id}:${region.id}`;
+  let hit = _vpCache.get(key);
+  if (!hit) { hit = regionVoiceParams(track, region); _vpCache.set(key, hit); }
+  return hit;
 }
 
-// The patch's own constellation: base source first, followed by Sub-note and
-// percussion layers. Percussion without an explicit position inherits the
-// base before a thread transforms it, exactly as the renderer does.
-function _spTrackSources(vp) {
-  if (vp?.layers?.[0]?.sound) {
-    const base = vp.layers[0]?.space || { angle: 0, dist: 2.5 };
-    const sources = vp.layers.map(layer => ({
-      angle: layer.space?.angle ?? base.angle,
-      dist: layer.space?.dist ?? base.dist,
-    }));
-    for (const layer of Array.isArray(vp.percLayers) ? vp.percLayers : []) {
-      sources.push({ angle: layer.space?.angle ?? base.angle, dist: layer.space?.dist ?? base.dist });
-    }
-    return sources;
-  }
-  const base = { angle: vp.spaceAzimuth ?? 0, dist: vp.spaceDistance ?? 2.5 };
-  const sources = [base];
-  for (const l of Array.isArray(vp.layers) ? vp.layers : []) {
-    sources.push({ angle: l.space?.angle ?? base.angle, dist: l.space?.dist ?? base.dist });
-  }
-  for (const l of Array.isArray(vp.percLayers) ? vp.percLayers : []) {
-    sources.push({ angle: l.space?.angle ?? base.angle, dist: l.space?.dist ?? base.dist });
-  }
-  return sources;
-}
-
-function _spIsMulti(vp) { return _spTrackSources(vp).length > 1; }
-
-// Circular-mean angle + mean distance of a constellation.
-function _spCentroid(sources) {
-  let sx = 0, sy = 0, sd = 0;
-  for (const s of sources) {
-    const a = (s.angle ?? 0) * Math.PI / 180;
-    sx += Math.sin(a);
-    sy += Math.cos(a);
-    sd += s.dist ?? 2.5;
-  }
-  const angle = (Math.abs(sx) > 1e-9 || Math.abs(sy) > 1e-9) ? Math.atan2(sx, sy) * 180 / Math.PI : 0;
-  return { angle, dist: sd / Math.max(1, sources.length) };
-}
-
-// Apply the group handle to a constellation. Pure — shared by playback
-// (regionPlayParams) and both canvases, so what you see is what you hear.
-function spTransformSources(sources, handle, mode) {
-  if (mode === "additive") {
-    const ha = (handle.angle ?? 0) * Math.PI / 180;
-    const hd = Math.max(0, handle.dist ?? 0);
-    const tx = Math.sin(ha) * hd, tz = Math.cos(ha) * hd;
-    return sources.map(s => {
-      const a = (s.angle ?? 0) * Math.PI / 180;
-      const d = s.dist ?? 2.5;
-      const x = Math.sin(a) * d + tx, z = Math.cos(a) * d + tz;
-      return { angle: Math.atan2(x, z) * 180 / Math.PI, dist: Math.min(30, Math.hypot(x, z)) };
-    });
-  }
-  const cen = _spCentroid(sources);
-  const dA = (handle.angle ?? cen.angle) - cen.angle;
-  const k = Math.max(0.02, handle.dist ?? cen.dist) / Math.max(0.05, cen.dist);
-  return sources.map(s => {
-    let a = (s.angle ?? 0) + dA;
-    a = ((a + 180) % 360 + 360) % 360 - 180;
-    return { angle: a, dist: Math.max(0.05, Math.min(30, (s.dist ?? 2.5) * k)) };
-  });
-}
+// spTrackSources / spIsMulti / spCentroid / spTransformSources /
+// spApplyThreadToPatch now live in producer-resolve.js — the placement law is
+// shared with playback so the canvases and the audio cannot drift apart.
 if (typeof window !== "undefined") window.spTransformSources = spTransformSources;  // debug/validation hook
 
-// Apply a track-thread point to the patch itself. This is the one resolution
-// law for live playback: patch layer positions + thread + PATCH movement mode.
-// It also includes percussion's independently-placeable hit layers.
-function spApplyThreadToPatch(params, handle) {
-  const sources = _spTrackSources(params);
-  const mode = params.spaceMovement === "additive" ? "additive" : "centered";
-  const out = spTransformSources(sources, handle, mode);
-  let at = 0;
-  if (params?.layers?.[0]?.sound) {
-    params.layers = params.layers.map(l => ({
-      ...l, space: { angle: out[at].angle, dist: Math.max(0.3, out[at++].dist) },
-    }));
-  } else {
-    params.spaceAzimuth = out[0].angle;
-    params.spaceDistance = Math.max(0.3, out[0].dist);
-    at = 1;
-    if (Array.isArray(params.layers)) {
-      params.layers = params.layers.map(l => ({
-        ...l, space: { angle: out[at].angle, dist: Math.max(0.3, out[at++].dist) },
-      }));
-    }
-  }
-  if (Array.isArray(params.percLayers)) {
-    params.percLayers = params.percLayers.map(l => ({
-      ...l, space: { angle: out[at].angle, dist: Math.max(0.3, out[at++].dist) },
-    }));
-  }
-  return params;
+// The global-space views draw MEMBERS only. Leaving the space removes a thread
+// from the picture but never from the data: its anchors and positions stay put,
+// so re-joining reinstates the path exactly as it was.
+function _spMemberTracks() {
+  return (arrangement?.tracks || []).filter(t => t.useGlobalSpace);
 }
 
 const _SP_HUES = [36, 152, 205, 280, 0, 60, 320, 100];
@@ -3142,11 +3429,15 @@ function globalSpaceStripHTML(laneW) {
   // checkbox. When on it always leaves evidence — a slim cylinder (~40% height,
   // no cross-section) in the collapsed view whose top aligns with the button,
   // or the full cross-section + cylinder when expanded.
-  const enabled = !!sp.enabled;
+  // The space itself is always available; membership is per thread.
+  const inCount = (arrangement.tracks || []).filter(t => t.useGlobalSpace).length;
+  const total = (arrangement.tracks || []).length;
+  const enabled = inCount > 0;
   const collapsedH = Math.round(spaceH * 0.4);
-  const fullPanel = (enabled && _spOpen) ? `
+  const fullPanel = _spOpen ? `
       <div class="tl2-row sp-panel-row">
         <div class="tl2-head sp-left">
+          ${anchorAtPh ? `<button class="sp-anchor-del" id="spDeleteAnchor" title="Delete ${esc(arrangement.tracks.find(t => t.id === _spSelTrack)?.name || "this thread")}'s anchor at this beat. The thread will run straight through, shaped by its remaining anchors — or return to where it started if this was the last one.">\u{1F5D1}</button>` : ""}
           <canvas id="spSection" width="132" height="${spaceH}" title="Cross-section at the playhead — you at the centre, one dot per track. Click a dot to select its track; drag to move it. A multi-layer patch shows its instruments as faint dots and one brighter HANDLE: in Centered mode the handle rides a ring at their average distance (drag to rotate them together or scale their distances); in Additive mode it sits just in front of your head and shifts them all by the same amount. Unanchored tracks stay where you put them; anchored tracks snap back unless an anchor sits at the playhead. Double-click a dot to anchor it here. Double-click the head to turn it, then drag the dash around the rim to yaw the listener."></canvas>
           <button class="sp-settings-toggle" id="spRoomToggle" title="Open global-space settings">${_spRoomOpen ? "▾" : "⚙"} ${esc(roomLabel)}</button>
         </div>
@@ -3155,12 +3446,13 @@ function globalSpaceStripHTML(laneW) {
         </div>
       </div>${_spRoomOpen ? spRoomDesignerHTML(head, sp, anchorAtPh) : ""}` : "";
   return `
-      <div class="tl2-row tl2-sp-row${enabled && !_spOpen ? " sp-collapsed-row" : ""}">
+      <div class="tl2-row tl2-sp-row${!_spOpen ? " sp-collapsed-row" : ""}">
         <div class="tl2-head tl2-corner gs-head">
-          <button class="gs-chevron sp-toggle${enabled ? " sp-active" : ""}" id="spToggle" title="Global space — click to turn it ${enabled ? "OFF" : "ON"}. Positions every instrument around the listener along the timeline (asks how to initialise on first use).">${notationIconHTML(["space"], { compact: true })}<span class="gs-head-label">Global space</span>${enabled ? `<span class="sp-onpip" title="Active — instruments are placed by the global space">●</span>` : ""}</button>
-          ${enabled ? `<button class="gs-chevron gs-caret sp-expand" id="spExpand" title="${_spOpen ? "Collapse to the slim view" : "Expand — cross-section + full cylinder"}">${_spOpen ? "▾" : "▸"}</button>` : ""}
+          <button class="gs-chevron sp-toggle${enabled ? " sp-active" : ""}" id="spToggle" title="Global space — a shared room threads can travel through. Put a thread in it with the SPACE flag on its head; threads outside it simply sit where you place them.">${notationIconHTML(["space"], { compact: true })}<span class="gs-head-label">Global space</span>${inCount ? `<span class="sp-onpip" title="${inCount} of ${total} thread${total === 1 ? "" : "s"} follow a path in here">${inCount}/${total}</span>` : ""}</button>
+          ${total && inCount < total ? `<button class="sp-addall" id="spAddAll" title="Put every thread in the global space, spread around the listener">＋ all</button>` : ""}
+          <button class="gs-chevron gs-caret sp-expand" id="spExpand" title="${_spOpen ? "Collapse to the slim view" : "Expand — cross-section + full cylinder"}">${_spOpen ? "▾" : "▸"}</button>
         </div>
-        ${enabled && !_spOpen ? `<div class="sp-cyl-wrap sp-cyl-collapsed" style="width:${laneW}px;height:${collapsedH}px"><canvas id="spCylinder" width="${laneW}" height="${collapsedH}" style="width:${laneW}px;height:${collapsedH}px" title="Global space over time (slim view) — one thread per instrument. Expand for the cross-section and full cylinder."></canvas></div>` : ""}
+        ${!_spOpen ? `<div class="sp-cyl-wrap sp-cyl-collapsed" style="width:${laneW}px;height:${collapsedH}px"><canvas id="spCylinder" width="${laneW}" height="${collapsedH}" style="width:${laneW}px;height:${collapsedH}px" title="Global space over time (slim view) — one thread per instrument. Expand for the cross-section and full cylinder."></canvas></div>` : ""}
       </div>${fullPanel}`;
 }
 
@@ -3333,7 +3625,8 @@ function drawSpSection() {
     const r = _spaceDistToR(Math.max(0.3, Math.min(30, p.dist ?? 2.5)), rMax);
     return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r };
   };
-  arrangement.tracks.forEach((t, i) => {
+  _spMemberTracks().forEach((t) => {
+    const i = arrangement.tracks.indexOf(t);   // hue stays put as members change
     const drag = _spRock.drag;
     const dragPos = (drag && drag.trackId === t.id) ? drag.pos : null;
     const pos = dragPos || _spTrackPos(t, phBeat);
@@ -3351,6 +3644,17 @@ function drawSpSection() {
       g.addColorStop(1, `hsla(${hue}, 85%, 65%, 0)`);
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(x, y, rGlow, 0, 2 * Math.PI); ctx.fill();
+    };
+    // An anchor pinned at THIS slice: ring the dot, so you can see at a glance
+    // which threads turn here before you touch anything.
+    const anchoredHere = trackAnchoredAt(t, phBeat);
+    const ringAnchor = (x, y, r) => {
+      if (!anchoredHere) return;
+      ctx.strokeStyle = `hsla(${hue}, 85%, 74%, 0.95)`;
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([2.5, 2.5]);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+      ctx.setLineDash([]);
     };
     if (constellation) {
       // fainter, smaller dots = the instruments the handle represents —
@@ -3379,6 +3683,7 @@ function drawSpSection() {
       // notch core: reads as a handle, not another instrument
       ctx.fillStyle = "rgba(10,14,20,0.9)";
       ctx.beginPath(); ctx.arc(hp.x, hp.y, 1.8, 0, 2 * Math.PI); ctx.fill();
+      ringAnchor(hp.x, hp.y, 10);
     } else {
       const { x, y } = xyOf(pos);
       glowAt(x, y, 1);
@@ -3386,6 +3691,7 @@ function drawSpSection() {
       if (seld) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; }
       ctx.beginPath(); ctx.arc(x, y, seld ? 5.5 : 4, 0, 2 * Math.PI); ctx.fill();
       ctx.shadowBlur = 0;
+      ringAnchor(x, y, 9);
     }
   });
 }
@@ -3465,7 +3771,7 @@ function drawCylinderMeshCore(ctx, w, cy, headR, phase, highlight = false) {
   }
 }
 
-function drawSpCylinder(rockRad) {
+function drawSpCylinder(rockRad = 0) {
   const cv = document.getElementById("spCylinder");
   if (!cv) return;
   const { ctx, w, h } = crisp2d(cv); // DPR-sharp (owner 2026-07-10)
@@ -3493,7 +3799,18 @@ function drawSpCylinder(rockRad) {
     const a = pos.angle * Math.PI / 180 + rockRad + roll;
     return { y: cy + Math.sin(a) * R * 0.85, back: Math.cos(a) > 0, dist: pos.dist };
   };
-  arrangement.tracks.forEach((t, i) => {
+  // Nothing in the space yet — say so, rather than showing an empty room and
+  // leaving you to wonder whether it is broken.
+  if (!_spMemberTracks().length) {
+    ctx.fillStyle = "rgba(140,152,168,0.75)";
+    ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("No threads in the global space yet — turn on ⌾ SPACE on a thread to give it a path through here.",
+      w / 2, cy);
+    ctx.textAlign = "left";
+  }
+  _spMemberTracks().forEach((t) => {
+    const i = arrangement.tracks.indexOf(t);   // hue stays put as members change
     const seld = t.id === _spSelTrack;
     const hue = t.hue ?? _spHue(i);
     // base thread: thin and dim everywhere…
@@ -3571,7 +3888,8 @@ function drawSpCylinder(rockRad) {
     const nowT = synth.ctx.currentTime;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    arrangement.tracks.forEach((t, i) => {
+    _spMemberTracks().forEach((t) => {
+      const i = arrangement.tracks.indexOf(t);   // hue stays put as members change
       const voice = producerVoices.get(t.id);
       if (!voice) return;
       const hue = t.hue ?? _spHue(i);
@@ -3648,46 +3966,67 @@ function _spAnimate() {
   // scheduling while something actually moves — so it settles and stops after
   // playback ends instead of rocking forever (owner 2026-07-10 bug fix).
   if (!document.getElementById("spCylinder") && !document.getElementById("spSection")) { _spRaf = null; return; }
+  if (_phMoving > 0) _phMoving--;
   const playing = !!arrPlay;
-  // ease the gentle auto-rock in with playback and out when it stops
-  _spRockAmp += ((playing ? 1 : 0) - _spRockAmp) * 0.05;
-  if (_spRockAmp < 0.002) _spRockAmp = 0;
+  // The threads move WITH the transport (owner 2026-07-28): the auto-rock
+  // eases in over ~0.2 s on play and out over ~0.2 s on pause, rather than
+  // drifting on for a second or two afterwards. Stopping the transport should
+  // visibly stop the picture, not leave it coasting.
+  _spRockAmp += ((playing ? 1 : 0) - _spRockAmp) * (playing ? 0.18 : 0.25);
+  if (_spRockAmp < 0.01) _spRockAmp = 0;
   const rock = Math.sin(performance.now() / 2400) * (10 * Math.PI / 180) * _spRockAmp;
   if (!_spRock.dragging) _spRock.roll *= 0.88; // spring back
   if (Math.abs(_spRock.roll) < 0.0004) _spRock.roll = 0;
   drawSpCylinder(rock);
   drawSpSection();
+  syncPlayheadToClock();
   // `drag` = a cross-section dot drag, `dragging` = a cylinder roll drag,
   // `headTurn?.dragging` = a head-rotation drag — all must keep the loop alive
   // (the drag handlers mutate state and rely on this loop to redraw).
-  const busy = playing || _spRock.dragging || _spRock.drag || _spHeadTurn.dragging || _spRockAmp > 0 || _spRock.roll !== 0 || _spAnyVoiceRinging();
+  // Drags keep the loop alive on their own; ring-out only keeps it alive long
+  // enough for the glows to fade, and by then the rock has already settled.
+  // `_phMoving` keeps the slice live while the playhead is being scrubbed with
+  // the transport stopped — the space views must always show where "now" is.
+  const busy = playing || _spRock.dragging || _spRock.drag || _spHeadTurn.dragging
+    || _phMoving || _spRockAmp > 0 || _spRock.roll !== 0 || _spAnyVoiceRinging();
   _spRaf = busy ? requestAnimationFrame(_spAnimate) : null;
 }
 
 function wireGlobalSpace(v) {
   // The "Global space" label is now the activate BUTTON (owner 2026-07-09).
+  // The space is always there — the header just opens and closes it. Whether
+  // anything is IN it is answered per thread, by the SPACE flag on each head.
   const spToggle = v.querySelector("#spToggle");
-  if (spToggle) spToggle.onclick = () => {
-    const sp = ensureGlobalSpace();
-    const turningOn = !sp.enabled;
-    if (turningOn && !sp.initialised) {
-      // Activation flow: either place a fresh arrangement or seed each thread
-      // from its patch constellation. Override/offset has been retired.
-      if (confirm("Smartly arrange the instruments in space?\n\nOK — spread the tracks around you\nCancel — begin each thread at its patch's own position")) {
-        spSmartArrange();
-      } else {
-        for (const track of arrangement.tracks) initialiseTrackThreadFromPatch(track);
-      }
-      sp.initialised = true;
-    }
-    sp.enabled = turningOn;
-    if (turningOn) _spOpen = true; // owner 2026-07-09: turning it on opens the full view
-    saveArrangement("global space on/off");
-    renderProduce();
-  };
-  // A separate chevron collapses/expands the view (only shown while on).
+  if (spToggle) spToggle.onclick = () => { _spOpen = !_spOpen; renderProduce(); };
   const spExpand = v.querySelector("#spExpand");
   if (spExpand) spExpand.onclick = () => { _spOpen = !_spOpen; renderProduce(); };
+  // Delete the anchor sitting under the playhead on the selected thread.
+  const spDelAnchor = v.querySelector("#spDeleteAnchor");
+  if (spDelAnchor) spDelAnchor.onclick = () => {
+    const sp = ensureGlobalSpace();
+    const anchors = sp.tracks?.[_spSelTrack];
+    if (!anchors?.length) return;
+    const i = anchors.findIndex(a => Math.abs(a.beat - playheadBeat) < SP_ANCHOR_GRAB_BEATS);
+    if (i < 0) return;
+    anchors.splice(i, 1);
+    if (!anchors.length) delete sp.tracks[_spSelTrack];
+    saveArrangement("remove space anchor");
+    renderProduce();
+  };
+  // Bulk join: put every thread on a path at once, spread around the listener.
+  const spAddAll = v.querySelector("#spAddAll");
+  if (spAddAll) spAddAll.onclick = () => {
+    const sp = ensureGlobalSpace();
+    spSmartArrange();
+    for (const track of arrangement.tracks) {
+      track.useGlobalSpace = true;
+      if (!sp.tracks?.[track.id]?.length && !sp.static?.[track.id]) initialiseTrackThreadFromPatch(track);
+    }
+    sp.initialised = true;
+    _spOpen = true;
+    saveArrangement("all threads join the global space");
+    renderProduce();
+  };
   const liveApply = () => {
     if (!arrPlay) return;
     const b = arrPlay.beat;
@@ -3776,7 +4115,7 @@ function wireGlobalSpace(v) {
     };
     const trackAtXY = (g) => {
       let best = null;
-      arrangement.tracks.forEach((t) => {
+      _spMemberTracks().forEach((t) => {
         const pos = _spTrackPos(t, curPlayBeat());
         // the HANDLE is the grabbable thing (for multi-layer patches the
         // faint source dots are display-only — their sound is placed from
@@ -3839,18 +4178,30 @@ function wireGlobalSpace(v) {
           drag.pos = { angle: 0, dist: 0 };
         }
         const anchors = sp.tracks[t.id];
-        const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < 0.26);
+        const a = anchors?.find(a => Math.abs(a.beat - curPlayBeat()) < SP_ANCHOR_GRAB_BEATS);
         if (a) {
-          // an anchor lives at the playhead: commit the drag to it
+          // On an anchor: bend the path here, leaving the rest of it alone.
           a.angle = drag.pos.angle;
           a.dist = drag.pos.dist;
           saveArrangement("move space anchor");
-        } else if (!anchors || !anchors.length) {
-          // an UNANCHORED track just moves — it stays where you drop it
+        } else if (anchors?.length) {
+          // OFF an anchor: slide the WHOLE thread by the same delta, keeping
+          // the shape of its path. It used to snap back, which read as a
+          // broken control rather than a rule.
+          const from = _spTrackPos(t, curPlayBeat());
+          const dA = drag.pos.angle - from.angle;
+          const k = Math.max(0.02, drag.pos.dist) / Math.max(0.05, from.dist);
+          for (const anchor of anchors) {
+            anchor.angle = ((anchor.angle + dA + 180) % 360 + 360) % 360 - 180;
+            anchor.dist = Math.max(SPACE_DMIN, Math.min(SPACE_DMAX, anchor.dist * k));
+          }
+          saveArrangement("move whole thread in space");
+        } else {
+          // No anchors at all: it simply stays where you drop it.
           sp.static = sp.static || {};
           sp.static[t.id] = { ...drag.pos };
           saveArrangement("move track in space");
-        } // anchored without an anchor here: snaps back (the rAF redraw handles it)
+        }
       };
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
@@ -3905,8 +4256,7 @@ function wireGlobalSpace(v) {
       const beats = Math.max(1, totalBeats());
       const hit = anchors.find(a => Math.abs((a.beat / beats) * w - x) < 6);
       if (hit) {
-        playheadBeat = hit.beat;
-        updatePlayhead(playheadBeat);
+        setPlayhead(hit.beat);
         renderProduce();
         return;
       }
@@ -3944,13 +4294,22 @@ function _midiTrackParams(track) {
 function onMidiMessage(ev) {
   if (_midi.deviceId && ev.target && ev.target.id !== _midi.deviceId) return;
   const [status, noteNumber, rawVel] = ev.data || [];
+  handleMidiEvent(status, noteNumber, rawVel);
+}
+
+// Shared by hardware MIDI (after the device filter) and musical typing —
+// from here down a typed key and a played key are indistinguishable.
+function handleMidiEvent(status, noteNumber, rawVel) {
   const cmd = status & 0xf0;
   if (cmd !== 0x90 && cmd !== 0x80) return;
   const isOn = cmd === 0x90 && rawVel > 0;
   const track = arrangement.tracks.find(t => t.id === _midi.armedTrackId);
   if (!track) return;
   const params = _midiTrackParams(track);
-  if (!_midi.engine) { _midi.engine = new GenerationEngine(params); _midi.engine.initialise(); }
+  // Constructor only — the monitor needs the scale and per-note variation.
+  // initialise() would compose a full motif repertoire the player's own
+  // melody then overrides note for note.
+  if (!_midi.engine) _midi.engine = new GenerationEngine(params);
   const engine = _midi.engine;
   const now = performance.now();
   if (isOn) {
@@ -4010,36 +4369,164 @@ function finishMidiRecording() {
   }).sort((a, b) => a.offsetDivs - b.offsetDivs);
   const lengthBeats = Math.max(1, Math.ceil(Math.max(...notes.map(n => n.offsetDivs + n.durationDivs)) / beatDiv));
   const free = trackFreeFrom(track, rec.startBeat);
-  if (free < 1) { alert("No free space on the armed track at the playhead — recording kept in memory was discarded."); return; }
-  track.regions.push({
+  let target = track;
+  let fit = Math.min(lengthBeats, free);
+  if (free < 1) {
+    // The armed lane is occupied at the playhead. A take is never thrown
+    // away: spill it onto a fresh track carrying the same voice, the way a
+    // DAW records an overlapping pass onto a new take lane.
+    target = {
+      id: crypto.randomUUID(),
+      name: `${track.name} take`,
+      gain: track.gain ?? 1,
+      regions: [],
+      ...(track.instrumentParams ? { instrumentParams: track.instrumentParams } : {}),
+      ...(track.useGlobalScale ? { useGlobalScale: true } : {}),
+    };
+    arrangement.tracks.splice(arrangement.tracks.indexOf(track) + 1, 0, target);
+    initialiseTrackThreadFromPatch(target, _midiTrackParams(track));
+    fit = Math.max(1, Math.min(lengthBeats, totalBeats() - rec.startBeat));
+  }
+  target.regions.push({
     id: crypto.randomUUID(),
     paletteId: track.regions[0]?.paletteId,
     startBeat: rec.startBeat,
-    lengthBeats: Math.min(lengthBeats, free),
+    lengthBeats: fit,
     seed: newSeed(),
     type: "baked",
     notes,
-    loopSourceBeats: Math.min(lengthBeats, free),
+    loopSourceBeats: fit,
   });
   saveArrangement("MIDI recording");
   renderProduce();
 }
 
-function midiToolbarHTML() {
-  if (!("requestMIDIAccess" in navigator)) return "";
-  if (!_midi.access) {
-    return `<button class="tb-util-btn" id="midiBtn" title="Connect a MIDI keyboard — arm a track with its ● button, play, and stop the arm to bake the take">${tbIcon("midi")}<span class="tb-label">MIDI</span></button>`;
+// ── Q10b: musical typing — the computer keyboard as a MIDI input ──
+// A toggle, not always-on, because the producer already spends letters on
+// shortcuts (Z zoom, R reroll…): while typing is on, note keys win, exactly
+// as in every DAW's computer-MIDI-keyboard mode. Typed keys synthesize
+// note-on/off into handleMidiEvent, so mapping preferences, monitoring and
+// record-arm behave identically to hardware — and no Web MIDI permission
+// is needed, so this also serves browsers without requestMIDIAccess.
+const KBD_MIDI_KEY = "phase0.kbdMidi.v1";
+let _kbd = { on: false, octave: 0, velocity: 100, down: new Map() };
+try {
+  const saved = JSON.parse(localStorage.getItem(KBD_MIDI_KEY) || "{}");
+  if (Number.isFinite(saved.octave)) _kbd.octave = clamp(Math.round(saved.octave), -4, 4);
+  if (Number.isFinite(saved.velocity)) _kbd.velocity = clamp(Math.round(saved.velocity), 1, 127);
+} catch { /* defaults stand */ }
+function saveKbdMidi() {
+  localStorage.setItem(KBD_MIDI_KEY, JSON.stringify({ octave: _kbd.octave, velocity: _kbd.velocity }));
+}
+
+function kbdReleaseAll() {
+  _kbd.down.forEach((note) => handleMidiEvent(0x80, note, 0));
+  _kbd.down.clear();
+}
+
+function setKbdMidi(on) {
+  if (_kbd.on === !!on) return;
+  _kbd.on = !!on;
+  if (!_kbd.on) {
+    kbdReleaseAll();
+  } else if (!_midi.armedTrackId && arrangement?.tracks.length) {
+    // DAW convention: enabling musical typing arms the selected (else first)
+    // track so keys make sound immediately; ● disarms and bakes as usual.
+    const sel = arrangement.tracks.find(t => t.id === selectedRegion?.trackId);
+    _midi.armedTrackId = (sel || arrangement.tracks[0]).id;
+    _midi.engine = null;
   }
-  const inputs = [..._midi.access.inputs.values()];
-  return `
-    <select id="midiDevice" class="splits-filter" title="Which MIDI input records">
-      <option value="">All inputs</option>
-      ${inputs.map(inp => `<option value="${esc(inp.id)}"${_midi.deviceId === inp.id ? " selected" : ""}>${esc(inp.name || inp.id)}</option>`).join("")}
-    </select>
-    ${_midi.armedTrackId ? `<span class="midi-rec-dot" title="Recording arms on the ● track — playing keys records; disarm to bake">●</span>` : ""}`;
+  renderProduce();
+}
+
+// Badge updates go straight to the DOM: a full renderProduce would drop
+// keys held mid-phrase (it rebuilds the toolbar the badge lives in).
+function updateKbdBadge() {
+  const el = document.getElementById("kbdOct");
+  if (el) el.textContent = `C${4 + _kbd.octave} · v${_kbd.velocity}`;
+}
+
+if (!window._kbdMidiInstalled) {
+  window._kbdMidiInstalled = true;
+  const inTextField = (t) =>
+    !!t && (/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || "") || t.isContentEditable);
+  // Capture phase so note keys pre-empt the producer's single-letter
+  // shortcuts (Z zoom, R reroll…) while typing mode is on.
+  document.addEventListener("keydown", (e) => {
+    if (!location.hash.includes("produce") || !arrangement) return;
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === "KeyK") {
+      e.preventDefault(); // ⌘K: the Logic/GarageBand musical-typing toggle
+      e.stopPropagation();
+      setKbdMidi(!_kbd.on);
+      return;
+    }
+    if (!_kbd.on || inTextField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.code === "KeyZ" || e.code === "KeyX") {
+      e.preventDefault();
+      e.stopPropagation();
+      kbdReleaseAll(); // octave moves under held keys would strand note-offs
+      _kbd.octave = clamp(_kbd.octave + (e.code === "KeyX" ? 1 : -1), -4, 4);
+      saveKbdMidi();
+      updateKbdBadge();
+      return;
+    }
+    if (e.code === "KeyC" || e.code === "KeyV") {
+      e.preventDefault();
+      e.stopPropagation();
+      _kbd.velocity = clamp(_kbd.velocity + (e.code === "KeyV" ? 10 : -10), 1, 127);
+      saveKbdMidi();
+      updateKbdBadge();
+      return;
+    }
+    if (!kbdIsNoteCode(e.code)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.repeat || _kbd.down.has(e.code)) return;
+    const note = kbdMidiNote(e.code, _kbd.octave);
+    if (note == null) return;
+    _kbd.down.set(e.code, note);
+    handleMidiEvent(0x90, note, _kbd.velocity);
+  }, true);
+  // keyup is not gated on mode/hash: a key pressed before a toggle or view
+  // switch must still deliver its note-off.
+  document.addEventListener("keyup", (e) => {
+    const note = _kbd.down.get(e.code);
+    if (note == null) return;
+    _kbd.down.delete(e.code);
+    e.stopPropagation();
+    handleMidiEvent(0x80, note, 0);
+  }, true);
+  window.addEventListener("blur", () => kbdReleaseAll());
+}
+
+function midiToolbarHTML() {
+  const kbdBtn = `
+    <button class="tb-util-btn${_kbd.on ? " on" : ""}" id="kbdBtn" aria-pressed="${_kbd.on}"
+      title="Musical typing (⌘K) — play notes from this keyboard: A-row white keys, W-row black keys, Z/X octave, C/V velocity. The ● armed track supplies the voice; disarm ● to bake the take.">
+      ${tbIcon("kbd")}<span class="tb-label">Keys</span>${_kbd.on ? `<span class="kbd-oct" id="kbdOct">C${4 + _kbd.octave} · v${_kbd.velocity}</span>` : ""}
+    </button>`;
+  let device = "";
+  if ("requestMIDIAccess" in navigator) {
+    if (!_midi.access) {
+      device = `<button class="tb-util-btn" id="midiBtn" title="Connect a MIDI keyboard — arm a track with its ● button, play, and stop the arm to bake the take">${tbIcon("midi")}<span class="tb-label">MIDI</span></button>`;
+    } else {
+      const inputs = [..._midi.access.inputs.values()];
+      device = `
+        <select id="midiDevice" class="splits-filter" title="Which MIDI input records (musical typing is always heard)">
+          <option value="">All inputs</option>
+          ${inputs.map(inp => `<option value="${esc(inp.id)}"${_midi.deviceId === inp.id ? " selected" : ""}>${esc(inp.name || inp.id)}</option>`).join("")}
+        </select>`;
+    }
+  }
+  const armed = _midi.armedTrackId
+    ? `<span class="midi-rec-dot" title="Recording arms on the ● track — playing keys records; disarm to bake">●</span>`
+    : (_kbd.on ? `<span class="kbd-hint">arm a track ● to play</span>` : "");
+  return kbdBtn + device + armed;
 }
 
 function wireMidi(v) {
+  const kbdBtn = v.querySelector("#kbdBtn");
+  if (kbdBtn) kbdBtn.onclick = () => setKbdMidi(!_kbd.on);
   const midiBtn = v.querySelector("#midiBtn");
   if (midiBtn) midiBtn.onclick = async () => {
     try {
@@ -4096,46 +4583,60 @@ function regionMiniPianoHTML(region) {
     const a = clamp(Number(n.velocity) || 0.62, 0.18, 1);
     return `<i class="tl2-mini-note" style="--x:${x.toFixed(2)}%;--w:${w.toFixed(2)}%;--y:${y.toFixed(2)}%;--a:${a.toFixed(2)}"></i>`;
   }).join("");
-  return `<span class="tl2-mini-roll" aria-hidden="true">${bars}</span>`;
+  // Provisional vs committed, drawn: a generative take is one roll of the dice
+  // (soft, rounded, feathered — "about here"), a baked one is fixed editable
+  // data (crisp, square, full strength — "exactly here").
+  const kind = region.type === "baked" ? "baked" : "generative";
+  return `<span class="tl2-mini-roll tl2-roll-${kind}" aria-hidden="true">${bars}</span>`;
 }
 
-function regionProbabilityCurveHTML(region, params = {}) {
-  const seed = (Math.floor(Number(region.seed) || 1) ^ 0x9E3779B9) >>> 0;
-  const rng = _fieldRng(seed);
-  const divs = clamp(Number(params.beatDivisions || arrangement.context?.beatDivisions || 1), 1, 6);
-  const on = clamp(Number(params.onBeatProb ?? 0.66), 0, 1);
-  const off = clamp(Number(params.offBeatProb ?? 0.38), 0, 1);
-  const surprise = clamp(Number(params.surpriseDensity ?? params.surpriseRate ?? 0.2), 0, 1);
-  // Owner 2026-07-09: lengthening a region LOOPS its motif rather than
-  // stretching one curve. One motif length = 100 viewBox units; the profile is
-  // a sum of harmonics (periodic), so it meets itself at every motif boundary
-  // at the same height AND slope — seamless repeats. viewBox width scales with
-  // the number of loops while preserveAspectRatio="none" keeps each loop at a
-  // fixed pixel width (the graphic extends lengthways, no vertical scaling).
-  const motifBeats = Math.max(1, Number(params.motifLengthBeats || params.motifLength || 4));
-  const loops = Math.max(1, regionLen(region) / motifBeats);
-  const base = clamp(52 - (on - off) * 20, 24, 78);
-  const harm = [1, 2, 3, 4].map(k => ({ k, a: (0.35 + rng() * 0.65) / k, ph: rng() * Math.PI * 2 }));
-  const sumA = harm.reduce((s, h) => s + h.a, 0) || 1;
-  const swing = (14 + off * 10 + surprise * 10) / sumA; // bounded so the seam never clamps
-  const yAt = (t) => { // t = phase within one loop, [0,1); periodic in t
-    let y = base;
-    for (const h of harm) y += swing * h.a * Math.sin(2 * Math.PI * h.k * t + h.ph);
-    return clamp(y, 12, 88);
-  };
-  const vbW = 100 * loops;
-  const stepsPerLoop = Math.min(30, 12 + Math.round(divs * 2 + surprise * 6));
-  const totalSteps = Math.max(2, Math.round(stepsPerLoop * loops));
-  const points = [];
-  for (let i = 0; i <= totalSteps; i++) {
-    const x = (i / totalSteps) * vbW;
-    points.push(`${x.toFixed(1)},${yAt((x / 100) % 1).toFixed(1)}`);
+// ── What a region DRAWS (owner 2026-07-28) ──────────────────
+// The body used to be a decorative curve: a seeded sum of harmonics scaled by
+// onBeatProb/offBeatProb and tiled once per motif length. It had nothing to do
+// with the take, which is why it re-tiled oddly as you resized and why a split
+// tail restarted the shape instead of continuing the music. It now shows the
+// notes that will actually sound, in the places they will sound.
+//
+// captureSpan is pure (GenerationEngine only, no audio context), and a take is
+// deterministic from its seed, so a longer capture is a superset of a shorter
+// one: capture in 16-beat chunks and slice. Resizing within a chunk is free.
+let _takeCache = new Map();
+function invalidateTakePreviews() { _takeCache = new Map(); }
+
+function regionTakeNotes(track, region) {
+  if (region.type === "baked") return Array.isArray(region.notes) ? region.notes : [];
+  const offset = region.takeOffsetBeats || 0;
+  const span = Math.max(16, Math.ceil((offset + regionLen(region)) / 16) * 16);
+  // The guide is part of the key: a change point moving must redraw the takes
+  // that cross it, not just the ones that start after it.
+  const guideKey = track.useGlobalScale
+    ? (arrangement.globalScale?.markers || []).map(m => m.atBeat).join(",") : "";
+  const key = `${region.id}:${region.seed}:${span}:${guideKey}`;
+  let all = _takeCache.get(key);
+  if (!all) {
+    try {
+      const startBeat = region.startBeat ?? 0;
+      const params = regionPlayParams(track, region, startBeat);
+      const beatSec = 60 / Math.max(30, params.tempo || 104);
+      // Params resolved AT EACH BEAT, so a Harmonic-guide change point inside
+      // the region turns the drawing exactly where it turns the sound. One
+      // engine carries the motif and walk across the boundary, as playback does.
+      const paramsAtBeat = track.useGlobalScale
+        ? (beat) => {
+          const at = startBeat + beat;
+          return { key: harmonicMarkerIdAt(arrangement, at), params: regionPlayParams(track, region, at) };
+        }
+        : null;
+      all = captureSpanEvolving(params, beatSec * span, paramsAtBeat) || [];
+    } catch { all = []; }
+    _takeCache.set(key, all);
   }
-  const pts = points.join(" ");
-  return `<svg class="tl2-prob-curve" viewBox="0 0 ${vbW.toFixed(1)} 100" preserveAspectRatio="none" aria-hidden="true">
-    <polyline class="tl2-prob-shadow" points="${pts}"></polyline>
-    <polyline class="tl2-prob-line" points="${pts}"></polyline>
-  </svg>`;
+  if (!all.length) return all;
+  const beatDiv = bakedGridFor(all, {});
+  const from = offset * beatDiv, to = (offset + regionLen(region)) * beatDiv;
+  return all
+    .filter(n => (n.offsetDivs || 0) >= from && (n.offsetDivs || 0) < to)
+    .map(n => ({ ...n, offsetDivs: (n.offsetDivs || 0) - from }));
 }
 
 // Boundary ticks for a region: baked → loop boundaries; generative → motif
@@ -4162,9 +4663,7 @@ function retileRegionGraphic(regionEl, region, track) {
   const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
   const params = pal?.params || track.instrumentParams || {};
   const shapeEl = regionEl.querySelector(".tl2-prob-curve, .tl2-mini-roll");
-  if (shapeEl) shapeEl.outerHTML = region.type === "baked"
-    ? regionMiniPianoHTML(region)
-    : regionProbabilityCurveHTML(region, params);
+  if (shapeEl) shapeEl.outerHTML = regionMiniPianoHTML({ ...region, notes: regionTakeNotes(track, region) });
   regionEl.querySelectorAll(".tl2-motiftick, .tl2-looptick").forEach(t => t.remove());
   const ticks = regionTicksHTML(region, params);
   if (ticks) regionEl.insertAdjacentHTML("afterbegin", ticks);
@@ -4183,7 +4682,22 @@ function produceTimelineHTML() {
       const patchSel = palettePreviewId && r.paletteId === palettePreviewId ? " patch-selected" : "";
       const baked = r.type === "baked" ? " baked" : "";
       const pal = (arrangement.palette || []).find(pl => pl.id === r.paletteId);
-      const label = pal ? pal.name : t.name;
+      // Per-take markers live HERE, not on the thread head: a region has
+      // exactly one patch, so "this module is edited / frozen" is unambiguous.
+      const ownParts = regionOverriddenParts(r);
+      const takeMarks = [
+        ownParts.length
+          ? `<span class="tl2-mark tl2-mark-own" title="Edited on this take only: ${esc(ownParts.map(x => CAPTURE_PART_LABELS[x].toLowerCase()).join(", "))}. The rest still follows its patch.">●</span>`
+          : "",
+        r.type === "baked"
+          ? `<span class="tl2-mark tl2-mark-baked" title="Baked — pitch, rhythm, dynamics and surprise are frozen into notes. Sound, space and percussion still follow the patch.">▦</span>`
+          : "",
+      ].join("");
+      // A take on a variant still has to say WHAT it is: the variant name
+      // alone ("Pentatonic major") loses the instrument. Root · diff.
+      const label = pal
+        ? (pal.parentId ? `${paletteDisplayName(rootPatchOf(pal))} · ${paletteDisplayName(pal)}` : paletteDisplayName(pal))
+        : t.name;
       let badgeHover = "";
       if (pal) {
         const b = patchBadges(pal.params);
@@ -4192,14 +4706,12 @@ function produceTimelineHTML() {
       // Baked → loop-boundary ticks; generative → light dashed motif-length
       // lines (owner 2026-07-09). Same generator as the live resize re-tile.
       const ticks = regionTicksHTML(r, pal?.params || t.instrumentParams || {});
-      const shape = r.type === "baked"
-        ? regionMiniPianoHTML(r)
-        : regionProbabilityCurveHTML(r, pal?.params || t.instrumentParams || {});
+      const shape = regionMiniPianoHTML({ ...r, notes: regionTakeNotes(t, r) });
       const gainDb = 20 * Math.log10(Math.max(0.02, r.gain ?? 1));
       return `<div class="tl2-region${sel}${patchSel}${baked}${r.muted ? " muted" : ""}" data-region="${r.id}" data-track="${t.id}"
         style="--track-h:${hue};left:${r.startBeat * pxPerBeat}px;width:${regionLen(r) * pxPerBeat - 2}px"
         title="${esc(label)}${esc(badgeHover)} — drag to move, right edge extends, ⌘T splits at the playhead. R rerolls a generative take (⇧R steps back). Double-click a baked region to edit notes.">
-        ${ticks}${shape}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span><span class="tl2-region-label">${esc(label)}</span>
+        ${ticks}${shape}<span class="tl2-seed-chip" title="This take's seed — its identity. Duplicate keeps it; ⇧⌘D duplicates with a new one.">⚄ ${r.seed}</span>${takeMarks}<span class="tl2-region-label">${esc(label)}</span>
         ${sel && pal ? `<span class="tl2-badges">${patchBadgesHTML({ ...pal.params, ...(pal.originScale || {}) }, pal.originTempo, true)}</span>` : ""}
         ${sel ? `<span class="tl2-gain-tag" data-gain-tag="${r.id}" title="Region level — drag vertically">${gainDb >= 0 ? "+" : ""}${gainDb.toFixed(1)}dB</span>` : ""}
         <span class="tl2-resize" data-resize="${r.id}" title="Drag to extend"></span>
@@ -4207,23 +4719,39 @@ function produceTimelineHTML() {
     }).join("");
     const gain = t.gain ?? 1;
     const gainDbTrack = 20 * Math.log10(Math.max(0.02, gain));
-    // Owner 07-07: the head is TWO rows so its controls never spill onto
-    // the lanes — identity on top, mix controls underneath.
+    // ── What the thread head can honestly say (owner 2026-07-28) ──
+    // Only TWO facts belong to a thread: whether the global space owns its
+    // position, and whether it follows the Harmonic guide. Both are stored per
+    // track, so they hold however many patches sit on the lane.
+    //
+    // Sound / note engine / percussion belong to a TAKE, and a thread can carry
+    // several takes from different patches — a per-thread glyph for them would
+    // silently change meaning as the playhead crossed regions. Those markers
+    // live on the region instead, where there is exactly one patch.
+    const takeCount = (t.regions || []).length;
+    const spaceGlobal = !!t.useGlobalSpace;
+    const scaleHG = !!t.useGlobalScale;
+    const threadFlags = `
+      <button class="tl2-flag${spaceGlobal ? " on" : ""}" data-track-module="${t.id}:space"
+        title="Global space \u2014 ${spaceGlobal ? "this thread follows a path through it: its position moves over time and it shares the arrangement's listener and room. Click to take it out." : "this thread sits where you put it, in its patch's own room. Click to give it a path."}">${THREAD_FLAG_ICON.space}</button>
+      <button class="tl2-flag${scaleHG ? " on" : ""}" data-track-module="${t.id}:clef"
+        title="Harmonic guide \u2014 ${scaleHG ? "takes on this thread regenerate under it. Click to stop following it." : "this thread keeps each patch's own scale. Click to follow the guide."}">${THREAD_FLAG_ICON.clef}</button>`;
     return `<div class="tl2-row">
       <div class="tl2-head tl2-track-head${trackAudible(t) ? "" : " inaudible"}${_spOpen && _spSelTrack === t.id ? " sp-sel" : ""}" data-track-head="${t.id}" style="--track-h:${hue}">
         <div class="tl2-head-top">
-          <span class="tl2-hue" style="background:hsl(${hue},70%,55%)" title="This track's colour (matches its global-space thread)"></span>
+          <span class="tl2-hue" style="background:hsl(${hue},70%,55%)" title="This thread's colour (matches its global-space path)"></span>
           <span class="tl2-name" title="${esc(t.name)} — click to select for the global space; drag to reorder">${esc(t.name)}</span>
-          <span class="tl2-db" title="Track level">${gainDbTrack >= 0 ? "+" : ""}${gainDbTrack.toFixed(1)}dB</span>
-          <button class="tl-remove" data-remove-track="${t.id}" title="Remove this track">×</button>
+          ${takeCount ? `<span class="tl2-takes" title="${takeCount} take${takeCount === 1 ? "" : "s"} on this thread">${takeCount}</span>` : ""}
+          <button class="tl-remove" data-remove-track="${t.id}" title="Remove this thread">\u00d7</button>
         </div>
         <div class="tl2-head-ctl">
+          ${threadFlags}
           <button class="tl2-ms${t.muted ? " on" : ""}" data-track-mute="${t.id}" title="Mute">M</button>
           <button class="tl2-ms tl2-solo${t.solo ? " on" : ""}" data-track-solo="${t.id}" title="Solo">S</button>
-          <button class="tl2-ms tl2-gsbtn${t.useGlobalScale ? " on" : ""}" data-track-gscale="${t.id}" title="Follow the Harmonic guide: this track's takes regenerate under the marker in force (baked notes stay put)">HG</button>
-          ${_midi.access ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this track's patch and bake into a region when you disarm">●</button>` : ""}
-          <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Track level"/>
-          <canvas class="tl-space-dot" data-track-space-dot="${t.id}" width="28" height="28" title="Spatial position — drag: left/right rotates around you, up/down changes distance"></canvas>
+          ${(_midi.access || _kbd.on) ? `<button class="tl2-ms tl2-arm${_midi.armedTrackId === t.id ? " on" : ""}" data-track-arm="${t.id}" title="Record-arm: played MIDI keys sound through this thread's patch and bake into a region when you disarm">\u25cf</button>` : ""}
+          <input type="range" class="tl-gain" data-track-gain="${t.id}" min="0" max="1.5" step="0.01" value="${gain}" title="Level trim. Distance is the real loudness control \u2014 this is artistic trim on top of it."/>
+          <span class="tl2-db" title="Level trim in dB">${gainDbTrack >= 0 ? "+" : ""}${gainDbTrack.toFixed(1)}</span>
+          <canvas class="tl-space-dot" data-track-space-dot="${t.id}" width="28" height="28" title="Where this thread sits \u2014 drag: left/right rotates around you, up/down changes distance. Moves the whole patch (every layer and hit) together."></canvas>
         </div>
       </div>
       <div class="tl2-lane" data-lane="${t.id}" style="width:${laneW}px">${regions}</div>
@@ -4280,12 +4808,48 @@ function editorRegion() {
   return region ? { track, region } : null;
 }
 
-function regionPatch(track, region) {
-  if (region?.paramsOverride) return region.paramsOverride;
-  const pal = (arrangement.palette || []).find(pl => pl.id === region.paletteId);
+// The patch a take is measured against — its palette entry (or variant).
+function regionBaseParams(track, region) {
+  const pal = palettePatchFor(arrangement, region);
   if (pal) return pal.params;
+  if (region?.paramsOverride) return region.paramsOverride;
   if (!track.instrumentParams) track.instrumentParams = {};
   return track.instrumentParams;
+}
+
+// ── The take under edit ─────────────────────────────────────
+// Opening the inspector used to deep-clone the WHOLE parameter set onto the
+// region, severing every module from its patch before you had touched
+// anything. Instead the inspector edits a resolved working copy, and each
+// control's persist() records only the module it actually changed — a module
+// edited back to the patch's value stops being an override at all.
+let _regionEdit = null;   // { regionId, params }
+
+function regionEditParams(track, region) {
+  if (!_regionEdit || _regionEdit.regionId !== region.id) {
+    _regionEdit = { regionId: region.id, params: serializeParams(regionVoiceParams(track, region)) };
+  }
+  return _regionEdit.params;
+}
+
+function invalidateRegionEdit(regionId = null) {
+  if (!regionId || _regionEdit?.regionId === regionId) _regionEdit = null;
+}
+
+// Record (or clear) one module's divergence from the patch.
+function persistRegionModule(track, region, part) {
+  const working = _regionEdit?.regionId === region.id ? _regionEdit.params : null;
+  if (!working) return;
+  const base = regionBaseParams(track, region);
+  if (modulesEqual(base, working, part)) {
+    if (region.overrides) {
+      delete region.overrides[part];
+      if (!Object.keys(region.overrides).length) delete region.overrides;
+    }
+    return;
+  }
+  region.overrides = region.overrides || {};
+  region.overrides[part] = extractModule(working, part);
 }
 
 function bakeRegion(track, region) {
@@ -4300,11 +4864,12 @@ function bakeRegion(track, region) {
   saveArrangement("bake region");
 }
 
-function ensureRegionPatchOverride(track, region) {
-  if (!region.paramsOverride) region.paramsOverride = JSON.parse(JSON.stringify(regionPatch(track, region) || {}));
-  const pl = (arrangement.palette || []).find(p => p.id === region.paletteId);
+// Module NAMES only — no parameter cloning. Older regions did not retain
+// them, so infer friendly labels rather than presenting an empty inspector.
+function ensureRegionModuleNames(track, region) {
+  const pl = palettePatchFor(arrangement, region);
   const savedParts = region.parts || pl?.parts || {};
-  const p = region.paramsOverride;
+  const p = regionEditParams(track, region);
   // Older regions did not retain module names.  Infer friendly labels instead
   // of presenting an empty inspector, while preserving any existing IDs.
   region.parts = {
@@ -4326,12 +4891,16 @@ function ensureRegionPatchOverride(track, region) {
 function editorPatchSubject() {
   const er = editorRegion();
   if (er && editorMode === "patch") {
-    const region = ensureRegionPatchOverride(er.track, er.region);
-    const palette = (arrangement.palette || []).find(p => p.id === er.region.paletteId);
-    return { patch: region, label: palette?.name || region.name || "Region patch", region: er.region, track: er.track, regionScoped: true };
+    const region = ensureRegionModuleNames(er.track, er.region);
+    const palette = palettePatchFor(arrangement, er.region);
+    return {
+      patch: region, params: regionEditParams(er.track, er.region),
+      label: palette ? paletteDisplayName(palette) : (region.name || "Region patch"),
+      region: er.region, track: er.track, regionScoped: true,
+    };
   }
   const pl = (arrangement.palette || []).find(p => p.id === palettePreviewId);
-  return pl ? { patch: pl, label: paletteDisplayName(pl), regionScoped: false } : null;
+  return pl ? { patch: pl, params: (pl.params || (pl.params = {})), label: paletteDisplayName(pl), regionScoped: false } : null;
 }
 function patchModuleOptions(half, selected) {
   const allowed = half === "subnote" ? PALETTE_SUBNOTE_SECTIONS : PALETTE_MACRO_SECTIONS;
@@ -4460,18 +5029,32 @@ function mountPatchStage(canvas, cfg) {
       w, h,
     };
   };
+  // Stacked dots: the melodic sources are the patch, percussion is a secondary
+  // accent on top of it, so a pile of overlapping dots must hand you a tonal
+  // layer rather than a hit. Rank every candidate within the grab radius by
+  // (tonal first, then the one already selected, then nearest) instead of
+  // letting whichever source happened to be selected keep winning ties.
   const srcAt = (x, y, w, h) => {
     const { cx, cy, rMax } = _stageGeom(w, h);
-    let best = null, bestD = 18;
     const sel = selId();
+    const hits = [];
     for (const s of sources()) {
       const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
       const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
       const d = Math.hypot(cx + Math.cos(rad) * r - x, cy + Math.sin(rad) * r - y);
-      // ties go to the already-selected source so stacked dots stay grabbable
-      if (d < bestD || (best && s.id === sel && d < 18)) { best = s; bestD = Math.min(d, bestD); }
+      if (d < 18) hits.push({ s, d });
     }
-    return best;
+    if (!hits.length) return null;
+    const rank = ({ s, d }) => [
+      s.kind === "percussion" ? 1 : 0,   // tonal layers first
+      s.id === sel ? 0 : 1,              // then whatever you already had hold of
+      d,                                 // then nearest
+    ];
+    hits.sort((a, b) => {
+      const ra = rank(a), rb = rank(b);
+      return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2];
+    });
+    return hits[0].s;
   };
   const applyAt = (e, s) => {
     const { x, y, w, h } = toLocal(e);
@@ -4539,8 +5122,17 @@ function patchLayerStripHTML(p) {
     !!l.mute); }).join("");
   // Percussion hits are their OWN group — kept visually distinct from the melodic
   // sound layers, each independently positionable + mutable (owner 2026-07-10).
+  // The hits live HERE and only here — the macro pane used to carry a second
+  // percussion card that duplicated this one. The group header carries the
+  // Library route and is its own drop target, so a kit can be dragged straight
+  // onto it instead of silently failing against the enclosing sound pane.
+  const percHead = `<div class="patch-lyr-group" data-patch-drop="percussion">
+      <button class="saem-route${producerBrowserTarget?.part === "percussion" ? " active" : ""}" data-browser-route="percussion" title="Choose percussion from the Library">${notationIconHTML(["percussion"], { compact: true })}</button>
+      <span>Percussion</span><small>${percLayers.length} hit${percLayers.length === 1 ? "" : "s"}</small>
+      <button class="patch-lyr-edit" data-patch-edit="percussion" title="Edit percussion in the Studio">✎</button>
+    </div>`;
   const percRows = percLayers.length ? (
-    `<div class="patch-lyr-group"><span>Percussion</span><small>${percLayers.length} hit${percLayers.length === 1 ? "" : "s"}</small></div>` +
+    percHead +
     percLayers.map((l, i) => row(
       `perc:${l.id}`, `P${i + 1}`, l.hue ?? (32 + i * 47) % 360,
       l.sound?.name || l.sound?.key || `Hit ${i + 1}`, ` <span class="patch-lyr-badge perc">HIT</span>`,
@@ -4548,16 +5140,63 @@ function patchLayerStripHTML(p) {
       l.space?.angle ?? (p.spaceAzimuth ?? 0), l.space?.dist ?? (p.spaceDistance ?? 2.5),
       `<button class="pal-btn patch-lyr-mute${l.mute ? " on" : ""}" data-patch-perc-mute="${l.id}" title="${l.mute ? "Unmute" : "Mute"} hit">M</button>`,
       !!l.mute, "patch-lyr-perc")).join("")
-  ) : "";
+  ) : percHead + `<div class="patch-lyr-empty">No hits yet — drag a percussion kit onto this header, or pick one from the Library.</div>`;
   const emptyNote = layers.length > 1 ? "" : `<div class="patch-lyr-empty">One sound layer. Stack more from the sub-note editor's LAYERS panel, or drag a preset onto this patch.</div>`;
   return baseRow + rows + emptyNote + percRows;
 }
-function patchScaleHTML(p, parts, regionScoped) {
+// ── Who owns this module? ───────────────────────────────────
+// One helper behind every "this is superseded" affordance, so a greyed control
+// and the audio can never disagree. Superseded controls stay VISIBLE and
+// readable — hiding them is what made the hierarchy unguessable.
+
+const OWNER_TAG = {
+  "harmonic-guide": "HG",
+  "global-space": "GLOBAL",
+  bake: "BAKED",
+  take: "TAKE",
+  variant: "VARIANT",
+};
+
+/**
+ * Authority for `part` on whatever the inspector is showing. A palette patch
+ * has no single thread, so it reports how many of its takes supersede it —
+ * the case the old copy missed entirely.
+ */
+function patchModuleAuthority(subject, part) {
+  if (subject?.regionScoped) return moduleAuthority(subject.track, subject.region, part);
+  const takes = takesOfPatch(subject?.patch?.id);
+  const superseded = takes.filter(({ track, region }) => moduleAuthority(track, region, part).superseded);
+  if (!superseded.length) return { owner: "patch", superseded: false, label: "", reason: "" };
+  const owners = [...new Set(superseded.map(({ track, region }) => moduleAuthority(track, region, part).owner))];
+  return {
+    owner: owners.length === 1 ? owners[0] : "mixed",
+    superseded: true,
+    label: owners.length === 1 ? OWNER_TAG[owners[0]] : "SUPERSEDED",
+    reason: `Superseded on ${superseded.length} of ${takes.length} take${takes.length === 1 ? "" : "s"}. Edits here are stored, and heard wherever they are not superseded.`,
+  };
+}
+
+function ownerChipHTML(auth) {
+  if (!auth?.superseded) return "";
+  return `<span class="module-owner-chip" title="${esc(auth.reason)}">${esc(auth.label || OWNER_TAG[auth.owner] || "SUPERSEDED")}</span>`;
+}
+
+function supersededNoteHTML(auth) {
+  if (!auth?.superseded) return "";
+  return `<div class="patch-global-note superseded-note">${esc(auth.reason)}</div>`;
+}
+
+function patchScaleHTML(p, parts, subject) {
   const div = p.scaleMode === "edo" ? (p.edoDivisions || 12) : 12;
   const degrees = Array.isArray(p.customDegrees) && p.customDegrees.length ? p.customDegrees : (SCALE_PRESETS[p.scalePreset] || SCALE_PRESETS.major).degrees;
-  return `<div class="patch-scale"><div class="patch-scale-head">Scale · ${esc(p.scaleMode === "edo" ? `${div}-EDO` : (SCALE_PRESETS[p.scalePreset]?.label || p.scalePreset || "Major"))}</div>
+  // The old note was shown on EVERY region regardless of whether the thread
+  // actually follows the guide, and never on a palette patch even though its
+  // takes could all be superseding it. Both directions now come from the
+  // authority helper instead of a guess.
+  const auth = patchModuleAuthority(subject, "clef");
+  return `<div class="patch-scale${auth.superseded ? " superseded" : ""}"><div class="patch-scale-head">Scale · ${esc(p.scaleMode === "edo" ? `${div}-EDO` : (SCALE_PRESETS[p.scalePreset]?.label || p.scalePreset || "Major"))}${ownerChipHTML(auth)}</div>
     <div class="patch-degrees">${degrees.map(d => `<button data-patch-degree="${d}" class="${(p.rootNotes || []).includes(d) ? "root" : (p.subScaleNotes || []).includes(d) ? "sub" : ""}" title="Cycle: scale → sub-scale → root → off">${d}</button>`).join("")}</div>
-    ${regionScoped ? '<div class="patch-global-note">If this track follows Harmonic guide, these patch-scale edits are stored but are not heard until HG is off.</div>' : ''}</div>`;
+    ${supersededNoteHTML(auth)}</div>`;
 }
 
 function patchSaveHTML(subject, p) {
@@ -4580,39 +5219,75 @@ function patchSaveHTML(subject, p) {
   </div>`;
 }
 function producerPatchInspectorHTML(subject) {
-  // Same store the wiring edits and playback reads: override for regions.
-  const p = (subject.regionScoped ? subject.patch.paramsOverride : subject.patch.params) || {};
+  // For a take this is the RESOLVED patch it plays (working copy); for a
+  // palette patch it is the patch itself. Same object the wiring edits.
+  const p = subject.params || {};
   const parts = subject.patch.parts || {};
   const movement = p.spaceMovement === "additive" ? "additive" : "centered";
-  const percOn = Array.isArray(p.percLayers) && p.percLayers.some(l => (Number(l.vol) || 0) > 0);
   const badges = patchBadges(p);
-  const context = subject.regionScoped ? "Region-local edits" : "Palette patch";
   const subnoteName = moduleNameForPatch(subject.patch, "notes");
   const spaceName = moduleNameForPatch(subject.patch, "space");
   const macroName = moduleNameForPatch(subject.patch, "stave");
   const scaleName = moduleNameForPatch(subject.patch, "clef");
-  const percussionName = moduleNameForPatch(subject.patch, "percussion");
+  const auth = Object.fromEntries(CAPTURE_PARTS.map(part => [part, patchModuleAuthority(subject, part)]));
+  // Which modules this patch ACTUALLY has. ensureLayers always fabricates a
+  // base layer and every engine param has a default, so a patch with no sound
+  // or no note engine used to render exactly like one that had them — the
+  // panes showed invented values as if they were the patch's own.
+  const has = capturePartsFor(p, "full", subject.patch.captureParts);
+  const missing = (part, what) =>
+    `<div class="patch-pane-absent">No ${what} in this patch yet — drag one here, or pick one from the Library with the icon above.</div>`;
+
+  // What this inspector IS, stated truthfully. The old badge read
+  // "Region-local edits" the moment you opened it, whether or not anything
+  // had diverged — so it never told you anything.
+  const diverged = subject.regionScoped ? regionOverriddenParts(subject.region) : [];
+  const contextLabel = subject.regionScoped
+    ? (diverged.length
+      ? `${diverged.map(part => CAPTURE_PART_LABELS[part].toLowerCase()).join(" + ")} on this take`
+      : "following its patch")
+    : `patch · ${takesOfPatch(subject.patch.id).length} take${takesOfPatch(subject.patch.id).length === 1 ? "" : "s"}`;
+  const contextTitle = subject.regionScoped
+    ? (diverged.length
+      ? "These modules are edited on this take only. Keep them in the Palette from the staging strip, or Revert."
+      : "Every module still comes from this patch — editing here will change only this take.")
+    : "Editing this patch changes every take that still inherits each module.";
+
   return `<div class="patch-inspector" data-patch-inspector>
-    <header class="patch-inspector-titlebar"><div><span>Inspecting ${subject.regionScoped ? "region" : "patch"}</span><h3>${esc(subject.label)}</h3></div><div class="patch-inspector-badges"><i>${esc(badges.scaleLabel)}</i><i>${badges.splits} splits</i><i>grid ${badges.grid}</i><i class="patch-local-badge">${context}</i></div><div class="patch-title-actions">${patchSaveHTML(subject, p)}${editorSwitcherHTML()}<button class="patch-close" data-patch-close title="Close inspector">×</button></div></header>
+    <header class="patch-inspector-titlebar"><div><span>Inspecting ${subject.regionScoped ? "take" : "patch"}</span><h3>${esc(subject.label)}</h3></div><div class="patch-inspector-badges"><i>${esc(badges.scaleLabel)}</i><i>${badges.splits} splits</i><i>grid ${badges.grid}</i><i class="patch-local-badge${diverged.length ? " diverged" : ""}" title="${esc(contextTitle)}">${esc(contextLabel)}</i></div><div class="patch-title-actions">${patchSaveHTML(subject, p)}${editorSwitcherHTML()}<button class="patch-close" data-patch-close title="Close inspector">×</button></div></header>
     <div class="patch-inspector-grid">
-      <section class="patch-pane patch-pane-subnote" data-patch-drop="notes"><header><button class="saem-route${producerBrowserTarget?.part === "notes" ? " active" : ""}" data-browser-route="notes" title="Choose sound from the Library">${notationIconHTML(["notes"], { compact: true })}</button><span>Sub-note</span><small class="patch-pane-name editable-name" data-module-name="notes" title="Double-click to rename">${esc(subnoteName)}</small><div><button data-patch-clear="notes" title="Clear sub-note">×</button><button data-patch-edit="subnote" title="Edit sub-note">✎</button></div></header>
-        <div class="patch-sound-meta">Sound &amp; layers <span>${esc(SPECTRAL_PROFILES[p.spectralProfile]?.label || p.spectralProfile || "Custom source")}</span></div>
+
+      <section class="patch-pane patch-pane-subnote${auth.notes.superseded ? " superseded" : ""}" data-patch-drop="notes"><header><button class="saem-route${producerBrowserTarget?.part === "notes" ? " active" : ""}" data-browser-route="notes" title="Choose sound from the Library">${notationIconHTML(["notes"], { compact: true })}</button><span>Sub-note</span><small class="patch-pane-name editable-name" data-module-name="notes" title="Double-click to rename">${esc(subnoteName)}</small>${ownerChipHTML(auth.notes)}<div><button data-patch-clear="notes" title="Clear sub-note">×</button><button data-patch-edit="subnote" title="Edit sub-note">✎</button></div></header>
+        ${has.notes ? `<div class="patch-sound-meta">Sound &amp; layers <span>${esc(SPECTRAL_PROFILES[p.spectralProfile]?.label || p.spectralProfile || "Custom source")}</span></div>
         <div class="patch-layer-list" data-patch-layer-list>${patchLayerStripHTML(p)}</div>
-        <div class="patch-drop-hint" data-patch-drophint="subnote">Drag a sound preset here to swap the sub-note</div>
+        <div class="patch-drop-hint" data-patch-drophint="subnote">Drag a sound preset here to swap the sub-note</div>`
+        : missing("notes", "sound")}
       </section>
-      <section class="patch-pane patch-pane-space" data-patch-drop="space"><header><button class="saem-route${producerBrowserTarget?.part === "space" ? " active" : ""}" data-browser-route="space" title="Choose space from the Library">${notationIconHTML(["space"], { compact: true })}</button><span>Patch space</span><small class="patch-pane-name editable-name" data-module-name="space" title="Double-click to rename">${esc(spaceName)}</small></header>
+
+      <section class="patch-pane patch-pane-space${auth.space.superseded ? " superseded" : ""}" data-patch-drop="space"><header><button class="saem-route${producerBrowserTarget?.part === "space" ? " active" : ""}" data-browser-route="space" title="Choose space from the Library">${notationIconHTML(["space"], { compact: true })}</button><span>Patch space</span><small class="patch-pane-name editable-name" data-module-name="space" title="Double-click to rename">${esc(spaceName)}</small>${ownerChipHTML(auth.space)}</header>
         <div class="patch-stage-wrap"><canvas id="patchStage" title="Drag a dot to place that source around the listener — front is up, rings are metres. Muted sources dim; soloed sources ring gold."></canvas></div>
         <div class="patch-stage-readout" id="patchStageReadout"></div>
         <div class="patch-movement-control"><span>Global movement</span><select data-patch-movement><option value="centered"${movement === "centered" ? " selected" : ""}>Centered</option><option value="additive"${movement === "additive" ? " selected" : ""}>Additive</option></select></div>
-        <p>The track thread moves these saved positions. Drag a dot to set a source's own place without touching the global space.</p>
+        <label class="patch-own-head" title="${esc(PARAM_DESC.spaceOwnHead)}"><input type="checkbox" data-patch-own-head${p.spaceOwnHead ? " checked" : ""}/> Keep this patch's own listener &amp; room</label>
+        ${supersededNoteHTML(auth.space)}
+        <p>The thread moves these saved positions. Drag a dot to set a source's own place without touching the global space.</p>
       </section>
-      <section class="patch-pane patch-pane-macro" data-patch-drop="stave"><header><button class="saem-route${producerBrowserTarget?.part === "stave" ? " active" : ""}" data-browser-route="stave" title="Choose note behaviour from the Library">${notationIconHTML(["stave"], { compact: true })}</button><span>Macro &amp; harmony</span><small class="patch-pane-name editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small><div><button data-patch-clear="stave" title="Clear note behaviour">×</button><button data-patch-edit="macro" title="Edit macro">✎</button></div></header>
-        <div class="patch-macro-2col">
-          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="percussion" title="Choose percussion from the Library">${notationIconHTML(["percussion"], { compact: true })}</button><b>Percussion</b><label class="patch-perc-toggle"><input type="checkbox" data-patch-perc${percOn ? " checked" : ""}/> On</label><button data-patch-edit="percussion" title="Edit percussion">✎</button></div><small class="editable-name" data-module-name="percussion" title="Double-click to rename">${esc(percussionName)}</small></div>
-          <div class="patch-module-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="stave" title="Choose note behaviour from the Library">${notationIconHTML(["stave"], { compact: true })}</button><b>Note engine</b><span>grid ${p.beatDivisions ?? 1}</span></div><small class="editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small></div>
+
+      <section class="patch-pane patch-pane-macro${auth.stave.superseded ? " superseded" : ""}" data-patch-drop="stave"><header><button class="saem-route${producerBrowserTarget?.part === "stave" ? " active" : ""}" data-browser-route="stave" title="Choose note behaviour from the Library">${notationIconHTML(["stave"], { compact: true })}</button><span>Note engine</span><small class="patch-pane-name editable-name" data-module-name="stave" title="Double-click to rename">${esc(macroName)}</small>${ownerChipHTML(auth.stave)}<div><button data-patch-clear="stave" title="Clear note behaviour">×</button><button data-patch-edit="macro" title="Edit macro">✎</button></div></header>
+        <!-- Quick dials: the four things worth varying per take without a
+             round trip to the Studio. Everything else stays behind ✎. -->
+        ${has.stave ? `<div class="patch-engine-knobs">
+          ${knobHTML("beatDivisions", "Grid", p.beatDivisions ?? 1, 1, 8, 1)}
+          ${knobHTML("onBeatProb", "On beat", p.onBeatProb ?? 0.5, 0, 1, 0.01)}
+          ${knobHTML("offBeatProb", "Off beat", p.offBeatProb ?? 0.2, 0, 1, 0.01)}
+          ${knobHTML("motifLengthBeats", "Motif", p.motifLengthBeats ?? 4, 1, 16, 1)}
+          ${knobHTML("surpriseProb", "Surprise", p.surpriseProb ?? 0, 0, 1, 0.01, { cool: true })}
         </div>
-        <div class="patch-module-card patch-scale-card"><div class="patch-module-card-head"><button class="saem-route" data-browser-route="clef" title="Choose scale and harmony from the Library">${notationIconHTML(["clef"], { compact: true })}</button><b>Scale &amp; harmony</b><small class="editable-name" data-module-name="clef" title="Double-click to rename">${esc(scaleName)}</small></div>${patchScaleHTML(p, parts, subject.regionScoped)}<button class="patch-text-action" data-patch-edit="scale">✎ Edit scale</button></div>
-        <div class="patch-drop-hint" data-patch-drophint="macro">Drag a macro / behaviour preset here to swap the macro</div>
+        ${badges.surpriseOn ? `<div class="patch-surprise-dims" title="Which dimensions a surprise can use">${badges.dims.map(d => `<i>${esc(d)}</i>`).join("")}</div>` : ""}`
+        : missing("stave", "note engine")}
+        ${supersededNoteHTML(auth.stave)}
+        <div class="patch-module-card patch-scale-card${auth.clef.superseded ? " superseded" : ""}" data-patch-drop="clef"><div class="patch-module-card-head"><button class="saem-route${producerBrowserTarget?.part === "clef" ? " active" : ""}" data-browser-route="clef" title="Choose scale and harmony from the Library">${notationIconHTML(["clef"], { compact: true })}</button><b>Scale &amp; harmony</b><small class="editable-name" data-module-name="clef" title="Double-click to rename">${esc(scaleName)}</small></div>${has.clef ? `${patchScaleHTML(p, parts, subject)}<button class="patch-text-action" data-patch-edit="scale">✎ Edit scale</button>` : missing("clef", "scale")}</div>
+        <div class="patch-drop-hint" data-patch-drophint="macro">Drag a note-engine preset here to swap it</div>
       </section>
     </div>
   </div>`;
@@ -4687,20 +5362,25 @@ function bindPatchInspector(v) {
   const subject = editorPatchSubject();
   if (!panel || !subject) return;
   const patch = subject.patch;
-  // A region-scoped subject PLAYS from its paramsOverride (created by
-  // editorPatchSubject → ensureRegionPatchOverride) — the inspector must edit
-  // that same object. region.params was a dead store nothing ever played.
-  const params = subject.regionScoped
-    ? (patch.paramsOverride || (patch.paramsOverride = {}))
-    : (patch.params || (patch.params = {}));
-  const persist = (label = "patch inspector") => {
+  // For a take this is its RESOLVED patch (a working copy); for a palette
+  // patch it is the patch itself. Every control edits this one object.
+  const params = subject.params;
+  // `part` says which of the five modules the control belongs to — that is
+  // what makes an edit land on just that module instead of forking the lot.
+  const persist = (part, label = "patch inspector") => {
     patchDirty = true;
-    patch.captureParts = capturePartsFor(params, "full");
-    saveArrangement(label);
     if (subject.regionScoped) {
+      persistRegionModule(subject.track, subject.region, part);
+      saveArrangement(label);
       const voice = producerVoices.get(subject.track.id);
       if (voice?.playing) voice.updateGenerationParams?.(regionPlayParams(subject.track, subject.region));
+      return;
     }
+    patch.captureParts = capturePartsFor(params, "full");
+    saveArrangement(label);
+    // A palette patch edit reaches every take that still inherits it, live.
+    invalidateRegionEdit();
+    refreshVoicesForPatch(patch.id);
   };
   panel.querySelectorAll("[data-browser-route]").forEach(btn => {
     btn.onclick = (event) => {
@@ -4724,9 +5404,33 @@ function bindPatchInspector(v) {
       renderProduce();
     };
   });
+  // "Save to Palette" used to clear a dirty flag and nothing else — on a take
+  // it created no palette entry at all, and ignored both the name field and
+  // the Include selection. It now actually makes the entry.
   const finishPatchSave = () => {
+    const name = panel.querySelector("#patchSaveName")?.value.trim() || subject.label || "Untitled patch";
+    const selected = patchSaveSelection || capturePartsFor(params, "full");
+    if (subject.regionScoped) {
+      const variant = promoteTakeToVariant(subject.track, subject.region);
+      if (variant) {
+        variant.name = name.slice(0, 80);
+        variant.customName = name.slice(0, 80);
+        palettePreviewId = variant.id;
+      }
+    } else {
+      // A palette patch saves a COPY, so the original stays as it was.
+      const copy = {
+        id: crypto.randomUUID(), name: name.slice(0, 80), customName: name.slice(0, 80),
+        kindLabel: "Patch", sourceId: patch.sourceId || null,
+        params: extractCaptureParams(params, selected),
+        parts: { ...(patch.parts || {}) }, captureParts: { ...selected },
+        originTempo: patch.originTempo ?? null, originScale: patch.originScale ?? null,
+        parentId: null, variantParts: [],
+      };
+      arrangement.palette.push(copy);
+      palettePreviewId = copy.id;
+    }
     patchDirty = false; patchSaveOpen = false;
-    patch.captureParts = capturePartsFor(params, "full");
     saveArrangement("save patch to palette");
     renderProduce();
   };
@@ -4754,7 +5458,7 @@ function bindPatchInspector(v) {
             const palettePatch = (arrangement.palette || []).find(item => item.id === subject.region?.paletteId);
             if (palettePatch) setPatchModuleName(palettePatch, part, value);
           }
-          persist(`rename ${CAPTURE_PART_LABELS[part]}`);
+          persist(part, `rename ${CAPTURE_PART_LABELS[part]}`);
         }
         renderProduce();
       });
@@ -4768,7 +5472,7 @@ function bindPatchInspector(v) {
       if (part === "notes") patch.parts.subnote = null;
       if (part === "stave") patch.parts.macro = null;
       patch.parts[CAPTURE_PART_NAME_KEYS[part]] = null;
-      persist("clear patch module"); renderProduce();
+      persist(part, "clear patch module"); renderProduce();
     };
   });
   panel.querySelector("[data-patch-close]")?.addEventListener("click", () => {
@@ -4798,7 +5502,7 @@ function bindPatchInspector(v) {
     };
   });
   const movement = panel.querySelector("[data-patch-movement]");
-  if (movement) movement.onchange = () => { params.spaceMovement = movement.value; persist("patch space movement"); };
+  if (movement) movement.onchange = () => { params.spaceMovement = movement.value; persist("space", "patch space movement"); };
   // ── Draggable space stage + sub-note-style layer strip (owner 2026-07-10) ──
   const layerById = (id) => (params.layers || []).find(l => l.id === id);
   const percById = (id) => (params.percLayers || []).find(l => l.id === id);
@@ -4822,22 +5526,22 @@ function bindPatchInspector(v) {
       else if (s.kind === "percussion") { const l = percById(s.id.slice(5)); if (l) l.space = { angle: az, dist }; }
       else { const l = layerById(s.id); if (l) l.space = { angle: az, dist }; }
       patchTargetHandles.get(s.id)?.redraw();
-      persist("patch source position"); updateReadout();
+      persist("space", "patch source position"); updateReadout();
     },
   });
   updateReadout();
   // Layer strip: level / position + remove. A row click selects it (rings its dot).
   panel.querySelectorAll("[data-patch-lyr-gain]").forEach(el => {
-    el.oninput = () => { const l = layerById(el.dataset.patchLyrGain); if (!l) return; l.gain = parseFloat(el.value); if (l.mute && l.gain > 0) l.mute = false; persist("layer level"); };
+    el.oninput = () => { const l = layerById(el.dataset.patchLyrGain); if (!l) return; l.gain = parseFloat(el.value); if (l.mute && l.gain > 0) l.mute = false; persist("notes", "layer level"); };
   });
   const baseGain = panel.querySelector("[data-patch-base-gain]");
-  if (baseGain) baseGain.oninput = () => { const l = params.layers?.[0]; if (l) l.gain = parseFloat(baseGain.value); persist("base layer level"); };
+  if (baseGain) baseGain.oninput = () => { const l = params.layers?.[0]; if (l) l.gain = parseFloat(baseGain.value); persist("notes", "base layer level"); };
   const baseSolo = panel.querySelector("[data-patch-base-solo]");
   if (baseSolo) baseSolo.onclick = () => {
     const l = params.layers?.[0]; if (!l) return;
     l.solo = !l.solo;
     baseSolo.classList.toggle("on", l.solo);
-    persist("solo base layer"); redrawStage();
+    persist("notes", "solo base layer"); redrawStage();
   };
   // Every row uses the same compact spatial target as a track header.
   const spaceTargetFor = (id) => id.startsWith("perc:") ? percById(id.slice(5)) : layerById(id);
@@ -4853,14 +5557,14 @@ function bindPatchInspector(v) {
         _patchStageSel = id; syncLayerRowSel();
         if (id === params.layers?.[0]?.id) { const l = params.layers[0]; l.space = { ...pos }; }
         else { const l = spaceTargetFor(id); if (l) l.space = { ...pos }; }
-        persist("patch source position"); updateReadout();
+        persist("space", "patch source position"); updateReadout();
       },
       redraw: redrawStage,
     });
     patchTargetHandles.set(id, handle);
   });
   panel.querySelectorAll("[data-patch-perc-gain]").forEach(el => {
-    el.oninput = () => { const l = percById(el.dataset.patchPercGain); if (!l) return; l.vol = parseFloat(el.value); if (l.mute && l.vol > 0) l.mute = false; persist("percussion hit level"); };
+    el.oninput = () => { const l = percById(el.dataset.patchPercGain); if (!l) return; l.vol = parseFloat(el.value); if (l.mute && l.vol > 0) l.mute = false; persist("percussion", "percussion hit level"); };
   });
   panel.querySelectorAll("[data-patch-layer-remove]").forEach(btn => {
     btn.onclick = () => {
@@ -4868,7 +5572,7 @@ function bindPatchInspector(v) {
       params.layers = (params.layers || []).filter(l => l.id !== id);
       if (!params.layers.length) params.layers = null;
       if (_patchStageSel === id) _patchStageSel = "base";
-      persist("remove layer"); renderProduce();
+      persist("notes", "remove layer"); renderProduce();
     };
   });
   panel.querySelectorAll("[data-patch-lyr]").forEach(row => {
@@ -4886,14 +5590,14 @@ function bindPatchInspector(v) {
       btn.title = l.mute ? "Unmute layer" : "Mute layer";
       btn.closest("[data-patch-lyr]")?.classList.toggle("muted", l.mute);
       const g = panel.querySelector(`[data-patch-lyr-gain="${l.id}"]`); if (g) g.value = l.gain ?? 1;
-      persist("mute patch layer"); redrawStage();
+      persist("notes", "mute patch layer"); redrawStage();
     };
   });
   panel.querySelectorAll("[data-patch-layer-solo]").forEach(btn => {
     btn.onclick = () => {
       const l = layerById(btn.dataset.patchLayerSolo); if (!l) return;
       l.solo = !l.solo; btn.classList.toggle("on", l.solo);
-      persist("solo patch layer"); redrawStage();
+      persist("notes", "solo patch layer"); redrawStage();
     };
   });
   panel.querySelectorAll("[data-patch-perc-mute]").forEach(btn => {
@@ -4905,11 +5609,34 @@ function bindPatchInspector(v) {
       btn.title = l.mute ? "Unmute hit" : "Mute hit";
       btn.closest("[data-patch-lyr]")?.classList.toggle("muted", l.mute);
       const g = panel.querySelector(`[data-patch-perc-gain="${l.id}"]`); if (g) g.value = l.vol ?? 0;
-      persist("mute percussion hit"); redrawStage();
+      persist("percussion", "mute percussion hit"); redrawStage();
     };
   });
-  const perc = panel.querySelector("[data-patch-perc]");
-  if (perc) perc.onchange = () => { params.percEnabled = perc.checked; persist("toggle patch percussion"); };
+  // The percussion on/off checkbox lived on a duplicate card in the macro
+  // pane; the hits' own levels in the layer strip are the real control.
+  // Quick note-engine dials — the four things worth varying per take.
+  panel.querySelectorAll(".patch-engine-knobs [data-knob]").forEach(cell => {
+    const key = cell.dataset.knob;
+    wireKnobCell(cell, {
+      get: () => params[key],
+      set: (value) => {
+        params[key] = value;
+        if (key.startsWith("surprise")) syncSurpriseFeatureParams(params);
+        persist("stave", `patch ${key}`);
+      },
+      // On drag end, redraw so the staging strip and the "on this take"
+      // badge appear — the edit has to announce itself.
+      onCommit: () => renderProduce(),
+    });
+  });
+  // The documented escape hatch from the shared listener — it had a live code
+  // path and a description but no control anywhere in the app.
+  const ownHead = panel.querySelector("[data-patch-own-head]");
+  if (ownHead) ownHead.onchange = () => {
+    params.spaceOwnHead = ownHead.checked;
+    persist("space", "patch keeps its own listener");
+    renderProduce();
+  };
   panel.querySelectorAll("[data-patch-degree]").forEach(btn => {
     btn.onclick = () => {
       const d = Number(btn.dataset.patchDegree);
@@ -4918,7 +5645,7 @@ function bindPatchInspector(v) {
       else if (sub.has(d)) sub.delete(d);
       else roots.add(d);
       params.rootNotes = [...roots]; params.subScaleNotes = [...sub];
-      persist("patch scale degree"); renderProduce();
+      persist("clef", "patch scale degree"); renderProduce();
     };
   });
 }
@@ -5197,13 +5924,17 @@ const SP_ANCHOR_GRAB_BEATS = 0.26;
 // what the drag handler does: free when the global space is off or the track
 // has no anchors, and — when it is anchored — only where the playhead is
 // sitting on one of its anchors (that anchor is what the drag edits).
-function _spTrackDotMovable(track, beat) {
-  const sp = arrangement.space || {};
-  if (!sp.enabled) return true;
-  const anchors = sp.tracks?.[track.id];
-  if (!anchors || !anchors.length) return true;
-  return anchors.some(a => Math.abs(a.beat - beat) < SP_ANCHOR_GRAB_BEATS);
+// Every thread is draggable now: on an anchor you bend the path there, off one
+// you slide the WHOLE path. Nothing snaps back.
+function _spTrackDotMovable() { return true; }
+
+/** The anchor pinned at this beat on this thread, if any. */
+function trackAnchorAt(track, beat) {
+  const anchors = arrangement.space?.tracks?.[track?.id];
+  if (!anchors?.length) return null;
+  return anchors.find(a => Math.abs(a.beat - beat) < SP_ANCHOR_GRAB_BEATS) || null;
 }
+function trackAnchoredAt(track, beat) { return !!trackAnchorAt(track, beat); }
 
 // Compact spatial "target" for the track head: concentric rings with the
 // listener at centre and a coloured dot where the track's thread is AT THE
@@ -5237,10 +5968,46 @@ function _kickTrackDotAnim() {
     _trackDotRaf = requestAnimationFrame(_trackDotAnim);
   }
 }
+/**
+ * Move the playhead. THE one way to do it while stopped, so the timeline, the
+ * cross-section and the cylinder can never disagree about where "now" is —
+ * they all read curPlayBeat(), and this kicks the space redraw because its rAF
+ * loop is otherwise idle when nothing is playing.
+ */
+let _phMoving = 0;   // frames of grace so a scrub keeps the space redrawing
+function setPlayhead(beat) {
+  _phMoving = 8;
+  playheadBeat = Math.max(0, Math.min(totalBeats() - 0.25, beat));
+  updatePlayhead(playheadBeat);
+  syncPlayheadToClock();
+  // Redraw the space views HERE rather than trusting the rAF loop: the browser
+  // parks rAF in a hidden or backgrounded tab, and "the slice shows where the
+  // playhead is" has to be true whether or not a loop happens to be running.
+  // Cheap now that the per-thread voice params are cached.
+  try { drawSpSection(); drawSpCylinder(); } catch { /* strip not mounted */ }
+  _kickSpAnim();   // and keep it smooth while a scrub is in flight
+}
+
+// The timeline playhead and the global-space playhead must be the SAME
+// playhead. The step loop moves the timeline one whole beat at a time while
+// the cylinder interpolates, so they visibly drifted apart within every beat.
+// Both now read curPlayBeat() on the same frame.
+function syncPlayheadToClock() {
+  const beat = curPlayBeat();
+  const line = document.getElementById("tlPlayhead");
+  if (line) {
+    line.classList.toggle("hidden", !(beat >= 0));
+    line.style.left = `${beat * pxPerBeat}px`;
+  }
+  const handle = document.getElementById("tlPhHandle");
+  if (handle) handle.style.left = `${beat * pxPerBeat}px`;
+}
+
 function _trackDotAnim() {
   _trackDotRaf = null; // clear first: a throw below must not wedge the kick guard
   if (!document.querySelector("[data-track-space-dot]")) return;
   repaintTrackSpaceDots();
+  syncPlayheadToClock();
   // one last frame after playback stops, then idle until something moves again
   _trackDotRaf = (arrPlay || _threadDrag) ? requestAnimationFrame(_trackDotAnim) : null;
 }
@@ -6349,17 +7116,32 @@ function splitSelectedRegionAtPlayhead() {
       alert("Split inside the first loop pass of a baked region (or unbake first).");
       return;
     }
-    const beatDiv = (arrangement.context.beatDivisions || 1);
+    // The grid comes from the NOTES, as it does on every other baked path.
+    // This one read arrangement.context.beatDivisions — a key the context does
+    // not carry — so it silently fell back to 1 and cut a grid-4 take at a
+    // quarter of the beat you asked for, scattering notes into the wrong half.
+    const beatDiv = bakedGridFor(region.notes, regionPlayParams(track, region));
     const cutDivs = rel * beatDiv;
     const tailNotes = region.notes.filter(nn => (nn.offsetDivs || 0) >= cutDivs)
       .map(nn => ({ ...nn, offsetDivs: (nn.offsetDivs || 0) - cutDivs }));
-    region.notes = region.notes.filter(nn => (nn.offsetDivs || 0) < cutDivs);
+    const headNotes = region.notes.filter(nn => (nn.offsetDivs || 0) < cutDivs);
+    // Edited percussion strikes are stored in BEATS and were deep-copied whole
+    // into both halves, so every hit played twice after a split.
+    const strikes = Array.isArray(region.percStrikes) ? region.percStrikes : null;
+    const headStrikes = strikes ? strikes.filter(x => (x.beat || 0) < rel) : null;
+    const tailStrikes = strikes
+      ? strikes.filter(x => (x.beat || 0) >= rel).map(x => ({ ...x, beat: (x.beat || 0) - rel }))
+      : null;
+
     const tail = JSON.parse(JSON.stringify(region));
     tail.id = crypto.randomUUID();
     tail.startBeat = cut;
     tail.lengthBeats = regionLen(region) - rel;
     tail.notes = tailNotes;
+    if (tailStrikes) tail.percStrikes = tailStrikes;
     tail.loopSourceBeats = tail.lengthBeats;
+    region.notes = headNotes;
+    if (headStrikes) region.percStrikes = headStrikes;
     region.lengthBeats = rel;
     region.loopSourceBeats = Math.min(region.loopSourceBeats || rel, rel);
     track.regions.push(tail);
@@ -6427,6 +7209,11 @@ function toggleShortcutOverlay() {
           <dt>⌘C · ⌘V</dt><dd>copy · paste region</dd>
           <dt>⌫</dt><dd>delete selection</dd>
           <dt>⇧click · drag</dt><dd>multi-select regions</dd>
+          <dt colspan="2"><b>Musical typing (⌘K toggles)</b></dt><dd></dd>
+          <dt>A S D F…</dt><dd>white keys from middle C</dd>
+          <dt>W E · T Y U…</dt><dd>black keys between them</dd>
+          <dt>Z · X</dt><dd>octave down · up</dd>
+          <dt>C · V</dt><dd>velocity down · up</dd>
         </dl>
         <dl>
           <dt colspan="2"><b>Piano roll (note selected)</b></dt><dd></dd>
@@ -6762,13 +7549,18 @@ function pointerDragMove(e) {
   }
   pointerDrag.ghost.style.left = `${e.clientX + 12}px`;
   pointerDrag.ghost.style.top = `${e.clientY + 10}px`;
-  document.querySelectorAll(".drop-target").forEach(el => el.classList.remove("drop-target"));
+  document.querySelectorAll(".drop-target, .drop-reject").forEach(el => el.classList.remove("drop-target", "drop-reject"));
   const lane = laneAtPoint(e.clientX, e.clientY);
   if (lane) lane.classList.add("drop-target");
   else if (pointerDrag.kind === "browser") {
     const dz = patchDropZoneAtPoint(e.clientX, e.clientY);
-    if (dz) dz.el.classList.add("drop-target");
-    else {
+    if (dz) {
+      // Only light up if the dragged item can actually supply this module.
+      // It used to highlight regardless, so dropping (say) a percussion kit
+      // on the Sound pane looked valid and then did nothing at all.
+      const item = browserItems().find(i => i.id === pointerDrag.data);
+      dz.el.classList.add(item?.captureParts?.[dz.part] ? "drop-target" : "drop-reject");
+    } else {
       const hg = harmonicGuideAtPoint(e.clientX, e.clientY);
       if (hg) hg.classList.add("drop-target");
       else {
@@ -6794,7 +7586,7 @@ function pointerDragUp(e) {
   if (!drag) return;
   drag.ghost?.remove();
   document.body.classList.remove("dragging");
-  document.querySelectorAll(".drop-target").forEach(el => el.classList.remove("drop-target"));
+  document.querySelectorAll(".drop-target, .drop-reject").forEach(el => el.classList.remove("drop-target", "drop-reject"));
   if (!drag.started) return; // plain click — click handlers take it from here
 
   const lane = laneAtPoint(e.clientX, e.clientY);
@@ -6813,6 +7605,10 @@ function pointerDragUp(e) {
     const dz = patchDropZoneAtPoint(e.clientX, e.clientY);
     if (dz) {
       const subject = editorPatchSubject();
+      if (!item.captureParts?.[dz.part]) {
+        producerStatus(`"${item.name}" has no ${CAPTURE_PART_LABELS[dz.part].toLowerCase()} to give.`);
+        return;
+      }
       if (subject && applyItemCapturePart(subject.patch, item, dz.part, { regionScoped: subject.regionScoped })) {
         patchDirty = true;
         if (subject.regionScoped) {
@@ -6962,6 +7758,10 @@ function openPaletteInEditor(id) {
   const pl = (arrangement.palette || []).find(x => x.id === id);
   if (!pl) return;
   palettePreviewId = pl.id;
+  // Clear any selected take: editorPatchSubject prefers a region, so leaving
+  // one selected would open THAT take's inspector instead of this patch.
+  selectedRegion = null;
+  selectedRegions.clear();
   editorMode = "patch";
   patchDirty = false; patchSaveOpen = false; patchSaveSelection = null; patchSaveSubjectId = pl.id;
   if (paletteIsPlayable(pl)) {
@@ -6971,25 +7771,74 @@ function openPaletteInEditor(id) {
   renderProduce();
 }
 
+// One palette row. Variants render as indented children of their patch,
+// labelled by what they CHANGE rather than by a version number.
+function paletteRowHTML(pl, { variant = false } = {}) {
+  const playable = paletteIsPlayable(pl);
+  const parts = capturePartsFor(pl.params, "full", pl.captureParts);
+  const takes = takesOfPatch(pl.id).length;
+  const diverged = divergedTakesOfPatch(pl.id).length;
+  const moduleNames = capturePartList(parts).map(part =>
+    `<span class="pal-module-name editable-name" data-pal-module-name="${pl.id}:${part}" title="Double-click to rename ${esc(CAPTURE_PART_LABELS[part])}"><b>${esc(CAPTURE_PART_LABELS[part])}</b>${esc(moduleNameForPatch(pl, part))}</span>`).join("");
+  // Compact by design: the name is the identity and gets the room, the badge
+  // is a count. The full sentence lives in the tooltip.
+  const takeBadge = takes
+    ? `<span class="pal-take-count" title="${takes} take${takes === 1 ? "" : "s"} on the timeline play this${diverged ? ` — ${diverged} with ${diverged === 1 ? "its" : "their"} own edits` : ""}">${takes}${diverged ? `<i class="pal-diverged">●</i>` : ""}</span>`
+    : "";
+  // Recomputed every render: editing a variant after making it must update
+  // what its icon advertises, or the row keeps describing the first change and
+  // silently hides every later one.
+  const diff = variant ? variantDiffParts(pl) : [];
+  const label = variant
+    ? `<span class="pal-variant-diff" title="What this variant changes: ${esc(diff.map(p => CAPTURE_PART_LABELS[p]).join(", ") || "nothing yet")}">${notationIconHTML(diff, { compact: true })}</span>`
+    : notationIconHTML(parts, { compact: true });
+  return `<div class="palette-item${variant ? " variant" : ""}${palettePreviewId === pl.id ? " selected" : ""}" data-palette-item="${pl.id}" title="${variant ? "A variant of the patch above — " : ""}Double-click to open it in the editor below. Drag it onto a thread to place it.">
+    <div class="pal-top">${label}<span class="pal-name editable-name" data-palette-name="${pl.id}" title="Double-click to rename">${esc(paletteDisplayName(pl))}</span>${takeBadge}<span class="pal-kind">${esc(variant ? "Variant" : (pl.kindLabel || "Patch"))}</span>
+      <span class="pal-actions">
+        <button class="pal-btn" data-palette-edit="${pl.id}" title="Open this patch in the editor below">✎</button>
+        <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="${playable ? "Add a thread playing this patch" : "Add Sound and Note behaviour before creating a thread"}"${playable ? "" : " disabled"}>＋</button>
+        <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
+      </span>
+    </div>
+    ${variant ? "" : (moduleNames ? `<div class="pal-module-names">${moduleNames}</div>` : "")}
+    ${playable ? "" : '<span class="pal-draft-note">Add sound and note behaviour before placing this patch.</span>'}
+  </div>`;
+}
+
+// The staging strip: a take has edits that are not yet part of any patch.
+// It appears only while that take is selected, so it prompts without nagging —
+// the persistent form is the ● on the patch's take count.
+function paletteStagingHTML(pl) {
+  const er = editorRegion();
+  if (!er) return "";
+  const { track, region } = er;
+  if (palettePatchFor(arrangement, region)?.id !== pl.id) return "";
+  const parts = regionOverriddenParts(region);
+  if (!parts.length) return "";
+  const names = parts.map(part => CAPTURE_PART_LABELS[part].toLowerCase()).join(" + ");
+  const inherit = takesOfPatch(pl.id).filter(({ region: r }) =>
+    r !== region && !parts.some(part => r.overrides?.[part])).length;
+  return `<div class="pal-stage-strip" data-stage-strip="${pl.id}">
+    <div class="pal-stage-what"><b>${esc(names)}</b> edited on this take only</div>
+    <div class="pal-stage-actions">
+      <button class="btn btn-primary btn-sm" data-stage-keep title="Add these edits to the Palette as a variant of ${esc(paletteDisplayName(pl))}">Keep as variant</button>
+      ${inherit ? `<button class="btn btn-secondary btn-sm" data-stage-apply title="Write these edits into ${esc(paletteDisplayName(pl))} itself — ${inherit} other take${inherit === 1 ? "" : "s"} will follow">Apply to all ${inherit + 1}</button>` : ""}
+      <button class="btn btn-ghost btn-sm" data-stage-revert title="Give this take back to its patch">Revert</button>
+    </div>
+  </div>`;
+}
+
 function producerPaletteHTML() {
   const items = arrangement.palette || [];
   if (!items.length) return '<div class="empty-state">Create a patch, then use its notation icons to route compatible parts from the Browser.</div>';
-  return items.map(pl => {
-    const playable = paletteIsPlayable(pl);
-    const parts = capturePartsFor(pl.params, "full", pl.captureParts);
-    const moduleNames = capturePartList(parts).map(part =>
-      `<span class="pal-module-name editable-name" data-pal-module-name="${pl.id}:${part}" title="Double-click to rename ${esc(CAPTURE_PART_LABELS[part])}"><b>${esc(CAPTURE_PART_LABELS[part])}</b>${esc(moduleNameForPatch(pl, part))}</span>`).join("");
-    return `<div class="palette-item${palettePreviewId === pl.id ? " selected" : ""}" data-palette-item="${pl.id}" title="Double-click to open this patch in the editor below. Drag it onto a track to place it.">
-      <div class="pal-top">${notationIconHTML(parts, { compact: true })}<span class="pal-name editable-name" data-palette-name="${pl.id}" title="Double-click to rename">${esc(paletteDisplayName(pl))}</span><span class="pal-kind">${esc(pl.kindLabel || "Patch")}</span>
-        <span class="pal-actions">
-          <button class="pal-btn" data-palette-edit="${pl.id}" title="Edit this patch in the Studio">✎</button>
-          <button class="pal-btn pal-track-btn" data-add-track="pal:${pl.id}" title="${playable ? "Add a track playing this patch" : "Add Sound and Note behaviour before creating a track"}"${playable ? "" : " disabled"}>＋</button>
-          <button class="pal-btn" data-palette-remove="${pl.id}" title="Remove from palette">×</button>
-        </span>
-      </div>
-      ${moduleNames ? `<div class="pal-module-names">${moduleNames}</div>` : ""}
-      ${playable ? "" : '<span class="pal-draft-note">Add sound and note behaviour before placing this patch.</span>'}
-    </div>`;
+  // Roots in their existing order, each followed by its variants. A variant
+  // whose parent has vanished is shown as a root so nothing can go missing.
+  const roots = items.filter(pl => !pl.parentId || !paletteById(pl.parentId));
+  return roots.map(pl => {
+    const variants = paletteVariantsOf(pl.id);
+    return paletteRowHTML(pl)
+      + paletteStagingHTML(pl)
+      + variants.map(v => paletteRowHTML(v, { variant: true }) + paletteStagingHTML(v)).join("");
   }).join("");
 }
 
@@ -7235,6 +8084,23 @@ function wireGlobalScale(v) {
       renderProduce();
     };
   });
+  // Keep the editor on screen. The render clamps it to the LANE, but the lane
+  // is wider than the panel and scrolls, so a change point near the right edge
+  // still ran off the visible box. Nudge it back after layout, where the real
+  // widths are known.
+  const gsEditor = v.querySelector(".gs-editor");
+  const gsPanel = v.querySelector("#stripsPanel");
+  if (gsEditor && gsPanel) {
+    requestAnimationFrame(() => {
+      const ed = gsEditor.getBoundingClientRect();
+      const panel = gsPanel.getBoundingClientRect();
+      const overflow = ed.right - (panel.right - 6);
+      if (overflow > 0) {
+        const cur = parseFloat(gsEditor.style.marginLeft) || 0;
+        gsEditor.style.marginLeft = `${Math.max(0, cur - overflow)}px`;
+      }
+    });
+  }
   const gsDel = v.querySelector("#gsDeleteMarker");
   if (gsDel) gsDel.onclick = () => {
     ensureGlobalScale().markers.splice(_gsSelMarker, 1);
@@ -7248,6 +8114,56 @@ function wireGlobalScale(v) {
       if (!t) return;
       t.useGlobalScale = !t.useGlobalScale;
       saveArrangement("track follows Harmonic guide");
+      renderProduce();
+    };
+  });
+  // Module glyphs in the thread head. The Scale glyph absorbed the old HG
+  // button: its superseded state IS the guide being on, so clicking it toggles
+  // rather than needing a separate control that says the same thing twice.
+  v.querySelectorAll("[data-track-module]").forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const [trackId, part] = btn.dataset.trackModule.split(":");
+      const track = arrangement.tracks.find(t => t.id === trackId);
+      if (!track) return;
+      if (part === "clef") {
+        track.useGlobalScale = !track.useGlobalScale;
+        saveArrangement("thread follows Harmonic guide");
+        renderProduce();
+        return;
+      }
+      if (part === "space") {
+        // Leaving: keep where it currently sits as the thread's own static
+        // place, so taking a thread out of the space never teleports it.
+        if (track.useGlobalSpace && !track.space) {
+          const at = _spTrackPos(track, curPlayBeat());
+          if (at) track.space = { angle: at.angle, dist: at.dist };
+        }
+        track.useGlobalSpace = !track.useGlobalSpace;
+        // Joining with no path yet: seed one from where the thread already is,
+        // so it enters the space at its current place rather than jumping.
+        if (track.useGlobalSpace) {
+          const sp = ensureGlobalSpace();
+          if (!sp.tracks?.[trackId]?.length && !sp.static?.[trackId]) {
+            sp.static = sp.static || {};
+            sp.static[trackId] = staticTrackPos(track) || _spCentroid(_spTrackSources(_spTrackVoiceParams(track, 0)));
+          }
+          _spSelTrack = trackId;
+          _spOpen = true;
+        }
+        saveArrangement(track.useGlobalSpace ? "thread joins the global space" : "thread leaves the global space");
+        renderProduce();
+        return;
+      }
+      // Everything else opens that module in the inspector for the take under
+      // the playhead — the glyph is a route to the thing it describes.
+      const region = regionAtBeat(track, curPlayBeat()) || track.regions?.[0];
+      if (!region) return;
+      selectedRegion = { trackId, regionId: region.id };
+      selectedRegions.clear();
+      palettePreviewId = region.paletteId || null;
+      editorMode = "patch";
+      producerBrowserTarget = null;
       renderProduce();
     };
   });
@@ -7519,11 +8435,8 @@ function wireProduce(v) {
     const rulerEl = v.querySelector("#tlRuler");
     const move = (ev) => {
       const rect = rulerEl.getBoundingClientRect();
-      playheadBeat = Math.max(0, Math.min(totalBeats() - 0.25,
-        Math.round(((ev.clientX - rect.left) / pxPerBeat) * 4) / 4));
-      updatePlayhead(playheadBeat);
+      setPlayhead(Math.round(((ev.clientX - rect.left) / pxPerBeat) * 4) / 4);
       phHandle.style.left = `${playheadBeat * pxPerBeat}px`;
-      // the cross-section follows live through the designer's rAF loop
     };
     const up = () => {
       window.removeEventListener("mousemove", move);
@@ -7574,10 +8487,7 @@ function wireProduce(v) {
         return;
       }
       // bottom half: locate + scrub (silent — determinism makes scrub-audio misleading)
-      const locate = (ev) => {
-        playheadBeat = beatAt(ev);
-        updatePlayhead(playheadBeat);
-      };
+      const locate = (ev) => setPlayhead(beatAt(ev));
       locate(e);
       const move = (ev) => locate(ev);
       const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
@@ -7992,7 +8902,7 @@ function wireProduce(v) {
 
   const rtz = v.querySelector("#arrRTZ");
   if (rtz) rtz.onclick = () => {
-    playheadBeat = 0;
+    setPlayhead(0);
     if (arrPlay) playArrangement(0);
     else updatePlayhead(0);
   };
@@ -8010,7 +8920,7 @@ function wireProduce(v) {
     showAppDialog({ title: "Go to bar", message: "Enter a bar, or bar.beat position.", value: posEl.textContent, input: true, confirmLabel: "Go", onConfirm: raw => {
       const [bar, beat] = raw.split(".").map(Number);
       if (!Number.isFinite(bar)) return;
-      playheadBeat = Math.max(0, Math.min(totalBeats() - 1, (bar - 1) * BEATS_PER_BAR + (Number.isFinite(beat) ? beat - 1 : 0)));
+      setPlayhead((bar - 1) * BEATS_PER_BAR + (Number.isFinite(beat) ? beat - 1 : 0));
       updatePlayhead(playheadBeat);
     }});
   };
@@ -8964,7 +9874,8 @@ function renderExplore() {
     "toneColorProb","toneFormantDrift","toneResonanceDrift","toneBreath",
     "vibratoProb","vibratoDepth","vibratoDepthSd","vibratoRate","vibratoRateSd",
     "spectralProb","spectralMix","spectralPartials","spectralDynamicAmount","partialMaterial",
-    "excitationType","excitationPosition","excitationHardness","excitationHuman","partialTransfer","bodyType","partialB","attackNoiseLevel",
+    "excitationType","excitationPosition","excitationHardness","excitationHuman","velocityHardnessCoupling","breathNoiseColor","breathLevelScale","breathVelocityExponent","breathTurbulence","breathBodyAmount","windBreathLevel","pianoActionNoiseLevel","envelopeAnomalyLevel","partialTransfer","bodyType","partialB","attackNoiseLevel","attackNoiseDirect","attackNoiseVelocityExponent","onsetSpectrumTilt","onsetSpectrumDecay","articulationCoupling","articulationStrength","articulationVariation","articulationVelocitySlope","onsetWanderCents","onsetWanderSettlePeriods","bowScratchLevel","bowNoiseLevel","bowNoiseVelocityExponent","onsetScoopDepthCents","onsetScoopSettle","onsetScoopRearticulatedScale","onsetScoopRegisterSlope","onsetScoopVelocitySlope",
+    "dynamicBlare","decaySecondStage","decaySecondRatio","materialT60Ref","materialT60Slope","materialT60Anchor","materialT60FitAmount","releaseDamping","polarisationAmount","polarisationSplitCents","polarisationDecayRatio","glottalTilt","glottalTiltDynamicSlope","singerFormantAmount","singerFormantHz","formantTuneToF0","voiceBreathSync","resonatorClass",
     "partialTilt","partialOddEven","partialComb","partialCombFreq",
     "partialGroup1","partialGroup2","partialGroup3","partialGroup4","partialGroup5","partialGroup6",
     "formantF1Level","formantF2Level","formantF3Level","formantF4Level","formantF5Level","formantBandwidth","bodyArticulation",
@@ -9032,7 +9943,10 @@ function renderExplore() {
       exploreParams[key] = sel.value;
       if (key === "spectralProfile") {
         resetSpectralPartialParams(exploreParams);
-        delete exploreParams.spectralProfileName;
+        // clear via the accessor (delete would tear it off exploreParams and
+        // break the layer-name mapping) — the row/title then fall back to the
+        // new module's label
+        exploreParams.spectralProfileName = undefined;
       }
       const out = v.querySelector(`#out_${key}`);
       if (out) out.textContent = fmtOutput(key, sel.value);
@@ -9104,6 +10018,17 @@ function renderExplore() {
   if (octDown) octDown.onclick = () => octShift(-1);
   const octUp = v.querySelector("#octUp");
   if (octUp) octUp.onclick = () => octShift(1);
+
+  // Panel dice: roll every active control in this macro-probability panel, then
+  // re-render (swaps dials, redraws distributions) and keep playback going.
+  v.querySelectorAll("[data-panel-rand]").forEach(btn => {
+    btn.onclick = () => {
+      const wasPlaying = synth.isPlaying;
+      randomiseMacroPanel(btn.dataset.panelRand);
+      renderExplore();
+      if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
+    };
+  });
 
   // Rotary knobs (tone chain): vertical drag, shift = fine, double-click
   // resets to the stage default. Every change lights up the overlay it
@@ -9823,6 +10748,7 @@ function m2InspectorHTML(p) {
   return `
     <div class="macro-card-head">
       <div class="section-label">Macro Probability — ${label}</div>
+      ${panelRandBtn(macroTab)}
     </div>
     ${macroPanelHTML(p)}`;
 }
@@ -10049,38 +10975,15 @@ function m2PresetParamsById(id) {
   return null;
 }
 
-// Load a browser entry as the BASE sound (sub-note mode): a recipe re-seats
-// the instrument exactly like the old instrument cards did; any preset —
-// sound module or full patch — contributes only its sound half. The shared
-// space (room, head, air) and the macro half stay untouched.
-function loadSoundModuleById(id) {
-  if (id.startsWith("r:")) {
-    const key = id.slice(2);
-    if (!SPECTRAL_PROFILES[key] || exploreParams.spectralProfile === key) return;
-    noteParamChange("spectralProfile", exploreParams.spectralProfile, key);
-    exploreParams.spectralProfile = key;
-    delete exploreParams.spectralProfileName;
-    resetSpectralPartialParams(exploreParams);
-    if ((exploreParams.bodyType || "auto") === "auto") {
-      delete exploreParams.bodyBands;
-      _chBodySel = null;
-    }
-  } else {
-    const params = m2PresetParamsById(id);
-    if (!params) return;
-    const migrated = migrateParamsShape(migrateToneParams({ ...params }));
-    const sound = { ...(migrated.layers?.[0]?.sound || {}) };
-    for (const k of Object.keys(sound)) if (k.startsWith("layer") || k.startsWith("baseLayer")) delete sound[k];
-    if (!Object.keys(sound).length) return;
-    Object.assign(exploreParams, sound);
-    if (!Object.prototype.hasOwnProperty.call(sound, "spectralProfileName")) delete exploreParams.spectralProfileName;
-    if ((exploreParams.bodyType || "auto") === "auto") {
-      delete exploreParams.bodyBands;
-      _chBodySel = null;
-    }
-  }
-  synth.updateGenerationParams(enginePlayParams());
-  renderExplore();
+// The browser entry's display name — layers stacked from a module carry it,
+// so the LAYERS strip reads as the modules that were placed (owner 2026-07-18).
+function m2PresetNameById(id) {
+  if (!id) return null;
+  if (id.startsWith("r:")) return SPECTRAL_PROFILES[id.slice(2)]?.label || null;
+  if (id.startsWith("f:")) return FACTORY_PRESETS.find(f => `f:${f.id}` === id)?.name || null;
+  if (id.startsWith("m:")) return loadPresets().find(e => `m:${e.id}` === id)?.name || null;
+  if (id.startsWith("g:")) return (_m2LibCommunity || []).find((e, i) => `g:${e.id ?? i}` === id)?.name || null;
+  return null;
 }
 
 // Resolve a browser id to its sound-half params WITHOUT applying it — used by
@@ -10141,7 +11044,7 @@ function stopSubnotePreview(rerender = true) {
 // any layers the preset carries ride along. Only the sound module comes
 // across (plus per-layer position) — the shared space (room, head, air)
 // stays the instrument's own.
-function addPresetAsLayers(params) {
+function addPresetAsLayers(params, moduleName = null) {
   if (!params) return false;
   const incoming = migrateParamsShape(migrateToneParams({ ...params }));
   let added = false;
@@ -10151,6 +11054,9 @@ function addPresetAsLayers(params) {
     const layer = {
       ...source,
       id: crypto.randomUUID(),
+      // the row is named for the module that was placed there; a multi-layer
+      // preset's own layer names win over the preset's title
+      name: (source.name && String(source.name).trim()) || moduleName || "",
       hue: (36 + exploreParams.layers.length * 70) % 360,
       sound: { ...sound, effectsChain: cloneFxChain(sound.effectsChain) },
       space: { ...(source.space || { angle: 0, dist: 2.5 }) },
@@ -10181,7 +11087,8 @@ function bindLayerDropTarget(target) {
   target.ondrop = (e) => {
     e.preventDefault();
     target.classList.remove("drop-ok");
-    addPresetAsLayers(m2PresetParamsById(e.dataTransfer.getData("application/x-preset-id")));
+    const droppedId = e.dataTransfer.getData("application/x-preset-id");
+    addPresetAsLayers(m2PresetParamsById(droppedId), m2PresetNameById(droppedId));
   };
 }
 
@@ -10394,24 +11301,33 @@ function prodFxTagsHTML(id, chain) {
 // the macro page, but its LOCATION in space lives here. No effects (percussion
 // bypasses the effects stage) and no per-source level (the three hits carry
 // their own vols on the macro page).
-function producerPercRowHTML(p) {
-  const angle = Number.isFinite(p.percAzimuth) ? p.percAzimuth : (p.spaceAzimuth ?? 0);
-  const dist = Number.isFinite(p.percDistance) ? p.percDistance : (p.spaceDistance ?? 2.5);
-  const active = (p.percBeatVol || 0) + (p.percMotifVol || 0) + (p.percDownbeatVol || 0) > 0;
-  return `
-    <div class="prod-layer-row perc-row${active ? "" : " dim"}" style="--layer-hue:32" title="Where the percussion sits in space. Its sounds and levels are set on the macro page.">
-      <span class="prod-layer-tag">P</span>
-      <span class="prod-layer-name">Percussion</span>
+// Percussion v2: hits are a LIST, each with its own position and level. The
+// old row here showed one group placed by percAzimuth/percBeatVol, a model
+// percLayers replaced — it drew a position that nothing played.
+function producerPercRowsHTML(p) {
+  const hits = Array.isArray(p.percLayers) ? p.percLayers : [];
+  if (!hits.length) return "";
+  const base = { angle: p.spaceAzimuth ?? 0, dist: p.spaceDistance ?? 2.5 };
+  return `<div class="prod-layer-group"><span>Percussion</span><small>${hits.length} hit${hits.length === 1 ? "" : "s"}</small></div>`
+    + hits.map((l, i) => {
+      const angle = l.space?.angle ?? base.angle;
+      const dist = l.space?.dist ?? base.dist;
+      const silent = !((Number(l.vol) || 0) > 0);
+      return `
+    <div class="prod-layer-row perc-row${silent ? " dim" : ""}" style="--layer-hue:${l.hue ?? (32 + i * 47) % 360}" title="Where this hit sits in space. Its sound and level are set on the macro page.">
+      <span class="prod-layer-tag">P${i + 1}</span>
+      <span class="prod-layer-name">${esc(l.sound?.name || l.sound?.key || `Hit ${i + 1}`)}</span>
       <div class="prod-layer-ctls">
         <span class="space-target-control">
-          <canvas class="compact-space-target" data-prod-space-target="perc" width="40" height="40"></canvas>
+          <canvas class="compact-space-target" data-prod-space-target="perc:${l.id}" width="40" height="40"></canvas>
           <span data-space-target-readout>${compactSpaceTargetText({ angle, dist })}</span>
         </span>
       </div>
       <div class="prod-layer-fx">
-        <span class="prod-fx-none">${active ? "sound &amp; mix on the macro page" : "silent — add hits on the macro page"}</span>
+        <span class="prod-fx-none">${silent ? "silent — set its level on the macro page" : "sound &amp; mix on the macro page"}</span>
       </div>
     </div>`;
+    }).join("");
 }
 
 function producerLayersRowHTML(l, i, p) {
@@ -10449,8 +11365,8 @@ function producerLayersPanelHTML(p) {
       </div>
       <div class="prod-layers-list">
         ${layers.map((l, i) => producerLayersRowHTML(l, i, p)).join("")}
-        ${producerPercRowHTML(p)}
-        ${layers.length > 1 ? "" : `<div class="prod-layers-empty">No extra layers yet — stack them from the sub-note editor's LAYERS panel. Percussion below can still be placed in space.</div>`}
+        ${producerPercRowsHTML(p)}
+        ${layers.length > 1 ? "" : `<div class="prod-layers-empty">No extra layers yet — stack them from the sub-note editor's LAYERS panel.</div>`}
       </div>
     </div>`;
 }
@@ -10479,27 +11395,29 @@ function bindProducerLayers(v, target = exploreParams, hooks = {}) {
     return { chain, fx: chain ? chain.find(f => f.uid === uid) : null };
   };
 
-  // ── Position + level (live, no re-render). Percussion is its own source, so
-  // its position drives percAzimuth/percDistance and needs a space reconfigure.
+  // ── Position + level (live, no re-render). Each percussion HIT carries its
+  // own position (percussion v2), so `perc:<id>` targets that hit's layer —
+  // the old single `perc` target wrote a group position nothing played.
+  const percById = (id) => (target.percLayers || []).find(l => l.id === id);
   panel.querySelectorAll("[data-prod-gain]").forEach(el => {
     el.oninput = () => { const l = layerById(el.dataset.prodGain); if (l) { l.gain = parseFloat(el.value); applyLive(); } };
   });
   panel.querySelectorAll("[data-prod-space-target]").forEach(cv => {
     const id = cv.dataset.prodSpaceTarget;
-    const get = () => id === "perc"
-      ? { angle: Number.isFinite(target.percAzimuth) ? target.percAzimuth : (target.spaceAzimuth ?? 0), dist: Number.isFinite(target.percDistance) ? target.percDistance : (target.spaceDistance ?? 2.5) }
-      : { angle: layerById(id)?.space?.angle ?? target.spaceAzimuth ?? 0, dist: layerById(id)?.space?.dist ?? target.spaceDistance ?? 2.5 };
+    const percId = id.startsWith("perc:") ? id.slice(5) : null;
+    const base = () => ({ angle: target.spaceAzimuth ?? 0, dist: target.spaceDistance ?? 2.5 });
+    const get = () => {
+      const src = percId ? percById(percId) : layerById(id);
+      return { angle: src?.space?.angle ?? base().angle, dist: src?.space?.dist ?? base().dist };
+    };
     wireCompactSpaceTarget(cv, {
       get,
-      hue: () => id === "perc" ? 32 : (layerById(id)?.hue ?? 205),
+      hue: () => percId ? (percById(percId)?.hue ?? 32) : (layerById(id)?.hue ?? 205),
       set: (pos) => {
-        if (id === "perc") {
-          target.percAzimuth = pos.angle; target.percDistance = pos.dist;
-          applyLive(); applyReverb();
-        } else {
-          const l = layerById(id); if (l) l.space = { ...pos };
-          applyLive();
-        }
+        const src = percId ? percById(percId) : layerById(id);
+        if (src) src.space = { ...pos };
+        applyLive();
+        if (percId) applyReverb();
       },
     });
   });
@@ -10589,6 +11507,14 @@ function macroWorkspaceHTML(p) {
 
 function macroTabButton(key, label) {
   return `<button class="macro-tab${macroTab === key ? " active" : ""}" data-macro-tab="${key}">${label}</button>`;
+}
+
+// A subtle dice for the header of a macro-probability panel. It rolls new
+// values for that whole panel (see randomiseMacroPanel), skipping any section
+// the user has switched off. tab is the macroTab ("melody" | "tuning" |
+// "duration" | "dynamics").
+function panelRandBtn(tab) {
+  return `<button class="panel-rand-btn" type="button" data-panel-rand="${tab}" title="Randomise this panel" aria-label="Randomise this panel">${tbIcon("dice")}</button>`;
 }
 
 function macroPanelHTML(p) {
@@ -11065,9 +11991,14 @@ function layerStripHTML(p, compact = false) {
   const rows = layers.map((layer, index) => {
     const sound = layer.sound || layer.subnote || {};
     const envStr = layerEnvLineText({ ...layer, subnote: sound }, p);
-    const title = (layer.name && String(layer.name).trim()) || (index === 0 ? "Untitled" : `Layer ${index + 1}`);
+    // Unnamed rows read as the sound module sitting in the slot (owner
+    // 2026-07-18: a layer's name should correspond to what was placed there);
+    // "Layer N" only when even the module is unknown.
+    const title = (layer.name && String(layer.name).trim())
+      || SPECTRAL_PROFILES[sound.spectralProfile]?.label
+      || `Layer ${index + 1}`;
     return `
-    <div class="layer-row${index === 0 ? " base-row" : ""}${layer.id === selectedId ? " sel" : ""}" data-layer-row="${layer.id}" style="--layer-hue:${layer.hue ?? (36 + index * 70) % 360}" title="Layer ${index + 1} — click to edit it in the stages above">
+    <div class="layer-row${layer.id === selectedId ? " sel" : ""}" data-layer-row="${layer.id}" style="--layer-hue:${layer.hue ?? (36 + index * 70) % 360}" title="Layer ${index + 1} — click to edit it in the stages above">
       <span class="layer-row-tag">${index + 1}</span>
       <span class="space-target-control layer-space-target">
         <canvas class="layer-minipad compact-space-target" data-layer-pad="${layer.id}" width="40" height="40"></canvas>
@@ -11076,13 +12007,12 @@ function layerStripHTML(p, compact = false) {
       <div class="layer-row-lines">
         <div class="layer-name-row">
           <span class="layer-name" data-layer-name="${layer.id}" title="Double-click to rename this layer">${esc(title)}</span>
-          ${index === 0 ? '<span class="layer-base-badge">BASE</span>' : ""}
         </div>
         <div class="layer-row-space">
           <label class="sp-ctl">Vol <input type="range" data-layer-gain="${layer.id}" min="0" max="1.5" step="0.01" value="${layer.gain ?? 1}" title="This layer's level"/></label>
           <button class="pal-btn layer-solo${layer.solo ? " on" : ""}" data-layer-solo="${layer.id}" title="Solo this layer">S</button>
-          ${index === 0 ? "" : `<button class="pal-btn" data-layer-recapture="${layer.id}" title="Copy the selected layer's sound into this layer">⟳</button>
-          <button class="pal-btn" data-layer-remove="${layer.id}" title="Remove this layer">×</button>`}
+          <button class="pal-btn" data-layer-recapture="${layer.id}" title="Copy the selected layer's sound into this layer">⟳</button>
+          ${layers.length > 1 ? `<button class="pal-btn" data-layer-remove="${layer.id}" title="Remove this layer">×</button>` : ""}
         </div>
         <div class="layer-env" title="This layer's envelope baseline">${esc(envStr)}</div>
         ${fxTagsHTML(layer.id, sound.effectsChain, sound.stageEffectsOn === false)}
@@ -11547,7 +12477,8 @@ function wireSubnoteTitle(v) {
           exploreParams.spectralProfileName = next;
         } else if (prev) {
           noteParamChange("spectralProfileName", prev, "");
-          delete exploreParams.spectralProfileName;
+          // accessor-safe clear (delete would remove the accessor itself)
+          exploreParams.spectralProfileName = undefined;
         }
       }
       renderExplore();
@@ -13784,6 +14715,38 @@ function knobHTML(key, label, value, min, max, step, opts = {}) {
     </div>`;
 }
 
+// The knob GESTURE, shared by the studio and the producer inspector: drag to
+// change (⇧ = fine), double-click to reset. `get`/`set` decide whose params.
+function wireKnobCell(cell, { get, set, onCommit = null }) {
+  const min = Number(cell.dataset.min), max = Number(cell.dataset.max), step = Number(cell.dataset.step);
+  const key = cell.dataset.knob;
+  const apply = (raw) => {
+    let val = clamp(raw, min, max);
+    val = clamp(Number((Math.round(val / step) * step).toFixed(6)), min, max);
+    if (get() === val) return;
+    set(val);
+    _setKnobVisual(cell, (val - min) / (max - min));
+    const out = cell.querySelector(".knob-out");
+    if (out) out.textContent = fmtOutput(key, val);
+  };
+  cell.onmousedown = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const cur = get();
+    const startVal = Number.isFinite(cur) ? cur : Number(cell.dataset.def);
+    const move = (ev) => apply(startVal + (startY - ev.clientY) * (max - min) / (ev.shiftKey ? 1400 : 160));
+    // Re-render only when the drag ENDS — mid-drag it would fight the pointer,
+    // but without it nothing tells you the edit is now take-local.
+    const up = () => {
+      window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
+      if (get() !== startVal) onCommit?.();
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  cell.ondblclick = () => { apply(Number(cell.dataset.def)); onCommit?.(); };
+}
+
 function _setKnobVisual(cell, frac) {
   const svg = cell.querySelector(".knob-svg");
   if (svg) svg.innerHTML = knobArcs(frac, cell.classList.contains("cool"));
@@ -13804,7 +14767,7 @@ let _tdSideTab = "envelope";
 const _chBypass = { body: null, space: null };
 
 function stagePowerState(p, stage) {
-  if (stage === "body") return (p.spectralResonanceAmount ?? 0.35) > 0.001;
+  if (stage === "body") return (p.spectralResonanceAmount ?? 1) > 0.001;
   if (stage === "effects") return p.stageEffectsOn !== false;
   if (stage === "space") return (p.reverbWet ?? 0.16) > 0.001;
   return true; // excitor + resonator are always in the chain
@@ -13813,10 +14776,10 @@ function stagePowerState(p, stage) {
 function toggleStagePower(p, stage) {
   if (stage === "body") {
     if (stagePowerState(p, "body")) {
-      _chBypass.body = p.spectralResonanceAmount ?? 0.35;
+      _chBypass.body = p.spectralResonanceAmount ?? 1;
       p.spectralResonanceAmount = 0;
     } else {
-      p.spectralResonanceAmount = _chBypass.body ?? 0.35;
+      p.spectralResonanceAmount = _chBypass.body ?? 1;
     }
     return;
   }
@@ -13884,7 +14847,7 @@ function chCardSummary(p, stage) {
   }
   if (stage === "body") {
     const label = !p.bodyType || p.bodyType === "auto" ? "auto" : (BODY_PRESETS[p.bodyType]?.label || p.bodyType);
-    return `${label} · amount ${(p.spectralResonanceAmount ?? 0.35).toFixed(2)}`;
+    return `${label} · amount ${(p.spectralResonanceAmount ?? 1).toFixed(2)}`;
   }
   if (stage === "effects") {
     const chain = sanitizeFxChain(p.effectsChain);
@@ -14279,6 +15242,38 @@ function chInspectorHTML(p) {
           ${knobHTML("attackNoiseLevel", "Onset noise", p.attackNoiseLevel ?? 1, 0, 2, 0.01, { def: 1 })}
         </div>
       </div>
+      <details class="ch-perf formant-detail">
+        <summary>Advanced excitation</summary>
+        <div class="controls-grid">
+          ${controlRow("velocityHardnessCoupling", "Velocity → hardness", p.velocityHardnessCoupling ?? 0, 0, 1, 0.01)}
+          ${controlRow("breathNoiseColor", "Air-noise colour", p.breathNoiseColor ?? 0, -1, 1, 0.01)}
+          ${controlRow("breathLevelScale", "Air-noise level", p.breathLevelScale ?? 1, 0, 3, 0.01)}
+          ${controlRow("breathVelocityExponent", "Air velocity curve", p.breathVelocityExponent ?? 1, 0, 2, 0.01)}
+          ${controlRow("breathTurbulence", "Air turbulence", p.breathTurbulence ?? 0, 0, 1, 0.01)}
+          ${controlRow("breathBodyAmount", "Air through body", p.breathBodyAmount ?? 0, 0, 1, 0.01)}
+          ${controlRow("windBreathLevel", "Pinned wind breath", p.windBreathLevel ?? 0, 0, 2, 0.01)}
+          ${controlRow("pianoActionNoiseLevel", "Piano action", p.pianoActionNoiseLevel ?? 0, 0, 2, 0.01)}
+          ${controlRow("envelopeAnomalyLevel", "Piano anomalies", p.envelopeAnomalyLevel ?? 0, 0, 2, 0.01)}
+          ${controlRow("attackNoiseDirect", "Independent onset", p.attackNoiseDirect ?? 0, 0, 1, 0.01)}
+          ${controlRow("attackNoiseVelocityExponent", "Onset velocity curve", p.attackNoiseVelocityExponent ?? 1, 0, 2, 0.01)}
+          ${controlRow("onsetSpectrumTilt", "Onset harmonic tilt", p.onsetSpectrumTilt ?? 0, -1, 1, 0.01)}
+          ${controlRow("onsetSpectrumDecay", "Onset-colour decay", p.onsetSpectrumDecay ?? 0.06, 0.015, 0.25, 0.005)}
+          ${controlRow("articulationCoupling", "Coupled articulation", p.articulationCoupling ?? 0, 0, 1, 0.01)}
+          ${controlRow("articulationStrength", "Articulation strength", p.articulationStrength ?? 0.5, 0, 1, 0.01)}
+          ${controlRow("articulationVariation", "Articulation variation", p.articulationVariation ?? 0, 0, 1, 0.01)}
+          ${controlRow("articulationVelocitySlope", "Articulation velocity", p.articulationVelocitySlope ?? 0, -1.5, 1.5, 0.01)}
+          ${controlRow("onsetWanderCents", "Bow onset wander", p.onsetWanderCents ?? 0, 0, 120, 1)}
+          ${controlRow("onsetWanderSettlePeriods", "Bow lock-in periods", p.onsetWanderSettlePeriods ?? 12, 2, 30, 1)}
+          ${controlRow("bowScratchLevel", "Bow scratch level", p.bowScratchLevel ?? 0, 0, 2, 0.01)}
+          ${controlRow("bowNoiseLevel", "Sustained bow noise", p.bowNoiseLevel ?? 0, 0, 2, 0.01)}
+          ${controlRow("bowNoiseVelocityExponent", "Bow-noise velocity", p.bowNoiseVelocityExponent ?? 0.9309, 0, 2, 0.01)}
+          ${controlRow("onsetScoopDepthCents", "Scoop depth (cents)", p.onsetScoopDepthCents ?? 0, 0, 180, 1)}
+          ${controlRow("onsetScoopSettle", "Scoop settle", p.onsetScoopSettle ?? 0.06, 0.015, 0.35, 0.005)}
+          ${controlRow("onsetScoopRearticulatedScale", "Inside-phrase scoop", p.onsetScoopRearticulatedScale ?? 0.35, 0, 1, 0.01)}
+          ${controlRow("onsetScoopRegisterSlope", "Scoop register curve", p.onsetScoopRegisterSlope ?? 0, -1.5, 1.5, 0.01)}
+          ${controlRow("onsetScoopVelocitySlope", "Scoop velocity curve", p.onsetScoopVelocitySlope ?? 0, -1.5, 1.5, 0.01)}
+        </div>
+      </details>
       <canvas class="ch-string" id="cvStringDiag" width="400" height="56"></canvas>
       <div class="ch-caption">position decides which modes can be driven — a partial with a node under the ${p.excitationType === "strike" ? "hammer" : p.excitationType === "pluck" ? "finger" : p.excitationType === "blow" ? "jet" : "bow"} falls silent; watch the dips in the field. Envelope &amp; modulation live in the right panel →</div>`;
   }
@@ -14295,7 +15290,7 @@ function chInspectorHTML(p) {
       <div class="ins-group">
         <div class="ins-group-label">Partials</div>
         <div class="knob-row">
-          ${knobHTML("spectralPartials", "Density", p.spectralPartials, 1, 64, 1, { def: 20 })}
+          ${knobHTML("spectralPartials", "Density", p.spectralPartials, 1, 128, 1, { def: 20 })}
           ${knobHTML("partialB", "Inharmonicity", Number.isFinite(p.partialB) ? p.partialB : legacyStretchToB(p.spectralStretchCents || 0), 0, 0.002, 0.00002, { def: 0 })}
         </div>
       </div>
@@ -14307,10 +15302,27 @@ function chInspectorHTML(p) {
       </div>
       <details class="ch-perf formant-detail">
         <summary title="Legacy macro transforms — position and the physical stages absorb most of these; they remain for fine surgery.">Advanced shaping</summary>
+        <label class="control-row" title="${esc(PARAM_DESC.resonatorClass || "Physical resonator mode series")}"><span>Resonator class</span>
+          <select data-param-select="resonatorClass" class="param-select">
+            ${[["string","String"],["openTube","Open cylindrical tube"],["closedTube","Closed tube"],["conicalTube","Conical tube"],["membrane","Membrane"],["bar","Bar / plate"]].map(([value,label]) => `<option value="${value}"${(p.resonatorClass || "string") === value ? " selected" : ""}>${label}</option>`).join("")}
+          </select>
+        </label>
         <div class="controls-grid">
+          ${controlRow("dynamicBlare", "Forte curvature", p.dynamicBlare ?? 0, 0, 1.5, 0.01)}
+          ${controlRow("decaySecondStage", "Second decay", p.decaySecondStage ?? 0, 0, 1, 0.01)}
+          ${controlRow("decaySecondRatio", "Late T60 ratio", p.decaySecondRatio ?? 1, 1, 8, 0.1)}
+          ${controlRow("materialT60Ref", "Fitted T60 @ C4", p.materialT60Ref ?? 0, 0, 20, 0.01)}
+          ${controlRow("materialT60Slope", "Fitted decay slope", p.materialT60Slope ?? 0, 0, 2.5, 0.001)}
+          ${controlRow("materialT60Anchor", "Loss-factor anchor", p.materialT60Anchor ?? p.partialMaterial ?? 0.45, 0, 1, 0.01)}
+          ${controlRow("materialT60FitAmount", "Fitted-law blend", p.materialT60FitAmount ?? 0, 0, 1, 0.01)}
+          ${controlRow("releaseDamping", "Release damping", p.releaseDamping ?? 0, 0, 1, 0.01)}
+          ${controlRow("polarisationAmount", "Polarisation modes", p.polarisationAmount ?? 0, 0, 1, 0.01)}
+          ${controlRow("polarisationSplitCents", "Mode split (cents)", p.polarisationSplitCents ?? 0, 0, 6, 0.01)}
+          ${controlRow("polarisationDecayRatio", "Second-mode T60", p.polarisationDecayRatio ?? 1, 0.25, 4, 0.01)}
           ${controlRow("partialOddEven", "Odd / even", p.partialOddEven, -1, 1, 0.01)}
           ${controlRow("partialComb", "Comb boost", p.partialComb, 0, 1, 0.01)}
           ${controlRow("partialCombFreq", "Comb centre", p.partialCombFreq, 1, 64, 1)}
+          ${controlRow("spectralCullThreshold", "Cull floor", p.spectralCullThreshold ?? 0.0005, 0.0001, 0.01, 0.0001)}
         </div>
         <div class="subsection-label">Octave groups</div>
         <div class="controls-grid">
@@ -14334,7 +15346,7 @@ function chInspectorHTML(p) {
       </select>
       ${bodyBandChipsHTML(p)}
       <div class="knob-row">
-        ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 0.35, cool: true })}
+        ${knobHTML("spectralResonanceAmount", "Amount", p.spectralResonanceAmount, 0, 1.5, 0.01, { def: 1, cool: true })}
         ${knobHTML("bodyArticulation", "Articulate", p.bodyArticulation ?? (p.bodyType === "vocal" ? 1 : 0), 0, 1, 0.01, { def: 0, cool: true })}
         ${(p.bodyArticulation ?? 0) > 0 ? knobHTML("formantChangeProb", "Vowel walk", p.formantChangeProb, 0, 1, 0.01, { def: 0.25, cool: true }) : ""}
       </div>
@@ -14348,6 +15360,17 @@ function chInspectorHTML(p) {
             ${knobHTML("formantBandwidth", "Band width", p.formantBandwidth, 0.4, 2.5, 0.01, { def: 1, cool: true })}
           </div>
         </div>` : `<canvas class="body-mini" id="cvBodyRidge" width="440" height="72"></canvas>`}
+      <details class="ch-perf formant-detail">
+        <summary>Advanced vocal body</summary>
+        <div class="controls-grid">
+          ${controlRow("glottalTilt", "Glottal tilt", p.glottalTilt ?? 0, -1, 1, 0.01)}
+          ${controlRow("glottalTiltDynamicSlope", "Tilt × effort", p.glottalTiltDynamicSlope ?? 0, -1, 1, 0.01)}
+          ${controlRow("singerFormantAmount", "Singer formant", p.singerFormantAmount ?? 0, 0, 1.5, 0.01)}
+          ${controlRow("singerFormantHz", "Singer centre Hz", p.singerFormantHz ?? 3000, 1800, 3600, 10)}
+          ${controlRow("formantTuneToF0", "F1 / f0 tuning", p.formantTuneToF0 ?? 0, 0, 1.2, 0.01)}
+          ${controlRow("voiceBreathSync", "Cyclic breath", p.voiceBreathSync ?? 0, 0, 1, 0.01)}
+        </div>
+      </details>
       <div class="ch-caption">${(p.bodyArticulation ?? 0) > 0
         ? "ARTICULATION rides on the selected body: the vowel EQ layers over its bands at the chosen depth — a violin body can sing. Click a band chip to see and reshape its EQ in the field"
         : "the body is a PRESET you can edit: click a band chip to see its EQ curve in the field and drag the Band gain knob to make it more or less extreme"}</div>`;
@@ -14597,7 +15620,7 @@ function drawChThumbs() {
   if (g) {
     const profile = SPECTRAL_PROFILES[p.spectralProfile] || SPECTRAL_PROFILES.violin;
     const bands = bodyBandsFor(p, profile);
-    const amount = clamp(p.spectralResonanceAmount ?? 0.35, 0, 1.5);
+    const amount = clamp(p.spectralResonanceAmount ?? 1, 0, 1.5);
     g.ctx.beginPath();
     for (let px = 0; px <= g.w; px += 3) {
       const f = 60 * Math.pow(12000 / 60, px / g.w);
@@ -15460,7 +16483,8 @@ function wireLayerStrip(v) {
   v.querySelectorAll("[data-layer-remove]").forEach(el => {
     el.onclick = () => {
       const index = exploreParams.layers.findIndex(layer => layer.id === el.dataset.layerRemove);
-      if (index <= 0) return;
+      // any row may go — including the first — as long as one layer remains
+      if (index < 0 || exploreParams.layers.length <= 1) return;
       const wasSelected = exploreParams.layers[index].id === exploreParams.selectedLayerId;
       exploreParams.layers.splice(index, 1);
       if (wasSelected) {
@@ -16167,7 +17191,7 @@ function drawBodyRidge() {
   ctx.clearRect(0, 0, w, h);
   const profile = SPECTRAL_PROFILES[exploreParams.spectralProfile] || SPECTRAL_PROFILES.violin;
   const bands = bodyBandsFor(exploreParams, profile);
-  const amount = clamp(exploreParams.spectralResonanceAmount ?? 0.35, 0, 1.5);
+  const amount = clamp(exploreParams.spectralResonanceAmount ?? 1, 0, 1.5);
   const FMIN = 60, FMAX = 12000;
   ctx.beginPath();
   ctx.moveTo(0, h);
@@ -16852,6 +17876,98 @@ function randomiseParams() {
   p.motifLengthBeats = ri(2, 8);
   p.sequenceProb = rf(0.3, 1.0);
   p.motifSurpriseProb = rf(0.0, 0.5);
+}
+
+// Panel-level randomiser for the macro-probability panels. Rolls new values for
+// every active control in one panel (tab = "melody" | "tuning" | "duration" |
+// "dynamics"), reusing the same ranges as randomiseParams() so a panel dice
+// matches what the top-bar dice would roll for that group. Sections the user has
+// switched off are skipped and left untouched — a disabled Surprise keeps its
+// values and its off state, and only the dials visible for the current mode
+// (Walk vs Arp, Glide vs Ring) are rolled. The caller re-renders + restarts
+// playback.
+function randomiseMacroPanel(tab) {
+  const ri = (lo, hi) => Math.floor(lo + Math.random() * (hi - lo + 1));
+  const rf = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(3);
+  const p = exploreParams;
+  const pattern = p.melodyPattern || "walk";
+  switch (tab) {
+    case "melody":
+      // Generation — only the dials for the active pattern are visible; the
+      // hidden set (walk dials under Arp, or vice versa) stays put
+      if (pattern === "walk") {
+        p.intervalPeakedness = rf(0.2, 3.5);
+        p.intervalRange = ri(2, 16);
+        p.momentum = rf(0, 0.9);
+      } else {
+        p.arpStep = ri(1, 4);
+        p.arpOctaves = ri(1, 3);
+      }
+      // Accuracy
+      p.motifHitProb = rf(0.75, 1.0);
+      p.motifHitRange = ri(1, 5);
+      // Register
+      p.registerCenter = ri(-12, 12);
+      p.registerWidth = ri(4, 24);
+      p.registerSkew = rf(-0.6, 0.6);
+      // Surprise — only when on AND Walk (arp surprise is deterministic/disabled)
+      if (p.surprisePitchEnabled && pattern === "walk") {
+        p.melSurpriseAmount = rf(0.2, 0.9);
+        p.surprisePitchDistance = rf(0.35, 1);
+      }
+      break;
+    case "tuning":
+      // Accuracy
+      p.precision = rf(0.7, 1.0);
+      p.precisionRange = ri(0, 35);
+      // Surprise
+      if (p.surpriseTuningEnabled) {
+        p.tunSurpriseAmount = rf(0.2, 0.9);
+        p.surpriseTuningDistance = rf(0.35, 1);
+      }
+      break;
+    case "duration":
+      // Generation
+      p.beatDivisions = ri(1, 4);
+      p.onBeatProb = rf(0.5, 1.0);
+      p.offBeatProb = rf(0.0, 0.5);
+      p.sameLengthProb = rf(0.0, 0.7);
+      p.restMotifStartRatio = rf(0.0, 0.25);
+      p.restOnMeterRatio = rf(0.0, 0.35);
+      p.restOffMeterRatio = rf(0.0, 0.55);
+      // Surprise
+      if (p.surpriseRhythmEnabled) {
+        p.durSurpriseAmount = rf(0.2, 0.9);
+        p.surpriseRhythmDistance = rf(0.35, 1);
+      }
+      // Breaks & Slides — the slide-speed dial only shows for Glide
+      p.gapProb = rf(0.4, 1.0);
+      p.gapMin = rf(-0.35, 0.22);
+      p.gapMax = rf(Math.max(p.gapMin, -0.05), 0.55);
+      p.gapDistanceSlope = rf(0.0, 1.0);
+      p.gapTimingRange = rf(0.0, 0.22);
+      p.phraseGap = rf(0.1, 0.5);
+      if ((p.noteConnection || "glide") === "glide") p.slideSpeed = rf(0.2, 1.0);
+      break;
+    case "dynamics":
+      // Generation
+      p.dynamicsRange = rf(0.08, 0.45);
+      // Accuracy
+      p.dynamicsPrecision = rf(0.45, 0.95);
+      p.dynamicsHitRange = ri(0, 75);
+      // Loudness Register
+      p.dynamicsLevel = rf(0.42, 0.78);
+      p.loudnessRange = rf(0.3, 0.9);
+      // Surprise
+      if (p.surpriseDynamicsEnabled) {
+        p.dynSurpriseAmount = rf(0.2, 0.9);
+        p.surpriseDynamicsDistance = rf(0.35, 1);
+      }
+      break;
+    default:
+      return;
+  }
+  syncSurpriseFeatureParams(p);
 }
 
 // Parameter-adjustment telemetry: changes buffer up per control and flush as
