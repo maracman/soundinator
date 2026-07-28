@@ -97,6 +97,47 @@ export function spTrackSources(vp) {
 export function spIsMulti(vp) { return spTrackSources(vp).length > 1; }
 
 /**
+ * The sources you can actually HEAR, for drawing. spTrackSources stays
+ * positional because the placement law maps its output back onto layers by
+ * index — filtering there would misplace everything. This is the display list:
+ * mute and solo applied, so a silenced layer does not sit in the room looking
+ * like it is sounding.
+ *
+ * Solo semantics match layerMixPlan: any solo anywhere silences everything not
+ * soloed; otherwise everything not muted sounds.
+ */
+export function spVisibleSources(vp) {
+  const unified = !!vp?.layers?.[0]?.sound;
+  const layers = Array.isArray(vp?.layers) ? vp.layers : [];
+  const perc = Array.isArray(vp?.percLayers) ? vp.percLayers : [];
+  const base = unified
+    ? (layers[0]?.space || { angle: 0, dist: 2.5 })
+    : { angle: vp?.spaceAzimuth ?? 0, dist: vp?.spaceDistance ?? 2.5 };
+
+  const tonal = unified
+    ? layers.map((l, i) => ({ layer: l, i }))
+    : [{ layer: { space: base, solo: vp?.baseLayerSolo, mute: false }, i: 0 },
+       ...layers.map((l, i) => ({ layer: l, i: i + 1 }))];
+  const anySolo = tonal.some(({ layer }) => layer?.solo);
+
+  const out = [];
+  for (const { layer, i } of tonal) {
+    if (anySolo ? !layer?.solo : layer?.mute) continue;
+    out.push({ kind: "layer", index: i,
+      angle: layer?.space?.angle ?? base.angle, dist: layer?.space?.dist ?? base.dist });
+  }
+  // A soloed sound layer silences the hits too — they are not part of the solo.
+  if (!anySolo) {
+    for (const l of perc) {
+      if (l?.mute || !((Number(l?.vol) || 0) > 0)) continue;
+      out.push({ kind: "percussion",
+        angle: l?.space?.angle ?? base.angle, dist: l?.space?.dist ?? base.dist });
+    }
+  }
+  return out;
+}
+
+/**
  * Apply the group handle to a constellation.
  *   centered — the handle rides the constellation's centre: rotate every
  *     source together, scale every distance by handle/centroid (so distances

@@ -7909,6 +7909,9 @@ body.dragging { cursor: grabbing; user-select: none; }
 /* Producer editor panel: switcher + body (owner 2026-07-09) */
 .editor-panel-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 6px; }
 .editor-topbar { display: flex; align-items: center; gap: 10px; flex: none; }
+/* The mode switcher sits right in BOTH modes, so it never moves under you. */
+.editor-topbar-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.editor-topbar .editor-region-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .editor-switch { display: inline-flex; gap: 2px; background: var(--display); border: 1px solid var(--border); border-radius: 7px; padding: 2px; }
 .editor-tab {
   font-size: 0.66rem; font-weight: 600; padding: 3px 11px; border-radius: 5px;

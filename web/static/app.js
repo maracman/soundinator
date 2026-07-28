@@ -88,6 +88,7 @@ import {
   defaultArrangementContext,
   spCentroid as _spCentroid,
   spTrackSources as _spTrackSources,
+  spVisibleSources,
   spIsMulti as _spIsMulti,
   spTransformSources,
   spApplyThreadToPatch,
@@ -3657,13 +3658,28 @@ function drawSpSection() {
       ctx.setLineDash([]);
     };
     if (constellation) {
-      // fainter, smaller dots = the instruments the handle represents —
-      // the sound comes from THESE, so the level glow rides them
-      for (const s of constellation) {
-        const p = xyOf(s);
+      // The instruments the handle represents — the sound comes from THESE,
+      // so the level glow rides them. Only the ones that SOUND are drawn: a
+      // muted or un-soloed layer sitting in the room looks like it is playing.
+      // On the selected thread they read clearly; on the others they stay
+      // faint, so the slice does not become a field of anonymous dots.
+      // They are not grabbable — the handle moves the constellation.
+      // TWO KINDS OF DOT, and they must never be confused:
+      //   layers  — small, faint, flat, NOT grabbable. Where the sound comes
+      //             from. They follow the handle; you do not drag them here.
+      //   handle  — larger, full strength, with a dark core punched out of it
+      //             (drawn below). The one thing you can actually move.
+      // Selecting a thread brightens its layers a little so you can read them,
+      // but never to handle strength — the size gap stays 2.2 against 5.5.
+      const audible = spVisibleSources(vp);
+      const placed = spTransformSources(audible, dragPos || _spTrackPos(t, phBeat),
+        vp.spaceMovement === "additive" ? "additive" : "centered");
+      for (let i = 0; i < placed.length; i++) {
+        const p = xyOf(placed[i]);
         glowAt(p.x, p.y, 0.85);
-        ctx.fillStyle = `hsla(${hue}, 70%, 62%, ${seld ? 0.55 : 0.4})`;
-        ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, 2 * Math.PI); ctx.fill();
+        const isPerc = audible[i].kind === "percussion";
+        ctx.fillStyle = `hsla(${isPerc ? 32 : hue}, 70%, 62%, ${seld ? (isPerc ? 0.34 : 0.5) : 0.26})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, isPerc ? 1.8 : 2.2, 0, 2 * Math.PI); ctx.fill();
       }
       const additive = vp.spaceMovement === "additive";
       if (seld && !additive) {
@@ -4184,24 +4200,17 @@ function wireGlobalSpace(v) {
           a.angle = drag.pos.angle;
           a.dist = drag.pos.dist;
           saveArrangement("move space anchor");
-        } else if (anchors?.length) {
-          // OFF an anchor: slide the WHOLE thread by the same delta, keeping
-          // the shape of its path. It used to snap back, which read as a
-          // broken control rather than a rule.
-          const from = _spTrackPos(t, curPlayBeat());
-          const dA = drag.pos.angle - from.angle;
-          const k = Math.max(0.02, drag.pos.dist) / Math.max(0.05, from.dist);
-          for (const anchor of anchors) {
-            anchor.angle = ((anchor.angle + dA + 180) % 360 + 360) % 360 - 180;
-            anchor.dist = Math.max(SPACE_DMIN, Math.min(SPACE_DMAX, anchor.dist * k));
-          }
-          saveArrangement("move whole thread in space");
-        } else {
-          // No anchors at all: it simply stays where you drop it.
+        } else if (!anchors || !anchors.length) {
+          // A thread with NO anchors is free: it stays where you drop it.
           sp.static = sp.static || {};
           sp.static[t.id] = { ...drag.pos };
           saveArrangement("move track in space");
         }
+        // A thread that HAS anchors is shaped by them, so a drag between two of
+        // them must not silently rewrite the path — it snaps back (the rAF
+        // redraw does it). To move it here, double-click to drop an anchor at
+        // this beat and drag that. Anchors are the edit surface; the thread
+        // between them is derived.
       };
       window.addEventListener("mousemove", move);
       window.addEventListener("mouseup", up);
@@ -4992,9 +5001,16 @@ function mountPatchStage(canvas, cfg) {
     ctx.beginPath();
     ctx.moveTo(cx - 2.6, cy - 7.4); ctx.lineTo(cx, cy - 12); ctx.lineTo(cx + 2.6, cy - 7.4);
     ctx.closePath(); ctx.fill();
-    // sources — muted dots dim, soloed dots get a gold dashed ring, selected a ring
+    // sources — muted dots dim, soloed dots get a gold dashed ring, selected a ring.
+    // PAINT ORDER matters when sources share a spot: percussion goes underneath
+    // (it is the accent, not the patch), then the sound layers, then whatever is
+    // selected on top. Painted last, a single hit was hiding the whole stack.
     const sel = selId();
-    for (const s of sources()) {
+    const painted = [...sources()].sort((a, b) => {
+      const rank = (s) => (s.id === sel ? 2 : s.kind === "percussion" ? 0 : 1);
+      return rank(a) - rank(b);
+    });
+    for (const s of painted) {
       const rad = (clamp(s.angle, -180, 180) - 90) * Math.PI / 180;
       const r = _spaceDistToR(clamp(s.dist, SPACE_DMIN, SPACE_DMAX), rMax);
       const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
@@ -5325,11 +5341,14 @@ function editorPanelHTML() {
     ? producerPatchInspectorHTML(subject)
     : (baked ? rollPanelHTML() : rollBakePromptHTML());
   if (editorMode === "patch") return `<div class="editor-panel-wrap patch-editor-wrap"><div class="editor-body editor-body-patch">${body}</div></div>`;
+  // The switcher lives on the RIGHT in both modes. It used to sit left here and
+  // right in the patch inspector, so it jumped across the panel every time you
+  // used it — the one control you are most likely to press twice in a row.
   return `
     <div class="editor-panel-wrap">
       <div class="editor-topbar">
-        ${editorSwitcherHTML()}
         <span class="editor-region-label" title="The region under edit">${esc(String(label))} · ${baked ? "baked" : "generative"}</span>
+        <span class="editor-topbar-actions">${editorSwitcherHTML()}</span>
       </div>
       <div class="editor-body editor-body-${editorMode}">${body}</div>
     </div>`;
@@ -5923,10 +5942,14 @@ const SP_ANCHOR_GRAB_BEATS = 0.26;
 // Can a drag on the track head actually move the thread AT THIS BEAT? Mirrors
 // what the drag handler does: free when the global space is off or the track
 // has no anchors, and — when it is anchored — only where the playhead is
-// sitting on one of its anchors (that anchor is what the drag edits).
-// Every thread is draggable now: on an anchor you bend the path there, off one
-// you slide the WHOLE path. Nothing snaps back.
-function _spTrackDotMovable() { return true; }
+// sitting on one of its anchors (that anchor is what the drag edits). An
+// anchored thread is NOT draggable between its anchors — the dot greys to say
+// so, and a drag there springs back.
+function _spTrackDotMovable(track, beat) {
+  const anchors = arrangement.space?.tracks?.[track?.id];
+  if (!anchors || !anchors.length) return true;
+  return anchors.some(a => Math.abs(a.beat - beat) < SP_ANCHOR_GRAB_BEATS);
+}
 
 /** The anchor pinned at this beat on this thread, if any. */
 function trackAnchorAt(track, beat) {

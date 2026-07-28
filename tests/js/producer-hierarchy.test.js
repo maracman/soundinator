@@ -402,6 +402,32 @@ test("module equality ignores key order", () => {
   assert.ok(modulesEqual(a, b, "notes"));
 });
 
+// ── anchors own the path ────────────────────────────────────
+
+test("an anchored thread is only movable AT its anchors", () => {
+  // Anchors are the edit surface; the thread between them is derived. A drag
+  // between two anchors must not silently rewrite the path — it springs back,
+  // and you drop a new anchor (double-click) to move it there. This was
+  // briefly relaxed to "slide the whole thread", which let a drag anywhere
+  // rewrite every anchor at once.
+  const a = makeArrangement();
+  const track = trackOf(a);
+  track.useGlobalSpace = true;
+  a.space = { enabled: true, static: {}, head: null, tracks: {
+    t1: [{ beat: 0, angle: -30, dist: 4 }, { beat: 16, angle: 40, dist: 8 }] } };
+
+  const at = (beat) => (a.space.tracks.t1 || []).some(x => Math.abs(x.beat - beat) < 0.26);
+  assert.ok(at(0), "movable where an anchor sits");
+  assert.ok(at(16), "and at the other one");
+  assert.ok(!at(8), "NOT movable between them — a drag there snaps back");
+
+  // an unanchored thread is free everywhere
+  const free = makeArrangement();
+  trackOf(free).useGlobalSpace = true;
+  free.space = { enabled: true, static: {}, head: null, tracks: {} };
+  assert.equal((free.space.tracks.t1 || []).length, 0, "no anchors → nothing pins it");
+});
+
 // ── variants ────────────────────────────────────────────────
 
 /** Two threads playing the same patch. */
