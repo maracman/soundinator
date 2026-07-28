@@ -236,12 +236,42 @@ update is "push to GitHub, then tell the server to catch up". No CI/CD needed
 at this scale — [`scripts/vps_update.sh`](../scripts/vps_update.sh) makes it
 one command and refuses to leave the server half-updated.
 
-One-time setup — let the `resona` user restart its own service (as root):
+One-time setup, as root. Two things: let the `resona` user restart its own
+service, and give it the deploy key so you never need root for a deploy.
 
 ```bash
 echo 'resona ALL=(root) NOPASSWD: /usr/bin/systemctl restart resona' \
     > /etc/sudoers.d/resona-restart && chmod 440 /etc/sudoers.d/resona-restart
+
+install -d -m 700 -o resona -g resona /home/resona/.ssh
+cat >> /home/resona/.ssh/authorized_keys        # paste soundinator_vps.pub
+chmod 600 /home/resona/.ssh/authorized_keys
+chown resona:resona /home/resona/.ssh/authorized_keys
 ```
+
+**Deploy as `resona`, not as root.** The service account can do exactly one
+privileged thing — `systemctl restart resona` — so a leaked deploy key costs
+you a redeploy, not the box. Point your ssh config at it and keep root behind a
+separate alias you have to ask for:
+
+```
+Host thesoundinator.com
+  User resona
+  IdentityFile ~/.ssh/soundinator_vps
+  IdentitiesOnly yes
+
+Host soundinator-root        # admin only
+  HostName thesoundinator.com
+  User root
+  IdentityFile ~/.ssh/soundinator_vps
+  IdentitiesOnly yes
+```
+
+If `ssh resona@<vps>` gives `Permission denied (publickey)`, the key half above
+is missing — add it rather than falling back to root. Running git in the
+checkout **as root** trips `detected dubious ownership`; the fix is to be
+`resona` (it owns the repo), never `git config --global --add safe.directory`,
+which just silences the warning that was telling you the truth.
 
 Then every update, from your own machine:
 
