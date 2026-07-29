@@ -1878,6 +1878,10 @@ function showAppDialog({ title, message = "", value = "", confirmLabel = "Contin
 
 const PALETTE_MACRO_SECTIONS = new Set(["melody", "rhythm", "dynamics", "surprise", "percussion"]);
 const PALETTE_SUBNOTE_SECTIONS = new Set(["sound", "space"]);
+// The same split expressed in capture parts — which half of the palette a
+// module belongs to. Named once because three call sites had it inline.
+const PALETTE_MACRO_PARTS = new Set(["stave", "clef", "percussion"]);
+const PALETTE_SUBNOTE_PARTS = new Set(["notes", "space"]);
 
 function palettePartsFor(item) {
   if (item.section === "full" || item.section === "instrument") return {
@@ -2057,16 +2061,41 @@ function applyItemToPalettePatch(pl, item, half = null) {
   const incoming = voiceParamsFor(item);
   const requested = half || (PALETTE_SUBNOTE_SECTIONS.has(item.section) ? "subnote" : "macro");
   pl.parts = pl.parts || { subnote: null, macro: null, subnoteName: null, macroName: null };
-  if (item.section === "full" || item.section === "instrument") {
+  // A "full" entry that does not actually carry every module — the Save
+  // overlay writes those deliberately now, and always did for Sub-note and
+  // Macro saves — must not be splatted over the patch wholesale: voiceParamsFor
+  // fills an entry's gaps from DEFAULTS, so replacing the params silently RESET
+  // the modules the entry never held. Percussion is left out of the test
+  // because capturePartsFor infers it absent whenever a patch has no audible
+  // hits, which is true of most whole rigs.
+  // An item with no captureParts at all makes no claim either way, so it keeps
+  // the old wholesale behaviour — the narrowing applies only where an entry
+  // has actually declared which modules it carries.
+  const wholeRig = (item.section === "full" || item.section === "instrument")
+    && (!item.captureParts
+      || CAPTURE_PARTS.every(part => part === "percussion" || item.captureParts[part]));
+  const held = CAPTURE_PARTS.filter(part => item.captureParts?.[part]);
+  if (wholeRig) {
     pl.params = { ...incoming };
     pl.parts = { subnote: item.id, macro: item.id, subnoteName: item.name, macroName: item.name };
+  } else if (item.section === "full" || item.section === "instrument") {
+    if (!held.length) return false;
+    let next = pl.params || {};
+    for (const part of held) next = applyModule(next, part, extractModule(incoming, part));
+    pl.params = next;
+    if (held.some(part => PALETTE_SUBNOTE_PARTS.has(part))) {
+      pl.parts.subnote = item.id; pl.parts.subnoteName = item.name;
+    }
+    if (held.some(part => PALETTE_MACRO_PARTS.has(part))) {
+      pl.parts.macro = item.id; pl.parts.macroName = item.name;
+    }
   } else {
     const allowed = requested === "subnote" ? PALETTE_SUBNOTE_SECTIONS : PALETTE_MACRO_SECTIONS;
     if (!allowed.has(item.section)) return false;
     // Same fix as applyItemCapturePart: go module by module rather than
     // looping Object.entries over a migrated patch, which never sees the
     // sound half at all. Half → the capture parts that half is made of.
-    const parts = requested === "subnote" ? ["notes", "space"] : ["stave", "clef", "percussion"];
+    const parts = [...(requested === "subnote" ? PALETTE_SUBNOTE_PARTS : PALETTE_MACRO_PARTS)];
     let next = pl.params || {};
     for (const part of parts) next = applyModule(next, part, extractModule(incoming, part));
     pl.params = next;
@@ -10832,6 +10861,25 @@ function loadFavs() {
 }
 function saveFavs(s) { localStorage.setItem("phase0.favs.v1", JSON.stringify([...s])); }
 
+// What a library row actually carries. `section` alone is not enough: every
+// Save-overlay entry is stored as section "full" with the truth in
+// captureParts, so a scale-only or sound-only save announced itself as a
+// "Full rig" and offered to load as one.
+function libEntryScope(entry) {
+  const parts = entry.captureParts;
+  const partial = parts && CAPTURE_PARTS.some(part => part !== "percussion" && !parts[part]);
+  if (!partial) {
+    return { partial: false,
+      label: PRESET_SECTIONS[entry.section]?.label || (entry.section === "full" ? "Full rig" : entry.section) };
+  }
+  const picked = capturePartList(parts);
+  const label = picked.length === 1 ? CAPTURE_PART_LABELS[picked[0]]
+    : picked.every(part => PALETTE_SUBNOTE_PARTS.has(part)) ? "Synth"
+    : picked.every(part => PALETTE_MACRO_PARTS.has(part)) ? "Note engine"
+    : "Part patch";
+  return { partial: true, label };
+}
+
 function m2LibEntries() {
   if (_m2Lib.tab === "mine") {
     return loadPresets().map(e => ({
@@ -10902,11 +10950,12 @@ function m2LibRowsHTML() {
   return rows.map(e => {
     const splits = e.parameters ? splitsBucketOf(e.parameters) : null;
     const layerCount = Array.isArray(e.parameters?.layers) ? e.parameters.layers.length : 0;
+    const scope = libEntryScope(e);
     return `
     <div class="m2-lib-row" draggable="true" data-m2-drag="${esc(e.id)}" title="${esc(e.desc || e.name)} — drag onto the LAYERS strip to stack its sound onto this instrument">
       <span class="m2-lib-name">${esc(e.name)}</span>
       <span class="m2-lib-tags">
-        <i class="m2-tag">${esc(PRESET_SECTIONS[e.section]?.label || (e.section === "full" ? "Full rig" : e.section))}</i>
+        <i class="m2-tag">${esc(scope.label)}</i>
         ${e.family ? `<i class="m2-tag">${esc(e.family)}</i>` : ""}
         ${(e.tags || []).slice(0, 2).map(tag => `<i class="m2-tag">${esc(tag)}</i>`).join("")}
         ${splits && splits !== "all" ? `<i class="m2-tag">${esc(splits)} splits</i>` : ""}
@@ -10916,6 +10965,7 @@ function m2LibRowsHTML() {
       <button class="m2-lib-heart${favs.has(e.id) ? " on" : ""}" data-m2-fav="${esc(e.id)}" title="Favourite — pin it to the ♥ filter">♥</button>
       <button class="btn btn-secondary btn-sm" data-m2-load="${esc(e.id)}" title="${m2SoundMode()
         ? (e.section === "full" ? "Load just this patch's sound module (its sub-note half) as the base sound" : "Load this sound module as the base sound")
+        : scope.partial ? `Apply just its ${scope.label.toLowerCase()}, keeping everything else`
         : (e.section === "full" ? "Load the whole rig" : "Apply just this section, keeping everything else")}">Load</button>
     </div>`;
   }).join("");
@@ -11194,7 +11244,8 @@ function wireM2LibList(v) {
       const entry = m2LibEntries().find(e => e.id === id);
       if (!entry || !entry.parameters) return;
       const wasPlaying = synth.isPlaying;
-      exploreParams = mergedPresetParams({ parameters: { ...entry.parameters }, section: entry.section || "full" });
+      exploreParams = mergedPresetParams({ parameters: { ...entry.parameters },
+        section: entry.section || "full", captureParts: entry.captureParts });
       renderExplore();
       if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
     };
@@ -18698,6 +18749,23 @@ function mergedPresetParams(entry) {
   // dead keys stop travelling.
   const loaded = migrateToneParams({ ...entry.parameters });
   if (loaded.motifLength && !loaded.motifLengthBeats) loaded.motifLengthBeats = loaded.motifLength;
+  // An entry saved as section "full" that only holds SOME modules — which is
+  // every Save-overlay entry, since the overlay records the truth in
+  // captureParts — must not take the DEFAULTS branch below. Doing so reset
+  // every module the entry never carried back to factory, so loading a
+  // scale-only save wiped the sound and the note engine with it. Apply just
+  // the modules it holds and leave the rest of the live patch standing.
+  const parts = entry.captureParts;
+  const held = parts ? CAPTURE_PARTS.filter(part => parts[part]) : [];
+  const partialFull = (!entry.section || entry.section === "full") && parts && held.length
+    && CAPTURE_PARTS.some(part => part !== "percussion" && !parts[part]);
+  if (partialFull) {
+    const incoming = migrateParamsShape({ ...DEFAULTS, ...loaded });
+    let next = serializeParams(exploreParams);
+    for (const part of held) next = applyModule(next, part, extractModule(incoming, part));
+    if (!Array.isArray(next.rootNotes)) next.rootNotes = [0];
+    return migrateParamsShape(next);
+  }
   const merged = entry.section && entry.section !== "full"
     ? { ...exploreParams, ...loaded }
     : { ...DEFAULTS, ...loaded };
@@ -18767,16 +18835,20 @@ function renderPresetList(container, presets, source) {
     const sectionLabel = sectionKey
       ? (PRESET_SECTIONS[sectionKey]?.label || (sectionKey === "instrument" ? "Instrument" : sectionKey))
       : null;
+    // A Save-overlay entry is section "full" with the truth in captureParts, so
+    // the chip said "Full" over a scale-only save. Same scope helper the
+    // sub-note browser uses.
+    const scope = libEntryScope(p);
     return `
     <div class="preset-item">
       <span class="name">${esc(p.name || p.preset_name || "Untitled")}</span>
-      <span class="section-chip${sectionKey ? "" : " chip-full"}">${sectionLabel || "Full"}</span>
+      <span class="section-chip${sectionKey || scope.partial ? "" : " chip-full"}">${esc(sectionLabel || (scope.partial ? scope.label : "Full"))}</span>
       ${p.family ? `<span class="family-tag">${esc(p.family)}</span>` : ""}
       <span class="meta">${p.description ? esc(p.description) : (sectionLabel ? `${Object.keys(p.parameters || {}).length} settings` : presetSummary(p.parameters))}</span>
       <span class="score">${(p.rating || p.favourite_rating) ? `${p.rating || p.favourite_rating}/7` : ""}</span>
       <div class="actions">
         <button class="btn btn-ghost btn-sm preview-btn" data-preview="${p.id}" title="Preview: hear this preset merged into your current sound, without changing anything">▶</button>
-        <button class="btn btn-secondary btn-sm" data-load='${JSON.stringify(p.parameters)}' data-section="${sectionKey || "full"}">Load</button>
+        <button class="btn btn-secondary btn-sm" data-load='${JSON.stringify(p.parameters)}' data-section="${sectionKey || "full"}" data-parts='${JSON.stringify(p.captureParts || null)}'>Load</button>
         ${source === "my" || source === "instrument" ? `<button class="btn btn-ghost btn-sm" data-remove="${p.id}">Remove</button>` : ""}
       </div>
     </div>
@@ -18805,6 +18877,7 @@ function renderPresetList(container, presets, source) {
       exploreParams = mergedPresetParams({
         parameters: JSON.parse(btn.dataset.load),
         section,
+        captureParts: JSON.parse(btn.dataset.parts || "null"),
       });
       renderExplore();
       if (wasPlaying) { synth.play(enginePlayParams()); startVisualiser(); }
@@ -23019,7 +23092,8 @@ function cloudLoadPatch(patch) {
   const entry = patch.data || {};
   if (!entry.parameters) { alert("This patch has no sound data."); return; }
   const wasPlaying = synth.isPlaying;
-  exploreParams = mergedPresetParams({ parameters: { ...entry.parameters }, section: entry.section || "full" });
+  exploreParams = mergedPresetParams({ parameters: { ...entry.parameters },
+    section: entry.section || "full", captureParts: entry.captureParts });
   const overlay = document.getElementById("cloudOverlay");
   if (overlay) overlay.hidden = true;
   const onExplore = (location.hash.replace(/^#\/?/, "") || "explore") === "explore";
