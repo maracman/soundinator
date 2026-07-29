@@ -2357,11 +2357,11 @@ function renderBrowserCards(v) {
   const addOrFill = (item) => {
     if (!item) return;
     if (producerBrowserTarget?.kind === "harmonic") {
-      if (setHarmonicGuideFromParams(item.params, item.name)) {
+      setHarmonicGuideFromParams(item.params, item.name, () => {
         addModuleToPalette(item, "clef");
         producerBrowserTarget = null;
         renderProduce();
-      }
+      });
       return;
     }
     if (producerBrowserTarget?.kind === "patch") {
@@ -3241,16 +3241,38 @@ function harmonicGuidePickerHTML() {
   </div>`;
 }
 
-function setHarmonicGuideFromParams(params, sourceLabel = "this module") {
+// Callback rather than a boolean return, because the overwrite guard is now
+// the app's own dialog instead of a raw window.confirm(). That confirm fired
+// from inside the drag's mouseup — a bare, unstyled browser prompt appearing
+// the instant you let go of a patch, which read as a glitch rather than as a
+// question, and answering it either way left the drop looking like it failed.
+// `onDone` runs only when the guide actually changed.
+function setHarmonicGuideFromParams(params, sourceLabel = "this module", onDone = null) {
   const choice = _hgScaleData(params);
-  if (!choice) return false;
+  if (!choice) {
+    producerStatus(`"${sourceLabel}" has no scale to give the Harmonic guide.`);
+    return false;
+  }
   const gs = ensureGlobalScale();
+  const apply = () => {
+    gs.markers = [{ atBeat: 0, label: choice.label, scaleMode: choice.scaleMode, edoDivisions: choice.edoDivisions, degrees: [...choice.degrees], subScaleNotes: [...choice.subScaleNotes], rootNotes: [...choice.rootNotes] }];
+    gs.enabled = true;
+    _gsSelMarker = 0;
+    saveArrangement("set Harmonic guide scale");
+    // No success toast here: onDone re-renders the producer, and the guide row
+    // itself comes back reading the new scale's name — that IS the receipt. A
+    // status line set around the re-render only survives by luck.
+    onDone?.();
+  };
   const hasExistingGuide = globalScaleActive() && (gs.markers || []).length > 0;
-  if (hasExistingGuide && !confirm(`This Harmonic guide already has markers used by HG tracks. Loading ${sourceLabel}'s scale will overwrite the existing guide. Continue?`)) return false;
-  gs.markers = [{ atBeat: 0, label: choice.label, scaleMode: choice.scaleMode, edoDivisions: choice.edoDivisions, degrees: [...choice.degrees], subScaleNotes: [...choice.subScaleNotes], rootNotes: [...choice.rootNotes] }];
-  gs.enabled = true;
-  _gsSelMarker = 0;
-  saveArrangement("set Harmonic guide scale");
+  if (!hasExistingGuide) { apply(); return true; }
+  showAppDialog({
+    title: "Replace the Harmonic guide?",
+    message: `The guide has ${(gs.markers || []).length} change point${(gs.markers || []).length === 1 ? "" : "s"} that HG tracks are following. Loading ${sourceLabel}'s scale (${choice.label}) replaces all of them with a single change point at bar 1.`,
+    confirmLabel: "Replace guide",
+    danger: true,
+    onConfirm: apply,
+  });
   return true;
 }
 
@@ -7614,6 +7636,16 @@ function pointerDragMove(e) {
   document.querySelectorAll(".drop-target, .drop-reject").forEach(el => el.classList.remove("drop-target", "drop-reject"));
   const lane = laneAtPoint(e.clientX, e.clientY);
   if (lane) lane.classList.add("drop-target");
+  else if (pointerDrag.kind === "palette") {
+    // The guide takes a palette patch's scale, so say so on the way in —
+    // rejecting when the patch has none, rather than staying silent and
+    // letting the drop look accepted and then do nothing.
+    const hg = harmonicGuideAtPoint(e.clientX, e.clientY);
+    if (hg) {
+      const pl = (arrangement.palette || []).find(x => x.id === pointerDrag.data);
+      hg.classList.add(_hgScaleData(pl?.params) ? "drop-target" : "drop-reject");
+    }
+  }
   else if (pointerDrag.kind === "browser") {
     const dz = patchDropZoneAtPoint(e.clientX, e.clientY);
     if (dz) {
@@ -7624,7 +7656,12 @@ function pointerDragMove(e) {
       dz.el.classList.add(item?.captureParts?.[dz.part] ? "drop-target" : "drop-reject");
     } else {
       const hg = harmonicGuideAtPoint(e.clientX, e.clientY);
-      if (hg) hg.classList.add("drop-target");
+      if (hg) {
+        // Same rule as the module panes above: only look droppable if the item
+        // actually carries a scale.
+        const item = browserItems().find(i => i.id === pointerDrag.data);
+        hg.classList.add(_hgScaleData(item?.params) ? "drop-target" : "drop-reject");
+      }
       else {
         const itemEl = paletteItemAtPoint(e.clientX, e.clientY);
         if (itemEl) itemEl.classList.add("drop-target");
@@ -7657,7 +7694,14 @@ function pointerDragUp(e) {
     return;
   }
   if (drag.kind === "palette") {
-    if (lane) dropPaletteOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX));
+    if (lane) { dropPaletteOnLane(lane.dataset.lane, drag.data, beatAtClientX(lane, e.clientX)); return; }
+    // A palette patch carries a scale exactly as a browser item does, but only
+    // the browser branch below ever offered it to the guide — dropping a patch
+    // here did nothing at all, with no highlight on the way in to say so.
+    if (harmonicGuideAtPoint(e.clientX, e.clientY)) {
+      const pl = (arrangement.palette || []).find(x => x.id === drag.data);
+      if (pl) setHarmonicGuideFromParams(pl.params, paletteDisplayName(pl), () => renderProduce());
+    }
     return;
   }
   if (drag.kind === "browser") {
@@ -7689,10 +7733,10 @@ function pointerDragUp(e) {
     // A scale-bearing module or complete patch can seed the Harmonic guide
     // directly.  The guide's own overwrite safeguard applies here too.
     if (harmonicGuideAtPoint(e.clientX, e.clientY)) {
-      if (setHarmonicGuideFromParams(item.params, item.name)) {
+      setHarmonicGuideFromParams(item.params, item.name, () => {
         addModuleToPalette(item, "clef");
         renderProduce();
-      }
+      });
       return;
     }
     if (lane) {
@@ -8073,7 +8117,7 @@ function wireGlobalScale(v) {
     btn.onclick = () => {
       const choice = _hgChoices.get(btn.dataset.hgChoice);
       if (!choice) return;
-      if (setHarmonicGuideFromParams(choice, choice.note || choice.label)) renderProduce();
+      setHarmonicGuideFromParams(choice, choice.note || choice.label, () => renderProduce());
     };
   });
   // Owner rework: the strip canvas is the surface. Double-click at a bar
