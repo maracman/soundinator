@@ -431,12 +431,17 @@ function tbIcon(name, mods = "") {
 // Swap a live button's icon (play↔stop etc.) without disturbing its classes.
 function setTbIcon(btn, name) { if (btn) btn.innerHTML = tbIcon(name); }
 
-function capturePartSelectorHTML(available, selected) {
+// `showInactive` lights each row's own mark even when the row is off, so the
+// icon says WHICH part the row is (dimmed by CSS until you tick it). The
+// producer's tight two-column grid leans on its labels instead and keeps the
+// original behaviour, where only ticked parts light at all.
+function capturePartSelectorHTML(available, selected, { showInactive = false } = {}) {
   return `<div class="saem-selector" role="group" aria-label="Parts to save">
     ${CAPTURE_PARTS.map(part => {
       const enabled = !!available?.[part];
-      return `<button type="button" data-save-part="${part}"${enabled ? "" : " disabled"} class="saem-selector-part${selected?.[part] ? " selected" : ""}" title="${enabled ? `Include ${CAPTURE_PART_LABELS[part]}` : `${CAPTURE_PART_LABELS[part]} is not present`}">
-        ${notationIconHTML(enabled && selected?.[part] ? [part] : [], { compact: true })}<span>${CAPTURE_PART_LABELS[part]}</span>
+      const lit = enabled && (selected?.[part] || showInactive) ? [part] : [];
+      return `<button type="button" data-save-part="${part}"${enabled ? "" : " disabled"} class="saem-selector-part${selected?.[part] ? " selected" : ""}" title="${enabled ? `Include ${CAPTURE_PART_LABELS[part]}` : `${CAPTURE_PART_LABELS[part]} is not present`}" aria-pressed="${enabled && !!selected?.[part]}">
+        ${notationIconHTML(lit, { compact: true, title: CAPTURE_PART_LABELS[part] })}<span>${CAPTURE_PART_LABELS[part]}</span>
       </button>`;
     }).join("")}
   </div>`;
@@ -21122,8 +21127,39 @@ function deleteLocalPreset(id) {
   savePresets(loadPresets().filter(e => e.id !== id));
 }
 
+// What a tick-set actually amounts to, for the overlay's wording and for the
+// community `kind`. Both used to come from the PAGE you happened to press Save
+// on, which is why a full patch saved from Sub-note went up called "synth" —
+// now they follow what you actually ticked. (`kind` stays synth/engine: a save
+// from these pages is never a composition.)
+function saveSelectionDescriptor(selection) {
+  const picked = capturePartList(selection);
+  const voice = picked.some(part => part === "notes" || part === "space");
+  const engine = picked.some(part => ["stave", "clef", "percussion"].includes(part));
+  const soloLabel = { notes: "sound", space: "space", stave: "note engine", clef: "scale", percussion: "percussion" };
+  const label = picked.length === 1 ? soloLabel[picked[0]]
+    : voice && engine ? "patch"
+    : voice ? "synth" : "note engine";
+  return { kind: voice ? "synth" : "engine", label, picked };
+}
+
 function openSaveOverlay() {
   const ctx = SAVE_CONTEXTS[workspaceTab] || SAVE_CONTEXTS.explore;
+  // Which modules this patch ACTUALLY holds. The picker only offers these, so
+  // a save can no longer claim a percussion or space module that isn't there —
+  // the old hardcoded per-page part list did exactly that, and those phantom
+  // modules then showed up as icons in the library and as valid drop sources
+  // in the Producer that dropped nothing.
+  const available = capturePartsFor(exploreParams, "full");
+  if (!capturePartList(available).length) {
+    for (const part of CAPTURE_PARTS) available[part] = !!ctx.parts[part];
+  }
+  // The page you pressed Save on is only the DEFAULT tick-set now.
+  const selection = Object.fromEntries(CAPTURE_PARTS.map(part =>
+    [part, !!(available[part] && ctx.parts[part])]));
+  if (!capturePartList(selection).length) {
+    for (const part of CAPTURE_PARTS) selection[part] = available[part];
+  }
   let overlay = document.getElementById("saveOverlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -21133,10 +21169,21 @@ function openSaveOverlay() {
   }
   overlay.hidden = false;
   overlay.innerHTML = `
-    <div class="cloud-modal auth-modal" role="dialog" aria-label="Save ${esc(ctx.label)}">
-      <header><h3>Save this ${esc(ctx.label)}</h3><button class="x" id="saveOvClose" title="Close">×</button></header>
+    <div class="cloud-modal auth-modal save-modal" role="dialog" aria-label="Save">
+      <header><h3>Save this <span id="saveOvKind">${esc(ctx.label)}</span></h3><button class="x" id="saveOvClose" title="Close">×</button></header>
       <form id="saveOvForm" class="auth-form">
         <label>Name<input type="text" id="saveOvName" required maxlength="120" value="" placeholder="Untitled ${esc(ctx.label)}"></label>
+        <!-- Which of the five modules go into the entry. Same marks as the
+             library rows and the Producer's Include selector, so what you tick
+             here is the icon you'll recognise later. -->
+        <div class="save-parts">
+          <div class="save-parts-head">
+            <span class="save-parts-title">What saves</span>
+            <button type="button" class="save-parts-toggle" id="saveOvAll"></button>
+          </div>
+          <div id="saveOvParts"></div>
+          <p class="auth-hint save-parts-sum" id="saveOvSummary"></p>
+        </div>
         <label>Tags <span class="auth-hint">(comma-separated, up to 8 — searchable in your library and the community)</span>
           <input type="text" id="saveOvTags" placeholder="bass, warm, slow"></label>
         <label id="saveOvDescRow" hidden>Description <span class="auth-hint">(140 characters, no links — shown on your profile)</span>
@@ -21153,6 +21200,50 @@ function openSaveOverlay() {
   overlay.querySelector("#saveOvClose").onclick = finish;
   const shareChk = overlay.querySelector("#saveOvShare");
   const submit = overlay.querySelector("#saveOvSubmit");
+  const nameEl = overlay.querySelector("#saveOvName");
+  const defaults = { ...selection };
+  const everything = () => CAPTURE_PARTS.every(part => !available[part] || selection[part]);
+  const sameAsDefaults = () => CAPTURE_PARTS.every(part => !!defaults[part] === !!selection[part]);
+
+  // Re-paints only the picker and the wording it drives, so a half-typed name
+  // or tag list survives every tick.
+  const paint = () => {
+    const desc = saveSelectionDescriptor(selection);
+    overlay.querySelector("#saveOvParts").innerHTML =
+      capturePartSelectorHTML(available, selection, { showInactive: true });
+    overlay.querySelectorAll("#saveOvParts [data-save-part]").forEach(btn => {
+      btn.onclick = () => {
+        const part = btn.dataset.savePart;
+        // At least one part must stay ticked — an entry with nothing in it is
+        // not a save, and the Producer's selector holds the same floor.
+        if (!selection[part]) selection[part] = true;
+        else if (capturePartList(selection).length > 1) selection[part] = false;
+        paint();
+      };
+    });
+    overlay.querySelector("#saveOvKind").textContent = desc.label;
+    nameEl.placeholder = `Untitled ${desc.label}`;
+    // Comma-joined both ways — two of the five labels already contain an "and"
+    // ("Scale and harmony"), so an "x and y" list reads as one long run-on.
+    const names = parts => parts.map(part => CAPTURE_PART_LABELS[part].toLowerCase()).join(", ");
+    const left = CAPTURE_PARTS.filter(part => available[part] && !selection[part]);
+    overlay.querySelector("#saveOvSummary").textContent =
+      `Saves ${names(desc.picked)}.` + (left.length ? ` Left out: ${names(left)}.` : " That's the whole patch.");
+    const allBtn = overlay.querySelector("#saveOvAll");
+    const canRevert = !sameAsDefaults() || !everything();
+    allBtn.hidden = !canRevert;
+    allBtn.textContent = everything() ? `Just the ${ctx.label}` : "Everything in this patch";
+    allBtn.onclick = () => {
+      const next = everything() ? defaults : available;
+      for (const part of CAPTURE_PARTS) selection[part] = !!next[part];
+      if (!capturePartList(selection).length) {
+        for (const part of CAPTURE_PARTS) selection[part] = !!available[part];
+      }
+      paint();
+    };
+  };
+  paint();
+
   shareChk.onchange = () => {
     overlay.querySelector("#saveOvDescRow").hidden = !shareChk.checked;
     submit.textContent = shareChk.checked ? "Save & share" : "Save to library";
@@ -21161,27 +21252,28 @@ function openSaveOverlay() {
     e.preventDefault();
     const errEl = overlay.querySelector("#saveOvError");
     errEl.hidden = true;
-    const name = overlay.querySelector("#saveOvName").value.trim() || `Untitled ${ctx.label}`;
+    const desc = saveSelectionDescriptor(selection);
+    const name = nameEl.value.trim() || `Untitled ${desc.label}`;
     const tags = overlay.querySelector("#saveOvTags").value
       .split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
-    const entry = saveLocalPreset({ name, parts: ctx.parts, tags, kindLabel: ctx.label });
+    const entry = saveLocalPreset({ name, parts: selection, tags, kindLabel: desc.label });
     if (!shareChk.checked) {
       finish();
       showAppDialog({ title: "Saved", message: `“${name}” is in your library.`, confirmLabel: "OK" });
       return;
     }
-    const user = await requireAuth(`Create a profile to share your ${ctx.label} with the community.`);
+    const user = await requireAuth(`Create a profile to share your ${desc.label} with the community.`);
     if (!user) { finish(); return; }
     try {
       await api("/api/community/share", {
         method: "POST",
         body: JSON.stringify({
-          kind: ctx.kind,
+          kind: desc.kind,
           name,
           description: overlay.querySelector("#saveOvDesc").value.trim(),
           data: { parameters: entry.parameters, captureParts: entry.captureParts },
           tags,
-          source_id: `${ctx.kind}:${entry.id}`,
+          source_id: `${desc.kind}:${entry.id}`,
         }),
       });
       trackEngagement("community_share");
@@ -21196,7 +21288,10 @@ function openSaveOverlay() {
       errEl.hidden = false;
     }
   };
-  overlay.querySelector("#saveOvName").focus();
+  // preventScroll: the picker made the form tall enough to scroll, and a plain
+  // focus() scrolled the Name field itself off the top of the modal.
+  nameEl.focus({ preventScroll: true });
+  overlay.querySelector(".cloud-modal").scrollTop = 0;
 }
 
 // 1–5 star widget. Editable stars post to /api/community/rate on click.
