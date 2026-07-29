@@ -1849,7 +1849,12 @@ function commitPaletteEdit() {
   return true;
 }
 
+// An ACKNOWLEDGEMENT ("Saved", "Shared") has nothing to cancel — both buttons
+// just closed it, which read as if dismissing might undo the save. With no
+// onConfirm and no input to abandon there is no second choice to offer, so
+// those dialogs get the one button.
 function showAppDialog({ title, message = "", value = "", confirmLabel = "Continue", danger = false, input = false, onConfirm }) {
+  const acknowledge = !onConfirm && !input;
   document.querySelector("#appDialog")?.remove();
   const overlay = document.createElement("div");
   overlay.id = "appDialog";
@@ -1858,13 +1863,13 @@ function showAppDialog({ title, message = "", value = "", confirmLabel = "Contin
     <h2 id="appDialogTitle">${esc(title)}</h2>
     ${message ? `<p>${esc(message)}</p>` : ""}
     ${input ? `<input class="app-dialog-input" maxlength="80" value="${esc(value)}" aria-label="${esc(title)}"/>` : ""}
-    <div class="app-dialog-actions"><button class="btn btn-ghost" data-dialog-cancel>Cancel</button><button class="btn ${danger ? "btn-danger" : "btn-primary"}" data-dialog-confirm>${esc(confirmLabel)}</button></div>
+    <div class="app-dialog-actions">${acknowledge ? "" : `<button class="btn btn-ghost" data-dialog-cancel>Cancel</button>`}<button class="btn ${danger ? "btn-danger" : "btn-primary"}" data-dialog-confirm>${esc(confirmLabel)}</button></div>
   </div>`;
   document.body.appendChild(overlay);
   const field = overlay.querySelector("input");
   const close = () => overlay.remove();
   const confirm = () => { const next = field ? field.value.trim() : true; if (field && !next) return; close(); onConfirm?.(next); };
-  overlay.querySelector("[data-dialog-cancel]").onclick = close;
+  overlay.querySelector("[data-dialog-cancel]")?.addEventListener("click", close);
   overlay.querySelector("[data-dialog-confirm]").onclick = confirm;
   overlay.onclick = e => { if (e.target === overlay) close(); };
   overlay.onkeydown = e => { if (e.key === "Escape") close(); if (e.key === "Enter") confirm(); };
@@ -9731,13 +9736,15 @@ function renderExplore() {
   v.querySelector("#workspaceTabs").onclick = (e) => {
     const btn = e.target.closest("[data-workspace-tab]");
     if (!btn || btn.dataset.workspaceTab === workspaceTab) return;
-    const wasPlaying = synth.isPlaying;
     workspaceTab = btn.dataset.workspaceTab;
     renderExplore();
-    if (wasPlaying) {
-      synth.play(enginePlayParams());
-      startVisualiser();
-    }
+    // Changing workshop is a VIEW change, not a performance change. This used
+    // to call synth.play() whenever it was already sounding, and play() runs
+    // stop() and rebuilds the engine — so the take restarted from bar one and
+    // every continuous effect (the vinyl crackle most audibly) re-attacked.
+    // The audio graph outlives the re-render; only the visualiser needs
+    // re-attaching to the freshly rendered canvas.
+    startVisualiser();
   };
 
   const tourBtn = v.querySelector("#studioTourBtn");
@@ -12082,6 +12089,29 @@ function drawLayerMiniPads() {
     const dist = l.space?.dist ?? 2.5;
     drawCompactSpaceTarget(cv, { angle, dist }, l.hue ?? 36, !!l.mute);
   });
+  wireLayerRowsFade();
+}
+
+// The band caps at two whole rows, so a third stacked layer leaves a few
+// pixels of the next row showing at the bottom edge — enough to clip its name
+// mid-glyph and read as a rendering fault rather than as "scroll for more".
+// Fading the last few pixels says which it is. Only while there IS more below,
+// so a list scrolled to its end keeps its final row at full strength.
+function wireLayerRowsFade() {
+  const rows = document.querySelector(".layer-rows");
+  if (!rows) return;
+  // 8px, not 1: the band leaves a pixel or two of rounding slack even when
+  // every row fits, and a tighter test reads that as "more below" and fades
+  // the last row for no reason.
+  const sync = () => rows.classList.toggle(
+    "more-below", rows.scrollTop + rows.clientHeight < rows.scrollHeight - 8);
+  rows.onscroll = sync;
+  // Observed, not computed once: this runs before the band has its final
+  // width on the first paint, so a single call latches whatever the
+  // half-laid-out box said and never corrects. It also has to answer again
+  // when the window resizes the band under an unchanged set of rows.
+  new ResizeObserver(sync).observe(rows);
+  sync();
 }
 
 function subnotePresetLabel(p = exploreParams) {

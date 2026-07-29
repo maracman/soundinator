@@ -5999,18 +5999,38 @@ body.explore-mode #app {
   margin-top: 0.4rem;
 }
 .layer-strip-label { font-size: 0.58rem; letter-spacing: 0.08em; color: var(--text3); }
-.layer-area { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.2rem 0.5rem 0.4rem; }
-/* Space audit 07-07: the rows never crowd the editors — they cap at two
-   rows tall and scroll (the whole CHORDA area shares one fixed canvas) */
+/* ONE cap for the whole layer band, in --layer-band-h. The rows and the
+   sync panel derive their own from it, so a rule that shortens the band can
+   never leave its children taller than it: they used to hold a hardcoded
+   162px while a later rule clamped the band to 18vh, and on any window under
+   ~900px tall the extra rows painted straight over the BROWSER strip below. */
+.layer-area {
+  --layer-band-h: 170px;
+  --layer-band-inset: 0.6rem;   /* this element's 0.2rem + 0.4rem padding */
+  display: flex; gap: 0.6rem; align-items: flex-start;
+  padding: 0.2rem 0.5rem 0.4rem;
+  max-height: var(--layer-band-h);
+  min-height: 0;
+  overflow: hidden;             /* the band never paints outside itself */
+}
+/* Space audit 07-07: the rows never crowd the editors — they cap with the
+   band and scroll (the whole CHORDA area shares one fixed canvas) */
 .layer-rows {
   display: flex;
   flex-direction: column;
   gap: 4px;
   flex: 1 1 auto;
   min-width: 0;
-  max-height: 128px;
+  min-height: 0;
+  max-height: calc(var(--layer-band-h) - var(--layer-band-inset));
   overflow-y: auto;
   scrollbar-color: rgba(245,166,35,0.42) rgba(10,14,20,0.55);
+}
+/* Set by wireLayerRowsFade() only while rows remain below the fold, so the
+   partly-shown row reads as "there is more" instead of as clipped text. */
+.layer-rows.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
 }
 .layer-solo.on {
   color: #ffd28a;
@@ -6086,12 +6106,11 @@ body.explore-mode #app {
 /* the synchronised-variation panel sits to the RIGHT of the rows — and
    scrolls internally rather than squeezing the editors above (the whole
    layer band is height-capped) */
-.layer-area { max-height: 170px; }
-.layer-rows { max-height: 162px; }
 .layer-sync {
   flex: none;
   width: 230px;
-  max-height: 162px;
+  min-height: 0;
+  max-height: calc(var(--layer-band-h) - var(--layer-band-inset));
   overflow-y: auto;
   padding: 0.4rem 0.55rem;
   background: var(--surface2);
@@ -9027,8 +9046,14 @@ body.explore-mode .view {
   height: clamp(94px, 16vh, 128px);
 }
 
+/* Shorten the band on short viewports by moving the ONE variable — setting
+   max-height directly here is what used to desync it from its children.
+   The floor is two whole rows (58px each + the 4px gap + the band's 9px of
+   padding); the old 110px fell 20px short, so on any window under ~720px tall
+   the second row was sliced through its own name — which is exactly the "two
+   rows tall and scroll" this band exists to give. */
 .layer-area {
-  max-height: clamp(110px, 18vh, 165px);
+  --layer-band-h: clamp(130px, 18vh, 165px);
 }
 
 .sl-layout {
