@@ -1876,6 +1876,17 @@ function showAppDialog({ title, message = "", value = "", confirmLabel = "Contin
   if (field) { field.focus(); field.select(); } else overlay.querySelector("[data-dialog-confirm]").focus();
 }
 
+// The one-way sibling of showAppDialog — what native alert() used to do, in
+// the app's own dialog. Errors take the action as the title and the reason as
+// the body, so "Could not rate: <server said 500>" reads as a heading over a
+// cause instead of one run-on line.
+function showAppNotice(title, message = "") {
+  showAppDialog({ title, message, confirmLabel: "OK" });
+}
+function showAppError(title, err) {
+  showAppNotice(title, err?.message ? String(err.message) : String(err || "Something went wrong."));
+}
+
 const PALETTE_MACRO_SECTIONS = new Set(["melody", "rhythm", "dynamics", "surprise", "percussion"]);
 const PALETTE_SUBNOTE_SECTIONS = new Set(["sound", "space"]);
 // The same split expressed in capture parts — which half of the palette a
@@ -2981,7 +2992,7 @@ function importArrangement(file) {
     selectedRegion = null;
     saveArrangement();
     renderProduce();
-  }).catch(err => alert(`Could not import: ${err.message}`));
+  }).catch(err => showAppError("Could not import", err));
 }
 
 // 16-bit PCM WAV encoder for an AudioBuffer (stereo interleaved).
@@ -3015,7 +3026,7 @@ async function mixdownArrangement(statusEl, btn) {
   const ctxP = arrangement.context;
   const beatSec = 60 / Math.max(30, ctxP.tempo || 104);
   const ends = arrangement.tracks.flatMap(t => t.regions.map(r => r.startBeat + regionLen(r)));
-  if (!ends.length) { alert("Nothing to mix down — place some regions first."); return; }
+  if (!ends.length) { showAppNotice("Nothing to mix down", "Place some regions first."); return; }
   stopArrangement();
   synth.stop();
   if (btn) btn.disabled = true;
@@ -3064,7 +3075,7 @@ async function mixdownArrangement(statusEl, btn) {
     }
   } catch (err) {
     if (statusEl) statusEl.textContent = "";
-    alert(`Mixdown failed: ${err.message}`);
+    showAppError("Mixdown failed", err);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -4289,27 +4300,35 @@ function wireGlobalSpace(v) {
       if (!t) return;
       _spSelTrack = t.id;
       const sp = ensureGlobalSpace();
-      // owner 07-07: the very FIRST anchoring asks once, then never again
-      if (!sp.anchorAsked) {
-        if (!confirm("Anchor this track in space?\n\nAnchors pin a track's position at a point in time — the thread then moves between its anchors, and drags snap back unless an anchor sits at the playhead. (This is asked only once.)")) return;
-        sp.anchorAsked = true;
-      }
+      // The position is read from the CLICK, so it is captured here rather
+      // than inside placeAnchor — the first-time dialog below is asynchronous
+      // now, and `g` is long gone by the time the answer arrives.
       const pos = posFromXY(g);
-      const anchors = (sp.tracks[t.id] = sp.tracks[t.id] || []);
-      if (!anchors.length) {
-        // the very first anchor also creates start + end anchors, seeded
-        // from wherever the track currently sits (incl. a static drag)
-        const cur = _spTrackPos(t, curPlayBeat());
-        anchors.push({ beat: 0, ...cur, smooth: 0.5 }, { beat: totalBeats(), ...cur, smooth: 0.5 });
-        if (sp.static) delete sp.static[t.id]; // anchors supersede the static spot
-      }
-      const atBeat = Math.round(curPlayBeat() * 4) / 4;
-      const existing = anchors.find(a => Math.abs(a.beat - atBeat) < 0.26);
-      if (existing) { existing.angle = pos.angle; existing.dist = pos.dist; }
-      else anchors.push({ beat: atBeat, angle: pos.angle, dist: pos.dist, smooth: 0.5 });
-      anchors.sort((a, b) => a.beat - b.beat);
-      saveArrangement("space anchor");
-      renderProduce();
+      const placeAnchor = () => {
+        const anchors = (sp.tracks[t.id] = sp.tracks[t.id] || []);
+        if (!anchors.length) {
+          // the very first anchor also creates start + end anchors, seeded
+          // from wherever the track currently sits (incl. a static drag)
+          const cur = _spTrackPos(t, curPlayBeat());
+          anchors.push({ beat: 0, ...cur, smooth: 0.5 }, { beat: totalBeats(), ...cur, smooth: 0.5 });
+          if (sp.static) delete sp.static[t.id]; // anchors supersede the static spot
+        }
+        const atBeat = Math.round(curPlayBeat() * 4) / 4;
+        const existing = anchors.find(a => Math.abs(a.beat - atBeat) < 0.26);
+        if (existing) { existing.angle = pos.angle; existing.dist = pos.dist; }
+        else anchors.push({ beat: atBeat, angle: pos.angle, dist: pos.dist, smooth: 0.5 });
+        anchors.sort((a, b) => a.beat - b.beat);
+        saveArrangement("space anchor");
+        renderProduce();
+      };
+      // owner 07-07: the very FIRST anchoring asks once, then never again
+      if (sp.anchorAsked) { placeAnchor(); return; }
+      showAppDialog({
+        title: "Anchor this track in space?",
+        message: "Anchors pin a track's position at a point in time — the thread then moves between its anchors, and drags snap back unless an anchor sits at the playhead. This is asked only once.",
+        confirmLabel: "Anchor it",
+        onConfirm: () => { sp.anchorAsked = true; placeAnchor(); },
+      });
     };
   }
 
@@ -4608,7 +4627,7 @@ function wireMidi(v) {
       };
       renderProduce();
     } catch (err) {
-      alert(`MIDI unavailable: ${err.message}`);
+      showAppError("MIDI unavailable", err);
     }
   };
   const devSel = v.querySelector("#midiDevice");
@@ -7197,7 +7216,7 @@ function splitSelectedRegionAtPlayhead() {
   if (rel <= 0 || rel >= regionLen(region)) return; // playhead not inside
   if (region.type === "baked") {
     if (region.loopSourceBeats && regionLen(region) > region.loopSourceBeats && rel > region.loopSourceBeats) {
-      alert("Split inside the first loop pass of a baked region (or unbake first).");
+      showAppNotice("Can't split there", "That point is inside the first loop pass of a baked region — split elsewhere, or unbake it first.");
       return;
     }
     // The grid comes from the NOTES, as it does on every other baked path.
@@ -10672,21 +10691,24 @@ function renderExplore() {
 
   // Instruments: capture the current voice (session context excluded)
   const saveInstrumentBtn = v.querySelector("#saveInstrumentBtn");
-  if (saveInstrumentBtn) saveInstrumentBtn.onclick = () => {
-    const name = prompt("Name this instrument:");
-    if (!name || !name.trim()) return;
-    const list = loadInstruments();
-    list.unshift({
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-      name: name.trim().slice(0, 80),
-      app_version: APP_VERSION,
-      parameters: extractInstrumentParams(exploreParams),
-    });
-    saveInstruments(list);
-    trackEngagement("save");
-    renderInstrumentTab(v);
-  };
+  // The dialog refuses an empty name itself, so the old blank/whitespace
+  // guard that followed prompt() is gone rather than duplicated.
+  if (saveInstrumentBtn) saveInstrumentBtn.onclick = () => showAppDialog({
+    title: "Name this instrument", input: true, value: "", confirmLabel: "Save instrument",
+    onConfirm: (name) => {
+      const list = loadInstruments();
+      list.unshift({
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        name: name.slice(0, 80),
+        app_version: APP_VERSION,
+        parameters: extractInstrumentParams(exploreParams),
+      });
+      saveInstruments(list);
+      trackEngagement("save");
+      renderInstrumentTab(v);
+    },
+  });
   renderInstrumentTab(v);
   const topMyPresets = v.querySelector("#topMyPresets");
   if (topMyPresets) topMyPresets.onclick = () => tabMy.click();
@@ -18452,7 +18474,7 @@ function maybeShowContribute(v) {
     } catch (err) {
       btn.disabled = false;
       btn.textContent = "Share preset";
-      alert("Could not contribute: " + err.message);
+      showAppError("Could not contribute", err);
     }
   };
 }
@@ -21484,7 +21506,7 @@ function wireStars(root, itemsById, onRated) {
         }
         if (onRated) onRated(itemId, d);
       } catch (err) {
-        alert("Could not rate: " + err.message);
+        showAppError("Could not rate", err);
       }
     };
   });
@@ -21765,7 +21787,7 @@ function wireCommunityCards(box, entriesById, { rerender, onAuthor, onTag } = {}
   box.querySelectorAll("[data-cmty-add]").forEach(btn => {
     btn.onclick = async () => {
       try { await addCommunityItemToLibrary(btn.dataset.cmtyAdd); rerender?.(); }
-      catch (err) { alert("Could not add: " + err.message); }
+      catch (err) { showAppError("Could not add", err); }
     };
   });
   box.querySelectorAll("[data-cmty-author]").forEach(btn => {
@@ -21855,7 +21877,7 @@ function auditionerVolume() {
 async function placeInAuditioner(entry) {
   const slot = auditionerSlotFor(entry);
   if (!slot) {
-    alert("Compositions play inline on profiles — the machine takes synths and note engines.");
+    showAppNotice("Not one for the machine", "Compositions play inline on profiles — the machine takes synths and note engines.");
     return;
   }
   if (!entry.data) {
@@ -21863,7 +21885,7 @@ async function placeInAuditioner(entry) {
       const d = await api("/api/community/items/" + encodeURIComponent(entry.id));
       entry.data = d.item.data;
     } catch (err) {
-      alert("Could not load this: " + err.message);
+      showAppError("Could not load this", err);
       return;
     }
   }
@@ -22711,7 +22733,7 @@ async function toggleCompositionPlayback(entry, row) {
     try {
       const d = await api("/api/community/items/" + encodeURIComponent(entry.id));
       entry.data = d.item.data;
-    } catch (err) { alert("Could not load this composition: " + err.message); return; }
+    } catch (err) { showAppError("Could not load this composition", err); return; }
   }
   const restored = normaliseArrangement({
     ...entry.data,
@@ -22854,7 +22876,7 @@ async function renderProfilePage(handle) {
             try {
               await api("/api/community/tags", { method: "POST", body: JSON.stringify({ item_id: entry.id, tags }) });
               renderProfilePage(handle);
-            } catch (err) { alert("Could not save tags: " + err.message); }
+            } catch (err) { showAppError("Could not save tags", err); }
           },
         });
       };
@@ -22953,11 +22975,11 @@ function uploadAvatar(file, onDone) {
       renderAccountBar();
       onDone?.();
     } catch (err) {
-      alert("Could not upload the image: " + err.message);
+      showAppError("Could not upload the image", err);
       onDone?.(); // callers await this — never leave them hanging
     }
   };
-  img.onerror = () => alert("That file doesn't look like an image.");
+  img.onerror = () => showAppNotice("Not an image", "That file doesn't look like an image.");
   img.src = URL.createObjectURL(file);
 }
 
@@ -23089,12 +23111,13 @@ async function openCloudPatches() {
     </div>`;
   overlay.onclick = (e) => { if (e.target === overlay) overlay.hidden = true; };
   document.getElementById("cloudClose").onclick = () => { overlay.hidden = true; };
-  document.getElementById("cloudSaveCurrent").onclick = async () => {
-    const name = prompt("Name this patch:", "");
-    if (!name || !name.trim()) return;
-    try { await cloudSaveEntry(currentSoundEntry(name.trim())); await renderCloudList(); }
-    catch (err) { alert("Could not save: " + err.message); }
-  };
+  document.getElementById("cloudSaveCurrent").onclick = () => showAppDialog({
+    title: "Name this patch", input: true, value: "", confirmLabel: "Save to cloud",
+    onConfirm: async (name) => {
+      try { await cloudSaveEntry(currentSoundEntry(name)); await renderCloudList(); }
+      catch (err) { showAppError("Could not save", err); }
+    },
+  });
   document.getElementById("cloudBackupLocal").onclick = cloudBackupLocal;
   await renderCloudList();
 }
@@ -23124,17 +23147,21 @@ async function renderCloudList() {
     };
   });
   ul.querySelectorAll("[data-cloud-del]").forEach(btn => {
-    btn.onclick = async () => {
-      if (!confirm("Delete this cloud patch?")) return;
-      try { await api("/api/patches/" + encodeURIComponent(btn.dataset.cloudDel), { method: "DELETE" }); await renderCloudList(); }
-      catch (err) { alert("Could not delete: " + err.message); }
-    };
+    btn.onclick = () => showAppDialog({
+      title: "Delete cloud patch?",
+      message: "It goes from your cloud library for good. Local presets are untouched.",
+      confirmLabel: "Delete", danger: true,
+      onConfirm: async () => {
+        try { await api("/api/patches/" + encodeURIComponent(btn.dataset.cloudDel), { method: "DELETE" }); await renderCloudList(); }
+        catch (err) { showAppError("Could not delete", err); }
+      },
+    });
   });
 }
 
 function cloudLoadPatch(patch) {
   const entry = patch.data || {};
-  if (!entry.parameters) { alert("This patch has no sound data."); return; }
+  if (!entry.parameters) { showAppNotice("Nothing to load", "This patch has no sound data."); return; }
   const wasPlaying = synth.isPlaying;
   exploreParams = mergedPresetParams({ parameters: { ...entry.parameters },
     section: entry.section || "full", captureParts: entry.captureParts });
@@ -23148,18 +23175,18 @@ function cloudLoadPatch(patch) {
 
 async function cloudBackupLocal() {
   const locals = loadPresets();
-  if (!locals.length) { alert("You have no local presets to back up."); return; }
+  if (!locals.length) { showAppNotice("Nothing to back up", "You have no local presets to back up."); return; }
   let existing = [];
   try { existing = await cloudFetchPatches(); } catch {}
   const known = new Set(existing.map(p => p.data && p.data.id).filter(Boolean));
   const todo = locals.filter(e => !known.has(e.id));
-  if (!todo.length) { alert("All local presets are already backed up."); return; }
+  if (!todo.length) { showAppNotice("Already backed up", "All local presets are already backed up."); return; }
   let ok = 0;
   for (const entry of todo) {
     try { await cloudSaveEntry(entry); ok++; } catch {}
   }
   await renderCloudList();
-  alert(`Backed up ${ok} preset${ok === 1 ? "" : "s"} to your cloud library.`);
+  showAppNotice("Backed up", `${ok} preset${ok === 1 ? "" : "s"} copied to your cloud library.`);
 }
 
 initAccountUI();
